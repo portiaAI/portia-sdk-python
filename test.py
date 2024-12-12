@@ -20,6 +20,6 @@ tool_registry = LocalToolRegistry.from_local_tools([AddTool()])
 # Create local storage
 storage = DiskFileStorage(storage_dir="/tmp/portia")
 
-runner = Runner(storage=storage, tool_registry=tool_registry)
+runner = Runner(tool_registry=tool_registry)
 output = runner.run_query("Add 1 and 2")
 print(output)
