@@ -6,7 +6,8 @@ on:
       - main
 
 permissions:
-  repository-projects: write
+  contents: write
+  actions: write
 
 jobs:
   create-tag:
