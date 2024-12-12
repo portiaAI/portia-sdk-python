@@ -27,6 +27,21 @@ pytest-cov = "^5.0.0"
 pyright = "^1.1.382"
 pytest-httpx = "^0.33.0"
 
+[tool.ruff]
+line-length=100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "D203",    # Disables checks for having a blank line before a class docstring. We instead have no-blank-line-before-class (D211) enabled.
+  "D213",    # Disables checks for multi-line docstrings not starting on the first line. We instead have multi-line-summary-first-line (D212) enabled.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = [
+  "S101",    # Disables check for asserts. Asserts in test cases can be useful.
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
