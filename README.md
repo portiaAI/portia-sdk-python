@@ -3,9 +3,31 @@
 
 ## Usage
 
+### Installation
+
 ```bash
 pip install portia-sdk-python 
 ```
+
+### Simple Usage
+
+```python
+# Create a local tool
+class AddTool(Tool):
+    id: str = "add_tool"
+    name: str = "Add Tool"
+    description: str = "Takes two numbers and adds them together"
+
+    def run(self, a: int, b: int) -> int:
+        return a + b
+
+
+# run a query:
+runner = Runner([AddTool])
+runner.run_query("Add 1 and 2")
+```
+
+### With Custom Registries
 
 ```python
 from portia.tool import Tool
@@ -22,7 +44,20 @@ class AdditionTool(Tool):
 
 
 # Create the ToolRegistry with the tool
-tool_registry = LocalToolRegistry([AdditionTool])
+tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
+
+# Create local storage
+storage = LocalStorage()
+
+runner = Runner(storage=storage, tool_registry=tool_registry)
+runner.run_query("Add 1 and 2")
+```
+
+### Using Portia Cloud
+
+```python
+runner = Runner(api_key='123')
+runner.run_query("Add 1 and 2")
 ```
 
 ## Tests

@@ -1,7 +1,19 @@
+"""Storage"""
+
+from __future__ import annotations
+
 from abc import ABC
-from uuid import UUID
+from pathlib import Path
+from typing import TYPE_CHECKING, TypeVar
+
+from pydantic import BaseModel, Field, ValidationError
 
 from portia.plan import Plan, Workflow
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class PlanNotFoundError(Exception):
@@ -55,3 +67,97 @@ class InMemoryStorage(Storage):
         if workflow_id in self.workflows:
             return self.workflows[workflow_id]
         raise WorkflowNotFoundError
+
+
+class DiskFileStorage(Storage):
+    """Disk-based implementation of the Storage interface.
+
+    Stores serialized Plan and Workflow objects as JSON files on disk.
+    """
+
+    storage_dir: str = Field(default=".portia")  # Directory to store files
+
+    def _ensure_storage(self) -> None:
+        """Ensure that the storage directory exists."""
+        Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
+
+    def _write(self, file_name: str, content: BaseModel) -> None:
+        """Write a serialized Plan or Workflow to a JSON file.
+
+        Args:
+            file_name (str): Name of the file.
+            content (Union[Plan, Workflow]): The Plan or Workflow object to serialize.
+
+        """
+        self._ensure_storage()  # Ensure storage directory exists
+        with Path(self.storage_dir, file_name).open("w") as file:
+            file.write(content.model_dump_json())
+
+    def _read(self, file_name: str, model: type[T]) -> T:
+        """Read a JSON file and deserialize it into a BaseModel instance.
+
+        Args:
+            file_name (str): Name of the file.
+            model (type[BaseModel]): The model class to deserialize into.
+
+        Returns:
+            BaseModel: The deserialized model instance.
+
+        """
+        with Path(self.storage_dir, file_name).open("r") as file:
+            f = file.read()
+            return model.model_validate_json(f)
+
+    def save_plan(self, plan: Plan) -> None:
+        """Save a Plan object to the storage.
+
+        Args:
+            plan (Plan): The Plan object to save.
+
+        """
+        self._write(f"plan-{plan.id}.json", plan)
+
+    def get_plan(self, plan_id: UUID) -> Plan:
+        """Retrieve a Plan object by its ID.
+
+        Args:
+            plan_id (UUID): The ID of the Plan to retrieve.
+
+        Returns:
+            Plan: The retrieved Plan object.
+
+        Raises:
+            PlanNotFoundError: If the Plan is not found or validation fails.
+
+        """
+        try:
+            return self._read(f"plan-{plan_id}.json", Plan)
+        except ValidationError as e:
+            raise PlanNotFoundError from e
+
+    def save_workflow(self, workflow: Workflow) -> None:
+        """Save a Workflow object to the storage.
+
+        Args:
+            workflow (Workflow): The Workflow object to save.
+
+        """
+        self._write(f"workflow-{workflow.id}.json", workflow)
+
+    def get_workflow(self, workflow_id: UUID) -> Workflow:
+        """Retrieve a Workflow object by its ID.
+
+        Args:
+            workflow_id (UUID): The ID of the Workflow to retrieve.
+
+        Returns:
+            Workflow: The retrieved Workflow object.
+
+        Raises:
+            WorkflowNotFoundError: If the Workflow is not found or validation fails.
+
+        """
+        try:
+            return self._read(f"workflow-{workflow_id}.json", Workflow)
+        except ValidationError as e:
+            raise WorkflowNotFoundError from e
