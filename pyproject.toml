@@ -6,6 +6,9 @@ authors = ["Tech <tech@portialabs.ai>"]
 readme = "README.md"
 repository = "https://pypi.org/TomPortia/aitrop-sdk-python/"
 homepage = "https://www.portialabs.ai/"
+packages = [
+  {include = "portia"}
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
