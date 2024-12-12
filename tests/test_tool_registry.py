@@ -4,13 +4,10 @@ import pytest
 
 from portia.tool import Tool
 from portia.tool_registry import (
-    AggregatedToolRegistry,
     LocalToolRegistry,
     ToolNotFoundError,
-    ToolRegistry,
     ToolSet,
 )
-
 
 MOCK_TOOL_NAME = "mock tool"
 
