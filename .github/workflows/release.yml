@@ -53,8 +53,6 @@ jobs:
 
       - name: Publish to PyPI
         run: |
-          # Build the package
+          export POETRY_PYPI_TOKEN_PYPI=${{secrets.POETRY_PYPI_TOKEN_PYPI}}
           poetry build
-
-          # Publish to PyPI (Make sure to configure your PyPI token)
-          poetry publish --build --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}
+          poetry publish -n

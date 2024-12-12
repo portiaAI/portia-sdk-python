@@ -1,10 +1,10 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.1.0-alpha.1"
+version = "0.0.1-alpha.1"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Tech <tech@portialabs.ai>"]
 readme = "README.md"
-repository = "https://pypi.org/TomPortia/aitrop-sdk-python/"
+repository = "https://pypi.org/TomPortia/portia-sdk-python/"
 homepage = "https://www.portialabs.ai/"
 packages = [
   {include = "portia"}
