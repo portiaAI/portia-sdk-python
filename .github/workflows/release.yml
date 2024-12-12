@@ -25,6 +25,9 @@ jobs:
       - name: Install Poetry
         run: pipx install poetry
 
+      - name: Fetch tags
+        run: git fetch --tags
+
       - name: Get version from pyproject.toml
         id: get_version
         run: |
@@ -36,22 +39,25 @@ jobs:
         run: |
           if git rev-parse "$VERSION" >/dev/null 2>&1; then
             echo "Tag $VERSION already exists. Skipping tag creation."
-            exit 0
+            echo "tag_exists=true" >> $GITHUB_ENV
           else
             echo "Tag $VERSION does not exist. Creating new tag."
           fi
 
       - name: Create Git tag
+        if: env.tag_exists != 'true'
         run: |
           git tag $VERSION
 
       - name: Push changes
+        if: env.tag_exists != 'true'
         run: |
           git push origin $VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to PyPI
+        if: env.tag_exists != 'true'
         run: |
           export POETRY_PYPI_TOKEN_PYPI=${{secrets.POETRY_PYPI_TOKEN_PYPI}}
           poetry build
