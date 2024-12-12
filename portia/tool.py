@@ -5,34 +5,30 @@ Each tool has a unique ID and a name, and child classes should implement the `ru
 with their specific logic.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Generic, TypeVar
-from uuid import uuid4
+
+from pydantic import BaseModel, Field
 
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
 
 
-class Tool(ABC, Generic[SERIALIZABLE_TYPE_VAR]):
+class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Abstract base class for a tool.
 
     This class serves as the blueprint for all tools. Child classes must implement the `run` method.
 
     Attributes:
-        id (str): A unique identifier generated for the tool.
+        id (str): A unique identifier for the tool.
         name (str): The name of the tool.
+        description (str): Purpose of the tool and usage.
 
     """
 
-    def __init__(self, name: str) -> None:
-        """Initialize a new tool instance.
-
-        Args:
-            name (str): The name of the tool.
-
-        """
-        self.id = str(uuid4())
-        self.name = name
+    id: str = Field(description="ID of the tool")
+    name: str = Field(description="Name of the tool")
+    description: str = Field(description="Purpose of the tool and usage")
 
     @abstractmethod
     def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR:  # noqa: ANN401
