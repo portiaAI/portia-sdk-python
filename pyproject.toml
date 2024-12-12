@@ -9,6 +9,11 @@ homepage = "https://www.portialabs.ai/"
 packages = [
   {include = "portia"}
 ]
+documentation = "https://www.portialabs.ai/docs"
+keywords = ["LLM", "agentic", "workflow"]
+classifiers = [
+    "Development Status :: 3 - Alpha"
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
