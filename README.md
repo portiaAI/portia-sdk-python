@@ -3,6 +3,10 @@
 
 ## Usage
 
+```bash
+pip install portia-sdk-python 
+```
+
 ```python
 from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry
