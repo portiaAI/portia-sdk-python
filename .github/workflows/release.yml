@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  repository-projects: write
+
 jobs:
   create-tag:
     runs-on: ubuntu-latest
@@ -40,8 +43,12 @@ jobs:
       - name: Create Git tag
         run: |
           git tag $VERSION
+
+      - name: Push changes
+        run: |
           git push origin $VERSION
-        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to PyPI
         run: |
