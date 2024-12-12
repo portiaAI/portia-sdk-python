@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from portia.plan import Plan
 from portia.workflow import Workflow
@@ -18,43 +18,35 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class PlanNotFoundError(Exception):
-    """Indicate a plan was not found."""
+    pass
 
 
 class PlanStorage(ABC):
-    """Base class for storing plans."""
-
-    @abstractmethod
     def save_plan(self, plan: Plan) -> None:
         """Save a plan."""
         raise NotImplementedError("save_plan is not implemented")
 
-    @abstractmethod
     def get_plan(self, plan_id: UUID) -> Plan:
         """Retrieve a plan by its ID."""
         raise NotImplementedError("get_plan is not implemented")
 
 
 class WorkflowNotFoundError(Exception):
-    """Indicate a workflow was not found."""
+    pass
 
 
 class WorkflowStorage(ABC):
-    """Base class for storing plans."""
-
-    @abstractmethod
     def save_workflow(self, workflow: Workflow) -> None:
         """Save a workflow."""
         raise NotImplementedError("save_workflow is not implemented")
 
-    @abstractmethod
     def get_workflow(self, workflow_id: UUID) -> Workflow:
         """Retrieve a workflow by its ID."""
         raise NotImplementedError("get_workflow is not implemented")
 
 
 class Storage(PlanStorage, WorkflowStorage):
-    """Combined base class for Plan + Workflow storage."""
+    pass
 
 
 class InMemoryStorage(Storage):
@@ -64,21 +56,17 @@ class InMemoryStorage(Storage):
     workflows: ClassVar[dict[UUID, Workflow]] = {}
 
     def save_plan(self, plan: Plan) -> None:
-        """Add plan to dict."""
         self.plans[plan.id] = plan
 
     def get_plan(self, plan_id: UUID) -> Plan:
-        """Get plan from dict."""
         if plan_id in self.plans:
             return self.plans[plan_id]
         raise PlanNotFoundError
 
     def save_workflow(self, workflow: Workflow) -> None:
-        """Add workflow to dict."""
         self.workflows[workflow.id] = workflow
 
     def get_workflow(self, workflow_id: UUID) -> Workflow:
-        """Get workflow from dict."""
         if workflow_id in self.workflows:
             return self.workflows[workflow_id]
         raise WorkflowNotFoundError
@@ -90,9 +78,7 @@ class DiskFileStorage(Storage):
     Stores serialized Plan and Workflow objects as JSON files on disk.
     """
 
-    def __init__(self, storage_dir: str | None) -> None:
-        """Set storage dir."""
-        self.storage_dir = storage_dir or ".portia"
+    storage_dir: str = Field(default=".portia")  # Directory to store files
 
     def _ensure_storage(self) -> None:
         """Ensure that the storage directory exists."""
@@ -149,7 +135,7 @@ class DiskFileStorage(Storage):
         """
         try:
             return self._read(f"plan-{plan_id}.json", Plan)
-        except (ValidationError, FileNotFoundError) as e:
+        except ValidationError as e:
             raise PlanNotFoundError from e
 
     def save_workflow(self, workflow: Workflow) -> None:
@@ -176,5 +162,5 @@ class DiskFileStorage(Storage):
         """
         try:
             return self._read(f"workflow-{workflow_id}.json", Workflow)
-        except (ValidationError, FileNotFoundError) as e:
+        except ValidationError as e:
             raise WorkflowNotFoundError from e
