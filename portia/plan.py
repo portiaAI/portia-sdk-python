@@ -50,6 +50,10 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 class Step(BaseModel):
     """A step in a workflow."""
 
+    id: UUID = Field(
+        default_factory=uuid4,
+        description="A unique ID for this step.",
+    )
     task: str = Field(
         description="The task that needs to be completed by this step",
     )
@@ -66,7 +70,7 @@ class Step(BaseModel):
         description="The name of the tool listed in <Tools/>",
     )
     output: Output | None = Field(
-        None,
+        default=None,
         description="The output of this step.",
     )
     clarifications: list[Clarification] | None = Field(

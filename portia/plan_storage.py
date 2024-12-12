@@ -21,7 +21,7 @@ class PlanNotFoundError(Exception):
     pass
 
 
-class PlanStorage(ABC):
+class PlanStorage(BaseModel):
     def save_plan(self, plan: Plan) -> None:
         """Save a plan."""
         raise NotImplementedError("save_plan is not implemented")
@@ -35,7 +35,7 @@ class WorkflowNotFoundError(Exception):
     pass
 
 
-class WorkflowStorage(ABC):
+class WorkflowStorage(BaseModel):
     def save_workflow(self, workflow: Workflow) -> None:
         """Save a workflow."""
         raise NotImplementedError("save_workflow is not implemented")
@@ -78,7 +78,7 @@ class DiskFileStorage(Storage):
     Stores serialized Plan and Workflow objects as JSON files on disk.
     """
 
-    storage_dir: str = Field(default=".portia")  # Directory to store files
+    storage_dir: str = Field()  # Directory to store files
 
     def _ensure_storage(self) -> None:
         """Ensure that the storage directory exists."""
