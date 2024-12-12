@@ -34,7 +34,7 @@ jobs:
 
       - name: Check if version is already tagged
         run: |
-          if git tag -l "$VERSION"; then
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
             echo "Tag $VERSION already exists. Skipping tag creation."
             exit 0
           else
