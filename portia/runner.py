@@ -86,7 +86,10 @@ class Runner:
 
     def resume_workflow(self, workflow: Workflow) -> Workflow:
         """Resume a workflow after an interruption."""
-        if workflow.state not in [WorkflowState.IN_PROGRESS, WorkflowState.NEED_CLARIFICATION]:
+        if workflow.state not in [
+            WorkflowState.IN_PROGRESS,
+            WorkflowState.NEED_CLARIFICATION,
+        ]:
             raise InvalidWorkflowStateError(workflow.id)
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)

@@ -44,7 +44,9 @@ class Config(BaseModel):
     # API Keys
     portia_api_key: SecretStr | None = SecretStr(os.getenv("PORTIA_API_KEY") or "")
     openai_api_key: SecretStr | None = SecretStr(os.getenv("OPENAI_API_KEY") or "")
-    anthropic_api_key: SecretStr | None = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
+    anthropic_api_key: SecretStr | None = SecretStr(
+        os.getenv("ANTHROPIC_API_KEY") or ""
+    )
     mistralai_api_key: SecretStr | None = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
 
     # Storage Options

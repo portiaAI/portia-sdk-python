@@ -31,7 +31,9 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             Step(
                 task="Email $email politely with $ai_search_results",
                 input=[
-                    Variable(name="$ai_search_results", description="summary of AI news"),
+                    Variable(
+                        name="$ai_search_results", description="summary of AI news"
+                    ),
                     Variable(
                         name="$email",
                         value="hello@portialabs.ai",
@@ -71,7 +73,9 @@ class Planner:
         examples: list[Plan] | None = None,
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
-        prompt = _render_prompt_insert_defaults(query, tool_list, system_context, examples)
+        prompt = _render_prompt_insert_defaults(
+            query, tool_list, system_context, examples
+        )
         return LLMWrapper(self.config).to_instructor(
             response_model=PlanOrError,
             messages=[
@@ -120,4 +124,7 @@ def _default_query_system_context() -> list[str]:
 
 def _get_tool_descriptions_for_tools(tool_list: ToolSet) -> list[dict[str, str]]:
     """Given a list of tool names, return the descriptions of the tools."""
-    return [{"name": tool.name, "description": tool.description} for tool in tool_list.get_tools()]
+    return [
+        {"name": tool.name, "description": tool.description}
+        for tool in tool_list.get_tools()
+    ]
