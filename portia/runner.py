@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from portia.config import Config, InvalidStorageError, StorageClass
 from portia.plan import Output, Plan
 from portia.planner import PlanError, Planner
 from portia.storage import DiskFileStorage, InMemoryStorage
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
 from portia.workflow import InvalidWorkflowStateError, Workflow, WorkflowState
+
+if TYPE_CHECKING:
+    from portia.config import Config
 
 
 class Runner:
