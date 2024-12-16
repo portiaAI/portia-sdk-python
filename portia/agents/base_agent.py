@@ -56,7 +56,7 @@ class RequestClarificationInput(BaseModel):
 class RequestClarificationTool(BaseTool):
     """RequestClarification Tool."""
 
-    name = "RequestClarification"
+    name: str = "RequestClarification"
     description: str = (
         "Use this tool when in doubt about an argument or parameter of a different tool."
     )

@@ -134,16 +134,16 @@ class Runner:
         if step.tool_name:
             tool = self.tool_registry.get_tool(step.tool_name)
         match agent_type:
-            case AgentType.TOOL_LESS:
+            case AgentType.TOOL_LESS.name:
                 raise NotImplementedError("Toolless agent not implemented in plan executor")
-            case AgentType.SIMPLE:
+            case AgentType.SIMPLE.name:
                 return SimpleAgent(
                     description=step.task,
                     inputs=step.input or [],
                     clarifications=clarifications,
                     tool=tool,
                 )
-            case AgentType.CHAIN_OF_THOUGHT:
+            case AgentType.CHAIN_OF_THOUGHT.name:
                 if tool is None:
                     raise InvalidAgentUsageError
                 return ComplexLanggraphAgent(
