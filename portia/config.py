@@ -63,6 +63,9 @@ class Config(BaseModel):
     llm_model_temperature: int | None = None
     llm_model_seed: int | None = None
 
+    # Agent Options
+    agent_type: str | None = None
+
     # System Context Overrides
     planner_system_content: list[str] | None = None
 

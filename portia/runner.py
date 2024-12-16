@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from portia.agents.base_agent import AgentType, BaseAgent, InvalidAgentError, InvalidAgentUsageError
+from portia.agents.complex_langgraph_agent import ComplexLanggraphAgent
+from portia.agents.simple_agent import SimpleAgent
+from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
 from portia.config import Config, InvalidStorageError, StorageClass
-from portia.plan import Output, Plan
+from portia.llm_wrapper import LLMWrapper
+from portia.plan import Output, Plan, Step
 from portia.planner import PlanError, Planner
 from portia.storage import DiskFileStorage, InMemoryStorage
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
@@ -26,6 +31,7 @@ class Runner:
         """Initialize storage and tools."""
         self.config = config
         self.tool_registry = tool_registry or LocalToolRegistry()
+        self.agent_type = config.agent_type or AgentType.CHAIN_OF_THOUGHT.name
 
         match config.storage_class:
             case StorageClass.MEMORY:
@@ -79,24 +85,72 @@ class Runner:
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
 
+    def get_clarifications_for_step(self, workflow: Workflow) -> list[Clarification]:
+        """get_clarifications_for_step isolates clarifications relevant for the current step."""
+        return [
+            clarification
+            for clarification in workflow.clarifications
+            if isinstance(clarification, (InputClarification, MultiChoiceClarification))
+            and clarification.step == workflow.current_step_index
+        ]
+
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
         self.storage.save_workflow(workflow)
         for index in range(workflow.current_step_index, len(plan.steps)):
             step = plan.steps[index]
             workflow.current_step_index = index
-            if step.tool_name:
-                try:
-                    tool = self.tool_registry.get_tool(step.tool_name)
-                    args = {var.name: var.value for var in step.input} if step.input else {}
-                    output = tool.run(**args)
-                except Exception as e:  # noqa: BLE001
-                    workflow.step_outputs[step.output] = Output(value=str(e))
-                    workflow.state = WorkflowState.FAILED
-                    self.storage.save_workflow(workflow)
-                    return workflow
-                else:
-                    workflow.step_outputs[step.output] = Output(value=output)
+
+            agent = self._get_agent_for_step(
+                step,
+                self.get_clarifications_for_step(workflow),
+                self.agent_type,
+            )
+
+            try:
+                step_output = agent.execute_sync(
+                    llm=LLMWrapper(config=self.config).to_langchain(),
+                    step_outputs=workflow.step_outputs,
+                )
+            except Exception as e:  # noqa: BLE001
+                workflow.step_outputs[step.output] = Output(value=str(e))
+                workflow.state = WorkflowState.FAILED
                 self.storage.save_workflow(workflow)
+                return workflow
+            else:
+                workflow.step_outputs[step.output] = step_output
+            self.storage.save_workflow(workflow)
+
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)
         return workflow
+
+    def _get_agent_for_step(
+        self,
+        step: Step,
+        clarifications: list[Clarification],
+        agent_type: str,
+    ) -> BaseAgent:
+        tool = None
+        if step.tool_name:
+            tool = self.tool_registry.get_tool(step.tool_name)
+        match agent_type:
+            case AgentType.TOOL_LESS:
+                raise NotImplementedError("Toolless agent not implemented in plan executor")
+            case AgentType.SIMPLE:
+                return SimpleAgent(
+                    description=step.task,
+                    inputs=step.input or [],
+                    clarifications=clarifications,
+                    tool=tool,
+                )
+            case AgentType.CHAIN_OF_THOUGHT:
+                if tool is None:
+                    raise InvalidAgentUsageError
+                return ComplexLanggraphAgent(
+                    description=step.task,
+                    inputs=step.input or [],
+                    clarifications=clarifications,
+                    tool=tool,
+                )
+            case _:
+                raise InvalidAgentError(agent_type)

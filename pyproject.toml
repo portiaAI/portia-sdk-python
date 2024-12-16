@@ -26,6 +26,8 @@ langchain-core = "^0.3.25"
 langchain-mistralai = "^0.2.3"
 langchain-openai = "^0.2.12"
 mistralai = "^1.2.5"
+langchain = "^0.3.12"
+langgraph = "^0.2.59"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"
