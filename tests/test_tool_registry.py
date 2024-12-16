@@ -10,6 +10,7 @@ from portia.tool_registry import (
 )
 
 MOCK_TOOL_NAME = "mock tool"
+OTHER_MOCK_TOOL_NAME = "other mock tool"
 
 
 class MockTool(Tool):
@@ -17,6 +18,18 @@ class MockTool(Tool):
 
     id: str = "mock_tool"
     name: str = MOCK_TOOL_NAME
+    description: str = "do nothing"
+
+    def run(self) -> None:
+        """Do nothing."""
+        return
+
+
+class OtherMockTool(Tool):
+    """A mock tool class for testing purposes."""
+
+    id: str = "mock_tool"
+    name: str = OTHER_MOCK_TOOL_NAME
     description: str = "do nothing"
 
     def run(self) -> None:
@@ -50,7 +63,7 @@ def test_local_tool_registry_get_tools() -> None:
     local_tool_registry = LocalToolRegistry.from_local_tools([MockTool(), MockTool()])
     tool_set = local_tool_registry.get_tools()
     assert len(tool_set.tools) == 1
-    assert any(tool.name == MOCK_TOOL_NAME for tool in tool_set.tools)
+    assert any(tool == MOCK_TOOL_NAME for tool in tool_set.tools)
 
 
 def test_aggregated_tool_registry_get_tool() -> None:
@@ -69,9 +82,9 @@ def test_aggregated_tool_registry_get_tool() -> None:
 def test_aggregated_tool_registry_get_tools() -> None:
     """Test getting all tools from an AggregatedToolRegistry."""
     local_tool_registry = LocalToolRegistry.from_local_tools([MockTool()])
-    other_tool_registry = LocalToolRegistry.from_local_tools([MockTool()])
+    other_tool_registry = LocalToolRegistry.from_local_tools([OtherMockTool()])
     aggregated_tool_registry = local_tool_registry + other_tool_registry
 
     tool_set = aggregated_tool_registry.get_tools()
     assert len(tool_set.tools) == 2
-    assert any(tool.name == MOCK_TOOL_NAME for tool in tool_set.tools)
+    assert any(tool == MOCK_TOOL_NAME for tool in tool_set.tools)

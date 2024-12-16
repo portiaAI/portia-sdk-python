@@ -12,7 +12,7 @@ from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry
 
 # Create a local tool
-class AddTool(Tool):
+class AdditionTool(Tool):
     id: str = "add_tool"
     name: str = "Add Tool"
     description: str = "Takes two numbers and adds them together"
@@ -22,7 +22,7 @@ class AddTool(Tool):
 
 
 # Create the ToolRegistry with the tool
-tool_registry = LocalToolRegistry([AddTool])
+tool_registry = LocalToolRegistry([AdditionTool])
 ```
 
 ## Tests

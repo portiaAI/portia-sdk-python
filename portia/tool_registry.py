@@ -20,14 +20,24 @@ class ToolSet:
 
     def __init__(self, tools: list[Tool]) -> None:
         """Initialize a set of tools."""
-        self.tools = tools
+        self.tools: dict[str, Tool] = {}
+        for tool in tools:
+            self.tools[tool.name] = tool
+
+    def add_tool(self, tool: Tool) -> None:
+        """Add a tool to the set."""
+        self.tools[tool.name] = tool
 
     def get_tool(self, name: str) -> Tool:
         """Get a tool by name."""
-        for tool in self.tools:
-            if tool.name == name:
-                return tool
+        if name in self.tools:
+            return self.tools[name]
         raise ToolNotFoundError
+
+    def __add__(self, other: ToolSet) -> ToolSet:
+        """Return an aggregated tool set."""
+        new_tools = list(self.tools.values()) + list(other.tools.values())
+        return ToolSet(new_tools)
 
 
 class ToolRegistry(ABC):
@@ -82,25 +92,25 @@ class AggregatedToolRegistry(ToolRegistry):
 
     def get_tools(self) -> ToolSet:
         """Get all tools from all registries."""
-        tools: list[Tool] = []
+        tools = ToolSet([])
         for registry in self.registries:
-            tools.extend(registry.get_tools().tools)
-        return ToolSet(tools)
+            tools += registry.get_tools()
+        return tools
 
     def match_tools(self, query: str) -> ToolSet:
         """Get all tools from all registries."""
-        tools: list[Tool] = []
+        tools = ToolSet([])
         for registry in self.registries:
-            tools.extend(registry.match_tools(query).tools)
-        return ToolSet(tools)
+            tools += registry.match_tools(query)
+        return tools
 
 
 class LocalToolRegistry(ToolRegistry):
     """Provides a simple in memory tool registry."""
 
     def __init__(self) -> None:
-        """Store tools in a dict for easy access."""
-        self.registry: dict[str, Tool] = {}
+        """Store tools in a tool set for easy access."""
+        self.tools = ToolSet([])
 
     @classmethod
     def from_local_tools(cls, tools: Sequence[Tool]) -> LocalToolRegistry:
@@ -112,11 +122,11 @@ class LocalToolRegistry(ToolRegistry):
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""
-        self.registry[tool.name] = tool
+        self.tools.add_tool(tool)
 
     def get_tool(self, tool_name: str) -> Tool:
         """Get the tool from the registry."""
-        tool = self.registry.get(
+        tool = self.tools.get_tool(
             tool_name,
         )
         if not tool:
@@ -125,4 +135,4 @@ class LocalToolRegistry(ToolRegistry):
 
     def get_tools(self) -> ToolSet:
         """Get all tools."""
-        return ToolSet(list(self.registry.values()))
+        return self.tools
