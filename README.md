@@ -1,5 +1,30 @@
 # Portia SDK Python
 
+
+## Usage
+
+```bash
+pip install portia-sdk-python 
+```
+
+```python
+from portia.tool import Tool
+from portia.tool_registry import LocalToolRegistry
+
+# Create a local tool
+class AdditionTool(Tool):
+    id: str = "add_tool"
+    name: str = "Add Tool"
+    description: str = "Takes two numbers and adds them together"
+
+    def run(self, a: int, b: int) -> int:
+        return a + b
+
+
+# Create the ToolRegistry with the tool
+tool_registry = LocalToolRegistry([AdditionTool])
+```
+
 ## Tests
 
 Run tests with `poetry run pytest`.
