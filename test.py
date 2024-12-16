@@ -1,3 +1,5 @@
+"""Little test script for debugging."""
+
 from portia.runner import Runner, RunnerConfig
 from portia.storage import DiskFileStorage
 from portia.tool import Tool
@@ -26,4 +28,4 @@ storage = DiskFileStorage(storage_dir="/tmp/portia")  # noqa: S108
 config = RunnerConfig()
 runner = Runner(config=config, tool_registry=tool_registry)
 output = runner.run_query("Add 1 and 2")
-print(output)
+print(output)  # noqa: T201
