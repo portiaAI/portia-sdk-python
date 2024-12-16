@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from re import S
-from typing import Sequence
-from portia.plan import Output, Plan, Step, Variable, Workflow, WorkflowState
-from portia.storage import DiskFileStorage, InMemoryStorage, Storage
+from typing import TYPE_CHECKING
 
-from portia.tool import Tool
+from portia.plan import Output, Plan, Step, Variable
+from portia.storage import DiskFileStorage, InMemoryStorage, Storage
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
+from portia.workflow import Workflow, WorkflowState
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from portia.tool import Tool
 
 
 class Runner:
@@ -50,12 +54,13 @@ class Runner:
         tool_set = ToolSet(tools) if tools else self.tool_registry.match_tools(query)
         steps = [
             Step(
-                tool_name=tool.name,
-                task=tool.description,
+                tool_name=None,
+                task="Do something",
                 input=[
                     Variable(name="a", value=4, description="A value"),
                     Variable(name="b", value=5, description="B value"),
                 ],
+                output=None,
             )
             for tool in tool_set.tools
         ]
@@ -64,9 +69,9 @@ class Runner:
         return plan
 
     def run_plan(self, plan: Plan) -> Workflow:
-        workflow = Workflow(plan=plan, state=WorkflowState.IN_PROGRESS)
+        workflow = Workflow(plan_id=plan.id, state=WorkflowState.IN_PROGRESS)
         self.storage.save_workflow(workflow)
-        for index, step in enumerate(workflow.plan.steps):
+        for index, step in enumerate(plan.steps):
             workflow.current_step_index = index
             if step.tool_name:
                 tool = self.tool_registry.get_tool(step.tool_name)
