@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from portia.plan import Plan
-from portia.plan_storage import (
+from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
     PlanNotFoundError,
