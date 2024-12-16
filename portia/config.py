@@ -62,6 +62,9 @@ class Config(BaseModel):
     # Agent Options
     default_agent_type: AgentType = AgentType.VERIFIER
 
+    # Agent Options
+    agent_type: str | None = None
+
     # System Context Overrides
     planner_system_context_override: list[str] | None = None
     agent_system_context_override: list[str] | None = None

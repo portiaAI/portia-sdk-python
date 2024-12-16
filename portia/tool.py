@@ -26,6 +26,10 @@ class _ArgsSchemaPlaceholder(BaseModel):
     pass
 
 
+class _ArgsSchemaPlaceholder(BaseModel):
+    pass
+
+
 class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Abstract base class for a tool.
 
