@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,7 +20,8 @@ if TYPE_CHECKING:
 class RunnerConfig(BaseModel):
     """General configuration for the library."""
 
-    portia_api_key: str | None = None
+    portia_api_key: str | None = os.getenv("PORTIA_API_KEY")
+    openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
 
     @classmethod
     def from_file(cls, file_path: Path) -> RunnerConfig:
