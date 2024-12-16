@@ -6,7 +6,8 @@
      - include a description, input used to complete the step, and an explicit mention of the tool used if applicable.
      - give a name to the variable for the output is from the step if it is successful.
     Inputs for each step can either be constants (which need to have a set value) or output variables from preceding steps.
-    IMPORTANT: If the tools needed are not available, return an empty plan.
+    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - do not return plans with no steps.
+    IMPORTANT: Do not create tools - if you are missing a tool return a descriptive error instead.
 </Instructions>
 
 <Examples>{% for example in examples if example.plan %}

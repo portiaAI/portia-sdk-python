@@ -49,17 +49,17 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     @classmethod
     def validate_uuid(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate a given uuid is valid else assign a new one."""
-        uuid_value = values.get("uuid")
+        uuid_value = values.get("id")
         if isinstance(uuid_value, str):
             try:
                 # Try parsing the UUID string
-                values["uuid"] = UUID(uuid_value)
+                values["id"] = UUID(uuid_value)
             except ValueError:
                 # If parsing fails, use the default_factory
-                values["uuid"] = uuid4()
+                values["id"] = uuid4()
         elif not isinstance(uuid_value, UUID):
             # If missing or invalid, use the default_factory
-            values["uuid"] = uuid4()
+            values["id"] = uuid4()
         return values
 
 
