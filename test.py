@@ -1,4 +1,4 @@
-from portia.plan_storage import DiskFileStorage
+from portia.storage import DiskFileStorage
 from portia.runner import Runner
 from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry

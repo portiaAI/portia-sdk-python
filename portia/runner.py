@@ -5,7 +5,7 @@ from __future__ import annotations
 from re import S
 from typing import Sequence
 from portia.plan import Output, Plan, Step, Variable, Workflow, WorkflowState
-from portia.plan_storage import DiskFileStorage, InMemoryStorage, Storage
+from portia.storage import DiskFileStorage, InMemoryStorage, Storage
 
 from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
