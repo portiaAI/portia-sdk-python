@@ -1,39 +1,45 @@
-""""""
+"""Runner classes which actually plan + run queries."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+
 from portia.plan import Output, Plan, Step, Variable
-from portia.storage import DiskFileStorage, InMemoryStorage, Storage
+from portia.storage import InMemoryStorage, Storage
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
-from portia.workflow import Workflow, WorkflowState
+from portia.workflow import InvalidWorkflowStateError, Workflow, WorkflowState
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from portia.tool import Tool
 
 
+class RunnerConfig(BaseModel):
+    """General configuration for the library."""
+
+    portia_api_key: str | None = None
+
+    @classmethod
+    def from_file(cls, file_path: Path) -> RunnerConfig:
+        """Load configuration from a JSON file."""
+        with Path.open(file_path) as f:
+            return cls.model_validate_json(f.read())
+
+
 class Runner:
-    """"""
+    """Create and run plans for queries."""
 
     def __init__(
         self,
-        tools: Sequence[Tool] | None = None,
-        api_key: str | None = None,
+        config: RunnerConfig,  # noqa: ARG002 - we'll use this soon
         storage: Storage | None = None,
         tool_registry: ToolRegistry | None = None,
     ) -> None:
+        """Initialize storage and tools."""
         self.storage = storage or InMemoryStorage()
         self.tool_registry = tool_registry or LocalToolRegistry()
-
-        # if api_key:
-        #     storage += PortiaWorkflowStorage(api_key)
-        #     registry += PortiaToolRegistry(api_key)
-
-        if tools:
-            self.tool_registry += LocalToolRegistry.from_local_tools(tools)
 
     def run_query(
         self,
@@ -41,37 +47,50 @@ class Runner:
         tools: list[Tool] | None = None,
         example_workflows: list[Plan] | None = None,
     ) -> Workflow:
+        """Plan and run a query in one go."""
         plan = self.plan_query(query, tools, example_workflows)
-
         return self.run_plan(plan)
 
     def plan_query(
         self,
         query: str,
         tools: list[Tool] | None = None,
-        example_plans: list[Plan] | None = None,
+        example_plans: list[Plan] | None = None,  # noqa: ARG002 - we're not using example plans yet
     ) -> Plan:
+        """Plans how to do the query given the set of tools and any examples."""
         tool_set = ToolSet(tools) if tools else self.tool_registry.match_tools(query)
         steps = [
             Step(
-                tool_name=None,
+                tool_name=tool.name,
                 task="Do something",
                 input=[
                     Variable(name="a", value=4, description="A value"),
                     Variable(name="b", value=5, description="B value"),
                 ],
-                output=None,
+                output="$sum",
             )
-            for tool in tool_set.tools
+            for tool in tool_set.get_tools()
         ]
         plan = Plan(query=query, steps=steps)
         self.storage.save_plan(plan)
         return plan
 
     def run_plan(self, plan: Plan) -> Workflow:
+        """Run a plan returning the completed workflow or clarifications if needed."""
         workflow = Workflow(plan_id=plan.id, state=WorkflowState.IN_PROGRESS)
+        return self._execute_workflow(plan, workflow)
+
+    def resume_workflow(self, workflow: Workflow) -> Workflow:
+        """Resume a workflow after an interruption."""
+        if workflow.state not in [WorkflowState.IN_PROGRESS, WorkflowState.NEED_CLARIFICATION]:
+            raise InvalidWorkflowStateError
+        plan = self.storage.get_plan(plan_id=workflow.plan_id)
+        return self._execute_workflow(plan, workflow)
+
+    def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
         self.storage.save_workflow(workflow)
-        for index, step in enumerate(plan.steps):
+        for index in range(workflow.current_step_index, len(plan.steps)):
+            step = plan.steps[index]
             workflow.current_step_index = index
             if step.tool_name:
                 tool = self.tool_registry.get_tool(step.tool_name)
@@ -79,12 +98,12 @@ class Runner:
                     args = {var.name: var.value for var in step.input} if step.input else {}
                     output = tool.run(**args)
                 except Exception as e:  # noqa: BLE001
-                    workflow.step_outputs[step.id] = Output(value=str(e))
+                    workflow.step_outputs[step.output] = Output(value=str(e))
                     workflow.state = WorkflowState.FAILED
                     self.storage.save_workflow(workflow)
                     return workflow
                 else:
-                    workflow.step_outputs[step.id] = Output(value=output)
+                    workflow.step_outputs[step.output] = Output(value=output)
                 self.storage.save_workflow(workflow)
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)

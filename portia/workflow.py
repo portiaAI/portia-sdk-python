@@ -21,6 +21,10 @@ class WorkflowState(str, Enum):
     FAILED = "FAILED"
 
 
+class InvalidWorkflowStateError(Exception):
+    """The given workflow is in an invalid state."""
+
+
 class Workflow(BaseModel):
     """A workflow represent a running instance of a Plan."""
 

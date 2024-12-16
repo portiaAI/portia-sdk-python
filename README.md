@@ -13,11 +13,7 @@ pip install portia-sdk-python
 
 ```python
 # Create a local tool
-<<<<<<< HEAD
 class AdditionTool(Tool):
-=======
-class AddTool(Tool):
->>>>>>> 89ab650 (wip)
     id: str = "add_tool"
     name: str = "Add Tool"
     description: str = "Takes two numbers and adds them together"
@@ -27,11 +23,8 @@ class AddTool(Tool):
 
 
 # run a query:
-<<<<<<< HEAD
-runner = Runner([AdditionTool])
-=======
-runner = Runner([AddTool])
->>>>>>> 89ab650 (wip)
+config = RunnerConfig()
+runner = Runner(config, tools_registry=LocalToolRegistry.from_local_tools([AdditionTool()])
 runner.run_query("Add 1 and 2")
 ```
 
@@ -52,11 +45,7 @@ class AdditionTool(Tool):
 
 
 # Create the ToolRegistry with the tool
-<<<<<<< HEAD
 tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
-=======
-tool_registry = LocalToolRegistry.from_local_tools([AddTool()])
->>>>>>> 89ab650 (wip)
 
 # Create local storage
 storage = LocalStorage()
@@ -68,7 +57,8 @@ runner.run_query("Add 1 and 2")
 ### Using Portia Cloud
 
 ```python
-runner = Runner(api_key='123')
+config = RunnerConfig(api_key='123')
+runner = Runner(config)
 runner.run_query("Add 1 and 2")
 ```
 

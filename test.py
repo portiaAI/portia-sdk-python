@@ -1,4 +1,4 @@
-from portia.runner import Runner
+from portia.runner import Runner, RunnerConfig
 from portia.storage import DiskFileStorage
 from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry
@@ -23,6 +23,7 @@ tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
 # Create local storage
 storage = DiskFileStorage(storage_dir="/tmp/portia")  # noqa: S108
 
-runner = Runner(tool_registry=tool_registry)
+config = RunnerConfig()
+runner = Runner(config=config, tool_registry=tool_registry)
 output = runner.run_query("Add 1 and 2")
 print(output)
