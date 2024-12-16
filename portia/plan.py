@@ -14,7 +14,11 @@ if TYPE_CHECKING:
 
 
 class Variable(BaseModel):
-    """A variable in the plan."""
+    """A variable in the plan.
+
+    A variable is a way of referencing other parts of the plan usually either another steps output
+    or a constant input variable.
+    """
 
     name: str = Field(
         description=(
