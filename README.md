@@ -13,7 +13,7 @@ pip install portia-sdk-python
 
 ```python
 # Create a local tool
-class AddTool(Tool):
+class AdditionTool(Tool):
     id: str = "add_tool"
     name: str = "Add Tool"
     description: str = "Takes two numbers and adds them together"
@@ -23,7 +23,7 @@ class AddTool(Tool):
 
 
 # run a query:
-runner = Runner([AddTool])
+runner = Runner([AdditionTool])
 runner.run_query("Add 1 and 2")
 ```
 
