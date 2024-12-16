@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.resources
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
@@ -87,7 +87,7 @@ class Planner:
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         prompt = _render_prompt_insert_defaults(query, tool_list, system_context, examples)
-        response = LLMWrapper(self.config).to_instructor(
+        return LLMWrapper(self.config).to_instructor(
             response_model=PlanOrError,
             messages=[
                 {
@@ -102,7 +102,6 @@ class Planner:
                 {"role": "user", "content": prompt},
             ],
         )
-        return cast(PlanOrError, response)
 
 
 def _render_prompt_insert_defaults(
