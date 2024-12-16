@@ -1,0 +1,45 @@
+
+<Instructions>
+    Enumerate the steps you plan on taking to answer the query.
+    If applicable, at each step indicate whether you would use a tool from those defined in <Tools>.
+    Each step should:
+     - include a description, input used to complete the step, and an explicit mention of the tool used if applicable.
+     - give a name to the variable for the output is from the step if it is successful.
+    Inputs for each step can either be constants (which need to have a set value) or output variables from preceding steps.
+    IMPORTANT: If the tools needed are not available, return an empty plan.
+</Instructions>
+
+<Examples>{% for example in examples if example.plan %}
+    <Example>
+        <Request>
+            <Tools>
+            {{example.tool_list}}
+            </Tools>
+            <Query>
+            {{example.query}}
+            </Query>
+        </Request>
+        <Response>
+{{example.plan.model_dump_json(indent=2)}}
+        </Response>
+    </Example>{% endfor %}
+</Examples>
+
+<Tools>{% for tool in tool_list %}
+    <Tool name={{tool.name}}>
+        {{tool.description}}
+    </Tool>{% endfor %}
+</Tools>
+
+<Request>
+    <Tools>
+        {{tool_list}}
+    </Tools>
+    <Query>
+        {{query}}
+    </Query>
+</Request>
+{% if system_context %}
+<SystemContext>{% for context in system_context %}
+    {{context}}{% endfor %}
+</SystemContext>{% endif %}
