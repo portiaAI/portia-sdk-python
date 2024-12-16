@@ -47,9 +47,7 @@ class Runner:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
-                self.storage = DiskFileStorage(
-                    storage_dir=config.must_get("storage_dir", str)
-                )
+                self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
             case _:
                 raise InvalidStorageError(config.storage_class.name)
 
@@ -172,9 +170,7 @@ class Runner:
             tool = self.tool_registry.get_tool(step.tool_name)
         match agent_type:
             case AgentType.TOOL_LESS:
-                raise NotImplementedError(
-                    "Toolless agent not implemented in plan executor"
-                )
+                raise NotImplementedError("Toolless agent not implemented in plan executor")
             case AgentType.ONE_SHOT:
                 return OneShotAgent(
                     description=step.task,
