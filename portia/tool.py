@@ -6,12 +6,11 @@ with their specific logic.
 """
 
 from abc import abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic
 
 from pydantic import BaseModel, Field
 
-Serializable = Any
-SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
+from portia.types import SERIALIZABLE_TYPE_VAR
 
 
 class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
