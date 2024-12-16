@@ -46,6 +46,11 @@ ignore = [
   "PLR2004", # Disables magic number checks. Its normal to assert using magic numbers for things like array length.
 ]
 
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+  "pydantic.BaseModel", # Tells ruff that BaseModel instances need to be evaluated at runtime.
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
