@@ -40,8 +40,13 @@ class AdditionTool(Tool):
 # Create the ToolRegistry with the tool
 tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
 
+<<<<<<< HEAD
 # Create local storage
 runner = Runner(config=RunnerConfig(storage=StorageClass.DISK), tool_registry=tool_registry)
+=======
+config = Config()
+runner = Runner(config=config, tool_registry=tool_registry)
+>>>>>>> 1e8ffd3 (rm)
 runner.run_query("Add 1 and 2")
 ```
 
@@ -71,7 +76,8 @@ remote_tool_registry = PortiaToolRegistry(api_key="123")
 
 tool_registry = local_tool_registry + remote_tool_registry
 
-runner = Runner(config=RunnerConfig(), tool_registry=tool_registry)
+config = Config()
+runner = Runner(config=config, tool_registry=tool_registry)
 runner.run_query("Add 1 and 2")
 ```
 
