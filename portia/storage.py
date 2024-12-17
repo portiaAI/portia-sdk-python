@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from portia.errors import PlanNotFoundError, WorkflowNotFoundError
 from portia.plan import Plan
 from portia.workflow import Workflow
 
@@ -15,10 +16,6 @@ if TYPE_CHECKING:
     from uuid import UUID
 
 T = TypeVar("T", bound=BaseModel)
-
-
-class PlanNotFoundError(Exception):
-    """Indicate a plan was not found."""
 
 
 class PlanStorage(ABC):
@@ -33,10 +30,6 @@ class PlanStorage(ABC):
     def get_plan(self, plan_id: UUID) -> Plan:
         """Retrieve a plan by its ID."""
         raise NotImplementedError("get_plan is not implemented")
-
-
-class WorkflowNotFoundError(Exception):
-    """Indicate a workflow was not found."""
 
 
 class WorkflowStorage(ABC):
@@ -71,7 +64,7 @@ class InMemoryStorage(Storage):
         """Get plan from dict."""
         if plan_id in self.plans:
             return self.plans[plan_id]
-        raise PlanNotFoundError
+        raise PlanNotFoundError(plan_id)
 
     def save_workflow(self, workflow: Workflow) -> None:
         """Add workflow to dict."""
@@ -81,7 +74,7 @@ class InMemoryStorage(Storage):
         """Get workflow from dict."""
         if workflow_id in self.workflows:
             return self.workflows[workflow_id]
-        raise WorkflowNotFoundError
+        raise WorkflowNotFoundError(workflow_id)
 
 
 class DiskFileStorage(Storage):
@@ -150,7 +143,7 @@ class DiskFileStorage(Storage):
         try:
             return self._read(f"plan-{plan_id}.json", Plan)
         except (ValidationError, FileNotFoundError) as e:
-            raise PlanNotFoundError from e
+            raise PlanNotFoundError(plan_id) from e
 
     def save_workflow(self, workflow: Workflow) -> None:
         """Save a Workflow object to the storage.
@@ -177,4 +170,4 @@ class DiskFileStorage(Storage):
         try:
             return self._read(f"workflow-{workflow_id}.json", Workflow)
         except (ValidationError, FileNotFoundError) as e:
-            raise WorkflowNotFoundError from e
+            raise WorkflowNotFoundError(workflow_id) from e

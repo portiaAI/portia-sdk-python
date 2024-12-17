@@ -14,23 +14,12 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field, model_validator
 
 from portia.clarification import Clarification
+from portia.errors import InvalidToolDescriptionError
 from portia.plan import Output
 from portia.templates.render import render_template
 from portia.types import SERIALIZABLE_TYPE_VAR
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
-
-
-class InvalidToolDescriptionError(Exception):
-    """Raised when the tool description is invalid."""
-
-
-class ToolRetryError(Exception):
-    """Raised when a tool fails on a retry."""
-
-
-class ToolFailedError(Exception):
-    """Raised when a tool fails with a hard error."""
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
@@ -149,7 +138,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         # OpenAI has a max function description length of 1024 characters.
         description_length = len(self._generate_tool_description())
         if description_length > MAX_TOOL_DESCRIPTION_LENGTH:
-            raise InvalidToolDescriptionError
+            raise InvalidToolDescriptionError(self.name)
         return self
 
     def to_langchain(self, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002

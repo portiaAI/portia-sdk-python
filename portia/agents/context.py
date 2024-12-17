@@ -44,7 +44,7 @@ def build_context(
         )
         for clarification in clarifications:
             if isinstance(clarification, (InputClarification, MultiChoiceClarification)):
-                context += f"argument: {clarification.argument}\n"
+                context += f"argument: {clarification.argument_name}\n"
                 context += f"clarification reason: {clarification.user_guidance}\n"
                 context += f"value: {clarification.response}\n\n----------\n\n"
 

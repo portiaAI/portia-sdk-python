@@ -46,10 +46,6 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
 ]
 
 
-class PlanError(Exception):
-    """Base class for exceptions in the query planner module. Indicates an error in planning."""
-
-
 class PlanOrError(BaseModel):
     """A plan or an error."""
 

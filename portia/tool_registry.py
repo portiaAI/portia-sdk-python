@@ -5,14 +5,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from portia.errors import ToolNotFoundError
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from portia.tool import Tool
-
-
-class ToolNotFoundError(Exception):
-    """Custom error class when tools aren't found."""
 
 
 class ToolSet:
@@ -32,7 +30,7 @@ class ToolSet:
         """Get a tool by name."""
         if name in self.tools:
             return self.tools[name]
-        raise ToolNotFoundError
+        raise ToolNotFoundError(name)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools."""
@@ -92,7 +90,7 @@ class AggregatedToolRegistry(ToolRegistry):
                 return registry.get_tool(tool_name)
             except ToolNotFoundError:  # noqa: PERF203
                 continue
-        raise ToolNotFoundError
+        raise ToolNotFoundError(tool_name)
 
     def get_tools(self) -> ToolSet:
         """Get all tools from all registries."""
@@ -134,7 +132,7 @@ class LocalToolRegistry(ToolRegistry):
             tool_name,
         )
         if not tool:
-            raise ToolNotFoundError
+            raise ToolNotFoundError(tool_name)
         return tool
 
     def get_tools(self) -> ToolSet:

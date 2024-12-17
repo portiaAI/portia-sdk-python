@@ -13,8 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import ArgumentClarification, Clarification, InputClarification
+from portia.errors import NoVerifiedArgsError, ToolFailedError, ToolRetryError
 from portia.plan import Output, Variable
-from portia.tool import ToolFailedError, ToolRetryError
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -23,10 +23,6 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 MAX_RETRIES = 4
-
-
-class NoVerifiedArgsError(Exception):
-    """Raised when verified args are expected but not present."""
 
 
 class ToolArgument(BaseModel):
@@ -263,7 +259,7 @@ class ToolCallingModel:
                         clarification
                         for clarification in self.agent.clarifications
                         if isinstance(clarification, ArgumentClarification)
-                        and clarification.argument == arg.name
+                        and clarification.argument_name == arg.name
                     ),
                     None,
                 )
@@ -361,7 +357,7 @@ class ComplexLanggraphAgent(BaseAgent):
             if not matching_clarification:
                 self.new_clarifications.append(
                     InputClarification(
-                        argument=arg.name,
+                        argument_name=arg.name,
                         user_guidance=f"Missing Argument: {arg.name}",
                     ),
                 )
@@ -397,9 +393,9 @@ class ComplexLanggraphAgent(BaseAgent):
     def process_output(self, last_message: BaseMessage) -> Output:
         """Process the output of the agent."""
         if "ToolSoftError" in last_message.content:
-            raise ToolRetryError(last_message.content)
+            raise ToolRetryError(self.tool.name, str(last_message.content))
         if "ToolHardError" in last_message.content:
-            raise ToolFailedError(last_message.content)
+            raise ToolFailedError(self.tool.name, str(last_message.content))
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,

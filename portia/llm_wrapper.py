@@ -17,16 +17,9 @@ from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from portia.config import Config, LLMProvider
+from portia.errors import InvalidLLMProviderError
 
 logger = logging.getLogger(__name__)
-
-
-class InvalidProviderError(Exception):
-    """Raised when a provider is invalid."""
-
-    def __init__(self, provider: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{provider} is not a supported provider")
 
 
 class LLMWrapper:
@@ -68,7 +61,7 @@ class LLMWrapper:
                     api_key=self.config.mistralai_api_key,
                 )
             case _:
-                raise InvalidProviderError(self.llm_provider)
+                raise InvalidLLMProviderError(self.llm_provider)
 
     def to_instructor(
         self,
@@ -120,4 +113,4 @@ class LLMWrapper:
                     seed=self.model_seed,
                 )
             case _:
-                raise InvalidProviderError(self.llm_provider)
+                raise InvalidLLMProviderError(self.llm_provider)

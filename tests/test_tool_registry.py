@@ -2,9 +2,9 @@
 
 import pytest
 
+from portia.errors import ToolNotFoundError
 from portia.tool_registry import (
     LocalToolRegistry,
-    ToolNotFoundError,
     ToolSet,
 )
 from tests.utils import MockTool

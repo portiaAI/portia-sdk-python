@@ -7,12 +7,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from portia.config import Config
+from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
 from portia.planner import PlanOrError
 from portia.runner import Runner
 from portia.tool_registry import LocalToolRegistry
-from portia.workflow import InvalidWorkflowStateError, WorkflowState
+from portia.workflow import WorkflowState
 from tests.utils import AdditionTool
 
 

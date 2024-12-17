@@ -24,18 +24,6 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 
-class InvalidAgentError(Exception):
-    """Raise when a given agent is invalid."""
-
-    def __init__(self, agent: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{agent} is not a supported agent")
-
-
-class InvalidAgentUsageError(Exception):
-    """Raise when a given agent is used incorrectly."""
-
-
 class AgentType(Enum):
     """Type of agent to use for executing a step."""
 

@@ -9,29 +9,9 @@ from typing import TypeVar
 
 from pydantic import BaseModel, SecretStr
 
+from portia.errors import ConfigNotFoundError, InvalidConfigError
+
 T = TypeVar("T")
-
-
-
-
-class APIKeyNotFoundError(Exception):
-    """Raised when an API Key is not set."""
-
-    def __init__(self, api_key: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{api_key} is not set")
-
-
-class InvalidStorageError(Exception):
-    """Raised when an invalid storage is provided."""
-
-
-class ConfigNotFoundError(Exception):
-    """Raised when a needed config value is not present."""
-
-
-class InvalidConfigError(Exception):
-    """Raised when a needed config value is invalid."""
 
 
 class StorageClass(Enum):

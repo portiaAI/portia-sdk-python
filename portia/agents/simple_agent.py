@@ -12,8 +12,8 @@ from langgraph.prebuilt import ToolNode
 from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification
+from portia.errors import ToolRetryError
 from portia.plan import Output, Variable
-from portia.tool import ToolRetryError
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -121,8 +121,8 @@ class SimpleAgent(BaseAgent):
 
     def process_output(self, last_message: BaseMessage) -> Output:
         """Process the output of the agent."""
-        if "ToolSoftError" in last_message.content:
-            raise ToolRetryError(last_message.content)
+        if "ToolSoftError" in last_message.content and self.tool:
+            raise ToolRetryError(self.tool.name, str(last_message.content))
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,

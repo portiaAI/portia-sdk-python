@@ -4,17 +4,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from portia.agents.base_agent import AgentType, BaseAgent, InvalidAgentError, InvalidAgentUsageError
+from portia.agents.base_agent import AgentType, BaseAgent
 from portia.agents.complex_langgraph_agent import ComplexLanggraphAgent
 from portia.agents.simple_agent import SimpleAgent
 from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
-from portia.config import Config, InvalidStorageError, StorageClass
+from portia.config import Config, StorageClass
+from portia.errors import (
+    InvalidAgentError,
+    InvalidAgentUsageError,
+    InvalidStorageError,
+    InvalidWorkflowStateError,
+    PlanError,
+)
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step
-from portia.planner import PlanError, Planner
+from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
-from portia.workflow import InvalidWorkflowStateError, Workflow, WorkflowState
+from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -39,7 +46,7 @@ class Runner:
             case StorageClass.DISK:
                 self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
             case _:
-                raise InvalidStorageError
+                raise InvalidStorageError(config.storage_class.name)
 
     def run_query(
         self,
@@ -81,7 +88,7 @@ class Runner:
     def resume_workflow(self, workflow: Workflow) -> Workflow:
         """Resume a workflow after an interruption."""
         if workflow.state not in [WorkflowState.IN_PROGRESS, WorkflowState.NEED_CLARIFICATION]:
-            raise InvalidWorkflowStateError
+            raise InvalidWorkflowStateError(workflow.id)
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
 
@@ -146,7 +153,7 @@ class Runner:
                 )
             case AgentType.CHAIN_OF_THOUGHT.name:
                 if tool is None:
-                    raise InvalidAgentUsageError
+                    raise InvalidAgentUsageError(agent_type)
                 return ComplexLanggraphAgent(
                     description=step.task,
                     inputs=step.input or [],
