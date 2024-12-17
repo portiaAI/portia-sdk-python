@@ -118,10 +118,14 @@ def test_runner_config_from_file() -> None:
     """Test loading configuration from a file."""
     config_data = '{"portia_api_key": "file-key", "openai_api_key": "file-openai-key", "llm_model_temperature": 10}'  # noqa: E501
     config_file = Path("config.json")
-    config_file.write_text(config_data)
+    try:
+        config_file.write_text(config_data)
 
-    config = Config.from_file(config_file)
+        config = Config.from_file(config_file)
 
-    assert config.must_get_raw_api_key("portia_api_key") == "file-key"
-    assert config.must_get_raw_api_key("openai_api_key") == "file-openai-key"
-    assert config.llm_model_temperature == 10
+        assert config.must_get_raw_api_key("portia_api_key") == "file-key"
+        assert config.must_get_raw_api_key("openai_api_key") == "file-openai-key"
+        assert config.llm_model_temperature == 10
+    finally:
+        if config_file.exists():
+            config_file.unlink()  # Remove the file after the test
