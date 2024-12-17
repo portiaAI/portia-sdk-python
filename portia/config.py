@@ -70,11 +70,7 @@ class Config(BaseModel):
 
     def must_get_api_key(self, name: str) -> SecretStr:
         """Get an api key as a SecretStr or error if not set."""
-        if not hasattr(self, name):
-            raise APIKeyNotFoundError(name)
-        if not getattr(self, name):
-            raise APIKeyNotFoundError(name)
-        return getattr(self, name)
+        return self.must_get(name, SecretStr)
 
     def must_get_raw_api_key(self, name: str) -> str:
         """Get a raw api key as a string or errors if not set."""
