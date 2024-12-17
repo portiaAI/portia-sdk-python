@@ -48,7 +48,7 @@ class Runner:
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples."""
         if not tools:
-            tools = self.tool_registry.get_tools()
+            tools = self.tool_registry.match_tools(query)
 
         planner = Planner(config=self.config)
         outcome = planner.generate_plan_or_error(
