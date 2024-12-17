@@ -70,7 +70,7 @@ class RequestClarificationTool(BaseTool):
         """Use the tool."""
         return [
             InputClarification(
-                argument=arg,
+                argument_name=arg,
                 user_guidance=f"Missing argument: {arg}",
             )
             for arg in missing_args
