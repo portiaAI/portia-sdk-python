@@ -11,9 +11,7 @@ from pydantic import BaseModel, SecretStr
 
 T = TypeVar("T")
 
-from pathlib import Path
 
-from pydantic import BaseModel, SecretStr
 
 
 class APIKeyNotFoundError(Exception):
