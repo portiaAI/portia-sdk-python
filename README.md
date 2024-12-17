@@ -13,6 +13,8 @@ pip install portia-sdk-python
 ### Simple Usage
 
 ```python
+from portia.runner import Runner, RunnerConfig
+
 runner = Runner(config=RunnerConfig(portia_api_key='123'))
 runner.run_query("Add 1 and 2")
 ```
@@ -21,6 +23,7 @@ runner.run_query("Add 1 and 2")
 ### With Custom Local Tools and Storage
 
 ```python
+from portia.runner import Runner, RunnerConfig
 from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry
 
@@ -38,8 +41,7 @@ class AdditionTool(Tool):
 tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
 
 # Create local storage
-config = RunnerConfig()
-runner = Runner(config=config, tool_registry=tool_registry)
+runner = Runner(config=RunnerConfig(), tool_registry=tool_registry)
 runner.run_query("Add 1 and 2")
 ```
 
@@ -48,8 +50,9 @@ runner.run_query("Add 1 and 2")
 Multiple registries can be combined to give the power of Portia Cloud with the customization of local tools:
 
 ```python
+from portia.runner import Runner, RunnerConfig
 from portia.tool import Tool
-from portia.tool_registry import LocalToolRegistry
+from portia.tool_registry import LocalToolRegistry, PortiaToolRegistry
 
 # Create a local tool
 class AdditionTool(Tool):
@@ -68,10 +71,7 @@ remote_tool_registry = PortiaToolRegistry(api_key="123")
 
 tool_registry = local_tool_registry + remote_tool_registry
 
-# Create local storage
-storage = LocalStorage()
-
-runner = Runner(storage=storage, tool_registry=tool_registry)
+runner = Runner(config=RunnerConfig(), tool_registry=tool_registry)
 runner.run_query("Add 1 and 2")
 ```
 
