@@ -37,6 +37,7 @@ pytest-rerunfailures = "^14.0"
 pytest-cov = "^5.0.0"
 pyright = "^1.1.382"
 pytest-httpx = "^0.33.0"
+pydoc-markdown = "^4.8.2"
 
 [tool.ruff]
 line-length=100
@@ -72,3 +73,16 @@ portia = ["templates/**/*.jinja"]
 filterwarnings = [
     "ignore:Failing to pass a value to the 'type_params' parameter of 'typing.ForwardRef._evaluate':DeprecationWarning",  # this comes from LangChain
 ]
+
+[[tool.pydoc-markdown.loaders]]
+type = "python"
+
+[[tool.pydoc-markdown.processors]]
+type = "filter"
+expression = "not 'test' in name and not name.startswith('_') and default()"
+skip_empty_modules = true
+
+[tool.pydoc-markdown.renderer]
+type = "docusaurus"
+relative_output_path="SDK"
+sidebar_top_level_label=""
