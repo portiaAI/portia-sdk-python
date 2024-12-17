@@ -35,8 +35,8 @@ from portia.tool_registry import LocalToolRegistry
 
 # Create a local tool
 class AdditionTool(Tool):
-    id: str = "add_tool"
-    name: str = "Add Tool"
+    id: str = "addition_tool"
+    name: str = "Addition Tool"
     description: str = "Takes two numbers and adds them together"
 
     def run(self, a: int, b: int) -> int:
