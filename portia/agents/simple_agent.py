@@ -13,6 +13,7 @@ from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification
 from portia.plan import Output, Variable
+from portia.tool import ToolRetryError
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -121,7 +122,7 @@ class SimpleAgent(BaseAgent):
     def process_output(self, last_message: BaseMessage) -> Output:
         """Process the output of the agent."""
         if "ToolSoftError" in last_message.content:
-            raise RuntimeError("Tool failed after 4 retries.")
+            raise ToolRetryError(last_message.content)
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,

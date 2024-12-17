@@ -2,7 +2,6 @@
 
 import pytest
 
-from portia.tool import Tool
 from portia.tool_registry import (
     LocalToolRegistry,
     ToolNotFoundError,

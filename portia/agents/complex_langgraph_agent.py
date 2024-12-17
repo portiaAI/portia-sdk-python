@@ -8,12 +8,13 @@ from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import ArgumentClarification, Clarification, InputClarification
 from portia.plan import Output, Variable
+from portia.tool import ToolFailedError, ToolRetryError
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -24,13 +25,14 @@ if TYPE_CHECKING:
 MAX_RETRIES = 4
 
 
+class NoVerifiedArgsError(Exception):
+    """Raised when verified args are expected but not present."""
+
+
 class ToolArgument(BaseModel):
     """Represents an argument for a tool as extracted from the goal and context."""
 
-    class Config:
-        """Configuration for ToolArgument."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
     value: Any | None = Field(
@@ -51,10 +53,7 @@ class ToolInputs(BaseModel):
 class VerifiedToolArgument(BaseModel):
     """Represents an argument for a tool after being verified by an agent."""
 
-    class Config:
-        """Configuration for ToolArgument."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
     value: Any | None = Field(
@@ -255,7 +254,7 @@ class ToolCallingModel:
         """Invoke the model with the given message state."""
         verified_args = self.agent.verified_args
         if not verified_args:
-            raise RuntimeError("should not be here")
+            raise NoVerifiedArgsError
         # handle any clarifications before calling
         if self.agent and self.agent.clarifications:
             for arg in verified_args.args:
@@ -398,9 +397,9 @@ class ComplexLanggraphAgent(BaseAgent):
     def process_output(self, last_message: BaseMessage) -> Output:
         """Process the output of the agent."""
         if "ToolSoftError" in last_message.content:
-            raise RuntimeError(f"Tool failed after 4 retries: {last_message.content}")
+            raise ToolRetryError(last_message.content)
         if "ToolHardError" in last_message.content:
-            raise RuntimeError(f"Tool failed: {last_message.content}")
+            raise ToolFailedError(last_message.content)
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,

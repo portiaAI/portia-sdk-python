@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 
 from portia.agents.context import build_context
 from portia.clarification import Clarification, InputClarification
-from portia.plan import Output
 
 if TYPE_CHECKING:
     from langchain.callbacks.manager import (
@@ -21,7 +20,7 @@ if TYPE_CHECKING:
     )
     from langchain_core.language_models.chat_models import BaseChatModel
 
-    from portia.plan import Variable
+    from portia.plan import Output, Variable
     from portia.tool import Tool
 
 
