@@ -6,10 +6,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.errors import PlanNotFoundError, WorkflowNotFoundError
 from portia.plan import Plan
+from portia.tool_registry import APIKeyRequiredError
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
@@ -171,3 +172,29 @@ class DiskFileStorage(Storage):
             return self._read(f"workflow-{workflow_id}.json", Workflow)
         except (ValidationError, FileNotFoundError) as e:
             raise WorkflowNotFoundError(workflow_id) from e
+
+
+class PortiaCloudStorage(Storage):
+    """Save plans and workflows to portia cloud."""
+
+    def __init__(self, api_key: SecretStr | None) -> None:
+        """Store tools in a tool set for easy access."""
+        if not api_key:
+            raise APIKeyRequiredError
+        self.api_key = api_key
+
+    def save_plan(self, plan: Plan) -> None:
+        """Add plan to dict."""
+        return
+
+    def get_plan(self, plan_id: UUID) -> Plan:
+        """Get plan from dict."""
+        raise PlanNotFoundError(plan_id)
+
+    def save_workflow(self, workflow: Workflow) -> None:
+        """Add workflow to dict."""
+        return
+
+    def get_workflow(self, workflow_id: UUID) -> Workflow:
+        """Get workflow from dict."""
+        raise WorkflowNotFoundError(workflow_id)

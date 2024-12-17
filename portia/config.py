@@ -78,6 +78,10 @@ class Config(BaseModel):
         with Path.open(file_path) as f:
             return cls.model_validate_json(f.read())
 
+    def has_api_key(self, name: str) -> bool:
+        """Check if the given API Key is available."""
+        return hasattr(self, name)
+
     def must_get_api_key(self, name: str) -> SecretStr:
         """Get an api key as a SecretStr or error if not set."""
         return self.must_get(name, SecretStr)

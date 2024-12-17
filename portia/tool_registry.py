@@ -5,7 +5,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from pydantic import SecretStr
+
 from portia.errors import ToolNotFoundError
+from portia.tool import PortiaRemoteTool
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -133,6 +136,57 @@ class InMemoryToolRegistry(ToolRegistry):
         )
         if not tool:
             raise ToolNotFoundError(tool_name)
+        return tool
+
+    def get_tools(self) -> ToolSet:
+        """Get all tools."""
+        return self.tools
+
+
+class APIKeyRequiredError(Exception):
+    """Raised when a given API Key is missing."""
+
+
+class ToolRegistrationFailedError(Exception):
+    """Raised when a tool registration fails."""
+
+
+class PortiaToolRegistry(ToolRegistry):
+    """Provides access to portia tools."""
+
+    def __init__(self, api_key: SecretStr | None) -> None:
+        """Store tools in a tool set for easy access."""
+        if not api_key:
+            raise APIKeyRequiredError
+        self.api_key = api_key
+        self.tools: ToolSet = ToolSet([])
+        self._load_tools()
+
+    def _load_tools(self) -> None:
+        # to do load tools here
+        self.tools = ToolSet(
+            tools=[
+                PortiaRemoteTool[str](
+                    id=1,
+                    description="",
+                    name="",
+                    output_schema=("None", "None: returns nothing"),
+                    api_key=self.api_key,
+                )
+            ],
+        )
+
+    def register_tool(self, tool: Tool) -> None:
+        """Register tool in registry."""
+        raise ToolRegistrationFailedError(tool)
+
+    def get_tool(self, tool_id: str) -> PortiaRemoteTool:
+        """Get the tool from the registry."""
+        tool = self.tools.get_tool(
+            tool_id,
+        )
+        if not tool:
+            raise ToolNotFoundError(tool_id)
         return tool
 
     def get_tools(self) -> ToolSet:

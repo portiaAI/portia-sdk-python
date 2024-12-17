@@ -11,7 +11,7 @@ from abc import abstractmethod
 from typing import Any, Generic
 
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 
 from portia.clarification import Clarification
 from portia.errors import InvalidToolDescriptionError
@@ -177,3 +177,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                     },
                 },
             )
+
+
+class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
+    api_key: SecretStr
+
+    def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:
+        # requests.post("tools", )
+        return ""
