@@ -10,21 +10,9 @@ from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
 from portia.planner import PlanOrError
 from portia.runner import Runner
-from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry
 from portia.workflow import InvalidWorkflowStateError, WorkflowState
-
-
-class AdditionTool(Tool):
-    """Add numbers."""
-
-    id: str = "add_tool"
-    name: str = "Add Tool"
-    description: str = "Takes two numbers and adds them together"
-
-    def run(self, a: int, b: int) -> int:
-        """Add the numbers."""
-        return a + b
+from tests.utils import AdditionTool
 
 
 @pytest.fixture
