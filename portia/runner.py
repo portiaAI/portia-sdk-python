@@ -100,7 +100,6 @@ class Runner:
                     args = {var.name: var.value for var in step.input} if step.input else {}
                     output = tool.run(**args)
                 except Exception as e:  # noqa: BLE001
-                    print(e)
                     workflow.step_outputs[step.output] = Output(value=str(e))
                     workflow.state = WorkflowState.FAILED
                     self.storage.save_workflow(workflow)
