@@ -27,7 +27,7 @@ class StorageClass(Enum):
 
     MEMORY = "MEMORY"
     DISK = "DISK"
-    CLOUD = "cloud"
+    CLOUD = "CLOUD"
 
 
 class RunnerConfig(BaseModel):
