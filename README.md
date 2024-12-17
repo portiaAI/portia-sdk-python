@@ -20,10 +20,10 @@ runner.run_query("Add 1 and 2")
 ```
 
 
-### With Custom Local Tools and Storage
+### With Custom Local Tools and Disk Storage
 
 ```python
-from portia.runner import Runner, RunnerConfig
+from portia.runner import Runner, RunnerConfig, StorageClass
 from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry
 
@@ -41,7 +41,7 @@ class AdditionTool(Tool):
 tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
 
 # Create local storage
-runner = Runner(config=RunnerConfig(), tool_registry=tool_registry)
+runner = Runner(config=RunnerConfig(storage=StorageClass.DISK), tool_registry=tool_registry)
 runner.run_query("Add 1 and 2")
 ```
 
