@@ -25,9 +25,9 @@ class InvalidStorageError(Exception):
 class StorageClass(Enum):
     """Represent locations plans and workflows are written to."""
 
-    InMemory = "in-memory"
-    Disk = "disk"
-    Cloud = "cloud"
+    MEMORY = "MEMORY"
+    DISK = "DISK"
+    CLOUD = "cloud"
 
 
 class RunnerConfig(BaseModel):
@@ -36,7 +36,7 @@ class RunnerConfig(BaseModel):
     portia_api_key: str | None = os.getenv("PORTIA_API_KEY")
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
 
-    storage_class: StorageClass = StorageClass.InMemory
+    storage_class: StorageClass = StorageClass.MEMORY
 
     @classmethod
     def from_file(cls, file_path: Path) -> RunnerConfig:
@@ -55,9 +55,9 @@ class Runner:
     ) -> None:
         """Initialize storage and tools."""
         match config.storage_class:
-            case StorageClass.InMemory:
+            case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
-            case StorageClass.Disk:
+            case StorageClass.DISK:
                 self.storage = DiskFileStorage(None)
             case _:
                 raise InvalidStorageError
