@@ -13,7 +13,9 @@ from portia.tool import PortiaRemoteTool
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from portia.tool import Tool
+    from pydantic import SecretStr
+
+    from portia.tool import PortiaRemoteTool, Tool
 
 
 class ToolSet:
@@ -159,22 +161,19 @@ class PortiaToolRegistry(ToolRegistry):
         if not api_key:
             raise APIKeyRequiredError
         self.api_key = api_key
-        self.tools: ToolSet = ToolSet([])
         self._load_tools()
 
     def _load_tools(self) -> None:
         # to do load tools here
-        self.tools = ToolSet(
-            tools=[
-                PortiaRemoteTool[str](
-                    id=1,
-                    description="",
-                    name="",
-                    output_schema=("None", "None: returns nothing"),
-                    api_key=self.api_key,
-                )
-            ],
+        response = httpx.get(
+            url="https://holsten-37277605247.us-central1.run.app/api/v0/tools/",
+            headers={
+                "Authorization": f"Api-Key {self.api_key}",
+                "Content-Type": "application/json",
+            },
         )
+        response.raise_for_status()
+        self.tools = response.json()
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""

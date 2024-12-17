@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
 
+import httpx
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.errors import PlanNotFoundError, WorkflowNotFoundError
@@ -184,17 +185,49 @@ class PortiaCloudStorage(Storage):
         self.api_key = api_key
 
     def save_plan(self, plan: Plan) -> None:
-        """Add plan to dict."""
-        return
+        """Add plan to cloud."""
+        response = httpx.post(
+            url="https://holsten-37277605247.us-central1.run.app/api/v0/plans/",
+            data=plan.model_dump(mode="json"),
+            headers={
+                "Authorization": f"Api-Key {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
 
     def get_plan(self, plan_id: UUID) -> Plan:
-        """Get plan from dict."""
-        raise PlanNotFoundError(plan_id)
+        """Get plan from cloud."""
+        response = httpx.get(
+            url=f"https://holsten-37277605247.us-central1.run.app/api/v0/plans/{plan_id}/",
+            headers={
+                "Authorization": f"Api-Key {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+        return Plan.model_validate_json(response.content)
 
     def save_workflow(self, workflow: Workflow) -> None:
-        """Add workflow to dict."""
-        return
+        """Add workflow to cloud."""
+        response = httpx.post(
+            url="https://holsten-37277605247.us-central1.run.app/api/v0/workflows/",
+            data=workflow.model_dump(mode="json"),
+            headers={
+                "Authorization": f"Api-Key {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
 
     def get_workflow(self, workflow_id: UUID) -> Workflow:
-        """Get workflow from dict."""
-        raise WorkflowNotFoundError(workflow_id)
+        """Get workflow from cloud."""
+        response = httpx.get(
+            url=f"https://holsten-37277605247.us-central1.run.app/api/v0/workflows/{workflow_id}/",
+            headers={
+                "Authorization": f"Api-Key {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+        return Workflow.model_validate_json(response.content)
