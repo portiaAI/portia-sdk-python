@@ -116,8 +116,8 @@ class Runner:
             step = plan.steps[index]
             workflow.current_step_index = index
             if step.tool_name:
-                tool = self.tool_registry.get_tool(step.tool_name)
                 try:
+                    tool = self.tool_registry.get_tool(step.tool_name)
                     args = {var.name: var.value for var in step.input} if step.input else {}
                     output = tool.run(**args)
                 except Exception as e:  # noqa: BLE001

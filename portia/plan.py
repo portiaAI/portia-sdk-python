@@ -67,7 +67,7 @@ class Step(BaseModel):
     )
     output: str = Field(
         ...,
-        description="The output id of this step i.e. $best_offers.",
+        description="The unique output id of this step i.e. $best_offers.",
     )
     clarifications: list[Clarification] | None = Field(
         default=None,
