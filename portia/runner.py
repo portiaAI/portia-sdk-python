@@ -31,7 +31,7 @@ class Runner:
         """Initialize storage and tools."""
         self.config = config
         self.tool_registry = tool_registry or LocalToolRegistry()
-        self.agent_type = config.agent_type or AgentType.CHAIN_OF_THOUGHT.name
+        self.agent_type = config.default_agent_type or AgentType.CHAIN_OF_THOUGHT.name
 
         match config.storage_class:
             case StorageClass.MEMORY:
@@ -65,7 +65,7 @@ class Runner:
         outcome = planner.generate_plan_or_error(
             query=query,
             tool_list=tools,
-            system_context=self.config.planner_system_content,
+            system_context=self.config.planner_system_context_override,
             examples=example_plans,
         )
         if outcome.error:
@@ -142,6 +142,7 @@ class Runner:
                     inputs=step.input or [],
                     clarifications=clarifications,
                     tool=tool,
+                    system_context=self.config.agent_system_context_override,
                 )
             case AgentType.CHAIN_OF_THOUGHT.name:
                 if tool is None:
@@ -151,6 +152,7 @@ class Runner:
                     inputs=step.input or [],
                     clarifications=clarifications,
                     tool=tool,
+                    system_context=self.config.agent_system_context_override,
                 )
             case _:
                 raise InvalidAgentError(agent_type)

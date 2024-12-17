@@ -16,23 +16,9 @@ from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
-from portia.config import Config
+from portia.config import Config, LLMProvider
 
 logger = logging.getLogger(__name__)
-
-
-class LLMProvider(Enum):
-    """Enum of LLM providers."""
-
-    OpenAI = "openai"
-    Anthropic = "anthropic"
-    MistralAI = "mistralai"
-
-
-DEFAULT_LLM_PROVIDER = LLMProvider.OpenAI
-DEFAULT_LLM_MODEL = "gpt-4o-mini"
-DEFAULT_MODEL_TEMPERATURE = 0
-DEFAULT_MODEL_SEED = 443
 
 
 class InvalidProviderError(Exception):
@@ -52,10 +38,10 @@ class LLMWrapper:
     ) -> None:
         """Initialize the wrapper."""
         self.config = config
-        self.llm_provider = config.llm_provider or DEFAULT_LLM_PROVIDER
-        self.model_name = config.llm_model_name or DEFAULT_LLM_MODEL
-        self.model_temperature = config.llm_model_temperature or DEFAULT_MODEL_TEMPERATURE
-        self.model_seed = config.llm_model_seed or DEFAULT_MODEL_SEED
+        self.llm_provider = config.llm_provider
+        self.model_name = config.llm_model_name
+        self.model_temperature = config.llm_model_temperature
+        self.model_seed = config.llm_model_seed
 
     def to_langchain(self) -> BaseChatModel:
         """Return a langchain chat model."""

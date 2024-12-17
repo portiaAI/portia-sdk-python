@@ -44,6 +44,14 @@ class StorageClass(Enum):
     CLOUD = "CLOUD"
 
 
+class LLMProvider(Enum):
+    """Enum of LLM providers."""
+
+    OpenAI = "openai"
+    Anthropic = "anthropic"
+    MistralAI = "mistralai"
+
+
 class Config(BaseModel):
     """General configuration for the library."""
 
@@ -58,16 +66,17 @@ class Config(BaseModel):
     storage_dir: str | None = None
 
     # LLM Options
-    llm_provider: str | None = None
-    llm_model_name: str | None = None
-    llm_model_temperature: int | None = None
-    llm_model_seed: int | None = None
+    llm_provider: LLMProvider = LLMProvider.OpenAI
+    llm_model_name: str = "gpt-4o-mini"
+    llm_model_temperature: int = 0
+    llm_model_seed: int = 443
 
     # Agent Options
-    agent_type: str | None = None
+    default_agent_type: str | None = None
 
     # System Context Overrides
-    planner_system_content: list[str] | None = None
+    planner_system_context_override: list[str] | None = None
+    agent_system_context_override: list[str] | None = None
 
     @classmethod
     def from_file(cls, file_path: Path) -> Config:
