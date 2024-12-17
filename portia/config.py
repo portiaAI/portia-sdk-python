@@ -38,15 +38,21 @@ class AgentType(Enum):
     VERIFIER = "VERIFIER"
 
 
+class LLMProvider(Enum):
+    """Enum of LLM providers."""
+
+    OpenAI = "openai"
+    Anthropic = "anthropic"
+    MistralAI = "mistralai"
+
+
 class Config(BaseModel):
     """General configuration for the library."""
 
     # API Keys
     portia_api_key: SecretStr | None = SecretStr(os.getenv("PORTIA_API_KEY") or "")
     openai_api_key: SecretStr | None = SecretStr(os.getenv("OPENAI_API_KEY") or "")
-    anthropic_api_key: SecretStr | None = SecretStr(
-        os.getenv("ANTHROPIC_API_KEY") or ""
-    )
+    anthropic_api_key: SecretStr | None = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
     mistralai_api_key: SecretStr | None = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
 
     # Storage Options
@@ -61,9 +67,6 @@ class Config(BaseModel):
 
     # Agent Options
     default_agent_type: AgentType = AgentType.VERIFIER
-
-    # Agent Options
-    agent_type: str | None = None
 
     # System Context Overrides
     planner_system_context_override: list[str] | None = None
