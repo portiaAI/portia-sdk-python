@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import os
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from portia.plan import Output, Plan, Step, Variable
-from portia.storage import InMemoryStorage, Storage
+from portia.storage import DiskFileStorage, InMemoryStorage
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
 from portia.workflow import InvalidWorkflowStateError, Workflow, WorkflowState
 
@@ -17,11 +18,25 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 
+class InvalidStorageError(Exception):
+    """Raised when an invalid storage is provided."""
+
+
+class StorageClass(Enum):
+    """Represent locations plans and workflows are written to."""
+
+    InMemory = "in-memory"
+    Disk = "disk"
+    Cloud = "cloud"
+
+
 class RunnerConfig(BaseModel):
     """General configuration for the library."""
 
     portia_api_key: str | None = os.getenv("PORTIA_API_KEY")
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
+
+    storage_class: StorageClass = StorageClass.InMemory
 
     @classmethod
     def from_file(cls, file_path: Path) -> RunnerConfig:
@@ -35,12 +50,18 @@ class Runner:
 
     def __init__(
         self,
-        config: RunnerConfig,  # noqa: ARG002 - we'll use this soon
-        storage: Storage | None = None,
+        config: RunnerConfig,
         tool_registry: ToolRegistry | None = None,
     ) -> None:
         """Initialize storage and tools."""
-        self.storage = storage or InMemoryStorage()
+        match config.storage_class:
+            case StorageClass.InMemory:
+                self.storage = InMemoryStorage()
+            case StorageClass.Disk:
+                self.storage = DiskFileStorage(None)
+            case _:
+                raise InvalidStorageError
+
         self.tool_registry = tool_registry or LocalToolRegistry()
 
     def run_query(

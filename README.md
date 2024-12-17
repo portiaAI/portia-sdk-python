@@ -38,10 +38,8 @@ class AdditionTool(Tool):
 tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
 
 # Create local storage
-storage = InMemoryStorage()
-
 config = RunnerConfig()
-runner = Runner(config=config, storage=storage, tool_registry=tool_registry)
+runner = Runner(config=config, tool_registry=tool_registry)
 runner.run_query("Add 1 and 2")
 ```
 

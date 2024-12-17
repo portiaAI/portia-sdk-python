@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from portia.runner import Runner, RunnerConfig
-from portia.storage import InMemoryStorage
 from portia.tool import Tool
 from portia.tool_registry import LocalToolRegistry
 from portia.workflow import InvalidWorkflowStateError, WorkflowState
@@ -27,9 +26,8 @@ class AdditionTool(Tool):
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
     config = RunnerConfig()
-    storage = InMemoryStorage()
     tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
-    return Runner(config=config, storage=storage, tool_registry=tool_registry)
+    return Runner(config=config, tool_registry=tool_registry)
 
 
 def test_runner_run_query(runner: Runner) -> None:
