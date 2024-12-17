@@ -87,3 +87,13 @@ Releases are controlled via Github Actions and the version field of the `pyproje
 1. Create a PR that updates the version field in the `pyproject.toml`.
 2. Merge the PR to main.
 3. Github Actions will create a new tag and push the new version to PyPi.
+
+## CLI 
+
+To test the CLI locally run 
+
+```bash
+pip install -e . 
+export OPENAI_API_KEY=$KEY
+portia-cli "add 4 + 8"
+```
