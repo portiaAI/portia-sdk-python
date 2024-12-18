@@ -34,6 +34,10 @@ class ToolSet:
             return self.tools[name]
         raise ToolNotFoundError
 
+    def get_tools(self) -> list[Tool]:
+        """Get all tools."""
+        return list(self.tools.values())
+
     def __add__(self, other: ToolSet) -> ToolSet:
         """Return an aggregated tool set."""
         new_tools = list(self.tools.values()) + list(other.tools.values())

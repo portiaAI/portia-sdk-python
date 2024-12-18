@@ -65,9 +65,9 @@ class Step(BaseModel):
         default=None,
         description="The name of the tool listed in <Tools/>",
     )
-    output: Output | None = Field(
-        None,
-        description="The output of this step.",
+    output: str = Field(
+        ...,
+        description="The unique output id of this step i.e. $best_offers.",
     )
     clarifications: list[Clarification] | None = Field(
         default=None,
