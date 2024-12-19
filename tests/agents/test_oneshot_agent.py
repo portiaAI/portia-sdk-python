@@ -7,9 +7,6 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
-from portia.agents.complex_langgraph_agent import (
-    ToolCallingModel,
-)
 from portia.agents.simple_agent import SimpleAgent, SimpleToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
 from portia.config import Config
