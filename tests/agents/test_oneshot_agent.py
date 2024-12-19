@@ -10,7 +10,7 @@ from langgraph.prebuilt import ToolNode
 from portia.agents.complex_langgraph_agent import (
     ToolCallingModel,
 )
-from portia.agents.simple_agent import SimpleAgent
+from portia.agents.simple_agent import SimpleAgent, SimpleToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
 from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
@@ -91,7 +91,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         ]
         return {"messages": [response]}
 
-    monkeypatch.setattr(ToolCallingModel, "invoke", tool_calling_model)
+    monkeypatch.setattr(SimpleToolCallingModel, "invoke", tool_calling_model)
 
     def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
         return {
