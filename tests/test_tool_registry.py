@@ -49,7 +49,7 @@ def test_aggregated_tool_registry_get_tool() -> None:
     """Test searching across multiple registries in AggregatedToolRegistry."""
     local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(name=MOCK_TOOL_NAME)])
     other_tool_registry = InMemoryToolRegistry.from_local_tools(
-        [MockTool(name=OTHER_MOCK_TOOL_NAME)]
+        [MockTool(name=OTHER_MOCK_TOOL_NAME)],
     )
     aggregated_tool_registry = local_tool_registry + other_tool_registry
 
@@ -64,7 +64,7 @@ def test_aggregated_tool_registry_get_tools() -> None:
     """Test getting all tools from an AggregatedToolRegistry."""
     local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(name=MOCK_TOOL_NAME)])
     other_tool_registry = InMemoryToolRegistry.from_local_tools(
-        [MockTool(name=OTHER_MOCK_TOOL_NAME)]
+        [MockTool(name=OTHER_MOCK_TOOL_NAME)],
     )
     aggregated_tool_registry = local_tool_registry + other_tool_registry
 

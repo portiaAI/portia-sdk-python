@@ -32,7 +32,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                 task="Email $email politely with $ai_search_results",
                 input=[
                     Variable(
-                        name="$ai_search_results", description="summary of AI news"
+                        name="$ai_search_results", description="summary of AI news",
                     ),
                     Variable(
                         name="$email",
@@ -74,7 +74,7 @@ class Planner:
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         prompt = _render_prompt_insert_defaults(
-            query, tool_list, system_context, examples
+            query, tool_list, system_context, examples,
         )
         return LLMWrapper(self.config).to_instructor(
             response_model=PlanOrError,
