@@ -174,7 +174,7 @@ class PortiaToolRegistry(ToolRegistry):
             },
         )
         response.raise_for_status()
-        self.tools = response.json()
+        self.tools = response.json()  # todo -here we need to pass the tools into Tools
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""
