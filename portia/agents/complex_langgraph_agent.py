@@ -13,7 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import ArgumentClarification, Clarification, InputClarification
-from portia.errors import NoVerifiedArgsError, ToolFailedError, ToolRetryError
+from portia.errors import (
+    InvalidWorkflowStateError,
+    NoVerifiedArgsError,
+    ToolFailedError,
+    ToolRetryError,
+)
 from portia.plan import Output, Variable
 
 if TYPE_CHECKING:
@@ -105,6 +110,8 @@ class ParserModel:
 
     def invoke(self, _: MessagesState) -> dict[str, Any]:
         """Invoke the model with the given message state."""
+        if not self.agent.tool:
+            raise InvalidWorkflowStateError(None)
         model = self.llm.with_structured_output(ToolInputs)
         response = model.invoke(
             self.arg_parser_prompt.format_messages(
@@ -304,7 +311,7 @@ class ComplexLanggraphAgent(BaseAgent):
         self,
         description: str,
         inputs: list[Variable],
-        tool: Tool,
+        tool: Tool | None = None,
         clarifications: list[Clarification] | None = None,
         system_context: list[str] | None = None,
     ) -> None:
@@ -392,9 +399,9 @@ class ComplexLanggraphAgent(BaseAgent):
 
     def process_output(self, last_message: BaseMessage) -> Output:
         """Process the output of the agent."""
-        if "ToolSoftError" in last_message.content:
+        if "ToolSoftError" in last_message.content and self.tool:
             raise ToolRetryError(self.tool.name, str(last_message.content))
-        if "ToolHardError" in last_message.content:
+        if "ToolHardError" in last_message.content and self.tool:
             raise ToolFailedError(self.tool.name, str(last_message.content))
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](

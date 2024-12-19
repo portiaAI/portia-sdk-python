@@ -1,7 +1,7 @@
 """Wrapper around different LLM providers allowing us to treat them the same."""
 
 import logging
-from enum import Enum
+from typing import TypeVar
 
 import instructor
 from anthropic import Anthropic
@@ -20,6 +20,8 @@ from portia.config import Config, LLMProvider
 from portia.errors import InvalidLLMProviderError
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class LLMWrapper:
@@ -65,9 +67,9 @@ class LLMWrapper:
 
     def to_instructor(
         self,
-        response_model: type[BaseModel],
+        response_model: type[T],
         messages: list[ChatCompletionMessageParam],
-    ) -> BaseModel:
+    ) -> T:
         """Use instructor to generate an object of response_model type."""
         match self.llm_provider:
             case LLMProvider.OpenAI:

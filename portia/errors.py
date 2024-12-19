@@ -1,6 +1,11 @@
 """Central definition of error classes."""
 
-from uuid import UUID
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from uuid import UUID
 
 
 class InvalidStorageError(Exception):
@@ -94,7 +99,7 @@ class ToolFailedError(Exception):
 class InvalidWorkflowStateError(Exception):
     """The given workflow is in an invalid state."""
 
-    def __init__(self, workflow_id: UUID) -> None:
+    def __init__(self, workflow_id: UUID | None) -> None:
         """Set custom error message."""
         super().__init__(f"Workflow with id {workflow_id} is in invalid state.")
 
