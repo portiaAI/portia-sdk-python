@@ -2,9 +2,6 @@
 
 import logging
 from enum import Enum
-from typing import (
-    TypeVar,
-)
 
 import instructor
 from anthropic import Anthropic
@@ -22,9 +19,6 @@ from pydantic import BaseModel
 from portia.config import Config
 
 logger = logging.getLogger(__name__)
-
-# BoundType for BaseModel
-T = TypeVar("T", bound=BaseModel)
 
 
 class LLMProvider(Enum):
@@ -92,9 +86,9 @@ class LLMWrapper:
 
     def to_instructor(
         self,
-        response_model: type[T],
+        response_model: type[BaseModel],
         messages: list[ChatCompletionMessageParam],
-    ) -> T:
+    ) -> BaseModel:
         """Use instructor to generate an object of response_model type."""
         match self.llm_provider:
             case LLMProvider.OpenAI:
