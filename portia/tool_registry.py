@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+import httpx
 from pydantic import SecretStr
 
 from portia.errors import ToolNotFoundError
@@ -179,13 +180,13 @@ class PortiaToolRegistry(ToolRegistry):
         """Register tool in registry."""
         raise ToolRegistrationFailedError(tool)
 
-    def get_tool(self, tool_id: str) -> PortiaRemoteTool:
+    def get_tool(self, tool_name: str) -> PortiaRemoteTool:
         """Get the tool from the registry."""
         tool = self.tools.get_tool(
-            tool_id,
+            tool_name,
         )
         if not tool:
-            raise ToolNotFoundError(tool_id)
+            raise ToolNotFoundError(tool_name)
         return tool
 
     def get_tools(self) -> ToolSet:

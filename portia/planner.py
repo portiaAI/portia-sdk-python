@@ -75,10 +75,14 @@ class Planner:
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         prompt = _render_prompt_insert_defaults(
+<<<<<<< HEAD
             query,
             tool_list,
             system_context,
             examples,
+=======
+            query, tool_list, system_context, examples,
+>>>>>>> d5ef76f (stash)
         )
         return LLMWrapper(self.config).to_instructor(
             response_model=PlanOrError,
