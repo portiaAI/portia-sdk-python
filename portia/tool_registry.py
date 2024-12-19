@@ -26,11 +26,11 @@ class ToolSet:
         """Add a tool to the set."""
         self.tools[tool.name] = tool
 
-    def get_tool(self, tool_id: str) -> Tool:
+    def get_tool(self, tool_name: str) -> Tool:
         """Get a tool by id."""
-        if tool_id in self.tools:
-            return self.tools[tool_id]
-        raise ToolNotFoundError(tool_id)
+        if tool_name in self.tools:
+            return self.tools[tool_name]
+        raise ToolNotFoundError(tool_name)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools."""
@@ -51,7 +51,7 @@ class ToolRegistry(ABC):
         raise NotImplementedError("register_tool is not implemented")
 
     @abstractmethod
-    def get_tool(self, tool_id: str) -> Tool:
+    def get_tool(self, tool_name: str) -> Tool:
         """Retrieve a tool's information."""
         raise NotImplementedError("get_tool is not implemented")
 
@@ -83,14 +83,14 @@ class AggregatedToolRegistry(ToolRegistry):
         """Tool registration should happen in individual registries."""
         raise NotImplementedError("tool registration should happen in individual registries.")
 
-    def get_tool(self, tool_id: str) -> Tool:
+    def get_tool(self, tool_name: str) -> Tool:
         """Search across all registries for a given tool, returning first match."""
         for registry in self.registries:
             try:
-                return registry.get_tool(tool_id)
+                return registry.get_tool(tool_name)
             except ToolNotFoundError:  # noqa: PERF203
                 continue
-        raise ToolNotFoundError(tool_id)
+        raise ToolNotFoundError(tool_name)
 
     def get_tools(self) -> ToolSet:
         """Get all tools from all registries."""
@@ -126,13 +126,13 @@ class InMemoryToolRegistry(ToolRegistry):
         """Register tool in registry."""
         self.tools.add_tool(tool)
 
-    def get_tool(self, tool_id: str) -> Tool:
+    def get_tool(self, tool_name: str) -> Tool:
         """Get the tool from the registry."""
         tool = self.tools.get_tool(
-            tool_id,
+            tool_name,
         )
         if not tool:
-            raise ToolNotFoundError(tool_id)
+            raise ToolNotFoundError(tool_name)
         return tool
 
     def get_tools(self) -> ToolSet:
