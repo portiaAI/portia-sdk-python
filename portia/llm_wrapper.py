@@ -3,7 +3,6 @@
 import logging
 from enum import Enum
 from typing import (
-    Any,
     TypeVar,
 )
 
@@ -53,45 +52,16 @@ class InvalidProviderError(Exception):
 class LLMWrapper:
     """LLMWrapper class for different LLMs."""
 
-    _instance = None  # Singleton instance
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
-        """Return singleton instance if it exists."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.__init__(*args, **kwargs)
-        return cls._instance
-
     def __init__(
         self,
         config: Config,
     ) -> None:
         """Initialize the wrapper."""
-        # set defaults
-        llm_provider = config.llm_provider or DEFAULT_LLM_PROVIDER
-        model_name = config.llm_model_name or DEFAULT_LLM_MODEL
-        model_temperature = config.llm_model_temperature or DEFAULT_MODEL_TEMPERATURE
-        model_seed = config.llm_model_seed or DEFAULT_MODEL_SEED
-
-        # Prevent reinitialization in singleton pattern
-        if hasattr(self, "_initialized") and self._initialized:
-            if (
-                llm_provider is not None
-                and self._instance
-                and self._instance.llm_provider != llm_provider
-            ):
-                error = (
-                    f"""Attempting to reinitialize LLM from {self.llm_provider} to {llm_provider}"""
-                )
-                raise ValueError(error)
-            return
-
         self.config = config
-        self.llm_provider = llm_provider
-        self.model_name = model_name
-        self.model_temperature = model_temperature
-        self.model_seed = model_seed
-        self._initialized = True
+        self.llm_provider = config.llm_provider or DEFAULT_LLM_PROVIDER
+        self.model_name = config.llm_model_name or DEFAULT_LLM_MODEL
+        self.model_temperature = config.llm_model_temperature or DEFAULT_MODEL_TEMPERATURE
+        self.model_seed = config.llm_model_seed or DEFAULT_MODEL_SEED
 
     def to_langchain(self) -> BaseChatModel:
         """Return a langchain chat model."""

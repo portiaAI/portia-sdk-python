@@ -29,7 +29,6 @@ def planner(mock_config: Config) -> Planner:
     return Planner(config=mock_config)
 
 
-@patch.object(LLMWrapper, "_instance", None)
 def test_generate_plan_or_error_success(planner: Planner, mock_tool_set: ToolSet) -> None:
     """Test successful plan generation with valid inputs."""
     mock_tool_set.get_tools.return_value = []  # type: ignore  # noqa: PGH003
@@ -45,7 +44,6 @@ def test_generate_plan_or_error_success(planner: Planner, mock_tool_set: ToolSet
     assert result.error is None
 
 
-@patch.object(LLMWrapper, "_instance", None)
 def test_generate_plan_or_error_failure(planner: Planner, mock_tool_set: ToolSet) -> None:
     """Test handling of error when generating a plan fails."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"

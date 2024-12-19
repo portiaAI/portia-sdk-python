@@ -35,7 +35,6 @@ def runner() -> Runner:
     return Runner(config=config, tool_registry=tool_registry)
 
 
-@patch.object(LLMWrapper, "_instance", None)
 def test_runner_run_query(runner: Runner) -> None:
     """Test running a query using the Runner."""
     query = "example query"
@@ -48,7 +47,6 @@ def test_runner_run_query(runner: Runner) -> None:
     assert workflow.state == WorkflowState.COMPLETE
 
 
-@patch.object(LLMWrapper, "_instance", None)
 def test_runner_plan_query(runner: Runner) -> None:
     """Test planning a query using the Runner."""
     query = "example query"
@@ -61,7 +59,6 @@ def test_runner_plan_query(runner: Runner) -> None:
     assert plan.query == query
 
 
-@patch.object(LLMWrapper, "_instance", None)
 def test_runner_run_plan(runner: Runner) -> None:
     """Test running a plan using the Runner."""
     query = "example query"
@@ -76,7 +73,6 @@ def test_runner_run_plan(runner: Runner) -> None:
     assert workflow.plan_id == plan.id
 
 
-@patch.object(LLMWrapper, "_instance", None)
 def test_runner_resume_workflow(runner: Runner) -> None:
     """Test resuming a workflow after interruption."""
     query = "example query"
@@ -96,7 +92,6 @@ def test_runner_resume_workflow(runner: Runner) -> None:
     assert workflow.current_step_index == 1
 
 
-@patch.object(LLMWrapper, "_instance", None)
 def test_runner_resume_workflow_invalid_state(runner: Runner) -> None:
     """Test resuming a workflow with an invalid state."""
     query = "example query"
