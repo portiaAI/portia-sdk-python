@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
-from portia.agents.simple_agent import SimpleAgent, SimpleToolCallingModel
+from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
 from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
@@ -51,7 +51,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
 
-    agent = SimpleAgent(
+    agent = OneShotAgent(
         description="Write a sentence with every letter of the alphabet.",
         inputs=[],
         tool=None,
@@ -88,7 +88,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         ]
         return {"messages": [response]}
 
-    monkeypatch.setattr(SimpleToolCallingModel, "invoke", tool_calling_model)
+    monkeypatch.setattr(OneShotToolCallingModel, "invoke", tool_calling_model)
 
     def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
         return {
@@ -101,7 +101,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
-    agent = SimpleAgent(
+    agent = OneShotAgent(
         description="Send an email to test@example.com saying Hi as both the subject and body.",
         inputs=[],
         tool=AdditionTool(),

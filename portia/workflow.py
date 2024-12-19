@@ -44,3 +44,9 @@ class Workflow(BaseModel):
         description="The current state of the workflow.",
     )
     step_outputs: dict[str, Output] = {}
+
+    def get_outstanding_clarifications(self) -> list[Clarification]:
+        """Return all outstanding clarifications."""
+        return [
+            clarification for clarification in self.clarifications if not clarification.resolved
+        ]

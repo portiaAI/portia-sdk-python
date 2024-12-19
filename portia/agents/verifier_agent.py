@@ -1,4 +1,4 @@
-"""Complex Agent for hardest problems."""
+"""Verifier Agent for hardest problems."""
 
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ class ParserModel:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, context: str, agent: ComplexLanggraphAgent) -> None:
+    def __init__(self, llm: BaseChatModel, context: str, agent: VerifierAgent) -> None:
         """Initialize the model."""
         self.llm = llm
         self.context = context
@@ -152,7 +152,7 @@ class VerifierModel:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, context: str, agent: ComplexLanggraphAgent) -> None:
+    def __init__(self, llm: BaseChatModel, context: str, agent: VerifierAgent) -> None:
         """Initialize the model."""
         self.llm = llm
         self.context = context
@@ -202,7 +202,7 @@ class ErrorClarifier:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, context: str, agent: ComplexLanggraphAgent) -> None:
+    def __init__(self, llm: BaseChatModel, context: str, agent: VerifierAgent) -> None:
         """Initialize the model."""
         self.llm = llm
         self.context = context
@@ -245,7 +245,7 @@ class ToolCallingModel:
         llm: BaseChatModel,
         context: str,
         tools: list[StructuredTool],
-        agent: ComplexLanggraphAgent,
+        agent: VerifierAgent,
     ) -> None:
         """Initialize the model."""
         self.llm = llm
@@ -289,8 +289,8 @@ class ToolCallingModel:
         return {"messages": [response]}
 
 
-class ComplexLanggraphAgent(BaseAgent):
-    """Agent responsible for achieving a task by using langgraph.
+class VerifierAgent(BaseAgent):
+    """Agent responsible for achieving a task by using verification.
 
     This agent does the following things:
      1. It uses an LLM to make sure that we have the right arguments for the tool, with
@@ -487,7 +487,7 @@ class ComplexLanggraphAgent(BaseAgent):
 
         workflow.add_conditional_edges(
             "tools",
-            ComplexLanggraphAgent.error_clarifier_or_finish,
+            VerifierAgent.error_clarifier_or_finish,
         )
 
         workflow.add_node("error_clarifier", ErrorClarifier(llm, context, self).invoke)

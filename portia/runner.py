@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from portia.agents.base_agent import AgentType, BaseAgent
-from portia.agents.complex_langgraph_agent import ComplexLanggraphAgent
-from portia.agents.simple_agent import SimpleAgent
+from portia.agents.one_shot_agent import OneShotAgent
+from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
-from portia.config import Config, StorageClass
+from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
     InvalidAgentError,
     InvalidAgentUsageError,
@@ -24,6 +23,7 @@ from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
+    from portia.agents.base_agent import BaseAgent
     from portia.config import Config
 
 
@@ -38,7 +38,6 @@ class Runner:
         """Initialize storage and tools."""
         self.config = config
         self.tool_registry = tool_registry or LocalToolRegistry()
-        self.agent_type = config.default_agent_type or AgentType.CHAIN_OF_THOUGHT.name
 
         match config.storage_class:
             case StorageClass.MEMORY:
@@ -110,7 +109,7 @@ class Runner:
             agent = self._get_agent_for_step(
                 step,
                 self.get_clarifications_for_step(workflow),
-                self.agent_type,
+                self.config.default_agent_type,
             )
 
             try:
@@ -135,26 +134,26 @@ class Runner:
         self,
         step: Step,
         clarifications: list[Clarification],
-        agent_type: str,
+        agent_type: AgentType,
     ) -> BaseAgent:
         tool = None
         if step.tool_name:
             tool = self.tool_registry.get_tool(step.tool_name)
         match agent_type:
-            case AgentType.TOOL_LESS.name:
+            case AgentType.TOOL_LESS:
                 raise NotImplementedError("Toolless agent not implemented in plan executor")
-            case AgentType.SIMPLE.name:
-                return SimpleAgent(
+            case AgentType.ONE_SHOT:
+                return OneShotAgent(
                     description=step.task,
                     inputs=step.input or [],
                     clarifications=clarifications,
                     tool=tool,
                     system_context=self.config.agent_system_context_override,
                 )
-            case AgentType.CHAIN_OF_THOUGHT.name:
+            case AgentType.VERIFIER:
                 if tool is None:
-                    raise InvalidAgentUsageError(agent_type)
-                return ComplexLanggraphAgent(
+                    raise InvalidAgentUsageError(agent_type.name)
+                return VerifierAgent(
                     description=step.task,
                     inputs=step.input or [],
                     clarifications=clarifications,

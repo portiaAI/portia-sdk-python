@@ -1,4 +1,4 @@
-"""Simple agent."""
+"""One Shot agent."""
 
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ if TYPE_CHECKING:
     from langchain.tools import StructuredTool
     from langchain_core.language_models.chat_models import BaseChatModel
 
-    from portia.agents.complex_langgraph_agent import VerifiedToolInputs
+    from portia.agents.verifier_agent import VerifiedToolInputs
     from portia.tool import Tool
 
 
 MAX_RETRIES = 4
 
 
-class SimpleToolCallingModel:
+class OneShotToolCallingModel:
     """Model to call the tool with unverified arguments."""
 
     tool_calling_prompt = ChatPromptTemplate.from_messages(
@@ -49,7 +49,7 @@ class SimpleToolCallingModel:
         llm: BaseChatModel,
         context: str,
         tools: list[StructuredTool],
-        agent: SimpleAgent,
+        agent: OneShotAgent,
     ) -> None:
         """Initialize the model."""
         self.llm = llm
@@ -73,7 +73,7 @@ class SimpleToolCallingModel:
         return {"messages": [response]}
 
 
-class SimpleAgent(BaseAgent):
+class OneShotAgent(BaseAgent):
     """Agent responsible for achieving a task by using langgraph.
 
     This agent does the following things:
@@ -157,14 +157,14 @@ class SimpleAgent(BaseAgent):
         tool_node = ToolNode(tools)
 
         workflow = StateGraph(MessagesState)
-        workflow.add_node("tool_agent", SimpleToolCallingModel(llm, context, tools, self).invoke)
+        workflow.add_node("tool_agent", OneShotToolCallingModel(llm, context, tools, self).invoke)
         workflow.add_node("tools", tool_node)
         workflow.add_edge(START, "tool_agent")
         workflow.add_conditional_edges("tool_agent", self.call_tool_or_return)
 
         workflow.add_conditional_edges(
             "tools",
-            SimpleAgent.retry_tool_or_finish,
+            OneShotAgent.retry_tool_or_finish,
         )
 
         # We could use a MemorySaver checkpointer to hold intermediate state,

@@ -1,4 +1,4 @@
-"""test complex agent."""
+"""test verifier agent."""
 
 from __future__ import annotations
 
@@ -12,17 +12,17 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
-from portia.agents.complex_langgraph_agent import (
-    ComplexLanggraphAgent,
+from portia.agents.toolless_agent import ToolLessModel
+from portia.agents.verifier_agent import (
     ParserModel,
     ToolArgument,
     ToolCallingModel,
     ToolInputs,
     VerifiedToolArgument,
     VerifiedToolInputs,
+    VerifierAgent,
     VerifierModel,
 )
-from portia.agents.toolless_agent import ToolLessModel
 from portia.clarification import InputClarification
 from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
@@ -84,7 +84,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
 
-    agent = ComplexLanggraphAgent(
+    agent = VerifierAgent(
         description="Write a sentence with every letter of the alphabet.",
         inputs=[],
         tool=None,
@@ -336,7 +336,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
-    agent = ComplexLanggraphAgent(
+    agent = VerifierAgent(
         description="Send an email to test@example.com saying Hi as both the subject and body.",
         inputs=[],
         tool=tool,

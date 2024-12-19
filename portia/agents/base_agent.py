@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from datetime import UTC, datetime
-from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from langchain.tools import BaseTool
@@ -22,14 +21,6 @@ if TYPE_CHECKING:
 
     from portia.plan import Output, Variable
     from portia.tool import Tool
-
-
-class AgentType(Enum):
-    """Type of agent to use for executing a step."""
-
-    TOOL_LESS = "TOOL_LESS"
-    SIMPLE = "SIMPLE"
-    CHAIN_OF_THOUGHT = "CHAIN_OF_THOUGHT"
 
 
 class RequestClarificationInput(BaseModel):

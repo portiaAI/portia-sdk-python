@@ -41,14 +41,14 @@ class LLMWrapper:
     def to_langchain(self) -> BaseChatModel:
         """Return a langchain chat model."""
         match self.llm_provider:
-            case LLMProvider.OpenAI:
+            case LLMProvider.OPENAI:
                 return ChatOpenAI(
                     name=self.model_name,
                     temperature=self.model_temperature,
                     seed=self.model_seed,
                     api_key=self.config.openai_api_key,
                 )
-            case LLMProvider.Anthropic:
+            case LLMProvider.ANTHROPIC:
                 return ChatAnthropic(
                     model_name=self.model_name,
                     temperature=self.model_temperature,
@@ -56,7 +56,7 @@ class LLMWrapper:
                     stop=None,
                     api_key=self.config.must_get_api_key("anthropic_api_key"),
                 )
-            case LLMProvider.MistralAI:
+            case LLMProvider.MISTRALAI:
                 return ChatMistralAI(
                     model_name=self.model_name,
                     temperature=self.model_temperature,
@@ -72,7 +72,7 @@ class LLMWrapper:
     ) -> T:
         """Use instructor to generate an object of response_model type."""
         match self.llm_provider:
-            case LLMProvider.OpenAI:
+            case LLMProvider.OPENAI:
                 client = instructor.from_openai(
                     client=OpenAI(
                         api_key=self.config.must_get_raw_api_key("openai_api_key"),
@@ -86,7 +86,7 @@ class LLMWrapper:
                     temperature=self.model_temperature,
                     seed=self.model_seed,
                 )
-            case LLMProvider.Anthropic:
+            case LLMProvider.ANTHROPIC:
                 client = instructor.from_anthropic(
                     client=Anthropic(
                         api_key=self.config.must_get_raw_api_key("anthropic_api_key"),
@@ -101,7 +101,7 @@ class LLMWrapper:
                     temperature=self.model_temperature,
                     seed=self.model_seed,
                 )
-            case LLMProvider.MistralAI:
+            case LLMProvider.MISTRALAI:
                 client = instructor.from_mistral(
                     client=Mistral(
                         api_key=self.config.must_get_raw_api_key("mistralai_api_key"),

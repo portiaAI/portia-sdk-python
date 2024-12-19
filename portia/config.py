@@ -25,9 +25,17 @@ class StorageClass(Enum):
 class LLMProvider(Enum):
     """Enum of LLM providers."""
 
-    OpenAI = "openai"
-    Anthropic = "anthropic"
-    MistralAI = "mistralai"
+    OPENAI = "OPENAI"
+    ANTHROPIC = "ANTHROPIC"
+    MISTRALAI = "MISTRALAI"
+
+
+class AgentType(Enum):
+    """Type of agent to use for executing a step."""
+
+    TOOL_LESS = "TOOL_LESS"
+    ONE_SHOT = "ONE_SHOT"
+    VERIFIER = "VERIFIER"
 
 
 class Config(BaseModel):
@@ -44,13 +52,13 @@ class Config(BaseModel):
     storage_dir: str | None = None
 
     # LLM Options
-    llm_provider: LLMProvider = LLMProvider.OpenAI
+    llm_provider: LLMProvider = LLMProvider.OPENAI
     llm_model_name: str = "gpt-4o-mini"
     llm_model_temperature: int = 0
     llm_model_seed: int = 443
 
     # Agent Options
-    default_agent_type: str | None = None
+    default_agent_type: AgentType = AgentType.VERIFIER
 
     # System Context Overrides
     planner_system_context_override: list[str] | None = None
