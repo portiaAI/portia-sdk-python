@@ -6,6 +6,7 @@ from typing import Any, Generic
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_serializer, model_validator
+from sqlalchemy import true
 
 from portia.types import SERIALIZABLE_TYPE_VAR
 
@@ -61,6 +62,11 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             # If missing or invalid, use the default_factory
             values["id"] = uuid4()
         return values
+
+    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
+        """Resolve the clarification with the given response."""
+        self.response = response
+        self.resolved = True
 
 
 class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):

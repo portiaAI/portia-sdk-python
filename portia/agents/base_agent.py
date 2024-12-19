@@ -87,7 +87,7 @@ class BaseAgent:
             self.system_context = system_context
 
     @abstractmethod
-    def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Any:  # noqa: ANN401
+    def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
         """Run the core execution logic of the task."""
 
     def _get_context(self, step_outputs: dict[str, Output]) -> str:

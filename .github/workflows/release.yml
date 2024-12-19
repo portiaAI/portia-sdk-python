@@ -1,7 +1,6 @@
 name: Version Tag Creation
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main

@@ -120,14 +120,33 @@ class Runner:
                     llm=LLMWrapper(config=self.config).to_langchain(),
                     step_outputs=workflow.step_outputs,
                 )
-            except Exception as e:  # noqa: BLE001
+
+            except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 workflow.step_outputs[step.output] = Output(value=str(e))
                 workflow.state = WorkflowState.FAILED
                 self.storage.save_workflow(workflow)
                 return workflow
             else:
                 workflow.step_outputs[step.output] = step_output
-            self.storage.save_workflow(workflow)
+
+            # if a clarification was returned append it to the set of clarifications needed
+            if isinstance(step_output.value, Clarification) or (
+                isinstance(step_output.value, list)
+                and len(step_output.value) > 0
+                and all(isinstance(item, Clarification) for item in step_output.value)
+            ):
+                new_clarifications = (
+                    [step_output.value]
+                    if isinstance(step_output.value, Clarification)
+                    else step_output.value
+                )
+                for clarification in new_clarifications:
+                    clarification.step = workflow.current_step_index
+
+                workflow.clarifications = workflow.clarifications + new_clarifications
+                workflow.state = WorkflowState.NEED_CLARIFICATION
+                self.storage.save_workflow(workflow)
+                return workflow
 
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)
