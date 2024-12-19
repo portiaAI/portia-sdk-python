@@ -38,14 +38,6 @@ class AgentType(Enum):
     VERIFIER = "VERIFIER"
 
 
-class LLMProvider(Enum):
-    """Enum of LLM providers."""
-
-    OpenAI = "openai"
-    Anthropic = "anthropic"
-    MistralAI = "mistralai"
-
-
 class Config(BaseModel):
     """General configuration for the library."""
 
