@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from portia import LocalToolRegistry
+from portia import InMemoryToolRegistry
 from portia.clarification import InputClarification
 from portia.config import Config
 from portia.runner import Runner
@@ -38,11 +38,11 @@ class AdditionTool(Tool):
         return a + b
 
 
-registry = LocalToolRegistry.from_local_tools([AdditionTool()])
+registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
 runner = Runner(Config(), tool_registry=registry)
 
 
-output = runner.run_query("Add 1 + 2")
+output = runner.run_query("Add 1 + 2", tools=["add_tool"])
 
 while output.state != WorkflowState.COMPLETE:
     for clarification in output.get_outstanding_clarifications():

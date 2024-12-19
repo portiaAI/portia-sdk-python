@@ -67,9 +67,9 @@ class WorkflowNotFoundError(Exception):
 class ToolNotFoundError(Exception):
     """Custom error class when tools aren't found."""
 
-    def __init__(self, tool_name: str) -> None:
+    def __init__(self, tool_id: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Tool with name {tool_name} not found.")
+        super().__init__(f"Tool with id {tool_id} not found.")
 
 
 class InvalidToolDescriptionError(Exception):

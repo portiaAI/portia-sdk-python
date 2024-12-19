@@ -25,7 +25,7 @@ runner.run_query("Add 1 and 2")
 ```python
 from portia.runner import Runner, RunnerConfig, StorageClass
 from portia.tool import Tool
-from portia.tool_registry import LocalToolRegistry
+from portia.tool_registry import InMemoryToolRegistry
 
 # Create a local tool
 class AdditionTool(Tool):
@@ -38,7 +38,7 @@ class AdditionTool(Tool):
 
 
 # Create the ToolRegistry with the tool
-tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
+tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
 
 runner = Runner(config=Config(), tool_registry=tool_registry)
 runner.run_query("Add 1 and 2")
@@ -51,7 +51,7 @@ Multiple registries can be combined to give the power of Portia Cloud with the c
 ```python
 from portia.runner import Runner, RunnerConfig
 from portia.tool import Tool
-from portia.tool_registry import LocalToolRegistry, PortiaToolRegistry
+from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry
 
 # Create a local tool
 class AdditionTool(Tool):
@@ -64,7 +64,7 @@ class AdditionTool(Tool):
 
 
 # Create the ToolRegistry with the tool
-local_tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
+local_tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
 
 remote_tool_registry = PortiaToolRegistry(api_key="123")
 

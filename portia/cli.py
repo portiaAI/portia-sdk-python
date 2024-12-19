@@ -4,7 +4,7 @@ import click
 
 from portia.config import Config
 from portia.runner import Runner
-from portia.tool_registry import LocalToolRegistry
+from portia.tool_registry import InMemoryToolRegistry
 from tests.utils import AdditionTool
 
 
@@ -13,9 +13,9 @@ from tests.utils import AdditionTool
 def cli(query: str) -> None:
     """Run a query."""
     config = Config()
-    tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
+    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
-    output = runner.run_query(query)
+    output = runner.run_query(query, tools=[])
     click.echo(output)
 
 

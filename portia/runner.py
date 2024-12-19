@@ -19,7 +19,7 @@ from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage
-from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
+from portia.tool_registry import InMemoryToolRegistry, ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class Runner:
     ) -> None:
         """Initialize storage and tools."""
         self.config = config
-        self.tool_registry = tool_registry or LocalToolRegistry()
+        self.tool_registry = tool_registry or InMemoryToolRegistry()
 
         match config.storage_class:
             case StorageClass.MEMORY:
@@ -50,7 +50,7 @@ class Runner:
     def run_query(
         self,
         query: str,
-        tools: ToolSet | None = None,
+        tools: ToolSet | list[str] | None = None,
         example_workflows: list[Plan] | None = None,
     ) -> Workflow:
         """Plan and run a query in one go."""
@@ -60,12 +60,15 @@ class Runner:
     def plan_query(
         self,
         query: str,
-        tools: ToolSet | None = None,
+        tools: ToolSet | list[str] | None = None,
         example_plans: list[Plan] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples."""
         if not tools:
             tools = self.tool_registry.match_tools(query)
+
+        if isinstance(tools, list):
+            tools = ToolSet([self.tool_registry.get_tool(tool) for tool in tools])
 
         planner = Planner(config=self.config)
         outcome = planner.generate_plan_or_error(

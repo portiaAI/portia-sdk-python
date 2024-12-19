@@ -12,7 +12,7 @@ from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
 from portia.planner import PlanOrError
 from portia.runner import Runner
-from portia.tool_registry import LocalToolRegistry
+from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState
 from tests.utils import AdditionTool
 
@@ -21,7 +21,7 @@ from tests.utils import AdditionTool
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
     config = Config()
-    tool_registry = LocalToolRegistry.from_local_tools([AdditionTool()])
+    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     return Runner(config=config, tool_registry=tool_registry)
 
 
