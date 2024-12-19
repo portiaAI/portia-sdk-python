@@ -6,7 +6,6 @@ from typing import Any, Generic
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_serializer, model_validator
-from sqlalchemy import true
 
 from portia.types import SERIALIZABLE_TYPE_VAR
 

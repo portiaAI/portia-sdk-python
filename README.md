@@ -95,5 +95,5 @@ To test the CLI locally run
 ```bash
 pip install -e . 
 export OPENAI_API_KEY=$KEY
-portia-cli "add 4 + 8"
+portia-cli run "add 4 + 8"
 ```
