@@ -2,47 +2,12 @@
 
 from __future__ import annotations
 
-import os
-from enum import Enum
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-from pydantic import BaseModel
-
-from portia.plan import Output, Plan, Step, Variable
+from portia.config import Config, InvalidStorageError, StorageClass
+from portia.plan import Output, Plan
+from portia.planner import PlanError, Planner
 from portia.storage import DiskFileStorage, InMemoryStorage
 from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
 from portia.workflow import InvalidWorkflowStateError, Workflow, WorkflowState
-
-if TYPE_CHECKING:
-    from portia.tool import Tool
-
-
-class InvalidStorageError(Exception):
-    """Raised when an invalid storage is provided."""
-
-
-class StorageClass(Enum):
-    """Represent locations plans and workflows are written to."""
-
-    MEMORY = "MEMORY"
-    DISK = "DISK"
-    CLOUD = "CLOUD"
-
-
-class RunnerConfig(BaseModel):
-    """General configuration for the library."""
-
-    portia_api_key: str | None = os.getenv("PORTIA_API_KEY")
-    openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
-
-    storage_class: StorageClass = StorageClass.MEMORY
-
-    @classmethod
-    def from_file(cls, file_path: Path) -> RunnerConfig:
-        """Load configuration from a JSON file."""
-        with Path.open(file_path) as f:
-            return cls.model_validate_json(f.read())
 
 
 class Runner:
@@ -50,24 +15,25 @@ class Runner:
 
     def __init__(
         self,
-        config: RunnerConfig,
+        config: Config,
         tool_registry: ToolRegistry | None = None,
     ) -> None:
         """Initialize storage and tools."""
+        self.config = config
+        self.tool_registry = tool_registry or LocalToolRegistry()
+
         match config.storage_class:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
-                self.storage = DiskFileStorage(None)
+                self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
             case _:
                 raise InvalidStorageError
-
-        self.tool_registry = tool_registry or LocalToolRegistry()
 
     def run_query(
         self,
         query: str,
-        tools: list[Tool] | None = None,
+        tools: ToolSet | None = None,
         example_workflows: list[Plan] | None = None,
     ) -> Workflow:
         """Plan and run a query in one go."""
@@ -77,26 +43,24 @@ class Runner:
     def plan_query(
         self,
         query: str,
-        tools: list[Tool] | None = None,
-        example_plans: list[Plan] | None = None,  # noqa: ARG002 - we're not using example plans yet
+        tools: ToolSet | None = None,
+        example_plans: list[Plan] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples."""
-        tool_set = ToolSet(tools) if tools else self.tool_registry.match_tools(query)
-        steps = [
-            Step(
-                tool_name=tool.name,
-                task="Do something",
-                input=[
-                    Variable(name="a", value=4, description="A value"),
-                    Variable(name="b", value=5, description="B value"),
-                ],
-                output="$sum",
-            )
-            for tool in tool_set.get_tools()
-        ]
-        plan = Plan(query=query, steps=steps)
-        self.storage.save_plan(plan)
-        return plan
+        if not tools:
+            tools = self.tool_registry.match_tools(query)
+
+        planner = Planner(config=self.config)
+        outcome = planner.generate_plan_or_error(
+            query=query,
+            tool_list=tools,
+            system_context=self.config.planner_system_content,
+            examples=example_plans,
+        )
+        if outcome.error:
+            raise PlanError(outcome.error)
+        self.storage.save_plan(outcome.plan)
+        return outcome.plan
 
     def run_plan(self, plan: Plan) -> Workflow:
         """Run a plan returning the completed workflow or clarifications if needed."""
