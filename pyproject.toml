@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "porita-sdk-python"
+name = "portia-sdk-python"
 version = "0.0.1-alpha.2"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Tech <tech@portialabs.ai>"]
