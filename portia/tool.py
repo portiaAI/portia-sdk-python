@@ -91,12 +91,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         Returns a tuple of the output and an Output object, as expected by langchain tools.
         This allows us to capture the output (artifact) directly instead of having it
-        seralized to a string first (see content_and_artifact in langgraph tool definition).
+        serialized to a string first (see content_and_artifact in langgraph tool definition).
         """
         intermediate_output = self._run(*args, **kwargs)
         return (intermediate_output.value, intermediate_output)  # type: ignore  # noqa: PGH003
 
     def _generate_tool_description(self) -> str:
+        """Generate tool descriptions."""
         args = []
         args_description = []
         args_name_description_dict = []
