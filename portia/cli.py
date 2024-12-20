@@ -1,4 +1,10 @@
-"""CLI."""
+"""CLI Implementation.
+
+Usage:
+
+portia-cli run "add 4 + 8" - run a query
+portia-cli plan "add 4 + 8" - plan a query
+"""
 
 import click
 
