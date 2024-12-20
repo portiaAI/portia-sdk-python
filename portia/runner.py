@@ -19,7 +19,7 @@ from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage
-from portia.tool_registry import LocalToolRegistry, ToolRegistry, ToolSet
+from portia.tool_registry import InMemoryToolRegistry, ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class Runner:
     ) -> None:
         """Initialize storage and tools."""
         self.config = config
-        self.tool_registry = tool_registry or LocalToolRegistry()
+        self.tool_registry = tool_registry or InMemoryToolRegistry()
 
         match config.storage_class:
             case StorageClass.MEMORY:
@@ -50,7 +50,7 @@ class Runner:
     def run_query(
         self,
         query: str,
-        tools: ToolSet | None = None,
+        tools: ToolSet | list[str] | None = None,
         example_workflows: list[Plan] | None = None,
     ) -> Workflow:
         """Plan and run a query in one go."""
@@ -60,12 +60,15 @@ class Runner:
     def plan_query(
         self,
         query: str,
-        tools: ToolSet | None = None,
+        tools: ToolSet | list[str] | None = None,
         example_plans: list[Plan] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples."""
         if not tools:
             tools = self.tool_registry.match_tools(query)
+
+        if isinstance(tools, list):
+            tools = ToolSet([self.tool_registry.get_tool(tool) for tool in tools])
 
         planner = Planner(config=self.config)
         outcome = planner.generate_plan_or_error(
@@ -86,7 +89,10 @@ class Runner:
 
     def resume_workflow(self, workflow: Workflow) -> Workflow:
         """Resume a workflow after an interruption."""
-        if workflow.state not in [WorkflowState.IN_PROGRESS, WorkflowState.NEED_CLARIFICATION]:
+        if workflow.state not in [
+            WorkflowState.IN_PROGRESS,
+            WorkflowState.NEED_CLARIFICATION,
+        ]:
             raise InvalidWorkflowStateError(workflow.id)
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
@@ -117,14 +123,33 @@ class Runner:
                     llm=LLMWrapper(config=self.config).to_langchain(),
                     step_outputs=workflow.step_outputs,
                 )
-            except Exception as e:  # noqa: BLE001
+
+            except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 workflow.step_outputs[step.output] = Output(value=str(e))
                 workflow.state = WorkflowState.FAILED
                 self.storage.save_workflow(workflow)
                 return workflow
             else:
                 workflow.step_outputs[step.output] = step_output
-            self.storage.save_workflow(workflow)
+
+            # if a clarification was returned append it to the set of clarifications needed
+            if isinstance(step_output.value, Clarification) or (
+                isinstance(step_output.value, list)
+                and len(step_output.value) > 0
+                and all(isinstance(item, Clarification) for item in step_output.value)
+            ):
+                new_clarifications = (
+                    [step_output.value]
+                    if isinstance(step_output.value, Clarification)
+                    else step_output.value
+                )
+                for clarification in new_clarifications:
+                    clarification.step = workflow.current_step_index
+
+                workflow.clarifications = workflow.clarifications + new_clarifications
+                workflow.state = WorkflowState.NEED_CLARIFICATION
+                self.storage.save_workflow(workflow)
+                return workflow
 
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)

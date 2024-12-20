@@ -26,11 +26,11 @@ class ToolSet:
         """Add a tool to the set."""
         self.tools[tool.name] = tool
 
-    def get_tool(self, name: str) -> Tool:
-        """Get a tool by name."""
-        if name in self.tools:
-            return self.tools[name]
-        raise ToolNotFoundError(name)
+    def get_tool(self, tool_name: str) -> Tool:
+        """Get a tool by id."""
+        if tool_name in self.tools:
+            return self.tools[tool_name]
+        raise ToolNotFoundError(tool_name)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools."""
@@ -107,7 +107,7 @@ class AggregatedToolRegistry(ToolRegistry):
         return tools
 
 
-class LocalToolRegistry(ToolRegistry):
+class InMemoryToolRegistry(ToolRegistry):
     """Provides a simple in memory tool registry."""
 
     def __init__(self) -> None:
@@ -115,9 +115,9 @@ class LocalToolRegistry(ToolRegistry):
         self.tools = ToolSet([])
 
     @classmethod
-    def from_local_tools(cls, tools: Sequence[Tool]) -> LocalToolRegistry:
+    def from_local_tools(cls, tools: Sequence[Tool]) -> InMemoryToolRegistry:
         """Easily create a local tool registry."""
-        registry = LocalToolRegistry()
+        registry = InMemoryToolRegistry()
         for t in tools:
             registry.register_tool(t)
         return registry

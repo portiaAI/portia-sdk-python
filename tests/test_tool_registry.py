@@ -4,7 +4,7 @@ import pytest
 
 from portia.errors import ToolNotFoundError
 from portia.tool_registry import (
-    LocalToolRegistry,
+    InMemoryToolRegistry,
     ToolSet,
 )
 from tests.utils import MockTool
@@ -24,8 +24,8 @@ def test_tool_set_get_tool() -> None:
 
 
 def test_local_tool_registry_register_tool() -> None:
-    """Test registering tools in the LocalToolRegistry."""
-    local_tool_registry = LocalToolRegistry()
+    """Test registering tools in the InMemoryToolRegistry."""
+    local_tool_registry = InMemoryToolRegistry()
     local_tool_registry.register_tool(MockTool(name=MOCK_TOOL_NAME))
     tool1 = local_tool_registry.get_tool(MOCK_TOOL_NAME)
     assert tool1.name == MOCK_TOOL_NAME
@@ -35,8 +35,8 @@ def test_local_tool_registry_register_tool() -> None:
 
 
 def test_local_tool_registry_get_tools() -> None:
-    """Test the get_tools method of LocalToolRegistry."""
-    local_tool_registry = LocalToolRegistry.from_local_tools(
+    """Test the get_tools method of InMemoryToolRegistry."""
+    local_tool_registry = InMemoryToolRegistry.from_local_tools(
         [MockTool(name=MOCK_TOOL_NAME), MockTool(name=OTHER_MOCK_TOOL_NAME)],
     )
     tool_set = local_tool_registry.get_tools()
@@ -47,8 +47,10 @@ def test_local_tool_registry_get_tools() -> None:
 
 def test_aggregated_tool_registry_get_tool() -> None:
     """Test searching across multiple registries in AggregatedToolRegistry."""
-    local_tool_registry = LocalToolRegistry.from_local_tools([MockTool(name=MOCK_TOOL_NAME)])
-    other_tool_registry = LocalToolRegistry.from_local_tools([MockTool(name=OTHER_MOCK_TOOL_NAME)])
+    local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(name=MOCK_TOOL_NAME)])
+    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+        [MockTool(name=OTHER_MOCK_TOOL_NAME)],
+    )
     aggregated_tool_registry = local_tool_registry + other_tool_registry
 
     tool1 = aggregated_tool_registry.get_tool(MOCK_TOOL_NAME)
@@ -60,8 +62,10 @@ def test_aggregated_tool_registry_get_tool() -> None:
 
 def test_aggregated_tool_registry_get_tools() -> None:
     """Test getting all tools from an AggregatedToolRegistry."""
-    local_tool_registry = LocalToolRegistry.from_local_tools([MockTool(name=MOCK_TOOL_NAME)])
-    other_tool_registry = LocalToolRegistry.from_local_tools([MockTool(name=OTHER_MOCK_TOOL_NAME)])
+    local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(name=MOCK_TOOL_NAME)])
+    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+        [MockTool(name=OTHER_MOCK_TOOL_NAME)],
+    )
     aggregated_tool_registry = local_tool_registry + other_tool_registry
 
     tool_set = aggregated_tool_registry.get_tools()

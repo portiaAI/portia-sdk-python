@@ -5,14 +5,14 @@ from portia.tool import (
 )
 from portia.tool_registry import (
     AggregatedToolRegistry,
-    LocalToolRegistry,
+    InMemoryToolRegistry,
     ToolRegistry,
     ToolSet,
 )
 
 __all__ = [
     "AggregatedToolRegistry",
-    "LocalToolRegistry",
+    "InMemoryToolRegistry",
     "Tool",
     "ToolRegistry",
     "ToolSet",

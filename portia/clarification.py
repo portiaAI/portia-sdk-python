@@ -62,6 +62,11 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             values["id"] = uuid4()
         return values
 
+    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
+        """Resolve the clarification with the given response."""
+        self.response = response
+        self.resolved = True
+
 
 class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     """A clarification about a specific argument for a tool.
