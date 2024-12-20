@@ -21,10 +21,6 @@ class WorkflowState(str, Enum):
     FAILED = "FAILED"
 
 
-class InvalidWorkflowStateError(Exception):
-    """The given workflow is in an invalid state."""
-
-
 class Workflow(BaseModel):
     """A workflow represent a running instance of a Plan."""
 
@@ -48,3 +44,9 @@ class Workflow(BaseModel):
         description="The current state of the workflow.",
     )
     step_outputs: dict[str, Output] = {}
+
+    def get_outstanding_clarifications(self) -> list[Clarification]:
+        """Return all outstanding clarifications."""
+        return [
+            clarification for clarification in self.clarifications if not clarification.resolved
+        ]

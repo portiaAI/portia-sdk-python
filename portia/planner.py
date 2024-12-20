@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import importlib.resources
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
 
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, Step, Variable
+from portia.templates.render import render_template
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -47,10 +46,6 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
 ]
 
 
-class PlanError(Exception):
-    """Base class for exceptions in the query planner module. Indicates an error in planning."""
-
-
 class PlanOrError(BaseModel):
     """A plan or an error."""
 
@@ -59,16 +54,6 @@ class PlanOrError(BaseModel):
         default=None,
         description="An error message if the plan could not be created.",
     )
-
-
-def render_template(file_name: str, **kwargs: Any) -> str:  # noqa: ANN401
-    """Render a jinja template from the file system in to a string."""
-    from portia import templates
-
-    with importlib.resources.path(templates, file_name) as template_path:
-        env = Environment(loader=FileSystemLoader(template_path.parent), autoescape=True)
-        template = env.get_template(file_name)
-        return template.render(**kwargs)
 
 
 class Planner:

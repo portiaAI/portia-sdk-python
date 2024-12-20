@@ -26,6 +26,8 @@ langchain-core = "^0.3.25"
 langchain-mistralai = "^0.2.3"
 langchain-openai = "^0.2.12"
 mistralai = "^1.2.5"
+langchain = "^0.3.12"
+langgraph = "^0.2.59"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"
@@ -65,3 +67,21 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.setuptools.package-data]
 portia = ["templates/**/*.jinja"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:Failing to pass a value to the 'type_params' parameter of 'typing.ForwardRef._evaluate':DeprecationWarning",  # this comes from LangChain
+]
+
+[[tool.pydoc-markdown.loaders]]
+type = "python"
+
+[[tool.pydoc-markdown.processors]]
+type = "filter"
+expression = "not 'test' in name and not name.startswith('_') and default()"
+skip_empty_modules = true
+
+[tool.pydoc-markdown.renderer]
+type = "docusaurus"
+relative_output_path="SDK"
+sidebar_top_level_label=""

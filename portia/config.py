@@ -9,27 +9,9 @@ from typing import TypeVar
 
 from pydantic import BaseModel, SecretStr
 
+from portia.errors import ConfigNotFoundError, InvalidConfigError
+
 T = TypeVar("T")
-
-
-class APIKeyNotFoundError(Exception):
-    """Raised when an API Key is not set."""
-
-    def __init__(self, api_key: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{api_key} is not set")
-
-
-class InvalidStorageError(Exception):
-    """Raised when an invalid storage is provided."""
-
-
-class ConfigNotFoundError(Exception):
-    """Raised when a needed config value is not present."""
-
-
-class InvalidConfigError(Exception):
-    """Raised when a needed config value is invalid."""
 
 
 class StorageClass(Enum):
@@ -38,6 +20,22 @@ class StorageClass(Enum):
     MEMORY = "MEMORY"
     DISK = "DISK"
     CLOUD = "CLOUD"
+
+
+class LLMProvider(Enum):
+    """Enum of LLM providers."""
+
+    OPENAI = "OPENAI"
+    ANTHROPIC = "ANTHROPIC"
+    MISTRALAI = "MISTRALAI"
+
+
+class AgentType(Enum):
+    """Type of agent to use for executing a step."""
+
+    TOOL_LESS = "TOOL_LESS"
+    ONE_SHOT = "ONE_SHOT"
+    VERIFIER = "VERIFIER"
 
 
 class Config(BaseModel):
@@ -54,13 +52,17 @@ class Config(BaseModel):
     storage_dir: str | None = None
 
     # LLM Options
-    llm_provider: str | None = None
-    llm_model_name: str | None = None
-    llm_model_temperature: int | None = None
-    llm_model_seed: int | None = None
+    llm_provider: LLMProvider = LLMProvider.OPENAI
+    llm_model_name: str = "gpt-4o-mini"
+    llm_model_temperature: int = 0
+    llm_model_seed: int = 443
+
+    # Agent Options
+    default_agent_type: AgentType = AgentType.VERIFIER
 
     # System Context Overrides
-    planner_system_content: list[str] | None = None
+    planner_system_context_override: list[str] | None = None
+    agent_system_context_override: list[str] | None = None
 
     @classmethod
     def from_file(cls, file_path: Path) -> Config:

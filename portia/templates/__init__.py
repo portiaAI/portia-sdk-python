@@ -1,21 +1,5 @@
-"""portia defines the base abstractions for building Agentic workflows."""
+"""Contains templates for LLM Context."""
 
-from portia.tool import (
-    Tool,
-)
-from portia.tool_registry import (
-    AggregatedToolRegistry,
-    LocalToolRegistry,
-    ToolNotFoundError,
-    ToolRegistry,
-    ToolSet,
-)
+from portia.templates.render import render_template
 
-__all__ = [
-    "AggregatedToolRegistry",
-    "LocalToolRegistry",
-    "Tool",
-    "ToolNotFoundError",
-    "ToolRegistry",
-    "ToolSet",
-]
+__all__ = ["render_template"]

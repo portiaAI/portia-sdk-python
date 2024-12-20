@@ -1,0 +1,11 @@
+---
+{{tool.overview}}
+"""
+{{tool.overview_description}}
+Args:{% for arg in tool.args %}
+    {{arg.name}} ({{arg.type}}): {{arg.description}}{% if arg.examples %}
+        Sample inputs: {{arg.examples}}
+{% endif %}{% endfor %}
+Returns: {% if tool.output_description %}{{tool.output_description}}{% endif %}
+"""
+---
