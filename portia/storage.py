@@ -14,6 +14,8 @@ from portia.plan import Plan
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
