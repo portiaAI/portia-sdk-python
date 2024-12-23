@@ -42,7 +42,7 @@ class Config(BaseModel):
     """General configuration for the library."""
 
     # Portia Cloud Options
-    portia_api_endpoint: str = "https://holsten-37277605247.us-central1.run.app"
+    portia_api_endpoint: str = "https://api.porita.dev"
     portia_api_key: SecretStr | None = SecretStr(os.getenv("PORTIA_API_KEY") or "")
 
     # LLM API Keys
