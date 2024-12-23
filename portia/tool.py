@@ -199,6 +199,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     """Tool that passes run execution to Portia Cloud."""
 
     api_key: SecretStr
+    api_endpoint: str
 
     def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:  # noqa: ANN401
         """Invoke the run endpoint and handle response."""
@@ -209,7 +210,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             # Combine args_dict and kwargs
             data = {**args_dict, **kwargs}
             response = httpx.post(
-                url=f"https://holsten-37277605247.us-central1.run.app/api/v0/tools/{self.id}/run/",
+                url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
                 content=json.dumps(data),
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",

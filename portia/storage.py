@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, ClassVar, TypeVar
 import httpx
 from pydantic import BaseModel, SecretStr, ValidationError
 
+from portia.config import Config
 from portia.errors import PlanNotFoundError, WorkflowNotFoundError
 from portia.plan import Plan
 from portia.tool_registry import APIKeyRequiredError
@@ -178,28 +179,28 @@ class DiskFileStorage(Storage):
 class PortiaCloudStorage(Storage):
     """Save plans and workflows to portia cloud."""
 
-    def __init__(self, api_key: SecretStr | None) -> None:
+    def __init__(self, config: Config) -> None:
         """Store tools in a tool set for easy access."""
-        if not api_key:
-            raise APIKeyRequiredError
-        self.api_key = api_key
+        self.api_key = config.must_get_api_key("portia_api_key")
+        self.api_endpoint = config.must_get("portia_api_endpoint", str)
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to cloud."""
         response = httpx.post(
-            url="https://holsten-37277605247.us-central1.run.app/api/v0/plans/",
-            data={"plan": plan.model_dump(mode="json")},
+            url=f"{self.api_endpoint}/api/v0/plans/",
+            json={"json": plan.model_dump(mode="json")},
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
+        print(response.content)
         response.raise_for_status()
 
     def get_plan(self, plan_id: UUID) -> Plan:
         """Get plan from cloud."""
         response = httpx.get(
-            url=f"https://holsten-37277605247.us-central1.run.app/api/v0/plans/{plan_id}/",
+            url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
@@ -211,8 +212,8 @@ class PortiaCloudStorage(Storage):
     def save_workflow(self, workflow: Workflow) -> None:
         """Add workflow to cloud."""
         response = httpx.post(
-            url="https://holsten-37277605247.us-central1.run.app/api/v0/workflows/",
-            data=workflow.model_dump(mode="json"),
+            url=f"{self.api_endpoint}/api/v0/workflows/",
+            json={"json": workflow.model_dump(mode="json")},
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
@@ -223,7 +224,7 @@ class PortiaCloudStorage(Storage):
     def get_workflow(self, workflow_id: UUID) -> Workflow:
         """Get workflow from cloud."""
         response = httpx.get(
-            url=f"https://holsten-37277605247.us-central1.run.app/api/v0/workflows/{workflow_id}/",
+            url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",

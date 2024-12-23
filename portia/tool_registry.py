@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import httpx
-from pydantic import BaseModel, SecretStr, create_model
+from pydantic import BaseModel, Field, create_model
 
 from portia.errors import ToolNotFoundError
 from portia.tool import PortiaRemoteTool
@@ -14,9 +14,8 @@ from portia.tool import PortiaRemoteTool
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from pydantic import SecretStr
-
-    from portia.tool import PortiaRemoteTool, Tool
+    from portia.config import Config
+    from portia.tool import Tool
 
 
 class ToolSet:
@@ -157,11 +156,10 @@ class ToolRegistrationFailedError(Exception):
 class PortiaToolRegistry(ToolRegistry):
     """Provides access to portia tools."""
 
-    def __init__(self, api_key: SecretStr | None) -> None:
+    def __init__(self, config: Config) -> None:
         """Store tools in a tool set for easy access."""
-        if not api_key:
-            raise APIKeyRequiredError
-        self.api_key = api_key
+        self.api_key = config.must_get_api_key("portia_api_key")
+        self.api_endpoint = config.must_get("portia_api_endpoint", str)
         self.tools = {}
         self._load_tools()
 
@@ -182,16 +180,19 @@ class PortiaToolRegistry(ToolRegistry):
 
         # Define fields for the model
         fields = {
-            key: (type_mapping.get(value.get("type"), Any), ... if key in required else None)
+            key: (
+                type_mapping.get(value.get("type"), Any),
+                Field(default=None) if key not in required else Field(...),
+            )
             for key, value in properties.items()
         }
 
         # Create the Pydantic model dynamically
-        return create_model(model_name, **fields)
+        return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
 
     def _load_tools(self) -> None:
         response = httpx.get(
-            url="https://holsten-37277605247.us-central1.run.app/api/v0/tools/descriptions/",
+            url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
@@ -211,7 +212,9 @@ class PortiaToolRegistry(ToolRegistry):
                     raw_tool["description"]["overview"],
                     raw_tool["description"]["output_description"],
                 ),
+                # pass API info
                 api_key=self.api_key,
+                api_endpoint=self.api_endpoint,
             )
             tools[raw_tool["tool_name"]] = tool
         self.tools = tools

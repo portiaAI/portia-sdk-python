@@ -41,8 +41,11 @@ class AgentType(Enum):
 class Config(BaseModel):
     """General configuration for the library."""
 
-    # API Keys
+    # Portia Cloud Options
+    portia_api_endpoint: str = "https://holsten-37277605247.us-central1.run.app"
     portia_api_key: SecretStr | None = SecretStr(os.getenv("PORTIA_API_KEY") or "")
+
+    # LLM API Keys
     openai_api_key: SecretStr | None = SecretStr(os.getenv("OPENAI_API_KEY") or "")
     anthropic_api_key: SecretStr | None = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
     mistralai_api_key: SecretStr | None = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
@@ -50,9 +53,6 @@ class Config(BaseModel):
     # Storage Options
     storage_class: StorageClass
     storage_dir: str | None = None
-
-    # Registry Options
-    enable_cloud_tool_registry: bool
 
     # LLM Options
     llm_provider: LLMProvider
@@ -105,5 +105,4 @@ def default_config() -> Config:
         llm_model_temperature=0,
         llm_model_seed=443,
         default_agent_type=AgentType.VERIFIER,
-        enable_cloud_tool_registry=False,
     )

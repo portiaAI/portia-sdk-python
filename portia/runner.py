@@ -14,7 +14,6 @@ from portia.clarification import (
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
     InvalidAgentError,
-    InvalidAgentUsageError,
     InvalidStorageError,
     InvalidWorkflowStateError,
     PlanError,
@@ -23,7 +22,7 @@ from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
-from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry, ToolRegistry, ToolSet
+from portia.tool_registry import ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
@@ -43,18 +42,13 @@ class Runner:
         self.config = config
         self.tool_registry = tool_registry
 
-        if config.has_api_key("portia_api_key") and config.enable_cloud_tool_registry:
-            self.tool_registry += PortiaToolRegistry(
-                api_key=config.must_get_api_key("portia_api_key"),
-            )
-
         match config.storage_class:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
                 self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
             case StorageClass.CLOUD:
-                self.storage = PortiaCloudStorage(api_key=config.must_get_api_key("portia_api_key"))
+                self.storage = PortiaCloudStorage(config=config)
             case _:
                 raise InvalidStorageError(config.storage_class.name)
 

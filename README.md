@@ -64,13 +64,14 @@ class AdditionTool(Tool):
 
 
 # Create the ToolRegistry with the tool
-local_tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
 
-remote_tool_registry = PortiaToolRegistry(api_key="123")
+config = Config()
+
+local_tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
+remote_tool_registry = PortiaToolRegistry(config)
 
 tool_registry = local_tool_registry + remote_tool_registry
 
-config = Config()
 runner = Runner(config=config, tool_registry=tool_registry)
 runner.run_query("Add 1 and 2")
 ```
