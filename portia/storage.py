@@ -5,7 +5,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
-from uuid import UUID
 
 import httpx
 from pydantic import BaseModel, ValidationError
