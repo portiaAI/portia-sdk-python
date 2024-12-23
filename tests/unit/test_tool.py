@@ -1,9 +1,7 @@
 """Tests for the Tool class."""
 
 import pytest
-from pydantic import HttpUrl
 
-from portia.clarification import ActionClarification
 from tests.utils import AdditionTool, ClarificationTool
 
 

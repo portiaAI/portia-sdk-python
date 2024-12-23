@@ -9,7 +9,7 @@ import pytest
 from portia.config import AgentType, Config, default_config
 from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Plan, Step, Variable
+from portia.plan import Plan
 from portia.planner import PlanOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry

@@ -41,7 +41,7 @@ def test_workflow_initialization() -> None:
 
 
 def test_workflow_get_outstanding_clarifications(
-    workflow: Workflow, mock_clarification: Clarification
+    workflow: Workflow, mock_clarification: Clarification,
 ) -> None:
     """Test get_outstanding_clarifications method."""
     outstanding = workflow.get_outstanding_clarifications()
