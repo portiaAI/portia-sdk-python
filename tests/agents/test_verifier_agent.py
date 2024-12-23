@@ -123,7 +123,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace(description="DESCRIPTION_STRING")
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
-        args_schema=_TestToolSchema,
+        args_json_schema=_TestToolSchema.model_json_schema,
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
@@ -167,7 +167,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace(description="DESCRIPTION_STRING")
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
-        args_schema=_TestToolSchema,
+        args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
     verifier_model = VerifierModel(
@@ -205,7 +205,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     )
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
-        args_schema=_TestToolSchema,
+        args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
@@ -249,7 +249,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     )
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
-        args_schema=_TestToolSchema,
+        args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
