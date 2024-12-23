@@ -5,7 +5,7 @@ from unittest import mock
 import pytest
 
 from portia.agents.toolless_agent import ToolLessAgent, ToolLessModel
-from portia.config import Config
+from portia.config import default_config
 from portia.llm_wrapper import LLMWrapper
 
 
@@ -22,6 +22,6 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         system_context=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(Config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
     assert mock_invoke.called
     assert output.value == "invoked"

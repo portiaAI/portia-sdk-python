@@ -9,7 +9,7 @@ from langgraph.prebuilt import ToolNode
 
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
-from portia.config import Config
+from portia.config import default_config
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import Output
 from tests.utils import AdditionTool
@@ -59,7 +59,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         system_context=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(Config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
     assert isinstance(output, Output)
     assert isinstance(output.value, str)
     assert output.value == "This is a sentence that should never be hallucinated by the LLM."
@@ -109,6 +109,6 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         system_context=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(Config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"

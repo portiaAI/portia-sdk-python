@@ -24,7 +24,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.config import Config
+from portia.config import default_config
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import Output
 from tests.utils import AdditionTool
@@ -92,7 +92,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         system_context=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(Config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
     assert isinstance(output, Output)
     assert isinstance(output.value, str)
     assert output.value == "This is a sentence that should never be hallucinated by the LLM."
@@ -127,7 +127,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=LLMWrapper(Config()).to_langchain(),
+        llm=LLMWrapper(default_config()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -171,7 +171,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     verifier_model = VerifierModel(
-        llm=LLMWrapper(Config()).to_langchain(),
+        llm=LLMWrapper(default_config()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -209,7 +209,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(Config()).to_langchain(),
+        llm=LLMWrapper(default_config()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -253,7 +253,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(Config()).to_langchain(),
+        llm=LLMWrapper(default_config()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -344,6 +344,6 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         system_context=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(Config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
