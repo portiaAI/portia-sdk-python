@@ -13,7 +13,6 @@ from portia.clarification import (
 )
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
-    InvalidAgentError,
     InvalidStorageError,
     InvalidWorkflowStateError,
     PlanError,
@@ -50,7 +49,7 @@ class Runner:
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=config)
             case _:
-                raise InvalidStorageError(config.storage_class.name)
+                raise InvalidStorageError(config.storage_class)
 
     def run_query(
         self,
@@ -162,6 +161,9 @@ class Runner:
             if index == len(plan.steps) - 1:
                 workflow.final_output = step_output
 
+            # persist at the end of each step
+            self.storage.save_workflow(workflow)
+
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)
         return workflow
@@ -194,5 +196,3 @@ class Runner:
                     tool=tool,
                     system_context=self.config.agent_system_context_override,
                 )
-            case _:
-                raise InvalidAgentError(agent_type)

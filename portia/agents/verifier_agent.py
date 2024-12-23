@@ -15,7 +15,6 @@ from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import ArgumentClarification, Clarification, InputClarification
 from portia.errors import (
     InvalidWorkflowStateError,
-    NoVerifiedArgsError,
     ToolFailedError,
     ToolRetryError,
 )
@@ -257,7 +256,7 @@ class ToolCallingModel:
         """Invoke the model with the given message state."""
         verified_args = self.agent.verified_args
         if not verified_args:
-            raise NoVerifiedArgsError
+            verified_args = VerifiedToolInputs(args=[])
         # handle any clarifications before calling
         if self.agent and self.agent.clarifications:
             for arg in verified_args.args:
@@ -496,4 +495,5 @@ class VerifierAgent(BaseAgent):
         app = workflow.compile()
 
         invocation_result = app.invoke({"messages": []})
+
         return self.process_output(invocation_result["messages"][-1])

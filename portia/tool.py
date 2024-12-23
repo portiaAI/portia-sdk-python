@@ -150,7 +150,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         Langchain agent needs to use the "content" response format, but Langgraph
         prefers the other.
         """
-        self._set_args_schema()
         if return_artifact:
             return StructuredTool(
                 name=self.name.replace(" ", "_"),
@@ -167,24 +166,9 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             func=self._run,
         )
 
-    def _set_args_schema(self) -> None:
-        if self.args_schema is None:
-            class_name = f"{self.__class__.__name__}Schema"
-            self.args_schema = type(
-                class_name,
-                (BaseModel,),
-                {
-                    "__annotations__": {
-                        k: v for k, v in self._run.__annotations__.items() if k != "return"
-                    },
-                },
-            )
-
     def args_json_schema(self) -> dict[str, Any]:
         """Return the json_schema for the tool args."""
-        if self.args_schema:
-            return self.args_schema.model_json_schema()["properties"]
-        return {}
+        return self.args_schema.model_json_schema()["properties"]
 
 
 class ToolHardError(Exception):

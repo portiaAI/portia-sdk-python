@@ -133,12 +133,9 @@ class InMemoryToolRegistry(ToolRegistry):
 
     def get_tool(self, tool_name: str) -> Tool:
         """Get the tool from the registry."""
-        tool = self.tools.get_tool(
+        return self.tools.get_tool(
             tool_name,
         )
-        if not tool:
-            raise ToolNotFoundError(tool_name)
-        return tool
 
     def get_tools(self) -> ToolSet:
         """Get all tools."""
@@ -206,7 +203,8 @@ class PortiaToolRegistry(ToolRegistry):
                 name=raw_tool["tool_name"],
                 description=raw_tool["description"]["overview_description"],
                 args_schema=self._generate_pydantic_model(
-                    raw_tool["tool_name"], raw_tool["schema"],
+                    raw_tool["tool_name"],
+                    raw_tool["schema"],
                 ),
                 output_schema=(
                     raw_tool["description"]["overview"],

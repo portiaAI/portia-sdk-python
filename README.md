@@ -110,7 +110,7 @@ To run tests:
 - Run unit tests with `poetry run pytest tests/unit`.
 - Run integration tests with `poetry run pytest tests/integration`.
 
-We utilize [pytest-parallel](https://pypi.org/project/pytest-parallel/) to execute tests in parallel. You can add the `--workers=4` argument to the commands above to run in parallel .
+We utilize [pytest-parallel](https://pypi.org/project/pytest-parallel/) to execute tests in parallel. You can add the `--workers=4` argument to the commands above to run in parallel. If you run into issues running this try setting `export NO_PROXY=true` first.
 
 ## Release
 

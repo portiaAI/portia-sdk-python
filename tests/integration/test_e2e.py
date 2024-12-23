@@ -5,6 +5,7 @@ import pytest
 from portia.config import AgentType, LLMProvider, default_config
 from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
+from portia.tool import ToolSoftError
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
@@ -126,7 +127,7 @@ def test_runner_run_query_with_clarifications(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
-def test_runner_run_query_with_error(
+def test_runner_run_query_with_hard_error(
     llm_provider: LLMProvider,
     llm_model_name: str,
     agent: AgentType,
@@ -163,3 +164,49 @@ def test_runner_run_query_with_error(
     assert workflow.final_output
     assert isinstance(workflow.final_output.value, str)
     assert "Something went wrong" in workflow.final_output.value
+
+
+# TODO: run this on the verifier  # noqa: TD002, TD003
+@pytest.mark.parametrize("agent", [AgentType.ONE_SHOT])
+@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+def test_runner_run_query_with_soft_error(
+    llm_provider: LLMProvider,
+    llm_model_name: str,
+    agent: AgentType,
+) -> None:
+    """Test running a query with error using the Runner."""
+    config = default_config()
+    config.llm_provider = llm_provider
+    config.llm_model_name = llm_model_name
+    config.default_agent_type = agent
+
+    class MyAdditionTool(AdditionTool):
+        def run(self, a: int, b: int) -> int:  # noqa: ARG002
+            raise ToolSoftError("Server Timeout")  # noqa: TRY003
+
+    tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
+    runner = Runner(config=config, tool_registry=tool_registry)
+    clarification_step = Step(
+        tool_name="Add Tool",
+        task="Use tool",
+        output="",
+        input=[
+            Variable(
+                name="a",
+                description="",
+                value=1,
+            ),
+            Variable(
+                name="b",
+                description="",
+                value=2,
+            ),
+        ],
+    )
+    plan = Plan(query="raise an error", steps=[clarification_step])
+    workflow = runner.run_plan(plan)
+
+    assert workflow.state == WorkflowState.FAILED
+    assert workflow.final_output
+    assert isinstance(workflow.final_output.value, str)
+    assert "Tool failed after retries" in workflow.final_output.value

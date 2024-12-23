@@ -2,6 +2,7 @@
 
 import pytest
 
+from portia.errors import InvalidToolDescriptionError
 from tests.utils import AdditionTool, ClarificationTool
 
 
@@ -21,6 +22,22 @@ def test_tool_initialization(add_tool: AdditionTool) -> None:
     """Test initialization of a Tool."""
     assert add_tool.name == "Add Tool"
     assert add_tool.description == "Takes two numbers and adds them together"
+
+
+def test_tool_initialization_long_description() -> None:
+    """Test initialization of a Tool."""
+
+    class FakeAdditionTool(AdditionTool):
+        description: str = "this is a description" * 100
+
+    with pytest.raises(InvalidToolDescriptionError):
+        FakeAdditionTool()
+
+
+def test_tool_to_langchain() -> None:
+    """Test langchain rep of a Tool."""
+    tool = AdditionTool()
+    tool.to_langchain(return_artifact=False)
 
 
 def test_run_method(add_tool: AdditionTool) -> None:

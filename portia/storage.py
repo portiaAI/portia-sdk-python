@@ -206,7 +206,7 @@ class PortiaCloudStorage(Storage):
             },
         )
         response.raise_for_status()
-        return Plan.model_validate_json(response.content)
+        return Plan.model_validate(response.json()["json"])
 
     def save_workflow(self, workflow: Workflow) -> None:
         """Add workflow to cloud."""
@@ -230,4 +230,4 @@ class PortiaCloudStorage(Storage):
             },
         )
         response.raise_for_status()
-        return Workflow.model_validate_json(response.content)
+        return Workflow.model_validate(response.json()["json"])

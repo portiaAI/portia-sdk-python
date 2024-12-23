@@ -83,6 +83,7 @@ addopts = "--cov --cov-report=term-missing"
 [tool.coverage.run]
 omit = [
     "*/tests/*", # Don't cover test files themselves
+    "example.py", # Don't cover example
 ]
 
 [tool.coverage.report]
