@@ -193,7 +193,6 @@ class PortiaCloudStorage(Storage):
                 "Content-Type": "application/json",
             },
         )
-        plan.id = UUID(response.json()["id"])
         response.raise_for_status()
 
     def get_plan(self, plan_id: UUID) -> Plan:
