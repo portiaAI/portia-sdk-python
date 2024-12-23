@@ -1,0 +1,30 @@
+name: Run Pyright
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  pyright:
+    name: Static Type Checking with Pyright
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Node.js (required for Pyright)
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      # Install Pyright globally
+      - name: Install Pyright
+        run: npm install -g pyright
+
+      # Run Pyright
+      - name: Run Pyright
+        run: pyright
