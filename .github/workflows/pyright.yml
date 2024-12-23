@@ -1,0 +1,40 @@
+name: Run Pyright
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  pyright:
+    name: Static Type Checking with Pyright
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Node.js (required for Pyright)
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+
+      # Install Pyright globally
+      - name: Install Pyright
+        run: npm install -g pyright
+
+        # Install Poetry
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Install dependencies using Poetry
+      - name: Install dependencies
+        run: poetry install --no-interaction --all-extras
+
+      # Run Pyright
+      - name: Run Pyright
+        run: poetry run pyright

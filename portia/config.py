@@ -41,24 +41,27 @@ class AgentType(Enum):
 class Config(BaseModel):
     """General configuration for the library."""
 
-    # API Keys
+    # Portia Cloud Options
+    portia_api_endpoint: str = "https://api.porita.dev"
     portia_api_key: SecretStr | None = SecretStr(os.getenv("PORTIA_API_KEY") or "")
+
+    # LLM API Keys
     openai_api_key: SecretStr | None = SecretStr(os.getenv("OPENAI_API_KEY") or "")
     anthropic_api_key: SecretStr | None = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
     mistralai_api_key: SecretStr | None = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
 
     # Storage Options
-    storage_class: StorageClass = StorageClass.MEMORY
+    storage_class: StorageClass
     storage_dir: str | None = None
 
     # LLM Options
-    llm_provider: LLMProvider = LLMProvider.OPENAI
-    llm_model_name: str = "gpt-4o-mini"
-    llm_model_temperature: int = 0
-    llm_model_seed: int = 443
+    llm_provider: LLMProvider
+    llm_model_name: str
+    llm_model_temperature: int
+    llm_model_seed: int
 
     # Agent Options
-    default_agent_type: AgentType = AgentType.VERIFIER
+    default_agent_type: AgentType
 
     # System Context Overrides
     planner_system_context_override: list[str] | None = None
@@ -69,6 +72,10 @@ class Config(BaseModel):
         """Load configuration from a JSON file."""
         with Path.open(file_path) as f:
             return cls.model_validate_json(f.read())
+
+    def has_api_key(self, name: str) -> bool:
+        """Check if the given API Key is available."""
+        return hasattr(self, name)
 
     def must_get_api_key(self, name: str) -> SecretStr:
         """Get an api key as a SecretStr or error if not set."""
@@ -87,3 +94,15 @@ class Config(BaseModel):
         if not isinstance(value, expected_type):
             raise InvalidConfigError(name)
         return value
+
+
+def default_config() -> Config:
+    """Return default config."""
+    return Config(
+        storage_class=StorageClass.MEMORY,
+        llm_provider=LLMProvider.OPENAI,
+        llm_model_name="gpt-4o-mini",
+        llm_model_temperature=0,
+        llm_model_seed=443,
+        default_agent_type=AgentType.VERIFIER,
+    )

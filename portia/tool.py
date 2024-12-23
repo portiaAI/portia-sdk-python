@@ -7,11 +7,13 @@ with their specific logic.
 
 from __future__ import annotations
 
+import json
 from abc import abstractmethod
 from typing import Any, Generic
 
+import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 
 from portia.clarification import Clarification
 from portia.errors import InvalidToolDescriptionError
@@ -177,3 +179,45 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                     },
                 },
             )
+
+    def args_json_schema(self) -> dict[str, Any]:
+        """Return the json_schema for the tool args."""
+        if self.args_schema:
+            return self.args_schema.model_json_schema()["properties"]
+        return {}
+
+
+class ToolHardError(Exception):
+    """Raised when a tool hits an error it can't retry."""
+
+
+class ToolSoftError(Exception):
+    """Raised when a tool hits an error it can retry."""
+
+
+class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
+    """Tool that passes run execution to Portia Cloud."""
+
+    api_key: SecretStr
+    api_endpoint: str
+
+    def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:  # noqa: ANN401
+        """Invoke the run endpoint and handle response."""
+        try:
+            # Convert args to a dictionary if necessary (e.g., by numbering them)
+            args_dict = {f"{i}": arg for i, arg in enumerate(args)}
+
+            # Combine args_dict and kwargs
+            data = {**args_dict, **kwargs}
+            response = httpx.post(
+                url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
+                content=json.dumps(data),
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            raise ToolHardError(e) from e

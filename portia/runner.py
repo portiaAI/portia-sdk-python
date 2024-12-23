@@ -6,11 +6,14 @@ from typing import TYPE_CHECKING
 
 from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.verifier_agent import VerifierAgent
-from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
+from portia.clarification import (
+    Clarification,
+    InputClarification,
+    MultiChoiceClarification,
+)
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
     InvalidAgentError,
-    InvalidAgentUsageError,
     InvalidStorageError,
     InvalidWorkflowStateError,
     PlanError,
@@ -18,8 +21,8 @@ from portia.errors import (
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
-from portia.storage import DiskFileStorage, InMemoryStorage
-from portia.tool_registry import InMemoryToolRegistry, ToolRegistry, ToolSet
+from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
+from portia.tool_registry import ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
@@ -33,17 +36,19 @@ class Runner:
     def __init__(
         self,
         config: Config,
-        tool_registry: ToolRegistry | None = None,
+        tool_registry: ToolRegistry,
     ) -> None:
         """Initialize storage and tools."""
         self.config = config
-        self.tool_registry = tool_registry or InMemoryToolRegistry()
+        self.tool_registry = tool_registry
 
         match config.storage_class:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
                 self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
+            case StorageClass.CLOUD:
+                self.storage = PortiaCloudStorage(config=config)
             case _:
                 raise InvalidStorageError(config.storage_class.name)
 
@@ -176,8 +181,6 @@ class Runner:
                     system_context=self.config.agent_system_context_override,
                 )
             case AgentType.VERIFIER:
-                if tool is None:
-                    raise InvalidAgentUsageError(agent_type.name)
                 return VerifierAgent(
                     description=step.task,
                     inputs=step.input or [],

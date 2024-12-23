@@ -5,7 +5,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
+from uuid import UUID
 
+import httpx
 from pydantic import BaseModel, ValidationError
 
 from portia.errors import PlanNotFoundError, WorkflowNotFoundError
@@ -13,7 +15,7 @@ from portia.plan import Plan
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
-    from uuid import UUID
+    from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -171,3 +173,61 @@ class DiskFileStorage(Storage):
             return self._read(f"workflow-{workflow_id}.json", Workflow)
         except (ValidationError, FileNotFoundError) as e:
             raise WorkflowNotFoundError(workflow_id) from e
+
+
+class PortiaCloudStorage(Storage):
+    """Save plans and workflows to portia cloud."""
+
+    def __init__(self, config: Config) -> None:
+        """Store tools in a tool set for easy access."""
+        self.api_key = config.must_get_api_key("portia_api_key")
+        self.api_endpoint = config.must_get("portia_api_endpoint", str)
+
+    def save_plan(self, plan: Plan) -> None:
+        """Add plan to cloud."""
+        response = httpx.post(
+            url=f"{self.api_endpoint}/api/v0/plans/",
+            json={"json": plan.model_dump(mode="json")},
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        plan.id = UUID(response.json()["id"])
+        response.raise_for_status()
+
+    def get_plan(self, plan_id: UUID) -> Plan:
+        """Get plan from cloud."""
+        response = httpx.get(
+            url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+        return Plan.model_validate_json(response.content)
+
+    def save_workflow(self, workflow: Workflow) -> None:
+        """Add workflow to cloud."""
+        response = httpx.post(
+            url=f"{self.api_endpoint}/api/v0/workflows/",
+            json={"json": workflow.model_dump(mode="json"), "plan": str(workflow.plan_id)},
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+
+    def get_workflow(self, workflow_id: UUID) -> Workflow:
+        """Get workflow from cloud."""
+        response = httpx.get(
+            url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+        return Workflow.model_validate_json(response.content)

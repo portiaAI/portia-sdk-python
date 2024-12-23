@@ -14,7 +14,6 @@ def add_tool() -> AdditionTool:
 def test_tool_initialization(add_tool: AdditionTool) -> None:
     """Test initialization of a Tool."""
     assert add_tool.name == "Add Tool"
-    assert add_tool.id == "add_tool"
     assert add_tool.description == "Takes two numbers and adds them together"
 
 

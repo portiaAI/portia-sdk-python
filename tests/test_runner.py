@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from portia.config import Config
+from portia.config import AgentType, Config, default_config
 from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
@@ -20,7 +20,7 @@ from tests.utils import AdditionTool
 @pytest.fixture
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
-    config = Config()
+    config = default_config()
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     return Runner(config=config, tool_registry=tool_registry)
 
@@ -101,7 +101,16 @@ def test_runner_resume_workflow_invalid_state(runner: Runner) -> None:
 
 def test_runner_config_from_file() -> None:
     """Test loading configuration from a file."""
-    config_data = '{"portia_api_key": "file-key", "openai_api_key": "file-openai-key", "llm_model_temperature": 10}'  # noqa: E501
+    config_data = """{
+"portia_api_key": "file-key",
+"openai_api_key": "file-openai-key",
+"llm_model_temperature": 10,
+"storage_class": "MEMORY",
+"llm_provider": "OPENAI",
+"llm_model_name": "gpt-4o-mini",
+"llm_model_seed": 443,
+"default_agent_type": "VERIFIER"
+}"""
 
     with tempfile.NamedTemporaryFile("w", delete=True, suffix=".json") as temp_file:
         temp_file.write(config_data)
@@ -113,4 +122,5 @@ def test_runner_config_from_file() -> None:
 
         assert config.must_get_raw_api_key("portia_api_key") == "file-key"
         assert config.must_get_raw_api_key("openai_api_key") == "file-openai-key"
+        assert config.default_agent_type == AgentType.VERIFIER
         assert config.llm_model_temperature == 10

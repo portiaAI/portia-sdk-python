@@ -118,7 +118,7 @@ class ParserModel:
                 context=self.context,
                 input=self.agent.description,
                 tool_name=self.agent.tool.name,
-                tool_args=self.agent.tool.args_schema.model_json_schema()["properties"],
+                tool_args=self.agent.tool.args_json_schema(),
                 tool_description=self.agent.tool.description,
             ),
         )
@@ -285,7 +285,6 @@ class ToolCallingModel:
                 past_errors=past_errors,
             ),
         )
-
         return {"messages": [response]}
 
 

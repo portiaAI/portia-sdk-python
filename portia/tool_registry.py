@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import httpx
+from pydantic import BaseModel, Field, create_model
 
 from portia.errors import ToolNotFoundError
+from portia.tool import PortiaRemoteTool
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from portia.config import Config
     from portia.tool import Tool
 
 
@@ -138,3 +143,93 @@ class InMemoryToolRegistry(ToolRegistry):
     def get_tools(self) -> ToolSet:
         """Get all tools."""
         return self.tools
+
+
+class APIKeyRequiredError(Exception):
+    """Raised when a given API Key is missing."""
+
+
+class ToolRegistrationFailedError(Exception):
+    """Raised when a tool registration fails."""
+
+
+class PortiaToolRegistry(ToolRegistry):
+    """Provides access to portia tools."""
+
+    def __init__(self, config: Config) -> None:
+        """Store tools in a tool set for easy access."""
+        self.api_key = config.must_get_api_key("portia_api_key")
+        self.api_endpoint = config.must_get("portia_api_endpoint", str)
+        self.tools = {}
+        self._load_tools()
+
+    def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
+        # Map JSON schema types to Python types
+        type_mapping = {
+            "string": str,
+            "integer": int,
+            "number": float,
+            "boolean": bool,
+            "array": list,
+            "object": dict,
+        }
+
+        # Extract properties and required fields
+        properties = schema.get("properties", {})
+        required = set(schema.get("required", []))
+
+        # Define fields for the model
+        fields = {
+            key: (
+                type_mapping.get(value.get("type"), Any),
+                Field(default=None) if key not in required else Field(...),
+            )
+            for key, value in properties.items()
+        }
+
+        # Create the Pydantic model dynamically
+        return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
+
+    def _load_tools(self) -> None:
+        response = httpx.get(
+            url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+        tools = {}
+        for raw_tool in response.json():
+            tool = PortiaRemoteTool(
+                id=raw_tool["tool_id"],
+                name=raw_tool["tool_name"],
+                description=raw_tool["description"]["overview_description"],
+                args_schema=self._generate_pydantic_model(
+                    raw_tool["tool_name"], raw_tool["schema"],
+                ),
+                output_schema=(
+                    raw_tool["description"]["overview"],
+                    raw_tool["description"]["output_description"],
+                ),
+                # pass API info
+                api_key=self.api_key,
+                api_endpoint=self.api_endpoint,
+            )
+            tools[raw_tool["tool_name"]] = tool
+        self.tools = tools
+
+    def register_tool(self, tool: Tool) -> None:
+        """Register tool in registry."""
+        raise ToolRegistrationFailedError(tool)
+
+    def get_tool(self, tool_name: str) -> PortiaRemoteTool:
+        """Get the tool from the registry."""
+        if tool_name in self.tools:
+            return self.tools[tool_name]
+
+        raise ToolNotFoundError(tool_name)
+
+    def get_tools(self) -> ToolSet:
+        """Get all tools."""
+        return ToolSet(tools=list(self.tools.values()))
