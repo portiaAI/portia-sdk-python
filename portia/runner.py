@@ -22,8 +22,8 @@ from portia.errors import (
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
-from portia.storage import DiskFileStorage, InMemoryStorage
-from portia.tool_registry import InMemoryToolRegistry, ToolRegistry, ToolSet
+from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
+from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry, ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
@@ -37,17 +37,24 @@ class Runner:
     def __init__(
         self,
         config: Config,
-        tool_registry: ToolRegistry | None = None,
+        tool_registry: ToolRegistry,
     ) -> None:
         """Initialize storage and tools."""
         self.config = config
-        self.tool_registry = tool_registry or InMemoryToolRegistry()
+        self.tool_registry = tool_registry
+
+        if config.has_api_key("portia_api_key") and config.enable_cloud_tool_registry:
+            self.tool_registry += PortiaToolRegistry(
+                api_key=config.must_get_api_key("portia_api_key"),
+            )
 
         match config.storage_class:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
                 self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
+            case StorageClass.CLOUD:
+                self.storage = PortiaCloudStorage(api_key=config.must_get_api_key("portia_api_key"))
             case _:
                 raise InvalidStorageError(config.storage_class.name)
 
@@ -180,8 +187,6 @@ class Runner:
                     system_context=self.config.agent_system_context_override,
                 )
             case AgentType.VERIFIER:
-                if tool is None:
-                    raise InvalidAgentUsageError(agent_type.name)
                 return VerifierAgent(
                     description=step.task,
                     inputs=step.input or [],

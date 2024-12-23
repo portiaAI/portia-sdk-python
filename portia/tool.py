@@ -8,6 +8,7 @@ with their specific logic.
 from __future__ import annotations
 
 from abc import abstractmethod
+import json
 from typing import Any, Generic
 
 import httpx
@@ -179,6 +180,12 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 },
             )
 
+    def args_json_schema(self) -> dict[str, Any]:
+        """Return the json_schema for the tool args."""
+        if self.args_schema:
+            return self.args_schema.model_json_schema()["properties"]
+        return {}
+
 
 class ToolHardError(Exception):
     """Raised when a tool hits an error it can't retry."""
@@ -201,16 +208,15 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
             # Combine args_dict and kwargs
             data = {**args_dict, **kwargs}
-
             response = httpx.post(
-                url=f"https://holsten-37277605247.us-central1.run.app/api/v0/tools/{self.name}/run/",
-                data=data,
+                url=f"https://holsten-37277605247.us-central1.run.app/api/v0/tools/{self.id}/run/",
+                content=json.dumps(data),
                 headers={
-                    "Authorization": f"Api-Key {self.api_key}",
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
             )
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            raise ToolHardError from e
+            raise ToolHardError(e) from e

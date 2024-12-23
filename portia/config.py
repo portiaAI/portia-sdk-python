@@ -48,17 +48,20 @@ class Config(BaseModel):
     mistralai_api_key: SecretStr | None = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
 
     # Storage Options
-    storage_class: StorageClass = StorageClass.MEMORY
+    storage_class: StorageClass
     storage_dir: str | None = None
 
+    # Registry Options
+    enable_cloud_tool_registry: bool
+
     # LLM Options
-    llm_provider: LLMProvider = LLMProvider.OPENAI
-    llm_model_name: str = "gpt-4o-mini"
-    llm_model_temperature: int = 0
-    llm_model_seed: int = 443
+    llm_provider: LLMProvider
+    llm_model_name: str
+    llm_model_temperature: int
+    llm_model_seed: int
 
     # Agent Options
-    default_agent_type: AgentType = AgentType.VERIFIER
+    default_agent_type: AgentType
 
     # System Context Overrides
     planner_system_context_override: list[str] | None = None
@@ -91,3 +94,16 @@ class Config(BaseModel):
         if not isinstance(value, expected_type):
             raise InvalidConfigError(name)
         return value
+
+
+def default_config() -> Config:
+    """Return default config."""
+    return Config(
+        storage_class=StorageClass.MEMORY,
+        llm_provider=LLMProvider.OPENAI,
+        llm_model_name="gpt-4o-mini",
+        llm_model_temperature=0,
+        llm_model_seed=443,
+        default_agent_type=AgentType.VERIFIER,
+        enable_cloud_tool_registry=False,
+    )

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr, create_model
 
 from portia.errors import ToolNotFoundError
 from portia.tool import PortiaRemoteTool
@@ -162,19 +162,59 @@ class PortiaToolRegistry(ToolRegistry):
         if not api_key:
             raise APIKeyRequiredError
         self.api_key = api_key
+        self.tools = {}
         self._load_tools()
 
+    def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
+        # Map JSON schema types to Python types
+        type_mapping = {
+            "string": str,
+            "integer": int,
+            "number": float,
+            "boolean": bool,
+            "array": list,
+            "object": dict,
+        }
+
+        # Extract properties and required fields
+        properties = schema.get("properties", {})
+        required = set(schema.get("required", []))
+
+        # Define fields for the model
+        fields = {
+            key: (type_mapping.get(value.get("type"), Any), ... if key in required else None)
+            for key, value in properties.items()
+        }
+
+        # Create the Pydantic model dynamically
+        return create_model(model_name, **fields)
+
     def _load_tools(self) -> None:
-        # to do load tools here
         response = httpx.get(
-            url="https://holsten-37277605247.us-central1.run.app/api/v0/tools/",
+            url="https://holsten-37277605247.us-central1.run.app/api/v0/tools/descriptions/",
             headers={
-                "Authorization": f"Api-Key {self.api_key}",
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
         response.raise_for_status()
-        self.tools = response.json()  # todo -here we need to pass the tools into Tools
+        tools = {}
+        for raw_tool in response.json():
+            tool = PortiaRemoteTool(
+                id=raw_tool["tool_id"],
+                name=raw_tool["tool_name"],
+                description=raw_tool["description"]["overview_description"],
+                args_schema=self._generate_pydantic_model(
+                    raw_tool["tool_name"], raw_tool["schema"]
+                ),
+                output_schema=(
+                    raw_tool["description"]["overview"],
+                    raw_tool["description"]["output_description"],
+                ),
+                api_key=self.api_key,
+            )
+            tools[raw_tool["tool_name"]] = tool
+        self.tools = tools
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""
@@ -182,13 +222,11 @@ class PortiaToolRegistry(ToolRegistry):
 
     def get_tool(self, tool_name: str) -> PortiaRemoteTool:
         """Get the tool from the registry."""
-        tool = self.tools.get_tool(
-            tool_name,
-        )
-        if not tool:
-            raise ToolNotFoundError(tool_name)
-        return tool
+        if tool_name in self.tools:
+            return self.tools[tool_name]
+
+        raise ToolNotFoundError(tool_name)
 
     def get_tools(self) -> ToolSet:
         """Get all tools."""
-        return self.tools
+        return ToolSet(tools=list(self.tools.values()))

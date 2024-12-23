@@ -188,9 +188,9 @@ class PortiaCloudStorage(Storage):
         """Add plan to cloud."""
         response = httpx.post(
             url="https://holsten-37277605247.us-central1.run.app/api/v0/plans/",
-            data=plan.model_dump(mode="json"),
+            data={"plan": plan.model_dump(mode="json")},
             headers={
-                "Authorization": f"Api-Key {self.api_key}",
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
@@ -201,7 +201,7 @@ class PortiaCloudStorage(Storage):
         response = httpx.get(
             url=f"https://holsten-37277605247.us-central1.run.app/api/v0/plans/{plan_id}/",
             headers={
-                "Authorization": f"Api-Key {self.api_key}",
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
@@ -214,7 +214,7 @@ class PortiaCloudStorage(Storage):
             url="https://holsten-37277605247.us-central1.run.app/api/v0/workflows/",
             data=workflow.model_dump(mode="json"),
             headers={
-                "Authorization": f"Api-Key {self.api_key}",
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
@@ -225,7 +225,7 @@ class PortiaCloudStorage(Storage):
         response = httpx.get(
             url=f"https://holsten-37277605247.us-central1.run.app/api/v0/workflows/{workflow_id}/",
             headers={
-                "Authorization": f"Api-Key {self.api_key}",
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
