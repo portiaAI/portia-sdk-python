@@ -49,10 +49,6 @@ runner.run_query("Add 1 and 2")
 Multiple registries can be combined to give the power of Portia Cloud with the customization of local tools:
 
 ```python
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.config import StorageClass, default_config
@@ -60,9 +56,7 @@ from portia.runner import Runner
 from portia.tool import Tool
 from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry
 from portia.workflow import WorkflowState
-
-if TYPE_CHECKING:
-    from portia.clarification import InputClarification
+from portia.clarification import InputClarification
 
 
 class AdditionToolSchema(BaseModel):
@@ -90,9 +84,11 @@ class AdditionTool(Tool):
 
 config = default_config()
 
-registry = InMemoryToolRegistry.from_local_tools([AdditionTool()]) + PortiaToolRegistry(
+local_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()]) 
+remote_registry = PortiaToolRegistry(
     config=config,
 )
+registry = local_registry + remote_registry
 
 runner = Runner(
     config,

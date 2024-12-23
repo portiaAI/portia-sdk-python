@@ -212,7 +212,7 @@ class PortiaCloudStorage(Storage):
         """Add workflow to cloud."""
         response = httpx.post(
             url=f"{self.api_endpoint}/api/v0/workflows/",
-            json={"json": workflow.model_dump(mode="json")},
+            json={"json": workflow.model_dump(mode="json"), "plan_id": workflow.plan_id},
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
