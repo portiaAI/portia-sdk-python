@@ -73,6 +73,17 @@ portia = ["templates/**/*.jinja"]
 filterwarnings = [
     "ignore:Failing to pass a value to the 'type_params' parameter of 'typing.ForwardRef._evaluate':DeprecationWarning",  # this comes from LangChain
 ]
+addopts = "--cov --cov-report=term-missing"
+
+[tool.coverage.run]
+omit = [
+    "*/tests/*", # Don't cover test files themselves
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if TYPE_CHECKING:",
+]
 
 [[tool.pydoc-markdown.loaders]]
 type = "python"
@@ -90,7 +101,3 @@ sidebar_top_level_label=""
 [tool.poetry.scripts]
 portia-cli = "portia.cli:cli"
 
-[tool.coverage.run]
-omit = [
-    "*/tests/*", # Don't cover test files themselves
-]

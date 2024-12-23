@@ -138,9 +138,6 @@ class Runner:
                 return workflow
             else:
                 workflow.step_outputs[step.output] = step_output
-                # set final output if is last step (accounting for zero index)
-                if index == len(plan.steps) - 1:
-                    workflow.final_output = step_output
 
             # if a clarification was returned append it to the set of clarifications needed
             if isinstance(step_output.value, Clarification) or (
@@ -160,6 +157,10 @@ class Runner:
                 workflow.state = WorkflowState.NEED_CLARIFICATION
                 self.storage.save_workflow(workflow)
                 return workflow
+
+            # set final output if is last step (accounting for zero index)
+            if index == len(plan.steps) - 1:
+                workflow.final_output = step_output
 
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)
