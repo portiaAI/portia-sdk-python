@@ -33,7 +33,7 @@ jobs:
 
       # Install dependencies using Poetry
       - name: Install dependencies
-        run: poetry install --no-interaction --no-dev
+        run: poetry install --no-interaction --all-extras
 
       # Run Pyright
       - name: Run Pyright
