@@ -27,4 +27,4 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
-        run: poetry run pytest --cov --cov-fail-under 95 --log-cli-level=WARNING
+        run: poetry run pytest --workers 4  --cov --cov-fail-under 95 --log-cli-level=WARNING

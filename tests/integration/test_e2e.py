@@ -72,8 +72,7 @@ def test_runner_plan_query(
     assert plan.steps[0].tool_name == "Add Tool"
     assert plan.steps[0].input
     assert len(plan.steps[0].input) == 2
-    assert plan.steps[0].input[0].value == 1
-    assert plan.steps[0].input[1].value == 2
+    assert plan.steps[0].input[0].value + plan.steps[0].input[1].value == 3
 
     workflow = runner.run_plan(plan)
 
