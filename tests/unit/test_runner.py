@@ -9,19 +9,19 @@ import pytest
 from portia.config import AgentType, Config, default_config
 from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Plan
+from portia.plan import Plan, Step, Variable
 from portia.planner import PlanOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState
-from tests.utils import AdditionTool
+from tests.utils import AdditionTool, ClarificationTool
 
 
 @pytest.fixture
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
     config = default_config()
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
+    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Runner(config=config, tool_registry=tool_registry)
 
 

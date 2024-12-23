@@ -16,28 +16,6 @@ from tests.utils import AdditionTool
 
 if TYPE_CHECKING:
     import pytest
-    from langchain_core.prompt_values import ChatPromptValue
-    from langchain_core.runnables.config import RunnableConfig
-
-
-class MockInvoker:
-    """Override for invoker."""
-
-    called: bool = False
-    prompt: ChatPromptValue | None = None
-
-    class MockAIMessage:
-        """Mock class for AIMessage."""
-
-        def __init__(self, content: str) -> None:
-            """Initialize content."""
-            self.content = content
-
-    def invoke(self, prompt: ChatPromptValue, _: RunnableConfig) -> MockAIMessage:
-        """Mock run for invoking the chain."""
-        self.called = True
-        self.prompt = prompt
-        return self.MockAIMessage("invoked")
 
 
 def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -25,7 +25,7 @@ def build_context(
     context = "Additional context: You MUST use this information to complete your task.\n"
     used_outputs = set()
     for var in inputs:
-        if var.value:
+        if var.value is not None:
             context += (
                 f"name: {var.name}\nvalue: {var.value}\n"
                 f"description: {var.description}\n\n----------\n\n"

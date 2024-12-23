@@ -1,14 +1,22 @@
 """Tests for the Tool class."""
 
 import pytest
+from pydantic import HttpUrl
 
-from tests.utils import AdditionTool
+from portia.clarification import ActionClarification
+from tests.utils import AdditionTool, ClarificationTool
 
 
 @pytest.fixture
 def add_tool() -> AdditionTool:
     """Fixture to create a mock tool instance."""
     return AdditionTool()
+
+
+@pytest.fixture
+def clarification_tool() -> ClarificationTool:
+    """Fixture to create a mock tool instance."""
+    return ClarificationTool()
 
 
 def test_tool_initialization(add_tool: AdditionTool) -> None:

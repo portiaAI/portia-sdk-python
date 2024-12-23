@@ -45,6 +45,8 @@ class Workflow(BaseModel):
     )
     step_outputs: dict[str, Output] = {}
 
+    final_output: Output | None = None
+
     def get_outstanding_clarifications(self) -> list[Clarification]:
         """Return all outstanding clarifications."""
         return [

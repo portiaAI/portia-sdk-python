@@ -102,13 +102,13 @@ class Runner:
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
 
-    def get_clarifications_for_step(self, workflow: Workflow) -> list[Clarification]:
+    def get_clarifications_for_step(self, workflow: Workflow, step: int) -> list[Clarification]:
         """get_clarifications_for_step isolates clarifications relevant for the current step."""
         return [
             clarification
             for clarification in workflow.clarifications
             if isinstance(clarification, (InputClarification, MultiChoiceClarification))
-            and clarification.step == workflow.current_step_index
+            and clarification.step == step
         ]
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
@@ -119,7 +119,7 @@ class Runner:
 
             agent = self._get_agent_for_step(
                 step,
-                self.get_clarifications_for_step(workflow),
+                self.get_clarifications_for_step(workflow, index),
                 self.config.default_agent_type,
             )
 
@@ -130,12 +130,17 @@ class Runner:
                 )
 
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                workflow.step_outputs[step.output] = Output(value=str(e))
+                error_output = Output(value=str(e))
+                workflow.step_outputs[step.output] = error_output
                 workflow.state = WorkflowState.FAILED
+                workflow.final_output = error_output
                 self.storage.save_workflow(workflow)
                 return workflow
             else:
                 workflow.step_outputs[step.output] = step_output
+                # set final output if is last step (accounting for zero index)
+                if index == len(plan.steps) - 1:
+                    workflow.final_output = step_output
 
             # if a clarification was returned append it to the set of clarifications needed
             if isinstance(step_output.value, Clarification) or (

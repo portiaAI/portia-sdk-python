@@ -99,7 +99,6 @@ class LLMWrapper:
                     messages=messages,
                     max_tokens=2048,
                     temperature=self.model_temperature,
-                    seed=self.model_seed,
                 )
             case LLMProvider.MISTRALAI:
                 client = instructor.from_mistral(
@@ -112,7 +111,6 @@ class LLMWrapper:
                     response_model=response_model,
                     messages=messages,
                     temperature=self.model_temperature,
-                    seed=self.model_seed,
                 )
             case _:
                 raise InvalidLLMProviderError(self.llm_provider)

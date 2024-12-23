@@ -34,6 +34,14 @@ def test_local_tool_registry_register_tool() -> None:
         local_tool_registry.get_tool("tool3")
 
 
+def test_local_tool_registry_get_and_run() -> None:
+    """Test getting and running tools in the InMemoryToolRegistry."""
+    local_tool_registry = InMemoryToolRegistry()
+    local_tool_registry.register_tool(MockTool(name=MOCK_TOOL_NAME))
+    tool1 = local_tool_registry.get_tool(MOCK_TOOL_NAME)
+    tool1.run()
+
+
 def test_local_tool_registry_get_tools() -> None:
     """Test the get_tools method of InMemoryToolRegistry."""
     local_tool_registry = InMemoryToolRegistry.from_local_tools(

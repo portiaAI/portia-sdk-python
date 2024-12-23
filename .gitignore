@@ -1,4 +1,4 @@
 dist
 __pycache__
-coverage
+.coverage
 test_harness.py
