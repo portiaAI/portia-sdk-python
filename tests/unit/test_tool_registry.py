@@ -2,7 +2,6 @@
 
 import pytest
 
-from example import AdditionTool
 from portia.errors import ToolNotFoundError
 from portia.tool import Tool
 from portia.tool_registry import (
@@ -11,7 +10,7 @@ from portia.tool_registry import (
     ToolRegistry,
     ToolSet,
 )
-from tests.utils import MockTool
+from tests.utils import AdditionTool, MockTool
 
 MOCK_TOOL_NAME = "mock tool"
 OTHER_MOCK_TOOL_NAME = "other mock tool"
