@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from pydantic import BaseModel, Field, create_model
@@ -206,7 +206,7 @@ class PortiaToolRegistry(ToolRegistry):
                 name=raw_tool["tool_name"],
                 description=raw_tool["description"]["overview_description"],
                 args_schema=self._generate_pydantic_model(
-                    raw_tool["tool_name"], raw_tool["schema"]
+                    raw_tool["tool_name"], raw_tool["schema"],
                 ),
                 output_schema=(
                     raw_tool["description"]["overview"],

@@ -7,16 +7,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 import httpx
-from pydantic import BaseModel, SecretStr, ValidationError
+from pydantic import BaseModel, ValidationError
 
-from portia.config import Config
 from portia.errors import PlanNotFoundError, WorkflowNotFoundError
 from portia.plan import Plan
-from portia.tool_registry import APIKeyRequiredError
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
     from uuid import UUID
+
+    from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
 
