@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from portia.config import Config
+from portia.config import Config, default_config
 from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
@@ -20,7 +20,7 @@ from tests.utils import AdditionTool
 @pytest.fixture
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
-    config = Config()
+    config = default_config()
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     return Runner(config=config, tool_registry=tool_registry)
 
