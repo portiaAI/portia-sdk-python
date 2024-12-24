@@ -8,12 +8,13 @@ from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import ArgumentClarification, Clarification, InputClarification
 from portia.errors import (
+    InvalidAgentOutputError,
     InvalidWorkflowStateError,
     ToolFailedError,
     ToolRetryError,
@@ -350,7 +351,7 @@ class VerifierAgent(BaseAgent):
 
             return tool_output
 
-        return Output(value="Requested clarification or failed to call tool.")
+        raise InvalidAgentOutputError(str(last_message.content))
 
     def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
         """Run the core execution logic of the task."""

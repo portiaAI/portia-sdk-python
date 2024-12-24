@@ -26,7 +26,7 @@ from portia.agents.verifier_agent import (
 )
 from portia.clarification import InputClarification
 from portia.config import default_config
-from portia.errors import InvalidWorkflowStateError
+from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import Output
 from tests.utils import AdditionTool
@@ -351,6 +351,63 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     assert output.value == "Sent email with id: 0"
 
 
+def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test running an agent with verified args.
+
+    Note: This tests mocks almost everything, but allows us to make sure things
+    are running in order and being called correctly and passed out correctly.
+    """
+    verified_tool_inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="email_address", value="test@example.com", made_up=False),
+        ],
+    )
+
+    tool = AdditionTool()
+
+    def tool_calling_model(self, state):  # noqa: ANN001, ANN202, ARG001
+        response = AIMessage(content="")
+        response.tool_calls = [
+            {
+                "name": "add_tool",
+                "type": "tool_call",
+                "id": "call_3z9rYHY6Rui7rTW0O7N7Wz51",
+                "args": {
+                    "recipients": ["test@example.com"],
+                    "email_title": "Hi",
+                    "email_body": "Hi",
+                },
+            },
+        ]
+        return {"messages": [response]}
+
+    monkeypatch.setattr(ToolCallingModel, "invoke", tool_calling_model)
+
+    def tool_call(self, input, config):  # noqa: A002, ANN001, ANN202, ARG001
+        return {
+            "messages": ToolMessage(
+                content="Sent email",
+                artifact=Output(value="Sent email with id: 0"),
+                tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
+            ),
+        }
+
+    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+
+    agent = VerifierAgent(
+        description="Send an email to test@example.com saying Hi as both the subject and body.",
+        inputs=[],
+        tool=tool,
+        clarifications=[],
+        system_context=[],
+    )
+    agent.verified_args = verified_tool_inputs
+
+    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
+    assert isinstance(output, Output)
+    assert output.value == "Sent email with id: 0"
+
+
 def test_verifier_agent_edge_cases() -> None:
     """Tests edge cases are handled."""
     agent = SimpleNamespace(description="DESCRIPTION_STRING")
@@ -447,4 +504,62 @@ def test_clarifications_or_continue() -> None:
     assert len(agent.new_clarifications) == 0
 
 
-# 212 - 222, 333 - 337, 377 - 384, 396, 401, 405, 411 - 414, 418, 470
+def test_call_tool_or_return() -> None:
+    """Test call_tool_or_return."""
+    # when clarifications don't match expect a new one
+    output = VerifierAgent.call_tool_or_return(
+        {
+            "messages": [
+                HumanMessage(
+                    content="",
+                ),
+            ],
+        },
+    )
+    assert output == END
+
+
+def test_process_output() -> None:
+    """Test process_output."""
+    agent = VerifierAgent(
+        description="Send an email to test@example.com saying Hi as both the subject and body.",
+        inputs=[],
+        tool=None,
+        clarifications=[],
+        system_context=[],
+    )
+
+    # with new clarifications
+    clarification = InputClarification(
+        argument_name="arg",
+        response="1",
+        user_guidance="",
+        resolved=True,
+    )
+    agent.new_clarifications = [clarification]
+    output = agent.process_output(
+        HumanMessage(content=""),
+    )
+    assert isinstance(output, Output)
+    assert isinstance(output.value, list)
+    assert isinstance(output.value[0], InputClarification)
+
+    # with no new clarifications
+    agent.new_clarifications = []
+    message = ToolMessage(content="", tool_call_id="123")
+    message.artifact = "123"
+    output = agent.process_output(message)
+    assert isinstance(output, Output)
+    assert output.value == "123"
+
+    # with no artifact
+    message = ToolMessage(content="456", tool_call_id="123")
+    output = agent.process_output(message)
+    assert isinstance(output, Output)
+    assert output.value == "456"
+
+    message = AIMessage(content="456")
+    with pytest.raises(InvalidAgentOutputError):
+        output = agent.process_output(
+            message,
+        )

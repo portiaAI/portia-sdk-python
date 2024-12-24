@@ -150,6 +150,15 @@ def test_runner_invalid_agent() -> None:
     with pytest.raises(NotImplementedError):
         runner.run_plan(plan)
 
+    config = default_config()
+    config.default_agent_type = "Other"  # type: ignore  # noqa: PGH003
+    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+    runner = Runner(config=config, tool_registry=tool_registry)
+
+    plan = runner.plan_query(query)
+    with pytest.raises(InvalidWorkflowStateError):
+        runner.run_plan(plan)
+
 
 def test_runner_resume_workflow(runner: Runner) -> None:
     """Test resuming a workflow after interruption."""
