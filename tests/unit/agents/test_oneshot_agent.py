@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from langchain_core.messages import AIMessage, ToolMessage
+import pytest
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langgraph.graph import END
 from langgraph.prebuilt import ToolNode
 
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
+from portia.clarification import InputClarification
 from portia.config import default_config
+from portia.errors import InvalidAgentOutputError
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import Output
 from tests.utils import AdditionTool
-
-if TYPE_CHECKING:
-    import pytest
 
 
 def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,7 +44,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     assert output.value == "This is a sentence that should never be hallucinated by the LLM."
 
 
-def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test running an agent without a tool.
 
     Note: This tests mocks almost everything, but allows us to make sure things
@@ -90,3 +91,82 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
+
+
+def test_oneshot_agent_end_criteria() -> None:
+    """Test process_output."""
+    # check end criteria
+    output = OneShotAgent.call_tool_or_return(
+        {
+            "messages": [
+                HumanMessage(
+                    content="Sent email",
+                ),
+            ],
+        },
+    )
+
+    assert output == END
+
+
+def test_oneshot_agent_process_output_clarification() -> None:
+    """Test process_output."""
+    # check process output when clarifications
+    agent = OneShotAgent(
+        description="Send an email to test@example.com saying Hi as both the subject and body.",
+        inputs=[],
+        tool=AdditionTool(),
+        clarifications=[],
+        system_context=[],
+    )
+    agent.new_clarifications = [InputClarification(user_guidance="test", argument_name="test")]
+    output = agent.process_output(
+        HumanMessage(
+            content="Sent email",
+        ),
+    )
+    assert isinstance(output, Output)
+    assert isinstance(output.value, list)
+    assert isinstance(output.value[0], InputClarification)
+
+
+def test_oneshot_agent_process_output_tools() -> None:
+    """Test process_output."""
+    # check process output when clarifications
+    agent = OneShotAgent(
+        description="Send an email to test@example.com saying Hi as both the subject and body.",
+        inputs=[],
+        tool=AdditionTool(),
+        clarifications=[],
+        system_context=[],
+    )
+    message = ToolMessage(content="", tool_call_id="call_J")
+    message.artifact = "123"
+    output = agent.process_output(
+        message,
+    )
+    assert isinstance(output, Output)
+    assert isinstance(output.value, str)
+    assert output.value == "123"
+
+    message = ToolMessage(content="456", tool_call_id="call_J")
+    output = agent.process_output(
+        message,
+    )
+    assert isinstance(output, Output)
+    assert isinstance(output.value, str)
+    assert output.value == "456"
+
+    message = HumanMessage(content="789")
+    output = agent.process_output(
+        message,
+    )
+    assert isinstance(output, Output)
+    assert isinstance(output.value, str)
+    assert output.value == "789"
+
+    message = AIMessage(content="456")
+    with pytest.raises(InvalidAgentOutputError):
+        output = agent.process_output(
+            message,
+        )

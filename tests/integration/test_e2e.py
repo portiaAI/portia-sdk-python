@@ -2,8 +2,10 @@
 
 import pytest
 
+from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, LLMProvider, default_config
-from portia.plan import Plan, Step, Variable
+from portia.llm_wrapper import LLMWrapper
+from portia.plan import Output, Plan, Step, Variable
 from portia.runner import Runner
 from portia.tool import ToolSoftError
 from portia.tool_registry import InMemoryToolRegistry
@@ -210,3 +212,15 @@ def test_runner_run_query_with_soft_error(
     assert workflow.final_output
     assert isinstance(workflow.final_output.value, str)
     assert "Tool failed after retries" in workflow.final_output.value
+
+
+@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: str) -> None:
+    """Test toolless agent."""
+    agent = ToolLessAgent(description="Tell me a funny joke", inputs=[])
+    config = default_config()
+    config.llm_provider = llm_provider
+    config.llm_model_name = llm_model_name
+    llm = LLMWrapper(config)
+    out = agent.execute_sync(llm=llm.to_langchain(), step_outputs={})
+    assert isinstance(out, Output)
