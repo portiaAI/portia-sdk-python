@@ -99,10 +99,6 @@ class ToolFailedError(Exception):
 class InvalidWorkflowStateError(Exception):
     """The given workflow is in an invalid state."""
 
-    def __init__(self, workflow_id: UUID | None) -> None:
-        """Set custom error message."""
-        super().__init__(f"Workflow with id {workflow_id} is in invalid state.")
-
 
 class InvalidAgentOutputError(Exception):
     """The agent returned output that could not be processed."""

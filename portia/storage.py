@@ -5,7 +5,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
-from uuid import UUID
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -15,6 +14,8 @@ from portia.plan import Plan
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -187,13 +188,12 @@ class PortiaCloudStorage(Storage):
         """Add plan to cloud."""
         response = httpx.post(
             url=f"{self.api_endpoint}/api/v0/plans/",
-            json={"json": plan.model_dump(mode="json")},
+            json={"id": str(plan.id), "json": plan.model_dump(mode="json")},
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
-        plan.id = UUID(response.json()["id"])
         response.raise_for_status()
 
     def get_plan(self, plan_id: UUID) -> Plan:
@@ -212,12 +212,30 @@ class PortiaCloudStorage(Storage):
         """Add workflow to cloud."""
         response = httpx.post(
             url=f"{self.api_endpoint}/api/v0/workflows/",
-            json={"json": workflow.model_dump(mode="json"), "plan": str(workflow.plan_id)},
+            json={
+                "id": str(workflow.id),
+                "json": workflow.model_dump(mode="json"),
+                "plan": str(workflow.plan_id),
+            },
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
         )
+        # If the workflow exists, update it instead
+        if "workflow with this id already exists." in str(response.content):
+            response = httpx.patch(
+                url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
+                json={
+                    "id": str(workflow.id),
+                    "json": workflow.model_dump(mode="json"),
+                    "plan": str(workflow.plan_id),
+                },
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+            )
         response.raise_for_status()
 
     def get_workflow(self, workflow_id: UUID) -> Workflow:

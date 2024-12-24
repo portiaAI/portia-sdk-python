@@ -168,8 +168,7 @@ def test_runner_run_query_with_hard_error(
     assert "Something went wrong" in workflow.final_output.value
 
 
-# TODO: run this on the verifier  # noqa: TD002, TD003
-@pytest.mark.parametrize("agent", [AgentType.ONE_SHOT])
+@pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 def test_runner_run_query_with_soft_error(
     llm_provider: LLMProvider,

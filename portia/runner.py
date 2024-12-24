@@ -121,7 +121,6 @@ class Runner:
                 self.get_clarifications_for_step(workflow, index),
                 self.config.default_agent_type,
             )
-
             try:
                 step_output = agent.execute_sync(
                     llm=LLMWrapper(config=self.config).to_langchain(),
@@ -196,3 +195,5 @@ class Runner:
                     tool=tool,
                     system_context=self.config.agent_system_context_override,
                 )
+            case _:
+                raise InvalidWorkflowStateError

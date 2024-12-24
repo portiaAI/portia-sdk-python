@@ -7,8 +7,9 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
@@ -25,6 +26,7 @@ from portia.agents.verifier_agent import (
 )
 from portia.clarification import InputClarification
 from portia.config import default_config
+from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import Output
 from tests.utils import AdditionTool
@@ -347,3 +349,102 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
+
+
+def test_verifier_agent_edge_cases() -> None:
+    """Tests edge cases are handled."""
+    agent = SimpleNamespace(description="DESCRIPTION_STRING")
+    agent.tool = None
+    parser_model = ParserModel(
+        llm=LLMWrapper(default_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+    with pytest.raises(InvalidWorkflowStateError):
+        parser_model.invoke({"messages": []})
+
+    agent.verified_args = None
+    tool_calling_model = ToolCallingModel(
+        llm=LLMWrapper(default_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        tools=[AdditionTool().to_langchain(return_artifact=True)],
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+    with pytest.raises(InvalidWorkflowStateError):
+        tool_calling_model.invoke({"messages": []})
+
+
+def test_clarifications_or_continue() -> None:
+    """Test clarifications_or_continue."""
+    clarification = InputClarification(
+        argument_name="arg",
+        response="2",
+        user_guidance="",
+        resolved=True,
+    )
+
+    agent = VerifierAgent(
+        description="Send an email to test@example.com saying Hi as both the subject and body.",
+        inputs=[],
+        tool=None,
+        clarifications=[clarification],
+        system_context=[],
+    )
+
+    inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="arg", value="1", made_up=True),
+        ],
+    )
+
+    # when clarifications don't match expect a new one
+    output = agent.clarifications_or_continue(
+        {
+            "messages": [
+                HumanMessage(
+                    content=inputs.model_dump_json(indent=2),
+                ),
+            ],
+        },
+    )
+    assert output == END
+    assert isinstance(agent.new_clarifications, list)
+    assert isinstance(agent.new_clarifications[0], InputClarification)
+
+    # when clarifications match expect to call tools
+    clarification = InputClarification(
+        argument_name="arg",
+        response="1",
+        user_guidance="",
+        resolved=True,
+    )
+
+    agent = VerifierAgent(
+        description="Send an email to test@example.com saying Hi as both the subject and body.",
+        inputs=[],
+        tool=None,
+        clarifications=[clarification],
+        system_context=[],
+    )
+
+    inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="arg", value="1", made_up=True),
+        ],
+    )
+
+    output = agent.clarifications_or_continue(
+        {
+            "messages": [
+                HumanMessage(
+                    content=inputs.model_dump_json(indent=2),
+                ),
+            ],
+        },
+    )
+    assert output == "tool_agent"
+    assert isinstance(agent.new_clarifications, list)
+    assert len(agent.new_clarifications) == 0
+
+
+# 212 - 222, 333 - 337, 377 - 384, 396, 401, 405, 411 - 414, 418, 470

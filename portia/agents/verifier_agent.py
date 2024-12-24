@@ -175,53 +175,6 @@ class VerifierModel:
         return {"messages": [response.model_dump_json(indent=2)]}
 
 
-class ErrorClarifier:
-    """Model to raise clarifications if we hit a soft error that the LLM believes can be solved."""
-
-    error_clarification_prompt = ChatPromptTemplate.from_messages(
-        [
-            SystemMessage(
-                content="You are an expert reviewer, reviewing errors from previous steps in \n"
-                "an Agentic flow. Your job is to review the error that was raised from the tool,"
-                "and decide whether the user can help fix the error by clarifying an argument.\n"
-                "A clarification is a question that will be presented back to the user to answer.\n"
-                "If a clarification is useful to fix the error return the clarification"
-                "including the reason the clarification is needed.\n"
-                "Only ask for clarifications on Arguments to tools.\n"
-                "If you believe that you can change the tool arguments to fix the error without a\n"
-                "clarification we'd prefer not to ask the user.",
-            ),
-            HumanMessagePromptTemplate.from_template(
-                "Context for user input and past steps:"
-                "\n{context}\n"
-                "The system was trying to achieve the following goal: {input}\n"
-                "\n\n----------\n\n"
-                "Context from previous attempts: {messages}\n",
-            ),
-        ],
-    )
-
-    def __init__(self, llm: BaseChatModel, context: str, agent: VerifierAgent) -> None:
-        """Initialize the model."""
-        self.llm = llm
-        self.context = context
-        self.agent = agent
-
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
-        """Invoke the model with the given message state."""
-        messages = state["messages"]
-        model = self.llm.with_structured_output(InputClarification)
-        response = model.invoke(
-            self.error_clarification_prompt.format_messages(
-                context=self.context,
-                input=self.agent.description,
-                messages=messages,
-            ),
-        )
-        response = InputClarification.model_validate(response)
-        return {"messages": [response.model_dump_json(indent=2)]}
-
-
 class ToolCallingModel:
     """Model to call the tool with the verified arguments."""
 
@@ -256,7 +209,7 @@ class ToolCallingModel:
         """Invoke the model with the given message state."""
         verified_args = self.agent.verified_args
         if not verified_args:
-            verified_args = VerifiedToolInputs(args=[])
+            raise InvalidWorkflowStateError
         # handle any clarifications before calling
         if self.agent and self.agent.clarifications:
             for arg in verified_args.args:
@@ -320,21 +273,14 @@ class VerifierAgent(BaseAgent):
         self.new_clarifications: list[Clarification] = []
 
     @staticmethod
-    def error_clarifier_or_finish(
-        state: MessagesState,
-    ) -> Literal["tool_agent", "error_clarifier", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should attempt to handle an error internally before finishing."""
+    def retry_tool_or_finish(state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
+        """Determine if we should retry calling the tool if there was an error."""
         messages = state["messages"]
         last_message = messages[-1]
         errors = [msg for msg in messages if "ToolSoftError" in msg.content]
 
-        if "ToolSoftError" in last_message.content:
-            # try internal retries first
-            if len(errors) < MAX_RETRIES:
-                return "tool_agent"
-
-            # try to raise a clarification
-            return "error_clarifier"
+        if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
+            return "tool_agent"
         # Otherwise, we stop (reply to the user) as its a hard error or unknown
         return END
 
@@ -353,7 +299,7 @@ class VerifierAgent(BaseAgent):
                     clarification
                     for clarification in self.clarifications or []
                     if clarification.resolved
-                    and getattr(clarification, "argument", None) == arg.name
+                    and getattr(clarification, "argument_name", None) == arg.name
                     and clarification.response == arg.value
                 ),
                 None,
@@ -371,17 +317,6 @@ class VerifierAgent(BaseAgent):
 
         state.update({"messages": [arguments.model_dump_json(indent=2)]})  # type: ignore  # noqa: PGH003
         return "tool_agent"
-
-    def error_clarifications_or_continue(self, state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should raise a clarification based on the response."""
-        messages = state["messages"]
-        for message in messages:
-            try:
-                clarification = InputClarification.model_validate_json(str(message.content))
-                self.new_clarifications.append(clarification)
-            except ValidationError:  # noqa: PERF203
-                continue
-        return END
 
     @staticmethod
     def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
@@ -446,19 +381,14 @@ class VerifierAgent(BaseAgent):
             argument_parser(argument_parser)
             argument_verifier(argument_verifier)
             tools(tools)
-            error_clarifier(error_clarifier)
             __end__([<p>__end__</p>]):::last
             __start__ --> argument_parser;
             argument_parser --> argument_verifier;
+            tool_agent --> tools;
             argument_verifier -.-> tool_agent;
             argument_verifier -.-> __end__;
-            tool_agent -.-> tools;
-            tool_agent -.-> __end__;
             tools -.-> tool_agent;
-            tools -.-> error_clarifier;
             tools -.-> __end__;
-            error_clarifier -.-> tool_agent;
-            error_clarifier -.-> __end__;
             classDef default fill:#f2f0ff,line-height:1.2
             classDef first fill-opacity:0
             classDef last fill:#bfb6fc
@@ -485,12 +415,8 @@ class VerifierAgent(BaseAgent):
 
         workflow.add_conditional_edges(
             "tools",
-            VerifierAgent.error_clarifier_or_finish,
+            VerifierAgent.retry_tool_or_finish,
         )
-
-        workflow.add_node("error_clarifier", ErrorClarifier(llm, context, self).invoke)
-
-        workflow.add_conditional_edges("error_clarifier", self.error_clarifications_or_continue)
 
         app = workflow.compile()
 

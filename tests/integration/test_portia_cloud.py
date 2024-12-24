@@ -33,9 +33,7 @@ def test_runner_run_query_with_cloud() -> None:
     storage = runner.storage
     # check we can get items back
     storage.get_plan(workflow.plan_id)
-    storage.get_workflow(
-        workflow.id,
-    )  # TODO: re-enable when https://github.com/portiaAI/backend-holsten/pull/67 is merged  # noqa: E501, TD002, TD003
+    storage.get_workflow(workflow.id)
 
 
 def test_run_tool_error() -> None:
