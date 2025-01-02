@@ -58,7 +58,7 @@ output = runner.run_query(
 
 # optional clarification resolution block
 while output.state == WorkflowState.NEED_CLARIFICATION:
-    for _clarification in output.get_outstanding_clarifications():
+    for clarification in output.get_outstanding_clarifications():  # noqa: B007
         # resolve clarification
         continue
 
