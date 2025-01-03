@@ -1,7 +1,10 @@
 """Wrapper around different LLM providers allowing us to treat them the same."""
 
+from __future__ import annotations
+
 import logging
-from typing import TypeVar
+from abc import ABC, abstractmethod
+from typing import Optional, TypeVar
 
 import instructor
 from anthropic import Anthropic
@@ -24,7 +27,27 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
-class LLMWrapper:
+class BaseLLMWrapper(ABC):
+    """Abstract base class for LLM wrappers."""
+
+    def __init__(self, config: Config) -> None:
+        """Initialize the base LLM wrapper."""
+        self.config = config
+
+    @abstractmethod
+    def to_langchain(self) -> BaseChatModel:
+        """Convert to a LangChain-compatible model."""
+
+    @abstractmethod
+    def to_instructor(
+        self,
+        response_model: type[T],
+        messages: list[ChatCompletionMessageParam],
+    ) -> T:
+        """Generate a response using instructor."""
+
+
+class LLMWrapper(BaseLLMWrapper):
     """LLMWrapper class for different LLMs."""
 
     def __init__(
@@ -32,7 +55,7 @@ class LLMWrapper:
         config: Config,
     ) -> None:
         """Initialize the wrapper."""
-        self.config = config
+        super().__init__(config)
         self.llm_provider = config.llm_provider
         self.model_name = config.llm_model_name.value
         self.model_temperature = config.llm_model_temperature
