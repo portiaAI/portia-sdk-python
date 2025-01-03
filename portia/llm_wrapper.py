@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, TypeVar
+from typing import TYPE_CHECKING, Optional, TypeVar
 
 import instructor
 from anthropic import Anthropic
@@ -16,11 +16,13 @@ from langchain_mistralai import ChatMistralAI
 from langchain_openai import ChatOpenAI
 from mistralai import Mistral
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from portia.config import Config, LLMProvider
 from portia.errors import InvalidLLMProviderError
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 
 logger = logging.getLogger(__name__)
 
