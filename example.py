@@ -39,8 +39,6 @@ class AdditionTool(Tool):
 
 config = default_config()
 config.storage_class = StorageClass.MEMORY
-config.json_log_serialize = True
-
 
 local_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
 cloud_registry = PortiaToolRegistry(

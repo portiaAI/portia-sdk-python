@@ -88,8 +88,9 @@ class Runner:
             logger.error(f"Error in planning - {outcome.error}")
             raise PlanError(outcome.error)
         self.storage.save_plan(outcome.plan)
-        logger.bind(plan=outcome.plan.id).debug(
+        logger.debug(
             f"Plan created with {len(outcome.plan.steps)} steps",
+            extra={"plan": outcome.plan.id},
         )
         return outcome.plan
 
@@ -118,71 +119,97 @@ class Runner:
         ]
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
-        with logger.contextualize(plan=plan.id, workflow=workflow.id):
-            self.storage.save_workflow(workflow)
-            logger.debug(f"Executing workflow from step {workflow.current_step_index}")
-            for index in range(workflow.current_step_index, len(plan.steps)):
-                step = plan.steps[index]
-                logger.debug(f"Executing step {index}: {step.task}")
-                workflow.current_step_index = index
-
-                agent = self._get_agent_for_step(
-                    step,
-                    self.get_clarifications_for_step(workflow, index),
-                    self.config.default_agent_type,
+        self.storage.save_workflow(workflow)
+        logger.debug(
+            f"Executing workflow from step {workflow.current_step_index}",
+            extra={"plan": plan.id, "workflow": workflow.id},
+        )
+        for index in range(workflow.current_step_index, len(plan.steps)):
+            step = plan.steps[index]
+            logger.debug(
+                f"Executing step {index}: {step.task}",
+                extra={"plan": plan.id, "workflow": workflow.id},
+            )
+            workflow.current_step_index = index
+            agent = self._get_agent_for_step(
+                step,
+                self.get_clarifications_for_step(workflow, index),
+                self.config.default_agent_type,
+            )
+            logger.debug(
+                f"Using agent: {type(agent)}",
+                extra={"plan": plan.id, "workflow": workflow.id},
+            )
+            try:
+                step_output = agent.execute_sync(
+                    llm=LLMWrapper(config=self.config).to_langchain(),
+                    step_outputs=workflow.step_outputs,
                 )
-                try:
-                    step_output = agent.execute_sync(
-                        llm=LLMWrapper(config=self.config).to_langchain(),
-                        step_outputs=workflow.step_outputs,
-                    )
-                    logger.debug(f"Step {index} output: {step_output.value}")
 
-                except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                    error_output = Output(value=str(e))
-                    workflow.step_outputs[step.output] = error_output
-                    workflow.state = WorkflowState.FAILED
-                    workflow.final_output = error_output
-                    self.storage.save_workflow(workflow)
-                    logger.error(f"Step {index} error: {error_output.value}")
-                    logger.debug(f"Final workflow status: {workflow.state}")
-                    return workflow
-                else:
-                    workflow.step_outputs[step.output] = step_output
-
-                # if a clarification was returned append it to the set of clarifications needed
-                if isinstance(step_output.value, Clarification) or (
-                    isinstance(step_output.value, list)
-                    and len(step_output.value) > 0
-                    and all(isinstance(item, Clarification) for item in step_output.value)
-                ):
-                    new_clarifications = (
-                        [step_output.value]
-                        if isinstance(step_output.value, Clarification)
-                        else step_output.value
-                    )
-                    for clarification in new_clarifications:
-                        clarification.step = workflow.current_step_index
-
-                    workflow.clarifications = workflow.clarifications + new_clarifications
-                    workflow.state = WorkflowState.NEED_CLARIFICATION
-                    self.storage.save_workflow(workflow)
-                    logger.info(f"{len(new_clarifications)} Clarification(s) requested")
-                    return workflow
-
-                # set final output if is last step (accounting for zero index)
-                if index == len(plan.steps) - 1:
-                    workflow.final_output = step_output
-
-                # persist at the end of each step
+            except Exception as e:  # noqa: BLE001 - We want to capture all failures here
+                error_output = Output(value=str(e))
+                workflow.step_outputs[step.output] = error_output
+                workflow.state = WorkflowState.FAILED
+                workflow.final_output = error_output
                 self.storage.save_workflow(workflow)
+                logger.error(
+                    f"Step {index} error: {e}",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                )
+                logger.debug(
+                    f"Final workflow status: {workflow.state}",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                )
+                return workflow
+            else:
+                workflow.step_outputs[step.output] = step_output
+                logger.debug(
+                    f"Step {index} successful",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                )
 
-            workflow.state = WorkflowState.COMPLETE
+            # if a clarification was returned append it to the set of clarifications needed
+            if isinstance(step_output.value, Clarification) or (
+                isinstance(step_output.value, list)
+                and len(step_output.value) > 0
+                and all(isinstance(item, Clarification) for item in step_output.value)
+            ):
+                new_clarifications = (
+                    [step_output.value]
+                    if isinstance(step_output.value, Clarification)
+                    else step_output.value
+                )
+                for clarification in new_clarifications:
+                    clarification.step = workflow.current_step_index
+
+                workflow.clarifications = workflow.clarifications + new_clarifications
+                workflow.state = WorkflowState.NEED_CLARIFICATION
+                self.storage.save_workflow(workflow)
+                logger.info(
+                    f"{len(new_clarifications)} Clarification(s) requested",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                )
+                return workflow
+
+            # set final output if is last step (accounting for zero index)
+            if index == len(plan.steps) - 1:
+                workflow.final_output = step_output
+
+            # persist at the end of each step
             self.storage.save_workflow(workflow)
-            logger.debug(f"Final workflow status: {workflow.state}")
-            if workflow.final_output:
-                logger.info(str(workflow.final_output.value))
-            return workflow
+
+        workflow.state = WorkflowState.COMPLETE
+        self.storage.save_workflow(workflow)
+        logger.debug(
+            f"Final workflow status: {workflow.state}",
+            extra={"plan": plan.id, "workflow": workflow.id},
+        )
+        if workflow.final_output:
+            logger.info(
+                str(workflow.final_output.value),
+                extra={"plan": plan.id, "workflow": workflow.id},
+            )
+        return workflow
 
     def _get_agent_for_step(
         self,
