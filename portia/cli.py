@@ -7,11 +7,33 @@ portia-cli plan "add 4 + 8" - plan a query
 """
 
 import click
+from pydantic import BaseModel, Field
 
 from portia.config import default_config
 from portia.runner import Runner
+from portia.tool import Tool
 from portia.tool_registry import InMemoryToolRegistry
-from tests.utils import AdditionTool
+
+
+class AdditionToolSchema(BaseModel):
+    """Input for AdditionTool."""
+
+    a: int = Field(..., description="The first number to add")
+    b: int = Field(..., description="The second number to add")
+
+
+class AdditionTool(Tool):
+    """Adds two numbers."""
+
+    id: str = "add_tool"
+    name: str = "Add Tool"
+    description: str = "Takes two numbers and adds them together"
+    args_schema: type[BaseModel] = AdditionToolSchema
+    output_schema: tuple[str, str] = ("int", "int: The value of the addition")
+
+    def run(self, a: int, b: int) -> int:
+        """Add the numbers."""
+        return a + b
 
 
 @click.group()
