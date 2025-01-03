@@ -1,6 +1,7 @@
 """Tests for the Planner module."""
 
 from unittest.mock import MagicMock
+from uuid import UUID
 
 import pytest
 
@@ -27,6 +28,23 @@ def mock_tool_set() -> ToolSet:
 def planner(mock_config: Config) -> Planner:
     """Create an instance of the Planner with mocked config."""
     return Planner(config=mock_config)
+
+
+def test_plan_uuid_assign() -> None:
+    """Test plan assign correct UUIDs."""
+    plan = Plan(
+        id="123",  # type: ignore  # noqa: PGH003
+        query="",
+        steps=[],
+    )
+    assert isinstance(plan.id, UUID)
+
+    clarification = Plan(
+        id=123,  # type: ignore  # noqa: PGH003
+        query="",
+        steps=[],
+    )
+    assert isinstance(clarification.id, UUID)
 
 
 def test_generate_plan_or_error_success(planner: Planner, mock_tool_set: ToolSet) -> None:

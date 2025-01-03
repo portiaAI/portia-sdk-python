@@ -12,7 +12,7 @@ from langgraph.prebuilt import ToolNode
 from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification
-from portia.errors import ToolRetryError
+from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.plan import Output, Variable
 
 if TYPE_CHECKING:
@@ -39,7 +39,8 @@ class OneShotToolCallingModel:
                 "context:\n{context}\n"
                 "Make sure you don't repeat past errors: {past_errors}\n"
                 "Use the provided tool. You should provide arguments that match the tool's schema\n"
-                "using the information contained in the query and context.",
+                "using the information contained in the query and context. Where clarifications\n"
+                "have been provided you should always use the values provided by them.",
             ),
         ],
     )
@@ -123,6 +124,8 @@ class OneShotAgent(BaseAgent):
         """Process the output of the agent."""
         if "ToolSoftError" in last_message.content and self.tool:
             raise ToolRetryError(self.tool.name, str(last_message.content))
+        if "ToolHardError" in last_message.content and self.tool:
+            raise ToolFailedError(self.tool.name, str(last_message.content))
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,
@@ -137,7 +140,7 @@ class OneShotAgent(BaseAgent):
             return tool_output
         if isinstance(last_message, HumanMessage):
             return Output(value=last_message.content)
-        return Output(value="Requested clarification or failed to call tool.")
+        raise InvalidAgentOutputError(str(last_message.content))
 
     def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
         """Run the core execution logic of the task."""

@@ -13,7 +13,6 @@ from portia.clarification import (
 )
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
-    InvalidAgentError,
     InvalidStorageError,
     InvalidWorkflowStateError,
     PlanError,
@@ -50,7 +49,7 @@ class Runner:
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=config)
             case _:
-                raise InvalidStorageError(config.storage_class.name)
+                raise InvalidStorageError(config.storage_class)
 
     def run_query(
         self,
@@ -102,13 +101,13 @@ class Runner:
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
 
-    def get_clarifications_for_step(self, workflow: Workflow) -> list[Clarification]:
+    def get_clarifications_for_step(self, workflow: Workflow, step: int) -> list[Clarification]:
         """get_clarifications_for_step isolates clarifications relevant for the current step."""
         return [
             clarification
             for clarification in workflow.clarifications
             if isinstance(clarification, (InputClarification, MultiChoiceClarification))
-            and clarification.step == workflow.current_step_index
+            and clarification.step == step
         ]
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
@@ -119,10 +118,9 @@ class Runner:
 
             agent = self._get_agent_for_step(
                 step,
-                self.get_clarifications_for_step(workflow),
+                self.get_clarifications_for_step(workflow, index),
                 self.config.default_agent_type,
             )
-
             try:
                 step_output = agent.execute_sync(
                     llm=LLMWrapper(config=self.config).to_langchain(),
@@ -130,8 +128,10 @@ class Runner:
                 )
 
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                workflow.step_outputs[step.output] = Output(value=str(e))
+                error_output = Output(value=str(e))
+                workflow.step_outputs[step.output] = error_output
                 workflow.state = WorkflowState.FAILED
+                workflow.final_output = error_output
                 self.storage.save_workflow(workflow)
                 return workflow
             else:
@@ -155,6 +155,13 @@ class Runner:
                 workflow.state = WorkflowState.NEED_CLARIFICATION
                 self.storage.save_workflow(workflow)
                 return workflow
+
+            # set final output if is last step (accounting for zero index)
+            if index == len(plan.steps) - 1:
+                workflow.final_output = step_output
+
+            # persist at the end of each step
+            self.storage.save_workflow(workflow)
 
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)
@@ -189,4 +196,4 @@ class Runner:
                     system_context=self.config.agent_system_context_override,
                 )
             case _:
-                raise InvalidAgentError(agent_type)
+                raise InvalidWorkflowStateError

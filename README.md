@@ -101,7 +101,16 @@ runner.run_query("Add 1 and 2")
 
 ## Tests
 
-Run tests with `poetry run pytest`.
+We write two types of tests:
+- Unit tests should mock out the LLM providers, and aim to give quick feedback. 
+- Integration tests actually call LLM providers, are much slower but test the system works fully.
+
+To run tests:
+- Run all tests with `poetry run pytest`.
+- Run unit tests with `poetry run pytest tests/unit`.
+- Run integration tests with `poetry run pytest tests/integration`.
+
+We utilize [pytest-parallel](https://pypi.org/project/pytest-parallel/) to execute tests in parallel. You can add the `--workers=4` argument to the commands above to run in parallel. If you run into issues running this try setting `export NO_PROXY=true` first.
 
 ## Release
 

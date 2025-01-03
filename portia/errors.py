@@ -99,30 +99,10 @@ class ToolFailedError(Exception):
 class InvalidWorkflowStateError(Exception):
     """The given workflow is in an invalid state."""
 
-    def __init__(self, workflow_id: UUID | None) -> None:
+
+class InvalidAgentOutputError(Exception):
+    """The agent returned output that could not be processed."""
+
+    def __init__(self, content: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Workflow with id {workflow_id} is in invalid state.")
-
-
-class InvalidAgentError(Exception):
-    """Raise when a given agent is invalid."""
-
-    def __init__(self, agent: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{agent} is not a supported agent")
-
-
-class InvalidAgentUsageError(Exception):
-    """Raise when a given agent is used incorrectly."""
-
-    def __init__(self, agent: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{agent} is not being used in correct context")
-
-
-class NoVerifiedArgsError(Exception):
-    """Raised when verified args are expected but not present."""
-
-    def __init__(self) -> None:
-        """Set custom error message."""
-        super().__init__("Expected verified args to be provided")
+        super().__init__(f"Agent returned invalid content: {content}")

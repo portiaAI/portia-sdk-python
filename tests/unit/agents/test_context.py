@@ -1,6 +1,5 @@
 """test context."""
 
-import logging
 
 import pytest
 from pydantic import HttpUrl
@@ -59,7 +58,6 @@ description: Title for email
 def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with inputs and outputs."""
     context = build_context(inputs, outputs, [])
-    logging.log(level=logging.INFO, msg=context.__str__())
     expected_output = """Additional context: You MUST use this information to complete your task.
 name: $email_address
 value: test@example.com
@@ -209,5 +207,4 @@ value: rainy
 ----------
 
 """  # noqa: E501
-    logging.log(level=logging.INFO, msg=context.__str__())
     assert context == expected_context

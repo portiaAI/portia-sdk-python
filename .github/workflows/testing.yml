@@ -5,6 +5,11 @@ on:
     branches:
       - "*"
 
+permissions:
+  contents: write
+  checks: write
+  pull-requests: write
+
 jobs:
   testing:
     runs-on: ubuntu-latest
@@ -24,4 +29,15 @@ jobs:
       - name: tests + coverage
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: poetry run pytest --cov --cov-fail-under 0 --log-cli-level=WARNING
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+        run: |
+          set -o pipefail
+          poetry run pytest --workers auto  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+
+      - name: Pytest coverage comment
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          pytest-coverage-path: ./pytest-coverage.txt
+          junitxml-path: ./pytest.xml

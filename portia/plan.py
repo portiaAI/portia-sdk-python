@@ -32,10 +32,6 @@ class Variable(BaseModel):
         description="A description of the variable.",
     )
 
-    def get_context_string(self) -> str:
-        """Return a string representation of the variable."""
-        return f"{self.name} ({self.description}): {self.value}"
-
 
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output of a tool with wrapper for data, summaries and LLM interpretation.

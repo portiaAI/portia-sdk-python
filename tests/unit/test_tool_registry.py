@@ -3,14 +3,54 @@
 import pytest
 
 from portia.errors import ToolNotFoundError
+from portia.tool import Tool
 from portia.tool_registry import (
+    AggregatedToolRegistry,
     InMemoryToolRegistry,
+    ToolRegistry,
     ToolSet,
 )
-from tests.utils import MockTool
+from tests.utils import AdditionTool, MockTool
 
 MOCK_TOOL_NAME = "mock tool"
 OTHER_MOCK_TOOL_NAME = "other mock tool"
+
+
+def test_registry_base_classes() -> None:
+    """Test registry raises."""
+
+    class MyRegistry(ToolRegistry):
+        """Override to test base."""
+
+        def get_tools(self) -> ToolSet:
+            return super().get_tools()  # type: ignore  # noqa: PGH003
+
+        def get_tool(self, tool_name: str) -> Tool:
+            return super().get_tool(tool_name)  # type: ignore  # noqa: PGH003
+
+        def register_tool(self, tool: Tool) -> None:
+            return super().register_tool(tool)  # type: ignore  # noqa: PGH003
+
+        def match_tools(self, query: str) -> ToolSet:
+            return super().match_tools(query)
+
+    registry = MyRegistry()
+
+    with pytest.raises(NotImplementedError):
+        registry.get_tools()
+
+    with pytest.raises(NotImplementedError):
+        registry.get_tool("1")
+
+    with pytest.raises(NotImplementedError):
+        registry.register_tool(AdditionTool())
+
+    with pytest.raises(NotImplementedError):
+        registry.match_tools("match")
+
+    agg_registry = AggregatedToolRegistry(registries=[registry])
+    with pytest.raises(NotImplementedError):
+        agg_registry.register_tool(AdditionTool())
 
 
 def test_tool_set_get_tool() -> None:
@@ -32,6 +72,14 @@ def test_local_tool_registry_register_tool() -> None:
 
     with pytest.raises(ToolNotFoundError):
         local_tool_registry.get_tool("tool3")
+
+
+def test_local_tool_registry_get_and_run() -> None:
+    """Test getting and running tools in the InMemoryToolRegistry."""
+    local_tool_registry = InMemoryToolRegistry()
+    local_tool_registry.register_tool(MockTool(name=MOCK_TOOL_NAME))
+    tool1 = local_tool_registry.get_tool(MOCK_TOOL_NAME)
+    tool1.run()
 
 
 def test_local_tool_registry_get_tools() -> None:
