@@ -24,6 +24,7 @@ from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
 from portia.tool_registry import ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
+from tests.unit.agents.test_context import outputs
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
@@ -164,8 +165,9 @@ class Runner:
             else:
                 workflow.step_outputs[step.output] = step_output
                 logger.debug(
-                    f"Step {index} successful",
+                    "Step output - {output}",
                     extra={"plan": plan.id, "workflow": workflow.id},
+                    output=str(step_output.value),
                 )
 
             # if a clarification was returned append it to the set of clarifications needed
@@ -206,8 +208,9 @@ class Runner:
         )
         if workflow.final_output:
             logger.info(
-                str(workflow.final_output.value),
+                "{output}",
                 extra={"plan": plan.id, "workflow": workflow.id},
+                output=str(workflow.final_output.value),
             )
         return workflow
 
