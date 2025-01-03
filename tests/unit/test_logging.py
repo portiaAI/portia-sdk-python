@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from portia.errors import InvalidLoggerError
-from portia.logging import logger_manager, LoggerInterface, LoggerManager, LoggerProxy
+from portia.logging import LoggerInterface, LoggerManager, LoggerProxy, logger_manager
 
 
 def test_logger_manager_initialization() -> None:
