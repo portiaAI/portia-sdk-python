@@ -24,7 +24,6 @@ from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
 from portia.tool_registry import ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
-from tests.unit.agents.test_context import outputs
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
