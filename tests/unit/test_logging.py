@@ -58,6 +58,22 @@ def test_configure_from_config() -> None:
     assert mock_config.default_log_sink == "sys.stdout"
 
 
+def test_configure_from_config_stderr() -> None:
+    """Test configuring the logger from a Config instance."""
+    logger_manager = LoggerManager()
+    mock_config = Mock(
+        default_log_sink="sys.stderr",
+        default_log_level="DEBUG",
+        json_log_serialize=False,
+    )
+
+    logger_manager.configure_from_config(mock_config)
+
+    # Verify log level and sink configuration
+    assert mock_config.default_log_level.upper() == "DEBUG"
+    assert mock_config.default_log_sink == "sys.stderr"
+
+
 def test_configure_from_config_custom_logger() -> None:
     """Test warning when configuring logger with a custom logger set."""
     mock_logger = Mock(spec=LoggerInterface)
