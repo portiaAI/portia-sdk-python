@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import os
-import sys
 from enum import Enum
-from logging import Handler
 from pathlib import Path
-from typing import TextIO, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, SecretStr
 
@@ -57,8 +55,9 @@ class Config(BaseModel):
     storage_dir: str | None = None
 
     # Logging Options
-    default_log_level: str = "INFO"
+    default_log_level: str = "DEBUG"
     default_log_sink: str = "sys.stdout"
+    json_log_serialize: bool = False
 
     # LLM Options
     llm_provider: LLMProvider

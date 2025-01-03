@@ -38,7 +38,9 @@ class AdditionTool(Tool):
 
 
 config = default_config()
-config.storage_class = StorageClass.CLOUD
+config.storage_class = StorageClass.MEMORY
+config.json_log_serialize = True
+
 
 local_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
 cloud_registry = PortiaToolRegistry(
@@ -53,7 +55,8 @@ runner = Runner(
 
 
 output = runner.run_query(
-    "Get the temperature in London and Sydney and then add the two temperatures together.",
+    "Get the temperature in London and Sydney and then add the two temperatures together "
+    "rounded to two decimal places.",
 )
 
 # optional clarification resolution block
@@ -64,6 +67,3 @@ while output.state == WorkflowState.NEED_CLARIFICATION:
 
     # after we've resolved all clarifications we resume
     runner.resume_workflow(output)
-
-
-print(output)  # noqa: T201
