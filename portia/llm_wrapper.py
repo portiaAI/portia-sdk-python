@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import instructor
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
-from langchain_core.language_models.chat_models import (
-    BaseChatModel,
-)
 from langchain_mistralai import ChatMistralAI
 from langchain_openai import ChatOpenAI
 from mistralai import Mistral
@@ -22,6 +19,9 @@ from portia.config import Config, LLMProvider
 from portia.errors import InvalidLLMProviderError
 
 if TYPE_CHECKING:
+    from langchain_core.language_models.chat_models import (
+        BaseChatModel,
+    )
     from openai.types.chat import ChatCompletionMessageParam
 
 logger = logging.getLogger(__name__)
