@@ -16,7 +16,7 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field, SecretStr, model_validator
 
 from portia.clarification import Clarification
-from portia.errors import InvalidToolDescriptionError
+from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.plan import Output
 from portia.templates.render import render_template
 from portia.types import SERIALIZABLE_TYPE_VAR
@@ -71,7 +71,15 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         **kwargs: Any,  # noqa: ANN401
     ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
         """Run the Tool function and generate an Output object with descriptions."""
-        output = self.run(*args, **kwargs)
+        try:
+            output = self.run(*args, **kwargs)
+        except Exception as e:
+            # check if error is wrapped as a Hard or Soft Tool Error.
+            # if not wrap as ToolSoftError
+            if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
+                raise ToolSoftError(e) from e
+            raise
+
         # handle clarifications cleanly
         if isinstance(output, Clarification) or (
             isinstance(output, list)
@@ -169,14 +177,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def args_json_schema(self) -> dict[str, Any]:
         """Return the json_schema for the tool args."""
         return self.args_schema.model_json_schema()["properties"]
-
-
-class ToolHardError(Exception):
-    """Raised when a tool hits an error it can't retry."""
-
-
-class ToolSoftError(Exception):
-    """Raised when a tool hits an error it can retry."""
 
 
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):

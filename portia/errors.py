@@ -106,3 +106,19 @@ class InvalidAgentOutputError(Exception):
     def __init__(self, content: str) -> None:
         """Set custom error message."""
         super().__init__(f"Agent returned invalid content: {content}")
+
+
+class ToolHardError(Exception):
+    """Raised when a tool hits an error it can't retry."""
+
+    def __init__(self, cause: Exception | str) -> None:
+        """Set custom error message."""
+        super().__init__(cause)
+
+
+class ToolSoftError(Exception):
+    """Raised when a tool hits an error it can retry."""
+
+    def __init__(self, cause: Exception | str) -> None:
+        """Set custom error message."""
+        super().__init__(cause)

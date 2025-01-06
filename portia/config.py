@@ -123,4 +123,5 @@ def default_config() -> Config:
         llm_model_temperature=0,
         llm_model_seed=443,
         default_agent_type=AgentType.VERIFIER,
+        default_log_level="info",
     )

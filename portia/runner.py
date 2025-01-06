@@ -88,10 +88,16 @@ class Runner:
             logger.error(f"Error in planning - {outcome.error}")
             raise PlanError(outcome.error)
         self.storage.save_plan(outcome.plan)
-        logger.debug(
+        logger.info(
             f"Plan created with {len(outcome.plan.steps)} steps",
             extra={"plan": outcome.plan.id},
         )
+        logger.debug(
+            "Plan: {plan}",
+            extra={"plan": outcome.plan.id},
+            plan=outcome.plan.model_dump_json(indent=4),
+        )
+
         return outcome.plan
 
     def run_plan(self, plan: Plan) -> Workflow:
@@ -198,7 +204,7 @@ class Runner:
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
-            logger.info(
+            logger.debug(
                 "New Workflow State: {workflow}",
                 extra={"plan": plan.id, "workflow": workflow.id},
                 workflow=workflow.model_dump_json(indent=4),

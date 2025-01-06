@@ -4,10 +4,10 @@ import pytest
 
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, LLMProvider, default_config
+from portia.errors import ToolSoftError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step, Variable
 from portia.runner import Runner
-from portia.tool import ToolSoftError
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
@@ -183,7 +183,7 @@ def test_runner_run_query_with_soft_error(
 
     class MyAdditionTool(AdditionTool):
         def run(self, a: int, b: int) -> int:  # noqa: ARG002
-            raise ToolSoftError("Server Timeout")  # noqa: TRY003
+            raise ToolSoftError("Server Timeout")
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
