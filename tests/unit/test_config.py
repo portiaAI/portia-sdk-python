@@ -49,3 +49,9 @@ def test_getters() -> None:
 
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_key", int)
+
+    with pytest.raises(InvalidConfigError):
+        c.must_get_raw_api_key("portia_api_key")
+
+    with pytest.raises(InvalidConfigError):
+        c.must_get_api_key("portia_api_key")
