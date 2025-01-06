@@ -198,6 +198,11 @@ class Runner:
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
+            logger.info(
+                "New Workflow State: {workflow}",
+                extra={"plan": plan.id, "workflow": workflow.id},
+                workflow=workflow.model_dump_json(indent=4),
+            )
 
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)

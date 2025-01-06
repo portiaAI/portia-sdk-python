@@ -104,7 +104,7 @@ class DiskFileStorage(Storage):
         """
         self._ensure_storage()  # Ensure storage directory exists
         with Path(self.storage_dir, file_name).open("w") as file:
-            file.write(content.model_dump_json())
+            file.write(content.model_dump_json(indent=4))
 
     def _read(self, file_name: str, model: type[T]) -> T:
         """Read a JSON file and deserialize it into a BaseModel instance.

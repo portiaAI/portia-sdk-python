@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger as default_logger
-
-from portia.errors import InvalidLoggerError
 
 if TYPE_CHECKING:
     from portia.config import Config
 
 
-@runtime_checkable
 class LoggerInterface(Protocol):
     """General Interface for loggers."""
 
@@ -54,8 +51,6 @@ class LoggerManager:
 
     def set_logger(self, custom_logger: LoggerInterface) -> None:
         """Set a custom logger."""
-        if not isinstance(custom_logger, LoggerInterface):
-            raise InvalidLoggerError
         self._logger = custom_logger
         self.custom_logger = True
 

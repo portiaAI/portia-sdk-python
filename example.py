@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 
 from portia.config import StorageClass, default_config
+from portia.logging import logger
 from portia.runner import Runner
 from portia.tool import Tool
 from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry
@@ -34,6 +35,7 @@ class AdditionTool(Tool):
 
     def run(self, a: float, b: float) -> float | InputClarification:
         """Add the numbers."""
+        logger.debug(f"Adding {a} and {b}")
         return a + b
 
 

@@ -106,7 +106,3 @@ class InvalidAgentOutputError(Exception):
     def __init__(self, content: str) -> None:
         """Set custom error message."""
         super().__init__(f"Agent returned invalid content: {content}")
-
-
-class InvalidLoggerError(Exception):
-    """The provided logger instance does not satisfy LoggerInterface."""
