@@ -2,6 +2,7 @@
 
 from unittest.mock import Mock
 
+from portia.config import LogLevel
 from portia.logging import LoggerInterface, LoggerManager, LoggerProxy, logger_manager
 
 
@@ -35,14 +36,14 @@ def test_configure_from_config() -> None:
     logger_manager = LoggerManager()
     mock_config = Mock(
         default_log_sink="sys.stdout",
-        default_log_level="DEBUG",
+        default_log_level=LogLevel.DEBUG,
         json_log_serialize=False,
     )
 
     logger_manager.configure_from_config(mock_config)
 
     # Verify log level and sink configuration
-    assert mock_config.default_log_level.upper() == "DEBUG"
+    assert mock_config.default_log_level == LogLevel.DEBUG
     assert mock_config.default_log_sink == "sys.stdout"
 
 
@@ -51,14 +52,14 @@ def test_configure_from_config_stderr() -> None:
     logger_manager = LoggerManager()
     mock_config = Mock(
         default_log_sink="sys.stderr",
-        default_log_level="DEBUG",
+        default_log_level=LogLevel.INFO,
         json_log_serialize=False,
     )
 
     logger_manager.configure_from_config(mock_config)
 
     # Verify log level and sink configuration
-    assert mock_config.default_log_level.upper() == "DEBUG"
+    assert mock_config.default_log_level == LogLevel.INFO
     assert mock_config.default_log_sink == "sys.stderr"
 
 
