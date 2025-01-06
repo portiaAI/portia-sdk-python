@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.0.1-alpha.4"
+version = "0.0.1-alpha.5"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Tech <tech@portialabs.ai>"]
 readme = "README.md"
@@ -29,6 +29,7 @@ mistralai = "^1.2.5"
 langchain = "^0.3.12"
 langgraph = "^0.2.59"
 click = "^8.1.7"
+loguru = "^0.7.3"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"

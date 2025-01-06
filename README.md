@@ -129,3 +129,32 @@ pip install -e .
 export OPENAI_API_KEY=$KEY
 portia-cli run "add 4 + 8"
 ```
+
+## Logging
+
+Custom tools can make use of the portia logging:
+
+```python
+from portia.logging import logger
+
+class AdditionTool(Tool):
+    """Adds two numbers."""
+    def run(self, a: float, b: float) -> float | InputClarification:
+        """Add the numbers."""
+        logger.debug(f"Adding {a} and {b}")
+        return a + b
+
+```
+
+The logging implementation itself can also be overridden by any logger that fulfils the LoggerInterface.
+
+For example to use the built in python logger:
+
+```python
+import logging
+from portia.logging import logger_manager
+
+logger = logging.getLogger(__name__)
+
+logger_manager.set_logger(logger)
+```

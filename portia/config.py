@@ -54,6 +54,18 @@ class Config(BaseModel):
     storage_class: StorageClass
     storage_dir: str | None = None
 
+    # Logging Options
+
+    # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
+    # where as setting it to ERROR will only display ERROR and above.
+    default_log_level: str = "DEBUG"
+    # default_log_sink controls where default logs are sent. By default this is to STDOUT
+    # but can also be set to STDERR (sys.stderr)
+    # or to a file by setting this to a file path ("./logs.txt")
+    default_log_sink: str = "sys.stdout"
+    # json_log_serialize sets whether logs are JSON serialized before sending to the log sink.
+    json_log_serialize: bool = False
+
     # LLM Options
     llm_provider: LLMProvider
     llm_model_name: str
@@ -93,6 +105,12 @@ class Config(BaseModel):
         value = getattr(self, name)
         if not isinstance(value, expected_type):
             raise InvalidConfigError(name)
+        # ensure non-empty values
+        match value:
+            case str() if value == "":
+                raise InvalidConfigError(name)
+            case SecretStr() if value.get_secret_value() == "":
+                raise InvalidConfigError(name)
         return value
 
 

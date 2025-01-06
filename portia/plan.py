@@ -36,8 +36,7 @@ class Variable(BaseModel):
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output of a tool with wrapper for data, summaries and LLM interpretation.
 
-    Contains a generic value T bound to Serializable and optional short and long summaries to be
-    used for the contextual output of the tool and to explain result to the LLM.
+    Contains a generic value T bound to Serializable.
     """
 
     value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 
 from portia.config import StorageClass, default_config
+from portia.logging import logger
 from portia.runner import Runner
 from portia.tool import Tool
 from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry
@@ -34,11 +35,12 @@ class AdditionTool(Tool):
 
     def run(self, a: float, b: float) -> float | InputClarification:
         """Add the numbers."""
+        logger.debug(f"Adding {a} and {b}")
         return a + b
 
 
 config = default_config()
-config.storage_class = StorageClass.CLOUD
+config.storage_class = StorageClass.MEMORY
 
 local_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
 cloud_registry = PortiaToolRegistry(
@@ -53,17 +55,15 @@ runner = Runner(
 
 
 output = runner.run_query(
-    "Get the temperature in London and Sydney and then add the two temperatures together.",
+    "Get the temperature in London and Sydney and then add the two temperatures together "
+    "rounded to two decimal places.",
 )
 
 # optional clarification resolution block
 while output.state == WorkflowState.NEED_CLARIFICATION:
-    for _clarification in output.get_outstanding_clarifications():
+    for clarification in output.get_outstanding_clarifications():  # noqa: B007
         # resolve clarification
         continue
 
     # after we've resolved all clarifications we resume
     runner.resume_workflow(output)
-
-
-print(output)  # noqa: T201

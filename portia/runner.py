@@ -18,6 +18,7 @@ from portia.errors import (
     PlanError,
 )
 from portia.llm_wrapper import LLMWrapper
+from portia.logging import logger, logger_manager
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
@@ -38,6 +39,7 @@ class Runner:
         tool_registry: ToolRegistry,
     ) -> None:
         """Initialize storage and tools."""
+        logger_manager.configure_from_config(config)
         self.config = config
         self.tool_registry = tool_registry
 
@@ -75,6 +77,7 @@ class Runner:
             tools = ToolSet([self.tool_registry.get_tool(tool) for tool in tools])
 
         planner = Planner(config=self.config)
+        logger.debug(f"Running planner for query - {query}")
         outcome = planner.generate_plan_or_error(
             query=query,
             tool_list=tools,
@@ -82,8 +85,13 @@ class Runner:
             examples=example_plans,
         )
         if outcome.error:
+            logger.error(f"Error in planning - {outcome.error}")
             raise PlanError(outcome.error)
         self.storage.save_plan(outcome.plan)
+        logger.debug(
+            f"Plan created with {len(outcome.plan.steps)} steps",
+            extra={"plan": outcome.plan.id},
+        )
         return outcome.plan
 
     def run_plan(self, plan: Plan) -> Workflow:
@@ -112,14 +120,25 @@ class Runner:
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
         self.storage.save_workflow(workflow)
+        logger.debug(
+            f"Executing workflow from step {workflow.current_step_index}",
+            extra={"plan": plan.id, "workflow": workflow.id},
+        )
         for index in range(workflow.current_step_index, len(plan.steps)):
             step = plan.steps[index]
+            logger.debug(
+                f"Executing step {index}: {step.task}",
+                extra={"plan": plan.id, "workflow": workflow.id},
+            )
             workflow.current_step_index = index
-
             agent = self._get_agent_for_step(
                 step,
                 self.get_clarifications_for_step(workflow, index),
                 self.config.default_agent_type,
+            )
+            logger.debug(
+                f"Using agent: {type(agent)}",
+                extra={"plan": plan.id, "workflow": workflow.id},
             )
             try:
                 step_output = agent.execute_sync(
@@ -133,9 +152,22 @@ class Runner:
                 workflow.state = WorkflowState.FAILED
                 workflow.final_output = error_output
                 self.storage.save_workflow(workflow)
+                logger.error(
+                    f"Step {index} error: {e}",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                )
+                logger.debug(
+                    f"Final workflow status: {workflow.state}",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                )
                 return workflow
             else:
                 workflow.step_outputs[step.output] = step_output
+                logger.debug(
+                    "Step output - {output}",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                    output=str(step_output.value),
+                )
 
             # if a clarification was returned append it to the set of clarifications needed
             if isinstance(step_output.value, Clarification) or (
@@ -154,6 +186,10 @@ class Runner:
                 workflow.clarifications = workflow.clarifications + new_clarifications
                 workflow.state = WorkflowState.NEED_CLARIFICATION
                 self.storage.save_workflow(workflow)
+                logger.info(
+                    f"{len(new_clarifications)} Clarification(s) requested",
+                    extra={"plan": plan.id, "workflow": workflow.id},
+                )
                 return workflow
 
             # set final output if is last step (accounting for zero index)
@@ -162,9 +198,24 @@ class Runner:
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
+            logger.info(
+                "New Workflow State: {workflow}",
+                extra={"plan": plan.id, "workflow": workflow.id},
+                workflow=workflow.model_dump_json(indent=4),
+            )
 
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)
+        logger.debug(
+            f"Final workflow status: {workflow.state}",
+            extra={"plan": plan.id, "workflow": workflow.id},
+        )
+        if workflow.final_output:
+            logger.info(
+                "{output}",
+                extra={"plan": plan.id, "workflow": workflow.id},
+                output=str(workflow.final_output.value),
+            )
         return workflow
 
     def _get_agent_for_step(
