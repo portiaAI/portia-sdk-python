@@ -58,7 +58,7 @@ class Config(BaseModel):
 
     # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
     # where as setting it to ERROR will only display ERROR and above.
-    default_log_level: str = "DEBUG"
+    default_log_level: str = "INFO"
     # default_log_sink controls where default logs are sent. By default this is to STDOUT
     # but can also be set to STDERR (sys.stderr)
     # or to a file by setting this to a file path ("./logs.txt")

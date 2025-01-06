@@ -5,11 +5,13 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Plan, Step, Variable
+from portia.plan import Plan
+from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
@@ -17,36 +19,6 @@ if TYPE_CHECKING:
     from portia.tool_registry import ToolSet
 
 logger = logging.getLogger(__name__)
-
-
-DEFAULT_EXAMPLE_PLANS: list[Plan] = [
-    Plan(
-        query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
-        steps=[
-            Step(
-                task="Find and summarize the latest news on artificial intelligence",
-                tool_name="portia::search_tool",
-                output="$ai_search_results",
-            ),
-            Step(
-                task="Email $email politely with $ai_search_results",
-                input=[
-                    Variable(
-                        name="$ai_search_results",
-                        description="summary of AI news",
-                    ),
-                    Variable(
-                        name="$email",
-                        value="hello@portialabs.ai",
-                        description="The email address to send the email to",
-                    ),
-                ],
-                tool_name="portia::send_email_tool",
-                output="$final_output",
-            ),
-        ],
-    ),
-]
 
 
 class PlanOrError(BaseModel):
@@ -80,7 +52,7 @@ class Planner:
             system_context,
             examples,
         )
-        return LLMWrapper(self.config).to_instructor(
+        response = LLMWrapper(self.config).to_instructor(
             response_model=PlanOrError,
             messages=[
                 {
@@ -95,6 +67,9 @@ class Planner:
                 {"role": "user", "content": prompt},
             ],
         )
+        # don't use the ID assigned by the LLM but assign our own to ensure uniqueness.
+        response.plan.id = uuid4()
+        return response
 
 
 def _render_prompt_insert_defaults(

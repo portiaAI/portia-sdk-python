@@ -10,38 +10,46 @@ pip install portia-sdk-python
 ```
 
 
-### Simple Usage
+### Simple Usage with Example Registry
 
 ```python
-from portia.runner import Runner, RunnerConfig
+from portia.config import default_config
+from portia.example_tools.registry import example_tool_registry
+from portia.runner import Runner
 
-runner = Runner(config=RunnerConfig(portia_api_key='123'))
+
+runner = Runner(
+    config=default_config(),
+    tool_registry=example_tool_registry,
+)
+
 runner.run_query("Add 1 and 2")
 ```
 
 
-### With Custom Local Tools and Disk Storage
+### With Custom Local Tools
 
 ```python
-from portia.runner import Runner, RunnerConfig, StorageClass
+from portia.config import default_config
+from portia.runner import Runner
 from portia.tool import Tool
 from portia.tool_registry import InMemoryToolRegistry
 
 # Create a local tool
-class AdditionTool(Tool):
-    id: str = "addition_tool"
-    name: str = "Addition Tool"
-    description: str = "Takes two numbers and adds them together"
+class SubtractionTool(Tool):
+    id: str = "subtraction_tool"
+    name: str = "Subtraction Tool"
+    description: str = "Takes two numbers and subtracts them together"
 
     def run(self, a: int, b: int) -> int:
-        return a + b
+        return a - b
 
 
 # Create the ToolRegistry with the tool
-tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
+tool_registry = InMemoryToolRegistry.from_local_tools([SubtractionTool()])
 
-runner = Runner(config=Config(), tool_registry=tool_registry)
-runner.run_query("Add 1 and 2")
+runner = Runner(config=default_config(), tool_registry=tool_registry)
+runner.run_query("Subtract 1 and 2")
 ```
 
 ### Hybrid Approach
@@ -49,53 +57,25 @@ runner.run_query("Add 1 and 2")
 Multiple registries can be combined to give the power of Portia Cloud with the customization of local tools:
 
 ```python
-from pydantic import BaseModel, Field, SecretStr
 
-from portia.config import StorageClass, default_config
+from portia.config import default_config
+from portia.example_tools.registry import example_tool_registry
 from portia.runner import Runner
-from portia.tool import Tool
-from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry
-from portia.workflow import WorkflowState
-from portia.clarification import InputClarification
-
-
-class AdditionToolSchema(BaseModel):
-    """Input for AdditionToolSchema."""
-
-    a: float = Field(..., description="The first number to add")
-    b: float = Field(..., description="The second number to add")
-
-
-class AdditionTool(Tool):
-    """Adds two numbers."""
-
-    id: str = "add_tool"
-    name: str = "Add Tool"
-    description: str = "Takes two numbers and adds them together"
-    args_schema: type[BaseModel] = AdditionToolSchema
-    output_schema: tuple[str, str] = ("int", "int: The value of the addition")
-
-    def run(self, a: float, b: float) -> float | InputClarification:
-        """Add the numbers."""
-        return a + b
-
-
-# Create the ToolRegistry with the tool
 
 config = default_config()
 
-local_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()]) 
 remote_registry = PortiaToolRegistry(
     config=config,
 )
-registry = local_registry + remote_registry
+
+registry = example_tool_registry + remote_registry
 
 runner = Runner(
     config,
     tool_registry=registry,
 )
 
-runner.run_query("Add 1 and 2")
+runner.run_query("Get the weather in Sydney and London then email me with a summary at hello@portialabs.ai")
 ```
 
 

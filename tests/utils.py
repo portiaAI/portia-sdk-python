@@ -5,7 +5,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from portia.clarification import Clarification, InputClarification
-from portia.tool import Tool, ToolHardError, ToolSoftError
+from portia.errors import ToolHardError, ToolSoftError
+from portia.tool import Tool
 
 
 class AdditionToolSchema(BaseModel):
@@ -80,6 +81,7 @@ class ErrorToolSchema(BaseModel):
 
     error_str: str
     return_soft_error: bool
+    return_uncaught_error: bool
 
 
 class ErrorTool(Tool):
@@ -94,8 +96,10 @@ class ErrorTool(Tool):
         "Error: The value of the error",
     )
 
-    def run(self, error_str: str, return_soft_error: bool) -> None:  # noqa: FBT001
+    def run(self, error_str: str, return_uncaught_error: bool, return_soft_error: bool) -> None:  # noqa: FBT001
         """Return the error."""
+        if return_uncaught_error:
+            raise Exception(error_str)  # noqa: TRY002
         if return_soft_error:
             raise ToolSoftError(error_str)
         raise ToolHardError(error_str)
