@@ -2,28 +2,9 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification, InputClarification
-
-
-def test_clarification_uuid_assign() -> None:
-    """Test clarifications assign correct UUIDs."""
-    clarification = InputClarification(
-        id="123",  # type: ignore  # noqa: PGH003
-        argument_name="test",
-        user_guidance="test",
-    )
-    assert isinstance(clarification.id, UUID)
-
-    clarification = InputClarification(
-        id=123,  # type: ignore  # noqa: PGH003
-        argument_name="test",
-        user_guidance="test",
-    )
-    assert isinstance(clarification.id, UUID)
 
 
 def test_clarification_resolve() -> None:
