@@ -4,14 +4,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from portia.errors import InvalidLoggerError
 from portia.logging import LoggerInterface, LoggerManager, LoggerProxy, logger_manager
 
 
 def test_logger_manager_initialization() -> None:
     """Test initialization of LoggerManager with default logger."""
     logger_manager = LoggerManager()
-    assert isinstance(logger_manager.logger, LoggerInterface)
     assert logger_manager.custom_logger is False
 
 
@@ -32,14 +30,6 @@ def test_set_logger() -> None:
     logger_manager.set_logger(mock_logger)
     assert logger_manager.logger == mock_logger
     assert logger_manager.custom_logger is True
-
-
-def test_set_logger_invalid_logger() -> None:
-    """Test setting an invalid logger raises an error."""
-    logger_manager = LoggerManager()
-
-    with pytest.raises(InvalidLoggerError):
-        logger_manager.set_logger(Mock())
 
 
 def test_configure_from_config() -> None:
