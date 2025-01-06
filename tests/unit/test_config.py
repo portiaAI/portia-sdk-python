@@ -4,8 +4,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from pydantic import Secret, SecretStr, ValidationError
-from regex import P
+from pydantic import SecretStr, ValidationError
 
 from portia.config import AgentType, Config, LLMModel, LLMProvider, StorageClass, default_config
 from portia.errors import ConfigNotFoundError, InvalidConfigError
