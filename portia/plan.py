@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Generic
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from portia.clarification import Clarification
 from portia.types import SERIALIZABLE_TYPE_VAR

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Generic
+from typing import Generic
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, HttpUrl, field_serializer, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_serializer
 
 from portia.types import SERIALIZABLE_TYPE_VAR
 
