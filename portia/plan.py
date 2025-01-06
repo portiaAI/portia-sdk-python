@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Generic
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from portia.clarification import Clarification
 from portia.types import SERIALIZABLE_TYPE_VAR
@@ -80,3 +80,22 @@ class Plan(BaseModel):
     )
     query: str = Field(description="The original query given by the user.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
+
+    # LLMs can struggle to generate uuids when returning structured output
+    # but as its an ID field we can assign a new ID in this case.
+    @model_validator(mode="before")
+    @classmethod
+    def validate_uuid(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Validate a given uuid is valid else assign a new one."""
+        uuid_value = values.get("id")
+        if isinstance(uuid_value, str):
+            try:
+                # Try parsing the UUID string
+                values["id"] = UUID(uuid_value)
+            except ValueError:
+                # If parsing fails, use the default_factory
+                values["id"] = uuid4()
+        elif not isinstance(uuid_value, UUID):
+            # If missing or invalid, use the default_factory
+            values["id"] = uuid4()
+        return values
