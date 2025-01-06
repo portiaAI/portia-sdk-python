@@ -47,6 +47,7 @@ def test_getters() -> None:
     with pytest.raises(ConfigNotFoundError):
         c.must_get("not real", str)
 
+    c.portia_api_key = SecretStr("")
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_key", int)
 
