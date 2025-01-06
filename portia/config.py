@@ -139,11 +139,6 @@ class Config(BaseModel):
     planner_system_context_override: list[str] | None = None
     agent_system_context_override: list[str] | None = None
 
-    class Config:
-        """Pydantic model config."""
-
-        validate_assignment = True
-
     @model_validator(mode="after")
     def check_config(self) -> Config:
         """Validate Config is consistent."""

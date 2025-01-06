@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr
 
-from portia.config import AgentType, Config, LLMModel, LLMProvider, default_config
+from portia.config import AgentType, Config, LLMModel, LLMProvider, StorageClass, default_config
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 
@@ -59,6 +59,12 @@ def test_getters() -> None:
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)
 
-    c.llm_provider = LLMProvider.OPENAI
     with pytest.raises(InvalidConfigError):
-        c.llm_model_name = LLMModel.CLAUDE_3_OPUS_LATEST
+        Config(
+            storage_class=StorageClass.MEMORY,
+            llm_provider=LLMProvider.OPENAI,
+            llm_model_name=LLMModel.CLAUDE_3_OPUS_LATEST,
+            llm_model_temperature=0,
+            llm_model_seed=443,
+            default_agent_type=AgentType.VERIFIER,
+        )
