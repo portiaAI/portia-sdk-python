@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -51,7 +52,7 @@ class Planner:
             system_context,
             examples,
         )
-        return LLMWrapper(self.config).to_instructor(
+        response = LLMWrapper(self.config).to_instructor(
             response_model=PlanOrError,
             messages=[
                 {
@@ -66,6 +67,9 @@ class Planner:
                 {"role": "user", "content": prompt},
             ],
         )
+        # don't use the ID assigned by the LLM but assign our own to ensure uniqueness.
+        response.plan.id = uuid4()
+        return response
 
 
 def _render_prompt_insert_defaults(
