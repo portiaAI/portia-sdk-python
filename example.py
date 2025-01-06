@@ -1,7 +1,5 @@
 """Simple Example."""
 
-from __future__ import annotations
-
 from portia.config import default_config
 from portia.example_tools.registry import example_tool_registry
 from portia.runner import Runner
