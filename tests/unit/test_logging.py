@@ -2,8 +2,6 @@
 
 from unittest.mock import Mock
 
-import pytest
-
 from portia.logging import LoggerInterface, LoggerManager, LoggerProxy, logger_manager
 
 
