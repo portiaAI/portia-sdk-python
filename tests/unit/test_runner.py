@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 from uuid import uuid4
 
+from pydantic import ValidationError
 import pytest
 
 from portia.clarification import InputClarification
@@ -42,10 +43,9 @@ def test_runner_run_query(runner: Runner) -> None:
 def test_runner_run_query_invalid_storage() -> None:
     """Ensure invalid storage throws."""
     config = default_config()
-    config.storage_class = "Invalid"  # type: ignore  # noqa: PGH003
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    with pytest.raises(InvalidStorageError):
-        Runner(config=config, tool_registry=tool_registry)
+
+    with pytest.raises(ValidationError):
+        config.storage_class = "Invalid"  # type: ignore  # noqa: PGH003
 
 
 def test_runner_run_query_disk_storage() -> None:
@@ -151,13 +151,9 @@ def test_runner_invalid_agent() -> None:
         runner.run_plan(plan)
 
     config = default_config()
-    config.default_agent_type = "Other"  # type: ignore  # noqa: PGH003
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
 
-    plan = runner.plan_query(query)
-    with pytest.raises(InvalidWorkflowStateError):
-        runner.run_plan(plan)
+    with pytest.raises(ValidationError):
+        config.default_agent_type = "Other"  # type: ignore  # noqa: PGH003
 
 
 def test_runner_resume_workflow(runner: Runner) -> None:

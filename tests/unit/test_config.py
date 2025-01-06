@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr
 
-from portia.config import AgentType, Config, default_config
+from portia.config import AgentType, Config, LLMModel, LLMProvider, default_config
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 
@@ -40,6 +40,7 @@ def test_runner_config_from_file() -> None:
 def test_getters() -> None:
     """Test getters work."""
     c = default_config()
+
     c.openai_api_key = SecretStr("123")
 
     assert c.has_api_key("portia_api_key")
@@ -57,3 +58,7 @@ def test_getters() -> None:
 
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)
+
+    c.llm_provider = LLMProvider.OPENAI
+    with pytest.raises(InvalidConfigError):
+        c.llm_model_name = LLMModel.CLAUDE_3_OPUS_LATEST

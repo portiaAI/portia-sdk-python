@@ -34,7 +34,7 @@ class LLMWrapper:
         """Initialize the wrapper."""
         self.config = config
         self.llm_provider = config.llm_provider
-        self.model_name = config.llm_model_name
+        self.model_name = config.llm_model_name.value
         self.model_temperature = config.llm_model_temperature
         self.model_seed = config.llm_model_seed
 
@@ -43,14 +43,14 @@ class LLMWrapper:
         match self.llm_provider:
             case LLMProvider.OPENAI:
                 return ChatOpenAI(
-                    name=self.model_name.value,
+                    name=self.model_name,
                     temperature=self.model_temperature,
                     seed=self.model_seed,
                     api_key=self.config.openai_api_key,
                 )
             case LLMProvider.ANTHROPIC:
                 return ChatAnthropic(
-                    model_name=self.model_name.value,
+                    model_name=self.model_name,
                     temperature=self.model_temperature,
                     timeout=10,
                     stop=None,
@@ -58,7 +58,7 @@ class LLMWrapper:
                 )
             case LLMProvider.MISTRALAI:
                 return ChatMistralAI(
-                    model_name=self.model_name.value,
+                    model_name=self.model_name,
                     temperature=self.model_temperature,
                     api_key=self.config.mistralai_api_key,
                 )
@@ -82,7 +82,7 @@ class LLMWrapper:
                 return client.chat.completions.create(
                     response_model=response_model,
                     messages=messages,
-                    model=self.model_name.value,
+                    model=self.model_name,
                     temperature=self.model_temperature,
                     seed=self.model_seed,
                 )
@@ -94,7 +94,7 @@ class LLMWrapper:
                     mode=instructor.Mode.ANTHROPIC_JSON,
                 )
                 return client.chat.completions.create(
-                    model=self.model_name.value,
+                    model=self.model_name,
                     response_model=response_model,
                     messages=messages,
                     max_tokens=2048,
@@ -107,7 +107,7 @@ class LLMWrapper:
                     ),
                 )
                 return client.chat.completions.create(
-                    model=self.model_name.value,
+                    model=self.model_name,
                     response_model=response_model,
                     messages=messages,
                     temperature=self.model_temperature,

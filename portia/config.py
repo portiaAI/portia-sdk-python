@@ -139,35 +139,40 @@ class Config(BaseModel):
     planner_system_context_override: list[str] | None = None
     agent_system_context_override: list[str] | None = None
 
+    class Config:
+        """Pydantic model config."""
+
+        validate_assignment = True
+
     @model_validator(mode="after")
     def check_config(self) -> Config:
         """Validate Config is consistent."""
         # Portia API Key must be provided if using cloud storage
         if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
             raise InvalidConfigError("portia_api_key", "Must be provided if using cloud storage")
-        expected_key: str = ""
-        supported_models: list[LLMModel] = []
+
+        def validate_llm_config(expected_key: str, supported_models: list[LLMModel]) -> None:
+            """Validate LLM Config."""
+            if not self.has_api_key(expected_key):
+                raise InvalidConfigError(
+                    f"{expected_key}",
+                    f"Must be provided if using {self.llm_provider}",
+                )
+            if self.llm_model_name not in supported_models:
+                raise InvalidConfigError(
+                    "llm_model_name",
+                    "Unsupported model please use one of"
+                    f"{", ".join(model.value for model in supported_models)}",
+                )
+
         match self.llm_provider:
             case LLMProvider.OPENAI:
-                expected_key = "openai_api_key"
-                supported_models = SUPPORTED_OPENAI_MODELS
+                validate_llm_config("openai_api_key", SUPPORTED_OPENAI_MODELS)
             case LLMProvider.ANTHROPIC:
-                expected_key = "anthropic_api_key"
-                supported_models = SUPPORTED_ANTHROPIC_MODELS
+                validate_llm_config("anthropic_api_key", SUPPORTED_ANTHROPIC_MODELS)
             case LLMProvider.MISTRALAI:
-                expected_key = "mistralai_api_key"
-                supported_models = SUPPORTED_MISTRALAI_MODELS
-        if not self.has_api_key(expected_key):
-            raise InvalidConfigError(
-                f"{expected_key}",
-                f"Must be provided if using {self.llm_provider}",
-            )
-        if self.llm_model_name not in supported_models:
-            raise InvalidConfigError(
-                "llm_model_name",
-                "Unsupported model please use one of"
-                f"{", ".join(model.value for model in supported_models)}",
-            )
+                validate_llm_config("mistralai_api_key", SUPPORTED_MISTRALAI_MODELS)
+
         return self
 
     @classmethod
@@ -204,9 +209,9 @@ class Config(BaseModel):
         # ensure non-empty values
         match value:
             case str() if value == "":
-                raise InvalidConfigError(name, "Empty Value not allowed")
+                raise InvalidConfigError(name, "Empty value not allowed")
             case SecretStr() if value.get_secret_value() == "":
-                raise InvalidConfigError(name, "Empty Value not allowed")
+                raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
 
 
