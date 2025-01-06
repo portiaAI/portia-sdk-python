@@ -166,7 +166,6 @@ def test_runner_run_query_with_hard_error(
     )
     plan = Plan(query="raise an error", steps=[clarification_step])
     workflow = runner.run_plan(plan)
-    print(workflow)
     assert workflow.state == WorkflowState.FAILED
     assert workflow.final_output
     assert isinstance(workflow.final_output.value, str)
