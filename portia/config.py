@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar
+from typing import Annotated, TypeVar
 
-from pydantic import BaseModel, SecretStr
+from pydantic import AfterValidator, BaseModel, SecretStr, model_validator
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
@@ -30,12 +30,72 @@ class LLMProvider(Enum):
     MISTRALAI = "MISTRALAI"
 
 
+class LLMModel(Enum):
+    """Supported Models."""
+
+    # OpenAI
+    GPT_4_O = "gpt-4o"
+    GPT_4_O_MINI = "gpt-4o-mini"
+    GPT_3_5_TURBO = "gpt-3.5-turbo"
+
+    # Anthropic
+    CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
+    CLAUDE_3_5_HAIKU = "claude-3-5-haiku-latest"
+    CLAUDE_3_OPUS_LATEST = "claude-3-opus-latest"
+
+    # MistralAI
+    MISTRAL_SMALL_LATEST = "mistral-small-latest"
+    MISTRAL_LARGE_LATEST = "mistral-large-latest"
+    MISTRAL_3_B_LATEST = "mistral-3b-latest"
+    MISTRAL_8_B_LATEST = "mistral-8b-latest"
+
+
+SUPPORTED_OPENAI_MODELS = [
+    LLMModel.GPT_4_O,
+    LLMModel.GPT_4_O_MINI,
+    LLMModel.GPT_3_5_TURBO,
+]
+
+SUPPORTED_ANTHROPIC_MODELS = [
+    LLMModel.CLAUDE_3_5_HAIKU,
+    LLMModel.CLAUDE_3_5_SONNET,
+    LLMModel.CLAUDE_3_OPUS_LATEST,
+]
+
+SUPPORTED_MISTRALAI_MODELS = [
+    LLMModel.MISTRAL_SMALL_LATEST,
+    LLMModel.MISTRAL_LARGE_LATEST,
+    LLMModel.MISTRAL_3_B_LATEST,
+    LLMModel.MISTRAL_8_B_LATEST,
+]
+
+
 class AgentType(Enum):
     """Type of agent to use for executing a step."""
 
     TOOL_LESS = "TOOL_LESS"
     ONE_SHOT = "ONE_SHOT"
     VERIFIER = "VERIFIER"
+
+
+class LogLevel(Enum):
+    """Available Log Levels."""
+
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+def is_greater_than_zero(value: int) -> int:
+    """Validate greater than zero."""
+    if value < 0:
+        raise ValueError(f"{value} must be greater than zero")  # noqa: TRY003
+    return value
+
+
+PositiveNumber = Annotated[int, AfterValidator(is_greater_than_zero)]
 
 
 class Config(BaseModel):
@@ -58,8 +118,8 @@ class Config(BaseModel):
 
     # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
     # where as setting it to ERROR will only display ERROR and above.
-    default_log_level: str = "INFO"
-    # default_log_sink controls where default logs are sent. By default this is to STDOUT
+    default_log_level: LogLevel = LogLevel.INFO
+    # default_log_sink controls where default logs are sent. By default this is STDOUT (sys.stdout)
     # but can also be set to STDERR (sys.stderr)
     # or to a file by setting this to a file path ("./logs.txt")
     default_log_sink: str = "sys.stdout"
@@ -68,9 +128,9 @@ class Config(BaseModel):
 
     # LLM Options
     llm_provider: LLMProvider
-    llm_model_name: str
-    llm_model_temperature: int
-    llm_model_seed: int
+    llm_model_name: LLMModel
+    llm_model_temperature: PositiveNumber
+    llm_model_seed: PositiveNumber
 
     # Agent Options
     default_agent_type: AgentType
@@ -78,6 +138,37 @@ class Config(BaseModel):
     # System Context Overrides
     planner_system_context_override: list[str] | None = None
     agent_system_context_override: list[str] | None = None
+
+    @model_validator(mode="after")
+    def check_config(self) -> Config:
+        """Validate Config is consistent."""
+        # Portia API Key must be provided if using cloud storage
+        if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
+            raise InvalidConfigError("portia_api_key", "Must be provided if using cloud storage")
+        expected_key: str = ""
+        supported_models: list[LLMModel] = []
+        match self.llm_provider:
+            case LLMProvider.OPENAI:
+                expected_key = "openai_api_key"
+                supported_models = SUPPORTED_OPENAI_MODELS
+            case LLMProvider.ANTHROPIC:
+                expected_key = "anthropic_api_key"
+                supported_models = SUPPORTED_ANTHROPIC_MODELS
+            case LLMProvider.MISTRALAI:
+                expected_key = "mistralai_api_key"
+                supported_models = SUPPORTED_MISTRALAI_MODELS
+        if not self.has_api_key(expected_key):
+            raise InvalidConfigError(
+                f"{expected_key}",
+                f"Must be provided if using {self.llm_provider}",
+            )
+        if self.llm_model_name not in supported_models:
+            raise InvalidConfigError(
+                "llm_model_name",
+                "Unsupported model please use one of"
+                f"{", ".join(model.value for model in supported_models)}",
+            )
+        return self
 
     @classmethod
     def from_file(cls, file_path: Path) -> Config:
@@ -87,7 +178,12 @@ class Config(BaseModel):
 
     def has_api_key(self, name: str) -> bool:
         """Check if the given API Key is available."""
-        return hasattr(self, name)
+        try:
+            self.must_get_api_key(name)
+        except InvalidConfigError:
+            return False
+        else:
+            return True
 
     def must_get_api_key(self, name: str) -> SecretStr:
         """Get an api key as a SecretStr or error if not set."""
@@ -104,13 +200,13 @@ class Config(BaseModel):
             raise ConfigNotFoundError(name)
         value = getattr(self, name)
         if not isinstance(value, expected_type):
-            raise InvalidConfigError(name)
+            raise InvalidConfigError(name, f"Not of expected type: {expected_type}")
         # ensure non-empty values
         match value:
             case str() if value == "":
-                raise InvalidConfigError(name)
+                raise InvalidConfigError(name, "Empty Value not allowed")
             case SecretStr() if value.get_secret_value() == "":
-                raise InvalidConfigError(name)
+                raise InvalidConfigError(name, "Empty Value not allowed")
         return value
 
 
@@ -119,7 +215,7 @@ def default_config() -> Config:
     return Config(
         storage_class=StorageClass.MEMORY,
         llm_provider=LLMProvider.OPENAI,
-        llm_model_name="gpt-4o-mini",
+        llm_model_name=LLMModel.GPT_4_O_MINI,
         llm_model_temperature=0,
         llm_model_seed=443,
         default_agent_type=AgentType.VERIFIER,

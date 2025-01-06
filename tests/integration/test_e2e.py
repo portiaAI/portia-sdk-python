@@ -3,7 +3,7 @@
 import pytest
 
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.config import AgentType, LLMProvider, default_config
+from portia.config import AgentType, LLMModel, LLMProvider, default_config
 from portia.errors import ToolSoftError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Output, Plan, Step, Variable
@@ -15,17 +15,18 @@ from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 PROVIDER_MODELS = [
     (
         LLMProvider.OPENAI,
-        "gpt-4o-mini",
+        LLMModel.GPT_4_O_MINI,
     ),
     (
         LLMProvider.MISTRALAI,
-        "mistral-large-latest",
+        LLMModel.MISTRAL_LARGE_LATEST,
     ),
     (
         LLMProvider.ANTHROPIC,
-        "claude-3-opus-20240229",
+        LLMModel.CLAUDE_3_OPUS_LATEST,
     ),
 ]
+
 AGENTS = [
     AgentType.VERIFIER,
     AgentType.ONE_SHOT,
@@ -34,7 +35,11 @@ AGENTS = [
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
-def test_runner_run_query(llm_provider: LLMProvider, llm_model_name: str, agent: AgentType) -> None:
+def test_runner_run_query(
+    llm_provider: LLMProvider,
+    llm_model_name: LLMModel,
+    agent: AgentType,
+) -> None:
     """Test running a simple query using the Runner."""
     config = default_config()
     config.llm_provider = llm_provider
@@ -56,7 +61,7 @@ def test_runner_run_query(llm_provider: LLMProvider, llm_model_name: str, agent:
 @pytest.mark.parametrize("agent", AGENTS)
 def test_runner_plan_query(
     llm_provider: LLMProvider,
-    llm_model_name: str,
+    llm_model_name: LLMModel,
     agent: AgentType,
 ) -> None:
     """Test planning a simple query using the Runner."""
@@ -88,7 +93,7 @@ def test_runner_plan_query(
 @pytest.mark.parametrize("agent", AGENTS)
 def test_runner_run_query_with_clarifications(
     llm_provider: LLMProvider,
-    llm_model_name: str,
+    llm_model_name: LLMModel,
     agent: AgentType,
 ) -> None:
     """Test running a query with clarification using the Runner."""
@@ -131,7 +136,7 @@ def test_runner_run_query_with_clarifications(
 @pytest.mark.parametrize("agent", AGENTS)
 def test_runner_run_query_with_hard_error(
     llm_provider: LLMProvider,
-    llm_model_name: str,
+    llm_model_name: LLMModel,
     agent: AgentType,
 ) -> None:
     """Test running a query with error using the Runner."""
@@ -176,7 +181,7 @@ def test_runner_run_query_with_hard_error(
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 def test_runner_run_query_with_soft_error(
     llm_provider: LLMProvider,
-    llm_model_name: str,
+    llm_model_name: LLMModel,
     agent: AgentType,
 ) -> None:
     """Test running a query with error using the Runner."""
@@ -218,7 +223,7 @@ def test_runner_run_query_with_soft_error(
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: str) -> None:
+def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> None:
     """Test toolless agent."""
     agent = ToolLessAgent(description="Tell me a funny joke", inputs=[])
     config = default_config()
