@@ -27,7 +27,7 @@ runner.run_query("Add 1 and 2")
 ```
 
 
-### With Custom Local Tools and Disk Storage
+### With Custom Local Tools
 
 ```python
 from portia.config import default_config

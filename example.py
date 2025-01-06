@@ -7,7 +7,6 @@ from portia.example_tools.registry import example_tool_registry
 from portia.runner import Runner
 
 config = default_config()
-config.default_log_level = "debug"
 
 runner = Runner(
     config,
