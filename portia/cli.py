@@ -11,6 +11,8 @@ import click
 from portia.config import default_config
 from portia.example_tools import example_tool_registry
 from portia.runner import Runner
+from portia.tool import PortiaRemoteTool
+from portia.tool_registry import PortiaToolRegistry
 
 
 @click.group()
@@ -24,7 +26,10 @@ def run(query: str) -> None:
     """Run a query."""
     config = default_config()
     config.default_log_level = "ERROR"
-    runner = Runner(config=config, tool_registry=example_tool_registry)
+    registry = example_tool_registry
+    if config.has_api_key("portia_api_key"):
+        registry += PortiaToolRegistry(config)
+    runner = Runner(config=config, tool_registry=registry)
     output = runner.run_query(query)
     click.echo(output.model_dump_json(indent=4))
 
@@ -35,7 +40,11 @@ def plan(query: str) -> None:
     """Plan a query."""
     config = default_config()
     config.default_log_level = "ERROR"
-    runner = Runner(config=config, tool_registry=example_tool_registry)
+    registry = example_tool_registry
+    if config.has_api_key("portia_api_key"):
+        registry += PortiaToolRegistry(config)
+    runner = Runner(config=config, tool_registry=registry)
+
     output = runner.plan_query(query)
     click.echo(output.model_dump_json(indent=4))
 
