@@ -2,8 +2,8 @@
 
 import pytest
 
-from portia.errors import InvalidToolDescriptionError
-from tests.utils import AdditionTool, ClarificationTool
+from portia.errors import InvalidToolDescriptionError, ToolSoftError
+from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 
 
 @pytest.fixture
@@ -45,3 +45,14 @@ def test_run_method(add_tool: AdditionTool) -> None:
     a, b = 1, 2
     result = add_tool.run(a, b)
     assert result == a + b
+
+
+def test_run_method_with_uncaught_error() -> None:
+    """Test the _run method wraps errors."""
+    tool = ErrorTool()
+    with pytest.raises(ToolSoftError):
+        tool._run(  # noqa: SLF001
+            error_str="this is an error",
+            return_uncaught_error=True,
+            return_soft_error=False,
+        )

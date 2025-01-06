@@ -58,12 +58,13 @@ class Config(BaseModel):
 
     # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
     # where as setting it to ERROR will only display ERROR and above.
-    default_log_level: str
-    # default_log_sink controls where default logs are sent. This can be STDOUT (sys.stdout) or
-    # STDERR (sys.stderr) or to a file by setting this to a file path ("./logs.txt")
-    default_log_sink: str
+    default_log_level: str = "INFO"
+    # default_log_sink controls where default logs are sent. By default this is to STDOUT
+    # but can also be set to STDERR (sys.stderr)
+    # or to a file by setting this to a file path ("./logs.txt")
+    default_log_sink: str = "sys.stdout"
     # json_log_serialize sets whether logs are JSON serialized before sending to the log sink.
-    json_log_serialize: bool
+    json_log_serialize: bool = False
 
     # LLM Options
     llm_provider: LLMProvider
@@ -122,7 +123,4 @@ def default_config() -> Config:
         llm_model_temperature=0,
         llm_model_seed=443,
         default_agent_type=AgentType.VERIFIER,
-        default_log_level="INFO",
-        default_log_sink="sys.stdout",
-        json_log_serialize=False,
     )
