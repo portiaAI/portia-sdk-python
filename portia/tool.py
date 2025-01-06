@@ -113,7 +113,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         args_name_description_dict = []
         out_type = self.output_schema[0]
         out_description = self.output_schema[1]
-        for arg, attribute in self.args_schema.model_json_schema()["properties"].items():
+        for arg, attribute in self.args_json_schema().items():
             arg_dict = {
                 "name": arg,
                 "type": attribute.get("type", None),

@@ -12,7 +12,7 @@ class AdditionToolSchema(BaseModel):
     b: float = Field(..., description="The second number to add")
 
 
-class AdditionTool(Tool):
+class AdditionTool(Tool[float]):
     """Adds two numbers."""
 
     id: str = "add_tool"

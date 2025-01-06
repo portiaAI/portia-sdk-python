@@ -5,7 +5,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from portia.clarification import Clarification, InputClarification
-from portia.tool import Tool, ToolHardError, ToolSoftError
+from portia.errors import ToolHardError, ToolSoftError
+from portia.tool import Tool
 
 
 class AdditionToolSchema(BaseModel):

@@ -83,7 +83,8 @@ class ParserModel:
         [
             SystemMessage(
                 content="You are very powerful assistant, but don't know current events."
-                "Make sure you explain where you are getting the values from "
+                "Your job is to correctly return the arguments needed for the given tool."
+                "Make sure you explain where you are getting the argument value from "
                 "(e.g. from the given context, from past messages, etc.)\n",
             ),
             HumanMessagePromptTemplate.from_template(
@@ -95,8 +96,7 @@ class ParserModel:
                 "More about the tool: {tool_description}\n"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Prefer values in clarifications over\n"
-                "those in the initial input. If there are optional args \n"
-                "you can leave them empty. Do not provide placeholder arguments like \n"
+                "those in the initial input. Do not provide placeholder arguments like \n"
                 "example@example.com. Instead mark them an invalid.\n",
             ),
         ],
@@ -396,7 +396,6 @@ class VerifierAgent(BaseAgent):
         """
 
         workflow.add_node("tool_agent", ToolCallingModel(llm, context, tools, self).invoke)
-
         if self.verified_args:
             workflow.add_edge(START, "tool_agent")
         else:

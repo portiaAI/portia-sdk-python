@@ -23,9 +23,10 @@ def cli() -> None:
 def run(query: str) -> None:
     """Run a query."""
     config = default_config()
+    config.default_log_level = "ERROR"
     runner = Runner(config=config, tool_registry=example_tool_registry)
-    output = runner.run_query(query, tools=[])
-    click.echo(output)
+    output = runner.run_query(query)
+    click.echo(output.model_dump_json(indent=4))
 
 
 @click.command()
@@ -33,9 +34,10 @@ def run(query: str) -> None:
 def plan(query: str) -> None:
     """Plan a query."""
     config = default_config()
+    config.default_log_level = "ERROR"
     runner = Runner(config=config, tool_registry=example_tool_registry)
-    output = runner.plan_query(query, tools=[])
-    click.echo(output)
+    output = runner.plan_query(query)
+    click.echo(output.model_dump_json(indent=4))
 
 
 cli.add_command(run)

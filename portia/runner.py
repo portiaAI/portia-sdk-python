@@ -70,11 +70,11 @@ class Runner:
         example_plans: list[Plan] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples."""
-        if not tools:
-            tools = self.tool_registry.match_tools(query)
-
         if isinstance(tools, list):
             tools = ToolSet([self.tool_registry.get_tool(tool) for tool in tools])
+
+        if not tools:
+            tools = self.tool_registry.match_tools(query)
 
         planner = Planner(config=self.config)
         logger.debug(f"Running planner for query - {query}")
@@ -159,7 +159,8 @@ class Runner:
                 workflow.final_output = error_output
                 self.storage.save_workflow(workflow)
                 logger.error(
-                    f"Step {index} error: {e}",
+                    "error: {error}",
+                    error=e,
                     extra={"plan": plan.id, "workflow": workflow.id},
                 )
                 logger.debug(
