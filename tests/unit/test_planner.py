@@ -27,7 +27,7 @@ def mock_tool_set() -> ToolSet:
 @pytest.fixture
 def planner(mock_config: Config) -> Planner:
     """Create an instance of the Planner with mocked config."""
-    return Planner(config=mock_config)
+    return Planner(llm_wrapper=LLMWrapper(config=mock_config))
 
 
 def test_plan_uuid_assign() -> None:
