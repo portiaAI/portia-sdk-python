@@ -91,7 +91,7 @@ class LogLevel(Enum):
 def is_greater_than_zero(value: int) -> int:
     """Validate greater than zero."""
     if value < 0:
-        raise ValueError(f"{value} must be greater than zero")  # noqa: TRY003
+        raise ValueError(f"{value} must be greater than zero")
     return value
 
 
