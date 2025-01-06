@@ -11,7 +11,6 @@ import click
 from portia.config import default_config
 from portia.example_tools import example_tool_registry
 from portia.runner import Runner
-from portia.tool import PortiaRemoteTool
 from portia.tool_registry import PortiaToolRegistry
 
 
