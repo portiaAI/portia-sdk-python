@@ -136,8 +136,14 @@ class Config(BaseModel):
     default_agent_type: AgentType
 
     # System Context Overrides
-    planner_system_context_override: list[str] | None = None
-    agent_system_context_override: list[str] | None = None
+    # Generally be mindful of context window sizes when passing additional data through these field.
+
+    # planner_system_context_extension allows passing additional context to the
+    # planner LLMs. Useful for refining instructions or passing pointers.
+    planner_system_context_extension: list[str] | None = None
+    # agent_system_context_extension allows passing additional context to the
+    # agent LLMs. Useful for passing execution hints or other data.
+    agent_system_context_extension: list[str] | None = None
 
     @model_validator(mode="after")
     def check_config(self) -> Config:

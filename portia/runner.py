@@ -87,8 +87,8 @@ class Runner:
         outcome = planner.generate_plan_or_error(
             query=query,
             tool_list=tools,
-            system_context=self.config.planner_system_context_override,
             examples=example_plans,
+            system_context_extension=self.config.planner_system_context_extension,
         )
         if outcome.error:
             logger.error(f"Error in planning - {outcome.error}")
@@ -249,7 +249,7 @@ class Runner:
                     inputs=step.input or [],
                     clarifications=clarifications,
                     tool=tool,
-                    system_context=self.config.agent_system_context_override,
+                    system_context_extension=self.config.agent_system_context_extension,
                 )
             case AgentType.VERIFIER:
                 return VerifierAgent(
@@ -257,7 +257,7 @@ class Runner:
                     inputs=step.input or [],
                     clarifications=clarifications,
                     tool=tool,
-                    system_context=self.config.agent_system_context_override,
+                    system_context_extension=self.config.agent_system_context_extension,
                 )
             case _:
                 raise InvalidWorkflowStateError

@@ -74,17 +74,15 @@ class BaseAgent:
         inputs: list[Variable],
         clarifications: list[Clarification] | None = None,
         tool: Tool | None = None,
-        system_context: list[str] | None = None,
+        system_context_extension: list[str] | None = None,
     ) -> None:
         """Initialize the base agent."""
         self.description = description
         self.inputs = inputs
         self.tool = tool
         self.clarifications = clarifications
-        if system_context is None:
-            self.system_context = self._default_system_context()
-        else:
-            self.system_context = system_context
+        self.system_context_extension = system_context_extension
+        self.system_context = self._default_system_context(system_context_extension)
 
     @abstractmethod
     def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
@@ -94,7 +92,9 @@ class BaseAgent:
         """Turn inputs and past outputs into a context string for the agent."""
         return build_context(self.inputs, step_outputs, self.clarifications, self.system_context)
 
-    def _default_system_context(self) -> list[str]:
+    def _default_system_context(self, system_context_extension: list[str] | None) -> list[str]:
         """Provide default system context."""
-        today = f"Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"
-        return [today]
+        base_context = [f"Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
+        if system_context_extension:
+            base_context.extend(system_context_extension)
+        return base_context

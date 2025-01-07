@@ -41,14 +41,14 @@ class Planner:
         self,
         query: str,
         tool_list: list[Tool],
-        system_context: list[str] | None = None,
+        system_context_extension: list[str] | None = None,
         examples: list[Plan] | None = None,
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         prompt = _render_prompt_insert_defaults(
             query,
             tool_list,
-            system_context,
+            system_context_extension,
             examples,
         )
         response = self.llm_wrapper.to_instructor(
@@ -74,12 +74,11 @@ class Planner:
 def _render_prompt_insert_defaults(
     query: str,
     tool_list: list[Tool],
-    system_context: list[str] | None = None,
+    system_context_extension: list[str] | None = None,
     examples: list[Plan] | None = None,
 ) -> str:
     """Render the prompt for the query planner with defaults inserted if not provided."""
-    if system_context is None:
-        system_context = _default_query_system_context()
+    system_context = _default_query_system_context(system_context_extension)
 
     if examples is None:
         examples = DEFAULT_EXAMPLE_PLANS
@@ -95,9 +94,14 @@ def _render_prompt_insert_defaults(
     )
 
 
-def _default_query_system_context() -> list[str]:
+def _default_query_system_context(
+    system_context_extension: list[str] | None = None,
+) -> list[str]:
     """Return the default system context."""
-    return [f"Today is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
+    base_context = [f"Today is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
+    if system_context_extension:
+        base_context.extend(system_context_extension)
+    return base_context
 
 
 def _get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
