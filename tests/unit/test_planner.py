@@ -9,7 +9,6 @@ from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
 from portia.planner import Planner, PlanOrError
-from portia.tool import Tool
 
 
 @pytest.fixture
