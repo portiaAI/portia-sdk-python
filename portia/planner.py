@@ -14,10 +14,8 @@ from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
-    from portia.config import Config
-    from portia.tool import Tool
     from portia.llm_wrapper import BaseLLMWrapper
-    from portia.tool_registry import ToolSet
+    from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
 
