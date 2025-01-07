@@ -9,18 +9,12 @@ from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
 from portia.planner import Planner, PlanOrError
-from portia.tool_registry import ToolSet
+from portia.tool import Tool
 
 
 @pytest.fixture
 def mock_config() -> Config:
     """Mock Config object for testing."""
-    return MagicMock()
-
-
-@pytest.fixture
-def mock_tool_set() -> ToolSet:
-    """Mock ToolSet object for testing."""
     return MagicMock()
 
 
@@ -47,7 +41,7 @@ def test_plan_uuid_assign() -> None:
     assert isinstance(clarification.id, UUID)
 
 
-def test_generate_plan_or_error_success(planner: Planner, mock_tool_set: ToolSet) -> None:
+def test_generate_plan_or_error_success(planner: Planner, mock_tool_set: list[Tool]) -> None:
     """Test successful plan generation with valid inputs."""
     mock_tool_set.get_tools.return_value = []  # type: ignore  # noqa: PGH003
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
@@ -62,7 +56,7 @@ def test_generate_plan_or_error_success(planner: Planner, mock_tool_set: ToolSet
     assert result.error is None
 
 
-def test_generate_plan_or_error_failure(planner: Planner, mock_tool_set: ToolSet) -> None:
+def test_generate_plan_or_error_failure(planner: Planner, mock_tool_set: list[Tool]) -> None:
     """Test handling of error when generating a plan fails."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 

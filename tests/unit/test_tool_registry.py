@@ -8,7 +8,6 @@ from portia.tool_registry import (
     AggregatedToolRegistry,
     InMemoryToolRegistry,
     ToolRegistry,
-    ToolSet,
 )
 from tests.utils import AdditionTool, MockTool
 
@@ -22,7 +21,7 @@ def test_registry_base_classes() -> None:
     class MyRegistry(ToolRegistry):
         """Override to test base."""
 
-        def get_tools(self) -> ToolSet:
+        def get_tools(self) -> list[Tool]:
             return super().get_tools()  # type: ignore  # noqa: PGH003
 
         def get_tool(self, tool_name: str) -> Tool:
@@ -31,7 +30,7 @@ def test_registry_base_classes() -> None:
         def register_tool(self, tool: Tool) -> None:
             return super().register_tool(tool)  # type: ignore  # noqa: PGH003
 
-        def match_tools(self, query: str) -> ToolSet:
+        def match_tools(self, query: str) -> list[Tool]:
             return super().match_tools(query)
 
     registry = MyRegistry()
@@ -51,16 +50,6 @@ def test_registry_base_classes() -> None:
     agg_registry = AggregatedToolRegistry(registries=[registry])
     with pytest.raises(NotImplementedError):
         agg_registry.register_tool(AdditionTool())
-
-
-def test_tool_set_get_tool() -> None:
-    """Test the ToolSet class's get_tool method."""
-    tool_set = ToolSet(tools=[MockTool(name=MOCK_TOOL_NAME)])
-    tool1 = tool_set.get_tool(MOCK_TOOL_NAME)
-    assert tool1.name == MOCK_TOOL_NAME
-
-    with pytest.raises(ToolNotFoundError):
-        tool_set.get_tool("tool3")
 
 
 def test_local_tool_registry_register_tool() -> None:
