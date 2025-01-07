@@ -34,7 +34,7 @@ class LLMWrapper:
         """Initialize the wrapper."""
         self.config = config
         self.llm_provider = config.llm_provider
-        self.model_name = config.llm_model_name
+        self.model_name = config.llm_model_name.value
         self.model_temperature = config.llm_model_temperature
         self.model_seed = config.llm_model_seed
 
