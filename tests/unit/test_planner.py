@@ -8,7 +8,7 @@ import pytest
 from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
-from portia.planner import Planner, PlanOrError
+from portia.planner import Planner, PlanOrError, _default_query_system_context
 from portia.tool_registry import ToolSet
 
 
@@ -74,3 +74,9 @@ def test_generate_plan_or_error_failure(planner: Planner, mock_tool_set: ToolSet
 
     assert result.error == "Unable to generate a plan"
     assert result.plan.query == query
+
+
+def test_planner_default_context_with_extensions() -> None:
+    """Test default context."""
+    context = _default_query_system_context(system_context_extension=["456"])
+    assert "456" in context
