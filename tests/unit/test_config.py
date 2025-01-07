@@ -57,3 +57,52 @@ def test_getters() -> None:
 
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)
+<<<<<<< Updated upstream
+=======
+
+    # mismatch between provider and model
+    with pytest.raises(InvalidConfigError):
+        Config(
+            storage_class=StorageClass.MEMORY,
+            llm_provider=LLMProvider.OPENAI,
+            llm_model_name=LLMModel.CLAUDE_3_OPUS_LATEST,
+            llm_model_temperature=0,
+            llm_model_seed=443,
+            default_agent_type=AgentType.VERIFIER,
+        )
+
+    # no api key for provider model
+    for provider in [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.MISTRALAI]:
+        with pytest.raises(InvalidConfigError):
+            Config(
+                storage_class=StorageClass.MEMORY,
+                llm_provider=provider,
+                openai_api_key=SecretStr(""),
+                llm_model_name=LLMModel.GPT_4_O_MINI,
+                llm_model_temperature=0,
+                llm_model_seed=443,
+                default_agent_type=AgentType.VERIFIER,
+            )
+
+    # negative temperature
+    with pytest.raises(ValidationError):
+        Config(
+            storage_class=StorageClass.MEMORY,
+            llm_provider=LLMProvider.OPENAI,
+            llm_model_name=LLMModel.GPT_4_O_MINI,
+            llm_model_temperature=0,
+            llm_model_seed=-443,
+            default_agent_type=AgentType.VERIFIER,
+        )
+    # no Portia API Key
+    with pytest.raises(InvalidConfigError):
+        Config(
+            storage_class=StorageClass.CLOUD,
+            portia_api_key=SecretStr(""),
+            llm_provider=LLMProvider.OPENAI,
+            llm_model_name=LLMModel.GPT_4_O_MINI,
+            llm_model_temperature=0,
+            llm_model_seed=443,
+            default_agent_type=AgentType.VERIFIER,
+        )
+>>>>>>> Stashed changes

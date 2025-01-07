@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from abc import abstractmethod
+import time
 from typing import Any, Generic
 
 import httpx
@@ -200,6 +201,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=60,
             )
             response.raise_for_status()
             return response.json()
