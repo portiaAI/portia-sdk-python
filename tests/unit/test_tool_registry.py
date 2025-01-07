@@ -76,10 +76,10 @@ def test_local_tool_registry_get_tools() -> None:
     local_tool_registry = InMemoryToolRegistry.from_local_tools(
         [MockTool(name=MOCK_TOOL_NAME), MockTool(name=OTHER_MOCK_TOOL_NAME)],
     )
-    tool_set = local_tool_registry.get_tools()
-    assert len(tool_set) == 2
-    assert any(tool == MOCK_TOOL_NAME for tool in tool_set)
-    assert any(tool == OTHER_MOCK_TOOL_NAME for tool in tool_set)
+    tools = local_tool_registry.get_tools()
+    assert len(tools) == 2
+    assert any(tool.name == MOCK_TOOL_NAME for tool in tools)
+    assert any(tool.name == OTHER_MOCK_TOOL_NAME for tool in tools)
 
 
 def test_aggregated_tool_registry_get_tool() -> None:
@@ -105,6 +105,6 @@ def test_aggregated_tool_registry_get_tools() -> None:
     )
     aggregated_tool_registry = local_tool_registry + other_tool_registry
 
-    tool_set = aggregated_tool_registry.get_tools()
-    assert len(tool_set) == 2
-    assert any(tool == MOCK_TOOL_NAME for tool in tool_set)
+    tools = aggregated_tool_registry.get_tools()
+    assert len(tools) == 2
+    assert any(tool.name == MOCK_TOOL_NAME for tool in tools)
