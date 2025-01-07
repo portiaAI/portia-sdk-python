@@ -24,7 +24,7 @@ def cli() -> None:
 def run(query: str) -> None:
     """Run a query."""
     config = default_config()
-    config.default_log_level = "ERROR"
+    config.default_log_level = "DEBUG"
     registry = example_tool_registry
     if config.has_api_key("portia_api_key"):
         registry += PortiaToolRegistry(config)

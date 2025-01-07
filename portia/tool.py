@@ -75,7 +75,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Run the Tool function and generate an Output object with descriptions."""
         args_dict = {f"{i}": arg for i, arg in enumerate(args)}
         data = {**args_dict, **kwargs}
-        logger.info(f"Invoking: {self.name} with {data}")
+        logger.debug(f"Invoking: {self.name} with {data}")
         start_time = time.time()
         try:
             output = self.run(*args, **kwargs)
