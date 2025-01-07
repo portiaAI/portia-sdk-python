@@ -265,10 +265,10 @@ class VerifierAgent(BaseAgent):
         inputs: list[Variable],
         tool: Tool | None = None,
         clarifications: list[Clarification] | None = None,
-        system_context: list[str] | None = None,
+        system_context_extension: list[str] | None = None,
     ) -> None:
         """Initialize the agent."""
-        super().__init__(description, inputs, clarifications, tool, system_context)
+        super().__init__(description, inputs, clarifications, tool, system_context_extension)
         self.tool = tool
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
@@ -360,7 +360,7 @@ class VerifierAgent(BaseAgent):
                 self.description,
                 self.inputs,
                 clarifications=self.clarifications,
-                system_context=self.system_context,
+                system_context_extension=self.system_context_extension,
             )
             return single_tool_agent.execute_sync(llm, step_outputs)
 

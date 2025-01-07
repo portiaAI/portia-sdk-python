@@ -19,7 +19,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         inputs=[],
         tool=None,
         clarifications=[],
-        system_context=[],
+        system_context_extension=[],
     )
 
     output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})

@@ -35,7 +35,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         inputs=[],
         tool=None,
         clarifications=[],
-        system_context=[],
+        system_context_extension=[],
     )
 
     output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
@@ -85,7 +85,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         inputs=[],
         tool=AdditionTool(),
         clarifications=[],
-        system_context=[],
+        system_context_extension=[],
     )
 
     output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
@@ -117,7 +117,7 @@ def test_oneshot_agent_process_output_clarification() -> None:
         inputs=[],
         tool=AdditionTool(),
         clarifications=[],
-        system_context=[],
+        system_context_extension=[],
     )
     agent.new_clarifications = [InputClarification(user_guidance="test", argument_name="test")]
     output = agent.process_output(
@@ -138,7 +138,7 @@ def test_oneshot_agent_process_output_tools() -> None:
         inputs=[],
         tool=AdditionTool(),
         clarifications=[],
-        system_context=[],
+        system_context_extension=[],
     )
     message = ToolMessage(content="", tool_call_id="call_J")
     message.artifact = "123"

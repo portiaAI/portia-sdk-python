@@ -88,10 +88,10 @@ class OneShotAgent(BaseAgent):
         inputs: list[Variable],
         clarifications: list[Clarification] | None = None,
         tool: Tool | None = None,
-        system_context: list[str] | None = None,
+        system_context_extension: list[str] | None = None,
     ) -> None:
         """Initialize the agent."""
-        super().__init__(description, inputs, clarifications, tool, system_context)
+        super().__init__(description, inputs, clarifications, tool, system_context_extension)
         self.verified_args: VerifiedToolInputs | None = None
         self.single_tool_agent = None
         self.new_clarifications: list[Clarification] = []
@@ -150,7 +150,7 @@ class OneShotAgent(BaseAgent):
                     self.description,
                     self.inputs,
                     self.clarifications,
-                    system_context=self.system_context,
+                    system_context_extension=self.system_context_extension,
                 )
             return self.single_tool_agent.execute_sync(llm, step_outputs)
 
