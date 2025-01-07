@@ -1,11 +1,11 @@
 """Simple Example."""
 
-from portia.config import default_config
+from portia.config import Config, LogLevel
 from portia.example_tools.registry import example_tool_registry
 from portia.runner import Runner
 
 runner = Runner(
-    default_config(),
+    Config.from_default(default_log_level=LogLevel.DEBUG),
     tool_registry=example_tool_registry,
 )
 

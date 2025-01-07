@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, TypeVar
+from typing import Annotated, Type, TypeVar
 
 from pydantic import AfterValidator, BaseModel, SecretStr, model_validator
 
@@ -175,6 +175,12 @@ class Config(BaseModel):
         """Load configuration from a JSON file."""
         with Path.open(file_path) as f:
             return cls.model_validate_json(f.read())
+
+    @classmethod
+    def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
+        """Create a Config instance with default values, allowing overrides."""
+        default = default_config()
+        return default.model_copy(update=kwargs)
 
     def has_api_key(self, name: str) -> bool:
         """Check if the given API Key is available."""
