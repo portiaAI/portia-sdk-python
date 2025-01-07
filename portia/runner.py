@@ -17,7 +17,7 @@ from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
 )
-from portia.llm_wrapper import LLMWrapper
+from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
 from portia.logging import logger, logger_manager
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
@@ -37,11 +37,13 @@ class Runner:
         self,
         config: Config,
         tool_registry: ToolRegistry,
+        llm_wrapper_class: type[BaseLLMWrapper] | None = None,
     ) -> None:
         """Initialize storage and tools."""
         logger_manager.configure_from_config(config)
         self.config = config
         self.tool_registry = tool_registry
+        self.llm_wrapper_class = llm_wrapper_class or LLMWrapper
 
         match config.storage_class:
             case StorageClass.MEMORY:
@@ -76,8 +78,8 @@ class Runner:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
-        planner = Planner(config=self.config)
         logger.debug(f"Running planner for query - {query}")
+        planner = Planner(self.llm_wrapper_class(self.config))
         outcome = planner.generate_plan_or_error(
             query=query,
             tool_list=tools,
@@ -148,7 +150,7 @@ class Runner:
             )
             try:
                 step_output = agent.execute_sync(
-                    llm=LLMWrapper(config=self.config).to_langchain(),
+                    llm=self.llm_wrapper_class(self.config).to_langchain(),
                     step_outputs=workflow.step_outputs,
                 )
 

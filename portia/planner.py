@@ -9,13 +9,12 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
 from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
-    from portia.config import Config
+    from portia.llm_wrapper import BaseLLMWrapper
     from portia.tool_registry import ToolSet
 
 logger = logging.getLogger(__name__)
@@ -34,9 +33,9 @@ class PlanOrError(BaseModel):
 class Planner:
     """planner class."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, llm_wrapper: BaseLLMWrapper) -> None:
         """Init with the config."""
-        self.config = config
+        self.llm_wrapper = llm_wrapper
 
     def generate_plan_or_error(
         self,
@@ -52,7 +51,7 @@ class Planner:
             system_context,
             examples,
         )
-        response = LLMWrapper(self.config).to_instructor(
+        response = self.llm_wrapper.to_instructor(
             response_model=PlanOrError,
             messages=[
                 {
