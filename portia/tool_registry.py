@@ -9,42 +9,12 @@ import httpx
 from pydantic import BaseModel, Field, create_model
 
 from portia.errors import ToolNotFoundError
-from portia.tool import PortiaRemoteTool
+from portia.tool import PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from portia.config import Config
-    from portia.tool import Tool
-
-
-class ToolSet:
-    """ToolSet is a convenience type for a set of Tools."""
-
-    def __init__(self, tools: list[Tool]) -> None:
-        """Initialize a set of tools."""
-        self.tools: dict[str, Tool] = {}
-        for tool in tools:
-            self.tools[tool.name] = tool
-
-    def add_tool(self, tool: Tool) -> None:
-        """Add a tool to the set."""
-        self.tools[tool.name] = tool
-
-    def get_tool(self, tool_name: str) -> Tool:
-        """Get a tool by id."""
-        if tool_name in self.tools:
-            return self.tools[tool_name]
-        raise ToolNotFoundError(tool_name)
-
-    def get_tools(self) -> list[Tool]:
-        """Get all tools."""
-        return list(self.tools.values())
-
-    def __add__(self, other: ToolSet) -> ToolSet:
-        """Return an aggregated tool set."""
-        new_tools = list(self.tools.values()) + list(other.tools.values())
-        return ToolSet(new_tools)
 
 
 class ToolRegistry(ABC):
@@ -61,11 +31,11 @@ class ToolRegistry(ABC):
         raise NotImplementedError("get_tool is not implemented")
 
     @abstractmethod
-    def get_tools(self) -> ToolSet:
+    def get_tools(self) -> list[Tool]:
         """Get all tools registered with registry."""
         raise NotImplementedError("get_tools is not implemented")
 
-    def match_tools(self, query: str) -> ToolSet:  # noqa: ARG002 - useful to have variable name
+    def match_tools(self, query: str) -> list[Tool]:  # noqa: ARG002 - useful to have variable name
         """Provide a set of tools that match a given query.
 
         This is optional to implement and will default to provide all tools.
@@ -97,16 +67,16 @@ class AggregatedToolRegistry(ToolRegistry):
                 continue
         raise ToolNotFoundError(tool_name)
 
-    def get_tools(self) -> ToolSet:
+    def get_tools(self) -> list[Tool]:
         """Get all tools from all registries."""
-        tools = ToolSet([])
+        tools = []
         for registry in self.registries:
             tools += registry.get_tools()
         return tools
 
-    def match_tools(self, query: str) -> ToolSet:
+    def match_tools(self, query: str) -> list[Tool]:
         """Get all tools from all registries."""
-        tools = ToolSet([])
+        tools = []
         for registry in self.registries:
             tools += registry.match_tools(query)
         return tools
@@ -117,7 +87,7 @@ class InMemoryToolRegistry(ToolRegistry):
 
     def __init__(self) -> None:
         """Store tools in a tool set for easy access."""
-        self.tools = ToolSet([])
+        self.tools = []
 
     @classmethod
     def from_local_tools(cls, tools: Sequence[Tool]) -> InMemoryToolRegistry:
@@ -129,15 +99,16 @@ class InMemoryToolRegistry(ToolRegistry):
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""
-        self.tools.add_tool(tool)
+        self.tools.append(tool)
 
     def get_tool(self, tool_name: str) -> Tool:
         """Get the tool from the registry."""
-        return self.tools.get_tool(
-            tool_name,
-        )
+        for tool in self.tools:
+            if tool.name == tool_name:
+                return tool
+        raise ToolNotFoundError(tool_name)
 
-    def get_tools(self) -> ToolSet:
+    def get_tools(self) -> list[Tool]:
         """Get all tools."""
         return self.tools
 
@@ -228,6 +199,6 @@ class PortiaToolRegistry(ToolRegistry):
 
         raise ToolNotFoundError(tool_name)
 
-    def get_tools(self) -> ToolSet:
+    def get_tools(self) -> list[Tool]:
         """Get all tools."""
-        return ToolSet(tools=list(self.tools.values()))
+        return list(self.tools.values())

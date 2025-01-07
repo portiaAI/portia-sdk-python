@@ -6,7 +6,15 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from portia.config import AgentType, Config, LLMModel, LLMProvider, StorageClass, default_config
+from portia.config import (
+    AgentType,
+    Config,
+    LLMModel,
+    LLMProvider,
+    LogLevel,
+    StorageClass,
+    default_config,
+)
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 
@@ -35,6 +43,12 @@ def test_runner_config_from_file() -> None:
         assert config.must_get_raw_api_key("openai_api_key") == "file-openai-key"
         assert config.default_agent_type == AgentType.VERIFIER
         assert config.llm_model_temperature == 10
+
+
+def test_from_default() -> None:
+    """Test from default."""
+    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
+    assert c.default_log_level == LogLevel.CRITICAL
 
 
 def test_getters() -> None:

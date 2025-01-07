@@ -22,12 +22,13 @@ from portia.logging import logger, logger_manager
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
-from portia.tool_registry import ToolRegistry, ToolSet
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
     from portia.config import Config
+    from portia.tool import Tool
+    from portia.tool_registry import ToolRegistry
 
 
 class Runner:
@@ -58,7 +59,7 @@ class Runner:
     def run_query(
         self,
         query: str,
-        tools: ToolSet | list[str] | None = None,
+        tools: list[Tool] | list[str] | None = None,
         example_workflows: list[Plan] | None = None,
     ) -> Workflow:
         """Plan and run a query in one go."""
@@ -68,12 +69,15 @@ class Runner:
     def plan_query(
         self,
         query: str,
-        tools: ToolSet | list[str] | None = None,
+        tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples."""
         if isinstance(tools, list):
-            tools = ToolSet([self.tool_registry.get_tool(tool) for tool in tools])
+            tools = [
+                self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
+                for tool in tools
+            ]
 
         if not tools:
             tools = self.tool_registry.match_tools(query)

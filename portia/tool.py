@@ -8,6 +8,7 @@ with their specific logic.
 from __future__ import annotations
 
 import json
+import time
 from abc import abstractmethod
 from typing import Any, Generic
 
@@ -17,6 +18,7 @@ from pydantic import BaseModel, Field, SecretStr, model_validator
 
 from portia.clarification import Clarification
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.logging import logger
 from portia.plan import Output
 from portia.templates.render import render_template
 from portia.types import SERIALIZABLE_TYPE_VAR
@@ -71,6 +73,10 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         **kwargs: Any,  # noqa: ANN401
     ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
         """Run the Tool function and generate an Output object with descriptions."""
+        args_dict = {f"{i}": arg for i, arg in enumerate(args)}
+        data = {**args_dict, **kwargs}
+        logger.debug(f"Invoking: {self.name} with {data}")
+        start_time = time.time()
         try:
             output = self.run(*args, **kwargs)
         except Exception as e:
@@ -79,6 +85,10 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
                 raise ToolSoftError(e) from e
             raise
+        else:
+            execution_time = time.time() - start_time
+            logger.debug(f"Tool {self.name} executed in {execution_time:.2f} seconds")
+            logger.debug("Tool output: {output}", output=output)
 
         # handle clarifications cleanly
         if isinstance(output, Clarification) or (
@@ -113,11 +123,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         args_name_description_dict = []
         out_type = self.output_schema[0]
         out_description = self.output_schema[1]
-        for arg, attribute in self.args_json_schema().items():
+        schema = self.args_json_schema()
+        for arg, attribute in schema["properties"].items():
             arg_dict = {
                 "name": arg,
                 "type": attribute.get("type", None),
                 "description": attribute.get("description", None),
+                "required": arg in schema.get("required", []),
             }
             args_name_description_dict.append(arg_dict)
             if "type" in attribute:
@@ -176,7 +188,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def args_json_schema(self) -> dict[str, Any]:
         """Return the json_schema for the tool args."""
-        return self.args_schema.model_json_schema()["properties"]
+        return self.args_schema.model_json_schema()
 
 
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
@@ -188,11 +200,10 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:  # noqa: ANN401
         """Invoke the run endpoint and handle response."""
         try:
-            # Convert args to a dictionary if necessary (e.g., by numbering them)
+            # Combine args and kwargs
             args_dict = {f"{i}": arg for i, arg in enumerate(args)}
-
-            # Combine args_dict and kwargs
             data = {**args_dict, **kwargs}
+            # Send to Cloud
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
                 content=json.dumps(data),
