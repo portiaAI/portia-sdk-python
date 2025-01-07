@@ -15,7 +15,7 @@ from portia.templates.render import render_template
 
 if TYPE_CHECKING:
     from portia.llm_wrapper import BaseLLMWrapper
-    from portia.tool_registry import ToolSet
+    from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class Planner:
     def generate_plan_or_error(
         self,
         query: str,
-        tool_list: ToolSet,
+        tool_list: list[Tool],
         system_context: list[str] | None = None,
         examples: list[Plan] | None = None,
     ) -> PlanOrError:
@@ -73,7 +73,7 @@ class Planner:
 
 def _render_prompt_insert_defaults(
     query: str,
-    tool_list: ToolSet,
+    tool_list: list[Tool],
     system_context: list[str] | None = None,
     examples: list[Plan] | None = None,
 ) -> str:
@@ -100,6 +100,6 @@ def _default_query_system_context() -> list[str]:
     return [f"Today is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
 
 
-def _get_tool_descriptions_for_tools(tool_list: ToolSet) -> list[dict[str, str]]:
+def _get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
     """Given a list of tool names, return the descriptions of the tools."""
-    return [{"name": tool.name, "description": tool.description} for tool in tool_list.get_tools()]
+    return [{"name": tool.name, "description": tool.description} for tool in tool_list]

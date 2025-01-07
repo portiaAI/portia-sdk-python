@@ -7,7 +7,6 @@ from portia.tool_registry import (
     AggregatedToolRegistry,
     InMemoryToolRegistry,
     ToolRegistry,
-    ToolSet,
 )
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "InMemoryToolRegistry",
     "Tool",
     "ToolRegistry",
-    "ToolSet",
 ]
