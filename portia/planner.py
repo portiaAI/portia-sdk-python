@@ -74,7 +74,7 @@ class Planner:
 def _render_prompt_insert_defaults(
     query: str,
     tool_list: list[Tool],
-    system_context_extension: list[str] | None = None,    
+    system_context_extension: list[str] | None = None,
     examples: list[Plan] | None = None,
 ) -> str:
     """Render the prompt for the query planner with defaults inserted if not provided."""

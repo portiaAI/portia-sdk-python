@@ -11,7 +11,6 @@ from portia.plan import Plan
 from portia.planner import Planner, PlanOrError, _default_query_system_context
 
 
-
 @pytest.fixture
 def mock_config() -> Config:
     """Mock Config object for testing."""
