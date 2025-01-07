@@ -35,9 +35,9 @@ class ConfigNotFoundError(Exception):
 class InvalidConfigError(Exception):
     """Raised when a needed config value is invalid."""
 
-    def __init__(self, value: str) -> None:
+    def __init__(self, value: str, issue: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Config value {value} is not valid")
+        super().__init__(f"Config value {value} is not valid - {issue}")
 
 
 class PlanError(Exception):

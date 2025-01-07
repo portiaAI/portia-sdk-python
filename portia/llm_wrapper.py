@@ -1,30 +1,55 @@
 """Wrapper around different LLM providers allowing us to treat them the same."""
 
+from __future__ import annotations
+
 import logging
-from typing import TypeVar
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, TypeVar
 
 import instructor
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
-from langchain_core.language_models.chat_models import (
-    BaseChatModel,
-)
 from langchain_mistralai import ChatMistralAI
 from langchain_openai import ChatOpenAI
 from mistralai import Mistral
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from portia.config import Config, LLMProvider
 from portia.errors import InvalidLLMProviderError
+
+if TYPE_CHECKING:
+    from langchain_core.language_models.chat_models import (
+        BaseChatModel,
+    )
+    from openai.types.chat import ChatCompletionMessageParam
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class LLMWrapper:
+class BaseLLMWrapper(ABC):
+    """Abstract base class for LLM wrappers."""
+
+    def __init__(self, config: Config) -> None:
+        """Initialize the base LLM wrapper."""
+        self.config = config
+
+    @abstractmethod
+    def to_langchain(self) -> BaseChatModel:
+        """Convert to a LangChain-compatible model."""
+
+    @abstractmethod
+    def to_instructor(
+        self,
+        response_model: type[T],
+        messages: list[ChatCompletionMessageParam],
+    ) -> T:
+        """Generate a response using instructor."""
+
+
+class LLMWrapper(BaseLLMWrapper):
     """LLMWrapper class for different LLMs."""
 
     def __init__(
@@ -32,9 +57,9 @@ class LLMWrapper:
         config: Config,
     ) -> None:
         """Initialize the wrapper."""
-        self.config = config
+        super().__init__(config)
         self.llm_provider = config.llm_provider
-        self.model_name = config.llm_model_name
+        self.model_name = config.llm_model_name.value
         self.model_temperature = config.llm_model_temperature
         self.model_seed = config.llm_model_seed
 

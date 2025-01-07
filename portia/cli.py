@@ -8,7 +8,7 @@ portia-cli plan "add 4 + 8" - plan a query
 
 import click
 
-from portia.config import default_config
+from portia.config import LogLevel, default_config
 from portia.example_tools import example_tool_registry
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
@@ -24,7 +24,7 @@ def cli() -> None:
 def run(query: str) -> None:
     """Run a query."""
     config = default_config()
-    config.default_log_level = "ERROR"
+    config.default_log_level = LogLevel.ERROR
     registry = example_tool_registry
     if config.has_api_key("portia_api_key"):
         registry += PortiaToolRegistry(config)
@@ -38,7 +38,7 @@ def run(query: str) -> None:
 def plan(query: str) -> None:
     """Plan a query."""
     config = default_config()
-    config.default_log_level = "ERROR"
+    config.default_log_level = LogLevel.ERROR
     registry = example_tool_registry
     if config.has_api_key("portia_api_key"):
         registry += PortiaToolRegistry(config)

@@ -70,7 +70,7 @@ class LoggerManager:
 
             default_logger.add(
                 log_sink,
-                level=config.default_log_level.upper(),
+                level=config.default_log_level.value,
                 format=DEFAULT_LOG_FORMAT,
                 serialize=config.json_log_serialize,
             )
