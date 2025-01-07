@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from abc import abstractmethod
-import time
 from typing import Any, Generic
 
 import httpx
