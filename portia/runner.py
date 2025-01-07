@@ -22,13 +22,13 @@ from portia.logging import logger, logger_manager
 from portia.plan import Output, Plan, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
-from portia.tool import Tool
-from portia.tool_registry import ToolRegistry
 from portia.workflow import Workflow, WorkflowState
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
     from portia.config import Config
+    from portia.tool import Tool
+    from portia.tool_registry import ToolRegistry
 
 
 class Runner:
