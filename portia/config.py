@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Type, TypeVar
+from typing import Annotated, TypeVar
 
 from pydantic import AfterValidator, BaseModel, SecretStr, model_validator
 
