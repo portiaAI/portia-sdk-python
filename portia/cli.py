@@ -8,7 +8,7 @@ portia-cli plan "add 4 + 8" - plan a query
 
 import click
 
-from portia.config import Config, LogLevel, default_config
+from portia.config import Config, LogLevel
 from portia.example_tools import example_tool_registry
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
