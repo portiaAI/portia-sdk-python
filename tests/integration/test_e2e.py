@@ -179,6 +179,7 @@ def test_runner_run_query_with_hard_error(
 
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.flaky(reruns=3)  # Anthropic is a little flaky
 def test_runner_run_query_with_soft_error(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,

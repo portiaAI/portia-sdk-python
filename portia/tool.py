@@ -123,11 +123,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         args_name_description_dict = []
         out_type = self.output_schema[0]
         out_description = self.output_schema[1]
-        for arg, attribute in self.args_json_schema().items():
+        schema = self.args_json_schema()
+        for arg, attribute in schema["properties"].items():
             arg_dict = {
                 "name": arg,
                 "type": attribute.get("type", None),
                 "description": attribute.get("description", None),
+                "required": arg in schema.get("required", []),
             }
             args_name_description_dict.append(arg_dict)
             if "type" in attribute:
@@ -186,7 +188,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def args_json_schema(self) -> dict[str, Any]:
         """Return the json_schema for the tool args."""
-        return self.args_schema.model_json_schema()["properties"]
+        return self.args_schema.model_json_schema()
 
 
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
