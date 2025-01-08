@@ -3,11 +3,9 @@
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
-from portia.clarification import InputClarification
 from portia.config import AgentType, StorageClass, default_config
 from portia.errors import InvalidStorageError, InvalidWorkflowStateError, PlanError
 from portia.llm_wrapper import LLMWrapper
@@ -15,7 +13,7 @@ from portia.plan import Plan, Step
 from portia.planner import PlanOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import Workflow, WorkflowState
+from portia.workflow import WorkflowState
 from tests.utils import AdditionTool, ClarificationTool
 
 
