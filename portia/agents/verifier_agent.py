@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import BaseAgent
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.clarification import ArgumentClarification, Clarification, InputClarification
+from portia.clarification import Clarification, InputClarification
 from portia.errors import (
     InvalidAgentOutputError,
     InvalidWorkflowStateError,
@@ -214,7 +214,9 @@ class ToolCallingModel:
         # handle any clarifications before calling
         if self.agent and self.agent.clarifications:
             for arg in verified_args.args:
-                matching_clarification = self.agent.get_last_resolved_clarification(arg.name, arg.value)
+                matching_clarification = (
+                    self.agent.get_last_resolved_clarification(arg.name, arg.value)
+                )
                 if matching_clarification and arg.value != matching_clarification.response:
                     arg.value = matching_clarification.response
                     arg.made_up = False
@@ -301,11 +303,14 @@ class VerifierAgent(BaseAgent):
         state.update({"messages": [arguments.model_dump_json(indent=2)]})  # type: ignore  # noqa: PGH003
         return "tool_agent"
 
-    def get_last_resolved_clarification(self, arg_name: str, arg_value: any) -> Clarification | None:
+    def get_last_resolved_clarification(self, arg_name: str,
+                                        arg_value: Any | None) -> Clarification | None:
         """Get the last resolved clarification for an argument."""
         matching_clarification = None
         for clarification in self.clarifications or []:
-            if clarification.resolved and getattr(clarification, "argument_name", None) == arg_name and clarification.response == arg_value:
+            if (clarification.resolved and
+                getattr(clarification, "argument_name", None) == arg_name and
+                clarification.response == arg_value):
                 matching_clarification = clarification
         return matching_clarification
 
