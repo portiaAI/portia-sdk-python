@@ -41,6 +41,8 @@ pyright = "^1.1.382"
 pytest-httpx = "^0.33.0"
 py = "^1.11.0"
 pytest-parallel = "^0.1.1"
+sphinx = "^8.1.3"
+sphinx-autodoc-typehints = "^3.0.0"
 
 [tool.ruff]
 line-length=100
@@ -89,19 +91,6 @@ omit = [
 exclude_lines = [
     "if TYPE_CHECKING:",
 ]
-
-[[tool.pydoc-markdown.loaders]]
-type = "python"
-
-[[tool.pydoc-markdown.processors]]
-type = "filter"
-expression = "not 'test' in name and not name.startswith('_') and default()"
-skip_empty_modules = true
-
-[tool.pydoc-markdown.renderer]
-type = "docusaurus"
-relative_output_path="SDK"
-sidebar_top_level_label=""
 
 [tool.poetry.scripts]
 portia-cli = "portia.cli:cli"
