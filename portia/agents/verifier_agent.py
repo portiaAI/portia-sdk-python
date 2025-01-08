@@ -303,10 +303,11 @@ class VerifierAgent(BaseAgent):
 
     def get_last_resolved_clarification(self, arg_name: str, arg_value: any) -> Clarification | None:
         """Get the last resolved clarification for an argument."""
+        matching_clarification = None
         for clarification in self.clarifications or []:
             if clarification.resolved and getattr(clarification, "argument_name", None) == arg_name and clarification.response == arg_value:
-                return clarification
-        return None
+                matching_clarification = clarification
+        return matching_clarification
 
     @staticmethod
     def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
