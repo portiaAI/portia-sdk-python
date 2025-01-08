@@ -6,11 +6,10 @@ from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, LLMModel, LLMProvider, default_config
 from portia.errors import ToolSoftError
-from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import WorkflowState
+from portia.workflow import Workflow, WorkflowState
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 
 PROVIDER_MODELS = [
@@ -79,9 +78,9 @@ def test_runner_plan_query(
 
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_name == "Add Tool"
-    assert plan.steps[0].input
-    assert len(plan.steps[0].input) == 2
-    assert plan.steps[0].input[0].value + plan.steps[0].input[1].value == 3
+    assert plan.steps[0].inputs
+    assert len(plan.steps[0].inputs) == 2
+    assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
 
     workflow = runner.create_and_execute_workflow(plan)
 
@@ -109,7 +108,7 @@ def test_runner_run_query_with_clarifications(
         tool_name="Clarification Tool",
         task="Use tool",
         output="",
-        input=[
+        inputs=[
             Variable(
                 name="user_guidance",
                 description="",
@@ -152,7 +151,7 @@ def test_runner_run_query_with_hard_error(
         tool_name="Error Tool",
         task="Use tool",
         output="",
-        input=[
+        inputs=[
             Variable(
                 name="error_str",
                 description="",
@@ -202,7 +201,7 @@ def test_runner_run_query_with_soft_error(
         tool_name="Add Tool",
         task="Use tool",
         output="",
-        input=[
+        inputs=[
             Variable(
                 name="a",
                 description="",
@@ -227,10 +226,17 @@ def test_runner_run_query_with_soft_error(
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> None:
     """Test toolless agent."""
-    agent = ToolLessAgent(description="Tell me a funny joke", inputs=[])
+    plan = Plan(
+        query="Tell me a funny joke",
+        steps=[Step(task="Tell me a funny joke", output="$joke")],
+    )
+    agent = ToolLessAgent(
+        step=plan.steps[0],
+        workflow=Workflow(plan_id=plan.id),
+        config=default_config(),
+    )
     config = default_config()
     config.llm_provider = llm_provider
     config.llm_model_name = llm_model_name
-    llm = LLMWrapper(config)
-    out = agent.execute_sync(llm=llm.to_langchain(), step_outputs={})
+    out = agent.execute_sync()
     assert isinstance(out, Output)

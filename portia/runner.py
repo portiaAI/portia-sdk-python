@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
+from portia.agents.toolless_agent import ToolLessAgent
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
@@ -236,22 +237,20 @@ class Runner:
         tool = None
         if step.tool_name:
             tool = self.tool_registry.get_tool(step.tool_name)
+        cls: type[BaseAgent]
         match config.default_agent_type:
             case AgentType.TOOL_LESS:
-                raise NotImplementedError("Toolless agent not implemented in runner")
+                cls = ToolLessAgent
             case AgentType.ONE_SHOT:
-                return OneShotAgent(
-                    step,
-                    workflow,
-                    config,
-                    tool,
-                )
+                cls = OneShotAgent
             case AgentType.VERIFIER:
-                return VerifierAgent(
-                    step,
-                    workflow,
-                    config,
-                    tool,
-                )
+                cls = VerifierAgent
             case _:
                 raise InvalidWorkflowStateError
+
+        return cls(
+            step,
+            workflow,
+            config,
+            tool,
+        )

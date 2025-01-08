@@ -26,10 +26,11 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.config import default_config
+from portia.config import Config, default_config
 from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
-from tests.utils import AdditionTool
+from portia.plan import Step
+from tests.utils import AdditionTool, get_test_workflow
 
 if TYPE_CHECKING:
     from langchain_core.prompt_values import ChatPromptValue
@@ -86,15 +87,15 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
 
+    (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
-        description="Write a sentence with every letter of the alphabet.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=None,
-        clarifications=[],
-        system_context_extension=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync()
     assert isinstance(output, Output)
     assert isinstance(output.value, str)
     assert output.value == "This is a sentence that should never be hallucinated by the LLM."
@@ -122,7 +123,8 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
-    agent = SimpleNamespace(description="DESCRIPTION_STRING")
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
@@ -166,7 +168,8 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mockinvoker.with_structured_output)
 
-    agent = SimpleNamespace(description="DESCRIPTION_STRING")
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
@@ -199,12 +202,13 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
         response=SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),  # type: ignore  # noqa: PGH003
     )
     monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
-
+    (_, workflow) = get_test_workflow()
     agent = SimpleNamespace(
-        description="DESCRIPTION_STRING",
         verified_args=verified_tool_inputs,
         clarifications=[],
     )
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.workflow = workflow
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
@@ -252,14 +256,18 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         resolved=True,
     )
 
+    (_, workflow) = get_test_workflow()
+    workflow.clarifications = [clarification]
     agent = SimpleNamespace(
-        description="DESCRIPTION_STRING",
         verified_args=verified_tool_inputs,
         clarifications=[failed_clarification, clarification],
         missing_args={"content": clarification},
-        get_last_resolved_clarification=lambda arg_name, arg_value:
-            clarification if arg_name == "content" and arg_value == "CONTENT_STRING" else None,
+        get_last_resolved_clarification=lambda arg_name, arg_value: clarification
+        if arg_name == "content" and arg_value == "CONTENT_STRING"
+        else None,
     )
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.workflow = workflow
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
@@ -277,7 +285,6 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     messages = mockinvoker.prompt
     assert messages
     assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
-    assert "CLARIFICATION_RESPONSE" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
@@ -349,15 +356,15 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
+    (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=tool,
-        clarifications=[],
-        system_context_extension=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync()
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
 
@@ -405,23 +412,24 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
+    (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=tool,
-        clarifications=[],
-        system_context_extension=[],
     )
     agent.verified_args = verified_tool_inputs
 
-    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync()
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
 
 
 def test_verifier_agent_edge_cases() -> None:
     """Tests edge cases are handled."""
-    agent = SimpleNamespace(description="DESCRIPTION_STRING")
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
         llm=LLMWrapper(default_config()).to_langchain(),
@@ -462,14 +470,20 @@ def test_get_last_resolved_clarification() -> None:
         user_guidance="",
         resolved=False,
     )
+    (plan, workflow) = get_test_workflow()
+    workflow.clarifications = [
+        resolved_clarification1,
+        resolved_clarification2,
+        unresolved_clarification,
+    ]
     agent = VerifierAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=None,
-        clarifications=[resolved_clarification1, resolved_clarification2, unresolved_clarification],
-        system_context_extension=[],
     )
-    assert agent.get_last_resolved_clarification("arg", "2") == resolved_clarification2
+    assert agent.get_last_resolved_clarification("arg") == resolved_clarification2
+
 
 def test_clarifications_or_continue() -> None:
     """Test clarifications_or_continue."""
@@ -480,14 +494,13 @@ def test_clarifications_or_continue() -> None:
         resolved=True,
     )
 
+    (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=None,
-        clarifications=[clarification],
-        system_context_extension=[],
     )
-
     inputs = VerifiedToolInputs(
         args=[
             VerifiedToolArgument(name="arg", value="1", made_up=True),
@@ -514,14 +527,16 @@ def test_clarifications_or_continue() -> None:
         response="1",
         user_guidance="",
         resolved=True,
+        step=1,
     )
 
+    (plan, workflow) = get_test_workflow()
+    workflow.clarifications = [clarification]
     agent = VerifierAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=None,
-        clarifications=[clarification],
-        system_context_extension=[],
     )
 
     inputs = VerifiedToolInputs(
@@ -561,12 +576,12 @@ def test_call_tool_or_return() -> None:
 
 def test_process_output() -> None:
     """Test process_output."""
+    (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=None,
-        clarifications=[],
-        system_context_extension=[],
     )
 
     # with new clarifications
