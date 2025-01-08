@@ -13,7 +13,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Email $email politely with $ai_search_results",
-                input=[
+                inputs=[
                     Variable(
                         name="$ai_search_results",
                         description="summary of AI news",
@@ -44,7 +44,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="What is the weather in the city in the input?",
-                input=[
+                inputs=[
                     Variable(
                         name="$southern_hemisphere_city",
                         description="City in the southern hemisphere",
@@ -55,7 +55,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="What is the weather in the city in the input?",
-                input=[
+                inputs=[
                     Variable(
                         name="$northern_hemisphere_city",
                         description="City in the norther hemisphere",
@@ -66,7 +66,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Compare the weather of the 2 cities ($southern_hemisphere_city_weather and $northern_hemisphere_city_weather) and write a comparison summarizing the similarities and differences",  # noqa: E501
-                input=[
+                inputs=[
                     Variable(
                         name="$southern_hemisphere_city_weather",
                         description="Weather of a city in the southern hemisphere",
@@ -80,7 +80,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Email hello@portialabs.ai with a $weather_comparison",
-                input=[
+                inputs=[
                     Variable(
                         name="$weather_comparison",
                         description="Comparison of the weather in the two cities",
@@ -101,7 +101,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Email $email_address politely with $london_weather",
-                input=[
+                inputs=[
                     Variable(
                         name="$london_weather",
                         description="Weather in London",
