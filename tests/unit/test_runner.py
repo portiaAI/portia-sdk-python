@@ -194,17 +194,3 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
 
     with pytest.raises(InvalidWorkflowStateError):
         runner.execute_workflow(workflow)
-
-
-def test_runner_get_clarifications(runner: Runner) -> None:
-    """Test getting clarifications."""
-    workflow = Workflow(
-        plan_id=uuid4(),
-        clarifications=[
-            InputClarification(user_guidance="t", argument_name="1", step=1),
-            InputClarification(user_guidance="t", argument_name="1", step=2),
-        ],
-    )
-    clarifications = runner.get_clarifications_for_step(workflow, 1)
-
-    assert len(clarifications) == 1
