@@ -304,7 +304,7 @@ class VerifierAgent(BaseAgent):
         return "tool_agent"
 
     def get_last_resolved_clarification(self, arg_name: str,
-                                        arg_value: Any | None) -> Clarification | None:
+                                        arg_value: Any | None) -> Clarification | None: # noqa: ANN401
         """Get the last resolved clarification for an argument."""
         matching_clarification = None
         for clarification in self.clarifications or []:
