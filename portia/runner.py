@@ -9,11 +9,10 @@ from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
-    InputClarification,
-    MultiChoiceClarification,
 )
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
+    InvalidAgentOutputError,
     InvalidStorageError,
     InvalidWorkflowStateError,
     PlanError,
@@ -124,15 +123,6 @@ class Runner:
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
 
-    def get_clarifications_for_step(self, workflow: Workflow, step: int) -> list[Clarification]:
-        """get_clarifications_for_step isolates clarifications relevant for the current step."""
-        return [
-            clarification
-            for clarification in workflow.clarifications
-            if isinstance(clarification, (InputClarification, MultiChoiceClarification))
-            and clarification.step == step
-        ]
-
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
         self.storage.save_workflow(workflow)
         logger.debug(
@@ -146,20 +136,23 @@ class Runner:
                 extra={"plan": plan.id, "workflow": workflow.id},
             )
             workflow.current_step_index = index
+
+            # we pass copies of the state to the agent so that the runner remains
+            # responsible for handling the output of the agent and updating the state.
             agent = self._get_agent_for_step(
-                step,
-                self.get_clarifications_for_step(workflow, index),
-                self.config.default_agent_type,
+                step.model_copy(deep=True),
+                workflow.model_copy(deep=True),
+                self.config.model_copy(deep=True),
             )
+
             logger.debug(
                 f"Using agent: {type(agent)}",
                 extra={"plan": plan.id, "workflow": workflow.id},
             )
             try:
-                step_output = agent.execute_sync(
-                    llm=self.llm_wrapper_class(self.config).to_langchain(),
-                    step_outputs=workflow.step_outputs,
-                )
+                step_output = agent.execute_sync()
+                if not isinstance(step_output, Output):
+                    raise InvalidAgentOutputError(step_output)  # noqa: TRY301
 
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = Output(value=str(e))
@@ -237,30 +230,28 @@ class Runner:
     def _get_agent_for_step(
         self,
         step: Step,
-        clarifications: list[Clarification],
-        agent_type: AgentType,
+        workflow: Workflow,
+        config: Config,
     ) -> BaseAgent:
         tool = None
         if step.tool_name:
             tool = self.tool_registry.get_tool(step.tool_name)
-        match agent_type:
+        match config.default_agent_type:
             case AgentType.TOOL_LESS:
-                raise NotImplementedError("Toolless agent not implemented in plan executor")
+                raise NotImplementedError("Toolless agent not implemented in runner")
             case AgentType.ONE_SHOT:
                 return OneShotAgent(
-                    description=step.task,
-                    inputs=step.input or [],
-                    clarifications=clarifications,
-                    tool=tool,
-                    system_context_extension=self.config.agent_system_context_extension,
+                    step,
+                    workflow,
+                    config,
+                    tool,
                 )
             case AgentType.VERIFIER:
                 return VerifierAgent(
-                    description=step.task,
-                    inputs=step.input or [],
-                    clarifications=clarifications,
-                    tool=tool,
-                    system_context_extension=self.config.agent_system_context_extension,
+                    step,
+                    workflow,
+                    config,
+                    tool,
                 )
             case _:
                 raise InvalidWorkflowStateError

@@ -1,4 +1,8 @@
-"""Verifier Agent for hardest problems."""
+"""The Verifier Agent for hardest problems.
+
+This agent uses multiple models (verifier, parser etc) to achieve the highest accuracy
+in completing tasks.
+"""
 
 from __future__ import annotations
 
@@ -19,13 +23,16 @@ from portia.errors import (
     ToolFailedError,
     ToolRetryError,
 )
+from portia.llm_wrapper import LLMWrapper
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
     from langchain_core.language_models.chat_models import BaseChatModel
 
-    from portia.plan import Variable
+    from portia.config import Config
+    from portia.plan import Step
     from portia.tool import Tool
+    from portia.workflow import Workflow
 
 MAX_RETRIES = 4
 
@@ -116,7 +123,7 @@ class ParserModel:
         response = model.invoke(
             self.arg_parser_prompt.format_messages(
                 context=self.context,
-                input=self.agent.description,
+                input=self.agent.step.task,
                 tool_name=self.agent.tool.name,
                 tool_args=self.agent.tool.args_json_schema(),
                 tool_description=self.agent.tool.description,
@@ -167,7 +174,7 @@ class VerifierModel:
         response = model.invoke(
             self.arg_verifier_prompt.format_messages(
                 context=self.context,
-                input=self.agent.description,
+                input=self.agent.step.task,
                 arguments=tool_args,
             ),
         )
@@ -212,11 +219,9 @@ class ToolCallingModel:
         if not verified_args:
             raise InvalidWorkflowStateError
         # handle any clarifications before calling
-        if self.agent and self.agent.clarifications:
+        if self.agent and self.agent.workflow.clarifications:
             for arg in verified_args.args:
-                matching_clarification = (
-                    self.agent.get_last_resolved_clarification(arg.name, arg.value)
-                )
+                matching_clarification = self.agent.get_last_resolved_clarification(arg.name)
                 if matching_clarification and arg.value != matching_clarification.response:
                     arg.value = matching_clarification.response
                     arg.made_up = False
@@ -228,7 +233,7 @@ class ToolCallingModel:
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 verified_args=verified_args.model_dump_json(indent=2),
-                input=self.agent.description,
+                input=self.agent.step.task,
                 past_errors=past_errors,
             ),
         )
@@ -255,15 +260,13 @@ class VerifierAgent(BaseAgent):
 
     def __init__(
         self,
-        description: str,
-        inputs: list[Variable],
+        step: Step,
+        workflow: Workflow,
+        config: Config,
         tool: Tool | None = None,
-        clarifications: list[Clarification] | None = None,
-        system_context_extension: list[str] | None = None,
     ) -> None:
         """Initialize the agent."""
-        super().__init__(description, inputs, clarifications, tool, system_context_extension)
-        self.tool = tool
+        super().__init__(step, workflow, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
 
@@ -288,7 +291,7 @@ class VerifierAgent(BaseAgent):
         for arg in arguments.args:
             if not arg.made_up:
                 continue
-            matching_clarification = self.get_last_resolved_clarification(arg.name, arg.value)
+            matching_clarification = self.get_last_resolved_clarification(arg.name)
 
             if not matching_clarification:
                 self.new_clarifications.append(
@@ -303,14 +306,18 @@ class VerifierAgent(BaseAgent):
         state.update({"messages": [arguments.model_dump_json(indent=2)]})  # type: ignore  # noqa: PGH003
         return "tool_agent"
 
-    def get_last_resolved_clarification(self, arg_name: str,
-                                        arg_value: Any | None) -> Clarification | None: # noqa: ANN401
+    def get_last_resolved_clarification(
+        self,
+        arg_name: str,
+    ) -> Clarification | None:
         """Get the last resolved clarification for an argument."""
         matching_clarification = None
-        for clarification in self.clarifications or []:
-            if (clarification.resolved and
-                getattr(clarification, "argument_name", None) == arg_name and
-                clarification.response == arg_value):
+        for clarification in self.workflow.clarifications:
+            if (
+                clarification.resolved
+                and getattr(clarification, "argument_name", None) == arg_name
+                and clarification.step == self.workflow.current_step_index
+            ):
                 matching_clarification = clarification
         return matching_clarification
 
@@ -348,18 +355,19 @@ class VerifierAgent(BaseAgent):
 
         raise InvalidAgentOutputError(str(last_message.content))
 
-    def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
+    def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
         if not self.tool:
             single_tool_agent = ToolLessAgent(
-                self.description,
-                self.inputs,
-                clarifications=self.clarifications,
-                system_context_extension=self.system_context_extension,
+                self.step,
+                self.workflow,
+                self.config,
+                self.tool,
             )
-            return single_tool_agent.execute_sync(llm, step_outputs)
+            return single_tool_agent.execute_sync()
 
-        context = self._get_context(step_outputs)
+        context = self.get_system_context()
+        llm = LLMWrapper(self.config).to_langchain()
 
         tools = [self.tool.to_langchain(return_artifact=True)]
         tool_node = ToolNode(tools)

@@ -1,4 +1,8 @@
-"""Agent designed when no tool is needed."""
+"""Agent designed when no tool is needed.
+
+This is useful for solving tasks where the LLM intrinsically has the knowledge or
+for creative tasks. Anything that an LLM can generate itself can use the ToolLess Agent.
+"""
 
 from typing import Any
 
@@ -11,6 +15,7 @@ from langchain_core.prompts import (
 from langgraph.graph import END, START, MessagesState, StateGraph
 
 from portia.agents.base_agent import BaseAgent, Output
+from portia.llm_wrapper import LLMWrapper
 
 
 class ToolLessModel:
@@ -40,7 +45,7 @@ class ToolLessModel:
         model = self.llm
         response = model.invoke(
             self.prompt.format_messages(
-                input=self.agent.description + self.context,
+                input=self.agent.step.task + self.context,
             ),
         )
 
@@ -50,10 +55,10 @@ class ToolLessModel:
 class ToolLessAgent(BaseAgent):
     """Agent responsible for achieving a task by using langgraph."""
 
-    def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
+    def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
-        context = self._get_context(step_outputs)
-
+        context = self.get_system_context()
+        llm = LLMWrapper(self.config).to_langchain()
         task_prompt = ChatPromptTemplate.from_messages(
             [
                 (
@@ -80,7 +85,7 @@ class ToolLessAgent(BaseAgent):
             {
                 "messages": task_prompt.format_messages(
                     context=context,
-                    input=self.description,
+                    input=self.step.task,
                     clarification_prompt="",
                 ),
             },

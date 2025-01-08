@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
-from portia.clarification import Clarification
 from portia.workflow import Workflow, WorkflowState
 
 
@@ -39,8 +38,8 @@ class Step(BaseModel):
     task: str = Field(
         description="The task that needs to be completed by this step",
     )
-    input: list[Variable] | None = Field(
-        default=None,
+    inputs: list[Variable] = Field(
+        default=[],
         description=(
             "The input to the step, as a variable with name and description. "
             "Constants should also have a value. These are not the inputs to the tool "
@@ -54,11 +53,6 @@ class Step(BaseModel):
     output: str = Field(
         ...,
         description="The unique output id of this step i.e. $best_offers.",
-    )
-    clarifications: list[Clarification] | None = Field(
-        default=None,
-        description="Clarifications for the step, if any.",
-        exclude=True,
     )
 
 

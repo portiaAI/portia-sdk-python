@@ -1,4 +1,9 @@
-"""One Shot agent."""
+"""A simple OneShotAgent that is optimized for simple tool calling tasks.
+
+It invokes the OneShotToolCallingModel up to four times but each individual attempt is a one shot.
+This agent is useful when the tool call is simple as it minimizes cost, but the VerifierAgent will
+be more successful on anything but simple tool calls.
+"""
 
 from __future__ import annotations
 
@@ -13,21 +18,30 @@ from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
+from portia.llm_wrapper import LLMWrapper
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
     from langchain_core.language_models.chat_models import BaseChatModel
 
     from portia.agents.verifier_agent import VerifiedToolInputs
-    from portia.plan import Variable
+    from portia.config import Config
+    from portia.plan import Step
     from portia.tool import Tool
+    from portia.workflow import Workflow
 
 
+# MAX_RETRIES controls how many times errors will be retried by the OneShotAgent
 MAX_RETRIES = 4
 
 
 class OneShotToolCallingModel:
-    """Model to call the tool with unverified arguments."""
+    """OneShotToolCallingModel is a one shot model for calling the given tool.
+
+    The tool and context are given directly to the LLM and we return the results.
+    This model is useful for simple tasks where the arguments are in the correct form
+    and are all present. Prefer to use the VerifierAgent if you have more complicated needs.
+    """
 
     tool_calling_prompt = ChatPromptTemplate.from_messages(
         [
@@ -35,12 +49,17 @@ class OneShotToolCallingModel:
                 content="You are very powerful assistant, but don't know current events.",
             ),
             HumanMessagePromptTemplate.from_template(
-                "query:\n{query}\n"
-                "context:\n{context}\n"
-                "Make sure you don't repeat past errors: {past_errors}\n"
-                "Use the provided tool. You should provide arguments that match the tool's schema\n"
-                "using the information contained in the query and context. Where clarifications\n"
-                "have been provided you should always use the values provided by them.",
+                [
+                    "query:",
+                    "{query}",
+                    "context:",
+                    "{context}",
+                    "Make sure you don't repeat past errors: {past_errors}",
+                    "Use the provided tool. You should provide arguments that match the tool's"
+                    "schema using the information contained in the query and context."
+                    "Where clarifications have been provided you should always use the values"
+                    "provided by them.",
+                ],
             ),
         ],
     )
@@ -65,7 +84,7 @@ class OneShotToolCallingModel:
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
-                query=self.agent.description,
+                query=self.agent.step.task,
                 context=self.context,
                 past_errors=past_errors,
             ),
@@ -84,16 +103,14 @@ class OneShotAgent(BaseAgent):
 
     def __init__(
         self,
-        description: str,
-        inputs: list[Variable],
-        clarifications: list[Clarification] | None = None,
+        step: Step,
+        workflow: Workflow,
+        config: Config,
         tool: Tool | None = None,
-        system_context_extension: list[str] | None = None,
     ) -> None:
         """Initialize the agent."""
-        super().__init__(description, inputs, clarifications, tool, system_context_extension)
+        super().__init__(step, workflow, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
-        self.single_tool_agent = None
         self.new_clarifications: list[Clarification] = []
 
     @staticmethod
@@ -142,19 +159,19 @@ class OneShotAgent(BaseAgent):
             return Output(value=last_message.content)
         raise InvalidAgentOutputError(str(last_message.content))
 
-    def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
+    def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
         if not self.tool:
-            if not self.single_tool_agent:
-                self.single_tool_agent = ToolLessAgent(
-                    self.description,
-                    self.inputs,
-                    self.clarifications,
-                    system_context_extension=self.system_context_extension,
-                )
-            return self.single_tool_agent.execute_sync(llm, step_outputs)
+            single_tool_agent = ToolLessAgent(
+                self.step,
+                self.workflow,
+                self.config,
+                self.tool,
+            )
+            return single_tool_agent.execute_sync()
 
-        context = self._get_context(step_outputs)
+        context = self.get_system_context()
+        llm = LLMWrapper(self.config).to_langchain()
 
         tools = [self.tool.to_langchain(return_artifact=True)]
         tool_node = ToolNode(tools)
@@ -170,10 +187,8 @@ class OneShotAgent(BaseAgent):
             OneShotAgent.retry_tool_or_finish,
         )
 
-        # We could use a MemorySaver checkpointer to hold intermediate state,
-        # this will allow us to process clarifications as if they were regular
-        # returns from tool calls.
         app = workflow.compile()
 
         invocation_result = app.invoke({"messages": []})
+
         return self.process_output(invocation_result["messages"][-1])
