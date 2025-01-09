@@ -224,7 +224,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def run(
         self,
-        ctx: ExecutionContext,
+        _: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  #  noqa: ANN401
     ) -> SERIALIZABLE_TYPE_VAR | Clarification:
