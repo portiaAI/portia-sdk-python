@@ -50,6 +50,37 @@ def test_from_default() -> None:
     assert c.default_log_level == LogLevel.CRITICAL
 
 
+@pytest.mark.parametrize("model", list(LLMModel))
+def test_swap_model_with_model(model: LLMModel) -> None:
+    """Test swapping model."""
+    c = Config.from_default(openai_api_key=SecretStr("123"))
+    c.swap_model(model.provider(), model)
+    assert c.llm_provider == model.provider()
+    assert c.llm_model_name == model
+
+
+@pytest.mark.parametrize("provider", list(LLMProvider))
+def test_swap_model_raises_wrong_provider(provider: LLMProvider) -> None:
+    """Test swapping model raises error if provider is wrong."""
+    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
+    invalid_model = next(model for model in LLMModel if model.provider() != provider)
+    with pytest.raises(InvalidConfigError):
+        c.swap_model(provider, invalid_model)
+
+
+def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test setting keys."""
+    monkeypatch.setenv("PORTIA_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
+    assert c.portia_api_key == SecretStr("test-key")
+    assert c.openai_api_key == SecretStr("test-openai-key")
+    assert c.anthropic_api_key == SecretStr("test-anthropic-key")
+    assert c.mistralai_api_key == SecretStr("test-mistral-key")
+
+
 def test_getters() -> None:
     """Test getters work."""
     c = Config.from_default(openai_api_key=SecretStr("123"))
