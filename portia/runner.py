@@ -147,7 +147,7 @@ class Runner:
             agent = self._get_agent_for_step(
                 step=ReadOnlyStep.from_step(step),
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
-                config=self.config.model_copy(deep=True),
+                config=self.config,  # config is already frozen so we don't need to copy
             )
 
             logger.debug(
