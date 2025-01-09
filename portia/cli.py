@@ -72,7 +72,7 @@ def run(
 
     if llm_provider or llm_model:
         provider = LLMProvider(llm_provider) if llm_provider else LLMModel(llm_model).provider()
-        model = LLMModel(llm_model) if llm_model else provider.default_model
+        model = LLMModel(llm_model) if llm_model else provider.default_model()
         config.swap_model(provider, model)
 
     # Add the tool registry
