@@ -11,4 +11,5 @@ runner = Runner(
 
 output = runner.run_query(
     "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
+    metadata={"user_id": "123"},
 )

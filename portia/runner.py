@@ -59,10 +59,11 @@ class Runner:
         query: str,
         tools: list[Tool] | list[str] | None = None,
         example_workflows: list[Plan] | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> Workflow:
         """Plan and run a query in one go."""
         plan = self.plan_query(query, tools, example_workflows)
-        return self.create_and_execute_workflow(plan)
+        return self.create_and_execute_workflow(plan, metadata)
 
     def plan_query(
         self,
@@ -104,9 +105,13 @@ class Runner:
 
         return outcome.plan
 
-    def create_and_execute_workflow(self, plan: Plan) -> Workflow:
+    def create_and_execute_workflow(
+        self,
+        plan: Plan,
+        metadata: dict[str, str] | None = None,
+    ) -> Workflow:
         """Create a new workflow from a plan and then run it."""
-        workflow = plan.create_workflow()
+        workflow = plan.create_workflow(metadata)
         return self._execute_workflow(plan, workflow)
 
     def execute_workflow(self, workflow: Workflow) -> Workflow:

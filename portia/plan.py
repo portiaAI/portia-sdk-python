@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tkinter import N
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -101,6 +102,8 @@ class Plan(BaseModel):
             values["id"] = uuid4()
         return values
 
-    def create_workflow(self) -> Workflow:
+    def create_workflow(self, metadata: dict[str, str] | None = None) -> Workflow:
         """Create a new workflow from this plan."""
-        return Workflow(plan_id=self.id, state=WorkflowState.NOT_STARTED)
+        if metadata is None:
+            metadata = {}
+        return Workflow(plan_id=self.id, state=WorkflowState.NOT_STARTED, metadata=metadata)
