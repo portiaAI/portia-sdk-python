@@ -21,7 +21,7 @@ from portia.logger import logger, logger_manager
 from portia.plan import Plan, ReadOnlyStep, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
-from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowMetadata, WorkflowState
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
@@ -59,7 +59,7 @@ class Runner:
         query: str,
         tools: list[Tool] | list[str] | None = None,
         example_workflows: list[Plan] | None = None,
-        metadata: dict[str, str] | None = None,
+        metadata: WorkflowMetadata | None = None,
     ) -> Workflow:
         """Plan and run a query in one go."""
         plan = self.plan_query(query, tools, example_workflows)
@@ -108,7 +108,7 @@ class Runner:
     def create_and_execute_workflow(
         self,
         plan: Plan,
-        metadata: dict[str, str] | None = None,
+        metadata: WorkflowMetadata | None = None,
     ) -> Workflow:
         """Create a new workflow from a plan and then run it."""
         workflow = plan.create_workflow(metadata)
