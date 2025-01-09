@@ -19,6 +19,7 @@ from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.llm_wrapper import LLMWrapper
+from portia.tool import ExecutionContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -175,7 +176,15 @@ class OneShotAgent(BaseAgent):
         context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()
 
-        tools = [self.tool.to_langchain(return_artifact=True)]
+        tools = [
+            self.tool.with_context(
+                ExecutionContext(
+                    plan_id=self.workflow.plan_id,
+                    workflow_id=self.workflow.id,
+                    metadata=self.workflow.metadata,
+                ),
+            ).to_langchain(return_artifact=True),
+        ]
         tool_node = ToolNode(tools)
 
         workflow = StateGraph(MessagesState)

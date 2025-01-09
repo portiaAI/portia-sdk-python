@@ -11,6 +11,7 @@ import json
 import time
 from abc import abstractmethod
 from typing import Any, Generic
+from uuid import UUID
 
 import httpx
 from langchain_core.tools import StructuredTool
@@ -28,6 +29,14 @@ MAX_TOOL_DESCRIPTION_LENGTH = 1024
 
 class _ArgsSchemaPlaceholder(BaseModel):
     pass
+
+
+class ExecutionContext(BaseModel):
+    """ExecutionContext provides context to the tool of the workflow its part of."""
+
+    plan_id: UUID
+    workflow_id: UUID
+    metadata: dict[str, str]
 
 
 class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
@@ -51,14 +60,21 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Output schema of the tool",
         examples=["(TYPE, DESCRIPTION)", "(json, json with API response, single object)"],
     )
+    context: ExecutionContext | None = None
 
     @abstractmethod
-    def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:  # noqa: ANN401
+    def run(
+        self,
+        ctx: ExecutionContext,
+        *args: Any,  # noqa: ANN401
+        **kwargs: Any,  # noqa: ANN401
+    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
         """Run the tool.
 
         This method must be implemented by subclasses to define the tool's specific behavior.
 
         Args:
+            ctx (ExecutionContext): Context of the execution environment
             args (Any): The arguments passed to the tool for execution.
             kwargs (Any): The keyword arguments passed to the tool for execution.
 
@@ -77,8 +93,12 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         data = {**args_dict, **kwargs}
         logger.info(f"Invoking: {self.name} with {data}")
         start_time = time.time()
+
+        if not self.context:
+            raise ToolHardError("No Context Provided")
+
         try:
-            output = self.run(*args, **kwargs)
+            output = self.run(self.context, *args, **kwargs)
         except Exception as e:
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
@@ -164,6 +184,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise InvalidToolDescriptionError(self.name)
         return self
 
+    def with_context(self, ctx: ExecutionContext) -> Tool:
+        """Set an execution context for a tool."""
+        self.context = ctx
+        return self
+
     def to_langchain(self, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002
         """Return a LangChain representation of this tool.
 
@@ -197,7 +222,12 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     api_key: SecretStr
     api_endpoint: str
 
-    def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:  # noqa: ANN401
+    def run(
+        self,
+        ctx: ExecutionContext,
+        *args: Any,  # noqa: ANN401
+        **kwargs: Any,  #  noqa: ANN401
+    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
         """Invoke the run endpoint and handle response."""
         try:
             # Combine args and kwargs

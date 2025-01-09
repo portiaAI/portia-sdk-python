@@ -9,7 +9,7 @@ from portia.tool_registry import (
     InMemoryToolRegistry,
     ToolRegistry,
 )
-from tests.utils import AdditionTool, MockTool
+from tests.utils import AdditionTool, MockTool, get_execution_ctx
 
 MOCK_TOOL_NAME = "mock tool"
 OTHER_MOCK_TOOL_NAME = "other mock tool"
@@ -68,7 +68,8 @@ def test_local_tool_registry_get_and_run() -> None:
     local_tool_registry = InMemoryToolRegistry()
     local_tool_registry.register_tool(MockTool(name=MOCK_TOOL_NAME))
     tool1 = local_tool_registry.get_tool(MOCK_TOOL_NAME)
-    tool1.run()
+    ctx = get_execution_ctx()
+    tool1.run(ctx)
 
 
 def test_local_tool_registry_get_tools() -> None:

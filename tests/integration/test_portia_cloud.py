@@ -13,7 +13,7 @@ from portia.tool_registry import (
     ToolRegistrationFailedError,
 )
 from portia.workflow import WorkflowState
-from tests.utils import AdditionTool
+from tests.utils import AdditionTool, get_execution_ctx
 
 
 def test_runner_run_query_with_cloud() -> None:
@@ -49,8 +49,9 @@ def test_run_tool_error() -> None:
 
     tool = registry.get_tool("Weather Tool")
     tool.api_key = SecretStr("123")
+    ctx = get_execution_ctx()
     with pytest.raises(ToolHardError):
-        tool.run()
+        tool.run(ctx)
 
 
 def test_runner_run_query_with_cloud_and_local() -> None:

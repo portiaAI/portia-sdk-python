@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
 from portia.config import Config, LogLevel
 from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import Plan, Step, Variable
-from portia.tool import Tool
+from portia.tool import ExecutionContext, Tool
 from portia.workflow import Workflow
 
 
@@ -35,6 +37,15 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
     )
 
 
+def get_execution_ctx(workflow: Workflow | None = None) -> ExecutionContext:
+    """Return an execution context from a workflow."""
+    return ExecutionContext(
+        plan_id=workflow.plan_id if workflow else uuid4(),
+        workflow_id=workflow.id if workflow else uuid4(),
+        metadata=workflow.metadata if workflow else {},
+    )
+
+
 class AdditionToolSchema(BaseModel):
     """Input for AdditionTool."""
 
@@ -51,7 +62,7 @@ class AdditionTool(Tool):
     args_schema: type[BaseModel] = AdditionToolSchema
     output_schema: tuple[str, str] = ("int", "int: The value of the addition")
 
-    def run(self, a: int, b: int) -> int:
+    def run(self, _: ExecutionContext, a: int, b: int) -> int:
         """Add the numbers."""
         return a + b
 
@@ -75,7 +86,12 @@ class ClarificationTool(Tool):
         "Clarification: The value of the Clarification",
     )
 
-    def run(self, user_guidance: str, raise_clarification: bool) -> Clarification | None:  # noqa: FBT001
+    def run(
+        self,
+        _: ExecutionContext,
+        user_guidance: str,
+        raise_clarification: bool,  # noqa: FBT001
+    ) -> Clarification | None:
         """Add the numbers."""
         if raise_clarification:
             return InputClarification(
@@ -97,7 +113,10 @@ class MockTool(Tool):
     args_schema: type[BaseModel] = MockToolSchema
     output_schema: tuple[str, str] = ("None", "None: returns nothing")
 
-    def run(self) -> None:
+    def run(
+        self,
+        _: ExecutionContext,
+    ) -> None:
         """Do nothing."""
         return
 
@@ -122,7 +141,13 @@ class ErrorTool(Tool):
         "Error: The value of the error",
     )
 
-    def run(self, error_str: str, return_uncaught_error: bool, return_soft_error: bool) -> None:  # noqa: FBT001
+    def run(
+        self,
+        _: ExecutionContext,
+        error_str: str,
+        return_uncaught_error: bool,  # noqa: FBT001
+        return_soft_error: bool,  # noqa: FBT001
+    ) -> None:
         """Return the error."""
         if return_uncaught_error:
             raise Exception(error_str)  # noqa: TRY002

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from tkinter import N
 from typing import Any
 from uuid import UUID, uuid4
 
