@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import SecretStr
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END
@@ -33,7 +34,9 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = OneShotAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=Config.from_default(
+            openai_api_key=SecretStr("123"),
+        ),
     )
 
     output = agent.execute_sync()

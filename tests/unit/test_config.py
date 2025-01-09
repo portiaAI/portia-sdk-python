@@ -46,7 +46,10 @@ def test_runner_config_from_file() -> None:
 
 def test_from_default() -> None:
     """Test from default."""
-    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
+    c = Config.from_default(
+        default_log_level=LogLevel.CRITICAL,
+        openai_api_key=SecretStr("123"),
+    )
     assert c.default_log_level == LogLevel.CRITICAL
 
 
@@ -60,6 +63,7 @@ def test_getters() -> None:
         c.must_get("not real", str)
 
     c = Config.from_default(
+        openai_api_key=SecretStr("123"),
         portia_api_key=SecretStr(""),
         portia_api_endpoint="",
     )

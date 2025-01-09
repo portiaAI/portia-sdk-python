@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import SecretStr
 
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import InvalidStorageError, InvalidWorkflowStateError, PlanError
@@ -20,7 +21,9 @@ from tests.utils import AdditionTool, ClarificationTool
 @pytest.fixture
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
-    config = Config.from_default()
+    config = Config.from_default(
+        openai_api_key=SecretStr("123"),
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Runner(config=config, tool_registry=tool_registry)
 
@@ -40,6 +43,7 @@ def test_runner_run_query(runner: Runner) -> None:
 def test_runner_run_query_invalid_storage() -> None:
     """Ensure invalid storage throws."""
     config = Config.from_default(
+        openai_api_key=SecretStr("123"),
         storage_class="Invalid",  # type: ignore  # noqa: PGH003
     )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
@@ -52,6 +56,7 @@ def test_runner_run_query_disk_storage() -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
         query = "example query"
         config = Config.from_default(
+            openai_api_key=SecretStr("123"),
             storage_class=StorageClass.DISK,
             storage_dir=tmp_dir,
         )
@@ -140,7 +145,10 @@ def test_runner_toolless_agent() -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    config = Config.from_default(default_agent_type=AgentType.TOOL_LESS)
+    config = Config.from_default(
+        default_agent_type=AgentType.TOOL_LESS,
+        openai_api_key=SecretStr("123"),
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
 
@@ -149,6 +157,7 @@ def test_runner_toolless_agent() -> None:
 
     config = Config.from_default(
         default_agent_type="Other",  # type: ignore  # noqa: PGH003
+        openai_api_key=SecretStr("123"),
     )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)

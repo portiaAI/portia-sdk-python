@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from portia.clarification import Clarification, InputClarification
+from portia.config import Config, LogLevel
 from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.tool import Tool
@@ -23,6 +24,11 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
     )
     plan = Plan(query="Add 1 + 2", steps=[step1])
     return plan, Workflow(plan_id=plan.id, current_step_index=1)
+
+
+def get_test_config(**kwargs) -> Config:  # noqa: ANN003
+    """Get test config."""
+    return Config.from_default(default_log_level=LogLevel.INFO, **kwargs)
 
 
 class AdditionToolSchema(BaseModel):
