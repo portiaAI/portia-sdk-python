@@ -55,9 +55,11 @@ def test_from_default() -> None:
 
 def test_getters() -> None:
     """Test getters work."""
-    c = Config.from_default(openai_api_key=SecretStr("123"))
+    c = Config.from_default(
+        openai_api_key=SecretStr("123"),
+    )
 
-    assert c.has_api_key("portia_api_key")
+    assert c.has_api_key("openai_api_key")
 
     with pytest.raises(ConfigNotFoundError):
         c.must_get("not real", str)

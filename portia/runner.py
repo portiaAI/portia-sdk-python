@@ -14,7 +14,6 @@ from portia.clarification import (
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
     InvalidAgentOutputError,
-    InvalidStorageError,
     InvalidWorkflowStateError,
     PlanError,
 )
@@ -55,8 +54,6 @@ class Runner:
                 self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=config)
-            case _:
-                raise InvalidStorageError(config.storage_class)
 
     def run_query(
         self,
@@ -246,8 +243,6 @@ class Runner:
                 cls = OneShotAgent
             case AgentType.VERIFIER:
                 cls = VerifierAgent
-            case _:
-                raise InvalidWorkflowStateError
 
         return cls(
             step,

@@ -225,13 +225,13 @@ class Config(BaseModel):
 
 
 def default_config(**kwargs) -> Config:  # noqa: ANN003
-    """Return default config."""
+    """Return default config with values that can be overridden."""
     return Config(
-        storage_class=StorageClass.MEMORY,
-        llm_provider=LLMProvider.OPENAI,
-        llm_model_name=LLMModel.GPT_4_O_MINI,
-        llm_model_temperature=0,
-        llm_model_seed=443,
-        default_agent_type=AgentType.VERIFIER,
+        storage_class=kwargs.pop("storage_class", StorageClass.MEMORY),
+        llm_provider=kwargs.pop("llm_provider", LLMProvider.OPENAI),
+        llm_model_name=kwargs.pop("llm_model_name", LLMModel.GPT_4_O_MINI),
+        llm_model_temperature=kwargs.pop("llm_model_temperature", 0),
+        llm_model_seed=kwargs.pop("llm_model_seed", 443),
+        default_agent_type=kwargs.pop("default_agent_type", AgentType.VERIFIER),
         **kwargs,
     )

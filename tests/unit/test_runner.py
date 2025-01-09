@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from portia.config import AgentType, StorageClass
-from portia.errors import InvalidStorageError, InvalidWorkflowStateError, PlanError
+from portia.errors import InvalidWorkflowStateError, PlanError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, Step
 from portia.planner import PlanOrError
@@ -35,16 +35,6 @@ def test_runner_run_query(runner: Runner) -> None:
     workflow = runner.run_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
-
-
-def test_runner_run_query_invalid_storage() -> None:
-    """Ensure invalid storage throws."""
-    config = get_test_config(
-        storage_class="Invalid",  # type: ignore  # noqa: PGH003
-    )
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    with pytest.raises(InvalidStorageError):
-        Runner(config=config, tool_registry=tool_registry)
 
 
 def test_runner_run_query_disk_storage() -> None:
@@ -148,16 +138,6 @@ def test_runner_toolless_agent() -> None:
 
     plan = runner.plan_query(query)
     runner.create_and_execute_workflow(plan)
-
-    config = get_test_config(
-        default_agent_type="Other",  # type: ignore  # noqa: PGH003
-    )
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
-
-    plan = runner.plan_query(query)
-    with pytest.raises(InvalidWorkflowStateError):
-        runner.create_and_execute_workflow(plan)
 
 
 def test_runner_execute_workflow(runner: Runner) -> None:
