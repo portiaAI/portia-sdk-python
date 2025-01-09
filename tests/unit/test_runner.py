@@ -120,7 +120,7 @@ def test_runner_create_and_execute_workflow(runner: Runner) -> None:
     assert workflow.plan_id == plan.id
 
 
-def test_runner_invalid_agent() -> None:
+def test_runner_toolless_agent() -> None:
     """Test running a plan using the Runner."""
     query = "example query"
 
@@ -145,8 +145,7 @@ def test_runner_invalid_agent() -> None:
     runner = Runner(config=config, tool_registry=tool_registry)
 
     plan = runner.plan_query(query)
-    with pytest.raises(NotImplementedError):
-        runner.create_and_execute_workflow(plan)
+    runner.create_and_execute_workflow(plan)
 
     config = default_config()
     config.default_agent_type = "Other"  # type: ignore  # noqa: PGH003
