@@ -16,10 +16,10 @@ import httpx
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field, SecretStr, model_validator
 
+from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logging import logger
-from portia.plan import Output
 from portia.templates.render import render_template
 from portia.types import SERIALIZABLE_TYPE_VAR
 

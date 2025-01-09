@@ -10,7 +10,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.agents.base_agent import BaseAgent
+from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
 from portia.errors import (
@@ -19,12 +19,12 @@ from portia.errors import (
     ToolFailedError,
     ToolRetryError,
 )
-from portia.plan import Output, Variable
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
     from langchain_core.language_models.chat_models import BaseChatModel
 
+    from portia.plan import Variable
     from portia.tool import Tool
 
 MAX_RETRIES = 4

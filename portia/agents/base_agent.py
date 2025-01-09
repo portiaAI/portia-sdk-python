@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic
 
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from portia.agents.context import build_context
 from portia.clarification import Clarification, InputClarification
+from portia.types import SERIALIZABLE_TYPE_VAR
 
 if TYPE_CHECKING:
     from langchain.callbacks.manager import (
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     )
     from langchain_core.language_models.chat_models import BaseChatModel
 
-    from portia.plan import Output, Variable
+    from portia.plan import Variable
     from portia.tool import Tool
 
 
@@ -98,3 +99,12 @@ class BaseAgent:
         if system_context_extension:
             base_context.extend(system_context_extension)
         return base_context
+
+
+class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+    """Output of a tool with wrapper for data, summaries and LLM interpretation.
+
+    Contains a generic value T bound to Serializable.
+    """
+
+    value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")

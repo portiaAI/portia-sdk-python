@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
+from portia.agents.base_agent import Output
 from portia.clarification import Clarification
-from portia.plan import Output
 from portia.workflow import Workflow, WorkflowState
 
 
@@ -41,7 +41,8 @@ def test_workflow_initialization() -> None:
 
 
 def test_workflow_get_outstanding_clarifications(
-    workflow: Workflow, mock_clarification: Clarification,
+    workflow: Workflow,
+    mock_clarification: Clarification,
 ) -> None:
     """Test get_outstanding_clarifications method."""
     outstanding = workflow.get_outstanding_clarifications()

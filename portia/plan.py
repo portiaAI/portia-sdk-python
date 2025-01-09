@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Generic
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
 from portia.clarification import Clarification
-from portia.types import SERIALIZABLE_TYPE_VAR
+from portia.workflow import Workflow, WorkflowState
 
 
 class Variable(BaseModel):
@@ -31,15 +31,6 @@ class Variable(BaseModel):
     description: str = Field(
         description="A description of the variable.",
     )
-
-
-class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
-    """Output of a tool with wrapper for data, summaries and LLM interpretation.
-
-    Contains a generic value T bound to Serializable.
-    """
-
-    value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")
 
 
 class Step(BaseModel):
@@ -99,3 +90,7 @@ class Plan(BaseModel):
             # If missing or invalid, use the default_factory
             values["id"] = uuid4()
         return values
+
+    def create_workflow(self) -> Workflow:
+        """Create a new workflow from this plan."""
+        return Workflow(plan_id=self.id, state=WorkflowState.NOT_STARTED)

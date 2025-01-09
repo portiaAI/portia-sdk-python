@@ -3,9 +3,10 @@
 import pytest
 from pydantic import HttpUrl
 
+from portia.agents.base_agent import Output
 from portia.agents.context import build_context
 from portia.clarification import ActionClarification, InputClarification
-from portia.plan import Output, Variable
+from portia.plan import Variable
 
 
 def test_context_empty() -> None:
