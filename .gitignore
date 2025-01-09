@@ -3,3 +3,5 @@ __pycache__
 .coverage
 test_harness.py
 htmlcov
+.venv
+.env

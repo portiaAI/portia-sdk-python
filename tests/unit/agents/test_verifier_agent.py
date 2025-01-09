@@ -257,8 +257,9 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         verified_args=verified_tool_inputs,
         clarifications=[failed_clarification, clarification],
         missing_args={"content": clarification},
-        get_last_resolved_clarification=lambda arg_name, arg_value:
-            clarification if arg_name == "content" and arg_value == "CONTENT_STRING" else None,
+        get_last_resolved_clarification=lambda arg_name, arg_value: clarification
+        if arg_name == "content" and arg_value == "CONTENT_STRING"
+        else None,
     )
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
@@ -470,6 +471,7 @@ def test_get_last_resolved_clarification() -> None:
         system_context_extension=[],
     )
     assert agent.get_last_resolved_clarification("arg", "2") == resolved_clarification2
+
 
 def test_clarifications_or_continue() -> None:
     """Test clarifications_or_continue."""

@@ -103,12 +103,12 @@ class Config(BaseModel):
 
     # Portia Cloud Options
     portia_api_endpoint: str = "https://api.porita.dev"
-    portia_api_key: SecretStr | None = SecretStr(os.getenv("PORTIA_API_KEY") or "")
+    portia_api_key: SecretStr | None = None
 
     # LLM API Keys
-    openai_api_key: SecretStr | None = SecretStr(os.getenv("OPENAI_API_KEY") or "")
-    anthropic_api_key: SecretStr | None = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
-    mistralai_api_key: SecretStr | None = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
+    openai_api_key: SecretStr | None = None
+    anthropic_api_key: SecretStr | None = None
+    mistralai_api_key: SecretStr | None = None
 
     # Storage Options
     storage_class: StorageClass
@@ -168,12 +168,14 @@ class Config(BaseModel):
 
         match self.llm_provider:
             case LLMProvider.OPENAI:
+                self.openai_api_key = SecretStr(os.getenv("OPENAI_API_KEY") or "")
                 validate_llm_config("openai_api_key", SUPPORTED_OPENAI_MODELS)
             case LLMProvider.ANTHROPIC:
+                self.anthropic_api_key = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
                 validate_llm_config("anthropic_api_key", SUPPORTED_ANTHROPIC_MODELS)
             case LLMProvider.MISTRALAI:
+                self.mistralai_api_key = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
                 validate_llm_config("mistralai_api_key", SUPPORTED_MISTRALAI_MODELS)
-
         return self
 
     @classmethod
