@@ -5,8 +5,8 @@ from unittest import mock
 import pytest
 
 from portia.agents.toolless_agent import ToolLessAgent, ToolLessModel
-from portia.config import default_config
-from portia.llm_wrapper import LLMWrapper
+from portia.config import Config
+from tests.utils import get_test_workflow
 
 
 def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -14,14 +14,9 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_invoke = mock.Mock(return_value={"messages": ["invoked"]})
     monkeypatch.setattr(ToolLessModel, "invoke", mock_invoke)
 
-    agent = ToolLessAgent(
-        description="Write a sentence with every letter of the alphabet.",
-        inputs=[],
-        tool=None,
-        clarifications=[],
-        system_context_extension=[],
-    )
+    (plan, workflow) = get_test_workflow()
+    agent = ToolLessAgent(step=plan.steps[0], workflow=workflow, config=Config.from_default())
 
-    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync()
     assert mock_invoke.called
     assert output.value == "invoked"

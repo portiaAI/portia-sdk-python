@@ -82,7 +82,7 @@ runner.run_query("Get the weather in Sydney and London then email me with a summ
 ## Tests
 
 We write two types of tests:
-- Unit tests should mock out the LLM providers, and aim to give quick feedback. 
+- Unit tests should mock out the LLM providers, and aim to give quick feedback. They should mock out LLM providers.
 - Integration tests actually call LLM providers, are much slower but test the system works fully.
 
 To run tests:

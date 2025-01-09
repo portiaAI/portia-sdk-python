@@ -6,7 +6,23 @@ from pydantic import BaseModel, Field
 
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
+from portia.plan import Plan, Step, Variable
 from portia.tool import Tool
+from portia.workflow import Workflow
+
+
+def get_test_workflow() -> tuple[Plan, Workflow]:
+    """Generate a simple test workflow."""
+    step1 = Step(
+        task="Add 1 + 2",
+        inputs=[
+            Variable(name="a", value=1, description=""),
+            Variable(name="b", value=2, description=""),
+        ],
+        output="$sum",
+    )
+    plan = Plan(query="Add 1 + 2", steps=[step1])
+    return plan, Workflow(plan_id=plan.id, current_step_index=1)
 
 
 class AdditionToolSchema(BaseModel):

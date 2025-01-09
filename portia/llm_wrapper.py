@@ -77,7 +77,7 @@ class LLMWrapper(BaseLLMWrapper):
                 return ChatAnthropic(
                     model_name=self.model_name,
                     temperature=self.model_temperature,
-                    timeout=10,
+                    timeout=120,
                     stop=None,
                     api_key=self.config.must_get_api_key("anthropic_api_key"),
                 )

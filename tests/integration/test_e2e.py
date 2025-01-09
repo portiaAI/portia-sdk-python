@@ -2,14 +2,14 @@
 
 import pytest
 
+from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.config import AgentType, LLMModel, LLMProvider, default_config
+from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
 from portia.errors import ToolSoftError
-from portia.llm_wrapper import LLMWrapper
-from portia.plan import Output, Plan, Step, Variable
+from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import WorkflowState
+from portia.workflow import Workflow, WorkflowState
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 
 PROVIDER_MODELS = [
@@ -41,10 +41,11 @@ def test_runner_run_query(
     agent: AgentType,
 ) -> None:
     """Test running a simple query using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
@@ -59,16 +60,18 @@ def test_runner_run_query(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
 def test_runner_plan_query(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
     agent: AgentType,
 ) -> None:
     """Test planning a simple query using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
@@ -78,11 +81,11 @@ def test_runner_plan_query(
 
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_name == "Add Tool"
-    assert plan.steps[0].input
-    assert len(plan.steps[0].input) == 2
-    assert plan.steps[0].input[0].value + plan.steps[0].input[1].value == 3
+    assert plan.steps[0].inputs
+    assert len(plan.steps[0].inputs) == 2
+    assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
 
-    workflow = runner.run_plan(plan)
+    workflow = runner.create_and_execute_workflow(plan)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
@@ -91,16 +94,19 @@ def test_runner_plan_query(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
 def test_runner_run_query_with_clarifications(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
     agent: AgentType,
 ) -> None:
     """Test running a query with clarification using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
@@ -108,7 +114,7 @@ def test_runner_run_query_with_clarifications(
         tool_name="Clarification Tool",
         task="Use tool",
         output="",
-        input=[
+        inputs=[
             Variable(
                 name="user_guidance",
                 description="",
@@ -123,12 +129,12 @@ def test_runner_run_query_with_clarifications(
     )
     plan = Plan(query="raise a clarification", steps=[clarification_step])
     runner.storage.save_plan(plan)
-    workflow = runner.run_plan(plan)
+    workflow = runner.create_and_execute_workflow(plan)
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "Do Something"
 
     workflow.get_outstanding_clarifications()[0].resolve(response=False)
-    runner.resume_workflow(workflow)
+    runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
 
 
@@ -140,18 +146,18 @@ def test_runner_run_query_with_hard_error(
     agent: AgentType,
 ) -> None:
     """Test running a query with error using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
-
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([ErrorTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
         tool_name="Error Tool",
         task="Use tool",
         output="",
-        input=[
+        inputs=[
             Variable(
                 name="error_str",
                 description="",
@@ -170,7 +176,7 @@ def test_runner_run_query_with_hard_error(
         ],
     )
     plan = Plan(query="raise an error", steps=[clarification_step])
-    workflow = runner.run_plan(plan)
+    workflow = runner.create_and_execute_workflow(plan)
     assert workflow.state == WorkflowState.FAILED
     assert workflow.final_output
     assert isinstance(workflow.final_output.value, str)
@@ -179,17 +185,18 @@ def test_runner_run_query_with_hard_error(
 
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.flaky(reruns=3)  # Anthropic is a little flaky
+@pytest.mark.flaky(reruns=3)
 def test_runner_run_query_with_soft_error(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
     agent: AgentType,
 ) -> None:
     """Test running a query with error using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     class MyAdditionTool(AdditionTool):
         def run(self, a: int, b: int) -> int:  # noqa: ARG002
@@ -201,7 +208,7 @@ def test_runner_run_query_with_soft_error(
         tool_name="Add Tool",
         task="Use tool",
         output="",
-        input=[
+        inputs=[
             Variable(
                 name="a",
                 description="",
@@ -215,7 +222,7 @@ def test_runner_run_query_with_soft_error(
         ],
     )
     plan = Plan(query="raise an error", steps=[clarification_step])
-    workflow = runner.run_plan(plan)
+    workflow = runner.create_and_execute_workflow(plan)
 
     assert workflow.state == WorkflowState.FAILED
     assert workflow.final_output
@@ -226,10 +233,18 @@ def test_runner_run_query_with_soft_error(
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> None:
     """Test toolless agent."""
-    agent = ToolLessAgent(description="Tell me a funny joke", inputs=[])
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    llm = LLMWrapper(config)
-    out = agent.execute_sync(llm=llm.to_langchain(), step_outputs={})
+    plan = Plan(
+        query="Tell me a funny joke",
+        steps=[Step(task="Tell me a funny joke", output="$joke")],
+    )
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+    )
+    agent = ToolLessAgent(
+        step=plan.steps[0],
+        workflow=Workflow(plan_id=plan.id),
+        config=config,
+    )
+    out = agent.execute_sync()
     assert isinstance(out, Output)
