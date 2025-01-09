@@ -62,12 +62,7 @@ class BaseAgent:
 
     def get_system_context(self) -> str:
         """Build a generic system context string from the step and workflow provided."""
-        return build_context(
-            self.step.inputs,
-            self.workflow.step_outputs,
-            self.workflow.clarifications,
-            self.config.agent_system_context_extension,
-        )
+        return build_context(self.step, self.workflow, self.config)
 
 
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):

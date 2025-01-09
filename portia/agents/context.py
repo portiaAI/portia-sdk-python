@@ -9,7 +9,9 @@ from portia.clarification import Clarification, InputClarification, MultiChoiceC
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import Output
-    from portia.plan import Variable
+    from portia.config import Config
+    from portia.plan import Step, Variable
+    from portia.workflow import Workflow
 
 
 def generate_main_system_context(system_context_extensions: list[str] | None = None) -> list[str]:
@@ -93,14 +95,27 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
     return clarification_context
 
 
-def build_context(
-    inputs: list[Variable],
-    previous_outputs: dict[str, Output],
-    clarifications: list[Clarification],
-    system_context_extensions: list[str] | None = None,
-) -> str:
+def generate_metadata_context(metadata: dict[str, str]) -> list[str]:
+    """Generate context from metadata."""
+    metadata_context = ["Metadata: This section contains general metadata about this execution."]
+    for key, value in metadata.items():
+        metadata_context.extend(
+            [
+                f"metadata_name: {key}",
+                f"metadata_value: {value}",
+                "----------",
+            ],
+        )
+    return metadata_context
+
+
+def build_context(step: Step, workflow: Workflow, config: Config) -> str:
     """Turn inputs and past outputs into a context string for the agent."""
-    system_context = generate_main_system_context(system_context_extensions)
+    inputs = step.inputs
+    previous_outputs = workflow.step_outputs
+    clarifications = workflow.clarifications
+    metadata = workflow.metadata
+    system_context = generate_main_system_context(config.agent_system_context_extension)
 
     # exit early if no additional information
     if not inputs and not clarifications and not previous_outputs:
@@ -115,6 +130,10 @@ def build_context(
     # Generate and append clarifications context
     clarification_context = generate_clarification_context(clarifications)
     context.extend(clarification_context)
+
+    # Handle metadata context
+    metadata_context = generate_metadata_context(metadata)
+    context.extend(metadata_context)
 
     # Append System Context
     context.extend(system_context)

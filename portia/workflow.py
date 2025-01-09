@@ -43,6 +43,12 @@ class Workflow(BaseModel):
         default=WorkflowState.NOT_STARTED,
         description="The current state of the workflow.",
     )
+
+    metadata: dict[str, str] = Field(
+        default={},
+        description="Additional metadata about this workflow",
+    )
+
     step_outputs: dict[str, Output] = {}
 
     final_output: Output | None = None

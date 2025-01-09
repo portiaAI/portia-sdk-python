@@ -8,7 +8,9 @@ from pydantic import HttpUrl
 from portia.agents.base_agent import Output
 from portia.agents.context import build_context
 from portia.clarification import ActionClarification, InputClarification
-from portia.plan import Variable
+from portia.config import Config
+from portia.plan import Step, Variable
+from tests.utils import get_test_workflow
 
 
 @pytest.fixture
@@ -36,19 +38,39 @@ def outputs() -> dict[str, Output]:
 
 def test_context_empty() -> None:
     """Test that the context is set up correctly."""
+    (plan, workflow) = get_test_workflow()
     context = build_context(
-        [],
-        {},
-        [],
-        [],
+        Step(inputs=[], output="", task=""),
+        workflow,
+        Config.from_default(),
     )
     assert "System Context:" in context
     assert len(context) == 42  # length should always be the same
 
 
+def test_context_metadata() -> None:
+    """Test that the context is set up correctly."""
+    (plan, workflow) = get_test_workflow()
+    workflow.metadata = {"user_id": "123"}
+    context = build_context(
+        plan.steps[0],
+        workflow,
+        Config.from_default(),
+    )
+    assert "System Context:" in context
+    assert "user_id" in context
+    assert "123" in context
+
+
 def test_context_inputs_only(inputs: list[Variable]) -> None:
     """Test that the context is set up correctly with inputs."""
-    context = build_context(inputs, {}, [])
+    (plan, workflow) = get_test_workflow()
+    plan.steps[0].inputs = inputs
+    context = build_context(
+        plan.steps[0],
+        workflow,
+        Config.from_default(),
+    )
     for variable in inputs:
         if variable.value:
             assert variable.value in context
@@ -56,7 +78,14 @@ def test_context_inputs_only(inputs: list[Variable]) -> None:
 
 def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with inputs and outputs."""
-    context = build_context(inputs, outputs, [])
+    (plan, workflow) = get_test_workflow()
+    plan.steps[0].inputs = inputs
+    workflow.step_outputs = outputs
+    context = build_context(
+        plan.steps[0],
+        workflow,
+        Config.from_default(),
+    )
     for variable in inputs:
         if variable.value:
             assert variable.value in context
@@ -68,29 +97,30 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
 
 def test_system_context() -> None:
     """Test that the system context is set up correctly."""
-    context = build_context([], {}, [], ["system context 1", "system context 2"])
+    (plan, workflow) = get_test_workflow()
+    context = build_context(
+        plan.steps[0],
+        workflow,
+        Config.from_default(
+            agent_system_context_extension=["system context 1", "system context 2"],
+        ),
+    )
     assert "system context 1" in context
     assert "system context 2" in context
 
 
 def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with all contexts."""
-    clarifications = [
-        InputClarification(
-            argument_name="$email_cc",
-            user_guidance="email cc list",
-            response="bob@bla.com",
-        ),
-        ActionClarification(
-            action_url=HttpUrl("http://example.com"),
-            user_guidance="click on the link",
-        ),
-    ]
+    (plan, workflow) = get_test_workflow()
+    plan.steps[0].inputs = inputs
+    workflow.step_outputs = outputs
+    workflow.metadata = {"user_id": "123"}
     context = build_context(
-        inputs,
-        outputs,
-        clarifications,
-        ["system context 1", "system context 2"],
+        plan.steps[0],
+        workflow,
+        Config.from_default(
+            agent_system_context_extension=["system context 1", "system context 2"],
+        ),
     )
     # as LLMs are sensitive even to white space formatting we do a complete match here
     assert (
@@ -143,7 +173,17 @@ def test_context_inputs_outputs_clarifications(
             user_guidance="click on the link",
         ),
     ]
-    context = build_context(inputs, outputs, clarifications)
+    (plan, workflow) = get_test_workflow()
+    plan.steps[0].inputs = inputs
+    workflow.step_outputs = outputs
+    workflow.clarifications = clarifications
+    context = build_context(
+        plan.steps[0],
+        workflow,
+        Config.from_default(
+            agent_system_context_extension=["system context 1", "system context 2"],
+        ),
+    )
     for variable in inputs:
         if variable.value:
             assert variable.value in context
