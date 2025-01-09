@@ -13,10 +13,9 @@ from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
 from portia.clarification import InputClarification
-from portia.config import default_config
+from portia.config import Config
 from portia.errors import InvalidAgentOutputError
-from portia.llm_wrapper import LLMWrapper
-from tests.utils import AdditionTool
+from tests.utils import AdditionTool, get_test_workflow
 
 
 def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -30,15 +29,14 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
 
+    (plan, workflow) = get_test_workflow()
     agent = OneShotAgent(
-        description="Write a sentence with every letter of the alphabet.",
-        inputs=[],
-        tool=None,
-        clarifications=[],
-        system_context_extension=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync()
     assert isinstance(output, Output)
     assert isinstance(output.value, str)
     assert output.value == "This is a sentence that should never be hallucinated by the LLM."
@@ -80,15 +78,15 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
+    (plan, workflow) = get_test_workflow()
     agent = OneShotAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=AdditionTool(),
-        clarifications=[],
-        system_context_extension=[],
     )
 
-    output = agent.execute_sync(llm=LLMWrapper(default_config()).to_langchain(), step_outputs={})
+    output = agent.execute_sync()
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
 
@@ -112,12 +110,12 @@ def test_oneshot_agent_end_criteria() -> None:
 def test_oneshot_agent_process_output_clarification() -> None:
     """Test process_output."""
     # check process output when clarifications
+    (plan, workflow) = get_test_workflow()
     agent = OneShotAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=AdditionTool(),
-        clarifications=[],
-        system_context_extension=[],
     )
     agent.new_clarifications = [InputClarification(user_guidance="test", argument_name="test")]
     output = agent.process_output(
@@ -133,12 +131,12 @@ def test_oneshot_agent_process_output_clarification() -> None:
 def test_oneshot_agent_process_output_tools() -> None:
     """Test process_output."""
     # check process output when clarifications
+    (plan, workflow) = get_test_workflow()
     agent = OneShotAgent(
-        description="Send an email to test@example.com saying Hi as both the subject and body.",
-        inputs=[],
+        step=plan.steps[0],
+        workflow=workflow,
+        config=Config.from_default(),
         tool=AdditionTool(),
-        clarifications=[],
-        system_context_extension=[],
     )
     message = ToolMessage(content="", tool_call_id="call_J")
     message.artifact = "123"

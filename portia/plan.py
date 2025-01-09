@@ -5,9 +5,8 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from portia.clarification import Clarification
 from portia.workflow import Workflow, WorkflowState
 
 
@@ -39,8 +38,8 @@ class Step(BaseModel):
     task: str = Field(
         description="The task that needs to be completed by this step",
     )
-    input: list[Variable] | None = Field(
-        default=None,
+    inputs: list[Variable] = Field(
+        default=[],
         description=(
             "The input to the step, as a variable with name and description. "
             "Constants should also have a value. These are not the inputs to the tool "
@@ -55,11 +54,22 @@ class Step(BaseModel):
         ...,
         description="The unique output id of this step i.e. $best_offers.",
     )
-    clarifications: list[Clarification] | None = Field(
-        default=None,
-        description="Clarifications for the step, if any.",
-        exclude=True,
-    )
+
+
+class ReadOnlyStep(Step):
+    """A read only copy of a step, passed to agents for reference."""
+
+    model_config = ConfigDict(frozen=True)
+
+    @classmethod
+    def from_step(cls, step: Step) -> ReadOnlyStep:
+        """Configure a read only step from a normal step."""
+        return cls(
+            task=step.task,
+            inputs=step.inputs,
+            tool_name=step.tool_name,
+            output=step.output,
+        )
 
 
 class Plan(BaseModel):

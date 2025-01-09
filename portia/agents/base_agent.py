@@ -1,104 +1,73 @@
-"""Agents for doing things."""
+"""Agents are responsible for executing steps of a workflow.
+
+The BaseAgent class is the base class all agents must extend.
+"""
 
 from __future__ import annotations
 
 from abc import abstractmethod
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Generic
 
-from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from portia.agents.context import build_context
-from portia.clarification import Clarification, InputClarification
-from portia.types import SERIALIZABLE_TYPE_VAR
+from portia.common import SERIALIZABLE_TYPE_VAR
 
 if TYPE_CHECKING:
-    from langchain.callbacks.manager import (
-        AsyncCallbackManagerForToolRun,
-        CallbackManagerForToolRun,
-    )
-    from langchain_core.language_models.chat_models import BaseChatModel
-
-    from portia.plan import Variable
+    from portia.config import Config
+    from portia.plan import Step
     from portia.tool import Tool
-
-
-class RequestClarificationInput(BaseModel):
-    """Input arguments for RequestClarification Tool."""
-
-    missing_args: list[str] = Field(
-        description="Arguments required by other tools without values in the context or input.",
-    )
-
-
-class RequestClarificationTool(BaseTool):
-    """RequestClarification Tool."""
-
-    name: str = "RequestClarification"
-    description: str = (
-        "Use this tool when in doubt about an argument or parameter of a different tool."
-    )
-    args_schema: type[BaseModel] = RequestClarificationInput
-    return_direct: bool = True
-
-    def _run(
-        self,
-        missing_args: list[str],
-        _: CallbackManagerForToolRun | None = None,
-    ) -> list[Clarification]:
-        """Use the tool."""
-        return [
-            InputClarification(
-                argument_name=arg,
-                user_guidance=f"Missing argument: {arg}",
-            )
-            for arg in missing_args
-        ]
-
-    async def _arun(
-        self,
-        missing_args: list[str],
-        _: AsyncCallbackManagerForToolRun | None = None,
-    ) -> str:
-        """Use the tool asynchronously."""
-        error = f"Request clarification does not support async, requested: {missing_args}"
-        raise NotImplementedError(error)
+    from portia.workflow import Workflow
 
 
 class BaseAgent:
-    """Base agent that can be implemented by different mechanisms."""
+    """An Agent is responsible for carrying out the task defined in the given Step.
+
+    This Base agent is the class all agents must extend. Critically agents must implement the
+    execute_sync function which is responsible for actually carrying out the task as given in
+    the step. They have access to copies of the step, workflow and config but changes to those
+    objects are forbidden.
+
+    Optionally new agents may also override the get_context function which is responsible for
+    the system_context for the agent. This should be done with thought as the details of the system
+    context are critically important for LLM performance.
+    """
 
     def __init__(
         self,
-        description: str,
-        inputs: list[Variable],
-        clarifications: list[Clarification] | None = None,
+        step: Step,
+        workflow: Workflow,
+        config: Config,
         tool: Tool | None = None,
-        system_context_extension: list[str] | None = None,
     ) -> None:
-        """Initialize the base agent."""
-        self.description = description
-        self.inputs = inputs
+        """Initialize the base agent with the given args.
+
+        Importantly the models here are frozen copies of those used in the Runner.
+        They are meant as a read only reference, useful for execution of the task
+        but can not be edited. The agent should return output via the response
+        of the execute_sync method.
+        """
+        self.step = step
         self.tool = tool
-        self.clarifications = clarifications
-        self.system_context_extension = system_context_extension
-        self.system_context = self._default_system_context(system_context_extension)
+        self.config = config
+        self.workflow = workflow
 
     @abstractmethod
-    def execute_sync(self, llm: BaseChatModel, step_outputs: dict[str, Output]) -> Output:
-        """Run the core execution logic of the task."""
+    def execute_sync(self) -> Output:
+        """Run the core execution logic of the task synchronously.
 
-    def _get_context(self, step_outputs: dict[str, Output]) -> str:
-        """Turn inputs and past outputs into a context string for the agent."""
-        return build_context(self.inputs, step_outputs, self.clarifications, self.system_context)
+        Implementation of this function is deferred to individual agent implementations
+        making it simple to write new ones.
+        """
 
-    def _default_system_context(self, system_context_extension: list[str] | None) -> list[str]:
-        """Provide default system context."""
-        base_context = [f"Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
-        if system_context_extension:
-            base_context.extend(system_context_extension)
-        return base_context
+    def get_system_context(self) -> str:
+        """Build a generic system context string from the step and workflow provided."""
+        return build_context(
+            self.step.inputs,
+            self.workflow.step_outputs,
+            self.workflow.clarifications,
+            self.config.agent_system_context_extension,
+        )
 
 
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):

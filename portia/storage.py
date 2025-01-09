@@ -215,7 +215,7 @@ class PortiaCloudStorage(Storage):
             json={
                 "id": str(workflow.id),
                 "json": workflow.model_dump(mode="json"),
-                "plan": str(workflow.plan_id),
+                "plan_id": str(workflow.plan_id),
             },
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
@@ -227,9 +227,8 @@ class PortiaCloudStorage(Storage):
             response = httpx.patch(
                 url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
                 json={
-                    "id": str(workflow.id),
+                    "plan_id": str(workflow.plan_id),
                     "json": workflow.model_dump(mode="json"),
-                    "plan": str(workflow.plan_id),
                 },
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",

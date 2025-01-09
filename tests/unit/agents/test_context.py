@@ -9,12 +9,6 @@ from portia.clarification import ActionClarification, InputClarification
 from portia.plan import Variable
 
 
-def test_context_empty() -> None:
-    """Test that the context is set up correctly."""
-    context = build_context([], {}, [])
-    assert context == "No additional context", "Expected no additional context."
-
-
 @pytest.fixture
 def inputs() -> list[Variable]:
     """Return a list of inputs for pytest fixtures."""
@@ -30,130 +24,105 @@ def inputs() -> list[Variable]:
 
 
 @pytest.fixture
-def outputs() -> dict[str, str]:
+def outputs() -> dict[str, Output]:
     """Return a dictionary of outputs for pytest fixtures."""
-    return {"$email_body": "The body of the email", "$london_weather": "rainy"}
+    return {
+        "$email_body": Output(value="The body of the email"),
+        "$london_weather": Output(value="rainy"),
+    }
+
+
+def test_context_empty() -> None:
+    """Test that the context is set up correctly."""
+    context = build_context(
+        [],
+        {},
+        [],
+        [],
+    )
+    assert "System Context:" in context
+    assert len(context) == 42  # length should always be the same
 
 
 def test_context_inputs_only(inputs: list[Variable]) -> None:
     """Test that the context is set up correctly with inputs."""
     context = build_context(inputs, {}, [])
-    expected_output = """Additional context: You MUST use this information to complete your task.
-name: $email_address
-value: test@example.com
-description: Target recipient for email
-
-----------
-
-name: $email_title
-value: Example email
-description: Title for email
-
-----------
-
-"""
-    assert context == expected_output
+    for variable in inputs:
+        if variable.value:
+            assert variable.value in context
 
 
 def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with inputs and outputs."""
     context = build_context(inputs, outputs, [])
-    expected_output = """Additional context: You MUST use this information to complete your task.
-name: $email_address
-value: test@example.com
-description: Target recipient for email
-
-----------
-
-name: $email_body
-value: The body of the email
-description: Content for email
-
-----------
-
-name: $email_title
-value: Example email
-description: Title for email
-
-----------
-
-
-Broader context: This may be useful information from previous steps that can indirectly help you.
-name: $london_weather
-value: rainy
-
-----------
-
-"""
-    assert context == expected_output
+    for variable in inputs:
+        if variable.value:
+            assert variable.value in context
+    for name, output in outputs.items():
+        assert name in context
+        if output.value:
+            assert output.value in context
 
 
 def test_system_context() -> None:
     """Test that the system context is set up correctly."""
-    context = build_context([], {}, [], system_context=["system context 1", "system context 2"])
-    assert (
-        context
-        == """Additional context: You MUST use this information to complete your task.
-
-System Context:
-system context 1
-system context 2
-
-----------
-
-"""
-    )
-
-
-def test_system_context_empty() -> None:
-    """Test that the system context is set up correctly when empty."""
-    context = build_context([], {}, [], system_context=[])
-    assert context == "No additional context"
+    context = build_context([], {}, [], ["system context 1", "system context 2"])
+    assert "system context 1" in context
+    assert "system context 2" in context
 
 
 def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with all contexts."""
+    clarifications = [
+        InputClarification(
+            argument_name="$email_cc",
+            user_guidance="email cc list",
+            response="bob@bla.com",
+        ),
+        ActionClarification(
+            action_url=HttpUrl("http://example.com"),
+            user_guidance="click on the link",
+        ),
+    ]
     context = build_context(
         inputs,
         outputs,
-        [],
-        system_context=["system context 1", "system context 2"],
+        clarifications,
+        ["system context 1", "system context 2"],
     )
-    expected_context = """Additional context: You MUST use this information to complete your task.
-name: $email_address
-value: test@example.com
-description: Target recipient for email
-
+    # as LLMs are sensitive even to white space formatting we do a complete match here
+    assert (
+        context
+        == """Additional context: You MUST use this information to complete your task.
+Inputs: the original inputs provided by the planner
+input_name: $email_address
+input_value: test@example.com
+input_description: Target recipient for email
 ----------
-
-name: $email_body
-value: The body of the email
-description: Content for email
-
+input_name: $email_body
+input_value: value='The body of the email'
+input_description: Content for email
 ----------
-
-name: $email_title
-value: Example email
-description: Title for email
-
+input_name: $email_title
+input_value: Example email
+input_description: Title for email
 ----------
-
-
 Broader context: This may be useful information from previous steps that can indirectly help you.
-name: $london_weather
-value: rainy
-
+output_name: $london_weather
+output_value: value='rainy'
 ----------
-
-
+Clarifications:
+This section contains the user provided response to previous clarifications
+They should take priority over any other context given.
+input_name: $email_cc
+clarification_reason: email cc list
+input_value: bob@bla.com
+----------
 System Context:
+Today's date is 2025-01-09
 system context 1
-system context 2
-
-----------
-
-"""
-    assert context == expected_context
+system context 2"""
+    )
 
 
 def test_context_inputs_outputs_clarifications(
@@ -173,38 +142,12 @@ def test_context_inputs_outputs_clarifications(
         ),
     ]
     context = build_context(inputs, outputs, clarifications)
-    expected_context = """Additional context: You MUST use this information to complete your task.
-name: $email_address
-value: test@example.com
-description: Target recipient for email
-
-----------
-
-name: $email_body
-value: The body of the email
-description: Content for email
-
-----------
-
-name: $email_title
-value: Example email
-description: Title for email
-
-----------
-
-Clarifications: This section contains user provided clarifications that might be useful to complete your task.
-argument: $email_cc
-clarification reason: email cc list
-value: bob@bla.com
-
-----------
-
-
-Broader context: This may be useful information from previous steps that can indirectly help you.
-name: $london_weather
-value: rainy
-
-----------
-
-"""  # noqa: E501
-    assert context == expected_context
+    for variable in inputs:
+        if variable.value:
+            assert variable.value in context
+    for name, output in outputs.items():
+        assert name in context
+        if output.value:
+            assert output.value in context
+    assert "email cc list" in context
+    assert "bob@bla.com" in context
