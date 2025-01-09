@@ -2,11 +2,12 @@
 
 import pytest
 
+from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, LLMModel, LLMProvider, default_config
 from portia.errors import ToolSoftError
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Output, Plan, Step, Variable
+from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
@@ -19,7 +20,6 @@ from portia.errors import (
 )
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
 from portia.logging import logger, logger_manager
-from portia.plan import Output, Plan, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
 from portia.workflow import Workflow, WorkflowState
@@ -27,6 +27,7 @@ from portia.workflow import Workflow, WorkflowState
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
     from portia.config import Config
+    from portia.plan import Plan, Step
     from portia.tool import Tool
     from portia.tool_registry import ToolRegistry
 

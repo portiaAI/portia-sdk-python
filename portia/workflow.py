@@ -7,8 +7,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from portia.agents.base_agent import Output
 from portia.clarification import Clarification
-from portia.plan import Output
 
 
 class WorkflowState(str, Enum):
