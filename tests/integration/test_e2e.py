@@ -99,10 +99,12 @@ def test_runner_run_query_with_clarifications(
     agent: AgentType,
 ) -> None:
     """Test running a query with clarification using the Runner."""
-    config = Config.from_default(default_log_level=LogLevel.DEBUG)
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
