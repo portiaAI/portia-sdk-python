@@ -108,7 +108,7 @@ def test_runner_plan_query_with_tools(runner: Runner) -> None:
     assert plan.query == query
 
 
-def test_runner_run_plan(runner: Runner) -> None:
+def test_runner_create_and_execute_workflow(runner: Runner) -> None:
     """Test running a plan using the Runner."""
     query = "example query"
 
@@ -116,7 +116,7 @@ def test_runner_run_plan(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.plan_query(query)
-    workflow = runner.run_plan(plan)
+    workflow = runner.create_and_execute_workflow(plan)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.plan_id == plan.id
@@ -148,7 +148,7 @@ def test_runner_invalid_agent() -> None:
 
     plan = runner.plan_query(query)
     with pytest.raises(NotImplementedError):
-        runner.run_plan(plan)
+        runner.create_and_execute_workflow(plan)
 
     config = default_config()
     config.default_agent_type = "Other"  # type: ignore  # noqa: PGH003
@@ -157,10 +157,10 @@ def test_runner_invalid_agent() -> None:
 
     plan = runner.plan_query(query)
     with pytest.raises(InvalidWorkflowStateError):
-        runner.run_plan(plan)
+        runner.create_and_execute_workflow(plan)
 
 
-def test_runner_resume_workflow(runner: Runner) -> None:
+def test_runner_execute_workflow(runner: Runner) -> None:
     """Test resuming a workflow after interruption."""
     query = "example query"
 
@@ -168,18 +168,18 @@ def test_runner_resume_workflow(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.plan_query(query)
-    workflow = runner.run_plan(plan)
+    workflow = runner.create_and_execute_workflow(plan)
 
     # Simulate workflow being in progress
     workflow.state = WorkflowState.IN_PROGRESS
     workflow.current_step_index = 1
-    workflow = runner.resume_workflow(workflow)
+    workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.current_step_index == 1
 
 
-def test_runner_resume_workflow_invalid_state(runner: Runner) -> None:
+def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
     """Test resuming a workflow with an invalid state."""
     query = "example query"
 
@@ -187,13 +187,13 @@ def test_runner_resume_workflow_invalid_state(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.plan_query(query)
-    workflow = runner.run_plan(plan)
+    workflow = runner.create_and_execute_workflow(plan)
 
     # Set invalid state
     workflow.state = WorkflowState.COMPLETE
 
     with pytest.raises(InvalidWorkflowStateError):
-        runner.resume_workflow(workflow)
+        runner.execute_workflow(workflow)
 
 
 def test_runner_get_clarifications(runner: Runner) -> None:

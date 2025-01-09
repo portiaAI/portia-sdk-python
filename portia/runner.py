@@ -64,8 +64,7 @@ class Runner:
     ) -> Workflow:
         """Plan and run a query in one go."""
         plan = self.plan_query(query, tools, example_workflows)
-        workflow = plan.create_workflow()
-        return self.run_workflow(workflow)
+        return self.create_and_execute_workflow(plan)
 
     def plan_query(
         self,
@@ -107,7 +106,12 @@ class Runner:
 
         return outcome.plan
 
-    def run_workflow(self, workflow: Workflow) -> Workflow:
+    def create_and_execute_workflow(self, plan: Plan) -> Workflow:
+        """Create a new workflow from a plan and then run it."""
+        workflow = plan.create_workflow()
+        return self._execute_workflow(plan, workflow)
+
+    def execute_workflow(self, workflow: Workflow) -> Workflow:
         """Run a workflow."""
         if workflow.state not in [
             WorkflowState.NOT_STARTED,
