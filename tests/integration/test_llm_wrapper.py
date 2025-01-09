@@ -46,8 +46,9 @@ def test_wrapper_methods(llm_provider: LLMProvider, llm_model_name: LLMModel) ->
 
 def test_wrapper_method_invalid() -> None:
     """Test we can generate wrappers for important providers."""
-    c = Config.from_default()
-    c.llm_provider = "Invalid"  # type: ignore  # noqa: PGH003
+    c = Config.from_default(
+        llm_provider="Invalid",  # type: ignore  # noqa: PGH003
+    )
     wrapper = LLMWrapper(c)
     with pytest.raises(InvalidLLMProviderError):
         wrapper.to_instructor(
