@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
+from portia.workflow import WorkflowMetadata
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import Output
@@ -95,10 +96,16 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
     return clarification_context
 
 
-def generate_metadata_context(metadata: dict[str, str]) -> list[str]:
+def generate_metadata_context(metadata: WorkflowMetadata) -> list[str]:
     """Generate context from metadata."""
     metadata_context = ["Metadata: This section contains general metadata about this execution."]
-    for key, value in metadata.items():
+    if metadata.end_user_id:
+        metadata_context.extend(
+            [
+                f"end_user_id: {metadata.end_user_id}",
+            ],
+        )
+    for key, value in metadata.additional_data.items():
         metadata_context.extend(
             [
                 f"metadata_name: {key}",

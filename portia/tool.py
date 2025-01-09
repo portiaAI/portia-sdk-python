@@ -23,6 +23,7 @@ from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logger import logger
 from portia.templates.render import render_template
+from portia.workflow import WorkflowMetadata
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
 
@@ -36,7 +37,7 @@ class ExecutionContext(BaseModel):
 
     plan_id: UUID
     workflow_id: UUID
-    metadata: dict[str, str]
+    metadata: WorkflowMetadata
 
 
 class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):

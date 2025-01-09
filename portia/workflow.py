@@ -21,6 +21,19 @@ class WorkflowState(str, Enum):
     FAILED = "FAILED"
 
 
+class WorkflowMetadata(BaseModel):
+    """Contains metadata about the workflow execution."""
+
+    end_user_id: str | None = Field(
+        default=None,
+        description="An identifier for the end user who the workflow is executing for.",
+    )
+    additional_data: dict[str, str] = Field(
+        default={},
+        description="Additional metadata about this workflow",
+    )
+
+
 class Workflow(BaseModel):
     """A workflow represent a running instance of a Plan."""
 
@@ -43,10 +56,12 @@ class Workflow(BaseModel):
         default=WorkflowState.NOT_STARTED,
         description="The current state of the workflow.",
     )
-
-    metadata: dict[str, str] = Field(
-        default={},
-        description="Additional metadata about this workflow",
+    metadata: WorkflowMetadata = Field(
+        default=WorkflowMetadata(
+            end_user_id=None,
+            additional_data={},
+        ),
+        description="Metadata for the workflow.",
     )
 
     step_outputs: dict[str, Output] = {}

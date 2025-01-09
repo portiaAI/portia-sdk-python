@@ -10,6 +10,7 @@ from portia.agents.context import build_context
 from portia.clarification import ActionClarification, InputClarification
 from portia.config import Config
 from portia.plan import Step, Variable
+from portia.workflow import WorkflowMetadata
 from tests.utils import get_test_workflow
 
 
@@ -51,7 +52,7 @@ def test_context_empty() -> None:
 def test_context_metadata() -> None:
     """Test that the context is set up correctly."""
     (plan, workflow) = get_test_workflow()
-    workflow.metadata = {"user_id": "123"}
+    workflow.metadata = WorkflowMetadata(additional_data={"user_id": "123"})
     context = build_context(
         plan.steps[0],
         workflow,
@@ -114,7 +115,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
     workflow.step_outputs = outputs
-    workflow.metadata = {"user_id": "123"}
+    workflow.metadata = WorkflowMetadata(additional_data={"user_id": "123"})
     context = build_context(
         plan.steps[0],
         workflow,
