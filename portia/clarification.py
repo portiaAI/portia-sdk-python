@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_serializer
 
-from portia.agents.base_agent import SERIALIZABLE_TYPE_VAR
+from portia.common import SERIALIZABLE_TYPE_VAR
 
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
