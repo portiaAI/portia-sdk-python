@@ -6,18 +6,20 @@ The BaseAgent class is the base class all agents must extend.
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
 from portia.agents.context import build_context
-from portia.types import SERIALIZABLE_TYPE_VAR
 
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.plan import Step
     from portia.tool import Tool
     from portia.workflow import Workflow
+
+Serializable = Any
+SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
 
 
 class BaseAgent:
