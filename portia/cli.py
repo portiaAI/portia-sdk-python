@@ -66,15 +66,15 @@ def run(
     # Check if we have multiple LLM keys and no LLM provider is provided
     keys = [config.openai_api_key, config.anthropic_api_key, config.mistralai_api_key]
     keys = [k for k in keys if k is not None]
-    if len(keys) > 1 and llm_provider is None:
-        raise click.UsageError("Must provide a LLM provider when using multiple LLM keys")
+    if len(keys) > 1 and llm_provider is None and llm_model is None:
+        message = "Multiple LLM keys found, but no default provided: Select a provider or model"
+        raise click.UsageError(message)
 
-    if llm_provider is not None and llm_model is not None:
-        config.swap_provider(LLMProvider(llm_provider), LLMModel(llm_model))
-    elif llm_provider is not None:
-        config.swap_provider(LLMProvider(llm_provider))
-    elif llm_model is not None:
-        config.swap_provider(LLMModel(llm_model).provider(), LLMModel(llm_model))
+    if llm_provider or llm_model:
+        provider = LLMProvider(llm_provider) if llm_provider else LLMModel(llm_model).provider()
+        model = LLMModel(llm_model) if llm_model else provider.default_model
+        config.swap_model(provider, model)
+
     # Add the tool registry
     registry = example_tool_registry
     if config.has_api_key("portia_api_key"):
