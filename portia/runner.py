@@ -20,10 +20,7 @@ from portia.errors import (
 )
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
 from portia.logging import logger, logger_manager
-<<<<<<< HEAD
-=======
-from portia.plan import Output, Plan, ReadOnlyStep, Step
->>>>>>> 935f1de (tests)
+from portia.plan import Plan, ReadOnlyStep, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
