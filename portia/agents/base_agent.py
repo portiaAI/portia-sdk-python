@@ -28,8 +28,9 @@ class BaseAgent:
     the step. They have access to copies of the step, workflow and config but changes to those
     objects are forbidden.
 
-    Optionally agents may also override the get_context function which is responsible for setting
-    the system_context for the agent.
+    Optionally new agents may also override the get_context function which is responsible for setting
+    the system_context for the agent. This should be done with thought as the details of the system
+    context are critically important for LLM performance.
     """
 
     def __init__(

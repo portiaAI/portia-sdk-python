@@ -108,9 +108,6 @@ def build_context(
 
     context = ["Additional context: You MUST use this information to complete your task."]
 
-    # Append System Context
-    context.extend(system_context)
-
     # Generate and append input context
     input_context = generate_input_context(inputs, previous_outputs)
     context.extend(input_context)
@@ -118,5 +115,8 @@ def build_context(
     # Generate and append clarifications context
     clarification_context = generate_clarification_context(clarifications)
     context.extend(clarification_context)
+
+    # Append System Context
+    context.extend(system_context)
 
     return "\n".join(context)

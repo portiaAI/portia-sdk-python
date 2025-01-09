@@ -73,21 +73,55 @@ def test_system_context() -> None:
 
 def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with all contexts."""
+    clarifications = [
+        InputClarification(
+            argument_name="$email_cc",
+            user_guidance="email cc list",
+            response="bob@bla.com",
+        ),
+        ActionClarification(
+            action_url=HttpUrl("http://example.com"),
+            user_guidance="click on the link",
+        ),
+    ]
     context = build_context(
         inputs,
         outputs,
-        [],
+        clarifications,
         ["system context 1", "system context 2"],
     )
-    for variable in inputs:
-        if variable.value:
-            assert variable.value in context
-    for name, output in outputs.items():
-        assert name in context
-        if output.value:
-            assert output.value in context
-    assert "system context 1" in context
-    assert "system context 2" in context
+    assert (
+        context
+        == """Additional context: You MUST use this information to complete your task.
+Inputs: the original inputs provided by the planner
+input_name: $email_address
+input_value: test@example.com
+input_description: Target recipient for email
+----------
+input_name: $email_body
+input_value: value='The body of the email'
+input_description: Content for email
+----------
+input_name: $email_title
+input_value: Example email
+input_description: Title for email
+----------
+Broader context: This may be useful information from previous steps that can indirectly help you.
+output_name: $london_weather
+output_value: value='rainy'
+----------
+Clarifications:
+This section contains the user provided response to previous clarifications
+They should take priority over any other context given.
+input_name: $email_cc
+clarification_reason: email cc list
+input_value: bob@bla.com
+----------
+System Context:
+Today's date is 2025-01-09
+system context 1
+system context 2"""
+    )
 
 
 def test_context_inputs_outputs_clarifications(

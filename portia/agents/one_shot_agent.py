@@ -40,7 +40,10 @@ class OneShotToolCallingModel:
 
     The tool and context are given directly to the LLM and we return the results.
     This model is useful for simple tasks where the arguments are in the correct form
-    and are all present. Prefer to use the VerifierAgent if you have more complicated needs.
+    and are all present. The OneShotToolModel will not carry out validation of arguments,
+    for example it will not complain about missing arguments.
+
+    Prefer to use the VerifierAgent if you have more complicated needs.
     """
 
     tool_calling_prompt = ChatPromptTemplate.from_messages(
