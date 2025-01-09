@@ -149,6 +149,7 @@ class Config(BaseModel):
     def check_config(self) -> Config:
         """Validate Config is consistent."""
         # Portia API Key must be provided if using cloud storage
+        self._set_keys()
         if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
             raise InvalidConfigError("portia_api_key", "Must be provided if using cloud storage")
 
@@ -168,15 +169,23 @@ class Config(BaseModel):
 
         match self.llm_provider:
             case LLMProvider.OPENAI:
-                self.openai_api_key = SecretStr(os.getenv("OPENAI_API_KEY") or "")
                 validate_llm_config("openai_api_key", SUPPORTED_OPENAI_MODELS)
             case LLMProvider.ANTHROPIC:
-                self.anthropic_api_key = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
                 validate_llm_config("anthropic_api_key", SUPPORTED_ANTHROPIC_MODELS)
             case LLMProvider.MISTRALAI:
-                self.mistralai_api_key = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
                 validate_llm_config("mistralai_api_key", SUPPORTED_MISTRALAI_MODELS)
         return self
+
+    def _set_keys(self) -> None:
+        """Set API keys from environment variables if not already set."""
+        if self.portia_api_key is None:
+            self.portia_api_key = SecretStr(os.getenv("PORTIA_API_KEY") or "")
+        if self.openai_api_key is None:
+            self.openai_api_key = SecretStr(os.getenv("OPENAI_API_KEY") or "")
+        if self.anthropic_api_key is None:
+            self.anthropic_api_key = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
+        if self.mistralai_api_key is None:
+            self.mistralai_api_key = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
 
     @classmethod
     def from_file(cls, file_path: Path) -> Config:
