@@ -262,8 +262,8 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         verified_args=verified_tool_inputs,
         clarifications=[failed_clarification, clarification],
         missing_args={"content": clarification},
-        get_last_resolved_clarification=lambda arg_name, arg_value: clarification
-        if arg_name == "content" and arg_value == "CONTENT_STRING"
+        get_last_resolved_clarification=lambda arg_name: clarification
+        if arg_name == "content"
         else None,
     )
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
@@ -457,18 +457,21 @@ def test_get_last_resolved_clarification() -> None:
         response="2",
         user_guidance="FAILED",
         resolved=True,
+        step=1,
     )
     resolved_clarification2 = InputClarification(
         argument_name="arg",
         response="2",
         user_guidance="SUCCESS",
         resolved=True,
+        step=1,
     )
     unresolved_clarification = InputClarification(
         argument_name="arg",
         response="2",
         user_guidance="",
         resolved=False,
+        step=1,
     )
     (plan, workflow) = get_test_workflow()
     workflow.clarifications = [
