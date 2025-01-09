@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from portia.config import AgentType, StorageClass, default_config
+from portia.config import AgentType, Config, StorageClass
 from portia.errors import InvalidStorageError, InvalidWorkflowStateError, PlanError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, Step
@@ -20,7 +20,7 @@ from tests.utils import AdditionTool, ClarificationTool
 @pytest.fixture
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
-    config = default_config()
+    config = Config.from_default()
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Runner(config=config, tool_registry=tool_registry)
 
@@ -39,8 +39,9 @@ def test_runner_run_query(runner: Runner) -> None:
 
 def test_runner_run_query_invalid_storage() -> None:
     """Ensure invalid storage throws."""
-    config = default_config()
-    config.storage_class = "Invalid"  # type: ignore  # noqa: PGH003
+    config = Config.from_default(
+        storage_class="Invalid",  # type: ignore  # noqa: PGH003
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     with pytest.raises(InvalidStorageError):
         Runner(config=config, tool_registry=tool_registry)
@@ -50,10 +51,10 @@ def test_runner_run_query_disk_storage() -> None:
     """Test running a query using the Runner."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         query = "example query"
-        config = default_config()
-        config.storage_class = StorageClass.DISK
-        config.storage_dir = tmp_dir
-
+        config = Config.from_default(
+            storage_class=StorageClass.DISK,
+            storage_dir=tmp_dir,
+        )
         tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
         runner = Runner(config=config, tool_registry=tool_registry)
 
@@ -139,16 +140,16 @@ def test_runner_toolless_agent() -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    config = default_config()
-    config.default_agent_type = AgentType.TOOL_LESS
+    config = Config.from_default(default_agent_type=AgentType.TOOL_LESS)
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
 
     plan = runner.plan_query(query)
     runner.create_and_execute_workflow(plan)
 
-    config = default_config()
-    config.default_agent_type = "Other"  # type: ignore  # noqa: PGH003
+    config = Config.from_default(
+        default_agent_type="Other",  # type: ignore  # noqa: PGH003
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
 

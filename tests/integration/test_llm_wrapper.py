@@ -2,7 +2,7 @@
 
 import pytest
 
-from portia.config import LLMModel, LLMProvider, default_config
+from portia.config import Config, LLMModel, LLMProvider
 from portia.errors import InvalidLLMProviderError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
@@ -27,9 +27,11 @@ PROVIDER_MODELS = [
 @pytest.mark.flaky(reruns=3)  # MistralAI is a little flaky on the to_instructor call
 def test_wrapper_methods(llm_provider: LLMProvider, llm_model_name: LLMModel) -> None:
     """Test we can generate wrappers for important providers."""
-    c = default_config()
-    c.llm_provider = llm_provider
-    c.llm_model_name = llm_model_name
+    c = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+    )
+
     wrapper = LLMWrapper(c)
     # check we don't get errors
     wrapper.to_instructor(
@@ -44,7 +46,7 @@ def test_wrapper_methods(llm_provider: LLMProvider, llm_model_name: LLMModel) ->
 
 def test_wrapper_method_invalid() -> None:
     """Test we can generate wrappers for important providers."""
-    c = default_config()
+    c = Config.from_default()
     c.llm_provider = "Invalid"  # type: ignore  # noqa: PGH003
     wrapper = LLMWrapper(c)
     with pytest.raises(InvalidLLMProviderError):

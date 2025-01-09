@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Annotated, TypeVar
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, SecretStr, model_validator
-from sqlalchemy import true
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 

@@ -26,7 +26,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.config import Config, default_config
+from portia.config import Config
 from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
@@ -131,7 +131,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=LLMWrapper(default_config()).to_langchain(),
+        llm=LLMWrapper(Config.from_default()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -176,7 +176,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     verifier_model = VerifierModel(
-        llm=LLMWrapper(default_config()).to_langchain(),
+        llm=LLMWrapper(Config.from_default()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -215,7 +215,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(default_config()).to_langchain(),
+        llm=LLMWrapper(Config.from_default()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -274,7 +274,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(default_config()).to_langchain(),
+        llm=LLMWrapper(Config.from_default()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -432,7 +432,7 @@ def test_verifier_agent_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
-        llm=LLMWrapper(default_config()).to_langchain(),
+        llm=LLMWrapper(Config.from_default()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -441,7 +441,7 @@ def test_verifier_agent_edge_cases() -> None:
 
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(default_config()).to_langchain(),
+        llm=LLMWrapper(Config.from_default()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003

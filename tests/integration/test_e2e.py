@@ -4,7 +4,7 @@ import pytest
 
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel, default_config
+from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
 from portia.errors import ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
@@ -41,10 +41,11 @@ def test_runner_run_query(
     agent: AgentType,
 ) -> None:
     """Test running a simple query using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
@@ -65,10 +66,11 @@ def test_runner_plan_query(
     agent: AgentType,
 ) -> None:
     """Test planning a simple query using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
@@ -140,11 +142,11 @@ def test_runner_run_query_with_hard_error(
     agent: AgentType,
 ) -> None:
     """Test running a query with error using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
-
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([ErrorTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
@@ -186,10 +188,11 @@ def test_runner_run_query_with_soft_error(
     agent: AgentType,
 ) -> None:
     """Test running a query with error using the Runner."""
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
-    config.default_agent_type = agent
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
 
     class MyAdditionTool(AdditionTool):
         def run(self, a: int, b: int) -> int:  # noqa: ARG002
@@ -230,13 +233,14 @@ def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> 
         query="Tell me a funny joke",
         steps=[Step(task="Tell me a funny joke", output="$joke")],
     )
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+    )
     agent = ToolLessAgent(
         step=plan.steps[0],
         workflow=Workflow(plan_id=plan.id),
-        config=default_config(),
+        config=config,
     )
-    config = default_config()
-    config.llm_provider = llm_provider
-    config.llm_model_name = llm_model_name
     out = agent.execute_sync()
     assert isinstance(out, Output)

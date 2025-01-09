@@ -3,7 +3,7 @@
 import pytest
 from pydantic import SecretStr
 
-from portia.config import StorageClass, default_config
+from portia.config import Config, StorageClass
 from portia.errors import ToolNotFoundError
 from portia.runner import Runner
 from portia.tool import ToolHardError
@@ -18,9 +18,7 @@ from tests.utils import AdditionTool
 
 def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
-    config = default_config()
-    config.storage_class = StorageClass.CLOUD
-
+    config = Config.from_default(storage_class=StorageClass.CLOUD)
     tool_registry = PortiaToolRegistry(config=config)
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Whats the weather in London"
@@ -38,8 +36,7 @@ def test_runner_run_query_with_cloud() -> None:
 
 def test_run_tool_error() -> None:
     """Test running a simple query using the Runner."""
-    config = default_config()
-    config.storage_class = StorageClass.CLOUD
+    config = Config.from_default(storage_class=StorageClass.CLOUD)
 
     registry = PortiaToolRegistry(
         config=config,
@@ -58,8 +55,7 @@ def test_run_tool_error() -> None:
 
 def test_runner_run_query_with_cloud_and_local() -> None:
     """Test running a simple query using the Runner."""
-    config = default_config()
-    config.storage_class = StorageClass.CLOUD
+    config = Config.from_default(storage_class=StorageClass.CLOUD)
 
     registry = InMemoryToolRegistry.from_local_tools([AdditionTool()]) + PortiaToolRegistry(
         config=config,
