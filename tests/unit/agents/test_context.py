@@ -90,6 +90,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
         clarifications,
         ["system context 1", "system context 2"],
     )
+    # as LLMs are sensitive even to white space formatting we do a complete match here
     assert (
         context
         == """Additional context: You MUST use this information to complete your task.
