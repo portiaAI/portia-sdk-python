@@ -7,7 +7,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Annotated, TypeVar
 
-from pydantic import AfterValidator, BaseModel, SecretStr, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, SecretStr, model_validator
+from sqlalchemy import true
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
@@ -145,10 +146,7 @@ class Config(BaseModel):
     # agent LLMs. Useful for passing execution hints or other data.
     agent_system_context_extension: list[str] | None = None
 
-    class Config:
-        """Configure class to be readonly."""
-
-        allow_mutation = False
+    model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="after")
     def check_config(self) -> Config:
