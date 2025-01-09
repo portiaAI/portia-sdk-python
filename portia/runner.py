@@ -19,7 +19,7 @@ from portia.errors import (
     PlanError,
 )
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
-from portia.logging import logger, logger_manager
+from portia.logger import logger, logger_manager
 from portia.plan import Plan, ReadOnlyStep, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
