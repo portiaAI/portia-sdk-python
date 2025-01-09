@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
 from portia.config import Config, LogLevel
@@ -28,7 +28,11 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
 
 def get_test_config(**kwargs) -> Config:  # noqa: ANN003
     """Get test config."""
-    return Config.from_default(default_log_level=LogLevel.INFO, **kwargs)
+    return Config.from_default(
+        **kwargs,
+        default_log_level=LogLevel.INFO,
+        openai_api_key=SecretStr("123"),
+    )
 
 
 class AdditionToolSchema(BaseModel):

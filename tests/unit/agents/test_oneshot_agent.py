@@ -16,7 +16,7 @@ from portia.agents.toolless_agent import ToolLessModel
 from portia.clarification import InputClarification
 from portia.config import Config
 from portia.errors import InvalidAgentOutputError
-from tests.utils import AdditionTool, get_test_workflow
+from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
 
 def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -31,13 +31,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
 
     (plan, workflow) = get_test_workflow()
-    agent = OneShotAgent(
-        step=plan.steps[0],
-        workflow=workflow,
-        config=Config.from_default(
-            openai_api_key=SecretStr("123"),
-        ),
-    )
+    agent = OneShotAgent(step=plan.steps[0], workflow=workflow, config=get_test_config())
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
@@ -85,7 +79,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = OneShotAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=AdditionTool(),
     )
 
@@ -117,7 +111,7 @@ def test_oneshot_agent_process_output_clarification() -> None:
     agent = OneShotAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=AdditionTool(),
     )
     agent.new_clarifications = [InputClarification(user_guidance="test", argument_name="test")]
@@ -138,7 +132,7 @@ def test_oneshot_agent_process_output_tools() -> None:
     agent = OneShotAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=AdditionTool(),
     )
     message = ToolMessage(content="", tool_call_id="call_J")

@@ -6,7 +6,7 @@ from pydantic import SecretStr
 
 from portia.agents.base_agent import BaseAgent
 from portia.config import Config
-from tests.utils import get_test_workflow
+from tests.utils import get_test_config, get_test_workflow
 
 
 def test_base_agent_default_context() -> None:
@@ -15,9 +15,7 @@ def test_base_agent_default_context() -> None:
     agent = BaseAgent(
         plan.steps[0],
         workflow,
-        Config.from_default(
-            openai_api_key=SecretStr("123"),
-        ),
+        get_test_config(),
         None,
     )
     context = agent.get_system_context()
@@ -31,9 +29,8 @@ def test_base_agent_default_context_with_extensions() -> None:
     agent = BaseAgent(
         plan.steps[0],
         workflow,
-        Config.from_default(
+        get_test_config(
             agent_system_context_extension=["456"],
-            openai_api_key=SecretStr("123"),
         ),
         None,
     )

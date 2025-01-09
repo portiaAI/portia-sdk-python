@@ -187,8 +187,8 @@ class Config(BaseModel):
     @classmethod
     def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
         """Create a Config instance with default values, allowing overrides."""
-        default = default_config()
-        return default.model_copy(update=kwargs)
+        default = default_config(**kwargs)
+        return default.model_copy()
 
     def has_api_key(self, name: str) -> bool:
         """Check if the given API Key is available."""
@@ -224,7 +224,7 @@ class Config(BaseModel):
         return value
 
 
-def default_config() -> Config:
+def default_config(**kwargs) -> Config:  # noqa: ANN003
     """Return default config."""
     return Config(
         storage_class=StorageClass.MEMORY,
@@ -233,4 +233,5 @@ def default_config() -> Config:
         llm_model_temperature=0,
         llm_model_seed=443,
         default_agent_type=AgentType.VERIFIER,
+        **kwargs,
     )
