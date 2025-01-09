@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.clarification import ArgumentClarification, Clarification, InputClarification
+from portia.clarification import Clarification, InputClarification
 from portia.errors import (
     InvalidAgentOutputError,
     InvalidWorkflowStateError,
@@ -214,14 +214,8 @@ class ToolCallingModel:
         # handle any clarifications before calling
         if self.agent and self.agent.clarifications:
             for arg in verified_args.args:
-                matching_clarification = next(
-                    (
-                        clarification
-                        for clarification in self.agent.clarifications
-                        if isinstance(clarification, ArgumentClarification)
-                        and clarification.argument_name == arg.name
-                    ),
-                    None,
+                matching_clarification = (
+                    self.agent.get_last_resolved_clarification(arg.name, arg.value)
                 )
                 if matching_clarification and arg.value != matching_clarification.response:
                     arg.value = matching_clarification.response
@@ -294,18 +288,8 @@ class VerifierAgent(BaseAgent):
         for arg in arguments.args:
             if not arg.made_up:
                 continue
-            # check if there's a clarification that matches the arg + value
-            matching_clarification = next(
-                (
-                    clarification
-                    for clarification in self.clarifications or []
-                    if clarification.resolved
-                    and getattr(clarification, "argument_name", None) == arg.name
-                    and clarification.response == arg.value
-                ),
-                None,
-            )
-            # args shouldn't be marked as made up if they're clarified
+            matching_clarification = self.get_last_resolved_clarification(arg.name, arg.value)
+
             if not matching_clarification:
                 self.new_clarifications.append(
                     InputClarification(
@@ -318,6 +302,17 @@ class VerifierAgent(BaseAgent):
 
         state.update({"messages": [arguments.model_dump_json(indent=2)]})  # type: ignore  # noqa: PGH003
         return "tool_agent"
+
+    def get_last_resolved_clarification(self, arg_name: str,
+                                        arg_value: Any | None) -> Clarification | None: # noqa: ANN401
+        """Get the last resolved clarification for an argument."""
+        matching_clarification = None
+        for clarification in self.clarifications or []:
+            if (clarification.resolved and
+                getattr(clarification, "argument_name", None) == arg_name and
+                clarification.response == arg_value):
+                matching_clarification = clarification
+        return matching_clarification
 
     @staticmethod
     def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
