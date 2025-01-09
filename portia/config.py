@@ -187,8 +187,7 @@ class Config(BaseModel):
     @classmethod
     def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
         """Create a Config instance with default values, allowing overrides."""
-        default = default_config(**kwargs)
-        return default.model_copy()
+        return default_config(**kwargs)
 
     def has_api_key(self, name: str) -> bool:
         """Check if the given API Key is available."""
