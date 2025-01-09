@@ -10,8 +10,7 @@ from langchain_core.prompts import (
 )
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from portia.agents.base_agent import BaseAgent
-from portia.plan import Output
+from portia.agents.base_agent import BaseAgent, Output
 
 
 class ToolLessModel:

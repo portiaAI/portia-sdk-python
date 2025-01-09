@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
 
 if TYPE_CHECKING:
-    from portia.plan import Output, Variable
+    from portia.agents.base_agent import Output
+    from portia.plan import Variable
 
 
 def build_context(
