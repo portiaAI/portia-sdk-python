@@ -5,7 +5,6 @@ from unittest import mock
 import pytest
 
 from portia.agents.toolless_agent import ToolLessAgent, ToolLessModel
-from portia.config import Config
 from tests.utils import get_test_config, get_test_workflow
 
 

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import SecretStr
-
 from portia.agents.base_agent import BaseAgent
-from portia.config import Config
 from tests.utils import get_test_config, get_test_workflow
 
 

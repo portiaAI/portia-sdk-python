@@ -26,7 +26,6 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.config import Config
 from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
