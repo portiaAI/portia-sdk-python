@@ -29,6 +29,26 @@ class LLMProvider(Enum):
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
 
+    def associated_models(self) -> list[LLMModel]:
+        """Get the associated models for the provider."""
+        match self:
+            case LLMProvider.OPENAI:
+                return SUPPORTED_OPENAI_MODELS
+            case LLMProvider.ANTHROPIC:
+                return SUPPORTED_ANTHROPIC_MODELS
+            case LLMProvider.MISTRALAI:
+                return SUPPORTED_MISTRALAI_MODELS
+
+    def default_model(self) -> LLMModel:
+        """Get the default model for the provider."""
+        match self:
+            case LLMProvider.OPENAI:
+                return LLMModel.GPT_4_O_MINI
+            case LLMProvider.ANTHROPIC:
+                return LLMModel.CLAUDE_3_5_SONNET
+            case LLMProvider.MISTRALAI:
+                return LLMModel.MISTRAL_LARGE_LATEST
+
 
 class LLMModel(Enum):
     """Supported Models."""
@@ -44,10 +64,21 @@ class LLMModel(Enum):
     CLAUDE_3_OPUS_LATEST = "claude-3-opus-latest"
 
     # MistralAI
-    MISTRAL_SMALL_LATEST = "mistral-small-latest"
     MISTRAL_LARGE_LATEST = "mistral-large-latest"
-    MISTRAL_3_B_LATEST = "mistral-3b-latest"
-    MISTRAL_8_B_LATEST = "mistral-8b-latest"
+
+    def provider(self) -> LLMProvider:
+        """Get the associated provider for the model."""
+        match self:
+            case LLMModel.GPT_4_O | LLMModel.GPT_4_O_MINI | LLMModel.GPT_3_5_TURBO:
+                return LLMProvider.OPENAI
+            case (
+                LLMModel.CLAUDE_3_5_HAIKU
+                | LLMModel.CLAUDE_3_5_SONNET
+                | LLMModel.CLAUDE_3_OPUS_LATEST
+            ):
+                return LLMProvider.ANTHROPIC
+            case LLMModel.MISTRAL_LARGE_LATEST:
+                return LLMProvider.MISTRALAI
 
 
 SUPPORTED_OPENAI_MODELS = [
@@ -63,10 +94,7 @@ SUPPORTED_ANTHROPIC_MODELS = [
 ]
 
 SUPPORTED_MISTRALAI_MODELS = [
-    LLMModel.MISTRAL_SMALL_LATEST,
     LLMModel.MISTRAL_LARGE_LATEST,
-    LLMModel.MISTRAL_3_B_LATEST,
-    LLMModel.MISTRAL_8_B_LATEST,
 ]
 
 
@@ -148,8 +176,9 @@ class Config(BaseModel):
     @model_validator(mode="after")
     def check_config(self) -> Config:
         """Validate Config is consistent."""
-        # Portia API Key must be provided if using cloud storage
+        # load keys from environment variables
         self._set_keys()
+        # Portia API Key must be provided if using cloud storage
         if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
             raise InvalidConfigError("portia_api_key", "Must be provided if using cloud storage")
 
@@ -231,6 +260,22 @@ class Config(BaseModel):
             case SecretStr() if value.get_secret_value() == "":
                 raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
+
+    def swap_provider(self, provider: LLMProvider, model: LLMModel | None = None) -> None:
+        """Swap the LLM provider and model. If model not provided, default model is used."""
+        if provider == LLMProvider.OPENAI and self.openai_api_key is None:
+            raise InvalidConfigError("openai_api_key", "Must be provided if using OpenAI")
+        if provider == LLMProvider.ANTHROPIC and self.anthropic_api_key is None:
+            raise InvalidConfigError("anthropic_api_key", "Must be provided if using Anthropic")
+        if provider == LLMProvider.MISTRALAI and self.mistralai_api_key is None:
+            raise InvalidConfigError("mistralai_api_key", "Must be provided if using MistralAI")
+        self.llm_provider = provider
+        if model is None:
+            self.llm_model_name = self.llm_provider.default_model()
+            return
+        if model not in self.llm_provider.associated_models():
+            raise InvalidConfigError("llm_model_name", "Unsupported model")
+        self.llm_model_name = model
 
 
 def default_config() -> Config:

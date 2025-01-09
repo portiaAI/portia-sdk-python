@@ -13,7 +13,7 @@ from enum import Enum
 import click
 from dotenv import load_dotenv
 
-from portia.config import Config, LLMProvider, LogLevel
+from portia.config import Config, LLMModel, LLMProvider, LogLevel
 from portia.example_tools import example_tool_registry
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
@@ -45,7 +45,18 @@ def cli() -> None:
     default=EnvLocation.ENV_VARS.value,
     help="The location of the environment variables: default is environment variables",
 )
-def run(query: str, llm_provider: LLMProvider | None, env_location: EnvLocation) -> None:
+@click.option(
+    "--llm-model",
+    type=click.Choice([m.value for m in LLMModel], case_sensitive=False),
+    required=False,
+    help="The LLM model to use",
+)
+def run(
+    query: str,
+    llm_provider: LLMProvider | None,
+    llm_model: LLMModel | None,
+    env_location: EnvLocation,
+) -> None:
     """Run a query."""
     env_location = EnvLocation(env_location)
     if env_location == EnvLocation.ENV_FILE:
@@ -58,6 +69,12 @@ def run(query: str, llm_provider: LLMProvider | None, env_location: EnvLocation)
     if len(keys) > 1 and llm_provider is None:
         raise click.UsageError("Must provide a LLM provider when using multiple LLM keys")
 
+    if llm_provider is not None and llm_model is not None:
+        config.swap_provider(LLMProvider(llm_provider), LLMModel(llm_model))
+    elif llm_provider is not None:
+        config.swap_provider(LLMProvider(llm_provider))
+    elif llm_model is not None:
+        config.swap_provider(LLMModel(llm_model).provider(), LLMModel(llm_model))
     # Add the tool registry
     registry = example_tool_registry
     if config.has_api_key("portia_api_key"):
