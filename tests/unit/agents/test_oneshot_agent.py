@@ -9,13 +9,13 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END
 from langgraph.prebuilt import ToolNode
 
+from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
 from portia.clarification import InputClarification
 from portia.config import default_config
 from portia.errors import InvalidAgentOutputError
 from portia.llm_wrapper import LLMWrapper
-from portia.tool import Output
 from tests.utils import AdditionTool
 
 

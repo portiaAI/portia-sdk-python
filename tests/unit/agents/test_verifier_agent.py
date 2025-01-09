@@ -13,6 +13,7 @@ from langgraph.graph import END
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
+from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessModel
 from portia.agents.verifier_agent import (
     ParserModel,
@@ -28,7 +29,6 @@ from portia.clarification import InputClarification
 from portia.config import default_config
 from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
-from portia.tool import Output
 from tests.utils import AdditionTool
 
 if TYPE_CHECKING:
