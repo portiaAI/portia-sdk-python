@@ -173,8 +173,6 @@ class Config(BaseModel):
     # agent LLMs. Useful for passing execution hints or other data.
     agent_system_context_extension: list[str] | None = None
 
-    model_config = ConfigDict(frozen=True)
-
     @model_validator(mode="after")
     def check_config(self) -> Config:
         """Validate Config is consistent."""
