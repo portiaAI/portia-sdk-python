@@ -242,12 +242,23 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         user_guidance="USER_GUIDANCE",
         response="CLARIFICATION_RESPONSE",
         argument_name="content",
+        resolved=True,
     )
+
+    failed_clarification = InputClarification(
+        user_guidance="USER_GUIDANCE_FAILED",
+        response="FAILED",
+        argument_name="content",
+        resolved=True,
+    )
+
     agent = SimpleNamespace(
         description="DESCRIPTION_STRING",
         verified_args=verified_tool_inputs,
-        clarifications=[clarification],
+        clarifications=[failed_clarification, clarification],
         missing_args={"content": clarification},
+        get_last_resolved_clarification=lambda arg_name, arg_value:
+            clarification if arg_name == "content" and arg_value == "CONTENT_STRING" else None,
     )
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
@@ -430,6 +441,35 @@ def test_verifier_agent_edge_cases() -> None:
     with pytest.raises(InvalidWorkflowStateError):
         tool_calling_model.invoke({"messages": []})
 
+
+def test_get_last_resolved_clarification() -> None:
+    """Test get_last_resolved_clarification."""
+    resolved_clarification1 = InputClarification(
+        argument_name="arg",
+        response="2",
+        user_guidance="FAILED",
+        resolved=True,
+    )
+    resolved_clarification2 = InputClarification(
+        argument_name="arg",
+        response="2",
+        user_guidance="SUCCESS",
+        resolved=True,
+    )
+    unresolved_clarification = InputClarification(
+        argument_name="arg",
+        response="2",
+        user_guidance="",
+        resolved=False,
+    )
+    agent = VerifierAgent(
+        description="Send an email to test@example.com saying Hi as both the subject and body.",
+        inputs=[],
+        tool=None,
+        clarifications=[resolved_clarification1, resolved_clarification2, unresolved_clarification],
+        system_context_extension=[],
+    )
+    assert agent.get_last_resolved_clarification("arg", "2") == resolved_clarification2
 
 def test_clarifications_or_continue() -> None:
     """Test clarifications_or_continue."""
