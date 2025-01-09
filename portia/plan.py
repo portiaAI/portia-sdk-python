@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from portia.workflow import Workflow, WorkflowState
 
@@ -54,6 +54,22 @@ class Step(BaseModel):
         ...,
         description="The unique output id of this step i.e. $best_offers.",
     )
+
+
+class ReadOnlyStep(Step):
+    """A read only copy of a step, passed to agents for reference."""
+
+    model_config = ConfigDict(frozen=True)
+
+    @classmethod
+    def from_step(cls, step: Step) -> ReadOnlyStep:
+        """Configure a read only step from a normal step."""
+        return cls(
+            task=step.task,
+            inputs=step.inputs,
+            tool_name=step.tool_name,
+            output=step.output,
+        )
 
 
 class Plan(BaseModel):

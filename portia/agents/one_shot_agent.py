@@ -54,11 +54,11 @@ class OneShotToolCallingModel:
                     "{query}",
                     "context:",
                     "{context}",
-                    "Make sure you don't repeat past errors: {past_errors}",
                     "Use the provided tool. You should provide arguments that match the tool's"
                     "schema using the information contained in the query and context."
-                    "Where clarifications have been provided you should always use the values"
-                    "provided by them.",
+                    "Where clarifications have been provided in the context you should always"
+                    "use the values provided by them.",
+                    "Make sure you don't repeat past errors: {past_errors}",
                 ],
             ),
         ],
@@ -89,7 +89,6 @@ class OneShotToolCallingModel:
                 past_errors=past_errors,
             ),
         )
-
         return {"messages": [response]}
 
 

@@ -26,7 +26,7 @@ class BaseAgent:
     This Base agent is the class all agents must extend. Critically agents must implement the
     execute_sync function which is responsible for actually carrying out the task as given in
     the step. They have access to copies of the step, workflow and config but changes to those
-    objects will not be respected by the runner.
+    objects are forbidden.
 
     Optionally agents may also override the get_context function which is responsible for setting
     the system_context for the agent.
@@ -41,9 +41,10 @@ class BaseAgent:
     ) -> None:
         """Initialize the base agent with the given args.
 
-        Importantly the models here are deep copies of those used in the Runner.
+        Importantly the models here are frozen copies of those used in the Runner.
         They are meant as a read only reference, useful for execution of the task
-        but should not be edited. Any changes will not be respected.
+        but can not be edited. The agent should return output via the response
+        of the execute_sync method.
         """
         self.step = step
         self.tool = tool

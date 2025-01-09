@@ -75,7 +75,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Run the Tool function and generate an Output object with descriptions."""
         args_dict = {f"{i}": arg for i, arg in enumerate(args)}
         data = {**args_dict, **kwargs}
-        logger.debug(f"Invoking: {self.name} with {data}")
+        logger.info(f"Invoking: {self.name} with {data}")
         start_time = time.time()
         try:
             output = self.run(*args, **kwargs)
@@ -88,7 +88,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         else:
             execution_time = time.time() - start_time
             logger.debug(f"Tool {self.name} executed in {execution_time:.2f} seconds")
-            logger.debug("Tool output: {output}", output=output)
+            logger.info("Tool output: {output}", output=output)
 
         # handle clarifications cleanly
         if isinstance(output, Clarification) or (

@@ -20,9 +20,13 @@ from portia.errors import (
 )
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
 from portia.logging import logger, logger_manager
+<<<<<<< HEAD
+=======
+from portia.plan import Output, Plan, ReadOnlyStep, Step
+>>>>>>> 935f1de (tests)
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
-from portia.workflow import Workflow, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
@@ -138,12 +142,12 @@ class Runner:
             )
             workflow.current_step_index = index
 
-            # we pass copies of the state to the agent so that the runner remains
+            # we pass read only copies of the state to the agent so that the runner remains
             # responsible for handling the output of the agent and updating the state.
             agent = self._get_agent_for_step(
-                step.model_copy(deep=True),
-                workflow.model_copy(deep=True),
-                self.config.model_copy(deep=True),
+                step=ReadOnlyStep.from_step(step),
+                workflow=ReadOnlyWorkflow.from_workflow(workflow),
+                config=self.config.model_copy(deep=True),
             )
 
             logger.debug(

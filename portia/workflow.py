@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
@@ -52,3 +52,22 @@ class Workflow(BaseModel):
         return [
             clarification for clarification in self.clarifications if not clarification.resolved
         ]
+
+
+class ReadOnlyWorkflow(Workflow):
+    """A read only copy of a workflow, passed to agents for reference."""
+
+    model_config = ConfigDict(frozen=True)
+
+    @classmethod
+    def from_workflow(cls, workflow: Workflow) -> ReadOnlyWorkflow:
+        """Configure a read only workflow from a normal workflow."""
+        return cls(
+            id=workflow.id,
+            plan_id=workflow.plan_id,
+            current_step_index=workflow.current_step_index,
+            clarifications=workflow.clarifications,
+            state=workflow.state,
+            step_outputs=workflow.step_outputs,
+            final_output=workflow.final_output,
+        )

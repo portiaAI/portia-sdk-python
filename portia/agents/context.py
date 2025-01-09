@@ -28,24 +28,24 @@ def generate_input_context(
     previous_outputs: dict[str, Output],
 ) -> list[str]:
     """Generate context for the inputs returning the context and which inputs were used."""
-    input_context = []
+    input_context = ["Inputs: the original inputs provided by the planner"]
     used_outputs = set()
     for var in inputs:
         if var.value is not None:
             input_context.extend(
                 [
-                    f"name: {var.name}",
-                    f"value: {var.value}",
-                    f"description: {var.description}",
+                    f"input_name: {var.name}",
+                    f"input_value: {var.value}",
+                    f"input_description: {var.description}",
                     "----------",
                 ],
             )
         elif var.name in previous_outputs:
             input_context.extend(
                 [
-                    f"name: {var.name}",
-                    f"value: {previous_outputs[var.name]}",
-                    f"description: {var.description}",
+                    f"input_name: {var.name}",
+                    f"input_value: {previous_outputs[var.name]}",
+                    f"input_description: {var.description}",
                     "----------",
                 ],
             )
@@ -60,8 +60,8 @@ def generate_input_context(
         for output_key in unused_output_keys:
             input_context.extend(
                 [
-                    f"name: {output_key}",
-                    f"value: {previous_outputs[output_key]}",
+                    f"output_name: {output_key}",
+                    f"output_value: {previous_outputs[output_key]}",
                     "----------",
                 ],
             )
@@ -75,17 +75,18 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
     if clarifications:
         clarification_context.extend(
             [
-                "Clarifications:"
-                "This section contains user provided input that might be useful to help your task",
+                "Clarifications:",
+                "This section contains the user provided response to previous clarifications",
+                "They should take priority over any other context given.",
             ],
         )
         for clarification in clarifications:
             if isinstance(clarification, (InputClarification, MultiChoiceClarification)):
                 clarification_context.extend(
                     [
-                        f"argument: {clarification.argument_name}",
-                        f"clarification reason: {clarification.user_guidance}",
-                        f"value: {clarification.response}",
+                        f"input_name: {clarification.argument_name}",
+                        f"clarification_reason: {clarification.user_guidance}",
+                        f"input_value: {clarification.response}",
                         "----------",
                     ],
                 )
@@ -107,6 +108,9 @@ def build_context(
 
     context = ["Additional context: You MUST use this information to complete your task."]
 
+    # Append System Context
+    context.extend(system_context)
+
     # Generate and append input context
     input_context = generate_input_context(inputs, previous_outputs)
     context.extend(input_context)
@@ -114,8 +118,5 @@ def build_context(
     # Generate and append clarifications context
     clarification_context = generate_clarification_context(clarifications)
     context.extend(clarification_context)
-
-    # Append System Context
-    context.extend(system_context)
 
     return "\n".join(context)

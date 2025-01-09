@@ -4,7 +4,7 @@ import pytest
 
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.config import AgentType, LLMModel, LLMProvider, default_config
+from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel, default_config
 from portia.errors import ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
@@ -97,7 +97,7 @@ def test_runner_run_query_with_clarifications(
     agent: AgentType,
 ) -> None:
     """Test running a query with clarification using the Runner."""
-    config = default_config()
+    config = Config.from_default(default_log_level=LogLevel.DEBUG)
     config.llm_provider = llm_provider
     config.llm_model_name = llm_model_name
     config.default_agent_type = agent

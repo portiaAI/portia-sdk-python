@@ -3,10 +3,12 @@
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
-from portia.workflow import Workflow, WorkflowState
+from portia.plan import ReadOnlyStep, Step
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
 
 
 @pytest.fixture
@@ -65,3 +67,21 @@ def test_workflow_state_enum() -> None:
     assert WorkflowState.COMPLETE == "COMPLETE"
     assert WorkflowState.NEED_CLARIFICATION == "NEED_CLARIFICATION"
     assert WorkflowState.FAILED == "FAILED"
+
+
+def test_read_only_workflow_immutable() -> None:
+    """Test immutability of workflow."""
+    workflow = Workflow(plan_id=uuid4())
+    read_only = ReadOnlyWorkflow.from_workflow(workflow)
+
+    with pytest.raises(ValidationError):
+        read_only.state = WorkflowState.IN_PROGRESS
+
+
+def test_read_only_step_immutable() -> None:
+    """Test immutability of step."""
+    step = Step(task="add", output="$out")
+    read_only = ReadOnlyStep.from_step(step)
+
+    with pytest.raises(ValidationError):
+        read_only.output = "$in"
