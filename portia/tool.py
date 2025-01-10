@@ -7,11 +7,11 @@ with their specific logic.
 
 from __future__ import annotations
 
-from functools import partial
 import json
 import time
 from abc import abstractmethod
-from typing import Any, Generic
+from functools import partial
+from typing import TYPE_CHECKING, Any, Generic
 
 import httpx
 from langchain_core.tools import StructuredTool
@@ -20,10 +20,12 @@ from pydantic import BaseModel, Field, SecretStr, model_validator
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.common import SERIALIZABLE_TYPE_VAR
-from portia.context import ExecutionContext, get_execution_context
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logger import logger
 from portia.templates.render import render_template
+
+if TYPE_CHECKING:
+    from portia.context import ExecutionContext
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
 
