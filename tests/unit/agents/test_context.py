@@ -1,5 +1,6 @@
 """test context."""
 
+from datetime import UTC, datetime
 import pytest
 from pydantic import HttpUrl
 
@@ -93,7 +94,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     # as LLMs are sensitive even to white space formatting we do a complete match here
     assert (
         context
-        == """Additional context: You MUST use this information to complete your task.
+        == f"""Additional context: You MUST use this information to complete your task.
 Inputs: the original inputs provided by the planner
 input_name: $email_address
 input_value: test@example.com
@@ -119,7 +120,7 @@ clarification_reason: email cc list
 input_value: bob@bla.com
 ----------
 System Context:
-Today's date is 2025-01-09
+Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}
 system context 1
 system context 2"""
     )
