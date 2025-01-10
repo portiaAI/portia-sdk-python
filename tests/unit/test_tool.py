@@ -2,7 +2,7 @@
 
 import pytest
 
-from portia.context import get_execution_context
+from portia.context import empty_context, get_execution_context
 from portia.errors import InvalidToolDescriptionError, ToolSoftError
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 
@@ -38,7 +38,7 @@ def test_tool_initialization_long_description() -> None:
 def test_tool_to_langchain() -> None:
     """Test langchain rep of a Tool."""
     tool = AdditionTool()
-    tool.to_langchain(return_artifact=False)
+    tool.to_langchain(ctx=empty_context(), return_artifact=False)
 
 
 def test_run_method(add_tool: AdditionTool) -> None:
@@ -54,6 +54,7 @@ def test_run_method_with_uncaught_error() -> None:
     tool = ErrorTool()
     with pytest.raises(ToolSoftError):
         tool._run(  # noqa: SLF001
+            ctx=empty_context(),
             error_str="this is an error",
             return_uncaught_error=True,
             return_soft_error=False,

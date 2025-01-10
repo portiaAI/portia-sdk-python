@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, SecretStr
 
@@ -13,6 +13,9 @@ from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.tool import Tool
 from portia.workflow import Workflow
+
+if TYPE_CHECKING:
+    from portia.context import ExecutionContext
 
 
 def get_test_workflow() -> tuple[Plan, Workflow]:
