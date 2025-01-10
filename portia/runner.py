@@ -150,9 +150,6 @@ class Runner:
             )
             try:
                 step_output = agent.execute_sync()
-                if not isinstance(step_output, Output):
-                    raise InvalidAgentOutputError(step_output)  # noqa: TRY301
-
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = Output(value=str(e))
                 workflow.step_outputs[step.output] = error_output

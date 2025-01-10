@@ -351,8 +351,6 @@ class VerifierAgent(BaseAgent):
             else:
                 tool_output = Output(value=last_message.content)
             return tool_output
-        if isinstance(last_message, HumanMessage):
-            return Output(value=last_message.content)
 
         raise InvalidAgentOutputError(str(last_message.content))
 
