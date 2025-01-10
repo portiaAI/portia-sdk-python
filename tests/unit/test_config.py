@@ -148,3 +148,21 @@ def test_getters() -> None:
             llm_model_seed=443,
             default_agent_type=AgentType.VERIFIER,
         )
+
+
+def test_get_default_model() -> None:
+    """Test getting default model."""
+    assert LLMProvider.OPENAI.default_model() == LLMModel.GPT_4_O_MINI
+    assert LLMProvider.ANTHROPIC.default_model() == LLMModel.CLAUDE_3_5_SONNET
+    assert LLMProvider.MISTRALAI.default_model() == LLMModel.MISTRAL_LARGE_LATEST
+
+
+@pytest.mark.parametrize("provider", list(LLMProvider))
+def test_swap_model_raises_no_api_key(provider: LLMProvider) -> None:
+    """Test swapping model raises error if no api key is set."""
+    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
+    c.openai_api_key = None
+    c.anthropic_api_key = None
+    c.mistralai_api_key = None
+    with pytest.raises(InvalidConfigError):
+        c.swap_model(provider, provider.default_model())
