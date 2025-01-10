@@ -5,7 +5,7 @@ from portia.example_tools.registry import example_tool_registry
 from portia.runner import Runner
 
 runner = Runner(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
+    Config.from_default(),
     tool_registry=example_tool_registry,
 )
 
