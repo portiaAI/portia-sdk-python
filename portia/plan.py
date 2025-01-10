@@ -100,7 +100,3 @@ class Plan(BaseModel):
             # If missing or invalid, use the default_factory
             values["id"] = uuid4()
         return values
-
-    def create_workflow(self) -> Workflow:
-        """Create a new workflow from this plan."""
-        return Workflow(plan_id=self.id, state=WorkflowState.NOT_STARTED)

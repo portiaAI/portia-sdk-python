@@ -61,7 +61,7 @@ def test_runner_run_query(
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
-def test_runner_plan_query(
+def test_runner_generate_plan(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
     agent: AgentType,
@@ -77,7 +77,7 @@ def test_runner_plan_query(
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Add 1 + 2 together"
 
-    plan = runner.plan_query(query)
+    plan = runner.generate_plan(query)
 
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_name == "Add Tool"

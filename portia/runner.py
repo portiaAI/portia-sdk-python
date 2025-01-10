@@ -58,17 +58,7 @@ class Runner:
             case _:
                 raise InvalidStorageError(config.storage_class)
 
-    def run_query(
-        self,
-        query: str,
-        tools: list[Tool] | list[str] | None = None,
-        example_workflows: list[Plan] | None = None,
-    ) -> Workflow:
-        """Plan and run a query in one go."""
-        plan = self.plan_query(query, tools, example_workflows)
-        return self.create_and_execute_workflow(plan)
-
-    def plan_query(
+    def generate_plan(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
@@ -108,10 +98,23 @@ class Runner:
 
         return outcome.plan
 
-    def create_and_execute_workflow(self, plan: Plan) -> Workflow:
-        """Create a new workflow from a plan and then run it."""
-        workflow = plan.create_workflow()
-        return self._execute_workflow(plan, workflow)
+    def create_workflow(
+        self,
+        query: str | None = None,
+        tools: list[Tool] | list[str] | None = None,
+        example_plans: list[Plan] | None = None,
+        plan: Plan | None = None,
+    ) -> Workflow:
+        """Plan and run a query in one go."""
+        if not plan:
+            if not query:
+                raise PlanError("must provide plan or query.")
+            plan = self.generate_plan(query, tools, example_plans)
+
+        return Workflow(
+            plan_id=plan.id,
+            state=WorkflowState.NOT_STARTED,
+        )
 
     def execute_workflow(self, workflow: Workflow) -> Workflow:
         """Run a workflow."""

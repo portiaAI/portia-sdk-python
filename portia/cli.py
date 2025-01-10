@@ -41,7 +41,7 @@ def plan(query: str) -> None:
     if config.has_api_key("portia_api_key"):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.plan_query(query)
+    output = runner.generate_plan(query)
     click.echo(output.model_dump_json(indent=4))
 
 
