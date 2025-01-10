@@ -60,6 +60,7 @@ ignore = [
 "**/tests/*" = [
   "S101",    # Disables check for asserts. Asserts in test cases can be useful.
   "PLR2004", # Disables magic number checks. Its normal to assert using magic numbers for things like array length.
+  "INP001",  # Disables checks for implicit namespace packages. Tests are not part of the package.
 ]
 
 [tool.ruff.lint.flake8-type-checking]
