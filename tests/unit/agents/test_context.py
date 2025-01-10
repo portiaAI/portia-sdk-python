@@ -111,12 +111,25 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
     workflow.step_outputs = outputs
+    clarifications = [
+        InputClarification(
+            argument_name="$email_cc",
+            user_guidance="email cc list",
+            response="bob@bla.com",
+        ),
+        ActionClarification(
+            action_url=HttpUrl("http://example.com"),
+            user_guidance="click on the link",
+        ),
+    ]
+    workflow.clarifications = clarifications
     context = build_context(
         ExecutionContext(agent_system_context_extension=["system context 1", "system context 2"]),
         plan.steps[0],
         workflow,
     )
     # as LLMs are sensitive even to white space formatting we do a complete match here
+    print(context)
     assert (
         context
         == f"""Additional context: You MUST use this information to complete your task.
@@ -144,6 +157,7 @@ input_name: $email_cc
 clarification_reason: email cc list
 input_value: bob@bla.com
 ----------
+Metadata: This section contains general metadata about this execution.
 System Context:
 Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}
 system context 1
