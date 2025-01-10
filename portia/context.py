@@ -66,7 +66,7 @@ def execution_context(
     try:
         yield
     finally:
-        _execution_context.context = None
+        delattr(_execution_context, "context")
 
 
 def get_execution_context() -> ExecutionContext:

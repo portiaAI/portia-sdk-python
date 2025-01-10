@@ -71,7 +71,6 @@ class ClarificationToolSchema(BaseModel):
     """Input for ClarificationTool."""
 
     user_guidance: str
-    raise_clarification: bool
 
 
 class ClarificationTool(Tool):
@@ -88,12 +87,11 @@ class ClarificationTool(Tool):
 
     def run(
         self,
-        _: ExecutionContext,
+        ctx: ExecutionContext,
         user_guidance: str,
-        raise_clarification: bool,  # noqa: FBT001
     ) -> Clarification | None:
         """Add the numbers."""
-        if raise_clarification:
+        if "raise_clarification" in ctx.additional_data:
             return InputClarification(
                 user_guidance=user_guidance,
                 argument_name="raise_clarification",

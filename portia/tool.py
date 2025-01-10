@@ -7,6 +7,7 @@ with their specific logic.
 
 from __future__ import annotations
 
+from functools import partial
 import json
 import time
 from abc import abstractmethod
@@ -76,19 +77,20 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def _run(
         self,
+        ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
         """Run the Tool function and generate an Output object with descriptions."""
         args_dict = {f"{i}": arg for i, arg in enumerate(args)}
         data = {**args_dict, **kwargs}
-        logger.info(f"Invoking: {self.name} with {data}")
+        logger.info(f"Invoking: {self.name} with {data} and context {ctx}")
         start_time = time.time()
 
-        ctx = get_execution_context()
         try:
             output = self.run(ctx, *args, **kwargs)
         except Exception as e:
+            logger.error(f"Tool: {self.name} returned error {e}")
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
@@ -113,6 +115,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def _run_with_artifacts(
         self,
+        ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> tuple[str, Output[SERIALIZABLE_TYPE_VAR]]:
@@ -122,7 +125,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         This allows us to capture the output (artifact) directly instead of having it
         serialized to a string first (see content_and_artifact in langgraph tool definition).
         """
-        intermediate_output = self._run(*args, **kwargs)
+        intermediate_output = self._run(ctx, *args, **kwargs)
         return (intermediate_output.value, intermediate_output)  # type: ignore  # noqa: PGH003
 
     def _generate_tool_description(self) -> str:
@@ -173,7 +176,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise InvalidToolDescriptionError(self.name)
         return self
 
-    def to_langchain(self, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002
+    def to_langchain(self, ctx: ExecutionContext, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002
         """Return a LangChain representation of this tool.
 
         Langchain agent needs to use the "content" response format, but Langgraph
@@ -184,7 +187,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 name=self.name.replace(" ", "_"),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
-                func=self._run_with_artifacts,
+                func=partial(self._run_with_artifacts, ctx),
                 return_direct=True,
                 response_format="content_and_artifact",
             )
@@ -192,7 +195,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             name=self.name.replace(" ", "_"),
             description=self._generate_tool_description(),
             args_schema=self.args_schema,
-            func=self._run,
+            func=partial(self._run, ctx),
         )
 
     def args_json_schema(self) -> dict[str, Any]:

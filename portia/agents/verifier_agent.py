@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
+from portia.context import get_execution_context
 from portia.errors import (
     InvalidAgentOutputError,
     InvalidWorkflowStateError,
@@ -376,7 +377,10 @@ class VerifierAgent(BaseAgent):
         llm = LLMWrapper(self.config).to_langchain()
 
         tools = [
-            self.tool.to_langchain(return_artifact=True),
+            self.tool.to_langchain(
+                return_artifact=True,
+                ctx=get_execution_context(),
+            ),
         ]
         tool_node = ToolNode(tools)
 

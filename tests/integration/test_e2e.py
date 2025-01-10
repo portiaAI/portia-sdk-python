@@ -5,7 +5,7 @@ import pytest
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
-from portia.context import ExecutionContext
+from portia.context import ExecutionContext, execution_context
 from portia.errors import ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
@@ -95,7 +95,6 @@ def test_runner_plan_query(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
-@pytest.mark.flaky(reruns=3)
 def test_runner_run_query_with_clarifications(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
@@ -121,16 +120,14 @@ def test_runner_run_query_with_clarifications(
                 description="",
                 value="Do Something",
             ),
-            Variable(
-                name="raise_clarification",
-                description="",
-                value=True,
-            ),
         ],
     )
     plan = Plan(query="raise a clarification", steps=[clarification_step])
     runner.storage.save_plan(plan)
-    workflow = runner.create_and_execute_workflow(plan)
+
+    with execution_context(additional_data={"raise_clarification": "True"}):
+        workflow = runner.create_and_execute_workflow(plan)
+
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "Do Something"
 
