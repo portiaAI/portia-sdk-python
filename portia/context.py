@@ -50,7 +50,7 @@ def empty_context() -> ExecutionContext:
 def execution_context(
     context: ExecutionContext | None = None,
     end_user_id: str | None = None,
-    metadata: dict[str, str] | None = None,
+    additional_data: dict[str, str] | None = None,
     planner_system_context_extension: list[str] | None = None,
     agent_system_context_extension: list[str] | None = None,
 ) -> Generator[None, None, None]:
@@ -58,7 +58,7 @@ def execution_context(
     if context is None:
         context = ExecutionContext(
             end_user_id=end_user_id,
-            metadata=metadata or {},
+            additional_data=additional_data or {},
             planner_system_context_extension=planner_system_context_extension,
             agent_system_context_extension=agent_system_context_extension,
         )

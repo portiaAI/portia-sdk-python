@@ -4,6 +4,7 @@ import pytest
 from pydantic import SecretStr
 
 from portia.config import Config, StorageClass
+from portia.context import get_execution_context
 from portia.errors import ToolNotFoundError
 from portia.runner import Runner
 from portia.tool import ToolHardError
@@ -13,7 +14,7 @@ from portia.tool_registry import (
     ToolRegistrationFailedError,
 )
 from portia.workflow import WorkflowState
-from tests.utils import AdditionTool, get_execution_ctx
+from tests.utils import AdditionTool
 
 
 def test_runner_run_query_with_cloud() -> None:
@@ -49,7 +50,7 @@ def test_run_tool_error() -> None:
 
     tool = registry.get_tool("Weather Tool")
     tool.api_key = SecretStr("123")
-    ctx = get_execution_ctx()
+    ctx = get_execution_context()
     with pytest.raises(ToolHardError):
         tool.run(ctx)
 

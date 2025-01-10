@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from portia.context import get_execution_context
-from portia.workflow import Workflow, WorkflowExecutionContext, WorkflowState
+from portia.workflow import Workflow, WorkflowState
 
 
 class Variable(BaseModel):
@@ -110,8 +110,5 @@ class Plan(BaseModel):
         return Workflow(
             plan_id=self.id,
             state=WorkflowState.NOT_STARTED,
-            execution_context=WorkflowExecutionContext(
-                end_user_id=ctx.end_user_id,
-                additional_data=ctx.additional_data,
-            ),
+            execution_context=ctx,
         )

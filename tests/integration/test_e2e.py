@@ -5,6 +5,7 @@ import pytest
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
+from portia.context import ExecutionContext
 from portia.errors import ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
@@ -199,7 +200,7 @@ def test_runner_run_query_with_soft_error(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, a: int, b: int) -> int:  # noqa: ARG002
+        def run(self, _: ExecutionContext, a: int, b: int) -> int:  # noqa: ARG002
             raise ToolSoftError("Server Timeout")
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
