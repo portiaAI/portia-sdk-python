@@ -209,4 +209,6 @@ def test_runner_execute_workflow_invalid_output(runner: Runner) -> None:
 
     output = runner._execute_workflow(plan, workflow)  # noqa: SLF001
     assert output.state == WorkflowState.FAILED
+    assert hasattr(output, "final_output")
+    assert hasattr(output.final_output, "value")
     assert output.final_output.value == "Agent returned invalid content: not an output object"
