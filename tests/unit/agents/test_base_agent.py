@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from portia.agents.base_agent import BaseAgent
 from tests.utils import get_test_config, get_test_workflow
+from portia.context import execution_context
+from tests.utils import get_test_workflow
 
 
 def test_base_agent_default_context() -> None:
@@ -31,6 +33,7 @@ def test_base_agent_default_context_with_extensions() -> None:
         ),
         None,
     )
-    context = agent.get_system_context()
+    with execution_context(agent_system_context_extension=["456"]):
+        context = agent.get_system_context()
     assert context is not None
     assert "456" in context
