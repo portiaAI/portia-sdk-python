@@ -118,7 +118,7 @@ def test_runner_run_query_with_clarifications(
             Variable(
                 name="user_guidance",
                 description="",
-                value="Do Something",
+                value="Return a clarification",
             ),
         ],
     )
@@ -129,7 +129,7 @@ def test_runner_run_query_with_clarifications(
         workflow = runner.create_and_execute_workflow(plan)
 
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
-    assert workflow.get_outstanding_clarifications()[0].user_guidance == "Do Something"
+    assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
 
     workflow.get_outstanding_clarifications()[0].resolve(response=False)
     runner.execute_workflow(workflow)
