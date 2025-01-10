@@ -204,7 +204,10 @@ def test_runner_execute_workflow_invalid_output(runner: Runner) -> None:
     agent = MagicMock()
     agent.execute_sync = MagicMock(return_value="not an output object")
     runner._get_agent_for_step = MagicMock(return_value=agent)  # noqa: SLF001
-    plan = runner.plan_query(query)
+    plan = Plan(
+        query=query,
+        steps=[Step(task="add 1 and 2", tool_name="Add Tool", output="$addition_result")],
+    )
     workflow = plan.create_workflow()
 
     output = runner._execute_workflow(plan, workflow)  # noqa: SLF001
