@@ -2,8 +2,9 @@
 
 import pytest
 
+from portia.context import get_execution_context
 from portia.errors import InvalidToolDescriptionError, ToolSoftError
-from tests.utils import AdditionTool, ClarificationTool, ErrorTool, get_execution_ctx
+from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 
 
 @pytest.fixture
@@ -43,7 +44,7 @@ def test_tool_to_langchain() -> None:
 def test_run_method(add_tool: AdditionTool) -> None:
     """Test the run method of the AddTool."""
     a, b = 1, 2
-    ctx = get_execution_ctx()
+    ctx = get_execution_context()
     result = add_tool.run(ctx, a, b)
     assert result == a + b
 
