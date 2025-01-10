@@ -13,7 +13,6 @@ from portia.clarification import (
 )
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
-    InvalidAgentOutputError,
     InvalidWorkflowStateError,
     PlanError,
 )
