@@ -48,7 +48,7 @@ def test_context_empty() -> None:
     assert len(context) == 42  # length should always be the same
 
 
-def test_context_metadata() -> None:
+def test_context_execution_context() -> None:
     """Test that the context is set up correctly."""
     (plan, workflow) = get_test_workflow()
     context = build_context(
@@ -160,9 +160,9 @@ input_name: $email_cc
 clarification_reason: email cc list
 input_value: bob@bla.com
 ----------
-Metadata: This section contains general metadata about this execution.
+Metadata: This section contains general context about this execution.
 end_user_id: 123
-metadata_name: email metadata_value: hello@world.com
+context_key_name: email context_key_value: hello@world.com
 ----------
 System Context:
 Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}

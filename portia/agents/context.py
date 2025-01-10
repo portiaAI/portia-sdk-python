@@ -95,26 +95,26 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
     return clarification_context
 
 
-def generate_metadata_context(context: ExecutionContext) -> list[str]:
-    """Generate context from metadata."""
+def generate_execution_context(context: ExecutionContext) -> list[str]:
+    """Generate context from execution context."""
     if not context.end_user_id and not context.additional_data:
         return []
 
-    metadata_context = ["Metadata: This section contains general metadata about this execution."]
+    execution_context = ["Metadata: This section contains general context about this execution."]
     if context.end_user_id:
-        metadata_context.extend(
+        execution_context.extend(
             [
                 f"end_user_id: {context.end_user_id}",
             ],
         )
     for key, value in context.additional_data.items():
-        metadata_context.extend(
+        execution_context.extend(
             [
-                f"metadata_name: {key} metadata_value: {value}",
+                f"context_key_name: {key} context_key_value: {value}",
                 "----------",
             ],
         )
-    return metadata_context
+    return execution_context
 
 
 def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
@@ -139,9 +139,9 @@ def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     clarification_context = generate_clarification_context(clarifications)
     context.extend(clarification_context)
 
-    # Handle metadata context
-    metadata_context = generate_metadata_context(ctx)
-    context.extend(metadata_context)
+    # Handle execution context
+    execution_context = generate_execution_context(ctx)
+    context.extend(execution_context)
 
     # Append System Context
     context.extend(system_context)
