@@ -21,12 +21,12 @@ PORTIA_API_KEY = "portia_api_key"
     "--log-level",
     type=click.Choice([level.name for level in LogLevel], case_sensitive=False),
     default="INFO",
-    help="Set the logging level"
+    help="Set the logging level",
 )
 @click.pass_context
 def cli(ctx: click.Context, log_level: str) -> None:
     """Portia CLI."""
-    # Store log level in context for use in subcommands
+    # Store log level in context for use in subcommands.
     ctx.ensure_object(dict)
     # Convert string to LogLevel enum
     ctx.obj[LOG_LEVEL] = LogLevel[log_level.upper()]
