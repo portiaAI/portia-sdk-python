@@ -621,3 +621,10 @@ def test_process_output() -> None:
         output = agent.process_output(
             message,
         )
+
+    # with no new clarifications and human message
+    agent.new_clarifications = []
+    message = HumanMessage(content="456")
+    output = agent.process_output(message)
+    assert isinstance(output, Output)
+    assert output.value == "456"

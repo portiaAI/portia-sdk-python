@@ -34,7 +34,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
         run: |
           set -o pipefail
-          poetry run pytest --workers auto  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          poetry run pytest -n auto  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
 
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
