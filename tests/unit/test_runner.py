@@ -7,7 +7,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from portia.config import AgentType, Config, StorageClass
-from portia.errors import InvalidStorageError, InvalidWorkflowStateError, PlanError
+from portia.errors import (
+    InvalidStorageError,
+    InvalidWorkflowStateError,
+    PlanError,
+)
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, Step
 from portia.planner import PlanOrError
@@ -192,3 +196,17 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
 
     with pytest.raises(InvalidWorkflowStateError):
         runner.execute_workflow(workflow)
+
+
+def test_runner_execute_workflow_invalid_output(runner: Runner) -> None:
+    """Test executing a workflow with an invalid output."""
+    query = "add 1 and 2"
+    agent = MagicMock()
+    agent.execute_sync = MagicMock(return_value="not an output object")
+    runner._get_agent_for_step = MagicMock(return_value=agent)  # noqa: SLF001
+    plan = runner.plan_query(query)
+    workflow = plan.create_workflow()
+
+    output = runner._execute_workflow(plan, workflow)  # noqa: SLF001
+    assert output.state == WorkflowState.FAILED
+    assert output.final_output.value == "Agent returned invalid content: not an output object"
