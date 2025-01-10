@@ -11,7 +11,7 @@ from portia.config import Config, LogLevel
 from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.tool import ExecutionContext, Tool
-from portia.workflow import Workflow, WorkflowMetadata
+from portia.workflow import Workflow
 
 
 def get_test_workflow() -> tuple[Plan, Workflow]:
@@ -42,7 +42,7 @@ def get_execution_ctx(workflow: Workflow | None = None) -> ExecutionContext:
     return ExecutionContext(
         plan_id=workflow.plan_id if workflow else uuid4(),
         workflow_id=workflow.id if workflow else uuid4(),
-        metadata=workflow.metadata if workflow else WorkflowMetadata(),
+        # metadata=workflow.metadata if workflow else WorkflowMetadata(),
     )
 
 

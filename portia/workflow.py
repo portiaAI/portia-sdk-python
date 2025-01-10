@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
+from portia.context import ExecutionContext
 
 
 class WorkflowState(str, Enum):
@@ -19,19 +20,6 @@ class WorkflowState(str, Enum):
     COMPLETE = "COMPLETE"
     NEED_CLARIFICATION = "NEED_CLARIFICATION"
     FAILED = "FAILED"
-
-
-class WorkflowMetadata(BaseModel):
-    """Contains metadata about the workflow execution."""
-
-    end_user_id: str | None = Field(
-        default=None,
-        description="An identifier for the end user who the workflow is executing for.",
-    )
-    additional_data: dict[str, str] = Field(
-        default={},
-        description="Additional metadata about this workflow",
-    )
 
 
 class Workflow(BaseModel):
@@ -56,12 +44,12 @@ class Workflow(BaseModel):
         default=WorkflowState.NOT_STARTED,
         description="The current state of the workflow.",
     )
-    metadata: WorkflowMetadata = Field(
-        default=WorkflowMetadata(
+    execution_context: ExecutionContext = Field(
+        default=ExecutionContext(
             end_user_id=None,
             additional_data={},
         ),
-        description="Metadata for the workflow.",
+        description="Execution Context for the workflow.",
     )
 
     step_outputs: dict[str, Output] = {}

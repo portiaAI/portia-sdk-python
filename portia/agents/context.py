@@ -6,11 +6,10 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
-from portia.workflow import WorkflowMetadata
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import Output
-    from portia.config import Config
+    from portia.context import ExecutionContext
     from portia.plan import Step, Variable
     from portia.workflow import Workflow
 
@@ -96,16 +95,16 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
     return clarification_context
 
 
-def generate_metadata_context(metadata: WorkflowMetadata) -> list[str]:
+def generate_metadata_context(context: ExecutionContext) -> list[str]:
     """Generate context from metadata."""
     metadata_context = ["Metadata: This section contains general metadata about this execution."]
-    if metadata.end_user_id:
+    if context.end_user_id:
         metadata_context.extend(
             [
-                f"end_user_id: {metadata.end_user_id}",
+                f"end_user_id: {context.end_user_id}",
             ],
         )
-    for key, value in metadata.additional_data.items():
+    for key, value in context.additional_data.items():
         metadata_context.extend(
             [
                 f"metadata_name: {key}",
@@ -116,13 +115,13 @@ def generate_metadata_context(metadata: WorkflowMetadata) -> list[str]:
     return metadata_context
 
 
-def build_context(step: Step, workflow: Workflow, config: Config) -> str:
+def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     """Turn inputs and past outputs into a context string for the agent."""
     inputs = step.inputs
     previous_outputs = workflow.step_outputs
     clarifications = workflow.clarifications
-    metadata = workflow.metadata
-    system_context = generate_main_system_context(config.agent_system_context_extension)
+
+    system_context = generate_main_system_context(ctx.agent_system_context_extension)
 
     # exit early if no additional information
     if not inputs and not clarifications and not previous_outputs:
@@ -139,7 +138,7 @@ def build_context(step: Step, workflow: Workflow, config: Config) -> str:
     context.extend(clarification_context)
 
     # Handle metadata context
-    metadata_context = generate_metadata_context(metadata)
+    metadata_context = generate_metadata_context(ctx)
     context.extend(metadata_context)
 
     # Append System Context

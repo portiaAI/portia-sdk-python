@@ -135,16 +135,6 @@ class Config(BaseModel):
     # Agent Options
     default_agent_type: AgentType
 
-    # System Context Overrides
-    # Generally be mindful of context window sizes when passing additional data through these field.
-
-    # planner_system_context_extension allows passing additional context to the
-    # planner LLMs. Useful for refining instructions or passing pointers.
-    planner_system_context_extension: list[str] | None = None
-    # agent_system_context_extension allows passing additional context to the
-    # agent LLMs. Useful for passing execution hints or other data.
-    agent_system_context_extension: list[str] | None = None
-
     model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="after")

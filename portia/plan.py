@@ -7,7 +7,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from portia.workflow import Workflow, WorkflowMetadata, WorkflowState
+from portia.context import get_execution_context
+from portia.workflow import Workflow, WorkflowExecutionContext, WorkflowState
 
 
 class Variable(BaseModel):
@@ -103,9 +104,14 @@ class Plan(BaseModel):
 
     def create_workflow(
         self,
-        metadata: WorkflowMetadata | None = None,
     ) -> Workflow:
         """Create a new workflow from this plan."""
-        if metadata is None:
-            metadata = WorkflowMetadata()
-        return Workflow(plan_id=self.id, state=WorkflowState.NOT_STARTED, metadata=metadata)
+        ctx = get_execution_context()
+        return Workflow(
+            plan_id=self.id,
+            state=WorkflowState.NOT_STARTED,
+            execution_context=WorkflowExecutionContext(
+                end_user_id=ctx.end_user_id,
+                additional_data=ctx.additional_data,
+            ),
+        )

@@ -21,7 +21,7 @@ from portia.logger import logger, logger_manager
 from portia.plan import Plan, ReadOnlyStep, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
-from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowMetadata, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
@@ -59,11 +59,10 @@ class Runner:
         query: str,
         tools: list[Tool] | list[str] | None = None,
         example_workflows: list[Plan] | None = None,
-        metadata: WorkflowMetadata | None = None,
     ) -> Workflow:
         """Plan and run a query in one go."""
         plan = self.plan_query(query, tools, example_workflows)
-        return self.create_and_execute_workflow(plan, metadata)
+        return self.create_and_execute_workflow(plan)
 
     def plan_query(
         self,
@@ -87,7 +86,6 @@ class Runner:
             query=query,
             tool_list=tools,
             examples=example_plans,
-            system_context_extension=self.config.planner_system_context_extension,
         )
         if outcome.error:
             logger.error(f"Error in planning - {outcome.error}")
@@ -108,13 +106,15 @@ class Runner:
     def create_and_execute_workflow(
         self,
         plan: Plan,
-        metadata: WorkflowMetadata | None = None,
     ) -> Workflow:
         """Create a new workflow from a plan and then run it."""
-        workflow = plan.create_workflow(metadata)
+        workflow = plan.create_workflow()
         return self._execute_workflow(plan, workflow)
 
-    def execute_workflow(self, workflow: Workflow) -> Workflow:
+    def execute_workflow(
+        self,
+        workflow: Workflow,
+    ) -> Workflow:
         """Run a workflow."""
         if workflow.state not in [
             WorkflowState.NOT_STARTED,
@@ -126,7 +126,11 @@ class Runner:
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
 
-    def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
+    def _execute_workflow(
+        self,
+        plan: Plan,
+        workflow: Workflow,
+    ) -> Workflow:
         self.storage.save_workflow(workflow)
         logger.debug(
             f"Executing workflow from step {workflow.current_step_index}",
@@ -145,7 +149,7 @@ class Runner:
             agent = self._get_agent_for_step(
                 step=ReadOnlyStep.from_step(step),
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
-                config=self.config,  # config is already frozen so we don't need to copy
+                config=self.config,
             )
 
             logger.debug(

@@ -11,7 +11,6 @@ import json
 import time
 from abc import abstractmethod
 from typing import Any, Generic
-from uuid import UUID
 
 import httpx
 from langchain_core.tools import StructuredTool
@@ -20,24 +19,16 @@ from pydantic import BaseModel, Field, SecretStr, model_validator
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.common import SERIALIZABLE_TYPE_VAR
+from portia.context import ExecutionContext, get_execution_context
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logger import logger
 from portia.templates.render import render_template
-from portia.workflow import WorkflowMetadata
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
     pass
-
-
-class ExecutionContext(BaseModel):
-    """ExecutionContext provides context to the tool of the workflow its part of."""
-
-    plan_id: UUID
-    workflow_id: UUID
-    metadata: WorkflowMetadata
 
 
 class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
@@ -61,7 +52,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Output schema of the tool",
         examples=["(TYPE, DESCRIPTION)", "(json, json with API response, single object)"],
     )
-    context: ExecutionContext | None = None
 
     @abstractmethod
     def run(
@@ -95,11 +85,9 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         logger.info(f"Invoking: {self.name} with {data}")
         start_time = time.time()
 
-        if not self.context:
-            raise ToolHardError("No Context Provided")
-
+        ctx = get_execution_context()
         try:
-            output = self.run(self.context, *args, **kwargs)
+            output = self.run(ctx, *args, **kwargs)
         except Exception as e:
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
@@ -185,11 +173,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise InvalidToolDescriptionError(self.name)
         return self
 
-    def with_context(self, ctx: ExecutionContext) -> Tool:
-        """Set an execution context for a tool."""
-        self.context = ctx
-        return self
-
     def to_langchain(self, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002
         """Return a LangChain representation of this tool.
 
@@ -225,7 +208,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def run(
         self,
-        _: ExecutionContext,
+        ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  #  noqa: ANN401
     ) -> SERIALIZABLE_TYPE_VAR | Clarification:
@@ -237,7 +220,15 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             # Send to Cloud
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
-                content=json.dumps({"arguments": data, "execution_context": {}}),
+                content=json.dumps(
+                    {
+                        "data": data,
+                        "context": {
+                            "end_user_id": ctx.end_user_id,
+                            "additional_data": ctx.additional_data,
+                        },
+                    },
+                ),
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",

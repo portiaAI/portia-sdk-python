@@ -3,7 +3,6 @@
 import pytest
 
 from portia.errors import InvalidToolDescriptionError, ToolSoftError
-from portia.tool import ExecutionContext
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool, get_execution_ctx
 
 
