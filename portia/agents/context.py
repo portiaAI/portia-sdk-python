@@ -97,6 +97,9 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
 
 def generate_metadata_context(context: ExecutionContext) -> list[str]:
     """Generate context from metadata."""
+    if not context.end_user_id and not context.additional_data:
+        return []
+
     metadata_context = ["Metadata: This section contains general metadata about this execution."]
     if context.end_user_id:
         metadata_context.extend(
@@ -107,8 +110,7 @@ def generate_metadata_context(context: ExecutionContext) -> list[str]:
     for key, value in context.additional_data.items():
         metadata_context.extend(
             [
-                f"metadata_name: {key}",
-                f"metadata_value: {value}",
+                f"metadata_name: {key} metadata_value: {value}",
                 "----------",
             ],
         )
