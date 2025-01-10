@@ -13,14 +13,15 @@ from portia.example_tools import example_tool_registry
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
 
-LOG_LEVEL = 'LOG_LEVEL'
+LOG_LEVEL = "log_level"
+PORTIA_API_KEY = "portia_api_key"
 
 @click.group()
 @click.option(
-    '--log-level',
+    "--log-level",
     type=click.Choice([level.name for level in LogLevel], case_sensitive=False),
-    default='INFO',
-    help='Set the logging level'
+    default="INFO",
+    help="Set the logging level"
 )
 @click.pass_context
 def cli(ctx: click.Context, log_level: str) -> None:
@@ -39,7 +40,7 @@ def run(ctx: click.Context, query: str) -> None:
     log_level = ctx.obj.get(LOG_LEVEL, LogLevel.INFO)
     config = Config.from_default(default_log_level=log_level)
     registry = example_tool_registry
-    if config.has_api_key("portia_api_key"):
+    if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
     output = runner.run_query(query)
@@ -51,10 +52,10 @@ def run(ctx: click.Context, query: str) -> None:
 @click.pass_context
 def plan(ctx: click.Context, query: str) -> None:
     """Plan a query."""
-    log_level = ctx.obj.get('log_level', LogLevel.INFO)
+    log_level = ctx.obj.get(LOG_LEVEL, LogLevel.INFO)
     config = Config.from_default(default_log_level=log_level)
     registry = example_tool_registry
-    if config.has_api_key("portia_api_key"):
+    if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
     output = runner.plan_query(query)
