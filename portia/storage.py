@@ -188,12 +188,7 @@ class PortiaCloudStorage(Storage):
         """Add plan to cloud."""
         response = httpx.post(
             url=f"{self.api_endpoint}/api/v0/plans/",
-            json={
-                "id": str(plan.id),
-                "json": {
-                    "steps": [step.model_dump_json() for step in plan.steps],
-                },
-            },
+            json={"id": str(plan.id), "json": plan.model_dump(mode="json")},
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
