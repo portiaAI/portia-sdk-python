@@ -616,6 +616,12 @@ def test_process_output() -> None:
     assert isinstance(output, Output)
     assert output.value == "456"
 
+    # with Human artifact
+    message = HumanMessage(content="456", tool_call_id="123")
+    output = agent.process_output(message)
+    assert isinstance(output, Output)
+    assert output.value == "456"
+
     message = AIMessage(content="456")
     with pytest.raises(InvalidAgentOutputError):
         output = agent.process_output(

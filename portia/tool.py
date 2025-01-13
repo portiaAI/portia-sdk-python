@@ -213,7 +213,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def run(
         self,
-        _: ExecutionContext,
+        ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  #  noqa: ANN401
     ) -> SERIALIZABLE_TYPE_VAR | Clarification:
@@ -225,7 +225,15 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             # Send to Cloud
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
-                content=json.dumps(data),
+                content=json.dumps(
+                    {
+                        "arguments": data,
+                        "execution_context": {
+                            "end_user_id": ctx.end_user_id,
+                            "additional_data": ctx.additional_data,
+                        },
+                    },
+                ),
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
