@@ -8,22 +8,6 @@ if TYPE_CHECKING:
     from uuid import UUID
 
 
-class InvalidStorageError(Exception):
-    """Raised when an invalid storage is provided."""
-
-    def __init__(self, storage: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{storage} is not a valid storage provider.")
-
-
-class InvalidLLMProviderError(Exception):
-    """Raised when a provider is invalid."""
-
-    def __init__(self, provider: str) -> None:
-        """Set custom error message."""
-        super().__init__(f"{provider} is not a supported LLM provider")
-
-
 class ConfigNotFoundError(Exception):
     """Raised when a needed config value is not present."""
 
