@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -359,7 +359,8 @@ class VerifierAgent(BaseAgent):
             else:
                 tool_output = Output(value=last_message.content)
             return tool_output
-
+        if isinstance(last_message, HumanMessage):
+            return Output(value=last_message.content)
         raise InvalidAgentOutputError(str(last_message.content))
 
     def execute_sync(self) -> Output:
