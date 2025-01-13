@@ -97,7 +97,7 @@ class ParserModel:
             HumanMessagePromptTemplate.from_template(
                 "Context for user input and past steps:"
                 "\n{context}\n"
-                "You will need to achieve the following goal: {input}\n"
+                "You will need to achieve the following goal: {task}\n"
                 "The system will have a tool available, called {tool_name}.\n"
                 "The format of the arguments for the tool are:\n{tool_args}\n"
                 "More about the tool: {tool_description}\n"
@@ -123,7 +123,7 @@ class ParserModel:
         response = model.invoke(
             self.arg_parser_prompt.format_messages(
                 context=self.context,
-                input=self.agent.step.task,
+                task=self.agent.step.task,
                 tool_name=self.agent.tool.name,
                 tool_args=self.agent.tool.args_json_schema(),
                 tool_description=self.agent.tool.description,
@@ -139,20 +139,28 @@ class VerifierModel:
     arg_verifier_prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(
-                content="You are an expert reviewer, trying to make sure the arguments given "
-                "are correct.\n"
-                "Please make sure you label if an argument was made up."
-                "Do not just trust the explanations provided."
-                "However if a field is marked as invalid it is likely wrong."
-                "We really care if the value of an argument is not in the context, a handled "
+                content="You are an expert reviewer. Your task is to validate and label arguments "
+                "provided. You must return the made_up field based "
+                "on the rules below.\n - An argument is made up if we cannot tell where the value "
+                "came from in the provided context\n- Do not just trust the explanations provided"
+                "\n- If an argument is marked as invalid it is likely wrong."
+                "\n- We really care if the value of an argument is not in the context, a handled "
                 "clarification or goal at all (then made_up should be TRUE), but it is ok if "
                 "it is there but in a different format (then made_up should be FALSE). "
-                "Arguments where the value comes from a clarification should be marked as FALSE.",
+                "\n- Arguments where the value comes from a clarification should be marked as FALSE"
+                "\nThe output must conform to the following schema:\n\n"
+                "class VerifiedToolArgument:\n"
+                "  name: str  # Name of the argument requested by the tool.\n"
+                "  value: Any | None  # Value of the argument from the goal or context.\n"
+                "  made_up: bool  # if the value is made_up based on the given rules.\n\n"
+                "class VerifiedToolInputs:\n"
+                "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
+                "Please ensure the output matches the VerifiedToolInputs schema.",
             ),
             HumanMessagePromptTemplate.from_template(
                 "Context for user input and past steps:"
                 "\n{context}\n"
-                "You will need to achieve the following goal: {input}\n"
+                "You will need to achieve the following goal: {task}\n"
                 "\n\n----------\n\n"
                 "Label of the following arguments as made up or not: {arguments}\n",
             ),
@@ -174,7 +182,7 @@ class VerifierModel:
         response = model.invoke(
             self.arg_verifier_prompt.format_messages(
                 context=self.context,
-                input=self.agent.step.task,
+                task=self.agent.step.task,
                 arguments=tool_args,
             ),
         )
@@ -233,7 +241,6 @@ class ToolCallingModel:
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 verified_args=verified_args.model_dump_json(indent=2),
-                input=self.agent.step.task,
                 past_errors=past_errors,
             ),
         )
@@ -370,7 +377,9 @@ class VerifierAgent(BaseAgent):
         context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()
 
-        tools = [self.tool.to_langchain(return_artifact=True)]
+        tools = [
+            self.tool.to_langchain(return_artifact=True),
+        ]
         tool_node = ToolNode(tools)
 
         workflow = StateGraph(MessagesState)
