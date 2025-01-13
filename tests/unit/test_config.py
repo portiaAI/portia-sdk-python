@@ -53,6 +53,19 @@ def test_from_default() -> None:
     assert c.default_log_level == LogLevel.CRITICAL
 
 
+def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test setting keys."""
+    monkeypatch.setenv("PORTIA_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
+    assert c.portia_api_key == SecretStr("test-key")
+    assert c.openai_api_key == SecretStr("test-openai-key")
+    assert c.anthropic_api_key == SecretStr("test-anthropic-key")
+    assert c.mistralai_api_key == SecretStr("test-mistral-key")
+
+
 def test_getters() -> None:
     """Test getters work."""
     c = Config.from_default(
@@ -123,3 +136,22 @@ def test_getters() -> None:
             llm_model_seed=443,
             default_agent_type=AgentType.VERIFIER,
         )
+
+
+def test_get_default_model() -> None:
+    """Test getting default model."""
+    assert LLMProvider.OPENAI.default_model() == LLMModel.GPT_4_O_MINI
+    assert LLMProvider.ANTHROPIC.default_model() == LLMModel.CLAUDE_3_5_SONNET
+    assert LLMProvider.MISTRALAI.default_model() == LLMModel.MISTRAL_LARGE_LATEST
+
+
+@pytest.mark.parametrize("model", list(LLMModel))
+def test_all_models_have_provider(model: LLMModel) -> None:
+    """Test all models have a provider."""
+    assert model.provider() is not None
+
+
+@pytest.mark.parametrize("provider", list(LLMProvider))
+def test_all_providers_have_associated_model(provider: LLMProvider) -> None:
+    """Test all providers have an associated model."""
+    assert provider.associated_models() is not None
