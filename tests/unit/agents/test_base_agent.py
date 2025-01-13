@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from portia.agents.base_agent import BaseAgent
-from tests.utils import get_test_config, get_test_workflow
 from portia.context import execution_context
-from tests.utils import get_test_workflow
+from tests.utils import get_test_config, get_test_workflow
 
 
 def test_base_agent_default_context() -> None:

@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
-from portia.context import ExecutionContext
+from portia.context import ExecutionContext, empty_context
 
 
 class WorkflowState(str, Enum):
@@ -45,10 +45,7 @@ class Workflow(BaseModel):
         description="The current state of the workflow.",
     )
     execution_context: ExecutionContext = Field(
-        default=ExecutionContext(
-            end_user_id=None,
-            additional_data={},
-        ),
+        default=empty_context(),
         description="Execution Context for the workflow.",
     )
 

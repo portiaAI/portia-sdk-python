@@ -95,7 +95,7 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
     return clarification_context
 
 
-def generate_execution_context(context: ExecutionContext) -> list[str]:
+def generate_context_from_execution_context(context: ExecutionContext) -> list[str]:
     """Generate context from execution context."""
     if not context.end_user_id and not context.additional_data:
         return []
@@ -140,7 +140,7 @@ def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     context.extend(clarification_context)
 
     # Handle execution context
-    execution_context = generate_execution_context(ctx)
+    execution_context = generate_context_from_execution_context(ctx)
     context.extend(execution_context)
 
     # Append System Context

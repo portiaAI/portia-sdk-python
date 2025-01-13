@@ -96,9 +96,6 @@ def execution_context(
           the `ExecutionContext` set in one thread does not affect others.
         - When the context manager exits, the context for the current thread is cleaned up
           to avoid memory leaks or unintended persistence of data.
-        - This approach does not provide isolation for asynchronous tasks within the same
-          thread. If using asyncio, consider an alternative context management approach
-          (e.g., contextvars) for async task safety.
 
     Example:
         >>> with execution_context(end_user_id="user123", additional_data={"key": "value"}):
