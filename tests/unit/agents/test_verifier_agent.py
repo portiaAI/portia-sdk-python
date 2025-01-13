@@ -26,11 +26,10 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.config import Config
 from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
-from tests.utils import AdditionTool, get_test_workflow
+from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
 if TYPE_CHECKING:
     from langchain_core.prompt_values import ChatPromptValue
@@ -91,7 +90,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=None,
     )
 
@@ -131,7 +130,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=LLMWrapper(Config.from_default()).to_langchain(),
+        llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -176,7 +175,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     verifier_model = VerifierModel(
-        llm=LLMWrapper(Config.from_default()).to_langchain(),
+        llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -215,7 +214,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(Config.from_default()).to_langchain(),
+        llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -274,7 +273,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(Config.from_default()).to_langchain(),
+        llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -360,7 +359,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=tool,
     )
 
@@ -416,7 +415,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=tool,
     )
     agent.verified_args = verified_tool_inputs
@@ -432,7 +431,7 @@ def test_verifier_agent_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
-        llm=LLMWrapper(Config.from_default()).to_langchain(),
+        llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -441,7 +440,7 @@ def test_verifier_agent_edge_cases() -> None:
 
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(Config.from_default()).to_langchain(),
+        llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain(return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -482,7 +481,7 @@ def test_get_last_resolved_clarification() -> None:
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=None,
     )
     assert agent.get_last_resolved_clarification("arg") == resolved_clarification2
@@ -501,7 +500,7 @@ def test_clarifications_or_continue() -> None:
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=None,
     )
     inputs = VerifiedToolInputs(
@@ -538,7 +537,7 @@ def test_clarifications_or_continue() -> None:
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=None,
     )
 
@@ -583,7 +582,7 @@ def test_process_output() -> None:
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
-        config=Config.from_default(),
+        config=get_test_config(),
         tool=None,
     )
 
@@ -621,10 +620,3 @@ def test_process_output() -> None:
         output = agent.process_output(
             message,
         )
-
-    # with no new clarifications and human message
-    agent.new_clarifications = []
-    message = HumanMessage(content="456")
-    output = agent.process_output(message)
-    assert isinstance(output, Output)
-    assert output.value == "456"

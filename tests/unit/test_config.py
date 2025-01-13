@@ -46,7 +46,10 @@ def test_runner_config_from_file() -> None:
 
 def test_from_default() -> None:
     """Test from default."""
-    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
+    c = Config.from_default(
+        default_log_level=LogLevel.CRITICAL,
+        openai_api_key=SecretStr("123"),
+    )
     assert c.default_log_level == LogLevel.CRITICAL
 
 
@@ -65,14 +68,17 @@ def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_getters() -> None:
     """Test getters work."""
-    c = Config.from_default(openai_api_key=SecretStr("123"))
+    c = Config.from_default(
+        openai_api_key=SecretStr("123"),
+    )
 
-    assert c.has_api_key("portia_api_key")
+    assert c.has_api_key("openai_api_key")
 
     with pytest.raises(ConfigNotFoundError):
         c.must_get("not real", str)
 
     c = Config.from_default(
+        openai_api_key=SecretStr("123"),
         portia_api_key=SecretStr(""),
         portia_api_endpoint="",
     )

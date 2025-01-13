@@ -6,25 +6,21 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from portia.config import AgentType, Config, StorageClass
-from portia.errors import (
-    InvalidStorageError,
-    InvalidWorkflowStateError,
-    PlanError,
-)
+from portia.config import AgentType, StorageClass
+from portia.errors import InvalidWorkflowStateError, PlanError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, Step
 from portia.planner import PlanOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState
-from tests.utils import AdditionTool, ClarificationTool
+from tests.utils import AdditionTool, ClarificationTool, get_test_config
 
 
 @pytest.fixture
 def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
-    config = Config.from_default()
+    config = get_test_config()
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Runner(config=config, tool_registry=tool_registry)
 
@@ -41,21 +37,11 @@ def test_runner_run_query(runner: Runner) -> None:
     assert workflow.state == WorkflowState.COMPLETE
 
 
-def test_runner_run_query_invalid_storage() -> None:
-    """Ensure invalid storage throws."""
-    config = Config.from_default(
-        storage_class="Invalid",  # type: ignore  # noqa: PGH003
-    )
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    with pytest.raises(InvalidStorageError):
-        Runner(config=config, tool_registry=tool_registry)
-
-
 def test_runner_run_query_disk_storage() -> None:
     """Test running a query using the Runner."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         query = "example query"
-        config = Config.from_default(
+        config = get_test_config(
             storage_class=StorageClass.DISK,
             storage_dir=tmp_dir,
         )
@@ -144,22 +130,14 @@ def test_runner_toolless_agent() -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    config = Config.from_default(default_agent_type=AgentType.TOOL_LESS)
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
-
-    plan = runner.plan_query(query)
-    runner.create_and_execute_workflow(plan)
-
-    config = Config.from_default(
-        default_agent_type="Other",  # type: ignore  # noqa: PGH003
+    config = get_test_config(
+        default_agent_type=AgentType.TOOL_LESS,
     )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
 
     plan = runner.plan_query(query)
-    with pytest.raises(InvalidWorkflowStateError):
-        runner.create_and_execute_workflow(plan)
+    runner.create_and_execute_workflow(plan)
 
 
 def test_runner_execute_workflow(runner: Runner) -> None:
@@ -196,23 +174,3 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
 
     with pytest.raises(InvalidWorkflowStateError):
         runner.execute_workflow(workflow)
-
-
-def test_runner_execute_workflow_invalid_output(runner: Runner) -> None:
-    """Test executing a workflow with an invalid output."""
-    query = "add 1 and 2"
-    agent = MagicMock()
-    agent.execute_sync = MagicMock(return_value="not an output object")
-    runner._get_agent_for_step = MagicMock(return_value=agent)  # noqa: SLF001
-    plan = Plan(
-        query=query,
-        steps=[Step(task="add 1 and 2", tool_name="Add Tool", output="$addition_result")],
-    )
-    workflow = plan.create_workflow()
-
-    output = runner._execute_workflow(plan, workflow)  # noqa: SLF001
-    assert output.state == WorkflowState.FAILED
-    assert hasattr(output, "final_output")
-    assert hasattr(output.final_output, "value")
-    assert output.final_output is not None
-    assert output.final_output.value == "Agent returned invalid content: not an output object"

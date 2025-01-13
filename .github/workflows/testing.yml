@@ -26,6 +26,13 @@ jobs:
       - name: install dependencies
         run: poetry install --all-extras
 
+      # run unit tests first without env keys
+      # this is to ensure we're not adding unit tests that need to call LLMs
+      - name: unit_tests + coverage
+        run: |
+          set -o pipefail
+          poetry run pytest tests/unit
+
       - name: tests + coverage
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

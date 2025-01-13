@@ -13,8 +13,6 @@ from portia.clarification import (
 )
 from portia.config import AgentType, Config, StorageClass
 from portia.errors import (
-    InvalidAgentOutputError,
-    InvalidStorageError,
     InvalidWorkflowStateError,
     PlanError,
 )
@@ -55,8 +53,6 @@ class Runner:
                 self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=config)
-            case _:
-                raise InvalidStorageError(config.storage_class)
 
     def run_query(
         self,
@@ -151,9 +147,6 @@ class Runner:
             )
             try:
                 step_output = agent.execute_sync()
-                if not isinstance(step_output, Output):
-                    raise InvalidAgentOutputError(step_output)  # noqa: TRY301
-
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = Output(value=str(e))
                 workflow.step_outputs[step.output] = error_output
@@ -244,8 +237,6 @@ class Runner:
                 cls = OneShotAgent
             case AgentType.VERIFIER:
                 cls = VerifierAgent
-            case _:
-                raise InvalidWorkflowStateError
 
         return cls(
             step,
