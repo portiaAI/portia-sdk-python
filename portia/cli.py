@@ -68,11 +68,14 @@ def cli(ctx: click.Context,
         llm_model: str | None,
         env_location: str) -> None:
     """Portia CLI."""
-
     ctx.ensure_object(dict)
     ctx.obj[CLIOptions.LOG_LEVEL.name] = LogLevel[log_level.upper()]
-    ctx.obj[CLIOptions.LLM_PROVIDER.name] = LLMProvider(llm_provider.upper()) if llm_provider else None
-    ctx.obj[CLIOptions.LLM_MODEL.name] = LLMModel(llm_model.upper()) if llm_model else None
+    ctx.obj[CLIOptions.LLM_PROVIDER.name] = (
+        LLMProvider(llm_provider.upper()) if llm_provider else None
+    )
+    ctx.obj[CLIOptions.LLM_MODEL.name] = (
+        LLMModel(llm_model.upper()) if llm_model else None
+    )
     ctx.obj[CLIOptions.ENV_LOCATION.name] = EnvLocation(env_location.upper())
 
 
@@ -107,7 +110,6 @@ def plan(ctx: click.Context, query: str) -> None:
 
 def _get_config(ctx: click.Context) -> Config:
     """Get the config from the context."""
-
     log_level = ctx.obj.get(CLIOptions.LOG_LEVEL.name, LogLevel.INFO)
     llm_provider = ctx.obj.get(CLIOptions.LLM_PROVIDER.name, None)
     llm_model = ctx.obj.get(CLIOptions.LLM_MODEL.name, None)
@@ -120,7 +122,7 @@ def _get_config(ctx: click.Context) -> Config:
         os.getenv("ANTHROPIC_API_KEY"),
         os.getenv("MISTRAL_API_KEY"),
     ]
-    
+
     keys = [k for k in keys if k is not None]
     if len(keys) > 1 and llm_provider is None and llm_model is None:
         message = "Multiple LLM keys found, but no default provided: Select a provider or model"
