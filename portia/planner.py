@@ -68,6 +68,7 @@ class Planner:
         )
         # don't use the ID assigned by the LLM but assign our own to ensure uniqueness.
         response.plan.id = uuid4()
+        response.plan.query = query
         return response
 
 

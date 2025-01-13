@@ -80,6 +80,7 @@ def test_runner_plan_query(
     plan = runner.plan_query(query)
 
     assert len(plan.steps) == 1
+    assert plan.query == query
     assert plan.steps[0].tool_name == "Add Tool"
     assert plan.steps[0].inputs
     assert len(plan.steps[0].inputs) == 2

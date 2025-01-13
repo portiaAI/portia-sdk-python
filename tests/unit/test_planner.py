@@ -59,7 +59,7 @@ def test_generate_plan_or_error_failure(planner: Planner) -> None:
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
     # Mock the LLMWrapper response to simulate an error in plan generation
-    mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error="Unable to generate a plan")
+    mock_response = PlanOrError(plan=Plan(query="SHOULD_GET_UPDATED", steps=[]), error="Unable to generate a plan")
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     result = planner.generate_plan_or_error(query=query, tool_list=[])
