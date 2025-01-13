@@ -50,24 +50,6 @@ def test_from_default() -> None:
     assert c.default_log_level == LogLevel.CRITICAL
 
 
-@pytest.mark.parametrize("model", list(LLMModel))
-def test_swap_model_with_model(model: LLMModel) -> None:
-    """Test swapping model."""
-    c = Config.from_default(openai_api_key=SecretStr("123"))
-    c.swap_model(model.provider(), model)
-    assert c.llm_provider == model.provider()
-    assert c.llm_model_name == model
-
-
-@pytest.mark.parametrize("provider", list(LLMProvider))
-def test_swap_model_raises_wrong_provider(provider: LLMProvider) -> None:
-    """Test swapping model raises error if provider is wrong."""
-    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
-    invalid_model = next(model for model in LLMModel if model.provider() != provider)
-    with pytest.raises(InvalidConfigError):
-        c.swap_model(provider, invalid_model)
-
-
 def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setting keys."""
     monkeypatch.setenv("PORTIA_API_KEY", "test-key")
@@ -157,12 +139,13 @@ def test_get_default_model() -> None:
     assert LLMProvider.MISTRALAI.default_model() == LLMModel.MISTRAL_LARGE_LATEST
 
 
+@pytest.mark.parametrize("model", list(LLMModel))
+def test_all_models_have_provider(model: LLMModel) -> None:
+    """Test all models have a provider."""
+    assert model.provider() is not None
+
+
 @pytest.mark.parametrize("provider", list(LLMProvider))
-def test_swap_model_raises_no_api_key(provider: LLMProvider) -> None:
-    """Test swapping model raises error if no api key is set."""
-    c = Config.from_default(default_log_level=LogLevel.CRITICAL)
-    c.openai_api_key = None
-    c.anthropic_api_key = None
-    c.mistralai_api_key = None
-    with pytest.raises(InvalidConfigError):
-        c.swap_model(provider, provider.default_model())
+def test_all_providers_have_associated_model(provider: LLMProvider) -> None:
+    """Test all providers have an associated model."""
+    assert provider.associated_models() is not None

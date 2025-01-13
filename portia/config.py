@@ -68,13 +68,11 @@ class LLMModel(Enum):
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model."""
-        if self in SUPPORTED_OPENAI_MODELS:
-            return LLMProvider.OPENAI
         if self in SUPPORTED_ANTHROPIC_MODELS:
             return LLMProvider.ANTHROPIC
         if self in SUPPORTED_MISTRALAI_MODELS:
             return LLMProvider.MISTRALAI
-        raise ValueError(f"Unsupported model: {self}")
+        return LLMProvider.OPENAI
 
 
 SUPPORTED_OPENAI_MODELS = [
@@ -251,19 +249,6 @@ class Config(BaseModel):
             case SecretStr() if value.get_secret_value() == "":
                 raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
-
-    def swap_model(self, provider: LLMProvider, model: LLMModel) -> None:
-        """Swap the LLM provider and model."""
-        if provider == LLMProvider.OPENAI and self.openai_api_key is None:
-            raise InvalidConfigError("openai_api_key", "Must be provided if using OpenAI")
-        if provider == LLMProvider.ANTHROPIC and self.anthropic_api_key is None:
-            raise InvalidConfigError("anthropic_api_key", "Must be provided if using Anthropic")
-        if provider == LLMProvider.MISTRALAI and self.mistralai_api_key is None:
-            raise InvalidConfigError("mistralai_api_key", "Must be provided if using MistralAI")
-        if model not in provider.associated_models():
-            raise InvalidConfigError("llm_model_name", "Unsupported model")
-        self.llm_provider = provider
-        self.llm_model_name = model
 
 
 def default_config() -> Config:

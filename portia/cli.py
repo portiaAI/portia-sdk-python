@@ -77,7 +77,9 @@ def run(
         provider = LLMProvider(llm_provider) if llm_provider else LLMModel(llm_model).provider()
         model = LLMModel(llm_model) if llm_model else provider.default_model()
         config = Config.from_default(
-            llm_provider=provider, llm_model_name=model, default_log_level=LogLevel.ERROR,
+            llm_provider=provider,
+            llm_model_name=model,
+            default_log_level=LogLevel.ERROR,
         )
     else:
         config = Config.from_default(default_log_level=LogLevel.ERROR)
