@@ -67,6 +67,6 @@ def test_runner_run_query_with_cloud_and_local() -> None:
     query = "Get the temperature in London and Sydney and then add the two temperatures together."
 
     workflow = runner.run_query(query)
-
+    print(workflow)
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
