@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, TypeVar
+from typing import Annotated, Self, TypeVar
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, SecretStr, model_validator
+from pydantic import AfterValidator, BaseModel, Field, SecretStr, model_validator
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
@@ -29,6 +29,26 @@ class LLMProvider(Enum):
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
 
+    def associated_models(self) -> list[LLMModel]:
+        """Get the associated models for the provider."""
+        match self:
+            case LLMProvider.OPENAI:
+                return SUPPORTED_OPENAI_MODELS
+            case LLMProvider.ANTHROPIC:
+                return SUPPORTED_ANTHROPIC_MODELS
+            case LLMProvider.MISTRALAI:
+                return SUPPORTED_MISTRALAI_MODELS
+
+    def default_model(self) -> LLMModel:
+        """Get the default model for the provider."""
+        match self:
+            case LLMProvider.OPENAI:
+                return LLMModel.GPT_4_O_MINI
+            case LLMProvider.ANTHROPIC:
+                return LLMModel.CLAUDE_3_5_SONNET
+            case LLMProvider.MISTRALAI:
+                return LLMModel.MISTRAL_LARGE_LATEST
+
 
 class LLMModel(Enum):
     """Supported Models."""
@@ -44,10 +64,15 @@ class LLMModel(Enum):
     CLAUDE_3_OPUS_LATEST = "claude-3-opus-latest"
 
     # MistralAI
-    MISTRAL_SMALL_LATEST = "mistral-small-latest"
     MISTRAL_LARGE_LATEST = "mistral-large-latest"
-    MISTRAL_3_B_LATEST = "mistral-3b-latest"
-    MISTRAL_8_B_LATEST = "mistral-8b-latest"
+
+    def provider(self) -> LLMProvider:
+        """Get the associated provider for the model."""
+        if self in SUPPORTED_ANTHROPIC_MODELS:
+            return LLMProvider.ANTHROPIC
+        if self in SUPPORTED_MISTRALAI_MODELS:
+            return LLMProvider.MISTRALAI
+        return LLMProvider.OPENAI
 
 
 SUPPORTED_OPENAI_MODELS = [
@@ -63,10 +88,7 @@ SUPPORTED_ANTHROPIC_MODELS = [
 ]
 
 SUPPORTED_MISTRALAI_MODELS = [
-    LLMModel.MISTRAL_SMALL_LATEST,
     LLMModel.MISTRAL_LARGE_LATEST,
-    LLMModel.MISTRAL_3_B_LATEST,
-    LLMModel.MISTRAL_8_B_LATEST,
 ]
 
 
@@ -103,12 +125,20 @@ class Config(BaseModel):
 
     # Portia Cloud Options
     portia_api_endpoint: str = "https://api.porita.dev"
-    portia_api_key: SecretStr | None = SecretStr(os.getenv("PORTIA_API_KEY") or "")
+    portia_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
+    )
 
     # LLM API Keys
-    openai_api_key: SecretStr | None = SecretStr(os.getenv("OPENAI_API_KEY") or "")
-    anthropic_api_key: SecretStr | None = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
-    mistralai_api_key: SecretStr | None = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
+    openai_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""),
+    )
+    anthropic_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("ANTHROPIC_API_KEY") or ""),
+    )
+    mistralai_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
+    )
 
     # Storage Options
     storage_class: StorageClass
@@ -138,7 +168,7 @@ class Config(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="after")
-    def check_config(self) -> Config:
+    def check_config(self) -> Self:
         """Validate Config is consistent."""
         # Portia API Key must be provided if using cloud storage
         if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
@@ -165,7 +195,6 @@ class Config(BaseModel):
                 validate_llm_config("anthropic_api_key", SUPPORTED_ANTHROPIC_MODELS)
             case LLMProvider.MISTRALAI:
                 validate_llm_config("mistralai_api_key", SUPPORTED_MISTRALAI_MODELS)
-
         return self
 
     @classmethod

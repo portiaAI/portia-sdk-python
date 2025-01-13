@@ -143,7 +143,6 @@ class Runner:
                 extra={"plan": plan.id, "workflow": workflow.id},
             )
             workflow.current_step_index = index
-
             # we pass read only copies of the state to the agent so that the runner remains
             # responsible for handling the output of the agent and updating the state.
             agent = self._get_agent_for_step(
@@ -151,7 +150,6 @@ class Runner:
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
                 config=self.config,
             )
-
             logger.debug(
                 f"Using agent: {type(agent)}",
                 extra={"plan": plan.id, "workflow": workflow.id},
