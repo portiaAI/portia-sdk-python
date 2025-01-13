@@ -229,8 +229,8 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "arguments": data,
                         "execution_context": {
-                            "end_user_id": ctx.end_user_id,
-                            "additional_data": ctx.additional_data,
+                            "end_user_id": ctx.end_user_id or "",
+                            "additional_data": ctx.additional_data or {},
                         },
                     },
                 ),
