@@ -7,7 +7,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Annotated, Self, TypeVar
 
-from pydantic import AfterValidator, BaseModel, Field, SecretStr, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
