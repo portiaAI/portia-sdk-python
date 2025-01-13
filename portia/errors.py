@@ -21,7 +21,7 @@ class InvalidConfigError(Exception):
 
     def __init__(self, value: str, issue: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Config value {value} is not valid - {issue}")
+        super().__init__(f"Config value {value.upper()} is not valid - {issue}")
 
 
 class PlanError(Exception):

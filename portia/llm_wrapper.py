@@ -128,7 +128,7 @@ class LLMWrapper(BaseLLMWrapper):
                         api_key=self.config.must_get_raw_api_key("mistralai_api_key"),
                     ),
                 )
-                return client.chat.completions.create(
+                return client.chat.completions.create(  # pyright: ignore[reportReturnType]
                     model=self.model_name,
                     response_model=response_model,
                     messages=messages,
