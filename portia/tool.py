@@ -206,7 +206,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             # Send to Cloud
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
-                content=json.dumps(data),
+                content=json.dumps({"arguments": data, "execution_context": {}}),
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
