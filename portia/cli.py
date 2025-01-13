@@ -8,6 +8,7 @@ portia-cli plan "add 4 + 8" - plan a query
 
 from __future__ import annotations
 
+import os
 from enum import Enum
 
 import click
@@ -61,10 +62,12 @@ def run(
     env_location = EnvLocation(env_location)
     if env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
-    config = Config.from_default(default_log_level=LogLevel.ERROR)
 
-    # Check if we have multiple LLM keys and no LLM provider is provided
-    keys = [config.openai_api_key, config.anthropic_api_key, config.mistralai_api_key]
+    keys = [
+        os.getenv("OPENAI_API_KEY"),
+        os.getenv("ANTHROPIC_API_KEY"),
+        os.getenv("MISTRAL_API_KEY"),
+    ]
     keys = [k for k in keys if k is not None]
     if len(keys) > 1 and llm_provider is None and llm_model is None:
         message = "Multiple LLM keys found, but no default provided: Select a provider or model"
@@ -73,7 +76,11 @@ def run(
     if llm_provider or llm_model:
         provider = LLMProvider(llm_provider) if llm_provider else LLMModel(llm_model).provider()
         model = LLMModel(llm_model) if llm_model else provider.default_model()
-        config.swap_model(provider, model)
+        config = Config.from_default(
+            llm_provider=provider, llm_model_name=model, default_log_level=LogLevel.ERROR,
+        )
+    else:
+        config = Config.from_default(default_log_level=LogLevel.ERROR)
 
     # Add the tool registry
     registry = example_tool_registry
