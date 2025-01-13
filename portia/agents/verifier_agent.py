@@ -181,13 +181,6 @@ class VerifierModel:
         tool_args = messages[-1].content
 
         model = self.llm.with_structured_output(VerifiedToolInputs)
-        print(
-            self.arg_verifier_prompt.format_messages(
-                context=self.context,
-                task=self.agent.step.task,
-                arguments=tool_args,
-            ),
-        )
         response = model.invoke(
             self.arg_verifier_prompt.format_messages(
                 context=self.context,
@@ -195,7 +188,6 @@ class VerifierModel:
                 arguments=tool_args,
             ),
         )
-        print(response)
         response = VerifiedToolInputs.model_validate(response)
         self.agent.verified_args = response
         return {"messages": [response.model_dump_json(indent=2)]}
