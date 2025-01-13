@@ -79,7 +79,12 @@ portia = ["templates/**/*.jinja"]
 filterwarnings = [
     "ignore:Failing to pass a value to the 'type_params' parameter of 'typing.ForwardRef._evaluate':DeprecationWarning",  # this comes from LangChain
 ]
-addopts = "--cov --cov-report=term-missing"
+addopts = [
+  "--cov",
+  "--cov-report=term-missing",
+  "--cov-report=html",
+  "--import-mode=importlib"
+]
 
 [tool.coverage.run]
 omit = [

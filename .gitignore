@@ -7,3 +7,4 @@ htmlcov
 docs
 .venv
 .env
+.vscode
