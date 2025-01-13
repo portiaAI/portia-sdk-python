@@ -17,6 +17,8 @@ class Variable(BaseModel):
     or a constant input variable.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(
         description=(
             "The name of the variable starting with '$'. The variable should be the output"
@@ -34,6 +36,8 @@ class Variable(BaseModel):
 
 class Step(BaseModel):
     """A step in a workflow."""
+
+    model_config = ConfigDict(extra="forbid")
 
     task: str = Field(
         description="The task that needs to be completed by this step",
@@ -59,7 +63,7 @@ class Step(BaseModel):
 class ReadOnlyStep(Step):
     """A read only copy of a step, passed to agents for reference."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     @classmethod
     def from_step(cls, step: Step) -> ReadOnlyStep:
@@ -74,6 +78,8 @@ class ReadOnlyStep(Step):
 
 class Plan(BaseModel):
     """A plan represent a series of steps that an agent should follow to execute the query."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: UUID = Field(
         default_factory=uuid4,
