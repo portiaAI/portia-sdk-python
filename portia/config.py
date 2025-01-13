@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, TypeVar, Self, Any
+from typing import Annotated, Self, TypeVar
 
-from pydantic import AfterValidator, BaseModel, SecretStr, model_validator, ValidationError, Field
+from pydantic import AfterValidator, BaseModel, Field, SecretStr, model_validator
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
@@ -70,12 +70,12 @@ class LLMModel(Enum):
         """Get the associated provider for the model."""
         if self in SUPPORTED_OPENAI_MODELS:
             return LLMProvider.OPENAI
-        elif self in SUPPORTED_ANTHROPIC_MODELS:
+        if self in SUPPORTED_ANTHROPIC_MODELS:
             return LLMProvider.ANTHROPIC
-        elif self in SUPPORTED_MISTRALAI_MODELS:
+        if self in SUPPORTED_MISTRALAI_MODELS:
             return LLMProvider.MISTRALAI
-        else:
-            raise ValueError(f"Unsupported model: {self}")
+        raise ValueError(f"Unsupported model: {self}")
+
 
 SUPPORTED_OPENAI_MODELS = [
     LLMModel.GPT_4_O,
@@ -127,12 +127,20 @@ class Config(BaseModel):
 
     # Portia Cloud Options
     portia_api_endpoint: str = "https://api.porita.dev"
-    portia_api_key: SecretStr | None = Field(default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""))
+    portia_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
+    )
 
     # LLM API Keys
-    openai_api_key: SecretStr | None = Field(default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""))
-    anthropic_api_key: SecretStr | None = Field(default_factory=lambda: SecretStr(os.getenv("ANTHROPIC_API_KEY") or ""))
-    mistralai_api_key: SecretStr | None = Field(default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""))
+    openai_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""),
+    )
+    anthropic_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("ANTHROPIC_API_KEY") or ""),
+    )
+    mistralai_api_key: SecretStr | None = Field(
+        default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
+    )
 
     # Storage Options
     storage_class: StorageClass
@@ -168,7 +176,7 @@ class Config(BaseModel):
     # agent_system_context_extension allows passing additional context to the
     # agent LLMs. Useful for passing execution hints or other data.
     agent_system_context_extension: list[str] | None = None
-        
+
     @model_validator(mode="after")
     def check_config(self) -> Self:
         """Validate Config is consistent."""
