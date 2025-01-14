@@ -10,7 +10,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from portia.errors import PlanNotFoundError, WorkflowNotFoundError
-from portia.plan import Plan
+from portia.plan import Plan, PlanContext, Step
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
@@ -188,7 +188,12 @@ class PortiaCloudStorage(Storage):
         """Add plan to cloud."""
         response = httpx.post(
             url=f"{self.api_endpoint}/api/v0/plans/",
-            json={"id": str(plan.id), "json": plan.model_dump(mode="json")},
+            json={
+                "id": str(plan.id),
+                "query": plan.plan_context.query,
+                "tool_list": [tool.name for tool in plan.plan_context.tool_list],
+                "steps": [step.model_dump(mode="json") for step in plan.steps],
+            },
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
@@ -206,7 +211,15 @@ class PortiaCloudStorage(Storage):
             },
         )
         response.raise_for_status()
-        return Plan.model_validate(response.json()["json"])
+        response_json = response.json()
+        return Plan(
+            id=UUID(response_json["id"]),
+            plan_context=PlanContext(
+                query=response_json["query"],
+                tool_list=response_json["tool_list"],
+            ),
+            steps=[Step.model_validate(step) for step in response_json["steps"]],
+        )
 
     def save_workflow(self, workflow: Workflow) -> None:
         """Add workflow to cloud."""

@@ -1,10 +1,14 @@
 """Default examples that are passed to the query planner."""
 
-from portia.plan import Plan, Step, Variable
+from portia.plan import Plan, PlanContext, Step, Variable
 
+# TODO(Emma): Currently the jinja template references the tool list, but this is not set in the
+# examples here.
 DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
-        query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
+        plan_context=PlanContext(
+            query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
+        ),
         steps=[
             Step(
                 task="Find and summarize the latest news on artificial intelligence",
