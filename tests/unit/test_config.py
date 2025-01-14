@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from portia import storage
 from portia.config import (
     AgentType,
     Config,
