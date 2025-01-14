@@ -26,6 +26,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
+from portia.context import empty_context
 from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
@@ -216,7 +217,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(return_artifact=True)],
+        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -275,7 +276,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(return_artifact=True)],
+        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -442,7 +443,7 @@ def test_verifier_agent_edge_cases() -> None:
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(return_artifact=True)],
+        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidWorkflowStateError):
@@ -611,6 +612,12 @@ def test_process_output() -> None:
 
     # with no artifact
     message = ToolMessage(content="456", tool_call_id="123")
+    output = agent.process_output(message)
+    assert isinstance(output, Output)
+    assert output.value == "456"
+
+    # with Human artifact
+    message = HumanMessage(content="456", tool_call_id="123")
     output = agent.process_output(message)
     assert isinstance(output, Output)
     assert output.value == "456"
