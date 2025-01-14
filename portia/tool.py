@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
@@ -25,7 +25,6 @@ from portia.logger import logger
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
-    from pydantic.v1 import ValidationError as ValidationErrorV1
 
     from portia.context import ExecutionContext
 
