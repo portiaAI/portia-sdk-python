@@ -1,9 +1,9 @@
 """Tests for the Planner module."""
 
+import re
 from unittest.mock import MagicMock
 from uuid import UUID
 
-import re
 import pytest
 
 from portia.config import Config
