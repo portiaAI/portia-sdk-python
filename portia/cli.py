@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from functools import wraps
+from typing import Any, Callable
 
 import click
 from dotenv import load_dotenv
@@ -37,8 +38,8 @@ class CLIOptions(Enum):
 
 PORTIA_API_KEY = "portia_api_key"
 
-def common_options(f):
-    """Common options decorator for CLI commands."""
+def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
+    """Define common options for CLI commands."""
     @click.option(
         "--log-level",
         type=click.Choice([level.name for level in LogLevel], case_sensitive=False),
@@ -64,14 +65,14 @@ def common_options(f):
         help="The LLM model to use",
     )
     @wraps(f)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         return f(*args, **kwargs)
     return wrapper
 
 @click.group()
-def cli():
+def cli() -> None:
     """Portia CLI."""
-    pass
+
 
 @click.command()
 @common_options
@@ -86,7 +87,7 @@ def run(query: str,
         log_level=LogLevel[log_level.upper()],
         llm_provider=LLMProvider(llm_provider.upper()) if llm_provider else None,
         llm_model=LLMModel(llm_model.upper()) if llm_model else None,
-        env_location=EnvLocation(env_location.upper())
+        env_location=EnvLocation(env_location.upper()),
     )
     # Add the tool registry
     registry = example_tool_registry
@@ -111,7 +112,7 @@ def plan(query: str,
         log_level=LogLevel[log_level.upper()],
         llm_provider=LLMProvider(llm_provider.upper()) if llm_provider else None,
         llm_model=LLMModel(llm_model.upper()) if llm_model else None,
-        env_location=EnvLocation(env_location.upper())
+        env_location=EnvLocation(env_location.upper()),
     )
     registry = example_tool_registry
     if config.has_api_key(PORTIA_API_KEY):
