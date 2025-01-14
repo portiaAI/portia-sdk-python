@@ -17,7 +17,6 @@ from portia.context import get_execution_context
 from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
-    WorkflowNotFoundError,
 )
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
 from portia.logger import logger, logger_manager
