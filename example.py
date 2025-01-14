@@ -13,26 +13,23 @@ runner = Runner(
 
 
 # Simple Example
-workflow = runner.create_workflow_from_query(
+workflow = runner.execute_query(
     "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
 )
-runner.execute_workflow(workflow)
 
 
 # With Execution Context
 with execution_context(end_user_id="123"):
-    workflow = runner.create_workflow_from_query(
+    workflow = runner.execute_query(
         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
     )
-    workflow = runner.execute_workflow(workflow)
 
 
 # When we hit a clarification we can ask our end user for clarification then resume the process
 with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-    workflow = runner.create_workflow_from_query(
+    workflow = runner.execute_query(
         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
     )
-    workflow = runner.execute_workflow(workflow)
 
 
 # Fetch workflow

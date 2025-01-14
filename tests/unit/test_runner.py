@@ -33,8 +33,7 @@ def test_runner_run_query(runner: Runner) -> None:
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    workflow = runner.create_workflow_from_query(query)
-    workflow = runner.execute_workflow(workflow)
+    workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
 
@@ -53,8 +52,7 @@ def test_runner_run_query_disk_storage() -> None:
         mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
         LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-        workflow = runner.create_workflow_from_query(query)
-        workflow = runner.execute_workflow(workflow)
+        workflow = runner.execute_query(query)
 
         assert workflow.state == WorkflowState.COMPLETE
         # Use Path to check for the files

@@ -91,8 +91,7 @@ def run(
 
     # Run the query
     runner = Runner(config=config, tool_registry=registry)
-    workflow = runner.create_workflow_from_query(query)
-    output = runner.execute_workflow(workflow)
+    output = runner.execute_query(query)
     click.echo(output.model_dump_json(indent=4))
 
 

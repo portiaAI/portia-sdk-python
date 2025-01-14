@@ -52,8 +52,7 @@ def test_runner_run_query(
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Add 1 + 2 together"
 
-    workflow = runner.create_workflow_from_query(query)
-    workflow = runner.execute_workflow(workflow)
+    workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
@@ -87,8 +86,7 @@ def test_runner_generate_plan(
     assert len(plan.steps[0].inputs) == 2
     assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
 
-    workflow = runner.create_workflow_from_query(query)
-    workflow = runner.execute_workflow(workflow)
+    workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
