@@ -128,15 +128,12 @@ class Runner:
         workflow_id: UUID | str | None = None,
     ) -> Workflow:
         """Run a workflow."""
-        if not workflow and not workflow_id:
-            raise ValueError("Either workflow or workflow_id must be provided")
+        if not workflow:
+            if not workflow_id:
+                raise ValueError("Either workflow or workflow_id must be provided")
 
-        if not workflow and workflow_id:
             parsed_id = UUID(workflow_id) if isinstance(workflow_id, str) else workflow_id
             workflow = self.storage.get_workflow(parsed_id)
-
-        if not workflow:
-            raise WorkflowNotFoundError(workflow_id)
 
         if workflow.state not in [
             WorkflowState.NOT_STARTED,

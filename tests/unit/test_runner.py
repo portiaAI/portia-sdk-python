@@ -1,13 +1,16 @@
 """Tests for runner classes."""
 
+from pdb import run
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 
+from portia import planner
 from portia.config import AgentType, StorageClass
-from portia.errors import InvalidWorkflowStateError, PlanError
+from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, Step
 from portia.planner import PlanOrError
@@ -162,6 +165,30 @@ def test_runner_execute_workflow(runner: Runner) -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.current_step_index == 1
+
+
+def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
+    """Test edge cases for execute."""
+    with pytest.raises(ValueError):  # noqa: PT011
+        runner.execute_workflow()
+
+    query = "example query"
+    mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow_from_plan(plan)
+
+    # Simulate workflow being in progress
+    workflow.state = WorkflowState.IN_PROGRESS
+    workflow.current_step_index = 1
+    workflow = runner.execute_workflow(workflow_id=workflow.id)
+
+    assert workflow.state == WorkflowState.COMPLETE
+    assert workflow.current_step_index == 1
+
+    with pytest.raises(WorkflowNotFoundError):
+        runner.execute_workflow(workflow_id=uuid4())
 
 
 def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
