@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
+from portia.context import get_execution_context
 from portia.workflow import Workflow, WorkflowState
 
 
@@ -112,6 +113,13 @@ class Plan(BaseModel):
         """Serialize the id to a string."""
         return str(plan_id)
 
-    def create_workflow(self) -> Workflow:
+    def create_workflow(
+        self,
+    ) -> Workflow:
         """Create a new workflow from this plan."""
-        return Workflow(plan_id=self.id, state=WorkflowState.NOT_STARTED)
+        ctx = get_execution_context()
+        return Workflow(
+            plan_id=self.id,
+            state=WorkflowState.NOT_STARTED,
+            execution_context=ctx,
+        )

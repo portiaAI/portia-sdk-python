@@ -86,7 +86,6 @@ class Runner:
             query=query,
             tool_list=tools,
             examples=example_plans,
-            system_context_extension=self.config.planner_system_context_extension,
         )
         if outcome.error:
             logger.error(f"Error in planning - {outcome.error}")
@@ -104,12 +103,18 @@ class Runner:
 
         return outcome.plan
 
-    def create_and_execute_workflow(self, plan: Plan) -> Workflow:
+    def create_and_execute_workflow(
+        self,
+        plan: Plan,
+    ) -> Workflow:
         """Create a new workflow from a plan and then run it."""
         workflow = plan.create_workflow()
         return self._execute_workflow(plan, workflow)
 
-    def execute_workflow(self, workflow: Workflow) -> Workflow:
+    def execute_workflow(
+        self,
+        workflow: Workflow,
+    ) -> Workflow:
         """Run a workflow."""
         if workflow.state not in [
             WorkflowState.NOT_STARTED,
@@ -122,6 +127,7 @@ class Runner:
         return self._execute_workflow(plan, workflow)
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
+        workflow.state = WorkflowState.IN_PROGRESS
         self.storage.save_workflow(workflow)
         logger.debug(
             f"Executing workflow from step {workflow.current_step_index}",
@@ -139,7 +145,7 @@ class Runner:
             agent = self._get_agent_for_step(
                 step=ReadOnlyStep.from_step(step),
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
-                config=self.config,  # config is already frozen so we don't need to copy
+                config=self.config,
             )
             logger.debug(
                 f"Using agent: {type(agent)}",

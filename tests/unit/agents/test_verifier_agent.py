@@ -26,6 +26,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
+from portia.context import empty_context
 from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
@@ -127,6 +128,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
@@ -139,13 +141,39 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert mock_invoker.called
     messages = mock_invoker.prompt
     assert messages
-    assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
+    assert "You are a highly capable assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert mock_invoker.output_format == ToolInputs
+
+
+def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the parser model with retries."""
+    tool_inputs = ToolInputs(
+        args=[],
+    )
+    mock_invoker = MockInvoker(response=tool_inputs)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.tool = SimpleNamespace(
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    parser_model = ParserModel(
+        llm=LLMWrapper(get_test_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+    with pytest.raises(InvalidAgentOutputError):
+        parser_model.invoke({})  # type: ignore  # noqa: PGH003
 
 
 def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -216,7 +244,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(return_artifact=True)],
+        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -275,7 +303,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(return_artifact=True)],
+        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -442,7 +470,7 @@ def test_verifier_agent_edge_cases() -> None:
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(return_artifact=True)],
+        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidWorkflowStateError):
@@ -611,6 +639,12 @@ def test_process_output() -> None:
 
     # with no artifact
     message = ToolMessage(content="456", tool_call_id="123")
+    output = agent.process_output(message)
+    assert isinstance(output, Output)
+    assert output.value == "456"
+
+    # with Human artifact
+    message = HumanMessage(content="456", tool_call_id="123")
     output = agent.process_output(message)
     assert isinstance(output, Output)
     assert output.value == "456"

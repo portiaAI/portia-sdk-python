@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import time
 from abc import abstractmethod
-from typing import Any, Generic
+from functools import partial
+from typing import TYPE_CHECKING, Any, Generic
 
 import httpx
 from langchain_core.tools import StructuredTool
@@ -22,6 +23,10 @@ from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logger import logger
 from portia.templates.render import render_template
+
+if TYPE_CHECKING:
+
+    from portia.context import ExecutionContext
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
 
@@ -53,12 +58,18 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     )
 
     @abstractmethod
-    def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:  # noqa: ANN401
+    def run(
+        self,
+        ctx: ExecutionContext,
+        *args: Any,  # noqa: ANN401
+        **kwargs: Any,  # noqa: ANN401
+    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
         """Run the tool.
 
         This method must be implemented by subclasses to define the tool's specific behavior.
 
         Args:
+            ctx (ExecutionContext): Context of the execution environment
             args (Any): The arguments passed to the tool for execution.
             kwargs (Any): The keyword arguments passed to the tool for execution.
 
@@ -69,17 +80,20 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def _run(
         self,
+        ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
         """Run the Tool function and generate an Output object with descriptions."""
         args_dict = {f"{i}": arg for i, arg in enumerate(args)}
         data = {**args_dict, **kwargs}
-        logger.info(f"Invoking: {self.name} with {data}")
+        logger.info(f"Invoking: {self.name} with {data} and context {ctx}")
         start_time = time.time()
+
         try:
-            output = self.run(*args, **kwargs)
+            output = self.run(ctx, *args, **kwargs)
         except Exception as e:
+            logger.error(f"Tool: {self.name} returned error {e}")
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
@@ -104,6 +118,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def _run_with_artifacts(
         self,
+        ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> tuple[str, Output[SERIALIZABLE_TYPE_VAR]]:
@@ -113,7 +128,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         This allows us to capture the output (artifact) directly instead of having it
         serialized to a string first (see content_and_artifact in langgraph tool definition).
         """
-        intermediate_output = self._run(*args, **kwargs)
+        intermediate_output = self._run(ctx, *args, **kwargs)
         return (intermediate_output.value, intermediate_output)  # type: ignore  # noqa: PGH003
 
     def _generate_tool_description(self) -> str:
@@ -164,7 +179,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise InvalidToolDescriptionError(self.name)
         return self
 
-    def to_langchain(self, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002
+    def to_langchain(self, ctx: ExecutionContext, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002
         """Return a LangChain representation of this tool.
 
         Langchain agent needs to use the "content" response format, but Langgraph
@@ -175,7 +190,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 name=self.name.replace(" ", "_"),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
-                func=self._run_with_artifacts,
+                func=partial(self._run_with_artifacts, ctx),
                 return_direct=True,
                 response_format="content_and_artifact",
             )
@@ -183,7 +198,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             name=self.name.replace(" ", "_"),
             description=self._generate_tool_description(),
             args_schema=self.args_schema,
-            func=self._run,
+            func=partial(self._run, ctx),
         )
 
     def args_json_schema(self) -> dict[str, Any]:
@@ -197,7 +212,12 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     api_key: SecretStr
     api_endpoint: str
 
-    def run(self, *args: Any, **kwargs: Any) -> SERIALIZABLE_TYPE_VAR | Clarification:  # noqa: ANN401
+    def run(
+        self,
+        ctx: ExecutionContext,
+        *args: Any,  # noqa: ANN401
+        **kwargs: Any,  #  noqa: ANN401
+    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
         """Invoke the run endpoint and handle response."""
         try:
             # Combine args and kwargs
@@ -206,7 +226,15 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             # Send to Cloud
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
-                content=json.dumps({"arguments": data, "execution_context": {}}),
+                content=json.dumps(
+                    {
+                        "arguments": data,
+                        "execution_context": {
+                            "end_user_id": ctx.end_user_id or "",
+                            "additional_data": ctx.additional_data or {},
+                        },
+                    },
+                ),
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",

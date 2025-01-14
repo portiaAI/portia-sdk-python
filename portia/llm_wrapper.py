@@ -71,6 +71,7 @@ class LLMWrapper(BaseLLMWrapper):
                     temperature=self.model_temperature,
                     seed=self.model_seed,
                     api_key=self.config.openai_api_key,
+                    max_retries=3,
                 )
             case LLMProvider.ANTHROPIC:
                 return ChatAnthropic(
@@ -78,6 +79,7 @@ class LLMWrapper(BaseLLMWrapper):
                     temperature=self.model_temperature,
                     timeout=120,
                     stop=None,
+                    max_retries=3,
                     api_key=self.config.must_get_api_key("anthropic_api_key"),
                 )
             case LLMProvider.MISTRALAI:
@@ -85,6 +87,7 @@ class LLMWrapper(BaseLLMWrapper):
                     model_name=self.model_name,
                     temperature=self.model_temperature,
                     api_key=self.config.mistralai_api_key,
+                    max_retries=3,
                 )
 
     def to_instructor(
