@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from portia.workflow import Workflow, WorkflowState
 
@@ -106,6 +106,11 @@ class Plan(BaseModel):
             # If missing or invalid, use the default_factory
             values["id"] = uuid4()
         return values
+
+    @field_serializer("id")
+    def serialize_id(self, plan_id: UUID) -> str:
+        """Serialize the id to a string."""
+        return str(plan_id)
 
     def create_workflow(self) -> Workflow:
         """Create a new workflow from this plan."""
