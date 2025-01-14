@@ -1,6 +1,7 @@
 """E2E Tests."""
 
 import pytest
+from regex import P
 
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
@@ -177,6 +178,7 @@ def test_runner_run_query_with_hard_error(
         ],
     )
     plan = Plan(query="raise an error", steps=[clarification_step])
+    runner.storage.save_plan(plan)
     workflow = runner.create_workflow_from_plan(plan)
     workflow = runner.execute_workflow(workflow)
 
@@ -225,6 +227,7 @@ def test_runner_run_query_with_soft_error(
         ],
     )
     plan = Plan(query="raise an error", steps=[clarification_step])
+    runner.storage.save_plan(plan)
     workflow = runner.create_workflow_from_plan(plan)
     workflow = runner.execute_workflow(workflow)
 
