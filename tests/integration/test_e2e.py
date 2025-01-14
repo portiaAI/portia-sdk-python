@@ -133,7 +133,8 @@ def test_runner_run_query_with_clarifications(
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
 
     workflow.get_outstanding_clarifications()[0].resolve(response=False)
-    runner.execute_workflow(workflow)
+    with execution_context(additional_data={"raise_clarification": "False"}):
+        runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
 
 
