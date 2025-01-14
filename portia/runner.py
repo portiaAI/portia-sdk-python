@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
@@ -12,9 +13,11 @@ from portia.clarification import (
     Clarification,
 )
 from portia.config import AgentType, Config, StorageClass
+from portia.context import get_execution_context
 from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
+    WorkflowNotFoundError,
 )
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
 from portia.logger import logger, logger_manager
@@ -54,17 +57,7 @@ class Runner:
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=config)
 
-    def run_query(
-        self,
-        query: str,
-        tools: list[Tool] | list[str] | None = None,
-        example_workflows: list[Plan] | None = None,
-    ) -> Workflow:
-        """Plan and run a query in one go."""
-        plan = self.plan_query(query, tools, example_workflows)
-        return self.create_and_execute_workflow(plan)
-
-    def plan_query(
+    def generate_plan(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
@@ -103,19 +96,44 @@ class Runner:
 
         return outcome.plan
 
-    def create_and_execute_workflow(
+    def create_workflow_from_query(
         self,
-        plan: Plan,
+        query: str,
+        tools: list[Tool] | list[str] | None = None,
+        example_workflows: list[Plan] | None = None,
     ) -> Workflow:
-        """Create a new workflow from a plan and then run it."""
-        workflow = plan.create_workflow()
-        return self._execute_workflow(plan, workflow)
+        """Plan a query then execute it as a workflow in one go."""
+        plan = self.generate_plan(query, tools, example_workflows)
+        return Workflow(
+            plan_id=plan.id,
+            state=WorkflowState.NOT_STARTED,
+            execution_context=get_execution_context(),
+        )
+
+    def create_workflow_from_plan(self, plan: Plan) -> Workflow:
+        """Create a workflow from a Plan."""
+        return Workflow(
+            plan_id=plan.id,
+            state=WorkflowState.NOT_STARTED,
+            execution_context=get_execution_context(),
+        )
 
     def execute_workflow(
         self,
-        workflow: Workflow,
+        workflow: Workflow | None = None,
+        workflow_id: UUID | str | None = None,
     ) -> Workflow:
         """Run a workflow."""
+        if not workflow and not workflow_id:
+            raise ValueError("Either workflow or workflow_id must be provided")
+
+        if not workflow and workflow_id:
+            parsed_id = UUID(workflow_id) if isinstance(workflow_id, str) else workflow_id
+            workflow = self.storage.get_workflow(parsed_id)
+
+        if not workflow:
+            raise WorkflowNotFoundError(workflow_id)
+
         if workflow.state not in [
             WorkflowState.NOT_STARTED,
             WorkflowState.IN_PROGRESS,

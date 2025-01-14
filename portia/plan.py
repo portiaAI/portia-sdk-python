@@ -112,14 +112,3 @@ class Plan(BaseModel):
     def serialize_id(self, plan_id: UUID) -> str:
         """Serialize the id to a string."""
         return str(plan_id)
-
-    def create_workflow(
-        self,
-    ) -> Workflow:
-        """Create a new workflow from this plan."""
-        ctx = get_execution_context()
-        return Workflow(
-            plan_id=self.id,
-            state=WorkflowState.NOT_STARTED,
-            execution_context=ctx,
-        )
