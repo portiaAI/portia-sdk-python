@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.0.1-alpha.15"
+version = "0.0.1-alpha.16"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Tech <tech@portialabs.ai>"]
 readme = "README.md"
@@ -16,7 +16,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.10"
 pydantic = "^2.10.3"
 jinja2 = "^3.1.4"
 instructor = "^1.7.0"
