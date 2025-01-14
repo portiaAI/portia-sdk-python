@@ -9,7 +9,7 @@ from portia.agents.base_agent import Output
 from portia.agents.context import build_context
 from portia.clarification import ActionClarification, InputClarification
 from portia.context import ExecutionContext
-from portia.plan import Plan, PlanContext, Step, Variable
+from portia.plan import Step, Variable
 from tests.utils import get_test_workflow
 
 
