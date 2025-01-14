@@ -62,17 +62,17 @@ class LLMModel(Enum):
     """Supported Models."""
 
     # OpenAI
-    GPT_4_O = "GPT_4_O"
-    GPT_4_O_MINI = "GPT_4_O_MINI"
-    GPT_3_5_TURBO = "GPT_3_5_TURBO"
+    GPT_4_O = "gpt-4o"
+    GPT_4_O_MINI = "gpt-4o-mini"
+    GPT_3_5_TURBO = "gpt-3.5-turbo"
 
     # Anthropic
-    CLAUDE_3_5_SONNET = "CLAUDE_3_5_SONNET-LATEST"
-    CLAUDE_3_5_HAIKU = "CLAUDE_3_5_HAIKU-LATEST"
-    CLAUDE_3_OPUS_LATEST = "CLAUDE_3_OPUS-LATEST"
+    CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
+    CLAUDE_3_5_HAIKU = "claude-3-5-haiku-latest"
+    CLAUDE_3_OPUS_LATEST = "claude-3-opus-latest"
 
     # MistralAI
-    MISTRAL_LARGE_LATEST = "MISTRAL_LARGE_LATEST"
+    MISTRAL_LARGE_LATEST = "mistral-large-latest"
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model."""
