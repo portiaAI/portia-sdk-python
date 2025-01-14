@@ -104,19 +104,23 @@ class Runner:
     ) -> Workflow:
         """Plan a query then execute it as a workflow in one go."""
         plan = self.generate_plan(query, tools, example_workflows)
-        return Workflow(
+        workflow = Workflow(
             plan_id=plan.id,
             state=WorkflowState.NOT_STARTED,
             execution_context=get_execution_context(),
         )
+        self.storage.save_workflow(workflow)
+        return workflow
 
     def create_workflow_from_plan(self, plan: Plan) -> Workflow:
         """Create a workflow from a Plan."""
-        return Workflow(
+        workflow = Workflow(
             plan_id=plan.id,
             state=WorkflowState.NOT_STARTED,
             execution_context=get_execution_context(),
         )
+        self.storage.save_workflow(workflow)
+        return workflow
 
     def execute_workflow(
         self,
