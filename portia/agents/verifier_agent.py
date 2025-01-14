@@ -12,7 +12,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, To
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.toolless_agent import ToolLessAgent
@@ -90,22 +90,33 @@ class ParserModel:
     arg_parser_prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(
-                content="You are very powerful assistant, but don't know current events."
-                "Your job is to correctly return the arguments needed for the given tool."
-                "Make sure you explain where you are getting the argument value from "
-                "(e.g. from the given context, from past messages, etc.)\n",
+                content=(
+                    "You are a highly capable assistant tasked with generating valid arguments for "
+                    "tools based on provided input. "
+                    "While you are not aware of current events, you excel at reasoning "
+                    "and adhering to instructions. "
+                    "Your responses must clearly explain the source of each argument "
+                    "(e.g., context, past messages, clarifications). "
+                    "Avoid assumptions or fabricated information."
+                ),
             ),
             HumanMessagePromptTemplate.from_template(
-                "Context for user input and past steps:"
-                "\n{context}\n"
-                "You will need to achieve the following goal: {task}\n"
-                "The system will have a tool available, called {tool_name}.\n"
-                "The format of the arguments for the tool are:\n{tool_args}\n"
-                "More about the tool: {tool_description}\n"
+                "Context for user input and past steps:\n{context}\n"
+                "Task: {task}\n"
+                "The system has a tool available named '{tool_name}'.\n"
+                "Argument schema for the tool:\n{tool_args}\n"
+                "Description of the tool: {tool_description}\n"
                 "\n\n----------\n\n"
-                "Please provide the arguments for the tool. Prefer values in clarifications over\n"
-                "those in the initial input. Do not provide placeholder arguments like \n"
-                "example@example.com. Instead mark them an invalid.\n",
+                "The following section contains previous schema errors. "
+                "Ensure your response avoids these errors:\n"
+                "{previous_errors}\n"
+                "\n\n----------\n\n"
+                "Please provide the arguments for the tool. Adhere to the following guidelines:\n"
+                "- Prefer values clarified in follow-up inputs over initial inputs.\n"
+                "- If a required value is missing or unclear, explicitly mark it as invalid and "
+                "specify what additional information is needed.\n"
+                "- Do not provide placeholder values (e.g., 'example@example.com').\n"
+                "- Ensure arguments align with the tool's schema and intended use.\n",
             ),
         ],
     )
@@ -115,8 +126,10 @@ class ParserModel:
         self.llm = llm
         self.context = context
         self.agent = agent
+        self.previous_errors: list[str] = []
+        self.retries = 0
 
-    def invoke(self, _: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: MessagesState) -> dict[str, Any]:
         """Invoke the model with the given message state."""
         if not self.agent.tool:
             raise InvalidWorkflowStateError(None)
@@ -128,9 +141,27 @@ class ParserModel:
                 tool_name=self.agent.tool.name,
                 tool_args=self.agent.tool.args_json_schema(),
                 tool_description=self.agent.tool.description,
+                previous_errors=",".join(self.previous_errors),
             ),
         )
         response = ToolInputs.model_validate(response)
+
+        # also test the ToolInputs that have come back
+        # actually work for the schema of the tool
+        # if not we can retry
+        test_args = {}
+        for arg in response.args:
+            test_args[arg.name] = arg.value
+        try:
+            self.agent.tool.args_schema.model_validate(test_args)
+        except ValidationError as e:
+            err = str(e)
+            self.previous_errors.append(err)
+            self.retries += 1
+            if self.retries <= MAX_RETRIES:
+                return self.invoke(state)
+            raise InvalidAgentOutputError(err) from e
+
         return {"messages": [response.model_dump_json(indent=2)]}
 
 
