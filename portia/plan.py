@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from portia.context import get_execution_context
 from portia.workflow import Workflow, WorkflowState
@@ -17,6 +17,8 @@ class Variable(BaseModel):
     A variable is a way of referencing other parts of the plan usually either another steps output
     or a constant input variable.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(
         description=(
@@ -35,6 +37,8 @@ class Variable(BaseModel):
 
 class Step(BaseModel):
     """A step in a workflow."""
+
+    model_config = ConfigDict(extra="forbid")
 
     task: str = Field(
         description="The task that needs to be completed by this step",
@@ -60,7 +64,7 @@ class Step(BaseModel):
 class ReadOnlyStep(Step):
     """A read only copy of a step, passed to agents for reference."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     @classmethod
     def from_step(cls, step: Step) -> ReadOnlyStep:
@@ -75,6 +79,8 @@ class ReadOnlyStep(Step):
 
 class Plan(BaseModel):
     """A plan represent a series of steps that an agent should follow to execute the query."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: UUID = Field(
         default_factory=uuid4,
@@ -101,6 +107,11 @@ class Plan(BaseModel):
             # If missing or invalid, use the default_factory
             values["id"] = uuid4()
         return values
+
+    @field_serializer("id")
+    def serialize_id(self, plan_id: UUID) -> str:
+        """Serialize the id to a string."""
+        return str(plan_id)
 
     def create_workflow(
         self,
