@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from portia.context import get_execution_context
 from portia.plan import Plan
 from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
@@ -41,14 +42,14 @@ class Planner:
         self,
         query: str,
         tool_list: list[Tool],
-        system_context_extension: list[str] | None = None,
         examples: list[Plan] | None = None,
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
+        ctx = get_execution_context()
         prompt = _render_prompt_insert_defaults(
             query,
             tool_list,
-            system_context_extension,
+            ctx.planner_system_context_extension,
             examples,
         )
         response = self.llm_wrapper.to_instructor(

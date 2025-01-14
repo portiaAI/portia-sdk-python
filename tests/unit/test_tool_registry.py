@@ -2,6 +2,7 @@
 
 import pytest
 
+from portia.context import get_execution_context
 from portia.errors import ToolNotFoundError
 from portia.tool import Tool
 from portia.tool_registry import (
@@ -68,7 +69,8 @@ def test_local_tool_registry_get_and_run() -> None:
     local_tool_registry = InMemoryToolRegistry()
     local_tool_registry.register_tool(MockTool(name=MOCK_TOOL_NAME))
     tool1 = local_tool_registry.get_tool(MOCK_TOOL_NAME)
-    tool1.run()
+    ctx = get_execution_context()
+    tool1.run(ctx)
 
 
 def test_local_tool_registry_get_tools() -> None:

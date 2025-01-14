@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from portia.agents.context import build_context
 from portia.common import SERIALIZABLE_TYPE_VAR
+from portia.context import get_execution_context
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -62,11 +63,11 @@ class BaseAgent:
 
     def get_system_context(self) -> str:
         """Build a generic system context string from the step and workflow provided."""
+        ctx = get_execution_context()
         return build_context(
-            self.step.inputs,
-            self.workflow.step_outputs,
-            self.workflow.clarifications,
-            self.config.agent_system_context_extension,
+            ctx,
+            self.step,
+            self.workflow,
         )
 
 
