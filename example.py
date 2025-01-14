@@ -12,7 +12,7 @@ runner = Runner(
 )
 
 
-# Simple Example 
+# Simple Example
 workflow = runner.create_workflow_from_query(
     "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
 )
