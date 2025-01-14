@@ -13,7 +13,7 @@ from portia.clarification import (
     Clarification,
 )
 from portia.config import AgentType, Config, StorageClass
-from portia.context import get_execution_context
+from portia.context import execution_context, get_execution_context, is_execution_context_set
 from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
@@ -56,6 +56,17 @@ class Runner:
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=config)
 
+    def execute_query(
+        self,
+        query: str,
+        tools: list[Tool] | list[str] | None = None,
+        example_plans: list[Plan] | None = None,
+    ) -> Workflow:
+        """End to end function to generate a plan and then execute it."""
+        plan = self.generate_plan(query, tools, example_plans)
+        workflow = self.create_workflow_from_plan(plan)
+        return self.execute_workflow(workflow)
+
     def generate_plan(
         self,
         query: str,
@@ -95,22 +106,6 @@ class Runner:
 
         return outcome.plan
 
-    def create_workflow_from_query(
-        self,
-        query: str,
-        tools: list[Tool] | list[str] | None = None,
-        example_workflows: list[Plan] | None = None,
-    ) -> Workflow:
-        """Plan a query then execute it as a workflow in one go."""
-        plan = self.generate_plan(query, tools, example_workflows)
-        workflow = Workflow(
-            plan_id=plan.id,
-            state=WorkflowState.NOT_STARTED,
-            execution_context=get_execution_context(),
-        )
-        self.storage.save_workflow(workflow)
-        return workflow
-
     def create_workflow_from_plan(self, plan: Plan) -> Workflow:
         """Create a workflow from a Plan."""
         workflow = Workflow(
@@ -142,6 +137,12 @@ class Runner:
             raise InvalidWorkflowStateError(workflow.id)
 
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
+
+        # if the workflow has execution context, but none is set then override it
+        if not is_execution_context_set() and workflow.execution_context:
+            with execution_context(workflow.execution_context):
+                return self._execute_workflow(plan, workflow)
+
         return self._execute_workflow(plan, workflow)
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:

@@ -120,3 +120,8 @@ def execution_context(
 def get_execution_context() -> ExecutionContext:
     """Retrieve the current end-user from the context."""
     return getattr(_execution_context, "context", empty_context())
+
+
+def is_execution_context_set() -> bool:
+    """Retrieve the current end-user from the context."""
+    return hasattr(_execution_context, "context")
