@@ -111,7 +111,7 @@ def test_portia_cloud_storage() -> None:
             url="https://api.porita.dev/api/v0/workflows/",
             json={
                 "id": str(workflow.id),
-                "json": workflow.model_dump(mode="json"),
+                "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
                 "plan_id": str(workflow.plan_id),
             },
             headers={
