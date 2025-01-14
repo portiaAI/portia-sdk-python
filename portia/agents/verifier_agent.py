@@ -12,7 +12,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, To
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.toolless_agent import ToolLessAgent
@@ -102,6 +102,7 @@ class ParserModel:
                 "The system will have a tool available, called {tool_name}.\n"
                 "The format of the arguments for the tool are:\n{tool_args}\n"
                 "More about the tool: {tool_description}\n"
+                "Make sure to avoid repeating previous errors: {previous_errors}"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Prefer values in clarifications over\n"
                 "those in the initial input. Do not provide placeholder arguments like \n"
@@ -115,12 +116,24 @@ class ParserModel:
         self.llm = llm
         self.context = context
         self.agent = agent
+        self.previous_errors: list[str] = []
+        self.retries = 0
 
-    def invoke(self, _: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: MessagesState) -> dict[str, Any]:
         """Invoke the model with the given message state."""
         if not self.agent.tool:
             raise InvalidWorkflowStateError(None)
         model = self.llm.with_structured_output(ToolInputs)
+        print(
+            self.arg_parser_prompt.format_messages(
+                context=self.context,
+                task=self.agent.step.task,
+                tool_name=self.agent.tool.name,
+                tool_args=self.agent.tool.args_json_schema(),
+                tool_description=self.agent.tool.description,
+                previous_errors=",".join(self.previous_errors),
+            ),
+        )
         response = model.invoke(
             self.arg_parser_prompt.format_messages(
                 context=self.context,
@@ -128,9 +141,24 @@ class ParserModel:
                 tool_name=self.agent.tool.name,
                 tool_args=self.agent.tool.args_json_schema(),
                 tool_description=self.agent.tool.description,
+                previous_errors=",".join(self.previous_errors),
             ),
         )
         response = ToolInputs.model_validate(response)
+
+        test_args = {}
+        for arg in response.args:
+            test_args[arg.name] = arg.value
+        try:
+            self.agent.tool.args_schema.model_validate(test_args)
+        except ValidationError as e:
+            err = str(e)
+            self.previous_errors.append(err)
+            self.retries += 1
+            if self.retries <= MAX_RETRIES:
+                return self.invoke(state)
+            raise InvalidAgentOutputError(err) from e
+
         return {"messages": [response.model_dump_json(indent=2)]}
 
 
@@ -286,6 +314,7 @@ class VerifierAgent(BaseAgent):
         errors = [msg for msg in messages if "ToolSoftError" in msg.content]
 
         if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
+            print("retrying")
             return "tool_agent"
         # Otherwise, we stop (reply to the user) as its a hard error or unknown
         return END

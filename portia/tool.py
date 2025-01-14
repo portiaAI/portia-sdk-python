@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
@@ -25,6 +25,8 @@ from portia.logger import logger
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
+    from pydantic.v1 import ValidationError as ValidationErrorV1
+
     from portia.context import ExecutionContext
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
@@ -178,6 +180,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise InvalidToolDescriptionError(self.name)
         return self
 
+    def handle_validation_errors(
+        self,
+        error: ValidationError | ValidationErrorV1,
+    ) -> str:
+        """Turn pydantic validation errors into soft errors."""
+        raise ToolSoftError(error) from error
+
     def to_langchain(self, ctx: ExecutionContext, return_artifact: bool = False) -> StructuredTool:  # noqa: FBT001, FBT002
         """Return a LangChain representation of this tool.
 
@@ -190,12 +199,14 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 func=partial(self._run_with_artifacts, ctx),
+                handle_validation_error=self.handle_validation_errors,
                 return_direct=True,
                 response_format="content_and_artifact",
             )
         return StructuredTool(
             name=self.name.replace(" ", "_"),
             description=self._generate_tool_description(),
+            handle_validation_error=self.handle_validation_errors,
             args_schema=self.args_schema,
             func=partial(self._run, ctx),
         )
