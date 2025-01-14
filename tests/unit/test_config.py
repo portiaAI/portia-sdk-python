@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr, ValidationError
 
+from portia import storage
 from portia.config import (
     AgentType,
     Config,
@@ -25,7 +26,7 @@ def test_runner_config_from_file() -> None:
 "llm_model_temperature": 10,
 "storage_class": "MEMORY",
 "llm_provider": "OPENAI",
-"llm_model_name": "gpt-4o-mini",
+"llm_model_name": "GPT_4_O_MINI",
 "llm_model_seed": 443,
 "default_agent_type": "VERIFIER"
 }"""
@@ -64,6 +65,38 @@ def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.openai_api_key == SecretStr("test-openai-key")
     assert c.anthropic_api_key == SecretStr("test-anthropic-key")
     assert c.mistralai_api_key == SecretStr("test-mistral-key")
+
+
+def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test setting keys as string."""
+    # storage
+    c = Config.from_default(storage_class="DISK")
+    assert c.storage_class == StorageClass.DISK
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(storage_class="OTHER")
+
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(storage_class=123)
+
+    # log level
+    c = Config.from_default(default_log_level="CRITICAL")
+    assert c.default_log_level == LogLevel.CRITICAL
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(default_log_level="some level")
+
+    # LLM provider + model
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+    c = Config.from_default(llm_provider="MISTRALAI", llm_model_name="mistral_large_latest")
+    assert c.llm_provider == LLMProvider.MISTRALAI
+    assert c.llm_model_name == LLMModel.MISTRAL_LARGE_LATEST
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(llm_provider="personal", llm_model_name="other-model")
+
+    # default_agent_type
+    c = Config.from_default(default_agent_type="verifier")
+    assert c.default_agent_type == AgentType.VERIFIER
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(default_agent_type="my agent")
 
 
 def test_getters() -> None:

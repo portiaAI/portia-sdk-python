@@ -5,9 +5,18 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Self, TypeVar
+from typing import Annotated, Callable, Self, TypeVar
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+    validator,
+)
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
@@ -54,17 +63,17 @@ class LLMModel(Enum):
     """Supported Models."""
 
     # OpenAI
-    GPT_4_O = "gpt-4o"
-    GPT_4_O_MINI = "gpt-4o-mini"
-    GPT_3_5_TURBO = "gpt-3.5-turbo"
+    GPT_4_O = "GPT_4_O"
+    GPT_4_O_MINI = "GPT_4_O_MINI"
+    GPT_3_5_TURBO = "GPT_3_5_TURBO"
 
     # Anthropic
-    CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
-    CLAUDE_3_5_HAIKU = "claude-3-5-haiku-latest"
-    CLAUDE_3_OPUS_LATEST = "claude-3-opus-latest"
+    CLAUDE_3_5_SONNET = "CLAUDE_3_5_SONNET-LATEST"
+    CLAUDE_3_5_HAIKU = "CLAUDE_3_5_HAIKU-LATEST"
+    CLAUDE_3_OPUS_LATEST = "CLAUDE_3_OPUS-LATEST"
 
     # MistralAI
-    MISTRAL_LARGE_LATEST = "mistral-large-latest"
+    MISTRAL_LARGE_LATEST = "MISTRAL_LARGE_LATEST"
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model."""
@@ -120,6 +129,28 @@ def is_greater_than_zero(value: int) -> int:
 PositiveNumber = Annotated[int, AfterValidator(is_greater_than_zero)]
 
 
+E = TypeVar("E", bound=Enum)
+
+
+def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
+    """Parse a string to enum or just return raw enum."""
+    if isinstance(value, str):
+        try:
+            return enum_type[value.upper()]
+        except KeyError as e:
+            raise InvalidConfigError(
+                value=value,
+                issue=f"Invalid value for enum {enum_type.__name__}",
+            ) from e
+    if isinstance(value, enum_type):
+        return value
+
+    raise InvalidConfigError(
+        value=str(value),
+        issue=f"Value must be a string or {enum_type.__name__}",
+    )
+
+
 class Config(BaseModel):
     """General configuration for the library."""
 
@@ -142,6 +173,13 @@ class Config(BaseModel):
 
     # Storage Options
     storage_class: StorageClass
+
+    @field_validator("storage_class", mode="before")
+    @classmethod
+    def parse_storage_class(cls, value: str | StorageClass) -> StorageClass:
+        """Parse storage class to enum if string provided."""
+        return parse_str_to_enum(value, StorageClass)
+
     storage_dir: str | None = None
 
     # Logging Options
@@ -149,6 +187,13 @@ class Config(BaseModel):
     # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
     # where as setting it to ERROR will only display ERROR and above.
     default_log_level: LogLevel = LogLevel.INFO
+
+    @field_validator("default_log_level", mode="before")
+    @classmethod
+    def parse_default_log_level(cls, value: str | LogLevel) -> LogLevel:
+        """Parse default_log_level to enum if string provided."""
+        return parse_str_to_enum(value, LogLevel)
+
     # default_log_sink controls where default logs are sent. By default this is STDOUT (sys.stdout)
     # but can also be set to STDERR (sys.stderr)
     # or to a file by setting this to a file path ("./logs.txt")
@@ -158,12 +203,32 @@ class Config(BaseModel):
 
     # LLM Options
     llm_provider: LLMProvider
+
+    @field_validator("llm_provider", mode="before")
+    @classmethod
+    def parse_llm_provider(cls, value: str | LLMProvider) -> LLMProvider:
+        """Parse llm_provider to enum if string provided."""
+        return parse_str_to_enum(value, LLMProvider)
+
     llm_model_name: LLMModel
+
+    @field_validator("llm_model_name", mode="before")
+    @classmethod
+    def parse_llm_model_name(cls, value: str | LLMModel) -> LLMModel:
+        """Parse llm_model_name to enum if string provided."""
+        return parse_str_to_enum(value, LLMModel)
+
     llm_model_temperature: PositiveNumber
     llm_model_seed: PositiveNumber
 
     # Agent Options
     default_agent_type: AgentType
+
+    @field_validator("default_agent_type", mode="before")
+    @classmethod
+    def parse_default_agent_type(cls, value: str | AgentType) -> AgentType:
+        """Parse default_agent_type to enum if string provided."""
+        return parse_str_to_enum(value, AgentType)
 
     model_config = ConfigDict(frozen=True)
 
