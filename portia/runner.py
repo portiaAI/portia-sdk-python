@@ -64,7 +64,7 @@ class Runner:
     ) -> Workflow:
         """End to end function to generate a plan and then execute it."""
         plan = self.generate_plan(query, tools, example_plans)
-        workflow = self.create_workflow_from_plan(plan)
+        workflow = self.create_workflow(plan)
         return self.execute_workflow(workflow)
 
     def generate_plan(
@@ -106,7 +106,7 @@ class Runner:
 
         return outcome.plan
 
-    def create_workflow_from_plan(self, plan: Plan) -> Workflow:
+    def create_workflow(self, plan: Plan) -> Workflow:
         """Create a workflow from a Plan."""
         workflow = Workflow(
             plan_id=plan.id,

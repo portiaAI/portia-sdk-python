@@ -106,7 +106,7 @@ def test_runner_create_and_execute_workflow(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.generate_plan(query)
-    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
@@ -139,7 +139,7 @@ def test_runner_toolless_agent() -> None:
     runner = Runner(config=config, tool_registry=tool_registry)
 
     plan = runner.generate_plan(query)
-    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
 
 
@@ -151,7 +151,7 @@ def test_runner_execute_workflow(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.generate_plan(query)
-    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
 
     # Simulate workflow being in progress
@@ -173,7 +173,7 @@ def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.generate_plan(query)
-    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.create_workflow(plan)
 
     # Simulate workflow being in progress
     workflow.state = WorkflowState.IN_PROGRESS
@@ -195,7 +195,7 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.generate_plan(query)
-    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
 
     # Set invalid state

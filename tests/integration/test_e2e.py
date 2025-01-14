@@ -126,7 +126,7 @@ def test_runner_run_query_with_clarifications(
     runner.storage.save_plan(plan)
 
     with execution_context(additional_data={"raise_clarification": "True"}):
-        workflow = runner.create_workflow_from_plan(plan)
+        workflow = runner.create_workflow(plan)
         workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
@@ -177,7 +177,7 @@ def test_runner_run_query_with_hard_error(
     )
     plan = Plan(query="raise an error", steps=[clarification_step])
     runner.storage.save_plan(plan)
-    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.FAILED
@@ -226,7 +226,7 @@ def test_runner_run_query_with_soft_error(
     )
     plan = Plan(query="raise an error", steps=[clarification_step])
     runner.storage.save_plan(plan)
-    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.FAILED

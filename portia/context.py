@@ -123,5 +123,5 @@ def get_execution_context() -> ExecutionContext:
 
 
 def is_execution_context_set() -> bool:
-    """Retrieve the current end-user from the context."""
+    """Check whether there is currently context set."""
     return hasattr(_execution_context, "context")
