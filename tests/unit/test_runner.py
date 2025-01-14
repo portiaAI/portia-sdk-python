@@ -1,6 +1,5 @@
 """Tests for runner classes."""
 
-from pdb import run
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -8,7 +7,6 @@ from uuid import uuid4
 
 import pytest
 
-from portia import planner
 from portia.config import AgentType, StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
