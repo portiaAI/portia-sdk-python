@@ -128,6 +128,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent.tool = SimpleNamespace(
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
@@ -140,7 +141,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert mock_invoker.called
     messages = mock_invoker.prompt
     assert messages
-    assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
+    assert "You are a highly capable assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
