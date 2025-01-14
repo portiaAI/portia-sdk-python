@@ -68,6 +68,11 @@ def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setting keys as string."""
+    monkeypatch.setenv("PORTIA_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+
     # storage
     c = Config.from_default(storage_class="DISK")
     assert c.storage_class == StorageClass.DISK
@@ -84,7 +89,6 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
         c = Config.from_default(default_log_level="some level")
 
     # LLM provider + model
-    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     c = Config.from_default(llm_provider="MISTRALAI", llm_model_name="mistral_large_latest")
     assert c.llm_provider == LLMProvider.MISTRALAI
     assert c.llm_model_name == LLMModel.MISTRAL_LARGE_LATEST
