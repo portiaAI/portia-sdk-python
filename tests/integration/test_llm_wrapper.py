@@ -3,7 +3,6 @@
 import pytest
 
 from portia.config import Config, LLMModel, LLMProvider
-from portia.errors import InvalidLLMProviderError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan
 
@@ -42,21 +41,3 @@ def test_wrapper_methods(llm_provider: LLMProvider, llm_model_name: LLMModel) ->
         ],
     )
     wrapper.to_langchain()
-
-
-def test_wrapper_method_invalid() -> None:
-    """Test we can generate wrappers for important providers."""
-    c = Config.from_default(
-        llm_provider="Invalid",  # type: ignore  # noqa: PGH003
-    )
-    wrapper = LLMWrapper(c)
-    with pytest.raises(InvalidLLMProviderError):
-        wrapper.to_instructor(
-            Plan,
-            [
-                {"role": "system", "content": "test"},
-                {"role": "user", "content": "test"},
-            ],
-        )
-    with pytest.raises(InvalidLLMProviderError):
-        wrapper.to_langchain()

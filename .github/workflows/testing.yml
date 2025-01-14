@@ -26,6 +26,13 @@ jobs:
       - name: install dependencies
         run: poetry install --all-extras
 
+      # run unit tests first without env keys
+      # this is to ensure we're not adding unit tests that need to call LLMs
+      - name: unit_tests + coverage
+        run: |
+          set -o pipefail
+          poetry run pytest tests/unit
+
       - name: tests + coverage
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -34,7 +41,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
         run: |
           set -o pipefail
-          poetry run pytest --workers auto  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          poetry run pytest -n auto  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
 
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
