@@ -99,6 +99,7 @@ def run(query: str,
     output = runner.run_query(query)
     click.echo(output.model_dump_json(indent=4))
 
+
 @click.command()
 @common_options
 @click.argument("query")
@@ -143,7 +144,11 @@ def _get_config(
         raise click.UsageError(message)
 
     if llm_provider or llm_model:
-        provider = llm_provider if llm_provider else llm_model.provider()
+        provider = (
+            llm_provider if llm_provider
+            # we are sure that llm_model is not None at this point
+            else llm_model.provider()  # pyright: ignore[reportOptionalMemberAccess]
+        )
         model = llm_model if llm_model else provider.default_model()
         config = Config.from_default(
             llm_provider=provider,
