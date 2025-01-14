@@ -79,7 +79,7 @@ def run(
         config = Config.from_default(
             llm_provider=provider,
             llm_model_name=model,
-            default_log_level=LogLevel.DEBUG,
+            default_log_level=LogLevel.ERROR,
         )
     else:
         config = Config.from_default(default_log_level=LogLevel.ERROR)

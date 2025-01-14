@@ -317,7 +317,6 @@ class VerifierAgent(BaseAgent):
         errors = [msg for msg in messages if "ToolSoftError" in msg.content]
 
         if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
-            print("retrying")
             return "tool_agent"
         # Otherwise, we stop (reply to the user) as its a hard error or unknown
         return END
