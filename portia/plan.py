@@ -7,9 +7,6 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from portia.context import get_execution_context
-from portia.workflow import Workflow, WorkflowState
-
 
 class Variable(BaseModel):
     """A variable in the plan.

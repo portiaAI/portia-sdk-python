@@ -1,7 +1,6 @@
 """E2E Tests."""
 
 import pytest
-from regex import P
 
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
