@@ -25,6 +25,7 @@ from portia.logger import logger
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
+
     from portia.context import ExecutionContext
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
