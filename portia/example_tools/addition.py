@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 
+from portia.context import ExecutionContext
 from portia.tool import Tool
 
 
@@ -21,6 +22,6 @@ class AdditionTool(Tool[float]):
     args_schema: type[BaseModel] = AdditionToolSchema
     output_schema: tuple[str, str] = ("float", "float: The value of the addition")
 
-    def run(self, a: float, b: float) -> float:
+    def run(self, _: ExecutionContext, a: float, b: float) -> float:
         """Add the numbers."""
         return a + b

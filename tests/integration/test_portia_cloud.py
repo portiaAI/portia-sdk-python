@@ -4,6 +4,7 @@ import pytest
 from pydantic import SecretStr
 
 from portia.config import Config, StorageClass
+from portia.context import get_execution_context
 from portia.errors import ToolNotFoundError
 from portia.runner import Runner
 from portia.tool import ToolHardError
@@ -49,8 +50,9 @@ def test_run_tool_error() -> None:
 
     tool = registry.get_tool("Weather Tool")
     tool.api_key = SecretStr("123")
+    ctx = get_execution_context()
     with pytest.raises(ToolHardError):
-        tool.run()
+        tool.run(ctx)
 
 
 def test_runner_run_query_with_cloud_and_local() -> None:
@@ -65,6 +67,5 @@ def test_runner_run_query_with_cloud_and_local() -> None:
     query = "Get the temperature in London and Sydney and then add the two temperatures together."
 
     workflow = runner.run_query(query)
-
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output

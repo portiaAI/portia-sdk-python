@@ -5,6 +5,7 @@ import pytest
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
+from portia.context import ExecutionContext, execution_context
 from portia.errors import ToolSoftError
 from portia.plan import Plan, Step, Variable
 from portia.runner import Runner
@@ -94,7 +95,6 @@ def test_runner_plan_query(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
-@pytest.mark.flaky(reruns=3)
 def test_runner_run_query_with_clarifications(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
@@ -118,20 +118,18 @@ def test_runner_run_query_with_clarifications(
             Variable(
                 name="user_guidance",
                 description="",
-                value="Do Something",
-            ),
-            Variable(
-                name="raise_clarification",
-                description="",
-                value=True,
+                value="Return a clarification",
             ),
         ],
     )
     plan = Plan(query="raise a clarification", steps=[clarification_step])
     runner.storage.save_plan(plan)
-    workflow = runner.create_and_execute_workflow(plan)
+
+    with execution_context(additional_data={"raise_clarification": "True"}):
+        workflow = runner.create_and_execute_workflow(plan)
+
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
-    assert workflow.get_outstanding_clarifications()[0].user_guidance == "Do Something"
+    assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
 
     workflow.get_outstanding_clarifications()[0].resolve(response=False)
     runner.execute_workflow(workflow)
@@ -199,7 +197,7 @@ def test_runner_run_query_with_soft_error(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, a: int, b: int) -> int:  # noqa: ARG002
+        def run(self, _: ExecutionContext, a: int, b: int) -> int:  # noqa: ARG002
             raise ToolSoftError("Server Timeout")
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])

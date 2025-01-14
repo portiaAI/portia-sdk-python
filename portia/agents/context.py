@@ -9,7 +9,9 @@ from portia.clarification import Clarification, InputClarification, MultiChoiceC
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import Output
-    from portia.plan import Variable
+    from portia.context import ExecutionContext
+    from portia.plan import Step, Variable
+    from portia.workflow import Workflow
 
 
 def generate_main_system_context(system_context_extensions: list[str] | None = None) -> list[str]:
@@ -93,14 +95,35 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
     return clarification_context
 
 
-def build_context(
-    inputs: list[Variable],
-    previous_outputs: dict[str, Output],
-    clarifications: list[Clarification],
-    system_context_extensions: list[str] | None = None,
-) -> str:
+def generate_context_from_execution_context(context: ExecutionContext) -> list[str]:
+    """Generate context from execution context."""
+    if not context.end_user_id and not context.additional_data:
+        return []
+
+    execution_context = ["Metadata: This section contains general context about this execution."]
+    if context.end_user_id:
+        execution_context.extend(
+            [
+                f"end_user_id: {context.end_user_id}",
+            ],
+        )
+    for key, value in context.additional_data.items():
+        execution_context.extend(
+            [
+                f"context_key_name: {key} context_key_value: {value}",
+                "----------",
+            ],
+        )
+    return execution_context
+
+
+def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     """Turn inputs and past outputs into a context string for the agent."""
-    system_context = generate_main_system_context(system_context_extensions)
+    inputs = step.inputs
+    previous_outputs = workflow.step_outputs
+    clarifications = workflow.clarifications
+
+    system_context = generate_main_system_context(ctx.agent_system_context_extension)
 
     # exit early if no additional information
     if not inputs and not clarifications and not previous_outputs:
@@ -115,6 +138,10 @@ def build_context(
     # Generate and append clarifications context
     clarification_context = generate_clarification_context(clarifications)
     context.extend(clarification_context)
+
+    # Handle execution context
+    execution_context = generate_context_from_execution_context(ctx)
+    context.extend(execution_context)
 
     # Append System Context
     context.extend(system_context)

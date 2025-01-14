@@ -214,7 +214,7 @@ class PortiaCloudStorage(Storage):
             url=f"{self.api_endpoint}/api/v0/workflows/",
             json={
                 "id": str(workflow.id),
-                "json": workflow.model_dump(mode="json"),
+                "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
                 "plan_id": str(workflow.plan_id),
             },
             headers={
@@ -228,7 +228,7 @@ class PortiaCloudStorage(Storage):
                 url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
                 json={
                     "plan_id": str(workflow.plan_id),
-                    "json": workflow.model_dump(mode="json"),
+                    "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
                 },
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
