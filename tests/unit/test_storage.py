@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from portia.plan import Plan
+from portia.plan import Plan, PlanContext
 from portia.storage import PlanStorage, WorkflowStorage
 from portia.workflow import Workflow
 
@@ -33,7 +33,7 @@ def test_storage_base_classes() -> None:
             return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
 
     storage = MyStorage()
-    plan = Plan(query="", steps=[])
+    plan = Plan(plan_context=PlanContext(query="", tool_list=[]), steps=[])
     workflow = Workflow(
         plan_id=plan.id,
     )

@@ -10,7 +10,7 @@ from portia.clarification import Clarification, InputClarification
 from portia.config import Config, LogLevel
 from portia.context import ExecutionContext, empty_context
 from portia.errors import ToolHardError, ToolSoftError
-from portia.plan import Plan, Step, Variable
+from portia.plan import Plan, PlanContext, Step, Variable
 from portia.tool import Tool
 from portia.workflow import Workflow
 
@@ -28,7 +28,13 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
         ],
         output="$sum",
     )
-    plan = Plan(query="Add 1 + 2", steps=[step1])
+    plan = Plan(
+        plan_context=PlanContext(
+            query="Add 1 + 2",
+            tool_list=["add_tool"],
+        ),
+        steps=[step1],
+    )
     return plan, Workflow(plan_id=plan.id, current_step_index=1)
 
 

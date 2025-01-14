@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -20,8 +19,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# TODO(Emma): This is a temporary class while we are migrating to a synced plan model. Evals
-# should be updated to use the new StepsOrError class.
+# TODO(Emma): This is a temporary class while we are migrating to a synced plan model. #noqa: FIX002
+# Evals should be updated to use the new StepsOrError class.
+# https://linear.app/portialabs/issue/POR-381
 class PlanOrError(BaseModel):
     """A plan or an error."""
 

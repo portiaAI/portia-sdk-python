@@ -7,8 +7,8 @@ import pytest
 
 from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Plan
-from portia.planner import Planner, PlanOrError, _default_query_system_context
+from portia.plan import Plan, PlanContext
+from portia.planner import Planner, StepsOrError, _default_query_system_context
 
 
 @pytest.fixture
@@ -26,15 +26,13 @@ def planner(mock_config: Config) -> Planner:
 def test_plan_uuid_assign() -> None:
     """Test plan assign correct UUIDs."""
     plan = Plan(
-        id="123",  # type: ignore  # noqa: PGH003
-        query="",
+        plan_context=PlanContext(query="", tool_list=[]),
         steps=[],
     )
     assert isinstance(plan.id, UUID)
 
     clarification = Plan(
-        id=123,  # type: ignore  # noqa: PGH003
-        query="",
+        plan_context=PlanContext(query="", tool_list=[]),
         steps=[],
     )
     assert isinstance(clarification.id, UUID)
@@ -45,12 +43,15 @@ def test_generate_plan_or_error_success(planner: Planner) -> None:
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
     # Mock the LLMWrapper response to simulate a successful plan generation
-    mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
+    mock_response = StepsOrError(
+        steps=[],
+        error=None,
+    )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     result = planner.generate_plan_or_error(query=query, tool_list=[])
 
-    assert result.plan.query == query
+    assert result.plan.plan_context.query == query
     assert result.error is None
 
 
@@ -59,13 +60,16 @@ def test_generate_plan_or_error_failure(planner: Planner) -> None:
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
     # Mock the LLMWrapper response to simulate an error in plan generation
-    mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error="Unable to generate a plan")
+    mock_response = StepsOrError(
+        steps=[],
+        error="Unable to generate a plan",
+    )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     result = planner.generate_plan_or_error(query=query, tool_list=[])
 
     assert result.error == "Unable to generate a plan"
-    assert result.plan.query == query
+    assert result.plan.plan_context.query == query
 
 
 def test_planner_default_context_with_extensions() -> None:

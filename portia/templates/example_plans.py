@@ -2,12 +2,11 @@
 
 from portia.plan import Plan, PlanContext, Step, Variable
 
-# TODO(Emma): Currently the jinja template references the tool list, but this is not set in the
-# examples here.
 DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
             query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
+            tool_list=["search_tool", "send_email_tool", "other_tool"],
         ),
         steps=[
             Step(
@@ -34,7 +33,10 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         ],
     ),
     Plan(
-        query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
+        plan_context=PlanContext(
+            query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
+            tool_list=["search_tool", "send_email_tool", "other_tool", "weather_tool"],
+        ),
         steps=[
             Step(
                 task="What is a city in the Southern hemisphere?",
@@ -96,7 +98,10 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         ],
     ),
     Plan(
-        query="Send an email to hello@portialabs.ai with the weather in London",
+        plan_context=PlanContext(
+            query="Send an email to hello@portialabs.ai with the weather in London",
+            tool_list=["weather_tool", "send_email_tool", "other_tool"],
+        ),
         steps=[
             Step(
                 task="What is the weather in London?",

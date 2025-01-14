@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
+from uuid import UUID
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -14,8 +15,6 @@ from portia.plan import Plan, PlanContext, Step
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -191,7 +190,7 @@ class PortiaCloudStorage(Storage):
             json={
                 "id": str(plan.id),
                 "query": plan.plan_context.query,
-                "tool_list": [tool.name for tool in plan.plan_context.tool_list],
+                "tool_list": plan.plan_context.tool_list,
                 "steps": [step.model_dump(mode="json") for step in plan.steps],
             },
             headers={

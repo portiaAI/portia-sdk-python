@@ -10,7 +10,7 @@
     IMPORTANT: Do not create tools - if you are missing a tool return a descriptive error instead.
 </Instructions>
 
-<Examples>{% for example in examples if example.plan %}
+<Examples>{% for example in examples %}
     <Example>
         <Request>
             <Tools>
@@ -21,7 +21,9 @@
             </Query>
         </Request>
         <Response>
-{{example.plan.model_dump_json(indent=2)}}
+            [{% for step in example.steps %}
+                {{step.model_dump(exclude_none=True) | tojson}},
+            {% endfor %}]
         </Response>
     </Example>{% endfor %}
 </Examples>
