@@ -49,6 +49,14 @@ def test_run_method(add_tool: AdditionTool) -> None:
     assert result == a + b
 
 
+def test_handle(add_tool: AdditionTool) -> None:
+    """Test the run method of the AddTool."""
+    a, b = 1, 2
+    ctx = get_execution_context()
+    result = add_tool.run(ctx, a, b)
+    assert result == a + b
+
+
 def test_run_method_with_uncaught_error() -> None:
     """Test the _run method wraps errors."""
     tool = ErrorTool()

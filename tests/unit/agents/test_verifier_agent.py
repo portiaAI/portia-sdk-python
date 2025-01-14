@@ -150,6 +150,32 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert mock_invoker.output_format == ToolInputs
 
 
+def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the parser model with retries."""
+    tool_inputs = ToolInputs(
+        args=[],
+    )
+    mock_invoker = MockInvoker(response=tool_inputs)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.tool = SimpleNamespace(
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    parser_model = ParserModel(
+        llm=LLMWrapper(get_test_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+    with pytest.raises(InvalidAgentOutputError):
+        parser_model.invoke({})  # type: ignore  # noqa: PGH003
+
+
 def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the verifier model."""
     tool_inputs = ToolInputs(
