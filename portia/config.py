@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Callable, Self, TypeVar
+from typing import Annotated, Self, TypeVar
 
 from pydantic import (
     AfterValidator,
@@ -15,7 +15,6 @@ from pydantic import (
     SecretStr,
     field_validator,
     model_validator,
-    validator,
 )
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
