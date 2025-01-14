@@ -12,16 +12,18 @@ runner = Runner(
 )
 
 # Simple Example
-workflow = runner.run_query(
+workflow = runner.create_workflow_from_query(
     "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
 )
+runner.execute_workflow(workflow)
 
 
 # With Execution Context
 with execution_context(end_user_id="123"):
-    workflow = runner.run_query(
+    workflow = runner.create_workflow_from_query(
         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
     )
+    runner.execute_workflow()
 
 
 # Resuming after a clarification

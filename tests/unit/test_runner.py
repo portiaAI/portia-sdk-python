@@ -32,7 +32,8 @@ def test_runner_run_query(runner: Runner) -> None:
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    workflow = runner.run_query(query)
+    workflow = runner.create_workflow_from_query(query)
+    workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
 
@@ -51,7 +52,8 @@ def test_runner_run_query_disk_storage() -> None:
         mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
         LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-        workflow = runner.run_query(query)
+        workflow = runner.create_workflow_from_query(query)
+        workflow = runner.execute_workflow(workflow)
 
         assert workflow.state == WorkflowState.COMPLETE
         # Use Path to check for the files
@@ -62,19 +64,19 @@ def test_runner_run_query_disk_storage() -> None:
         assert len(workflow_files) == 1
 
 
-def test_runner_plan_query(runner: Runner) -> None:
+def test_runner_generate_plan(runner: Runner) -> None:
     """Test planning a query using the Runner."""
     query = "example query"
 
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    plan = runner.plan_query(query)
+    plan = runner.generate_plan(query)
 
     assert plan.query == query
 
 
-def test_runner_plan_query_error(runner: Runner) -> None:
+def test_runner_generate_plan_error(runner: Runner) -> None:
     """Test planning a query that returns an error."""
     query = "example query"
 
@@ -82,17 +84,17 @@ def test_runner_plan_query_error(runner: Runner) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     with pytest.raises(PlanError):
-        runner.plan_query(query)
+        runner.generate_plan(query)
 
 
-def test_runner_plan_query_with_tools(runner: Runner) -> None:
+def test_runner_generate_plan_with_tools(runner: Runner) -> None:
     """Test planning a query using the Runner."""
     query = "example query"
 
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    plan = runner.plan_query(query, tools=["Add Tool"])
+    plan = runner.generate_plan(query, tools=["Add Tool"])
 
     assert plan.query == query
 
@@ -104,8 +106,9 @@ def test_runner_create_and_execute_workflow(runner: Runner) -> None:
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    plan = runner.plan_query(query)
-    workflow = runner.create_and_execute_workflow(plan)
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.plan_id == plan.id
@@ -136,8 +139,9 @@ def test_runner_toolless_agent() -> None:
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
 
-    plan = runner.plan_query(query)
-    runner.create_and_execute_workflow(plan)
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.execute_workflow(workflow)
 
 
 def test_runner_execute_workflow(runner: Runner) -> None:
@@ -147,8 +151,9 @@ def test_runner_execute_workflow(runner: Runner) -> None:
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    plan = runner.plan_query(query)
-    workflow = runner.create_and_execute_workflow(plan)
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.execute_workflow(workflow)
 
     # Simulate workflow being in progress
     workflow.state = WorkflowState.IN_PROGRESS
@@ -166,8 +171,9 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    plan = runner.plan_query(query)
-    workflow = runner.create_and_execute_workflow(plan)
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow_from_plan(plan)
+    workflow = runner.execute_workflow(workflow)
 
     # Set invalid state
     workflow.state = WorkflowState.COMPLETE

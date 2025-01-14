@@ -91,7 +91,8 @@ def run(
 
     # Run the query
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.run_query(query)
+    workflow = runner.create_workflow_from_query(query)
+    output = runner.execute_workflow(workflow)
     click.echo(output.model_dump_json(indent=4))
 
 
@@ -104,7 +105,7 @@ def plan(query: str) -> None:
     if config.has_api_key("portia_api_key"):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.plan_query(query)
+    output = runner.generate_plan(query)
     click.echo(output.model_dump_json(indent=4))
 
 

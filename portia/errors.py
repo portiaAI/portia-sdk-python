@@ -43,7 +43,7 @@ class PlanNotFoundError(Exception):
 class WorkflowNotFoundError(Exception):
     """Indicate a workflow was not found."""
 
-    def __init__(self, workflow_id: UUID) -> None:
+    def __init__(self, workflow_id: UUID | str | None) -> None:
         """Set custom error message."""
         super().__init__(f"Workflow with id {workflow_id} not found.")
 
