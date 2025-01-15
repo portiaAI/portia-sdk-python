@@ -214,7 +214,7 @@ def test_runner_run_query_with_soft_error(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, _: ExecutionContext, __: int, ___: int) -> int:
+        def run(self, _: ExecutionContext, a: int, b: int) -> int:  # noqa: ARG002
             raise ToolSoftError("Server Timeout")
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
