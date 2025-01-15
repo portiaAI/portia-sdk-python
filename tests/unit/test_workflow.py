@@ -57,7 +57,7 @@ def test_workflow_get_outstanding_clarifications(
 
 def test_workflow_get_outstanding_clarifications_none() -> None:
     """Test get_outstanding_clarifications when no clarifications are outstanding."""
-    workflow = Workflow(plan_id=uuid4(), clarifications=[])
+    workflow = Workflow(plan_id=uuid4(), outputs=WorkflowOutputs(clarifications=[]))
 
     assert workflow.get_outstanding_clarifications() == []
 
