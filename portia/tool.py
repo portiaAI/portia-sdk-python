@@ -242,6 +242,8 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 timeout=60,
             )
             response.raise_for_status()
-            return response.json()
         except Exception as e:
+            logger.error(f"Error from Portia Cloud: {e}")
             raise ToolHardError(e) from e
+        else:
+            return response.json()

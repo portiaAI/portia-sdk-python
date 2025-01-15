@@ -50,7 +50,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolRegistrationFailedError):
         registry.register_tool(AdditionTool())
 
-    tool = registry.get_tool("Weather Tool")
+    tool = registry.get_tool("Portia Weather Tool")
     tool.api_key = SecretStr("123")
     ctx = get_execution_context()
     with pytest.raises(ToolHardError):
