@@ -11,24 +11,25 @@ runner = Runner(
     tool_registry=example_tool_registry,
 )
 
-# Simple Example - We can plan and run the query in one go
-workflow = runner.run_query(
+
+# Simple Example
+workflow = runner.execute_query(
     "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
 )
 
 # We can also provide additional execution context to the process
 with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-    plan = runner.plan_query(
+    plan = runner.execute_query(
         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
     )
-    workflow = runner.create_and_execute_workflow(plan)
-
 
 # When we hit a clarification we can ask our end user for clarification then resume the process
 with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-    workflow = runner.run_query(
+    workflow = runner.execute_query(
         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
     )
+
+
 # Fetch workflow
 workflow = runner.storage.get_workflow(workflow.id)
 # Update clarifications

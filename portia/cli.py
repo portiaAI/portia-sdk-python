@@ -28,6 +28,7 @@ class EnvLocation(Enum):
     ENV_FILE = "ENV_FILE"
     ENV_VARS = "ENV_VARS"
 
+
 class CLIOptions(Enum):
     """The options for the CLI."""
 
@@ -36,10 +37,13 @@ class CLIOptions(Enum):
     LLM_MODEL = "LLM_MODEL"
     ENV_LOCATION = "ENV_LOCATION"
 
+
 PORTIA_API_KEY = "portia_api_key"
+
 
 def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
     """Define common options for CLI commands."""
+
     @click.option(
         "--log-level",
         type=click.Choice([level.name for level in LogLevel], case_sensitive=False),
@@ -67,7 +71,9 @@ def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(f)
     def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         return f(*args, **kwargs)
+
     return wrapper
+
 
 @click.group()
 def cli() -> None:
@@ -77,11 +83,13 @@ def cli() -> None:
 @click.command()
 @common_options
 @click.argument("query")
-def run(query: str,
-        log_level: str,
-        llm_provider: str | None,
-        llm_model: str | None,
-        env_location: str) -> None:
+def run(
+    query: str,
+    log_level: str,
+    llm_provider: str | None,
+    llm_model: str | None,
+    env_location: str,
+) -> None:
     """Run a query."""
     config = _get_config(
         log_level=LogLevel[log_level.upper()],
@@ -96,18 +104,20 @@ def run(query: str,
 
     # Run the query
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.run_query(query)
+    output = runner.execute_query(query)
     click.echo(output.model_dump_json(indent=4))
 
 
 @click.command()
 @common_options
 @click.argument("query")
-def plan(query: str,
-         log_level: str,
-         llm_provider: str | None,
-         llm_model: str | None,
-         env_location: str) -> None:
+def plan(
+    query: str,
+    log_level: str,
+    llm_provider: str | None,
+    llm_model: str | None,
+    env_location: str,
+) -> None:
     """Plan a query."""
     config = _get_config(
         log_level=LogLevel[log_level.upper()],
@@ -119,8 +129,9 @@ def plan(query: str,
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.plan_query(query)
+    output = runner.generate_plan(query)
     click.echo(output.model_dump_json(indent=4))
+
 
 def _get_config(
     log_level: LogLevel,
@@ -145,7 +156,8 @@ def _get_config(
 
     if llm_provider or llm_model:
         provider = (
-            llm_provider if llm_provider
+            llm_provider
+            if llm_provider
             # we are sure that llm_model is not None at this point
             else llm_model.provider()  # pyright: ignore[reportOptionalMemberAccess]
         )
@@ -159,6 +171,7 @@ def _get_config(
         config = Config.from_default(default_log_level=log_level)
 
     return config
+
 
 cli.add_command(run)
 cli.add_command(plan)

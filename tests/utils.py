@@ -99,7 +99,10 @@ class ClarificationTool(Tool):
         user_guidance: str,
     ) -> Clarification | None:
         """Add the numbers."""
-        if "raise_clarification" in ctx.additional_data:
+        if (
+            "raise_clarification" in ctx.additional_data
+            and ctx.additional_data["raise_clarification"] == "True"
+        ):
             return InputClarification(
                 user_guidance=user_guidance,
                 argument_name="raise_clarification",

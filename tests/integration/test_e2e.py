@@ -52,7 +52,7 @@ def test_runner_run_query(
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Add 1 + 2 together"
 
-    workflow = runner.run_query(query)
+    workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
@@ -62,7 +62,7 @@ def test_runner_run_query(
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
-def test_runner_plan_query(
+def test_runner_generate_plan(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
     agent: AgentType,
@@ -78,7 +78,7 @@ def test_runner_plan_query(
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Add 1 + 2 together"
 
-    plan = runner.plan_query(query)
+    plan = runner.generate_plan(query)
 
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_name == "Add Tool"
@@ -86,7 +86,7 @@ def test_runner_plan_query(
     assert len(plan.steps[0].inputs) == 2
     assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
 
-    workflow = runner.create_and_execute_workflow(plan)
+    workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
@@ -132,13 +132,15 @@ def test_runner_run_query_with_clarifications(
     runner.storage.save_plan(plan)
 
     with execution_context(additional_data={"raise_clarification": "True"}):
-        workflow = runner.create_and_execute_workflow(plan)
+        workflow = runner.create_workflow(plan)
+        workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
 
     workflow.get_outstanding_clarifications()[0].resolve(response=False)
-    runner.execute_workflow(workflow)
+    with execution_context(additional_data={"raise_clarification": "False"}):
+        runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
 
 
@@ -186,7 +188,10 @@ def test_runner_run_query_with_hard_error(
         ),
         steps=[clarification_step],
     )
-    workflow = runner.create_and_execute_workflow(plan)
+    runner.storage.save_plan(plan)
+    workflow = runner.create_workflow(plan)
+    workflow = runner.execute_workflow(workflow)
+
     assert workflow.state == WorkflowState.FAILED
     assert workflow.final_output
     assert isinstance(workflow.final_output.value, str)
@@ -238,7 +243,9 @@ def test_runner_run_query_with_soft_error(
         ),
         steps=[clarification_step],
     )
-    workflow = runner.create_and_execute_workflow(plan)
+    runner.storage.save_plan(plan)
+    workflow = runner.create_workflow(plan)
+    workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.FAILED
     assert workflow.final_output
