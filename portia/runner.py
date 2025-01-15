@@ -126,11 +126,8 @@ class Runner:
         plan = self.storage.get_plan(plan_id=workflow.plan_id)
         return self._execute_workflow(plan, workflow)
 
-    def _execute_workflow(
-        self,
-        plan: Plan,
-        workflow: Workflow,
-    ) -> Workflow:
+    def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
+        workflow.state = WorkflowState.IN_PROGRESS
         self.storage.save_workflow(workflow)
         logger.debug(
             f"Executing workflow from step {workflow.current_step_index}",
