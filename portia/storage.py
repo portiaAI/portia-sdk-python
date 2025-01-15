@@ -10,13 +10,14 @@ from uuid import UUID
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from portia.context import ExecutionContext
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.logger import logger
 from portia.plan import Plan
-from portia.workflow import Workflow, WorkflowOutputs, WorkflowState
+from portia.workflow import Workflow
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -261,11 +262,4 @@ class PortiaCloudStorage(Storage):
             },
         )
         self.check_response(response)
-        return Workflow(
-            id=UUID(response.json()["id"]),
-            plan_id=UUID(response.json()["plan_id"]),
-            current_step_index=response.json()["current_step_index"],
-            state=WorkflowState(response.json()["state"]),
-            execution_context=ExecutionContext.model_validate(response.json()["execution_context"]),
-            outputs=WorkflowOutputs.model_validate(response.json()["outputs"]),
-        )
+        return Workflow.model_validate(response.json()["json"])

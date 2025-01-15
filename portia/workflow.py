@@ -87,10 +87,7 @@ class ReadOnlyWorkflow(Workflow):
             id=workflow.id,
             plan_id=workflow.plan_id,
             current_step_index=workflow.current_step_index,
-            # TODO(Emma): Check if we should be using a deepcopy here. # noqa: FIX002 TD003
             outputs=workflow.outputs,
             state=workflow.state,
-            # TODO(Emma): Check why a read only workflow doesn't have the # noqa: FIX002 TD003
-            # execution context prior to this change.
             execution_context=workflow.execution_context,
         )
