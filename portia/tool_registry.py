@@ -26,7 +26,7 @@ class ToolRegistry(ABC):
         raise NotImplementedError("register_tool is not implemented")
 
     @abstractmethod
-    def get_tool(self, tool_name: str) -> Tool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Retrieve a tool's information."""
         raise NotImplementedError("get_tool is not implemented")
 
@@ -58,14 +58,14 @@ class AggregatedToolRegistry(ToolRegistry):
         """Tool registration should happen in individual registries."""
         raise NotImplementedError("tool registration should happen in individual registries.")
 
-    def get_tool(self, tool_name: str) -> Tool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Search across all registries for a given tool, returning first match."""
         for registry in self.registries:
             try:
-                return registry.get_tool(tool_name)
+                return registry.get_tool(tool_id)
             except ToolNotFoundError:  # noqa: PERF203
                 continue
-        raise ToolNotFoundError(tool_name)
+        raise ToolNotFoundError(tool_id)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools from all registries."""
@@ -101,12 +101,12 @@ class InMemoryToolRegistry(ToolRegistry):
         """Register tool in registry."""
         self.tools.append(tool)
 
-    def get_tool(self, tool_name: str) -> Tool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Get the tool from the registry."""
         for tool in self.tools:
-            if tool.name == tool_name:
+            if tool.id == tool_id:
                 return tool
-        raise ToolNotFoundError(tool_name)
+        raise ToolNotFoundError(tool_id)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools."""
@@ -192,12 +192,12 @@ class PortiaToolRegistry(ToolRegistry):
         """Register tool in registry."""
         raise ToolRegistrationFailedError(tool)
 
-    def get_tool(self, tool_name: str) -> PortiaRemoteTool:
+    def get_tool(self, tool_id: str) -> PortiaRemoteTool:
         """Get the tool from the registry."""
-        if tool_name in self.tools:
-            return self.tools[tool_name]
+        if tool_id in self.tools:
+            return self.tools[tool_id]
 
-        raise ToolNotFoundError(tool_name)
+        raise ToolNotFoundError(tool_id)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools."""

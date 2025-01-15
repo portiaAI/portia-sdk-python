@@ -51,9 +51,9 @@ class Step(BaseModel):
             "necessarily, but all the inputs to the step."
         ),
     )
-    tool_name: str | None = Field(
+    tool_id: str | None = Field(
         default=None,
-        description="The name of the tool listed in <Tools/>",
+        description="The ID of the tool listed in <Tools/>",
     )
     output: str = Field(
         ...,
@@ -72,7 +72,7 @@ class ReadOnlyStep(Step):
         return cls(
             task=step.task,
             inputs=step.inputs,
-            tool_name=step.tool_name,
+            tool_id=step.tool_id,
             output=step.output,
         )
 

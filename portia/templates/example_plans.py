@@ -8,7 +8,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         steps=[
             Step(
                 task="Find and summarize the latest news on artificial intelligence",
-                tool_name="search_tool",
+                tool_id="search_tool",
                 output="$ai_search_results",
             ),
             Step(
@@ -24,7 +24,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The email address to send the email to",
                     ),
                 ],
-                tool_name="send_email_tool",
+                tool_id="send_email_tool",
                 output="$final_output",
             ),
         ],
@@ -34,12 +34,12 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         steps=[
             Step(
                 task="What is a city in the Southern hemisphere?",
-                tool_name="search_tool",
+                tool_id="search_tool",
                 output="$southern_hemisphere_city",
             ),
             Step(
                 task="What is a city in the Northern hemisphere?",
-                tool_name="search_tool",
+                tool_id="search_tool",
                 output="$northern_hemisphere_city",
             ),
             Step(
@@ -50,7 +50,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="City in the southern hemisphere",
                     ),
                 ],
-                tool_name="weather_tool",
+                tool_id="weather_tool",
                 output="$southern_hemisphere_city_weather",
             ),
             Step(
@@ -61,7 +61,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="City in the norther hemisphere",
                     ),
                 ],
-                tool_name="weather_tool",
+                tool_id="weather_tool",
                 output="$northern_hemisphere_city_weather",
             ),
             Step(
@@ -86,7 +86,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="Comparison of the weather in the two cities",
                     ),
                 ],
-                tool_name="send_email_tool",
+                tool_id="send_email_tool",
                 output="If the email was successfully sent",
             ),
         ],
@@ -96,7 +96,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         steps=[
             Step(
                 task="What is the weather in London?",
-                tool_name="weather_tool",
+                tool_id="weather_tool",
                 output="$london_weather",
             ),
             Step(
@@ -112,7 +112,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The email address",
                     ),
                 ],
-                tool_name="send_email_tool",
+                tool_id="send_email_tool",
                 output="If the email was successfully sent",
             ),
         ],

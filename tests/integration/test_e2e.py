@@ -81,7 +81,7 @@ def test_runner_plan_query(
     plan = runner.plan_query(query)
 
     assert len(plan.steps) == 1
-    assert plan.steps[0].tool_name == "Add Tool"
+    assert plan.steps[0].tool_id == "add_tool"
     assert plan.steps[0].inputs
     assert len(plan.steps[0].inputs) == 2
     assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
@@ -111,7 +111,7 @@ def test_runner_run_query_with_clarifications(
     tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
-        tool_name="Clarification Tool",
+        tool_id="clarification_tool",
         task="Use tool",
         output="",
         inputs=[
@@ -152,7 +152,7 @@ def test_runner_run_query_with_hard_error(
     tool_registry = InMemoryToolRegistry.from_local_tools([ErrorTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
-        tool_name="Error Tool",
+        tool_id="error_tool",
         task="Use tool",
         output="",
         inputs=[
@@ -203,7 +203,7 @@ def test_runner_run_query_with_soft_error(
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
-        tool_name="Add Tool",
+        tool_id="add_tool",
         task="Use tool",
         output="",
         inputs=[

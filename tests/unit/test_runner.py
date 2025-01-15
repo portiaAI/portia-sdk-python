@@ -92,7 +92,7 @@ def test_runner_plan_query_with_tools(runner: Runner) -> None:
     mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    plan = runner.plan_query(query, tools=["Add Tool"])
+    plan = runner.plan_query(query, tools=["add_tool"])
 
     assert plan.query == query
 
@@ -121,7 +121,7 @@ def test_runner_toolless_agent() -> None:
             steps=[
                 Step(
                     task="Find and summarize the latest news on artificial intelligence",
-                    tool_name="Add Tool",
+                    tool_id="add_tool",
                     output="$ai_search_results",
                 ),
             ],

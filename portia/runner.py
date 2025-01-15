@@ -233,8 +233,8 @@ class Runner:
         config: Config,
     ) -> BaseAgent:
         tool = None
-        if step.tool_name:
-            tool = self.tool_registry.get_tool(step.tool_name)
+        if step.tool_id:
+            tool = self.tool_registry.get_tool(step.tool_id)
         cls: type[BaseAgent]
         match config.default_agent_type:
             case AgentType.TOOL_LESS:

@@ -375,9 +375,9 @@ class VerifierAgent(BaseAgent):
     def process_output(self, last_message: BaseMessage) -> Output:
         """Process the output of the agent."""
         if "ToolSoftError" in last_message.content and self.tool:
-            raise ToolRetryError(self.tool.name, str(last_message.content))
+            raise ToolRetryError(self.tool.id, str(last_message.content))
         if "ToolHardError" in last_message.content and self.tool:
-            raise ToolFailedError(self.tool.name, str(last_message.content))
+            raise ToolFailedError(self.tool.id, str(last_message.content))
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,
