@@ -185,7 +185,7 @@ class Config(BaseModel):
 
     # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
     # where as setting it to ERROR will only display ERROR and above.
-    default_log_level: LogLevel = LogLevel.DEBUG
+    default_log_level: LogLevel = LogLevel.INFO
 
     @field_validator("default_log_level", mode="before")
     @classmethod
