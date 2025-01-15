@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, patch
+from uuid import UUID
 
 import pytest
 
+from portia.errors import StorageError
 from portia.plan import Plan
-from portia.storage import PlanStorage, WorkflowStorage
+from portia.storage import PlanStorage, PortiaCloudStorage, WorkflowStorage
 from portia.workflow import Workflow
-
-if TYPE_CHECKING:
-    from uuid import UUID
+from tests.utils import get_test_config
 
 
 def test_storage_base_classes() -> None:
@@ -48,3 +48,90 @@ def test_storage_base_classes() -> None:
 
     with pytest.raises(NotImplementedError):
         storage.get_workflow(workflow.id)
+
+
+def test_portia_cloud_storage() -> None:
+    """Test PortiaCloudStorage raises StorageError on failure responses."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(id=UUID("12345678-1234-5678-1234-567812345678"), query="", steps=[])
+    workflow = Workflow(
+        id=UUID("87654321-4321-8765-4321-876543218765"),
+        plan_id=plan.id,
+    )
+
+    # Simulate a failed response
+    mock_response = MagicMock()
+    mock_response.is_success = False
+    mock_response.content = b"An error occurred."
+
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+        patch("httpx.get", return_value=mock_response) as mock_get,
+    ):
+        # Test save_plan failure
+        with pytest.raises(StorageError, match="An error occurred."):
+            storage.save_plan(plan)
+
+        mock_post.assert_called_once_with(
+            url="https://api.porita.dev/api/v0/plans/",
+            json={"id": str(plan.id), "json": plan.model_dump(mode="json")},
+            headers={
+                "Authorization": "Api-Key test_api_key",
+                "Content-Type": "application/json",
+            },
+        )
+
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+        patch("httpx.get", return_value=mock_response) as mock_get,
+    ):
+        # Test get_plan failure
+        with pytest.raises(StorageError, match="An error occurred."):
+            storage.get_plan(plan.id)
+
+        mock_get.assert_called_once_with(
+            url=f"https://api.porita.dev/api/v0/plans/{plan.id}/",
+            headers={
+                "Authorization": "Api-Key test_api_key",
+                "Content-Type": "application/json",
+            },
+        )
+
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+        patch("httpx.get", return_value=mock_response) as mock_get,
+    ):
+        # Test save_workflow failure
+        with pytest.raises(StorageError, match="An error occurred."):
+            storage.save_workflow(workflow)
+
+        mock_post.assert_called_once_with(
+            url="https://api.porita.dev/api/v0/workflows/",
+            json={
+                "id": str(workflow.id),
+                "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
+                "plan_id": str(workflow.plan_id),
+            },
+            headers={
+                "Authorization": "Api-Key test_api_key",
+                "Content-Type": "application/json",
+            },
+        )
+
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+        patch("httpx.get", return_value=mock_response) as mock_get,
+    ):
+        # Test get_workflow failure
+        with pytest.raises(StorageError, match="An error occurred."):
+            storage.get_workflow(workflow.id)
+
+        mock_get.assert_called_once_with(
+            url=f"https://api.porita.dev/api/v0/workflows/{workflow.id}/",
+            headers={
+                "Authorization": "Api-Key test_api_key",
+                "Content-Type": "application/json",
+            },
+        )
