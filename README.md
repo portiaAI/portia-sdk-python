@@ -23,7 +23,7 @@ runner = Runner(
     tool_registry=example_tool_registry,
 )
 
-runner.run_query("Add 1 and 2")
+workflow = runner.execute_query("Add 1 and 2")
 ```
 
 
@@ -49,7 +49,7 @@ class SubtractionTool(Tool):
 tool_registry = InMemoryToolRegistry.from_local_tools([SubtractionTool()])
 
 runner = Runner(config=default_config(), tool_registry=tool_registry)
-runner.run_query("Subtract 1 and 2")
+workflow = runner.execute_query("Subtract 1 and 2")
 ```
 
 ### Hybrid Approach
@@ -75,7 +75,7 @@ runner = Runner(
     tool_registry=registry,
 )
 
-runner.run_query("Get the weather in Sydney and London then email me with a summary at hello@portialabs.ai")
+runner.execute_query("Get the weather in Sydney and London then email me with a summary at hello@portialabs.ai")
 ```
 
 

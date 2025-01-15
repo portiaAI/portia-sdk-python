@@ -24,7 +24,7 @@ def test_runner_run_query_with_cloud() -> None:
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Whats the weather in London"
 
-    workflow = runner.run_query(query)
+    workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
@@ -66,6 +66,6 @@ def test_runner_run_query_with_cloud_and_local() -> None:
     runner = Runner(config=config, tool_registry=registry)
     query = "Get the temperature in London and Sydney and then add the two temperatures together."
 
-    workflow = runner.run_query(query)
+    workflow = runner.execute_query(query)
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.final_output
