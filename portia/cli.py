@@ -84,7 +84,11 @@ def cli() -> None:
 @common_options
 @click.argument("query")
 def run(
-    query: str, log_level: str, llm_provider: str | None, llm_model: str | None, env_location: str,
+    query: str,
+    log_level: str,
+    llm_provider: str | None,
+    llm_model: str | None,
+    env_location: str,
 ) -> None:
     """Run a query."""
     config = _get_config(
@@ -108,7 +112,11 @@ def run(
 @common_options
 @click.argument("query")
 def plan(
-    query: str, log_level: str, llm_provider: str | None, llm_model: str | None, env_location: str,
+    query: str,
+    log_level: str,
+    llm_provider: str | None,
+    llm_model: str | None,
+    env_location: str,
 ) -> None:
     """Plan a query."""
     config = _get_config(
@@ -121,7 +129,7 @@ def plan(
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.execute_query(query)
+    output = runner.generate_plan(query)
     click.echo(output.model_dump_json(indent=4))
 
 
