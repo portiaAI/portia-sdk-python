@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from threading import local
+from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
@@ -11,8 +11,11 @@ from pydantic import BaseModel, ConfigDict
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-# Thread-local storage for end-user data
-_execution_context = local()
+# Define a ContextVar for execution context
+_execution_context: ContextVar[ExecutionContext | None] = ContextVar(
+    "_execution_context",
+    default=None,
+)
 
 
 class ExecutionContext(BaseModel):
@@ -68,17 +71,17 @@ def execution_context(
     planner_system_context_extension: list[str] | None = None,
     agent_system_context_extension: list[str] | None = None,
 ) -> Generator[None, None, None]:
-    """Set the execution context for the current thread for the duration of the workflow.
+    """Set the execution context for the duration of the workflow.
 
-    This context manager ensures thread safety by using thread-local storage,
+    This context manager ensures context isolation by using `contextvars.ContextVar`,
     meaning that the execution context set within this block will only affect
-    the current thread. This is particularly useful in multi-threaded
-    applications, such as web servers or task queues, where multiple threads
-    may need independent contexts simultaneously.
+    the current task or thread. This is particularly useful in both multi-threaded
+    and asynchronous applications, such as web servers or task queues, where multiple
+    tasks or threads may need independent contexts simultaneously.
 
     Arguments:
     ---------
-        context (Optional[ExecutionContext]): The execution context to set for this thread.
+        context (Optional[ExecutionContext]): The execution context to set for the current task.
             If not provided, a new `ExecutionContext` is created using the provided parameters.
         end_user_id (Optional[str]): An identifier for the end user, used to customize
             the execution for specific users. Defaults to `None`.
@@ -93,16 +96,16 @@ def execution_context(
     ------
         None: The block of code within the context manager executes with the specified context.
 
-    Thread Safety:
-        - The `_execution_context` object is a thread-local storage instance, ensuring that
-          the `ExecutionContext` set in one thread does not affect others.
-        - When the context manager exits, the context for the current thread is cleaned up
+    Context Isolation:
+        - The `_execution_context` object is a `ContextVar`, ensuring that the `ExecutionContext`
+          set in one task or thread does not affect others.
+        - When the context manager exits, the context for the current task is cleaned up
           to avoid memory leaks or unintended persistence of data.
 
     Example:
         >>> with execution_context(end_user_id="user123", additional_data={"key": "value"}):
         >>>     # Code here runs with the specified execution context
-        >>> # Outside the block, the execution context is cleared for the current thread.
+        >>> # Outside the block, the execution context is cleared for the current task.
 
     """
     if context is None:
@@ -112,13 +115,18 @@ def execution_context(
             planner_system_context_extension=planner_system_context_extension,
             agent_system_context_extension=agent_system_context_extension,
         )
-    _execution_context.context = context
+    token = _execution_context.set(context)
     try:
         yield
     finally:
-        delattr(_execution_context, "context")
+        _execution_context.reset(token)
 
 
 def get_execution_context() -> ExecutionContext:
     """Retrieve the current end-user from the context."""
-    return getattr(_execution_context, "context", empty_context())
+    return _execution_context.get() or empty_context()
+
+
+def is_execution_context_set() -> bool:
+    """Check whether there is currently context set."""
+    return _execution_context.get() is not None

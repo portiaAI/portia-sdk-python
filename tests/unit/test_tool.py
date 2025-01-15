@@ -1,9 +1,13 @@
 """Tests for the Tool class."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
+from pydantic import SecretStr
 
 from portia.context import empty_context, get_execution_context
-from portia.errors import InvalidToolDescriptionError, ToolSoftError
+from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.tool import PortiaRemoteTool
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 
 
@@ -66,4 +70,34 @@ def test_run_method_with_uncaught_error() -> None:
             error_str="this is an error",
             return_uncaught_error=True,
             return_soft_error=False,
+        )
+
+
+def test_remote_tool_hard_error() -> None:
+    """Test http errors come back to hard errors."""
+    mock_response = MagicMock()
+    mock_response.is_success = False
+    mock_response.content = b"An error occurred."
+    with (
+        patch("httpx.post", return_value={mock_response}) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+        with pytest.raises(ToolHardError):
+            tool.run(empty_context())
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
         )

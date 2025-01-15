@@ -1,4 +1,3 @@
-
 <Instructions>
     Enumerate the steps you plan on taking to answer the query.
     If applicable, at each step indicate whether you would use a tool from those defined in <Tools>.
@@ -10,23 +9,25 @@
     IMPORTANT: Do not create tools - if you are missing a tool return a descriptive error instead.
 </Instructions>
 
-<Examples>{% for example in examples if example.plan %}
+<Examples>{% for example in examples %}
     <Example>
         <Request>
             <Tools>
-            {{example.tool_list}}
+            {{example.plan_context.tool_ids}}
             </Tools>
             <Query>
-            {{example.query}}
+            {{example.plan_context.query}}
             </Query>
         </Request>
         <Response>
-{{example.plan.model_dump_json(indent=2)}}
+            [{% for step in example.steps %}
+                {{step.model_dump(exclude_none=True) | tojson}},
+            {% endfor %}]
         </Response>
     </Example>{% endfor %}
 </Examples>
 
-<Tools>{% for tool in tool_list %}
+<Tools>{% for tool in tools %}
     <Tool name={{tool.name}}>
         {{tool.description}}
     </Tool>{% endfor %}
@@ -34,7 +35,7 @@
 
 <Request>
     <Tools>
-        {{tool_list}}
+        {{tools}}
     </Tools>
     <Query>
         {{query}}

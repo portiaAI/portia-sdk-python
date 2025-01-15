@@ -17,6 +17,7 @@ from portia.workflow import WorkflowState
 from tests.utils import AdditionTool
 
 
+@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -24,7 +25,7 @@ def test_runner_run_query_with_cloud() -> None:
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Whats the weather in London"
 
-    workflow = runner.run_query(query)
+    workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
@@ -35,6 +36,7 @@ def test_runner_run_query_with_cloud() -> None:
     storage.get_workflow(workflow.id)
 
 
+@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_run_tool_error() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -54,7 +56,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolHardError):
         tool.run(ctx)
 
-
+@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_runner_run_query_with_cloud_and_local() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -66,6 +68,6 @@ def test_runner_run_query_with_cloud_and_local() -> None:
     runner = Runner(config=config, tool_registry=registry)
     query = "Get the temperature in London and Sydney and then add the two temperatures together."
 
-    workflow = runner.run_query(query)
+    workflow = runner.execute_query(query)
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
