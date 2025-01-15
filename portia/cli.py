@@ -84,7 +84,7 @@ def cli() -> None:
 @common_options
 @click.argument("query")
 def run(
-    query: str, log_level: str, llm_provider: str | None, llm_model: str | None, env_location: str
+    query: str, log_level: str, llm_provider: str | None, llm_model: str | None, env_location: str,
 ) -> None:
     """Run a query."""
     config = _get_config(
@@ -108,7 +108,7 @@ def run(
 @common_options
 @click.argument("query")
 def plan(
-    query: str, log_level: str, llm_provider: str | None, llm_model: str | None, env_location: str
+    query: str, log_level: str, llm_provider: str | None, llm_model: str | None, env_location: str,
 ) -> None:
     """Plan a query."""
     config = _get_config(
