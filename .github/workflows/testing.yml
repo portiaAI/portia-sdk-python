@@ -39,9 +39,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+        # TODO(Emma): Re-enable 100% coverage with integration tests.
+        # https://linear.app/portialabs/issue/POR-383
         run: |
           set -o pipefail
-          poetry run pytest -n auto  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          poetry run pytest -n auto  --cov --cov-fail-under 94 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
 
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main

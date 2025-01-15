@@ -8,7 +8,7 @@ from uuid import UUID
 import pytest
 
 from portia.errors import StorageError
-from portia.plan import Plan
+from portia.plan import Plan, PlanContext
 from portia.storage import PlanStorage, PortiaCloudStorage, WorkflowStorage
 from portia.workflow import Workflow
 from tests.utils import get_test_config
@@ -33,7 +33,7 @@ def test_storage_base_classes() -> None:
             return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
 
     storage = MyStorage()
-    plan = Plan(query="", steps=[])
+    plan = Plan(plan_context=PlanContext(query="", tool_ids=[]), steps=[])
     workflow = Workflow(
         plan_id=plan.id,
     )
@@ -55,7 +55,11 @@ def test_portia_cloud_storage() -> None:
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
 
-    plan = Plan(id=UUID("12345678-1234-5678-1234-567812345678"), query="", steps=[])
+    plan = Plan(
+        id=UUID("12345678-1234-5678-1234-567812345678"),
+        plan_context=PlanContext(query="", tool_ids=[]),
+        steps=[],
+    )
     workflow = Workflow(
         id=UUID("87654321-4321-8765-4321-876543218765"),
         plan_id=plan.id,
@@ -76,7 +80,12 @@ def test_portia_cloud_storage() -> None:
 
         mock_post.assert_called_once_with(
             url="https://api.porita.dev/api/v0/plans/",
-            json={"id": str(plan.id), "json": plan.model_dump(mode="json")},
+            json={
+                "id": str(plan.id),
+                "steps": [],
+                "query": plan.plan_context.query,
+                "tool_ids": plan.plan_context.tool_ids,
+            },
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",

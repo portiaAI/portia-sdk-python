@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
 class Variable(BaseModel):
@@ -73,6 +73,13 @@ class ReadOnlyStep(Step):
             output=step.output,
         )
 
+class PlanContext(BaseModel):
+    """Context for a plan."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(description="The original query given by the user.")
+    tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
 
 class Plan(BaseModel):
     """A plan represent a series of steps that an agent should follow to execute the query."""
@@ -83,27 +90,8 @@ class Plan(BaseModel):
         default_factory=uuid4,
         description="A unique ID for this plan.",
     )
-    query: str = Field(description="The original query given by the user.")
+    plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
-
-    # LLMs can struggle to generate uuids when returning structured output
-    # but as its an ID field we can assign a new ID in this case.
-    @model_validator(mode="before")
-    @classmethod
-    def validate_uuid(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """Validate a given uuid is valid else assign a new one."""
-        uuid_value = values.get("id")
-        if isinstance(uuid_value, str):
-            try:
-                # Try parsing the UUID string
-                values["id"] = UUID(uuid_value)
-            except ValueError:
-                # If parsing fails, use the default_factory
-                values["id"] = uuid4()
-        elif not isinstance(uuid_value, UUID):
-            # If missing or invalid, use the default_factory
-            values["id"] = uuid4()
-        return values
 
     @field_serializer("id")
     def serialize_id(self, plan_id: UUID) -> str:
