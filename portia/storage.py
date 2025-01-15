@@ -215,7 +215,7 @@ class PortiaCloudStorage(Storage):
             id=UUID(response_json["id"]),
             plan_context=PlanContext(
                 query=response_json["query"],
-                tool_list=response_json["tool_list"],
+                tool_ids=response_json["tool_ids"],
             ),
             steps=[Step.model_validate(step) for step in response_json["steps"]],
         )

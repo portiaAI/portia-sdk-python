@@ -125,7 +125,7 @@ def test_runner_run_query_with_clarifications(
     plan = Plan(
         plan_context=PlanContext(
             query="raise a clarification",
-            tool_list=["clarification_tool"],
+            tool_ids=["clarification_tool"],
         ),
         steps=[clarification_step],
     )
@@ -182,7 +182,7 @@ def test_runner_run_query_with_hard_error(
     plan = Plan(
         plan_context=PlanContext(
             query="raise an error",
-            tool_list=["error_tool"],
+            tool_ids=["error_tool"],
         ),
         steps=[clarification_step],
     )
@@ -234,7 +234,7 @@ def test_runner_run_query_with_soft_error(
     plan = Plan(
         plan_context=PlanContext(
             query="add numbers",
-            tool_list=["add_tool"],
+            tool_ids=["add_tool"],
         ),
         steps=[clarification_step],
     )
@@ -252,7 +252,7 @@ def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> 
     plan = Plan(
         plan_context=PlanContext(
             query="Tell me a funny joke",
-            tool_list=[],
+            tool_ids=[],
         ),
         steps=[Step(task="Tell me a funny joke", output="$joke")],
     )

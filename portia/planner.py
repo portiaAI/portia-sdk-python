@@ -81,7 +81,7 @@ class Planner:
             plan=Plan(
                 plan_context=PlanContext(
                     query=query,
-                    tool_list=[tool.id for tool in tool_list],
+                    tool_ids=[tool.id for tool in tool_list],
                 ),
                 steps=response.steps,
             ),

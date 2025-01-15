@@ -31,7 +31,7 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
     plan = Plan(
         plan_context=PlanContext(
             query="Add 1 + 2",
-            tool_list=["add_tool"],
+            tool_ids=["add_tool"],
         ),
         steps=[step1],
     )

@@ -33,7 +33,7 @@ def test_storage_base_classes() -> None:
             return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
 
     storage = MyStorage()
-    plan = Plan(plan_context=PlanContext(query="", tool_list=[]), steps=[])
+    plan = Plan(plan_context=PlanContext(query="", tool_ids=[]), steps=[])
     workflow = Workflow(
         plan_id=plan.id,
     )

@@ -82,7 +82,7 @@ class PlanContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(description="The original query given by the user.")
-    tool_list: list[str] = Field(description="The list of tools IDs available to the planner.")
+    tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
 
 class Plan(BaseModel):
     """A plan represent a series of steps that an agent should follow to execute the query."""

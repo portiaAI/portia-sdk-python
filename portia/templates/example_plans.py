@@ -6,7 +6,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
             query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
-            tool_list=["search_tool", "send_email_tool", "other_tool"],
+            tool_ids=["search_tool", "send_email_tool", "other_tool"],
         ),
         steps=[
             Step(
@@ -35,7 +35,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
             query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
-            tool_list=["search_tool", "send_email_tool", "other_tool", "weather_tool"],
+            tool_ids=["search_tool", "send_email_tool", "other_tool", "weather_tool"],
         ),
         steps=[
             Step(
@@ -100,7 +100,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
             query="Send an email to hello@portialabs.ai with the weather in London",
-            tool_list=["weather_tool", "send_email_tool", "other_tool"],
+            tool_ids=["weather_tool", "send_email_tool", "other_tool"],
         ),
         steps=[
             Step(

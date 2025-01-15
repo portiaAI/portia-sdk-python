@@ -33,13 +33,13 @@ def planner(mock_config: Config) -> Planner:
 def test_plan_uuid_assign() -> None:
     """Test plan assign correct UUIDs."""
     plan = Plan(
-        plan_context=PlanContext(query="", tool_list=[]),
+        plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
     )
     assert isinstance(plan.id, UUID)
 
     clarification = Plan(
-        plan_context=PlanContext(query="", tool_list=[]),
+        plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
     )
     assert isinstance(clarification.id, UUID)
@@ -56,7 +56,7 @@ def test_generate_plan_or_error_success(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_list=[])
+    result = planner.generate_plan_or_error(query=query, tool_ids=[])
 
     assert result.plan.plan_context.query == query
     assert result.error is None
@@ -73,7 +73,7 @@ def test_generate_plan_or_error_failure(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_list=[])
+    result = planner.generate_plan_or_error(query=query, tool_ids=[])
 
     assert result.error == "Unable to generate a plan"
     assert result.plan.plan_context.query == query
@@ -90,7 +90,7 @@ def test_render_prompt() -> None:
         Plan(
             plan_context=PlanContext(
                 query="plan query 1",
-                tool_list=["plan_tool1a", "plan_tool1b"],
+                tool_ids=["plan_tool1a", "plan_tool1b"],
             ),
             steps=[
                 Step(
