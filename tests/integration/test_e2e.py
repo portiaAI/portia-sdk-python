@@ -233,7 +233,7 @@ def test_runner_run_query_with_soft_error(
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="add numbers",
+            query="raise an error",
             tool_ids=["add_tool"],
         ),
         steps=[clarification_step],
