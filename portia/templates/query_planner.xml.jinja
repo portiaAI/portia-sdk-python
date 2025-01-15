@@ -13,7 +13,7 @@
     <Example>
         <Request>
             <Tools>
-            {{example.plan_context.tool_list}}
+            {{example.plan_context.tool_ids}}
             </Tools>
             <Query>
             {{example.plan_context.query}}
@@ -27,7 +27,7 @@
     </Example>{% endfor %}
 </Examples>
 
-<Tools>{% for tool in tool_list %}
+<Tools>{% for tool in tools %}
     <Tool name={{tool.name}}>
         {{tool.description}}
     </Tool>{% endfor %}
@@ -35,7 +35,7 @@
 
 <Request>
     <Tools>
-        {{tool_ids}}
+        {{tools}}
     </Tools>
     <Query>
         {{query}}

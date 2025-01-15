@@ -80,7 +80,12 @@ def test_portia_cloud_storage() -> None:
 
         mock_post.assert_called_once_with(
             url="https://api.porita.dev/api/v0/plans/",
-            json={"id": str(plan.id), "json": plan.model_dump(mode="json")},
+            json={
+                "id": str(plan.id),
+                "steps": [],
+                "query": plan.plan_context.query,
+                "tool_ids": plan.plan_context.tool_ids,
+            },
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",

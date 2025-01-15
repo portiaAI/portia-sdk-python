@@ -105,7 +105,7 @@ def _render_prompt_insert_defaults(
     return render_template(
         "query_planner.xml.jinja",
         query=query,
-        tool_list=tools_with_descriptions,
+        tools=tools_with_descriptions,
         examples=examples,
         system_context=system_context,
     )
