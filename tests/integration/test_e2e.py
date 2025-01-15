@@ -225,7 +225,7 @@ def test_runner_run_query_with_soft_error(
     assert workflow.state == WorkflowState.FAILED
     assert workflow.final_output
     assert isinstance(workflow.final_output.value, str)
-    assert "Tool failed after retries" in workflow.final_output.value
+    assert "Tool add_tool failed after retries" in workflow.final_output.value
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
