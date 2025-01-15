@@ -38,7 +38,7 @@ def outputs() -> dict[str, Output]:
 
 def test_context_empty() -> None:
     """Test that the context is set up correctly."""
-    (plan, workflow) = get_test_workflow()
+    (_, workflow) = get_test_workflow()
     context = build_context(
         ExecutionContext(),
         Step(inputs=[], output="", task=""),
@@ -79,7 +79,7 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
     """Test that the context is set up correctly with inputs and outputs."""
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
-    workflow.step_outputs = outputs
+    workflow.outputs.step_outputs = outputs
     context = build_context(
         ExecutionContext(),
         plan.steps[0],
@@ -110,7 +110,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     """Test that the context is set up correctly with all contexts."""
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
-    workflow.step_outputs = outputs
+    workflow.outputs.step_outputs = outputs
     clarifications = [
         InputClarification(
             argument_name="$email_cc",
@@ -122,7 +122,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
             user_guidance="click on the link",
         ),
     ]
-    workflow.clarifications = clarifications
+    workflow.outputs.clarifications = clarifications
     context = build_context(
         ExecutionContext(
             agent_system_context_extension=["system context 1", "system context 2"],
@@ -189,8 +189,8 @@ def test_context_inputs_outputs_clarifications(
     ]
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
-    workflow.step_outputs = outputs
-    workflow.clarifications = clarifications
+    workflow.outputs.step_outputs = outputs
+    workflow.outputs.clarifications = clarifications
     context = build_context(
         ExecutionContext(agent_system_context_extension=["system context 1", "system context 2"]),
         plan.steps[0],

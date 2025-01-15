@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from threading import local
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -24,6 +24,8 @@ class ExecutionContext(BaseModel):
 
     ExecutionContext
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     # end_user_id is used by the system to identify the actual user for who a workflow is running.
     # This is used to identify the user for Authentication purposes and also to assist with

@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Generic
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.context import build_context
 from portia.common import SERIALIZABLE_TYPE_VAR
@@ -76,5 +76,7 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     Contains a generic value T bound to Serializable.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")

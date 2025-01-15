@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Generic
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, HttpUrl, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_serializer
 
 from portia.common import SERIALIZABLE_TYPE_VAR
 
@@ -19,6 +19,8 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     - That one argument provided for a tool is missing and the user needs to provide it.
     - That the user has given an input that is not allowed and needs to choose from a list.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: UUID = Field(
         default_factory=uuid4,

@@ -5,17 +5,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
+from uuid import UUID
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from portia.context import ExecutionContext
 from portia.errors import PlanNotFoundError, WorkflowNotFoundError
 from portia.plan import Plan
-from portia.workflow import Workflow
+from portia.workflow import Workflow, WorkflowOutputs, WorkflowState
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -214,7 +214,10 @@ class PortiaCloudStorage(Storage):
             url=f"{self.api_endpoint}/api/v0/workflows/",
             json={
                 "id": str(workflow.id),
-                "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
+                "current_step_index": workflow.current_step_index,
+                "state": workflow.state,
+                "execution_context": workflow.execution_context,
+                "outputs": workflow.outputs,
                 "plan_id": str(workflow.plan_id),
             },
             headers={
@@ -227,8 +230,11 @@ class PortiaCloudStorage(Storage):
             response = httpx.patch(
                 url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
                 json={
+                    "current_step_index": workflow.current_step_index,
+                    "state": workflow.state,
+                    "execution_context": workflow.execution_context,
+                    "outputs": workflow.outputs,
                     "plan_id": str(workflow.plan_id),
-                    "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
                 },
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
@@ -247,4 +253,11 @@ class PortiaCloudStorage(Storage):
             },
         )
         response.raise_for_status()
-        return Workflow.model_validate(response.json()["json"])
+        return Workflow(
+            id=UUID(response.json()["id"]),
+            plan_id=UUID(response.json()["plan_id"]),
+            current_step_index=response.json()["current_step_index"],
+            state=WorkflowState.model_validate(response.json()["state"]),
+            execution_context=ExecutionContext.model_validate(response.json()["execution_context"]),
+            outputs=WorkflowOutputs.model_validate(response.json()["outputs"]),
+        )

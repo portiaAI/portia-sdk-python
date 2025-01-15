@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.plan import ReadOnlyStep, Step
-from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowOutputs, WorkflowState
 
 
 @pytest.fixture
@@ -23,9 +23,11 @@ def workflow(mock_clarification: Clarification) -> Workflow:
     return Workflow(
         plan_id=uuid4(),
         current_step_index=1,
-        clarifications=[mock_clarification],
         state=WorkflowState.IN_PROGRESS,
-        step_outputs={"step1": Output(value="Test output")},
+        outputs=WorkflowOutputs(
+            clarifications=[mock_clarification],
+            step_outputs={"step1": Output(value="Test output")},
+        ),
     )
 
 
@@ -37,9 +39,9 @@ def test_workflow_initialization() -> None:
     assert workflow.id is not None
     assert workflow.plan_id == plan_id
     assert workflow.current_step_index == 0
-    assert workflow.clarifications == []
+    assert workflow.outputs.clarifications == []
     assert workflow.state == WorkflowState.NOT_STARTED
-    assert workflow.step_outputs == {}
+    assert workflow.outputs.step_outputs == {}
 
 
 def test_workflow_get_outstanding_clarifications(
