@@ -11,7 +11,8 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from portia.context import ExecutionContext
-from portia.errors import PlanNotFoundError, WorkflowNotFoundError
+from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
+from portia.logger import logger
 from portia.plan import Plan
 from portia.workflow import Workflow, WorkflowOutputs, WorkflowState
 
@@ -184,6 +185,13 @@ class PortiaCloudStorage(Storage):
         self.api_key = config.must_get_api_key("portia_api_key")
         self.api_endpoint = config.must_get("portia_api_endpoint", str)
 
+    def check_response(self, response: httpx.Response) -> None:
+        """Validate response from Portia API."""
+        if not response.is_success:
+            error_str = str(response.content)
+            logger.error(f"Error from Portia Cloud: {error_str}")
+            raise StorageError(error_str)
+
     def save_plan(self, plan: Plan) -> None:
         """Add plan to cloud."""
         response = httpx.post(
@@ -194,7 +202,7 @@ class PortiaCloudStorage(Storage):
                 "Content-Type": "application/json",
             },
         )
-        response.raise_for_status()
+        self.check_response(response)
 
     def get_plan(self, plan_id: UUID) -> Plan:
         """Get plan from cloud."""
@@ -205,7 +213,7 @@ class PortiaCloudStorage(Storage):
                 "Content-Type": "application/json",
             },
         )
-        response.raise_for_status()
+        self.check_response(response)
         return Plan.model_validate(response.json()["json"])
 
     def save_workflow(self, workflow: Workflow) -> None:
@@ -241,7 +249,7 @@ class PortiaCloudStorage(Storage):
                     "Content-Type": "application/json",
                 },
             )
-        response.raise_for_status()
+        self.check_response(response)
 
     def get_workflow(self, workflow_id: UUID) -> Workflow:
         """Get workflow from cloud."""
@@ -252,12 +260,12 @@ class PortiaCloudStorage(Storage):
                 "Content-Type": "application/json",
             },
         )
-        response.raise_for_status()
+        self.check_response(response)
         return Workflow(
             id=UUID(response.json()["id"]),
             plan_id=UUID(response.json()["plan_id"]),
             current_step_index=response.json()["current_step_index"],
-            state=WorkflowState.model_validate(response.json()["state"]),
+            state=WorkflowState(response.json()["state"]),
             execution_context=ExecutionContext.model_validate(response.json()["execution_context"]),
             outputs=WorkflowOutputs.model_validate(response.json()["outputs"]),
         )

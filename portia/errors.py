@@ -106,3 +106,11 @@ class ToolSoftError(Exception):
     def __init__(self, cause: Exception | str) -> None:
         """Set custom error message."""
         super().__init__(cause)
+
+
+class StorageError(Exception):
+    """Raised when there's an issue with the storage."""
+
+    def __init__(self, cause: Exception | str) -> None:
+        """Set custom error message."""
+        super().__init__(cause)
