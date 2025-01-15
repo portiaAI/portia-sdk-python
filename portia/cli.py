@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import os
 from enum import Enum
+from functools import wraps
+from typing import Any, Callable
 
 import click
 from dotenv import load_dotenv
@@ -36,55 +38,57 @@ class CLIOptions(Enum):
 
 PORTIA_API_KEY = "portia_api_key"
 
+def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
+    """Define common options for CLI commands."""
+    @click.option(
+        "--log-level",
+        type=click.Choice([level.name for level in LogLevel], case_sensitive=False),
+        default=LogLevel.INFO.value,
+        help="Set the logging level",
+    )
+    @click.option(
+        "--llm-provider",
+        type=click.Choice([p.value for p in LLMProvider], case_sensitive=False),
+        required=False,
+        help="The LLM provider to use",
+    )
+    @click.option(
+        "--env-location",
+        type=click.Choice([e.value for e in EnvLocation], case_sensitive=False),
+        default=EnvLocation.ENV_VARS.value,
+        help="The location of the environment variables: default is environment variables",
+    )
+    @click.option(
+        "--llm-model",
+        type=click.Choice([m.value for m in LLMModel], case_sensitive=False),
+        required=False,
+        help="The LLM model to use",
+    )
+    @wraps(f)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        return f(*args, **kwargs)
+    return wrapper
+
 @click.group()
-@click.option(
-    "--log-level",
-    type=click.Choice([level.name for level in LogLevel], case_sensitive=False),
-    default=LogLevel.INFO.value,
-    help="Set the logging level",
-)
-@click.option(
-    "--llm-provider",
-    type=click.Choice([p.value for p in LLMProvider], case_sensitive=False),
-    required=False,
-    help="The LLM provider to use",
-)
-@click.option(
-    "--env-location",
-    type=click.Choice([e.value for e in EnvLocation], case_sensitive=False),
-    default=EnvLocation.ENV_VARS.value,
-    help="The location of the environment variables: default is environment variables",
-)
-@click.option(
-    "--llm-model",
-    type=click.Choice([m.value for m in LLMModel], case_sensitive=False),
-    required=False,
-    help="The LLM model to use",
-)
-@click.pass_context
-def cli(ctx: click.Context,
+def cli() -> None:
+    """Portia CLI."""
+
+
+@click.command()
+@common_options
+@click.argument("query")
+def run(query: str,
         log_level: str,
         llm_provider: str | None,
         llm_model: str | None,
         env_location: str) -> None:
-    """Portia CLI."""
-    ctx.ensure_object(dict)
-    ctx.obj[CLIOptions.LOG_LEVEL.name] = LogLevel[log_level.upper()]
-    ctx.obj[CLIOptions.LLM_PROVIDER.name] = (
-        LLMProvider(llm_provider.upper()) if llm_provider else None
-    )
-    ctx.obj[CLIOptions.LLM_MODEL.name] = (
-        LLMModel(llm_model.upper()) if llm_model else None
-    )
-    ctx.obj[CLIOptions.ENV_LOCATION.name] = EnvLocation(env_location.upper())
-
-
-@click.command()
-@click.argument("query")
-@click.pass_context
-def run(ctx: click.Context, query: str) -> None:
     """Run a query."""
-    config = _get_config(ctx)
+    config = _get_config(
+        log_level=LogLevel[log_level.upper()],
+        llm_provider=LLMProvider(llm_provider.upper()) if llm_provider else None,
+        llm_model=LLMModel(llm_model.upper()) if llm_model else None,
+        env_location=EnvLocation(env_location.upper()),
+    )
     # Add the tool registry
     registry = example_tool_registry
     if config.has_api_key(PORTIA_API_KEY):
@@ -95,12 +99,22 @@ def run(ctx: click.Context, query: str) -> None:
     output = runner.run_query(query)
     click.echo(output.model_dump_json(indent=4))
 
+
 @click.command()
+@common_options
 @click.argument("query")
-@click.pass_context
-def plan(ctx: click.Context, query: str) -> None:
+def plan(query: str,
+         log_level: str,
+         llm_provider: str | None,
+         llm_model: str | None,
+         env_location: str) -> None:
     """Plan a query."""
-    config = _get_config(ctx)
+    config = _get_config(
+        log_level=LogLevel[log_level.upper()],
+        llm_provider=LLMProvider(llm_provider.upper()) if llm_provider else None,
+        llm_model=LLMModel(llm_model.upper()) if llm_model else None,
+        env_location=EnvLocation(env_location.upper()),
+    )
     registry = example_tool_registry
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
@@ -108,12 +122,13 @@ def plan(ctx: click.Context, query: str) -> None:
     output = runner.plan_query(query)
     click.echo(output.model_dump_json(indent=4))
 
-def _get_config(ctx: click.Context) -> Config:
+def _get_config(
+    log_level: LogLevel,
+    llm_provider: LLMProvider | None,
+    llm_model: LLMModel | None,
+    env_location: EnvLocation,
+) -> Config:
     """Get the config from the context."""
-    log_level = ctx.obj.get(CLIOptions.LOG_LEVEL.name, LogLevel.INFO)
-    llm_provider = ctx.obj.get(CLIOptions.LLM_PROVIDER.name, None)
-    llm_model = ctx.obj.get(CLIOptions.LLM_MODEL.name, None)
-    env_location = ctx.obj.get(CLIOptions.ENV_LOCATION.name, EnvLocation.ENV_VARS)
     if env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
 
@@ -129,7 +144,11 @@ def _get_config(ctx: click.Context) -> Config:
         raise click.UsageError(message)
 
     if llm_provider or llm_model:
-        provider = llm_provider if llm_provider else llm_model.provider()
+        provider = (
+            llm_provider if llm_provider
+            # we are sure that llm_model is not None at this point
+            else llm_model.provider()  # pyright: ignore[reportOptionalMemberAccess]
+        )
         model = llm_model if llm_model else provider.default_model()
         config = Config.from_default(
             llm_provider=provider,
@@ -140,7 +159,6 @@ def _get_config(ctx: click.Context) -> Config:
         config = Config.from_default(default_log_level=log_level)
 
     return config
-
 
 cli.add_command(run)
 cli.add_command(plan)
