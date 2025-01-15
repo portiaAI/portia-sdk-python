@@ -170,7 +170,10 @@ def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
         runner.execute_workflow()
 
     query = "example query"
-    mock_response = PlanOrError(plan=Plan(query=query, steps=[]), error=None)
+    mock_response = StepsOrError(
+        steps=[],
+        error=None,
+    )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = runner.generate_plan(query)
