@@ -1,5 +1,22 @@
 # Portia SDK Python
 
+[Mounir notes] Suggested structure:
+- Overview:
+    - What it is in a sentence or two
+    - What's in this repo
+    - Contributor guide link
+- Why Portia
+    - Plan in an explicit, structured way
+    - Manage workflow execution statefully
+    - Authenticate tool calls just-in-time
+    - Direct execution with Clarifications
+- What you can build on Portia
+- Let's get started!
+    - Install -- validate installation with a simple example using `run_query` and example tools
+    - Demonstrate the key features in one multi-tool, multi-step example -- Simple example with `generate_plan`, `create_workflow`, `execute_workflow` (e.g. something with weather and file writing)
+- Where can I learn more
+    - Docs
+    - Other 
 
 ## Usage
 
