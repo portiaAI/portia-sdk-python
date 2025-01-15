@@ -55,7 +55,11 @@ def test_portia_cloud_storage() -> None:
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
 
-    plan = Plan(id=UUID("12345678-1234-5678-1234-567812345678"), query="", steps=[])
+    plan = Plan(
+        id=UUID("12345678-1234-5678-1234-567812345678"),
+        plan_context=PlanContext(query="", tool_ids=[]),
+        steps=[],
+    )
     workflow = Workflow(
         id=UUID("87654321-4321-8765-4321-876543218765"),
         plan_id=plan.id,

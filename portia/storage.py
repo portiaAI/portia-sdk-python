@@ -198,7 +198,7 @@ class PortiaCloudStorage(Storage):
             json={
                 "id": str(plan.id),
                 "query": plan.plan_context.query,
-                "tool_list": plan.plan_context.tool_list,
+                "tool_ids": plan.plan_context.tool_ids,
                 "steps": [step.model_dump(mode="json") for step in plan.steps],
             },
             headers={

@@ -56,7 +56,7 @@ def test_generate_plan_or_error_success(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_ids=[])
+    result = planner.generate_plan_or_error(query=query, tool_list=[])
 
     assert result.plan.plan_context.query == query
     assert result.error is None
@@ -73,7 +73,7 @@ def test_generate_plan_or_error_failure(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_ids=[])
+    result = planner.generate_plan_or_error(query=query, tool_list=[])
 
     assert result.error == "Unable to generate a plan"
     assert result.plan.plan_context.query == query
