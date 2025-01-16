@@ -56,6 +56,14 @@ class ToolNotFoundError(Exception):
         super().__init__(f"Tool with name {tool_name} not found.")
 
 
+class DuplicateToolError(Exception):
+    """Custom error class when tools are registered with the same name."""
+
+    def __init__(self, tool_name: str) -> None:
+        """Set custom error message."""
+        super().__init__(f"Tool with name {tool_name} already exists.")
+
+
 class InvalidToolDescriptionError(Exception):
     """Raised when the tool description is invalid."""
 

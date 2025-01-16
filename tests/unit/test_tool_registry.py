@@ -3,7 +3,7 @@
 import pytest
 
 from portia.context import get_execution_context
-from portia.errors import ToolNotFoundError
+from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.tool import Tool
 from portia.tool_registry import (
     AggregatedToolRegistry,
@@ -63,6 +63,9 @@ def test_local_tool_registry_register_tool() -> None:
     with pytest.raises(ToolNotFoundError):
         local_tool_registry.get_tool("tool3")
 
+    with pytest.raises(DuplicateToolError):
+        local_tool_registry.register_tool(MockTool(name=MOCK_TOOL_NAME))
+
 
 def test_local_tool_registry_get_and_run() -> None:
     """Test getting and running tools in the InMemoryToolRegistry."""
@@ -82,6 +85,16 @@ def test_local_tool_registry_get_tools() -> None:
     assert len(tools) == 2
     assert any(tool.name == MOCK_TOOL_NAME for tool in tools)
     assert any(tool.name == OTHER_MOCK_TOOL_NAME for tool in tools)
+
+
+def test_aggregated_tool_registry_duplicate_tool() -> None:
+    """Test searching across multiple registries in AggregatedToolRegistry."""
+    local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(name=MOCK_TOOL_NAME)])
+    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+        [MockTool(name=MOCK_TOOL_NAME)],
+    )
+    with pytest.raises(DuplicateToolError):
+        aggregated_tool_registry = local_tool_registry + other_tool_registry  # noqa: F841
 
 
 def test_aggregated_tool_registry_get_tool() -> None:
