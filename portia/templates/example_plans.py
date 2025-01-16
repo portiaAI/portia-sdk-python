@@ -1,10 +1,13 @@
 """Default examples that are passed to the query planner."""
 
-from portia.plan import Plan, Step, Variable
+from portia.plan import Plan, PlanContext, Step, Variable
 
 DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
-        query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
+        plan_context=PlanContext(
+            query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
+            tool_ids=["search_tool", "send_email_tool", "other_tool"],
+        ),
         steps=[
             Step(
                 task="Find and summarize the latest news on artificial intelligence",
@@ -30,7 +33,10 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         ],
     ),
     Plan(
-        query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
+        plan_context=PlanContext(
+            query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
+            tool_ids=["search_tool", "send_email_tool", "other_tool", "weather_tool"],
+        ),
         steps=[
             Step(
                 task="What is a city in the Southern hemisphere?",
@@ -92,7 +98,10 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         ],
     ),
     Plan(
-        query="Send an email to hello@portialabs.ai with the weather in London",
+        plan_context=PlanContext(
+            query="Send an email to hello@portialabs.ai with the weather in London",
+            tool_ids=["weather_tool", "send_email_tool", "other_tool"],
+        ),
         steps=[
             Step(
                 task="What is the weather in London?",

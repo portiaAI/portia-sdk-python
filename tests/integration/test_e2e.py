@@ -7,7 +7,7 @@ from portia.agents.toolless_agent import ToolLessAgent
 from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
 from portia.context import ExecutionContext, execution_context
 from portia.errors import ToolSoftError
-from portia.plan import Plan, Step, Variable
+from portia.plan import Plan, PlanContext, Step, Variable
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import Workflow, WorkflowState
@@ -122,7 +122,13 @@ def test_runner_run_query_with_clarifications(
             ),
         ],
     )
-    plan = Plan(query="raise a clarification", steps=[clarification_step])
+    plan = Plan(
+        plan_context=PlanContext(
+            query="raise a clarification",
+            tool_ids=["clarification_tool"],
+        ),
+        steps=[clarification_step],
+    )
     runner.storage.save_plan(plan)
 
     with execution_context(additional_data={"raise_clarification": "True"}):
@@ -175,7 +181,13 @@ def test_runner_run_query_with_hard_error(
             ),
         ],
     )
-    plan = Plan(query="raise an error", steps=[clarification_step])
+    plan = Plan(
+        plan_context=PlanContext(
+            query="raise an error",
+            tool_ids=["error_tool"],
+        ),
+        steps=[clarification_step],
+    )
     runner.storage.save_plan(plan)
     workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
@@ -224,7 +236,13 @@ def test_runner_run_query_with_soft_error(
             ),
         ],
     )
-    plan = Plan(query="raise an error", steps=[clarification_step])
+    plan = Plan(
+        plan_context=PlanContext(
+            query="raise an error",
+            tool_ids=["add_tool"],
+        ),
+        steps=[clarification_step],
+    )
     runner.storage.save_plan(plan)
     workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
@@ -239,7 +257,10 @@ def test_runner_run_query_with_soft_error(
 def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> None:
     """Test toolless agent."""
     plan = Plan(
-        query="Tell me a funny joke",
+        plan_context=PlanContext(
+            query="Tell me a funny joke",
+            tool_ids=[],
+        ),
         steps=[Step(task="Tell me a funny joke", output="$joke")],
     )
     config = Config.from_default(
