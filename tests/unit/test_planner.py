@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from portia.config import Config
+from portia.context import ExecutionContext, get_execution_context
 from portia.example_tools.addition import AdditionTool
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
@@ -40,7 +41,7 @@ def test_generate_plan_or_error_success(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_list=[])
+    result = planner.generate_plan_or_error(get_execution_context(), query=query, tool_list=[])
 
     assert result.plan.plan_context.query == query
     assert result.error is None
@@ -57,7 +58,7 @@ def test_generate_plan_or_error_failure(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_list=[])
+    result = planner.generate_plan_or_error(get_execution_context(), query=query, tool_list=[])
 
     assert result.error == "Unable to generate a plan"
     assert result.plan.plan_context.query == query
@@ -88,10 +89,10 @@ def test_render_prompt() -> None:
         ),
     ]
     rendered_prompt = _render_prompt_insert_defaults(
+        ctx=ExecutionContext(planner_system_context_extension=["extension"]),
         query="test query",
         tool_list=[AdditionTool()],
         examples=plans,
-        system_context_extension=["extension"],
     )
     overall_pattern = re.compile(
         r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?"

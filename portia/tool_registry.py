@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from portia.config import Config
+    from portia.context import ExecutionContext
 
 
 class ToolRegistry(ABC):
@@ -35,7 +36,7 @@ class ToolRegistry(ABC):
         """Get all tools registered with registry."""
         raise NotImplementedError("get_tools is not implemented")
 
-    def match_tools(self, query: str) -> list[Tool]:  # noqa: ARG002 - useful to have variable name
+    def match_tools(self, ctx: ExecutionContext, query: str) -> list[Tool]:  # noqa: ARG002 - useful to have variable name
         """Provide a set of tools that match a given query.
 
         This is optional to implement and will default to provide all tools.
@@ -83,11 +84,15 @@ class AggregatedToolRegistry(ToolRegistry):
             tools += registry.get_tools()
         return tools
 
-    def match_tools(self, query: str) -> list[Tool]:
+    def match_tools(
+        self,
+        ctx: ExecutionContext,
+        query: str,
+    ) -> list[Tool]:
         """Get all tools from all registries."""
         tools = []
         for registry in self.registries:
-            tools += registry.match_tools(query)
+            tools += registry.match_tools(ctx, query)
         return tools
 
 

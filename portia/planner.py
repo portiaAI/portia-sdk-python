@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from portia.context import get_execution_context
+from portia.context import ExecutionContext, get_execution_context
 from portia.plan import Plan, PlanContext, Step
 from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
+
 
 # TODO(Emma): This is a temporary class while we are migrating to a synced plan model. #noqa: FIX002
 # Evals should be updated to use the new StepsOrError class.
@@ -30,6 +31,7 @@ class PlanOrError(BaseModel):
         default=None,
         description="An error message if the plan could not be created.",
     )
+
 
 class StepsOrError(BaseModel):
     """A list of steps or an error."""
@@ -50,16 +52,16 @@ class Planner:
 
     def generate_plan_or_error(
         self,
+        ctx: ExecutionContext,
         query: str,
         tool_list: list[Tool],
         examples: list[Plan] | None = None,
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
-        ctx = get_execution_context()
         prompt = _render_prompt_insert_defaults(
+            ctx,
             query,
             tool_list,
-            ctx.planner_system_context_extension,
             examples,
         )
         response = self.llm_wrapper.to_instructor(
@@ -88,14 +90,15 @@ class Planner:
             error=response.error,
         )
 
+
 def _render_prompt_insert_defaults(
+    ctx: ExecutionContext,
     query: str,
     tool_list: list[Tool],
-    system_context_extension: list[str] | None = None,
     examples: list[Plan] | None = None,
 ) -> str:
     """Render the prompt for the query planner with defaults inserted if not provided."""
-    system_context = _default_query_system_context(system_context_extension)
+    system_context = _default_query_system_context(ctx.planner_system_context_extension)
 
     if examples is None:
         examples = DEFAULT_EXAMPLE_PLANS

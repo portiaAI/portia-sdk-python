@@ -2,7 +2,7 @@
 
 import pytest
 
-from portia.context import get_execution_context
+from portia.context import ExecutionContext, get_execution_context
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.tool import Tool
 from portia.tool_registry import (
@@ -31,8 +31,8 @@ def test_registry_base_classes() -> None:
         def register_tool(self, tool: Tool) -> None:
             return super().register_tool(tool)  # type: ignore  # noqa: PGH003
 
-        def match_tools(self, query: str) -> list[Tool]:
-            return super().match_tools(query)
+        def match_tools(self, ctx: ExecutionContext, query: str) -> list[Tool]:
+            return super().match_tools(ctx, query)
 
     registry = MyRegistry()
 
@@ -46,7 +46,7 @@ def test_registry_base_classes() -> None:
         registry.register_tool(AdditionTool())
 
     with pytest.raises(NotImplementedError):
-        registry.match_tools("match")
+        registry.match_tools(get_execution_context(), "match")
 
     agg_registry = AggregatedToolRegistry(registries=[registry])
     with pytest.raises(NotImplementedError):

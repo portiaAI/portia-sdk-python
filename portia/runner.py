@@ -80,12 +80,14 @@ class Runner:
                 for tool in tools
             ]
 
+        context = get_execution_context()
         if not tools:
-            tools = self.tool_registry.match_tools(query)
+            tools = self.tool_registry.match_tools(context, query)
 
         logger.debug(f"Running planner for query - {query}")
         planner = Planner(self.llm_wrapper_class(self.config))
         outcome = planner.generate_plan_or_error(
+            ctx=context,
             query=query,
             tool_list=tools,
             examples=example_plans,
