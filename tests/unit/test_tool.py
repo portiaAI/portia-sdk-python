@@ -73,6 +73,12 @@ def test_run_method_with_uncaught_error() -> None:
         )
 
 
+def test_tool_str_repr() -> None:
+    """Test tools can be serialized to string."""
+    tool = AdditionTool()
+    assert str(tool) == f"ToolModel(id={tool.id}, name={tool.name}, description={tool.description})"
+
+
 def test_remote_tool_hard_error() -> None:
     """Test http errors come back to hard errors."""
     mock_response = MagicMock()

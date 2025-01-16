@@ -25,7 +25,6 @@ from portia.logger import logger
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
-
     from portia.context import ExecutionContext
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
@@ -204,6 +203,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def args_json_schema(self) -> dict[str, Any]:
         """Return the json_schema for the tool args."""
         return self.args_schema.model_json_schema()
+
+    def __str__(self) -> str:
+        """Return the string representation."""
+        print("222")
+        return f"ToolModel(id={self.id}, name={self.name}, description={self.description})"
 
 
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
