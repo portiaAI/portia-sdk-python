@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 
+from portia.clarification import Clarification, ValueAcceptanceClarification
 from portia.context import ExecutionContext
 from portia.tool import Tool
 
