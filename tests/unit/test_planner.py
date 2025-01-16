@@ -2,7 +2,6 @@
 
 import re
 from unittest.mock import MagicMock
-from uuid import UUID
 
 import pytest
 
@@ -100,7 +99,7 @@ def test_render_prompt() -> None:
         re.DOTALL,
     )
     example_match, tools_content, request_content, system_context_content = overall_pattern.findall(
-        rendered_prompt
+        rendered_prompt,
     )[0]
 
     tool_pattern = re.compile(r"<Tools>(.*?)</Tools>", re.DOTALL)

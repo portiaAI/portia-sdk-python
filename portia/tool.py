@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer, model_validator
+from pydantic import BaseModel, Field, SecretStr, field_serializer, model_validator
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
