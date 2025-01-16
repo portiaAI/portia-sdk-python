@@ -120,8 +120,8 @@ def generate_context_from_execution_context(context: ExecutionContext) -> list[s
 def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     """Turn inputs and past outputs into a context string for the agent."""
     inputs = step.inputs
-    previous_outputs = workflow.step_outputs
-    clarifications = workflow.clarifications
+    previous_outputs = workflow.outputs.step_outputs
+    clarifications = workflow.outputs.clarifications
 
     system_context = generate_main_system_context(ctx.agent_system_context_extension)
 

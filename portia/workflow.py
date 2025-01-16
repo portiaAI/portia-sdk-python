@@ -22,6 +22,23 @@ class WorkflowState(str, Enum):
     FAILED = "FAILED"
 
 
+class WorkflowOutputs(BaseModel):
+    """Outputs of a workflow including clarifications."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clarifications: list[Clarification] = Field(
+        default=[],
+        description="Any clarifications needed for this workflow.",
+    )
+
+    outputs: dict[str, Output] = {}
+
+    step_outputs: dict[str, Output] = {}
+
+    final_output: Output | None = None
+
+
 class Workflow(BaseModel):
     """A workflow represent a running instance of a Plan."""
 
@@ -36,10 +53,6 @@ class Workflow(BaseModel):
         default=0,
         description="The current step that is being executed",
     )
-    clarifications: list[Clarification] = Field(
-        default=[],
-        description="Any clarifications needed for this workflow.",
-    )
     state: WorkflowState = Field(
         default=WorkflowState.NOT_STARTED,
         description="The current state of the workflow.",
@@ -48,15 +61,17 @@ class Workflow(BaseModel):
         default=empty_context(),
         description="Execution Context for the workflow.",
     )
-
-    step_outputs: dict[str, Output] = {}
-
-    final_output: Output | None = None
+    outputs: WorkflowOutputs = Field(
+        default=WorkflowOutputs(),
+        description="Outputs of the workflow including clarifications.",
+    )
 
     def get_outstanding_clarifications(self) -> list[Clarification]:
         """Return all outstanding clarifications."""
         return [
-            clarification for clarification in self.clarifications if not clarification.resolved
+            clarification
+            for clarification in self.outputs.clarifications
+            if not clarification.resolved
         ]
 
 
@@ -72,8 +87,7 @@ class ReadOnlyWorkflow(Workflow):
             id=workflow.id,
             plan_id=workflow.plan_id,
             current_step_index=workflow.current_step_index,
-            clarifications=workflow.clarifications,
+            outputs=workflow.outputs,
             state=workflow.state,
-            step_outputs=workflow.step_outputs,
-            final_output=workflow.final_output,
+            execution_context=workflow.execution_context,
         )

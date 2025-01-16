@@ -28,7 +28,7 @@ def test_runner_run_query_with_cloud() -> None:
     workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
-    assert workflow.final_output
+    assert workflow.outputs.final_output
 
     storage = runner.storage
     # check we can get items back
@@ -70,4 +70,4 @@ def test_runner_run_query_with_cloud_and_local() -> None:
 
     workflow = runner.execute_query(query)
     assert workflow.state == WorkflowState.COMPLETE
-    assert workflow.final_output
+    assert workflow.outputs.final_output

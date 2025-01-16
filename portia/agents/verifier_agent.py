@@ -259,7 +259,7 @@ class ToolCallingModel:
         if not verified_args:
             raise InvalidWorkflowStateError
         # handle any clarifications before calling
-        if self.agent and self.agent.workflow.clarifications:
+        if self.agent and self.agent.workflow.outputs.clarifications:
             for arg in verified_args.args:
                 matching_clarification = self.agent.get_last_resolved_clarification(arg.name)
                 if matching_clarification and arg.value != matching_clarification.response:
@@ -351,7 +351,7 @@ class VerifierAgent(BaseAgent):
     ) -> Clarification | None:
         """Get the last resolved clarification for an argument."""
         matching_clarification = None
-        for clarification in self.workflow.clarifications:
+        for clarification in self.workflow.outputs.clarifications:
             if (
                 clarification.resolved
                 and getattr(clarification, "argument_name", None) == arg_name
