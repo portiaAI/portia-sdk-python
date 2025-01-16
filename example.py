@@ -18,20 +18,20 @@ workflow = runner.execute_query(
 )
 
 # We can also provide additional execution context to the process
-# with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-#     plan = runner.execute_query(
-#         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
-#     )
+with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
+    plan = runner.execute_query(
+        "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
+    )
 
-# # When we hit a clarification we can ask our end user for clarification then resume the process
-# with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-#     workflow = runner.execute_query(
-#         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
-#     )
+# When we hit a clarification we can ask our end user for clarification then resume the process
+with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
+    workflow = runner.execute_query(
+        "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
+    )
 
 
 # Fetch workflow
-# workflow = runner.storage.get_workflow(workflow.id)
+workflow = runner.storage.get_workflow(workflow.id)
 # Update clarifications
 if workflow.state == WorkflowState.NEED_CLARIFICATION:
     for c in workflow.get_outstanding_clarifications():
