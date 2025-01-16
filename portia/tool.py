@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer, model_validator
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
@@ -206,8 +206,17 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def __str__(self) -> str:
         """Return the string representation."""
-        print("222")
-        return f"ToolModel(id={self.id}, name={self.name}, description={self.description})"
+        return (
+            f"ToolModel(id={self.id!r}, name={self.name!r}, "
+            f"description={self.description!r}, "
+            f"args_schema={self.args_schema.__name__!r}, "
+            f"output_schema={self.output_schema!r})"
+        )
+
+    @field_serializer("args_schema")
+    def serialize_args_schema(self, value: type[BaseModel]) -> str:
+        """Serialize the type by returning its class name."""
+        return value.__name__
 
 
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):

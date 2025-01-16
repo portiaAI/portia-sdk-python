@@ -73,6 +73,7 @@ class ReadOnlyStep(Step):
             output=step.output,
         )
 
+
 class PlanContext(BaseModel):
     """Context for a plan."""
 
@@ -80,6 +81,7 @@ class PlanContext(BaseModel):
 
     query: str = Field(description="The original query given by the user.")
     tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
+
 
 class Plan(BaseModel):
     """A plan represent a series of steps that an agent should follow to execute the query."""
@@ -97,3 +99,11 @@ class Plan(BaseModel):
     def serialize_id(self, plan_id: UUID) -> str:
         """Serialize the id to a string."""
         return str(plan_id)
+
+    def __str__(self) -> str:
+        """Return the string representation."""
+        return (
+            f"PlanModel(id={self.id!r},"
+            f"plan_context={self.plan_context!r}, "
+            f"steps={self.steps!r}"
+        )

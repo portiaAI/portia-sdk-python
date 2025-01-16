@@ -73,10 +73,17 @@ def test_run_method_with_uncaught_error() -> None:
         )
 
 
-def test_tool_str_repr() -> None:
+def test_tool_serialization() -> None:
     """Test tools can be serialized to string."""
     tool = AdditionTool()
-    assert str(tool) == f"ToolModel(id={tool.id}, name={tool.name}, description={tool.description})"
+    assert str(tool) == (
+        f"ToolModel(id={tool.id!r}, name={tool.name!r}, "
+        f"description={tool.description!r}, "
+        f"args_schema={tool.args_schema.__name__!r}, "
+        f"output_schema={tool.output_schema!r})"
+    )
+    # check we can also serialize to JSON
+    AdditionTool().model_dump_json()
 
 
 def test_remote_tool_hard_error() -> None:

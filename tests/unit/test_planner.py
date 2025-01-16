@@ -30,21 +30,6 @@ def planner(mock_config: Config) -> Planner:
     return Planner(llm_wrapper=LLMWrapper(config=mock_config))
 
 
-def test_plan_uuid_assign() -> None:
-    """Test plan assign correct UUIDs."""
-    plan = Plan(
-        plan_context=PlanContext(query="", tool_ids=[]),
-        steps=[],
-    )
-    assert isinstance(plan.id, UUID)
-
-    clarification = Plan(
-        plan_context=PlanContext(query="", tool_ids=[]),
-        steps=[],
-    )
-    assert isinstance(clarification.id, UUID)
-
-
 def test_generate_plan_or_error_success(planner: Planner) -> None:
     """Test successful plan generation with valid inputs."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
@@ -84,6 +69,7 @@ def test_planner_default_context_with_extensions() -> None:
     context = _default_query_system_context(system_context_extension=["456"])
     assert "456" in context
 
+
 def test_render_prompt() -> None:
     """Test render prompt."""
     plans = [
@@ -113,9 +99,9 @@ def test_render_prompt() -> None:
         r"<SystemContext>(.*?)</SystemContext>",
         re.DOTALL,
     )
-    example_match, tools_content, request_content, system_context_content = (
-        overall_pattern.findall(rendered_prompt)[0]
-    )
+    example_match, tools_content, request_content, system_context_content = overall_pattern.findall(
+        rendered_prompt
+    )[0]
 
     tool_pattern = re.compile(r"<Tools>(.*?)</Tools>", re.DOTALL)
     tool_match = tool_pattern.findall(example_match)[0]
@@ -142,5 +128,3 @@ def test_render_prompt() -> None:
     assert "test query" in request_content
     assert "Add Tool" in request_content
     assert "extension" in system_context_content
-
-

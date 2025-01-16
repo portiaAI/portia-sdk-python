@@ -85,3 +85,15 @@ def test_read_only_step_immutable() -> None:
 
     with pytest.raises(ValidationError):
         read_only.output = "$in"
+
+
+def test_workflow_serialization() -> None:
+    """Test workflow can be serialized to string."""
+    workflow = Workflow(plan_id=uuid4())
+    assert str(workflow) == (
+        f"Workflow(id={workflow.id}, plan_id={workflow.plan_id}, "
+        f"state={workflow.state}, current_step_index={workflow.current_step_index}, "
+        f"final_output={'set' if workflow.final_output else 'unset'})"
+    )
+    # check we can also serialize to JSON
+    workflow.model_dump_json()
