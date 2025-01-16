@@ -95,7 +95,7 @@ def test_workflow_serialization() -> None:
     assert str(workflow) == (
         f"Workflow(id={workflow.id}, plan_id={workflow.plan_id}, "
         f"state={workflow.state}, current_step_index={workflow.current_step_index}, "
-        f"final_output={'set' if workflow.final_output else 'unset'})"
+        f"final_output={'set' if workflow.outputs.final_output else 'unset'})"
     )
     # check we can also serialize to JSON
     workflow.model_dump_json()
