@@ -74,6 +74,14 @@ class Workflow(BaseModel):
             if not clarification.resolved
         ]
 
+    def __str__(self) -> str:
+        """Return the string representation."""
+        return (
+            f"Workflow(id={self.id}, plan_id={self.plan_id}, "
+            f"state={self.state}, current_step_index={self.current_step_index}, "
+            f"final_output={'set' if self.final_output else 'unset'})"
+        )
+
 
 class ReadOnlyWorkflow(Workflow):
     """A read only copy of a workflow, passed to agents for reference."""
