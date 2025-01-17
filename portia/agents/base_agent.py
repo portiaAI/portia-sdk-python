@@ -82,7 +82,7 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")
 
     @field_serializer("value")
-    def serialize_action_url(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:
-        """Serialize the action URL to a string."""
+    def serialize_value(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:
+        """Serialize the value to a string."""
         value_type = type(value).__name__ if value is not None else "None"
         return f"{value} (type: {value_type})"
