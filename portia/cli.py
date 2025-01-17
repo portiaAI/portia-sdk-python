@@ -9,6 +9,7 @@ portia-cli plan "add 4 + 8" - plan a query
 from __future__ import annotations
 
 import os
+import webbrowser
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable
@@ -16,10 +17,14 @@ from typing import Any, Callable
 import click
 from dotenv import load_dotenv
 
+from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification
 from portia.config import Config, LLMModel, LLMProvider, LogLevel
+from portia.context import execution_context
 from portia.example_tools import example_tool_registry
+from portia.logger import logger
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
+from portia.workflow import WorkflowState
 
 
 class EnvLocation(Enum):
@@ -104,8 +109,37 @@ def run(
 
     # Run the query
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.execute_query(query)
-    click.echo(output.model_dump_json(indent=4))
+    with execution_context(end_user_id="tom"):
+        workflow = runner.execute_query(query)
+
+        final_states = [WorkflowState.COMPLETE, WorkflowState.FAILED]
+        while workflow.state not in final_states:
+            for clarification in workflow.get_outstanding_clarifications():
+                if isinstance(clarification, MultiChoiceClarification):
+                    user_input = input(
+                        clarification.user_guidance
+                        + "\nPlease enter an option from below:\n"
+                        + "\n".join(clarification.options)
+                        + "\nchoice: ",
+                    )
+                    clarification.resolve(user_input)
+                if isinstance(clarification, ActionClarification):
+                    webbrowser.open(str(clarification.action_url))
+                    logger.info("Please complete authentication to continue")
+                    auth_complete = False
+                    while not auth_complete:
+                        user_input = input("Is Authentication Complete [Y/N]")
+                        if user_input.lower() == "y":
+                            auth_complete = True
+                    clarification.resolve(None)
+                if isinstance(clarification, InputClarification):
+                    user_input = input(
+                        clarification.user_guidance + "\nPlease enter a value:\n",
+                    )
+                    clarification.resolve(user_input)
+            runner.execute_workflow(workflow)
+
+    click.echo(workflow.model_dump_json(indent=4))
 
 
 @click.command()

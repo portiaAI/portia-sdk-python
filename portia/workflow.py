@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
@@ -27,7 +27,7 @@ class WorkflowOutputs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    clarifications: list[Clarification] = Field(
+    clarifications: list[SerializeAsAny[Clarification]] = Field(
         default=[],
         description="Any clarifications needed for this workflow.",
     )

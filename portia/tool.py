@@ -12,13 +12,19 @@ import time
 from abc import abstractmethod
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic
+from xml.dom import ValidationErr
 
 import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, SecretStr, field_serializer, model_validator
+from pydantic import BaseModel, Field, HttpUrl, SecretStr, field_serializer, model_validator
 
 from portia.agents.base_agent import Output
-from portia.clarification import Clarification
+from portia.clarification import (
+    ActionClarification,
+    Clarification,
+    InputClarification,
+    MultiChoiceClarification,
+)
 from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logger import logger
@@ -230,7 +236,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  #  noqa: ANN401
-    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
+    ) -> SERIALIZABLE_TYPE_VAR | None | Clarification:
         """Invoke the run endpoint and handle response."""
         try:
             # Combine args and kwargs
@@ -259,4 +265,29 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             logger.error(f"Error from Portia Cloud: {e}")
             raise ToolHardError(e) from e
         else:
-            return response.json()
+            try:
+                output = Output.model_validate(response.json()["output"])
+                if isinstance(output.value, list) and output.value and "type" in output.value[0]:
+                    clarification = output.value[0]
+                    match clarification["type"]:
+                        case "Action Clarification":
+                            return ActionClarification(
+                                action_url=HttpUrl(clarification["action_url"]),
+                                user_guidance=clarification["user_guidance"],
+                            )
+                        case "Input Clarification":
+                            return InputClarification(
+                                argument_name=clarification["argument_name"],
+                                user_guidance=clarification["user_guidance"],
+                            )
+                        case "Multi Choice Clarification":
+                            return MultiChoiceClarification(
+                                argument_name=clarification["argument_name"],
+                                user_guidance=clarification["user_guidance"],
+                                options=clarification["options"],
+                            )
+            except (ValidationErr, KeyError) as e:
+                logger.error(f"Error parsing response from Portia Cloud: {e}")
+                raise ToolHardError(e) from e
+            else:
+                return output.value  # type: ignore  # noqa: PGH003
