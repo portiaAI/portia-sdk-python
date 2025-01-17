@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from portia.config import Config
-from portia.example_tools.addition import AdditionTool
 from portia.llm_wrapper import LLMWrapper
+from portia.open_source_tools.addition import AdditionTool
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planner import (
     Planner,

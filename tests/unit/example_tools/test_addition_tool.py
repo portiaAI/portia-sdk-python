@@ -1,7 +1,7 @@
 """Addition tool tests."""
 
 from portia.context import empty_context
-from portia.example_tools.addition import AdditionTool
+from portia.open_source_tools.addition import AdditionTool
 
 
 def test_addition_tool_successful_response() -> None:

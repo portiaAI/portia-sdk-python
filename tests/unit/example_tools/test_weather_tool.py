@@ -6,7 +6,7 @@ import pytest
 
 from portia.context import empty_context
 from portia.errors import ToolHardError, ToolSoftError
-from portia.example_tools.weather import WeatherTool
+from portia.open_source_tools.weather import WeatherTool
 
 
 def test_weather_tool_missing_api_key() -> None:

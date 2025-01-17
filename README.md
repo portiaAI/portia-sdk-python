@@ -31,7 +31,7 @@ pip install portia-sdk-python
 
 ```python
 from portia.config import default_config
-from portia.example_tools.registry import example_tool_registry
+from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
 
 
@@ -76,7 +76,7 @@ Multiple registries can be combined to give the power of Portia Cloud with the c
 ```python
 
 from portia.config import default_config
-from portia.example_tools.registry import example_tool_registry
+from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
 
 config = default_config()

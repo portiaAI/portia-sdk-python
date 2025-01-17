@@ -20,8 +20,8 @@ from dotenv import load_dotenv
 from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification
 from portia.config import Config, LLMModel, LLMProvider, LogLevel
 from portia.context import execution_context
-from portia.example_tools import example_tool_registry
 from portia.logger import logger
+from portia.open_source_tools import example_tool_registry
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
 from portia.workflow import WorkflowState
