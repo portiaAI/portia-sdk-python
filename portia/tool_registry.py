@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from pydantic import BaseModel, Field, create_model
 
-from portia.errors import ToolNotFoundError
+from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.tool import PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
@@ -44,6 +44,15 @@ class ToolRegistry(ABC):
 
     def __add__(self, other: ToolRegistry) -> ToolRegistry:
         """Return an aggregated tool registry."""
+        # Ensure uniqueness of tools
+        self_tools = self.get_tools()
+        other_tools = other.get_tools()
+        tool_names = set()
+        for tool in [*self_tools, *other_tools]:
+            if tool.name in tool_names:
+                raise DuplicateToolError(tool.name)
+            tool_names.add(tool.name)
+
         return AggregatedToolRegistry([self, other])
 
 
@@ -99,14 +108,22 @@ class InMemoryToolRegistry(ToolRegistry):
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""
+        if self._get_tool(tool.name):
+            raise DuplicateToolError(tool.name)
         self.tools.append(tool)
 
-    def get_tool(self, tool_name: str) -> Tool:
-        """Get the tool from the registry."""
+    def _get_tool(self, tool_name: str) -> Tool | None:
         for tool in self.tools:
             if tool.name == tool_name:
                 return tool
-        raise ToolNotFoundError(tool_name)
+        return None
+
+    def get_tool(self, tool_name: str) -> Tool:
+        """Get the tool from the registry."""
+        tool = self._get_tool(tool_name)
+        if not tool:
+            raise ToolNotFoundError(tool_name)
+        return tool
 
     def get_tools(self) -> list[Tool]:
         """Get all tools."""

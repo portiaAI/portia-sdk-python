@@ -79,7 +79,7 @@ class Workflow(BaseModel):
         return (
             f"Workflow(id={self.id}, plan_id={self.plan_id}, "
             f"state={self.state}, current_step_index={self.current_step_index}, "
-            f"final_output={'set' if self.final_output else 'unset'})"
+            f"final_output={'set' if self.outputs.final_output else 'unset'})"
         )
 
 
