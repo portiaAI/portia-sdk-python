@@ -7,7 +7,7 @@ from pydantic import HttpUrl
 from portia.clarification import (
     ActionClarification,
     InputClarification,
-    ValueAcceptanceClarification,
+    ValueConfirmationClarification,
 )
 
 
@@ -22,9 +22,9 @@ def test_clarification_resolve() -> None:
     assert clarification.response == "res"
 
 
-def test_value_acceptance_clarification_resolve() -> None:
+def test_value_confirmation_clarification_resolve() -> None:
     """Test clarifications can be resolved."""
-    clarification = ValueAcceptanceClarification(
+    clarification = ValueConfirmationClarification(
         argument_name="test",
         user_guidance="test",
         response="this is the answer",

@@ -95,7 +95,7 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     options: list[str]
 
 
-class ValueAcceptanceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
+class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """A value acceptance clarification.
 
     Represents a clarification where the user is presented a value and needs to accept it.
