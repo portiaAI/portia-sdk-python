@@ -70,7 +70,7 @@ class ToolCallRecord(BaseModel):
     step: int
     input: Any
     output: Any
-    latency: int
+    latency_seconds: float
 
 
 class ToolCallStorage(ABC):
@@ -87,7 +87,21 @@ class LogToolCallStorage(ToolCallStorage):
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Log the tool call."""
-        logger.info(f"Tool Executed: {tool_call.output}")
+        logger.info(
+            "Invoked {tool_name} with args: {tool_input}",
+            tool_name=tool_call.tool_name,
+            tool_input=tool_call.input,
+        )
+        logger.debug(
+            f"Tool {tool_call.tool_name} executed in {tool_call.latency_seconds:.2f} seconds",
+        )
+        match tool_call.outcome:
+            case ToolCallState.SUCCESS:
+                logger.info("Tool output: {output}", output=tool_call.output)
+            case ToolCallState.FAILED:
+                logger.error("Tool returned error {output}", output=tool_call.output)
+            case ToolCallState.NEED_CLARIFICATION:
+                logger.error("Tool returned clarifications {output}", output=tool_call.output)
 
 
 class Storage(PlanStorage, WorkflowStorage, ToolCallStorage):
@@ -316,16 +330,7 @@ class PortiaCloudStorage(Storage):
         self.check_response(response)
         return Workflow.model_validate(response.json()["json"])
 
-    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:  # noqa: ARG002
         """Save a tool call in the backend."""
-        response = httpx.post(
-            url=f"{self.api_endpoint}/api/v0/tool_calls/",
-            json={
-                "output": tool_call.output,
-            },
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-        )
-        self.check_response(response)
+        # TODO(tom) - finish this when the backend is up  # noqa: FIX002, TD003, TD004
+        logger.warning("no backend implemented for tool calls")

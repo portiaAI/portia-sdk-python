@@ -262,9 +262,9 @@ class Runner:
     ) -> BaseAgent:
         tool = None
         if step.tool_name:
-            tool = self.tool_registry.get_tool(step.tool_name)
+            child_tool = self.tool_registry.get_tool(step.tool_name)
             tool = ToolCallWrapper(
-                child_tool=tool,
+                child_tool=child_tool,
                 storage=self.storage,
                 workflow=workflow,
             )

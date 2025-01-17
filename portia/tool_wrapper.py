@@ -42,12 +42,11 @@ class ToolCallWrapper(Tool):
 
     def run(self, ctx: ExecutionContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
         """Run the child tool and store the outcome."""
-
         # initialize empty call record
         record = ToolCallRecord(
             input=combine_args_kwargs(*args, **kwargs),
             output=None,
-            latency=0,
+            latency_seconds=0,
             tool_name=self._child_tool.name,
             workflow_id=self._workflow.id,
             step=self._workflow.current_step_index,
@@ -60,7 +59,7 @@ class ToolCallWrapper(Tool):
             output = self._child_tool.run(ctx, *args, **kwargs)
         except Exception as e:
             record.output = e
-            record.latency = (datetime.now(tz=UTC) - start_time).microseconds
+            record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             record.outcome = ToolCallState.FAILED
             self._storage.save_tool_call(record)
             raise
@@ -70,6 +69,6 @@ class ToolCallWrapper(Tool):
                 record.outcome = ToolCallState.NEED_CLARIFICATION
             else:
                 record.outcome = ToolCallState.SUCCESS
-            record.latency = (datetime.now(tz=UTC) - start_time).microseconds
+            record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             self._storage.save_tool_call(record)
         return output
