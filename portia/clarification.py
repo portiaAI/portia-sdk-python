@@ -11,7 +11,6 @@ from pydantic import (
     Field,
     HttpUrl,
     field_serializer,
-    field_validator,
     model_validator,
 )
 
