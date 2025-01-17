@@ -109,35 +109,35 @@ def run(
 
     # Run the query
     runner = Runner(config=config, tool_registry=registry)
-    with execution_context(end_user_id="tom"):
-        workflow = runner.execute_query(query)
 
-        final_states = [WorkflowState.COMPLETE, WorkflowState.FAILED]
-        while workflow.state not in final_states:
-            for clarification in workflow.get_outstanding_clarifications():
-                if isinstance(clarification, MultiChoiceClarification):
-                    user_input = input(
-                        clarification.user_guidance
-                        + "\nPlease enter an option from below:\n"
-                        + "\n".join(clarification.options)
-                        + "\nchoice: ",
-                    )
-                    clarification.resolve(user_input)
-                if isinstance(clarification, ActionClarification):
-                    webbrowser.open(str(clarification.action_url))
-                    logger.info("Please complete authentication to continue")
-                    auth_complete = False
-                    while not auth_complete:
-                        user_input = input("Is Authentication Complete [Y/N]")
-                        if user_input.lower() == "y":
-                            auth_complete = True
-                    clarification.resolve(None)
-                if isinstance(clarification, InputClarification):
-                    user_input = input(
-                        clarification.user_guidance + "\nPlease enter a value:\n",
-                    )
-                    clarification.resolve(user_input)
-            runner.execute_workflow(workflow)
+    workflow = runner.execute_query(query)
+
+    final_states = [WorkflowState.COMPLETE, WorkflowState.FAILED]
+    while workflow.state not in final_states:
+        for clarification in workflow.get_outstanding_clarifications():
+            if isinstance(clarification, MultiChoiceClarification):
+                user_input = input(
+                    clarification.user_guidance
+                    + "\nPlease enter an option from below:\n"
+                    + "\n".join(clarification.options)
+                    + "\nchoice: ",
+                )
+                clarification.resolve(user_input)
+            if isinstance(clarification, ActionClarification):
+                webbrowser.open(str(clarification.action_url))
+                logger.info("Please complete authentication to continue")
+                auth_complete = False
+                while not auth_complete:
+                    user_input = input("Is Authentication Complete [Y/N]")
+                    if user_input.lower() == "y":
+                        auth_complete = True
+                clarification.resolve(None)
+            if isinstance(clarification, InputClarification):
+                user_input = input(
+                    clarification.user_guidance + "\nPlease enter a value:\n",
+                )
+                clarification.resolve(user_input)
+        runner.execute_workflow(workflow)
 
     click.echo(workflow.model_dump_json(indent=4))
 
