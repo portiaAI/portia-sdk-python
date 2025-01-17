@@ -100,7 +100,7 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
 
     type: str = "Multiple Choice Clarification"
     options: list[str]
-      
+
     @model_validator(mode="after")
     def validate_response(
         self,
@@ -110,7 +110,7 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
-      
+
 class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """A value acceptance clarification.
 
