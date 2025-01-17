@@ -15,6 +15,8 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from portia.agents.base_agent import BaseAgent, Output
+from portia.agents.langgraph_agent import LanggraphAgent
+from portia.agents.models.summarizer_model import SummarizerModel
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification
 from portia.context import get_execution_context
@@ -30,10 +32,6 @@ if TYPE_CHECKING:
     from portia.plan import Step
     from portia.tool import Tool
     from portia.workflow import Workflow
-
-
-# MAX_RETRIES controls how many times errors will be retried by the OneShotAgent
-MAX_RETRIES = 4
 
 
 class OneShotToolCallingModel:
@@ -96,7 +94,7 @@ class OneShotToolCallingModel:
         return {"messages": [response]}
 
 
-class OneShotAgent(BaseAgent):
+class OneShotAgent(LanggraphAgent):
     """Agent responsible for achieving a task by using langgraph.
 
     This agent does the following things:
@@ -115,16 +113,6 @@ class OneShotAgent(BaseAgent):
         super().__init__(step, workflow, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
-
-    @staticmethod
-    def retry_tool_or_finish(state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should retry calling the tool if there was an error."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        errors = [msg for msg in messages if "ToolSoftError" in msg.content]
-        if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
-            return "tool_agent"
-        return END
 
     @staticmethod
     def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
@@ -187,14 +175,11 @@ class OneShotAgent(BaseAgent):
         workflow = StateGraph(MessagesState)
         workflow.add_node("tool_agent", OneShotToolCallingModel(llm, context, tools, self).invoke)
         workflow.add_node("tools", tool_node)
+        workflow.add_node("summarizer", SummarizerModel(llm).invoke)
         workflow.add_edge(START, "tool_agent")
         workflow.add_conditional_edges("tool_agent", self.call_tool_or_return)
-
-        workflow.add_conditional_edges(
-            "tools",
-            OneShotAgent.retry_tool_or_finish,
-        )
-
+        workflow.add_conditional_edges("tools", self.next_state_after_tool_call)
+        workflow.add_edge("summarizer", END)
         app = workflow.compile()
 
         invocation_result = app.invoke({"messages": []})

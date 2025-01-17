@@ -6,7 +6,7 @@ in completing tasks.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
@@ -15,6 +15,8 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from portia.agents.base_agent import BaseAgent, Output
+from portia.agents.langgraph_agent import LanggraphAgent
+from portia.agents.models.summarizer_model import SummarizerModel, SummarizerOutput
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
 from portia.context import get_execution_context
@@ -34,8 +36,6 @@ if TYPE_CHECKING:
     from portia.plan import Step
     from portia.tool import Tool
     from portia.workflow import Workflow
-
-MAX_RETRIES = 4
 
 
 class ToolArgument(BaseModel):
@@ -158,7 +158,7 @@ class ParserModel:
             err = str(e)
             self.previous_errors.append(err)
             self.retries += 1
-            if self.retries <= MAX_RETRIES:
+            if self.retries <= LanggraphAgent.MAX_RETRIES:
                 return self.invoke(state)
             raise InvalidAgentOutputError(err) from e
 
@@ -279,7 +279,7 @@ class ToolCallingModel:
         return {"messages": [response]}
 
 
-class VerifierAgent(BaseAgent):
+class VerifierAgent(LanggraphAgent):
     """Agent responsible for achieving a task by using verification.
 
     This agent does the following things:
@@ -310,16 +310,17 @@ class VerifierAgent(BaseAgent):
         self.new_clarifications: list[Clarification] = []
 
     @staticmethod
-    def retry_tool_or_finish(state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should retry calling the tool if there was an error."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        errors = [msg for msg in messages if "ToolSoftError" in msg.content]
+    def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
+        """Determine if we should continue or not.
 
-        if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
-            return "tool_agent"
-        # Otherwise, we stop (reply to the user) as its a hard error or unknown
+        This is only to catch issues when the agent does not figure out how to use the tool
+        to achieve the goal.
+        """
+        last_message = state["messages"][-1]
+        if hasattr(last_message, "tool_calls"):
+            return "tools"
         return END
+
 
     def clarifications_or_continue(self, state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
         """Determine if we should continue with the tool call or request clarifications instead."""
@@ -360,18 +361,6 @@ class VerifierAgent(BaseAgent):
                 matching_clarification = clarification
         return matching_clarification
 
-    @staticmethod
-    def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should continue or not.
-
-        This is only to catch issues when the agent does not figure out how to use the tool
-        to achieve the goal.
-        """
-        last_message = state["messages"][-1]
-        if hasattr(last_message, "tool_calls"):
-            return "tools"
-        return END
-
     def process_output(self, last_message: BaseMessage) -> Output:
         """Process the output of the agent."""
         if "ToolSoftError" in last_message.content and self.tool:
@@ -381,6 +370,8 @@ class VerifierAgent(BaseAgent):
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,
+                short_summary="Clarifications requested.",
+                long_summary="Clarifications requested please resolve them before retrying.",
             )
         if isinstance(last_message, ToolMessage):
             if last_message.artifact and isinstance(last_message.artifact, Output):
@@ -422,24 +413,27 @@ class VerifierAgent(BaseAgent):
         `print(app.get_graph().draw_mermaid())` on the compiled workflow (and running any agent
         task). The below represents the current state of the graph (use a mermaid editor
         to view e.g <https://mermaid.live/edit>)
-
         graph TD;
-            __start__([<p>__start__</p>]):::first
-            tool_agent(tool_agent)
-            argument_parser(argument_parser)
-            argument_verifier(argument_verifier)
-            tools(tools)
-            __end__([<p>__end__</p>]):::last
-            __start__ --> argument_parser;
-            argument_parser --> argument_verifier;
-            tool_agent --> tools;
-            argument_verifier -.-> tool_agent;
-            argument_verifier -.-> __end__;
-            tools -.-> tool_agent;
-            tools -.-> __end__;
-            classDef default fill:#f2f0ff,line-height:1.2
-            classDef first fill-opacity:0
-            classDef last fill:#bfb6fc
+                __start__([<p>__start__</p>]):::first
+                tool_agent(tool_agent)
+                argument_parser(argument_parser)
+                argument_verifier(argument_verifier)
+                tools(tools)
+                summarizer(summarizer)
+                __end__([<p>__end__</p>]):::last
+                __start__ --> argument_parser;
+                argument_parser --> argument_verifier;
+                summarizer --> __end__;
+                argument_verifier -.-> tool_agent;
+                argument_verifier -.-> __end__;
+                tools -.-> tool_agent;
+                tools -.-> summarizer;
+                tools -.-> __end__;
+                tool_agent -.-> tools;
+                tool_agent -.-> __end__;
+                classDef default fill:#f2f0ff,line-height:1.2
+                classDef first fill-opacity:0
+                classDef last fill:#bfb6fc
         """
 
         workflow.add_node("tool_agent", ToolCallingModel(llm, context, tools, self).invoke)
@@ -450,23 +444,18 @@ class VerifierAgent(BaseAgent):
             workflow.add_node("argument_verifier", VerifierModel(llm, context, self).invoke)
             workflow.add_edge(START, "argument_parser")
             workflow.add_edge("argument_parser", "argument_verifier")
-
             workflow.add_conditional_edges(
                 "argument_verifier",
                 self.clarifications_or_continue,
             )
 
         workflow.add_node("tools", tool_node)
-
+        workflow.add_node("summarizer", SummarizerModel(llm).invoke)
+        workflow.add_conditional_edges("tools", self.next_state_after_tool_call)
         workflow.add_conditional_edges("tool_agent", self.call_tool_or_return)
-
-        workflow.add_conditional_edges(
-            "tools",
-            VerifierAgent.retry_tool_or_finish,
-        )
+        workflow.add_edge("summarizer", END)
 
         app = workflow.compile()
 
         invocation_result = app.invoke({"messages": []})
-
         return self.process_output(invocation_result["messages"][-1])

@@ -78,3 +78,11 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """
 
     value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")
+    short_summary: str | None = Field(
+        default=None,
+        description="A short summary of the output",
+    )
+    long_summary: str | None = Field(
+        default=None,
+        description="A long summary of the output",
+    )
