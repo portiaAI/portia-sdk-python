@@ -6,7 +6,7 @@ import pytest
 
 from portia.context import empty_context
 from portia.errors import ToolHardError, ToolSoftError
-from portia.example_tools.search_tool import SearchTool
+from portia.open_source_tools.search_tool import SearchTool
 
 
 def test_search_tool_missing_api_key() -> None:

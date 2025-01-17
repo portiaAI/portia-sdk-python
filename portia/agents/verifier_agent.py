@@ -112,9 +112,8 @@ class ParserModel:
                 "{previous_errors}\n"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Adhere to the following guidelines:\n"
+                "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
-                "- If a required value is missing or unclear, explicitly mark it as invalid and "
-                "specify what additional information is needed.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
                 "- Ensure arguments align with the tool's schema and intended use.\n",
             ),
