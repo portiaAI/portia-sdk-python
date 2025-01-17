@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from regex import W
+
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.toolless_agent import ToolLessAgent
@@ -23,6 +25,7 @@ from portia.logger import logger, logger_manager
 from portia.plan import Plan, ReadOnlyStep, Step
 from portia.planner import Planner
 from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
+from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
 
 if TYPE_CHECKING:
@@ -260,6 +263,11 @@ class Runner:
         tool = None
         if step.tool_name:
             tool = self.tool_registry.get_tool(step.tool_name)
+            tool = ToolCallWrapper(
+                child_tool=tool,
+                storage=self.storage,
+                workflow=workflow,
+            )
         cls: type[BaseAgent]
         match config.default_agent_type:
             case AgentType.TOOL_LESS:

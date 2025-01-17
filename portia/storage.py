@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 from uuid import UUID
 
 import httpx
@@ -49,11 +50,51 @@ class WorkflowStorage(ABC):
         raise NotImplementedError("get_workflow is not implemented")
 
 
-class Storage(PlanStorage, WorkflowStorage):
+class ToolCallState(str, Enum):
+    """State of a tool call."""
+
+    IN_PROGRESS = "IN_PROGRESS"
+    SUCCESS = "SUCCESS"
+    NEED_CLARIFICATION = "NEED_CLARIFICATION"
+    FAILED = "FAILED"
+
+
+class ToolCallRecord(BaseModel):
+    """Records an individual tool call."""
+
+    tool_name: str
+    workflow_id: UUID
+    end_user_id: str | None
+    additional_data: dict[str, str]
+    outcome: ToolCallState
+    step: int
+    input: Any
+    output: Any
+    latency: int
+
+
+class ToolCallStorage(ABC):
+    """Base class for storing tool calls."""
+
+    @abstractmethod
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Save a ToolCall."""
+        raise NotImplementedError("save_tool_call is not implemented")
+
+
+class LogToolCallStorage(ToolCallStorage):
+    """ToolCallStorage that logs calls."""
+
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Log the tool call."""
+        logger.info(f"Tool Executed: {tool_call.output}")
+
+
+class Storage(PlanStorage, WorkflowStorage, ToolCallStorage):
     """Combined base class for Plan + Workflow storage."""
 
 
-class InMemoryStorage(Storage):
+class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
     """Simple storage class that keeps plans + workflows in memory."""
 
     plans: ClassVar[dict[UUID, Plan]] = {}
@@ -80,7 +121,7 @@ class InMemoryStorage(Storage):
         raise WorkflowNotFoundError(workflow_id)
 
 
-class DiskFileStorage(Storage):
+class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
     """Disk-based implementation of the Storage interface.
 
     Stores serialized Plan and Workflow objects as JSON files on disk.
@@ -274,3 +315,17 @@ class PortiaCloudStorage(Storage):
         )
         self.check_response(response)
         return Workflow.model_validate(response.json()["json"])
+
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Save a tool call in the backend."""
+        response = httpx.post(
+            url=f"{self.api_endpoint}/api/v0/tool_calls/",
+            json={
+                "output": tool_call.output,
+            },
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        self.check_response(response)
