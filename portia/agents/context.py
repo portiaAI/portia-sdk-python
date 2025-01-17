@@ -115,9 +115,9 @@ def generate_clarification_context(clarifications: list[Clarification], step: in
     if other_step_clarifications:
         clarification_context.extend(
             [
-                "This section contains the user provided response to previous tasks. "
-                "You may use the values here if no other context is provided but should not use"
-                "values from here if there is another value provided."
+                "This section contains the user provided response to previous tasks.",
+                "You may use the values here if no other context is provided but should not use",
+                "values from here if there is another value provided.",
             ],
         )
         for clarification in other_step_clarifications:
