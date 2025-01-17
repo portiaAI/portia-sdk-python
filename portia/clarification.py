@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_serializer
 
 from portia.common import SERIALIZABLE_TYPE_VAR
-from portia.logger import logger
 
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
