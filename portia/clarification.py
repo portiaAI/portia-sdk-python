@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Generic
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from portia.common import SERIALIZABLE_TYPE_VAR
 
@@ -93,3 +101,12 @@ class MultiChoiceClarification(ArgumentClarification[str]):
 
     type: str = "Multiple Choice Clarification"
     options: list[str]
+
+    @model_validator(mode="after")
+    def validate_response(
+        self,
+    ) -> MultiChoiceClarification:
+        """Ensure provided response is an option."""
+        if self.response not in self.options:
+            raise ValueError(f"{self.response} is not a supported option")
+        return self

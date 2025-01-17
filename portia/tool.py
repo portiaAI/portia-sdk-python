@@ -258,6 +258,8 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "execution_context": {
                             "end_user_id": ctx.end_user_id or "",
                             "additional_data": ctx.additional_data or {},
+                            "workflow_id": "",
+                            "current_step_index": "",
                         },
                     },
                 ),
