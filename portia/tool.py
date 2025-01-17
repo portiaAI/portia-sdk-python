@@ -12,11 +12,18 @@ import time
 from abc import abstractmethod
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic
-from xml.dom import ValidationErr
 
 import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, HttpUrl, SecretStr, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    HttpUrl,
+    SecretStr,
+    ValidationError,
+    field_serializer,
+    model_validator,
+)
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
@@ -286,7 +293,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                                 user_guidance=clarification["user_guidance"],
                                 options=clarification["options"],
                             )
-            except (ValidationErr, KeyError) as e:
+            except (ValidationError, KeyError) as e:
                 logger.error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e
             else:
