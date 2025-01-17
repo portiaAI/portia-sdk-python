@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING
 from portia.clarification import (
     ArgumentClarification,
     Clarification,
-    InputClarification,
-    MultiChoiceClarification,
 )
 
 if TYPE_CHECKING:
