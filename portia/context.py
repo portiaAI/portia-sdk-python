@@ -52,6 +52,7 @@ class ExecutionContext(BaseModel):
     # passed to the agents so for ad-hoc data prefer additional_data.
     agent_system_context_extension: list[str] | None = None
 
+
 def empty_context() -> ExecutionContext:
     """Return an empty context."""
     return ExecutionContext(
@@ -102,7 +103,6 @@ def execution_context(
           to avoid memory leaks or unintended persistence of data.
 
     Example:
-    -------
         >>> with execution_context(end_user_id="user123", additional_data={"key": "value"}):
         >>>     # Code here runs with the specified execution context
         >>> # Outside the block, the execution context is cleared for the current task.

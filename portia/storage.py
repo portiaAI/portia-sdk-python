@@ -98,7 +98,6 @@ class DiskFileStorage(Storage):
         """Write a serialized Plan or Workflow to a JSON file.
 
         Args:
-        ----
             file_name (str): Name of the file.
             content (Union[Plan, Workflow]): The Plan or Workflow object to serialize.
 
@@ -111,12 +110,10 @@ class DiskFileStorage(Storage):
         """Read a JSON file and deserialize it into a BaseModel instance.
 
         Args:
-        ----
             file_name (str): Name of the file.
             model (type[BaseModel]): The model class to deserialize into.
 
         Returns:
-        -------
             BaseModel: The deserialized model instance.
 
         """
@@ -128,7 +125,6 @@ class DiskFileStorage(Storage):
         """Save a Plan object to the storage.
 
         Args:
-        ----
             plan (Plan): The Plan object to save.
 
         """
@@ -138,15 +134,12 @@ class DiskFileStorage(Storage):
         """Retrieve a Plan object by its ID.
 
         Args:
-        ----
             plan_id (UUID): The ID of the Plan to retrieve.
 
         Returns:
-        -------
             Plan: The retrieved Plan object.
 
         Raises:
-        ------
             PlanNotFoundError: If the Plan is not found or validation fails.
 
         """
@@ -159,7 +152,6 @@ class DiskFileStorage(Storage):
         """Save a Workflow object to the storage.
 
         Args:
-        ----
             workflow (Workflow): The Workflow object to save.
 
         """
@@ -169,15 +161,12 @@ class DiskFileStorage(Storage):
         """Retrieve a Workflow object by its ID.
 
         Args:
-        ----
             workflow_id (UUID): The ID of the Workflow to retrieve.
 
         Returns:
-        -------
             Workflow: The retrieved Workflow object.
 
         Raises:
-        ------
             WorkflowNotFoundError: If the Workflow is not found or validation fails.
 
         """
