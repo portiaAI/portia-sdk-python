@@ -52,6 +52,7 @@ class ExecutionContext(BaseModel):
     # passed to the agents so for ad-hoc data prefer additional_data.
     agent_system_context_extension: list[str] | None = None
 
+
 def empty_context() -> ExecutionContext:
     """Return an empty context."""
     return ExecutionContext(
