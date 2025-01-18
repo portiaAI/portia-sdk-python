@@ -43,10 +43,6 @@ class WorkflowOutputs(BaseModel):
 
     final_output: Output | None = None
 
-    def to_json(self) -> dict:
-        """Convert the outputs to a JSON serializable dictionary."""
-        return self.model_dump(mode="json")
-
 
 class Workflow(BaseModel):
     """A workflow represent a running instance of a Plan."""
