@@ -17,6 +17,11 @@ from portia.context import ExecutionContext, empty_context
 class WorkflowState(PortiaEnum):
     """Progress of the Workflow."""
 
+    @classmethod
+    def enumerate(cls) -> tuple[tuple[str, str], ...]:
+        """Return a tuple of all choices as (name, value) pairs."""
+        return tuple((x.name, x.value) for x in cls)
+
     NOT_STARTED = "NOT_STARTED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETE = "COMPLETE"
@@ -37,6 +42,10 @@ class WorkflowOutputs(BaseModel):
     step_outputs: dict[str, Output] = {}
 
     final_output: Output | None = None
+
+    def to_json(self) -> dict:
+        """Convert the outputs to a JSON serializable dictionary."""
+        return self.model_dump(mode="json")
 
 
 class Workflow(BaseModel):
