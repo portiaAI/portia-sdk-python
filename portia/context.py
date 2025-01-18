@@ -102,6 +102,7 @@ def execution_context(
           to avoid memory leaks or unintended persistence of data.
 
     Example:
+    -------
         >>> with execution_context(end_user_id="user123", additional_data={"key": "value"}):
         >>>     # Code here runs with the specified execution context
         >>> # Outside the block, the execution context is cleared for the current task.
