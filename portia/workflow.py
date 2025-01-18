@@ -8,7 +8,12 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
-from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification, Clarification
+from portia.clarification import (
+    ActionClarification,
+    Clarification,
+    InputClarification,
+    MultiChoiceClarification,
+)
 from portia.context import ExecutionContext, empty_context
 
 
@@ -40,10 +45,6 @@ class WorkflowOutputs(BaseModel):
     step_outputs: dict[str, Output] = {}
 
     final_output: Output | None = None
-
-    def to_json(self) -> dict:
-        """Convert the outputs to a JSON serializable dictionary."""
-        return self.model_dump(mode="json")
 
 
 class Workflow(BaseModel):
