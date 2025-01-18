@@ -236,8 +236,9 @@ class PortiaCloudStorage(Storage):
                 "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
                 "state": workflow.state,
-                "execution_context": workflow.execution_context,
-                "outputs": workflow.outputs,
+                # TODO(Emma): If this works, define def to_json(self) -> dict on ExecutionContext
+                "execution_context": workflow.execution_context.model_dump(mode="json"),
+                "outputs": workflow.outputs.model_dump(mode="json"),
                 "plan_id": str(workflow.plan_id),
             },
             headers={
@@ -252,8 +253,8 @@ class PortiaCloudStorage(Storage):
                 json={
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
-                    "execution_context": workflow.execution_context,
-                    "outputs": workflow.outputs,
+                    "execution_context": workflow.execution_context.model_dump(mode="json"),
+                    "outputs": workflow.outputs.model_dump(mode="json"),
                     "plan_id": str(workflow.plan_id),
                 },
                 headers={

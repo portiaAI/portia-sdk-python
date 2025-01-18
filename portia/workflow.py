@@ -8,12 +8,17 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
-from portia.clarification import Clarification
+from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification, Clarification
 from portia.context import ExecutionContext, empty_context
 
 
 class WorkflowState(str, Enum):
     """Progress of the Workflow."""
+
+    @classmethod
+    def enumerate(cls) -> tuple[tuple[str, str], ...]:
+        """Return a tuple of all choices as (name, value) pairs."""
+        return tuple((x.name, x.value) for x in cls)
 
     NOT_STARTED = "NOT_STARTED"
     IN_PROGRESS = "IN_PROGRESS"
@@ -27,16 +32,18 @@ class WorkflowOutputs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    clarifications: list[Clarification] = Field(
+    clarifications: list[ActionClarification | InputClarification | MultiChoiceClarification | Clarification] = Field(
         default=[],
         description="Any clarifications needed for this workflow.",
     )
 
-    outputs: dict[str, Output] = {}
-
     step_outputs: dict[str, Output] = {}
 
     final_output: Output | None = None
+
+    def to_json(self) -> dict:
+        """Convert the outputs to a JSON serializable dictionary."""
+        return self.model_dump(mode="json")
 
 
 class Workflow(BaseModel):
