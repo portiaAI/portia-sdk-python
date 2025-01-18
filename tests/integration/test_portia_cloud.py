@@ -3,6 +3,7 @@
 import pytest
 from pydantic import SecretStr
 
+from portia.clarification import ActionClarification
 from portia.config import Config, StorageClass
 from portia.context import get_execution_context
 from portia.errors import ToolNotFoundError
@@ -56,6 +57,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolHardError):
         tool.run(ctx)
 
+
 @pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_runner_run_query_with_cloud_and_local() -> None:
     """Test running a simple query using the Runner."""
@@ -71,3 +73,17 @@ def test_runner_run_query_with_cloud_and_local() -> None:
     workflow = runner.execute_query(query)
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
+
+
+def test_runner_run_query_with_oauth() -> None:
+    """Test running a simple query using the Runner."""
+    config = Config.from_default()
+    tool_registry = PortiaToolRegistry(config=config)
+    runner = Runner(config=config, tool_registry=tool_registry)
+    query = "Star the portiaai/portia-sdk-repo"
+
+    workflow = runner.execute_query(query)
+
+    assert workflow.state == WorkflowState.NEED_CLARIFICATION
+    assert len(workflow.outputs.clarifications) == 1
+    assert isinstance(workflow.outputs.clarifications[0], ActionClarification)

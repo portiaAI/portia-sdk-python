@@ -1,9 +1,12 @@
 """E2E Tests."""
 
+from __future__ import annotations
+
 import pytest
 
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
+from portia.clarification import Clarification, InputClarification
 from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
 from portia.context import ExecutionContext, execution_context
 from portia.errors import ToolSoftError
@@ -274,3 +277,84 @@ def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> 
     )
     out = agent.execute_sync()
     assert isinstance(out, Output)
+
+
+@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize("agent", AGENTS)
+def test_runner_run_query_with_multiple_clarifications(
+    llm_provider: LLMProvider,
+    llm_model_name: LLMModel,
+    agent: AgentType,
+) -> None:
+    """Test running a query with multiple clarification using the Runner."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        default_agent_type=agent,
+    )
+
+    class MyAdditionTool(AdditionTool):
+        def run(self, _: ExecutionContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+            if a == 1:
+                return InputClarification(argument_name="a", user_guidance="please try again")
+            return a + b
+
+    tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
+    runner = Runner(config=config, tool_registry=tool_registry)
+
+    step_one = Step(
+        tool_name="Add Tool",
+        task="Use tool",
+        output="$step_one",
+        inputs=[
+            Variable(
+                name="a",
+                description="",
+                value=1,
+            ),
+            Variable(
+                name="b",
+                description="",
+                value=2,
+            ),
+        ],
+    )
+    step_two = Step(
+        tool_name="Add Tool",
+        task="Use tool",
+        output="",
+        inputs=[
+            Variable(
+                name="a",
+                description="",
+                value="$step_one",
+            ),
+            Variable(
+                name="b",
+                description="",
+                value=40,
+            ),
+        ],
+    )
+    plan = Plan(
+        plan_context=PlanContext(
+            query="raise a clarification",
+            tool_ids=["clarification_tool"],
+        ),
+        steps=[step_one, step_two],
+    )
+    runner.storage.save_plan(plan)
+
+    workflow = runner.create_workflow(plan)
+    workflow = runner.execute_workflow(workflow)
+
+    assert workflow.state == WorkflowState.NEED_CLARIFICATION
+    assert workflow.get_outstanding_clarifications()[0].user_guidance == "please try again"
+
+    workflow.get_outstanding_clarifications()[0].resolve(response=456)
+    with execution_context(additional_data={"raise_clarification": "False"}):
+        runner.execute_workflow(workflow)
+    assert workflow.state == WorkflowState.COMPLETE
+    # 498 = 456 (clarification - value a - step 1) + 2 (value b - step 1) + 40 (value b - step 2)
+    assert workflow.outputs.final_output == Output(value=498)

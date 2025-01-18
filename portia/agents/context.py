@@ -5,7 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from portia.clarification import Clarification, InputClarification, MultiChoiceClarification
+from portia.clarification import (
+    ArgumentClarification,
+    Clarification,
+)
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import Output
@@ -71,19 +74,34 @@ def generate_input_context(
     return input_context
 
 
-def generate_clarification_context(clarifications: list[Clarification]) -> list[str]:
+def generate_clarification_context(clarifications: list[Clarification], step: int) -> list[str]:
     """Generate context from clarifications."""
     clarification_context = []
-    if clarifications:
+    # It's important we distinguish between clarifications for the current step where we really
+    # want to use the value provided, and clarifications for other steps which may be useful
+    # (e.g. consider a plan with 10 steps, each needing the same clarification, we don't want
+    # to ask 10 times) but can also lead to side effects (e.g. consider a Plan with two steps where
+    # both steps use different tools but with the same parameter name. We don't want to use the
+    # clarification from the previous step for the second tool)
+    current_step_clarifications = []
+    other_step_clarifications = []
+
+    for clarification in clarifications:
+        if clarification.step == step:
+            current_step_clarifications.append(clarification)
+        else:
+            other_step_clarifications.append(clarification)
+
+    if current_step_clarifications:
         clarification_context.extend(
             [
                 "Clarifications:",
                 "This section contains the user provided response to previous clarifications",
-                "They should take priority over any other context given.",
+                "for the current step. They should take priority over any other context given.",
             ],
         )
-        for clarification in clarifications:
-            if isinstance(clarification, (InputClarification, MultiChoiceClarification)):
+        for clarification in current_step_clarifications:
+            if isinstance(clarification, (ArgumentClarification)) and clarification.step == step:
                 clarification_context.extend(
                     [
                         f"input_name: {clarification.argument_name}",
@@ -92,6 +110,25 @@ def generate_clarification_context(clarifications: list[Clarification]) -> list[
                         "----------",
                     ],
                 )
+    if other_step_clarifications:
+        clarification_context.extend(
+            [
+                "This section contains the user provided response to previous tasks.",
+                "You may use the values here if no other context is provided but should not use",
+                "values from here if there is another value provided.",
+            ],
+        )
+        for clarification in other_step_clarifications:
+            if isinstance(clarification, (ArgumentClarification)) and clarification.step == step:
+                clarification_context.extend(
+                    [
+                        f"input_name: {clarification.argument_name}",
+                        f"clarification_reason: {clarification.user_guidance}",
+                        f"input_value: {clarification.response}",
+                        "----------",
+                    ],
+                )
+
     return clarification_context
 
 
@@ -136,7 +173,10 @@ def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     context.extend(input_context)
 
     # Generate and append clarifications context
-    clarification_context = generate_clarification_context(clarifications)
+    clarification_context = generate_clarification_context(
+        clarifications,
+        workflow.current_step_index,
+    )
     context.extend(clarification_context)
 
     # Handle execution context

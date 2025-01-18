@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
@@ -37,7 +37,11 @@ class WorkflowOutputs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    clarifications: list[ActionClarification | InputClarification | MultiChoiceClarification | Clarification] = Field(
+    clarifications: list[
+        SerializeAsAny[
+            ActionClarification | InputClarification | MultiChoiceClarification | Clarification
+        ]
+    ] = Field(
         default=[],
         description="Any clarifications needed for this workflow.",
     )
@@ -81,6 +85,14 @@ class Workflow(BaseModel):
             for clarification in self.outputs.clarifications
             if not clarification.resolved
         ]
+
+    def __str__(self) -> str:
+        """Return the string representation."""
+        return (
+            f"Workflow(id={self.id}, plan_id={self.plan_id}, "
+            f"state={self.state}, current_step_index={self.current_step_index}, "
+            f"final_output={'set' if self.outputs.final_output else 'unset'})"
+        )
 
 
 class ReadOnlyWorkflow(Workflow):

@@ -2,7 +2,7 @@
 
 from portia.config import Config, LogLevel
 from portia.context import execution_context
-from portia.example_tools.registry import example_tool_registry
+from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
 from portia.workflow import WorkflowState
 

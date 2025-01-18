@@ -153,13 +153,9 @@ Broader context: This may be useful information from previous steps that can ind
 output_name: $london_weather
 output_value: value='rainy'
 ----------
-Clarifications:
-This section contains the user provided response to previous clarifications
-They should take priority over any other context given.
-input_name: $email_cc
-clarification_reason: email cc list
-input_value: bob@bla.com
-----------
+This section contains the user provided response to previous tasks.
+You may use the values here if no other context is provided but should not use
+values from here if there is another value provided.
 Metadata: This section contains general context about this execution.
 end_user_id: 123
 context_key_name: email context_key_value: hello@world.com
@@ -181,10 +177,12 @@ def test_context_inputs_outputs_clarifications(
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
+            step=1,
         ),
         ActionClarification(
             action_url=HttpUrl("http://example.com"),
             user_guidance="click on the link",
+            step=2,
         ),
     ]
     (plan, workflow) = get_test_workflow()

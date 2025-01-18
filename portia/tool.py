@@ -15,17 +15,29 @@ from typing import TYPE_CHECKING, Any, Generic
 
 import httpx
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    HttpUrl,
+    SecretStr,
+    ValidationError,
+    field_serializer,
+    model_validator,
+)
 
 from portia.agents.base_agent import Output
-from portia.clarification import Clarification
+from portia.clarification import (
+    ActionClarification,
+    Clarification,
+    InputClarification,
+    MultiChoiceClarification,
+)
 from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logger import logger
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
-
     from portia.context import ExecutionContext
 
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
@@ -205,6 +217,20 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return the json_schema for the tool args."""
         return self.args_schema.model_json_schema()
 
+    def __str__(self) -> str:
+        """Return the string representation."""
+        return (
+            f"ToolModel(id={self.id!r}, name={self.name!r}, "
+            f"description={self.description!r}, "
+            f"args_schema={self.args_schema.__name__!r}, "
+            f"output_schema={self.output_schema!r})"
+        )
+
+    @field_serializer("args_schema")
+    def serialize_args_schema(self, value: type[BaseModel]) -> str:
+        """Serialize the type by returning its class name."""
+        return value.__name__
+
 
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     """Tool that passes run execution to Portia Cloud."""
@@ -217,7 +243,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         ctx: ExecutionContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  #  noqa: ANN401
-    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
+    ) -> SERIALIZABLE_TYPE_VAR | None | Clarification:
         """Invoke the run endpoint and handle response."""
         try:
             # Combine args and kwargs
@@ -246,4 +272,29 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             logger.error(f"Error from Portia Cloud: {e}")
             raise ToolHardError(e) from e
         else:
-            return response.json()
+            try:
+                output = Output.model_validate(response.json()["output"])
+                if isinstance(output.value, list) and output.value and "type" in output.value[0]:
+                    clarification = output.value[0]
+                    match clarification["type"]:
+                        case "Action Clarification":
+                            return ActionClarification(
+                                action_url=HttpUrl(clarification["action_url"]),
+                                user_guidance=clarification["user_guidance"],
+                            )
+                        case "Input Clarification":
+                            return InputClarification(
+                                argument_name=clarification["argument_name"],
+                                user_guidance=clarification["user_guidance"],
+                            )
+                        case "Multi Choice Clarification":
+                            return MultiChoiceClarification(
+                                argument_name=clarification["argument_name"],
+                                user_guidance=clarification["user_guidance"],
+                                options=clarification["options"],
+                            )
+            except (ValidationError, KeyError) as e:
+                logger.error(f"Error parsing response from Portia Cloud: {e}")
+                raise ToolHardError(e) from e
+            else:
+                return output.value  # type: ignore  # noqa: PGH003
