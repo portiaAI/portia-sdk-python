@@ -83,7 +83,7 @@ class ActionClarification(Clarification[bool]):
         return str(action_url)
 
 
-class InputClarification(ArgumentClarification[str]):
+class InputClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """An input based clarification.
 
     Represents a clarification where the user needs to provide a value for a specific argument.
@@ -92,7 +92,7 @@ class InputClarification(ArgumentClarification[str]):
     type: str = "Input Clarification"
 
 
-class MultiChoiceClarification(ArgumentClarification[str]):
+class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """A multiple choice based clarification.
 
     Represents a clarification where the user needs to select an option for a specific argument.
@@ -109,3 +109,18 @@ class MultiChoiceClarification(ArgumentClarification[str]):
         if self.response not in self.options:
             raise ValueError(f"{self.response} is not a supported option")
         return self
+
+
+class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
+    """A value acceptance clarification.
+
+    Represents a clarification where the user is presented a value and needs to accept it.
+    The clarification should be created with the response field already set. The user will
+    denote acceptance by setting the resolved flag.
+    """
+
+    type: str = "Value Acceptance Clarification"
+
+    def resolve(self, response: str | None) -> None:  # noqa: ARG002
+        """Resolve the clarification but don't update the response."""
+        self.resolved = True

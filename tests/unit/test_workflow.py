@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
+from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import ReadOnlyStep, Step
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowOutputs, WorkflowState
 
@@ -91,7 +92,16 @@ def test_read_only_step_immutable() -> None:
 
 def test_workflow_serialization() -> None:
     """Test workflow can be serialized to string."""
-    workflow = Workflow(plan_id=uuid4())
+    workflow = Workflow(
+        plan_id=uuid4(),
+        outputs=WorkflowOutputs(
+            step_outputs={
+                "1": Output(value=ToolHardError("this is a tool hard error")),
+                "2": Output(value=ToolSoftError("this is a tool soft error")),
+            },
+            final_output=Output(value="This is the end"),
+        ),
+    )
     assert str(workflow) == (
         f"Workflow(id={workflow.id}, plan_id={workflow.plan_id}, "
         f"state={workflow.state}, current_step_index={workflow.current_step_index}, "
