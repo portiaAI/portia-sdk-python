@@ -80,7 +80,7 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
     # Check that summaries were added to the artifact
     output_message = result["messages"][0]
     assert isinstance(output_message, ToolMessage)
-    assert output_message.artifact.output_summary == "Short summary"
+    assert output_message.artifact.summary == "Short summary"
 
 
 def test_summarizer_model_non_tool_message(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -144,4 +144,4 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
     # Should return original message without summaries when error occurs
     output_message = result["messages"][0]
     assert isinstance(output_message, ToolMessage)
-    assert output_message.artifact.output_summary is None
+    assert output_message.artifact.summary is None
