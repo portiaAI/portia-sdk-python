@@ -43,7 +43,7 @@ jobs:
         # https://linear.app/portialabs/issue/POR-383
         run: |
           set -o pipefail
-          poetry run pytest -n auto  --cov --cov-fail-under 94 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          poetry run pytest -workers auto  --cov --cov-fail-under 94 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
 
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
