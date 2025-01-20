@@ -70,7 +70,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     )
     should_summarize: bool = Field(
         default=False,
-        description="Whether the tool output requires a summary",
+        description="Whether the tool's output requires a summary. "
+        "Tools may not require a summary if they already produce a nice textual output.",
     )
 
     @abstractmethod
