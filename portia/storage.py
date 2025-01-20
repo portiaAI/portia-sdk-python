@@ -340,10 +340,10 @@ class PortiaCloudStorage(Storage):
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id,
                 "additional_data": tool_call.additional_data,
-                "outcome": tool_call.outcome,
-                "latency_seconds": tool_call.latency_seconds,
                 "input": tool_call.input,
                 "output": tool_call.output,
+                "outcome": tool_call.outcome,
+                "latency_seconds": tool_call.latency_seconds,
             },
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
