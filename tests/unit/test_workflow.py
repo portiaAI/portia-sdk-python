@@ -7,8 +7,9 @@ from pydantic import ValidationError
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
+from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import ReadOnlyStep, Step
-from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowOutputs, WorkflowState
 
 
 @pytest.fixture
@@ -23,9 +24,11 @@ def workflow(mock_clarification: Clarification) -> Workflow:
     return Workflow(
         plan_id=uuid4(),
         current_step_index=1,
-        clarifications=[mock_clarification],
         state=WorkflowState.IN_PROGRESS,
-        step_outputs={"step1": Output(value="Test output")},
+        outputs=WorkflowOutputs(
+            clarifications=[mock_clarification],
+            step_outputs={"step1": Output(value="Test output")},
+        ),
     )
 
 
@@ -37,9 +40,9 @@ def test_workflow_initialization() -> None:
     assert workflow.id is not None
     assert workflow.plan_id == plan_id
     assert workflow.current_step_index == 0
-    assert workflow.clarifications == []
+    assert workflow.outputs.clarifications == []
     assert workflow.state == WorkflowState.NOT_STARTED
-    assert workflow.step_outputs == {}
+    assert workflow.outputs.step_outputs == {}
 
 
 def test_workflow_get_outstanding_clarifications(
@@ -55,7 +58,7 @@ def test_workflow_get_outstanding_clarifications(
 
 def test_workflow_get_outstanding_clarifications_none() -> None:
     """Test get_outstanding_clarifications when no clarifications are outstanding."""
-    workflow = Workflow(plan_id=uuid4(), clarifications=[])
+    workflow = Workflow(plan_id=uuid4(), outputs=WorkflowOutputs(clarifications=[]))
 
     assert workflow.get_outstanding_clarifications() == []
 
@@ -85,3 +88,24 @@ def test_read_only_step_immutable() -> None:
 
     with pytest.raises(ValidationError):
         read_only.output = "$in"
+
+
+def test_workflow_serialization() -> None:
+    """Test workflow can be serialized to string."""
+    workflow = Workflow(
+        plan_id=uuid4(),
+        outputs=WorkflowOutputs(
+            step_outputs={
+                "1": Output(value=ToolHardError("this is a tool hard error")),
+                "2": Output(value=ToolSoftError("this is a tool soft error")),
+            },
+            final_output=Output(value="This is the end"),
+        ),
+    )
+    assert str(workflow) == (
+        f"Workflow(id={workflow.id}, plan_id={workflow.plan_id}, "
+        f"state={workflow.state}, current_step_index={workflow.current_step_index}, "
+        f"final_output={'set' if workflow.outputs.final_output else 'unset'})"
+    )
+    # check we can also serialize to JSON
+    workflow.model_dump_json()

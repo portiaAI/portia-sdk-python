@@ -38,7 +38,7 @@ def outputs() -> dict[str, Output]:
 
 def test_context_empty() -> None:
     """Test that the context is set up correctly."""
-    (plan, workflow) = get_test_workflow()
+    (_, workflow) = get_test_workflow()
     context = build_context(
         ExecutionContext(),
         Step(inputs=[], output="", task=""),
@@ -79,7 +79,7 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
     """Test that the context is set up correctly with inputs and outputs."""
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
-    workflow.step_outputs = outputs
+    workflow.outputs.step_outputs = outputs
     context = build_context(
         ExecutionContext(),
         plan.steps[0],
@@ -110,7 +110,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     """Test that the context is set up correctly with all contexts."""
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
-    workflow.step_outputs = outputs
+    workflow.outputs.step_outputs = outputs
     clarifications = [
         InputClarification(
             argument_name="$email_cc",
@@ -122,7 +122,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
             user_guidance="click on the link",
         ),
     ]
-    workflow.clarifications = clarifications
+    workflow.outputs.clarifications = clarifications
     context = build_context(
         ExecutionContext(
             agent_system_context_extension=["system context 1", "system context 2"],
@@ -153,13 +153,9 @@ Broader context: This may be useful information from previous steps that can ind
 output_name: $london_weather
 output_value: value='rainy' short_summary=None long_summary=None
 ----------
-Clarifications:
-This section contains the user provided response to previous clarifications
-They should take priority over any other context given.
-input_name: $email_cc
-clarification_reason: email cc list
-input_value: bob@bla.com
-----------
+This section contains the user provided response to previous tasks.
+You may use the values here if no other context is provided but should not use
+values from here if there is another value provided.
 Metadata: This section contains general context about this execution.
 end_user_id: 123
 context_key_name: email context_key_value: hello@world.com
@@ -181,16 +177,18 @@ def test_context_inputs_outputs_clarifications(
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
+            step=1,
         ),
         ActionClarification(
             action_url=HttpUrl("http://example.com"),
             user_guidance="click on the link",
+            step=2,
         ),
     ]
     (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
-    workflow.step_outputs = outputs
-    workflow.clarifications = clarifications
+    workflow.outputs.step_outputs = outputs
+    workflow.outputs.clarifications = clarifications
     context = build_context(
         ExecutionContext(agent_system_context_extension=["system context 1", "system context 2"]),
         plan.steps[0],

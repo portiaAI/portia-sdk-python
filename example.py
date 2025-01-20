@@ -1,11 +1,9 @@
 """Simple Example."""
 
 from portia.config import Config, LogLevel, StorageClass
-from portia.context import execution_context
-from portia.example_tools.registry import example_tool_registry
+from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
-from portia.workflow import WorkflowState
 
 my_config = Config.from_default(
     default_log_level=LogLevel.DEBUG,

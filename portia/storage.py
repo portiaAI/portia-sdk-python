@@ -5,18 +5,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, TypeVar
+from uuid import UUID
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.logger import logger
-from portia.plan import Plan
+from portia.plan import Plan, PlanContext, Step
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -196,7 +195,12 @@ class PortiaCloudStorage(Storage):
         """Add plan to cloud."""
         response = httpx.post(
             url=f"{self.api_endpoint}/api/v0/plans/",
-            json={"id": str(plan.id), "json": plan.model_dump(mode="json")},
+            json={
+                "id": str(plan.id),
+                "query": plan.plan_context.query,
+                "tool_ids": plan.plan_context.tool_ids,
+                "steps": [step.model_dump(mode="json") for step in plan.steps],
+            },
             headers={
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
@@ -214,7 +218,15 @@ class PortiaCloudStorage(Storage):
             },
         )
         self.check_response(response)
-        return Plan.model_validate(response.json()["json"])
+        response_json = response.json()
+        return Plan(
+            id=UUID(response_json["id"]),
+            plan_context=PlanContext(
+                query=response_json["query"],
+                tool_ids=response_json["tool_ids"],
+            ),
+            steps=[Step.model_validate(step) for step in response_json["steps"]],
+        )
 
     def save_workflow(self, workflow: Workflow) -> None:
         """Add workflow to cloud."""
@@ -222,7 +234,10 @@ class PortiaCloudStorage(Storage):
             url=f"{self.api_endpoint}/api/v0/workflows/",
             json={
                 "id": str(workflow.id),
-                "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
+                "current_step_index": workflow.current_step_index,
+                "state": workflow.state,
+                "execution_context": workflow.execution_context,
+                "outputs": workflow.outputs,
                 "plan_id": str(workflow.plan_id),
             },
             headers={
@@ -235,8 +250,11 @@ class PortiaCloudStorage(Storage):
             response = httpx.patch(
                 url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
                 json={
+                    "current_step_index": workflow.current_step_index,
+                    "state": workflow.state,
+                    "execution_context": workflow.execution_context,
+                    "outputs": workflow.outputs,
                     "plan_id": str(workflow.plan_id),
-                    "json": workflow.model_dump(mode="json", exclude={"execution_context"}),
                 },
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",

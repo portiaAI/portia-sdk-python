@@ -158,11 +158,11 @@ class Runner:
         )
         for index in range(workflow.current_step_index, len(plan.steps)):
             step = plan.steps[index]
+            workflow.current_step_index = index
             logger.debug(
                 f"Executing step {index}: {step.task}",
                 extra={"plan": plan.id, "workflow": workflow.id},
             )
-            workflow.current_step_index = index
             # we pass read only copies of the state to the agent so that the runner remains
             # responsible for handling the output of the agent and updating the state.
             agent = self._get_agent_for_step(
@@ -178,9 +178,9 @@ class Runner:
                 step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = Output(value=str(e))
-                workflow.step_outputs[step.output] = error_output
+                workflow.outputs.step_outputs[step.output] = error_output
                 workflow.state = WorkflowState.FAILED
-                workflow.final_output = error_output
+                workflow.outputs.final_output = error_output
                 self.storage.save_workflow(workflow)
                 logger.error(
                     "error: {error}",
@@ -193,7 +193,7 @@ class Runner:
                 )
                 return workflow
             else:
-                workflow.step_outputs[step.output] = step_output
+                workflow.outputs.step_outputs[step.output] = step_output
                 logger.debug(
                     "Step output - {output}",
                     extra={"plan": plan.id, "workflow": workflow.id},
@@ -214,7 +214,9 @@ class Runner:
                 for clarification in new_clarifications:
                     clarification.step = workflow.current_step_index
 
-                workflow.clarifications = workflow.clarifications + new_clarifications
+                workflow.outputs.clarifications = (
+                    workflow.outputs.clarifications + new_clarifications
+                )
                 workflow.state = WorkflowState.NEED_CLARIFICATION
                 self.storage.save_workflow(workflow)
                 logger.info(
@@ -225,7 +227,7 @@ class Runner:
 
             # set final output if is last step (accounting for zero index)
             if index == len(plan.steps) - 1:
-                workflow.final_output = step_output
+                workflow.outputs.final_output = step_output
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
@@ -241,11 +243,11 @@ class Runner:
             f"Final workflow status: {workflow.state}",
             extra={"plan": plan.id, "workflow": workflow.id},
         )
-        if workflow.final_output:
+        if workflow.outputs.final_output:
             logger.info(
                 "{output}",
                 extra={"plan": plan.id, "workflow": workflow.id},
-                output=str(workflow.final_output.value),
+                output=str(workflow.outputs.final_output.value),
             )
         return workflow
 

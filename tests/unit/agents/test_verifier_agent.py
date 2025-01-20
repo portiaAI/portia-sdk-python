@@ -284,7 +284,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     )
 
     (_, workflow) = get_test_workflow()
-    workflow.clarifications = [clarification]
+    workflow.outputs.clarifications = [clarification]
     agent = SimpleNamespace(
         verified_args=verified_tool_inputs,
         clarifications=[failed_clarification, clarification],
@@ -501,7 +501,7 @@ def test_get_last_resolved_clarification() -> None:
         step=1,
     )
     (plan, workflow) = get_test_workflow()
-    workflow.clarifications = [
+    workflow.outputs.clarifications = [
         resolved_clarification1,
         resolved_clarification2,
         unresolved_clarification,
@@ -561,7 +561,7 @@ def test_clarifications_or_continue() -> None:
     )
 
     (plan, workflow) = get_test_workflow()
-    workflow.clarifications = [clarification]
+    workflow.outputs.clarifications = [clarification]
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,

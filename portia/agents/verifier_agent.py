@@ -6,7 +6,7 @@ in completing tasks.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
@@ -14,9 +14,9 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from portia.agents.base_agent import BaseAgent, Output
+from portia.agents.base_agent import Output
 from portia.agents.langgraph_agent import LanggraphAgent
-from portia.agents.models.summarizer_model import SummarizerModel, SummarizerOutput
+from portia.agents.models.summarizer_model import SummarizerModel
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
 from portia.context import get_execution_context
@@ -112,9 +112,8 @@ class ParserModel:
                 "{previous_errors}\n"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Adhere to the following guidelines:\n"
+                "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
-                "- If a required value is missing or unclear, explicitly mark it as invalid and "
-                "specify what additional information is needed.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
                 "- Ensure arguments align with the tool's schema and intended use.\n",
             ),
@@ -259,7 +258,7 @@ class ToolCallingModel:
         if not verified_args:
             raise InvalidWorkflowStateError
         # handle any clarifications before calling
-        if self.agent and self.agent.workflow.clarifications:
+        if self.agent and self.agent.workflow.outputs.clarifications:
             for arg in verified_args.args:
                 matching_clarification = self.agent.get_last_resolved_clarification(arg.name)
                 if matching_clarification and arg.value != matching_clarification.response:
@@ -352,7 +351,7 @@ class VerifierAgent(LanggraphAgent):
     ) -> Clarification | None:
         """Get the last resolved clarification for an argument."""
         matching_clarification = None
-        for clarification in self.workflow.clarifications:
+        for clarification in self.workflow.outputs.clarifications:
             if (
                 clarification.resolved
                 and getattr(clarification, "argument_name", None) == arg_name

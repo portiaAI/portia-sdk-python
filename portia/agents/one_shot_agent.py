@@ -14,7 +14,7 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.agents.base_agent import BaseAgent, Output
+from portia.agents.base_agent import Output
 from portia.agents.langgraph_agent import LanggraphAgent
 from portia.agents.models.summarizer_model import SummarizerModel
 from portia.agents.toolless_agent import ToolLessAgent

@@ -3,6 +3,7 @@
 import pytest
 from pydantic import SecretStr
 
+from portia.clarification import ActionClarification
 from portia.config import Config, StorageClass
 from portia.context import get_execution_context
 from portia.errors import ToolNotFoundError
@@ -17,6 +18,7 @@ from portia.workflow import WorkflowState
 from tests.utils import AdditionTool
 
 
+@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -27,7 +29,7 @@ def test_runner_run_query_with_cloud() -> None:
     workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
-    assert workflow.final_output
+    assert workflow.outputs.final_output
 
     storage = runner.storage
     # check we can get items back
@@ -35,6 +37,7 @@ def test_runner_run_query_with_cloud() -> None:
     storage.get_workflow(workflow.id)
 
 
+@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_run_tool_error() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -55,6 +58,7 @@ def test_run_tool_error() -> None:
         tool.run(ctx)
 
 
+@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_runner_run_query_with_cloud_and_local() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -68,4 +72,18 @@ def test_runner_run_query_with_cloud_and_local() -> None:
 
     workflow = runner.execute_query(query)
     assert workflow.state == WorkflowState.COMPLETE
-    assert workflow.final_output
+    assert workflow.outputs.final_output
+
+
+def test_runner_run_query_with_oauth() -> None:
+    """Test running a simple query using the Runner."""
+    config = Config.from_default()
+    tool_registry = PortiaToolRegistry(config=config)
+    runner = Runner(config=config, tool_registry=tool_registry)
+    query = "Star the portiaai/portia-sdk-repo"
+
+    workflow = runner.execute_query(query)
+
+    assert workflow.state == WorkflowState.NEED_CLARIFICATION
+    assert len(workflow.outputs.clarifications) == 1
+    assert isinstance(workflow.outputs.clarifications[0], ActionClarification)

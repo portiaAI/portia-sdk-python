@@ -1,5 +1,22 @@
 # Portia SDK Python
 
+[Mounir notes] Suggested structure:
+- Overview:
+    - What it is in a sentence or two
+    - What's in this repo
+    - Contributor guide link
+- Why Portia
+    - Plan in an explicit, structured way
+    - Manage workflow execution statefully
+    - Authenticate tool calls just-in-time
+    - Direct execution with Clarifications
+- What you can build on Portia
+- Let's get started!
+    - Install -- validate installation with a simple example using `run_query` and example tools
+    - Demonstrate the key features in one multi-tool, multi-step example -- Simple example with `generate_plan`, `create_workflow`, `execute_workflow` (e.g. something with weather and file writing)
+- Where can I learn more
+    - Docs
+    - Other 
 
 ## Usage
 
@@ -14,7 +31,7 @@ pip install portia-sdk-python
 
 ```python
 from portia.config import default_config
-from portia.example_tools.registry import example_tool_registry
+from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
 
 
@@ -59,7 +76,7 @@ Multiple registries can be combined to give the power of Portia Cloud with the c
 ```python
 
 from portia.config import default_config
-from portia.example_tools.registry import example_tool_registry
+from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
 
 config = default_config()

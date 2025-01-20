@@ -9,6 +9,7 @@ portia-cli plan "add 4 + 8" - plan a query
 from __future__ import annotations
 
 import os
+import webbrowser
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable
@@ -16,10 +17,14 @@ from typing import Any, Callable
 import click
 from dotenv import load_dotenv
 
+from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification
 from portia.config import Config, LLMModel, LLMProvider, LogLevel
-from portia.example_tools import example_tool_registry
+from portia.context import execution_context
+from portia.logger import logger
+from portia.open_source_tools import example_tool_registry
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
+from portia.workflow import WorkflowState
 
 
 class EnvLocation(Enum):
@@ -68,6 +73,12 @@ def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
         required=False,
         help="The LLM model to use",
     )
+    @click.option(
+        "--end-user-id",
+        type=click.STRING,
+        required=False,
+        help="Run with an end user id",
+    )
     @wraps(f)
     def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         return f(*args, **kwargs)
@@ -83,11 +94,12 @@ def cli() -> None:
 @click.command()
 @common_options
 @click.argument("query")
-def run(
+def run(  # noqa: PLR0913
     query: str,
     log_level: str,
     llm_provider: str | None,
     llm_model: str | None,
+    end_user_id: str | None,
     env_location: str,
 ) -> None:
     """Run a query."""
@@ -104,8 +116,38 @@ def run(
 
     # Run the query
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.execute_query(query)
-    click.echo(output.model_dump_json(indent=4))
+
+    with execution_context(end_user_id=end_user_id):
+        workflow = runner.execute_query(query)
+
+        final_states = [WorkflowState.COMPLETE, WorkflowState.FAILED]
+        while workflow.state not in final_states:
+            for clarification in workflow.get_outstanding_clarifications():
+                if isinstance(clarification, MultiChoiceClarification):
+                    user_input = input(
+                        clarification.user_guidance
+                        + "\nPlease enter an option from below:\n"
+                        + "\n".join(clarification.options)
+                        + "\nchoice: ",
+                    )
+                    clarification.resolve(user_input)
+                if isinstance(clarification, ActionClarification):
+                    webbrowser.open(str(clarification.action_url))
+                    logger.info("Please complete authentication to continue")
+                    auth_complete = False
+                    while not auth_complete:
+                        user_input = input("Is Authentication Complete [Y/N]")
+                        if user_input.lower() == "y":
+                            auth_complete = True
+                    clarification.resolve(None)
+                if isinstance(clarification, InputClarification):
+                    user_input = input(
+                        clarification.user_guidance + "\nPlease enter a value:\n",
+                    )
+                    clarification.resolve(user_input)
+            runner.execute_workflow(workflow)
+
+        click.echo(workflow.model_dump_json(indent=4))
 
 
 @click.command()

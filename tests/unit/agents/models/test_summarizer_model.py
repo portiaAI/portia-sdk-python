@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    import pytest
+    from pydantic import BaseModel
 
 from portia.agents.base_agent import Output
 from portia.agents.models.summarizer_model import SummarizerModel, SummarizerOutput
@@ -20,20 +21,20 @@ class MockInvoker:
     """Mock invoker."""
 
     called: bool
-    prompt: Any
+    prompt: list[BaseMessage]
     response: AIMessage | BaseModel | None
 
     def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
         """Init worker."""
         self.called = False
-        self.prompt = None
+        self.prompt = []
         self.response = response
         self.output_format = None
 
     def invoke(
         self,
-        prompt: Any,
-        **kwargs: Any,  # noqa: ANN401, ARG002
+        prompt: list[BaseMessage],
+        **_: Any,  # noqa: ANN401
     ) -> AIMessage | BaseModel:
         """Mock run for invoking the chain."""
         self.called = True
@@ -42,7 +43,7 @@ class MockInvoker:
             return self.response
         return AIMessage(content="invoked")
 
-    def with_structured_output(self, output_format: Any) -> MockInvoker:  # noqa: ANN401
+    def with_structured_output(self, output_format: type[BaseModel]) -> MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
         return self
@@ -72,7 +73,7 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert mock_invoker.called
     assert mock_invoker.output_format == SummarizerOutput
-    messages = mock_invoker.prompt
+    messages: list[BaseMessage] = mock_invoker.prompt
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "Tool output content" in messages[1].content
@@ -118,11 +119,15 @@ def test_summarizer_model_no_messages(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the summarizer model error handling."""
-    def mock_invoke(*args: Any, **kwargs: Any) -> None:
-        raise Exception("Test error")
+    class TestError(Exception):
+        """Test error."""
+
+    def mock_invoke(**_: Any) -> AIMessage | BaseModel:  # noqa: ANN401
+        """Mock invoke that raises an error."""
+        raise TestError("Test error")
 
     mock_invoker = MockInvoker()
-    mock_invoker.invoke = mock_invoke
+    mock_invoker.invoke = mock_invoke  # type: ignore  # noqa: PGH003
     monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
