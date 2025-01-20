@@ -52,8 +52,7 @@ class MockInvoker:
 def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the summarizer model with valid tool message."""
     summary = SummarizerOutput(
-        short_summary="Short summary",
-        long_summary="Long detailed summary",
+        summary="Short summary",
     )
     mock_invoker = MockInvoker(response=summary)
     monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
@@ -81,8 +80,7 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
     # Check that summaries were added to the artifact
     output_message = result["messages"][0]
     assert isinstance(output_message, ToolMessage)
-    assert output_message.artifact.short_summary == "Short summary"
-    assert output_message.artifact.long_summary == "Long detailed summary"
+    assert output_message.artifact.output_summary == "Short summary"
 
 
 def test_summarizer_model_non_tool_message(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -146,5 +144,4 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
     # Should return original message without summaries when error occurs
     output_message = result["messages"][0]
     assert isinstance(output_message, ToolMessage)
-    assert output_message.artifact.short_summary is None
-    assert output_message.artifact.long_summary is None
+    assert output_message.artifact.output_summary is None

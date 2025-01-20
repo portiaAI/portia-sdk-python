@@ -64,8 +64,7 @@ def test_runner_run_query(
     assert workflow.outputs.final_output
     assert workflow.outputs.final_output.value == 3
     for output in workflow.outputs.step_outputs.values():
-        assert output.short_summary is not None
-        assert output.long_summary is not None
+        assert output.summary is not None
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)

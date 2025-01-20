@@ -369,8 +369,7 @@ class VerifierAgent(LanggraphAgent):
         if len(self.new_clarifications) > 0:
             return Output[list[Clarification]](
                 value=self.new_clarifications,
-                short_summary="Clarifications requested.",
-                long_summary="Clarifications requested please resolve them before retrying.",
+                summary="Clarifications requested please resolve them before retrying.",
             )
         if isinstance(last_message, ToolMessage):
             if last_message.artifact and isinstance(last_message.artifact, Output):
