@@ -208,6 +208,7 @@ def _get_config(
             llm_provider=provider,
             llm_model_name=model,
             default_log_level=log_level,
+            storage_class="CLOUD",
         )
     else:
         config = Config.from_default(default_log_level=log_level)
