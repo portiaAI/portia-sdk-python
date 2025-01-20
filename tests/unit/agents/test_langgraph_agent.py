@@ -1,23 +1,19 @@
 """Test langgraph agent."""
 from __future__ import annotations
 
-from uuid import uuid4
-
 from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.agents.langgraph_agent import LanggraphAgent
-from portia.config import Config
 from portia.plan import Step
-from portia.workflow import Workflow
-from tests.utils import AdditionTool
+from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
 
 def test_next_state_after_tool_call_no_error() -> None:
     """Test next state when tool call succeeds."""
     # Arrange
-    config = Config.from_default()
-    workflow = Workflow(plan_id=uuid4())
+    config = get_test_config()
+    workflow = get_test_workflow()
     step = Step(task="test_task", output="test_output")
     agent = LanggraphAgent(step=step, workflow=workflow, config=config)
 
@@ -40,8 +36,8 @@ def test_next_state_after_tool_call_no_error() -> None:
 def test_next_state_after_tool_call_with_summarize() -> None:
     """Test next state when tool call succeeds and should summarize."""
     # Arrange
-    config = Config.from_default()
-    workflow = Workflow(plan_id=uuid4())
+    config = get_test_config()
+    workflow = get_test_workflow()
     step = Step(task="test_task", output="test_output")
     tool = AdditionTool()
     tool.should_summarize = True
@@ -66,8 +62,8 @@ def test_next_state_after_tool_call_with_summarize() -> None:
 def test_next_state_after_tool_call_with_error_retry() -> None:
     """Test next state when tool call fails and max retries reached."""
     # Arrange
-    config = Config.from_default()
-    workflow = Workflow(plan_id=uuid4())
+    config = get_test_config()
+    workflow = get_test_workflow()
     step = Step(task="test_task", output="test_output")
     agent = LanggraphAgent(step=step, workflow=workflow, config=config)
 
