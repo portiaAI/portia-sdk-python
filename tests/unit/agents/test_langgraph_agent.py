@@ -13,7 +13,7 @@ def test_next_state_after_tool_call_no_error() -> None:
     """Test next state when tool call succeeds."""
     # Arrange
     config = get_test_config()
-    workflow = get_test_workflow()
+    _, workflow = get_test_workflow()
     step = Step(task="test_task", output="test_output")
     agent = LanggraphAgent(step=step, workflow=workflow, config=config)
 
@@ -37,7 +37,7 @@ def test_next_state_after_tool_call_with_summarize() -> None:
     """Test next state when tool call succeeds and should summarize."""
     # Arrange
     config = get_test_config()
-    workflow = get_test_workflow()
+    _, workflow = get_test_workflow()
     step = Step(task="test_task", output="test_output")
     tool = AdditionTool()
     tool.should_summarize = True
@@ -63,7 +63,7 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
     """Test next state when tool call fails and max retries reached."""
     # Arrange
     config = get_test_config()
-    workflow = get_test_workflow()
+    _, workflow = get_test_workflow()
     step = Step(task="test_task", output="test_output")
     agent = LanggraphAgent(step=step, workflow=workflow, config=config)
 

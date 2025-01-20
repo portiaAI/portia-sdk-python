@@ -4,17 +4,31 @@ It is a wrapper around the BaseAgent class that provides common utilities for La
 """
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from langgraph.graph import END, MessagesState
 
-from portia.agents.base_agent import BaseAgent
+from portia.agents.base_agent import BaseAgent, Tool
 
+if TYPE_CHECKING:
+    from portia.config import Config
+    from portia.plan import Step
+    from portia.workflow import Workflow
 
 class LanggraphAgent(BaseAgent):
     """Agent responsible for achieving a task by using langgraph."""
 
     MAX_RETRIES = 4
+
+    def __init__(
+        self,
+        step: Step,
+        workflow: Workflow,
+        config: Config,
+        tool: Tool | None = None,
+    ) -> None:
+        """Initialize the LanggraphAgent."""
+        super().__init__(step, workflow, config, tool)
 
     def next_state_after_tool_call(
         self,
