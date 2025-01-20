@@ -50,7 +50,7 @@ class WorkflowStorage(ABC):
         raise NotImplementedError("get_workflow is not implemented")
 
 
-class ToolCallState(str, Enum):
+class ToolCallStatus(str, Enum):
     """State of a tool call."""
 
     IN_PROGRESS = "IN_PROGRESS"
@@ -66,7 +66,7 @@ class ToolCallRecord(BaseModel):
     workflow_id: UUID
     end_user_id: str | None
     additional_data: dict[str, str]
-    outcome: ToolCallState
+    status: ToolCallStatus
     step: int
     input: Any
     output: Any
@@ -95,12 +95,12 @@ class LogToolCallStorage(ToolCallStorage):
         logger().debug(
             f"Tool {tool_call.tool_name} executed in {tool_call.latency_seconds:.2f} seconds",
         )
-        match tool_call.outcome:
-            case ToolCallState.SUCCESS:
+        match tool_call.status:
+            case ToolCallStatus.SUCCESS:
                 logger().info("Tool output: {output}", output=tool_call.output)
-            case ToolCallState.FAILED:
+            case ToolCallStatus.FAILED:
                 logger().error("Tool returned error {output}", output=tool_call.output)
-            case ToolCallState.NEED_CLARIFICATION:
+            case ToolCallStatus.NEED_CLARIFICATION:
                 logger().error("Tool returned clarifications {output}", output=tool_call.output)
 
 
@@ -342,7 +342,45 @@ class PortiaCloudStorage(Storage):
                 "additional_data": tool_call.additional_data,
                 "input": tool_call.input,
                 "output": tool_call.output,
-                "outcome": tool_call.outcome,
+                "status": tool_call.status,
+                "latency_seconds": tool_call.latency_seconds,
+            },
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        self.check_response(response)
+
+
+class PortiaToolCallStorage(InMemoryStorage):
+    """Save tool calls to portia cloud only."""
+
+    def __init__(self, config: Config) -> None:
+        """Store tools in a tool set for easy access."""
+        self.api_key = config.must_get_api_key("portia_api_key")
+        self.api_endpoint = config.must_get("portia_api_endpoint", str)
+
+    def check_response(self, response: httpx.Response) -> None:
+        """Validate response from Portia API."""
+        if not response.is_success:
+            error_str = str(response.content)
+            logger.error(f"Error from Portia Cloud: {error_str}")
+            raise StorageError(error_str)
+
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Save a tool call in the backend."""
+        response = httpx.post(
+            url=f"{self.api_endpoint}/api/v0/tool-calls/",
+            json={
+                "workflow": str(tool_call.workflow_id),
+                "tool_name": tool_call.tool_name,
+                "step": tool_call.step,
+                "end_user_id": tool_call.end_user_id or "",
+                "additional_data": tool_call.additional_data,
+                "input": tool_call.input,
+                "output": tool_call.output,
+                "status": tool_call.status,
                 "latency_seconds": tool_call.latency_seconds,
             },
             headers={

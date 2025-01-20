@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import stat
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
-from portia.storage import ToolCallRecord, ToolCallState, ToolCallStorage
+from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
 from portia.tool import Tool
 
 if TYPE_CHECKING:
@@ -52,7 +53,7 @@ class ToolCallWrapper(Tool):
             step=self._workflow.current_step_index,
             end_user_id=ctx.end_user_id,
             additional_data=ctx.additional_data,
-            outcome=ToolCallState.IN_PROGRESS,
+            status=ToolCallStatus.IN_PROGRESS,
         )
         start_time = datetime.now(tz=UTC)
         try:
@@ -60,15 +61,15 @@ class ToolCallWrapper(Tool):
         except Exception as e:
             record.output = e
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
-            record.outcome = ToolCallState.FAILED
+            record.status = ToolCallStatus.FAILED
             self._storage.save_tool_call(record)
             raise
         else:
             record.output = output
             if isinstance(output, Clarification):
-                record.outcome = ToolCallState.NEED_CLARIFICATION
+                record.status = ToolCallStatus.NEED_CLARIFICATION
             else:
-                record.outcome = ToolCallState.SUCCESS
+                record.status = ToolCallStatus.SUCCESS
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             self._storage.save_tool_call(record)
         return output

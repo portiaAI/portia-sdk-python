@@ -1,12 +1,11 @@
 """Tests for the ToolCallWrapper class."""
 
-
 import pytest
 
 from portia.clarification import Clarification
 from portia.context import get_execution_context
 from portia.errors import ToolHardError
-from portia.storage import ToolCallRecord, ToolCallState, ToolCallStorage
+from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool, get_test_workflow
@@ -51,7 +50,7 @@ def test_tool_call_wrapper_run_success(mock_tool: Tool, mock_storage: MockStorag
     ctx = get_execution_context()
     result = wrapper.run(ctx, 1, 2)
     assert result == 3
-    assert mock_storage.records[-1].outcome == ToolCallState.SUCCESS
+    assert mock_storage.records[-1].status == ToolCallStatus.SUCCESS
 
 
 def test_tool_call_wrapper_run_with_exception(
@@ -64,7 +63,7 @@ def test_tool_call_wrapper_run_with_exception(
     ctx = get_execution_context()
     with pytest.raises(ToolHardError, match="Test error"):
         wrapper.run(ctx, "Test error", False, False)  # noqa: FBT003
-    assert mock_storage.records[-1].outcome == ToolCallState.FAILED
+    assert mock_storage.records[-1].status == ToolCallStatus.FAILED
 
 
 def test_tool_call_wrapper_run_with_clarification(
@@ -78,7 +77,7 @@ def test_tool_call_wrapper_run_with_clarification(
     ctx.additional_data["raise_clarification"] = "True"
     result = wrapper.run(ctx, "new clarification")
     assert isinstance(result, Clarification)
-    assert mock_storage.records[-1].outcome == ToolCallState.NEED_CLARIFICATION
+    assert mock_storage.records[-1].status == ToolCallStatus.NEED_CLARIFICATION
 
 
 def test_tool_call_wrapper_run_records_latency(mock_tool: Tool, mock_storage: MockStorage) -> None:
