@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
@@ -14,16 +13,12 @@ from portia.clarification import (
     InputClarification,
     MultiChoiceClarification,
 )
+from portia.common import PortiaEnum
 from portia.context import ExecutionContext, empty_context
 
 
-class WorkflowState(str, Enum):
+class WorkflowState(PortiaEnum):
     """Progress of the Workflow."""
-
-    @classmethod
-    def enumerate(cls) -> tuple[tuple[str, str], ...]:
-        """Return a tuple of all choices as (name, value) pairs."""
-        return tuple((x.name, x.value) for x in cls)
 
     NOT_STARTED = "NOT_STARTED"
     IN_PROGRESS = "IN_PROGRESS"

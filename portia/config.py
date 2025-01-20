@@ -154,7 +154,7 @@ class Config(BaseModel):
     """General configuration for the library."""
 
     # Portia Cloud Options
-    portia_api_endpoint: str = os.getenv("PORTIA_API_ENDPOINT") or "https://api.porita.dev"
+    portia_api_endpoint: str = "http://localhost:8080"
     portia_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
     )
