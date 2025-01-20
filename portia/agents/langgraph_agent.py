@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING, Literal
 
 from langgraph.graph import END, MessagesState
 
-from portia.agents.base_agent import BaseAgent, Tool
+from portia.agents.base_agent import BaseAgent
 
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.plan import Step
+    from portia.tool import Tool
     from portia.workflow import Workflow
 
 class LanggraphAgent(BaseAgent):
