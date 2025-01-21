@@ -76,16 +76,10 @@ class LoggerManager:
             )
 
 
-class LoggerProxy:
-    """Wrap the logging property to ensure dynamic resolution."""
-
-    def __getattr__(self, name: str) -> LoggerInterface:
-        """Delegate attribute access to the current logger."""
-        return getattr(logger_manager.logger, name)
-
-
 # expose manager to allow updating logger
 logger_manager = LoggerManager()
 
-# Expose logger via proxy
-logger = LoggerProxy()
+
+def logger() -> LoggerInterface:
+    """Return active logger."""
+    return logger_manager.logger

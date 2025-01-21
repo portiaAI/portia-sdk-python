@@ -188,7 +188,7 @@ class PortiaCloudStorage(Storage):
         """Validate response from Portia API."""
         if not response.is_success:
             error_str = str(response.content)
-            logger.error(f"Error from Portia Cloud: {error_str}")
+            logger().error(f"Error from Portia Cloud: {error_str}")
             raise StorageError(error_str)
 
     def save_plan(self, plan: Plan) -> None:

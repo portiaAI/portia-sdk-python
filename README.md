@@ -138,7 +138,7 @@ class AdditionTool(Tool):
     """Adds two numbers."""
     def run(self, a: float, b: float) -> float | InputClarification:
         """Add the numbers."""
-        logger.debug(f"Adding {a} and {b}")
+        logger().debug(f"Adding {a} and {b}")
         return a + b
 
 ```

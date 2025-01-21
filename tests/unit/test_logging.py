@@ -2,7 +2,6 @@
 
 from unittest.mock import Mock
 
-from portia import logger
 from portia.config import LogLevel
 from portia.logger import LoggerInterface, LoggerManager, logger, logger_manager
 
@@ -82,9 +81,9 @@ def test_configure_from_config_custom_logger() -> None:
     )
 
 
-def test_logger_proxy() -> None:
+def test_logger() -> None:
     """Test the LoggerProxy provides access to the current logger."""
     mock_logger = Mock(spec=LoggerInterface)
     logger_manager.set_logger(mock_logger)
 
-    assert logger.info == mock_logger.info
+    assert logger() == mock_logger
