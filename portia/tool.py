@@ -273,6 +273,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             raise ToolHardError(e) from e
         else:
             try:
+                print(response.json())
                 output = Output.model_validate(response.json()["output"])
                 # Handle Tool Errors
                 if isinstance(output.value, str):
