@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from httpx import Response
 from pydantic import SecretStr
 
 from portia.context import empty_context, get_execution_context
@@ -86,13 +87,83 @@ def test_tool_serialization() -> None:
     AdditionTool().model_dump_json()
 
 
-def test_remote_tool_hard_error() -> None:
+def test_remote_tool_hard_error_from_server() -> None:
     """Test http errors come back to hard errors."""
     mock_response = MagicMock()
-    mock_response.is_success = False
-    mock_response.content = b"An error occurred."
+    mock_response.raise_for_status = MagicMock(
+        side_effect=Exception(),
+    )
+    mock_response.json = MagicMock(
+        return_value={"output": {"value": "An error occurred."}},
+    )
     with (
-        patch("httpx.post", return_value={mock_response}) as mock_post,
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+        with pytest.raises(ToolHardError):
+            tool.run(empty_context())
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_soft_error() -> None:
+    """Test remote soft errors come back to soft errors."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={"output": {"value": "ToolSoftError: An error occurred."}},
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+        with pytest.raises(ToolSoftError):
+            tool.run(empty_context())
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_hard_error() -> None:
+    """Test remote hard errors come back to hard errors."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={"output": {"value": "ToolHardError: An error occurred."}},
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
     ):
         tool = PortiaRemoteTool(
             id="test",
