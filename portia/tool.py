@@ -11,7 +11,7 @@ import json
 import time
 from abc import abstractmethod
 from functools import partial
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, Self
 
 import httpx
 from langchain_core.tools import StructuredTool
@@ -99,13 +99,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Run the Tool function and generate an Output object with descriptions."""
         args_dict = {f"{i}": arg for i, arg in enumerate(args)}
         data = {**args_dict, **kwargs}
-        logger.info(f"Invoking: {self.name} with {data} and context {ctx}")
+        logger().info(f"Invoking: {self.name} with {data} and context {ctx}")
         start_time = time.time()
 
         try:
             output = self.run(ctx, *args, **kwargs)
         except Exception as e:
-            logger.error(f"Tool: {self.name} returned error {e}")
+            logger().error(f"Tool: {self.name} returned error {e}")
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
@@ -113,8 +113,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise
         else:
             execution_time = time.time() - start_time
-            logger.debug(f"Tool {self.name} executed in {execution_time:.2f} seconds")
-            logger.info("Tool output: {output}", output=output)
+            logger().debug(f"Tool {self.name} executed in {execution_time:.2f} seconds")
+            logger().info("Tool output: {output}", output=output)
 
         # handle clarifications cleanly
         if isinstance(output, Clarification) or (
@@ -146,7 +146,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def _generate_tool_description(self) -> str:
         """Generate tool descriptions."""
         args = []
-        args_description = []
         args_name_description_dict = []
         out_type = self.output_schema[0]
         out_description = self.output_schema[1]
@@ -155,14 +154,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             arg_dict = {
                 "name": arg,
                 "type": attribute.get("type", None),
-                "description": attribute.get("description", None),
                 "required": arg in schema.get("required", []),
             }
             args_name_description_dict.append(arg_dict)
             if "type" in attribute:
                 args.append(f"{arg}: '{attribute['type']}'")
-            if "description" in attribute:
-                args_description.append(f"{arg}: '{attribute['description']}")
 
         description = self.description.replace("\n", " ")
         overview = f"{self.name.replace(' ', '_')}({', '.join(args)})"
@@ -183,7 +179,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         )
 
     @model_validator(mode="after")
-    def check_description_length(self) -> Tool:
+    def check_description_length(self) -> Self:
         """Check that the description is less than 1024 characters."""
         # OpenAI has a max function description length of 1024 characters.
         description_length = len(self._generate_tool_description())
@@ -238,6 +234,43 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     api_key: SecretStr
     api_endpoint: str
 
+    def parse_response(self, response: dict[str, Any]) -> Output:
+        """Parse a JSON response into domain models/errors."""
+        output = Output.model_validate(response["output"])
+        # Handle Tool Errors
+        if isinstance(output.value, str):
+            if "ToolSoftError" in output.value:
+                raise ToolSoftError(output.value)
+            if "ToolHardError" in output.value:
+                raise ToolHardError(output.value)
+        # Handle Clarifications
+        if isinstance(output.value, list) and output.value and "type" in output.value[0]:
+            clarification = output.value[0]
+            match clarification["type"]:
+                case "Action Clarification":
+                    return Output(
+                        value=ActionClarification(
+                            action_url=HttpUrl(clarification["action_url"]),
+                            user_guidance=clarification["user_guidance"],
+                        ),
+                    )
+                case "Input Clarification":
+                    return Output(
+                        value=InputClarification(
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                        ),
+                    )
+                case "Multi Choice Clarification":
+                    return Output(
+                        value=MultiChoiceClarification(
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                            options=clarification["options"],
+                        ),
+                    )
+        return output
+
     def run(
         self,
         ctx: ExecutionContext,
@@ -268,33 +301,17 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 timeout=60,
             )
             response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            logger().error(f"Error from Portia Cloud: {e.response.content}")
+            raise ToolHardError(e) from e
         except Exception as e:
-            logger.error(f"Error from Portia Cloud: {e}")
+            logger().error(f"Unhandled error from Portia Cloud: {e}")
             raise ToolHardError(e) from e
         else:
             try:
-                output = Output.model_validate(response.json()["output"])
-                if isinstance(output.value, list) and output.value and "type" in output.value[0]:
-                    clarification = output.value[0]
-                    match clarification["type"]:
-                        case "Action Clarification":
-                            return ActionClarification(
-                                action_url=HttpUrl(clarification["action_url"]),
-                                user_guidance=clarification["user_guidance"],
-                            )
-                        case "Input Clarification":
-                            return InputClarification(
-                                argument_name=clarification["argument_name"],
-                                user_guidance=clarification["user_guidance"],
-                            )
-                        case "Multi Choice Clarification":
-                            return MultiChoiceClarification(
-                                argument_name=clarification["argument_name"],
-                                user_guidance=clarification["user_guidance"],
-                                options=clarification["options"],
-                            )
+                output = self.parse_response(response.json())
             except (ValidationError, KeyError) as e:
-                logger.error(f"Error parsing response from Portia Cloud: {e}")
+                logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e
             else:
-                return output.value  # type: ignore  # noqa: PGH003
+                return output.value

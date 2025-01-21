@@ -188,7 +188,7 @@ class PortiaCloudStorage(Storage):
         """Validate response from Portia API."""
         if not response.is_success:
             error_str = str(response.content)
-            logger.error(f"Error from Portia Cloud: {error_str}")
+            logger().error(f"Error from Portia Cloud: {error_str}")
             raise StorageError(error_str)
 
     def save_plan(self, plan: Plan) -> None:
@@ -236,8 +236,8 @@ class PortiaCloudStorage(Storage):
                 "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
                 "state": workflow.state,
-                "execution_context": workflow.execution_context,
-                "outputs": workflow.outputs,
+                "execution_context": workflow.execution_context.model_dump(mode="json"),
+                "outputs": workflow.outputs.model_dump(mode="json"),
                 "plan_id": str(workflow.plan_id),
             },
             headers={
@@ -252,8 +252,8 @@ class PortiaCloudStorage(Storage):
                 json={
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
-                    "execution_context": workflow.execution_context,
-                    "outputs": workflow.outputs,
+                    "execution_context": workflow.execution_context.model_dump(mode="json"),
+                    "outputs": workflow.outputs.model_dump(mode="json"),
                     "plan_id": str(workflow.plan_id),
                 },
                 headers={

@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Generic
+from typing import Generic, Self
 from uuid import UUID, uuid4
 
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     HttpUrl,
     field_serializer,
@@ -26,8 +25,6 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     - That one argument provided for a tool is missing and the user needs to provide it.
     - That the user has given an input that is not allowed and needs to choose from a list.
     """
-
-    model_config = ConfigDict(extra="forbid")
 
     id: UUID = Field(
         default_factory=uuid4,
@@ -102,11 +99,9 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     options: list[str]
 
     @model_validator(mode="after")
-    def validate_response(
-        self,
-    ) -> MultiChoiceClarification:
+    def validate_response(self) -> Self:
         """Ensure provided response is an option."""
-        if self.response not in self.options:
+        if self.resolved and self.response not in self.options:
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
