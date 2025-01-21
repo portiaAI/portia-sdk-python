@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Generic, Self
+from typing import Generic, Self, Union
 from uuid import UUID, uuid4
 
 from pydantic import (
@@ -119,3 +119,14 @@ class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR
     def resolve(self, response: str | None) -> None:  # noqa: ARG002
         """Resolve the clarification but don't update the response."""
         self.resolved = True
+
+
+ClarificationListType = list[
+    Union[
+        Clarification,
+        InputClarification,
+        ActionClarification,
+        MultiChoiceClarification,
+        ValueConfirmationClarification,
+    ]
+]

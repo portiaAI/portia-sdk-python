@@ -118,8 +118,6 @@ def test_workflow_serialization() -> None:
     # check we can also serialize to JSON
     json_str = workflow.model_dump_json()
     # parse back to workflow
-    print(json_str)
     parsed_workflow = Workflow.model_validate_json(json_str)
     # ensure clarification types are maintained
-    print(parsed_workflow.outputs.clarifications[0])
     assert isinstance(parsed_workflow.outputs.clarifications[0], InputClarification)
