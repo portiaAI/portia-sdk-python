@@ -238,6 +238,43 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     api_key: SecretStr
     api_endpoint: str
 
+    def parse_response(self, response: dict[str, Any]) -> Output:
+        """Parse a JSON response into domain models/errors."""
+        output = Output.model_validate(response["output"])
+        # Handle Tool Errors
+        if isinstance(output.value, str):
+            if "ToolSoftError" in output.value:
+                raise ToolSoftError(output.value)
+            if "ToolHardError" in output.value:
+                raise ToolHardError(output.value)
+        # Handle Clarifications
+        if isinstance(output.value, list) and output.value and "type" in output.value[0]:
+            clarification = output.value[0]
+            match clarification["type"]:
+                case "Action Clarification":
+                    return Output(
+                        value=ActionClarification(
+                            action_url=HttpUrl(clarification["action_url"]),
+                            user_guidance=clarification["user_guidance"],
+                        ),
+                    )
+                case "Input Clarification":
+                    return Output(
+                        value=InputClarification(
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                        ),
+                    )
+                case "Multi Choice Clarification":
+                    return Output(
+                        value=MultiChoiceClarification(
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                            options=clarification["options"],
+                        ),
+                    )
+        return output
+
     def run(
         self,
         ctx: ExecutionContext,
@@ -273,34 +310,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             raise ToolHardError(e) from e
         else:
             try:
-                print(response.json())
-                output = Output.model_validate(response.json()["output"])
-                # Handle Tool Errors
-                if isinstance(output.value, str):
-                    if "ToolSoftError" in output.value:
-                        raise ToolSoftError(output.value)
-                    if "ToolHardError" in output.value:
-                        raise ToolHardError(output.value)
-                # Handle Clarifications
-                if isinstance(output.value, list) and output.value and "type" in output.value[0]:
-                    clarification = output.value[0]
-                    match clarification["type"]:
-                        case "Action Clarification":
-                            return ActionClarification(
-                                action_url=HttpUrl(clarification["action_url"]),
-                                user_guidance=clarification["user_guidance"],
-                            )
-                        case "Input Clarification":
-                            return InputClarification(
-                                argument_name=clarification["argument_name"],
-                                user_guidance=clarification["user_guidance"],
-                            )
-                        case "Multi Choice Clarification":
-                            return MultiChoiceClarification(
-                                argument_name=clarification["argument_name"],
-                                user_guidance=clarification["user_guidance"],
-                                options=clarification["options"],
-                            )
+                output = self.parse_response(response.json())
             except (ValidationError, KeyError) as e:
                 logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e

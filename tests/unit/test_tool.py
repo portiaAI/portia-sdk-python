@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from httpx import HTTPStatusError, Response
 import pytest
+from httpx import Response
 from pydantic import SecretStr
 
 from portia.context import empty_context, get_execution_context
