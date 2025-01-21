@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 from portia import logger
 from portia.config import LogLevel
-from portia.logger import LoggerInterface, LoggerManager, logger, logger_manager
+from portia.logger import LoggerInterface, LoggerManager, logger_manager
 
 
 def test_logger_manager_initialization() -> None:
