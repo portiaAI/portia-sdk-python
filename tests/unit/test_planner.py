@@ -121,7 +121,7 @@ def test_render_prompt() -> None:
     assert "$plan_input1" in response_match
     assert "$plan_output1" in response_match
 
-    assert "Takes two float and adds them together" in tools_content
+    assert "Takes two numbers and adds them together" in tools_content
     assert "Add Tool" in tools_content
 
     assert "test query" in request_content
