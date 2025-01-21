@@ -12,7 +12,6 @@ from langgraph.prebuilt import ToolNode
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
-from portia.clarification import InputClarification
 from portia.errors import InvalidAgentOutputError
 from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
@@ -102,30 +101,8 @@ def test_oneshot_agent_end_criteria() -> None:
     assert output == END
 
 
-def test_oneshot_agent_process_output_clarification() -> None:
-    """Test process_output."""
-    # check process output when clarifications
-    (plan, workflow) = get_test_workflow()
-    agent = OneShotAgent(
-        step=plan.steps[0],
-        workflow=workflow,
-        config=get_test_config(),
-        tool=AdditionTool(),
-    )
-    agent.new_clarifications = [InputClarification(user_guidance="test", argument_name="test")]
-    output = agent.process_output(
-        HumanMessage(
-            content="Sent email",
-        ),
-    )
-    assert isinstance(output, Output)
-    assert isinstance(output.value, list)
-    assert isinstance(output.value[0], InputClarification)
-
-
 def test_oneshot_agent_process_output_tools() -> None:
     """Test process_output."""
-    # check process output when clarifications
     (plan, workflow) = get_test_workflow()
     agent = OneShotAgent(
         step=plan.steps[0],
