@@ -14,14 +14,13 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.agent_execution_manager import AgentExecutionManager, AgentNode
+from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.llms.summarizer import LLMSummarizer
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.workflow import Workflow
-
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -140,7 +139,7 @@ class OneShotAgent(BaseAgent):
         workflow.add_node(AgentNode.TOOLS, tool_node)
         workflow.add_node(AgentNode.SUMMARIZER, LLMSummarizer(llm).invoke)
         workflow.add_edge(START, AgentNode.TOOL_AGENT)
-        
+
         # Use execution manager for state transitions
         workflow.add_conditional_edges(
             AgentNode.TOOL_AGENT,
@@ -151,8 +150,8 @@ class OneShotAgent(BaseAgent):
             self.execution_manager.next_state_after_tool_call,
         )
         workflow.add_edge(AgentNode.SUMMARIZER, END)
-        
+
         app = workflow.compile()
         invocation_result = app.invoke({"messages": []})
-        
+
         return self.execution_manager.process_output(invocation_result["messages"][-1])

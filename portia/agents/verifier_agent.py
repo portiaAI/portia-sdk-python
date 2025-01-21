@@ -8,14 +8,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.agent_execution_manager import AgentExecutionManager, AgentNode
+from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.llms.summarizer import LLMSummarizer
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
@@ -23,8 +23,6 @@ from portia.context import get_execution_context
 from portia.errors import (
     InvalidAgentOutputError,
     InvalidWorkflowStateError,
-    ToolFailedError,
-    ToolRetryError,
 )
 from portia.llm_wrapper import LLMWrapper
 
@@ -309,7 +307,10 @@ class VerifierAgent(BaseAgent):
         self.new_clarifications: list[Clarification] = []
         self.execution_manager = AgentExecutionManager(tool)
 
-    def clarifications_or_continue(self, state: MessagesState) -> Literal[AgentNode.TOOL_AGENT, END]:  # type: ignore  # noqa: PGH003
+    def clarifications_or_continue(
+        self,
+        state: MessagesState,
+    ) -> Literal[AgentNode.TOOL_AGENT, END]:  # type: ignore  # noqa: PGH003
         """Determine if we should continue with the tool call or request clarifications instead."""
         messages = state["messages"]
         last_message = messages[-1]
@@ -414,11 +415,20 @@ class VerifierAgent(BaseAgent):
 
         workflow.add_node(AgentNode.TOOLS, tool_node)
         workflow.add_node(AgentNode.SUMMARIZER, LLMSummarizer(llm).invoke)
-        workflow.add_conditional_edges(AgentNode.TOOLS, self.execution_manager.next_state_after_tool_call)
-        workflow.add_conditional_edges(AgentNode.TOOL_AGENT, self.execution_manager.tool_call_or_end)
+        workflow.add_conditional_edges(
+            AgentNode.TOOLS,
+            self.execution_manager.next_state_after_tool_call,
+        )
+        workflow.add_conditional_edges(
+            AgentNode.TOOL_AGENT,
+            self.execution_manager.tool_call_or_end,
+        )
         workflow.add_edge(AgentNode.SUMMARIZER, END)
 
         app = workflow.compile()
 
         invocation_result = app.invoke({"messages": []})
-        return self.execution_manager.process_output(invocation_result["messages"][-1], self.new_clarifications)
+        return self.execution_manager.process_output(
+            invocation_result["messages"][-1],
+            self.new_clarifications,
+        )

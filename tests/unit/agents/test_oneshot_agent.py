@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langgraph.graph import END
+if TYPE_CHECKING:
+    import pytest
+
+from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
-from portia.clarification import InputClarification
-from portia.errors import InvalidAgentOutputError
 from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
 

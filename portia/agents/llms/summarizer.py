@@ -60,7 +60,7 @@ class LLMSummarizer:
         ):
             return {"messages": [last_message]}
 
-        logger.debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
+        logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
         tool_output = last_message.content
         model = self.llm.with_structured_output(SummarizerOutput)
         try:
@@ -73,6 +73,6 @@ class LLMSummarizer:
             summary = SummarizerOutput.model_validate(summary)
             last_message.artifact.summary = summary.summary
         except Exception as e:  # noqa: BLE001 - we want to catch all exceptions
-            logger.error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
+            logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
 
         return {"messages": [last_message]}

@@ -5,16 +5,22 @@ It is a wrapper around the BaseAgent class that provides common utilities for La
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
-from langchain_core.messages import BaseMessage, ToolMessage, HumanMessage
+from typing import TYPE_CHECKING, Literal
+
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
+
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.tool import Tool
+
+if TYPE_CHECKING:
+    from portia.tool import Tool
+
 
 class AgentNode(str, Enum):
     """States for agent execution."""
+
     TOOL_AGENT = "tool_agent"
     SUMMARIZER = "summarizer"
     TOOLS = "tools"
@@ -23,10 +29,11 @@ class AgentNode(str, Enum):
 
 class AgentExecutionManager:
     """Manages agent execution, including state transitions and output processing."""
-    
+
     MAX_RETRIES = 4
 
     def __init__(self, tool: Tool | None = None) -> None:
+        """Initialize the agent execution manager."""
         self.tool = tool
 
     def next_state_after_tool_call(
@@ -63,13 +70,17 @@ class AgentExecutionManager:
             return AgentNode.TOOLS
         return END
 
-    def process_output(self, last_message: BaseMessage, clarifications: list[Clarification] = []) -> Output:
+    def process_output(
+        self,
+        last_message: BaseMessage,
+        clarifications: list[Clarification] | None = None,
+    ) -> Output:
         """Process the output of the agent."""
         if "ToolSoftError" in last_message.content and self.tool:
             raise ToolRetryError(self.tool.name, str(last_message.content))
         if "ToolHardError" in last_message.content and self.tool:
             raise ToolFailedError(self.tool.name, str(last_message.content))
-        if len(clarifications) > 0:
+        if clarifications and len(clarifications) > 0:
             return Output[list[Clarification]](
                 value=clarifications,
             )
@@ -84,4 +95,3 @@ class AgentExecutionManager:
         if isinstance(last_message, HumanMessage):
             return Output(value=last_message.content)
         raise InvalidAgentOutputError(str(last_message.content))
-    

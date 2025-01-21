@@ -1,6 +1,7 @@
 """Test agent execution manager."""
 from __future__ import annotations
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
@@ -72,12 +73,12 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
 def test_should_continue_tool_execution() -> None:
     """Test should_continue_tool_execution state transitions."""
     manager = AgentExecutionManager()
-    
+
     message_with_calls = AIMessage(content="test")
-    state_with_calls: MessagesState = {"messages": [message_with_calls]}  # type: ignore
-    
+    state_with_calls: MessagesState = {"messages": [message_with_calls]}  # type: ignore  # noqa: PGH003
+
     message_without_calls = HumanMessage(content="test")
-    state_without_calls: MessagesState = {"messages": [message_without_calls]}  # type: ignore
+    state_without_calls: MessagesState = {"messages": [message_without_calls]}  # type: ignore  # noqa: PGH003
 
     assert manager.tool_call_or_end(state_with_calls) == AgentNode.TOOLS
     assert manager.tool_call_or_end(state_without_calls) == END
@@ -89,7 +90,7 @@ def test_process_output_with_clarifications() -> None:
     clarifications = [InputClarification(argument_name="test", user_guidance="test")]
     message = HumanMessage(content="test")
 
-    result = manager.process_output(message, clarifications)
+    result = manager.process_output(message, clarifications)  # type: ignore  # noqa: PGH003
 
     assert isinstance(result, Output)
     assert result.value == clarifications
@@ -99,21 +100,16 @@ def test_process_output_with_tool_errors() -> None:
     """Test process_output with tool errors."""
     tool = AdditionTool()
     manager = AgentExecutionManager(tool)
-    
+
     soft_error = ToolMessage(content="ToolSoftError: test", tool_call_id="1", name="test")
     hard_error = ToolMessage(content="ToolHardError: test", tool_call_id="1", name="test")
 
-    try:
+    with pytest.raises(ToolRetryError):
         manager.process_output(soft_error)
-        assert False, "Should have raised ToolRetryError"
-    except ToolRetryError:
-        pass
 
-    try:
+    with pytest.raises(ToolFailedError):
         manager.process_output(hard_error)
-        assert False, "Should have raised ToolFailedError"
-    except ToolFailedError:
-        pass
+
 
 
 def test_process_output_with_invalid_message() -> None:
@@ -121,8 +117,5 @@ def test_process_output_with_invalid_message() -> None:
     manager = AgentExecutionManager()
     invalid_message = AIMessage(content="test")
 
-    try:
+    with pytest.raises(InvalidAgentOutputError):
         manager.process_output(invalid_message)
-        assert False, "Should have raised InvalidAgentOutputError"
-    except InvalidAgentOutputError:
-        pass 
