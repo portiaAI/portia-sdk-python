@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessModel
 from portia.agents.verifier_agent import (
+    MAX_RETRIES,
     ParserModel,
     ToolArgument,
     ToolCallingModel,
@@ -172,8 +173,22 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    with pytest.raises(InvalidAgentOutputError):
-        parser_model.invoke({})  # type: ignore  # noqa: PGH003
+
+    # Track number of invoke calls
+    invoke_count = 0
+    original_invoke = parser_model.invoke
+
+    def counted_invoke(*args, **kwargs) -> dict[str, Any]:  # noqa: ANN002, ANN003
+        nonlocal invoke_count
+        invoke_count += 1
+        return original_invoke(*args, **kwargs)
+
+    parser_model.invoke = counted_invoke
+
+    parser_model.invoke({})  # type: ignore  # noqa: PGH003
+
+    # Initial invoke call is not counted towards the MAX_RETRIES
+    assert invoke_count == MAX_RETRIES + 1
 
 
 def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:

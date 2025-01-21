@@ -5,10 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from portia.clarification import (
-    ArgumentClarification,
-    Clarification,
-)
+from portia.clarification import ArgumentClarification, ClarificationListType
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import Output
@@ -74,7 +71,7 @@ def generate_input_context(
     return input_context
 
 
-def generate_clarification_context(clarifications: list[Clarification], step: int) -> list[str]:
+def generate_clarification_context(clarifications: ClarificationListType, step: int) -> list[str]:
     """Generate context from clarifications."""
     clarification_context = []
     # It's important we distinguish between clarifications for the current step where we really

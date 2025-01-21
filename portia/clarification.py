@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Generic, Self
+from typing import Generic, Self, Union
 from uuid import UUID, uuid4
 
 from pydantic import (
@@ -101,7 +101,7 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     @model_validator(mode="after")
     def validate_response(self) -> Self:
         """Ensure provided response is an option."""
-        if self.response not in self.options:
+        if self.resolved and self.response not in self.options:
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
@@ -119,3 +119,14 @@ class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR
     def resolve(self, response: str | None) -> None:  # noqa: ARG002
         """Resolve the clarification but don't update the response."""
         self.resolved = True
+
+
+ClarificationListType = list[
+    Union[
+        Clarification,
+        InputClarification,
+        ActionClarification,
+        MultiChoiceClarification,
+        ValueConfirmationClarification,
+    ]
+]

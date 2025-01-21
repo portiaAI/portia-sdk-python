@@ -151,7 +151,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def _generate_tool_description(self) -> str:
         """Generate tool descriptions."""
         args = []
-        args_description = []
         args_name_description_dict = []
         out_type = self.output_schema[0]
         out_description = self.output_schema[1]
@@ -160,14 +159,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             arg_dict = {
                 "name": arg,
                 "type": attribute.get("type", None),
-                "description": attribute.get("description", None),
                 "required": arg in schema.get("required", []),
             }
             args_name_description_dict.append(arg_dict)
             if "type" in attribute:
                 args.append(f"{arg}: '{attribute['type']}'")
-            if "description" in attribute:
-                args_description.append(f"{arg}: '{attribute['description']}")
 
         description = self.description.replace("\n", " ")
         overview = f"{self.name.replace(' ', '_')}({', '.join(args)})"
