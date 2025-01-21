@@ -101,7 +101,7 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     @model_validator(mode="after")
     def validate_response(self) -> Self:
         """Ensure provided response is an option."""
-        if self.response not in self.options:
+        if self.resolved and self.response not in self.options:
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
