@@ -24,7 +24,7 @@ class SummarizerOutput(BaseModel):
         description="Summary of the textual output of the tool",
     )
 
-class SummarizerModel:
+class LLMSummarizer:
     """Model to generate a summary for the textual output of a tool.
 
     This model is used only on the tool output message.

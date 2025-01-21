@@ -14,9 +14,9 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from portia.agents.base_agent import Output
-from portia.agents.langgraph_agent import LanggraphAgent
-from portia.agents.models.summarizer_model import SummarizerModel
+from portia.agents.base_agent import BaseAgent, Output
+from portia.agents.agent_execution_manager import AgentExecutionManager, AgentNode
+from portia.agents.llms.summarizer import LLMSummarizer
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
 from portia.context import get_execution_context
@@ -157,7 +157,7 @@ class ParserModel:
             err = str(e)
             self.previous_errors.append(err)
             self.retries += 1
-            if self.retries <= LanggraphAgent.MAX_RETRIES:
+            if self.retries <= AgentExecutionManager.MAX_RETRIES:
                 return self.invoke(state)
             raise InvalidAgentOutputError(err) from e
 
@@ -278,7 +278,7 @@ class ToolCallingModel:
         return {"messages": [response]}
 
 
-class VerifierAgent(LanggraphAgent):
+class VerifierAgent(BaseAgent):
     """Agent responsible for achieving a task by using verification.
 
     This agent does the following things:
@@ -307,21 +307,9 @@ class VerifierAgent(LanggraphAgent):
         super().__init__(step, workflow, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
+        self.execution_manager = AgentExecutionManager(tool)
 
-    @staticmethod
-    def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should continue or not.
-
-        This is only to catch issues when the agent does not figure out how to use the tool
-        to achieve the goal.
-        """
-        last_message = state["messages"][-1]
-        if hasattr(last_message, "tool_calls"):
-            return "tools"
-        return END
-
-
-    def clarifications_or_continue(self, state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
+    def clarifications_or_continue(self, state: MessagesState) -> Literal[AgentNode.TOOL_AGENT, END]:  # type: ignore  # noqa: PGH003
         """Determine if we should continue with the tool call or request clarifications instead."""
         messages = state["messages"]
         last_message = messages[-1]
@@ -339,11 +327,11 @@ class VerifierAgent(LanggraphAgent):
                         user_guidance=f"Missing Argument: {arg.name}",
                     ),
                 )
-        if len(self.new_clarifications) > 0:
+        if self.new_clarifications:
             return END
 
         state.update({"messages": [arguments.model_dump_json(indent=2)]})  # type: ignore  # noqa: PGH003
-        return "tool_agent"
+        return AgentNode.TOOL_AGENT
 
     def get_last_resolved_clarification(
         self,
@@ -359,29 +347,6 @@ class VerifierAgent(LanggraphAgent):
             ):
                 matching_clarification = clarification
         return matching_clarification
-
-    def process_output(self, last_message: BaseMessage) -> Output:
-        """Process the output of the agent."""
-        if "ToolSoftError" in last_message.content and self.tool:
-            raise ToolRetryError(self.tool.name, str(last_message.content))
-        if "ToolHardError" in last_message.content and self.tool:
-            raise ToolFailedError(self.tool.name, str(last_message.content))
-        if len(self.new_clarifications) > 0:
-            return Output[list[Clarification]](
-                value=self.new_clarifications,
-                summary="Clarifications requested please resolve them before retrying.",
-            )
-        if isinstance(last_message, ToolMessage):
-            if last_message.artifact and isinstance(last_message.artifact, Output):
-                tool_output = last_message.artifact
-            elif last_message.artifact:
-                tool_output = Output(value=last_message.artifact)
-            else:
-                tool_output = Output(value=last_message.content)
-            return tool_output
-        if isinstance(last_message, HumanMessage):
-            return Output(value=last_message.content)
-        raise InvalidAgentOutputError(str(last_message.content))
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
@@ -434,26 +399,26 @@ class VerifierAgent(LanggraphAgent):
                 classDef last fill:#bfb6fc
         """
 
-        workflow.add_node("tool_agent", ToolCallingModel(llm, context, tools, self).invoke)
+        workflow.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(llm, context, tools, self).invoke)
         if self.verified_args:
-            workflow.add_edge(START, "tool_agent")
+            workflow.add_edge(START, AgentNode.TOOL_AGENT)
         else:
-            workflow.add_node("argument_parser", ParserModel(llm, context, self).invoke)
-            workflow.add_node("argument_verifier", VerifierModel(llm, context, self).invoke)
-            workflow.add_edge(START, "argument_parser")
-            workflow.add_edge("argument_parser", "argument_verifier")
+            workflow.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(llm, context, self).invoke)
+            workflow.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(llm, context, self).invoke)
+            workflow.add_edge(START, AgentNode.ARGUMENT_PARSER)
+            workflow.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
             workflow.add_conditional_edges(
-                "argument_verifier",
+                AgentNode.ARGUMENT_VERIFIER,
                 self.clarifications_or_continue,
             )
 
-        workflow.add_node("tools", tool_node)
-        workflow.add_node("summarizer", SummarizerModel(llm).invoke)
-        workflow.add_conditional_edges("tools", self.next_state_after_tool_call)
-        workflow.add_conditional_edges("tool_agent", self.call_tool_or_return)
-        workflow.add_edge("summarizer", END)
+        workflow.add_node(AgentNode.TOOLS, tool_node)
+        workflow.add_node(AgentNode.SUMMARIZER, LLMSummarizer(llm).invoke)
+        workflow.add_conditional_edges(AgentNode.TOOLS, self.execution_manager.next_state_after_tool_call)
+        workflow.add_conditional_edges(AgentNode.TOOL_AGENT, self.execution_manager.tool_call_or_end)
+        workflow.add_edge(AgentNode.SUMMARIZER, END)
 
         app = workflow.compile()
 
         invocation_result = app.invoke({"messages": []})
-        return self.process_output(invocation_result["messages"][-1])
+        return self.execution_manager.process_output(invocation_result["messages"][-1], self.new_clarifications)
