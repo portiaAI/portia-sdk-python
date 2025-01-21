@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
-from portia.clarification import Clarification
+from portia.clarification import (
+    ClarificationListType,
+)
 from portia.common import PortiaEnum
 from portia.context import ExecutionContext, empty_context
 
@@ -27,7 +29,7 @@ class WorkflowOutputs(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    clarifications: list[SerializeAsAny[Clarification]] = Field(
+    clarifications: ClarificationListType = Field(
         default=[],
         description="Any clarifications needed for this workflow.",
     )
@@ -64,7 +66,7 @@ class Workflow(BaseModel):
         description="Outputs of the workflow including clarifications.",
     )
 
-    def get_outstanding_clarifications(self) -> list[Clarification]:
+    def get_outstanding_clarifications(self) -> ClarificationListType:
         """Return all outstanding clarifications."""
         return [
             clarification

@@ -6,20 +6,20 @@ import pytest
 from pydantic import ValidationError
 
 from portia.agents.base_agent import Output
-from portia.clarification import Clarification
+from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import ReadOnlyStep, Step
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowOutputs, WorkflowState
 
 
 @pytest.fixture
-def mock_clarification() -> Clarification:
+def mock_clarification() -> InputClarification:
     """Create a mock clarification for testing."""
-    return Clarification(user_guidance="test", resolved=False)
+    return InputClarification(user_guidance="test", resolved=False, argument_name="test")
 
 
 @pytest.fixture
-def workflow(mock_clarification: Clarification) -> Workflow:
+def workflow(mock_clarification: InputClarification) -> Workflow:
     """Create a Workflow instance for testing."""
     return Workflow(
         plan_id=uuid4(),
@@ -95,6 +95,14 @@ def test_workflow_serialization() -> None:
     workflow = Workflow(
         plan_id=uuid4(),
         outputs=WorkflowOutputs(
+            clarifications=[
+                InputClarification(
+                    step=0,
+                    argument_name="test",
+                    user_guidance="help",
+                    response="yes",
+                ),
+            ],
             step_outputs={
                 "1": Output(value=ToolHardError("this is a tool hard error")),
                 "2": Output(value=ToolSoftError("this is a tool soft error")),
@@ -108,4 +116,8 @@ def test_workflow_serialization() -> None:
         f"final_output={'set' if workflow.outputs.final_output else 'unset'})"
     )
     # check we can also serialize to JSON
-    workflow.model_dump_json()
+    json_str = workflow.model_dump_json()
+    # parse back to workflow
+    parsed_workflow = Workflow.model_validate_json(json_str)
+    # ensure clarification types are maintained
+    assert isinstance(parsed_workflow.outputs.clarifications[0], InputClarification)
