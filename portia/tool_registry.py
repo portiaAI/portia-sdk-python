@@ -167,7 +167,15 @@ class PortiaToolRegistry(ToolRegistry):
         fields = {
             key: (
                 type_mapping.get(value.get("type"), Any),
-                Field(default=None) if key not in required else Field(...),
+                Field(
+                    default=None,
+                    description=value.get("description", ""),
+                )
+                if key not in required
+                else Field(
+                    ...,
+                    description=value.get("description", ""),
+                ),
             )
             for key, value in properties.items()
         }
