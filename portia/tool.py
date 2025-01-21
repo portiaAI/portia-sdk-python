@@ -315,4 +315,4 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e
             else:
-                return output.value  # type: ignore  # noqa: PGH003
+                return output.value
