@@ -7,7 +7,6 @@ import pytest
 
 from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
-from portia.open_source_tools.addition import AdditionTool
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planner import (
     Planner,
@@ -15,6 +14,7 @@ from portia.planner import (
     _default_query_system_context,
     _render_prompt_insert_defaults,
 )
+from tests.utils import AdditionTool
 
 
 @pytest.fixture
