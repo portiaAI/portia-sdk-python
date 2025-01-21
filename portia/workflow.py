@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification
+from portia.common import PortiaEnum
 from portia.context import ExecutionContext, empty_context
 
 
-class WorkflowState(str, Enum):
+class WorkflowState(PortiaEnum):
     """Progress of the Workflow."""
 
     NOT_STARTED = "NOT_STARTED"
@@ -31,8 +31,6 @@ class WorkflowOutputs(BaseModel):
         default=[],
         description="Any clarifications needed for this workflow.",
     )
-
-    outputs: dict[str, Output] = {}
 
     step_outputs: dict[str, Output] = {}
 
