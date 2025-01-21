@@ -34,7 +34,6 @@ class CalculatorTool(Tool[float]):
     def run(self, _: ExecutionContext, math_question: str) -> float:
         """Run the CalculatorTool."""
         expression = self.math_expression(math_question)
-        print(expression)
         if not expression:
             raise ToolHardError("No valid mathematical expression found in the input.")
 

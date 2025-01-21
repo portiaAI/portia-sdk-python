@@ -1,10 +1,11 @@
 """Tests for Calculator Tool."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import pytest
 
 from portia.context import ExecutionContext
-from portia.errors import ToolHardError, ToolSoftError
+from portia.errors import ToolHardError
 from portia.open_source_tools.calculator_tool import CalculatorTool
 
 
