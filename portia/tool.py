@@ -99,13 +99,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Run the Tool function and generate an Output object with descriptions."""
         args_dict = {f"{i}": arg for i, arg in enumerate(args)}
         data = {**args_dict, **kwargs}
-        logger.info(f"Invoking: {self.name} with {data} and context {ctx}")
+        logger().info(f"Invoking: {self.name} with {data} and context {ctx}")
         start_time = time.time()
 
         try:
             output = self.run(ctx, *args, **kwargs)
         except Exception as e:
-            logger.error(f"Tool: {self.name} returned error {e}")
+            logger().error(f"Tool: {self.name} returned error {e}")
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
@@ -113,8 +113,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise
         else:
             execution_time = time.time() - start_time
-            logger.debug(f"Tool {self.name} executed in {execution_time:.2f} seconds")
-            logger.info("Tool output: {output}", output=output)
+            logger().debug(f"Tool {self.name} executed in {execution_time:.2f} seconds")
+            logger().info("Tool output: {output}", output=output)
 
         # handle clarifications cleanly
         if isinstance(output, Clarification) or (
@@ -269,7 +269,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             )
             response.raise_for_status()
         except Exception as e:
-            logger.error(f"Error from Portia Cloud: {e}")
+            logger().error(f"Error from Portia Cloud: {e}")
             raise ToolHardError(e) from e
         else:
             try:
@@ -294,7 +294,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                                 options=clarification["options"],
                             )
             except (ValidationError, KeyError) as e:
-                logger.error(f"Error parsing response from Portia Cloud: {e}")
+                logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e
             else:
                 return output.value  # type: ignore  # noqa: PGH003
