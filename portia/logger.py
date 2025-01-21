@@ -76,18 +76,10 @@ class LoggerManager:
             )
 
 
-class LoggerProxy:
-    """Wrap the logging property to ensure dynamic resolution."""
-
-    @property
-    def logger(self) -> LoggerInterface:
-        """Return current logger."""
-        return logger_manager.logger
-
-
 # expose manager to allow updating logger
 logger_manager = LoggerManager()
 
-# Expose logger via proxy
-logger_proxy = LoggerProxy()
-logger = logger_proxy.logger
+
+def logger() -> LoggerInterface:
+    """Return active logger."""
+    return logger_manager.logger

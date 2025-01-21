@@ -83,7 +83,7 @@ class Runner:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
-        logger.debug(f"Running planner for query - {query}")
+        logger().debug(f"Running planner for query - {query}")
         planner = Planner(self.llm_wrapper_class(self.config))
         outcome = planner.generate_plan_or_error(
             query=query,
@@ -91,14 +91,14 @@ class Runner:
             examples=example_plans,
         )
         if outcome.error:
-            logger.error(f"Error in planning - {outcome.error}")
+            logger().error(f"Error in planning - {outcome.error}")
             raise PlanError(outcome.error)
         self.storage.save_plan(outcome.plan)
-        logger.info(
+        logger().info(
             f"Plan created with {len(outcome.plan.steps)} steps",
             extra={"plan": outcome.plan.id},
         )
-        logger.debug(
+        logger().debug(
             "Plan: {plan}",
             extra={"plan": outcome.plan.id},
             plan=outcome.plan.model_dump_json(indent=4),
@@ -152,14 +152,14 @@ class Runner:
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
         workflow.state = WorkflowState.IN_PROGRESS
         self.storage.save_workflow(workflow)
-        logger.debug(
+        logger().debug(
             f"Executing workflow from step {workflow.current_step_index}",
             extra={"plan": plan.id, "workflow": workflow.id},
         )
         for index in range(workflow.current_step_index, len(plan.steps)):
             step = plan.steps[index]
             workflow.current_step_index = index
-            logger.debug(
+            logger().debug(
                 f"Executing step {index}: {step.task}",
                 extra={"plan": plan.id, "workflow": workflow.id},
             )
@@ -170,7 +170,7 @@ class Runner:
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
                 config=self.config,
             )
-            logger.debug(
+            logger().debug(
                 f"Using agent: {type(agent)}",
                 extra={"plan": plan.id, "workflow": workflow.id},
             )
@@ -182,19 +182,19 @@ class Runner:
                 workflow.state = WorkflowState.FAILED
                 workflow.outputs.final_output = error_output
                 self.storage.save_workflow(workflow)
-                logger.error(
+                logger().error(
                     "error: {error}",
                     error=e,
                     extra={"plan": plan.id, "workflow": workflow.id},
                 )
-                logger.debug(
+                logger().debug(
                     f"Final workflow status: {workflow.state}",
                     extra={"plan": plan.id, "workflow": workflow.id},
                 )
                 return workflow
             else:
                 workflow.outputs.step_outputs[step.output] = step_output
-                logger.debug(
+                logger().debug(
                     "Step output - {output}",
                     extra={"plan": plan.id, "workflow": workflow.id},
                     output=str(step_output.value),
@@ -219,7 +219,7 @@ class Runner:
                 )
                 workflow.state = WorkflowState.NEED_CLARIFICATION
                 self.storage.save_workflow(workflow)
-                logger.info(
+                logger().info(
                     f"{len(new_clarifications)} Clarification(s) requested",
                     extra={"plan": plan.id, "workflow": workflow.id},
                 )
@@ -231,7 +231,7 @@ class Runner:
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
-            logger.debug(
+            logger().debug(
                 "New Workflow State: {workflow}",
                 extra={"plan": plan.id, "workflow": workflow.id},
                 workflow=workflow.model_dump_json(indent=4),
@@ -239,12 +239,12 @@ class Runner:
 
         workflow.state = WorkflowState.COMPLETE
         self.storage.save_workflow(workflow)
-        logger.debug(
+        logger().debug(
             f"Final workflow status: {workflow.state}",
             extra={"plan": plan.id, "workflow": workflow.id},
         )
         if workflow.outputs.final_output:
-            logger.info(
+            logger().info(
                 "{output}",
                 extra={"plan": plan.id, "workflow": workflow.id},
                 output=str(workflow.outputs.final_output.value),

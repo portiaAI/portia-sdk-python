@@ -133,7 +133,7 @@ def run(  # noqa: PLR0913
                     clarification.resolve(user_input)
                 if isinstance(clarification, ActionClarification):
                     webbrowser.open(str(clarification.action_url))
-                    logger.info("Please complete authentication to continue")
+                    logger().info("Please complete authentication to continue")
                     auth_complete = False
                     while not auth_complete:
                         user_input = input("Is Authentication Complete [Y/N]")
