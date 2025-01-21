@@ -11,7 +11,7 @@ import json
 import time
 from abc import abstractmethod
 from functools import partial
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, Self
 
 import httpx
 from langchain_core.tools import StructuredTool
@@ -183,7 +183,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         )
 
     @model_validator(mode="after")
-    def check_description_length(self) -> Tool:
+    def check_description_length(self) -> Self:
         """Check that the description is less than 1024 characters."""
         # OpenAI has a max function description length of 1024 characters.
         description_length = len(self._generate_tool_description())
