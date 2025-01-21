@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     import pytest
     from pydantic import BaseModel
 
+from portia.agents.agent_node_utils.summarizer import LLMSummarizer
 from portia.agents.base_agent import Output
-from portia.agents.llms.summarizer import LLMSummarizer, SummarizerOutput
 from portia.llm_wrapper import LLMWrapper
 from tests.utils import get_test_config
 
@@ -51,9 +51,7 @@ class MockInvoker:
 
 def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the summarizer model with valid tool message."""
-    summary = SummarizerOutput(
-        summary="Short summary",
-    )
+    summary = AIMessage(content="Short summary")
     mock_invoker = MockInvoker(response=summary)
     monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
@@ -71,7 +69,6 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
     result = summarizer_model.invoke({"messages": [tool_message]})
 
     assert mock_invoker.called
-    assert mock_invoker.output_format == SummarizerOutput
     messages: list[BaseMessage] = mock_invoker.prompt
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content

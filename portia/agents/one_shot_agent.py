@@ -14,9 +14,14 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.agents.agent_execution_manager import AgentExecutionManager, AgentNode
+from portia.agents.agent_node_utils.summarizer import LLMSummarizer
 from portia.agents.base_agent import BaseAgent, Output
-from portia.agents.llms.summarizer import LLMSummarizer
+from portia.agents.execution_utils import (
+    AgentNode,
+    next_state_after_tool_call,
+    process_output,
+    tool_call_or_end,
+)
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
@@ -109,7 +114,6 @@ class OneShotAgent(BaseAgent):
     ) -> None:
         """Initialize the agent."""
         super().__init__(step, workflow, config, tool)
-        self.execution_manager = AgentExecutionManager(tool)
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
@@ -143,15 +147,15 @@ class OneShotAgent(BaseAgent):
         # Use execution manager for state transitions
         workflow.add_conditional_edges(
             AgentNode.TOOL_AGENT,
-            self.execution_manager.tool_call_or_end,
+            tool_call_or_end,
         )
         workflow.add_conditional_edges(
             AgentNode.TOOLS,
-            self.execution_manager.next_state_after_tool_call,
+            lambda state: next_state_after_tool_call(state, self.tool),
         )
         workflow.add_edge(AgentNode.SUMMARIZER, END)
 
         app = workflow.compile()
         invocation_result = app.invoke({"messages": []})
 
-        return self.execution_manager.process_output(invocation_result["messages"][-1])
+        return process_output(invocation_result["messages"][-1], self.tool)

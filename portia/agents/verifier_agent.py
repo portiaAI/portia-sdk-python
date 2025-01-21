@@ -14,9 +14,15 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from portia.agents.agent_execution_manager import AgentExecutionManager, AgentNode
+from portia.agents.agent_node_utils.summarizer import LLMSummarizer
 from portia.agents.base_agent import BaseAgent, Output
-from portia.agents.llms.summarizer import LLMSummarizer
+from portia.agents.execution_utils import (
+    MAX_RETRIES,
+    AgentNode,
+    next_state_after_tool_call,
+    process_output,
+    tool_call_or_end,
+)
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
 from portia.context import get_execution_context
@@ -155,7 +161,7 @@ class ParserModel:
             err = str(e)
             self.previous_errors.append(err)
             self.retries += 1
-            if self.retries <= AgentExecutionManager.MAX_RETRIES:
+            if self.retries <= MAX_RETRIES:
                 return self.invoke(state)
             raise InvalidAgentOutputError(err) from e
 
@@ -305,7 +311,6 @@ class VerifierAgent(BaseAgent):
         super().__init__(step, workflow, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
-        self.execution_manager = AgentExecutionManager(tool)
 
     def clarifications_or_continue(
         self,
@@ -352,17 +357,15 @@ class VerifierAgent(BaseAgent):
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
         if not self.tool:
-            single_tool_agent = ToolLessAgent(
+            return ToolLessAgent(
                 self.step,
                 self.workflow,
                 self.config,
                 self.tool,
-            )
-            return single_tool_agent.execute_sync()
+            ).execute_sync()
 
         context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()
-
         tools = [
             self.tool.to_langchain(
                 return_artifact=True,
@@ -417,18 +420,18 @@ class VerifierAgent(BaseAgent):
         workflow.add_node(AgentNode.SUMMARIZER, LLMSummarizer(llm).invoke)
         workflow.add_conditional_edges(
             AgentNode.TOOLS,
-            self.execution_manager.next_state_after_tool_call,
+            lambda state: next_state_after_tool_call(state, self.tool),
         )
         workflow.add_conditional_edges(
             AgentNode.TOOL_AGENT,
-            self.execution_manager.tool_call_or_end,
+            tool_call_or_end,
         )
         workflow.add_edge(AgentNode.SUMMARIZER, END)
 
         app = workflow.compile()
-
         invocation_result = app.invoke({"messages": []})
-        return self.execution_manager.process_output(
+        return process_output(
             invocation_result["messages"][-1],
+            self.tool,
             self.new_clarifications,
         )

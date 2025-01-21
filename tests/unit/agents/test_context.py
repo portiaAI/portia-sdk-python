@@ -142,7 +142,7 @@ input_value: test@example.com
 input_description: Target recipient for email
 ----------
 input_name: $email_body
-input_value: value='The body of the email' summary=None
+input_value: The body of the email
 input_description: Content for email
 ----------
 input_name: $email_title
@@ -151,7 +151,7 @@ input_description: Title for email
 ----------
 Broader context: This may be useful information from previous steps that can indirectly help you.
 output_name: $london_weather
-output_value: value='rainy' summary=None
+output_value: rainy
 ----------
 This section contains the user provided response to previous tasks.
 You may use the values here if no other context is provided but should not use

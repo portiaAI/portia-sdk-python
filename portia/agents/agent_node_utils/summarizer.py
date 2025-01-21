@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
-from langchain_core.messages import ToolMessage
-from pydantic import BaseModel, Field
+from langchain_core.messages import BaseMessage, ToolMessage
 
 from portia.agents.base_agent import Output
 from portia.logger import logger
@@ -15,14 +14,6 @@ from portia.logger import logger
 if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
     from langgraph.graph import MessagesState
-
-
-class SummarizerOutput(BaseModel):
-    """Model for the structured summary output."""
-
-    summary: str = Field(
-        description="Summary of the textual output of the tool",
-    )
 
 class LLMSummarizer:
     """Model to generate a summary for the textual output of a tool.
@@ -62,16 +53,14 @@ class LLMSummarizer:
 
         logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
         tool_output = last_message.content
-        model = self.llm.with_structured_output(SummarizerOutput)
         try:
-            summary = model.invoke(
+            summary: BaseMessage = self.llm.invoke(
                 self.summarizer_prompt.format_messages(
                     tool_output=tool_output,
                     max_length=self.summary_max_length,
                 ),
             )
-            summary = SummarizerOutput.model_validate(summary)
-            last_message.artifact.summary = summary.summary
+            last_message.artifact.summary = summary.content  # type: ignore[attr-defined]
         except Exception as e:  # noqa: BLE001 - we want to catch all exceptions
             logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
 

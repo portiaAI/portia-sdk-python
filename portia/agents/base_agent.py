@@ -82,7 +82,8 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")
     summary: str | None = Field(
         default=None,
-        description="Summary of the textual output of the tool",
+        description="Textual summary of the output of the tool."
+        "Not all tools generate output summaries",
     )
 
     @field_serializer("value")

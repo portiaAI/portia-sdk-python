@@ -49,7 +49,7 @@ def generate_input_context(
             input_context.extend(
                 [
                     f"input_name: {var.name}",
-                    f"input_value: {previous_outputs[var.name]}",
+                    f"input_value: {previous_outputs[var.name].value}",
                     f"input_description: {var.description}",
                     "----------",
                 ],
@@ -66,7 +66,7 @@ def generate_input_context(
             input_context.extend(
                 [
                     f"output_name: {output_key}",
-                    f"output_value: {previous_outputs[output_key]}",
+                    f"output_value: {previous_outputs[output_key].value}",
                     "----------",
                 ],
             )
