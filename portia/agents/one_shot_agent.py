@@ -16,7 +16,6 @@ from langgraph.prebuilt import ToolNode
 
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.clarification import Clarification
 from portia.context import get_execution_context
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.llm_wrapper import LLMWrapper
@@ -60,8 +59,6 @@ class OneShotToolCallingModel:
                     "{context}",
                     "Use the provided tool. You should provide arguments that match the tool's"
                     "schema using the information contained in the query and context."
-                    "Where clarifications have been provided in the context you should always"
-                    "use the values provided by them.",
                     "Make sure you don't repeat past errors: {past_errors}",
                 ],
             ),
@@ -114,7 +111,6 @@ class OneShotAgent(BaseAgent):
         """Initialize the agent."""
         super().__init__(step, workflow, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
-        self.new_clarifications: list[Clarification] = []
 
     @staticmethod
     def retry_tool_or_finish(state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
@@ -146,10 +142,6 @@ class OneShotAgent(BaseAgent):
             raise ToolRetryError(self.tool.name, str(last_message.content))
         if "ToolHardError" in last_message.content and self.tool:
             raise ToolFailedError(self.tool.name, str(last_message.content))
-        if len(self.new_clarifications) > 0:
-            return Output[list[Clarification]](
-                value=self.new_clarifications,
-            )
         if isinstance(last_message, ToolMessage):
             if last_message.artifact and isinstance(last_message.artifact, Output):
                 tool_output = last_message.artifact
