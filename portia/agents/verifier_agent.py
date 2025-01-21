@@ -159,7 +159,13 @@ class ParserModel:
             self.retries += 1
             if self.retries <= MAX_RETRIES:
                 return self.invoke(state)
-            raise InvalidAgentOutputError(err) from e
+            # Previously we would raise an error here, but this restricts the agent from
+            # being able to raise clarifications for the tool arguments marked as invalid.
+            # Missing tool arguments are often represented as None, which isn't a compatible
+            # type for non-optional arguments.
+            #
+            # Here is a Linear ticket to fix this:
+            # https://linear.app/portialabs/issue/POR-456
 
         return {"messages": [response.model_dump_json(indent=2)]}
 
@@ -336,6 +342,7 @@ class VerifierAgent(BaseAgent):
                     InputClarification(
                         argument_name=arg.name,
                         user_guidance=f"Missing Argument: {arg.name}",
+                        step=self.workflow.current_step_index,
                     ),
                 )
         if len(self.new_clarifications) > 0:
