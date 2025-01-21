@@ -28,7 +28,7 @@ from portia.agents.verifier_agent import (
 )
 from portia.clarification import InputClarification
 from portia.context import empty_context
-from portia.errors import InvalidAgentOutputError, InvalidWorkflowStateError
+from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
 from tests.utils import AdditionTool, get_test_config, get_test_workflow

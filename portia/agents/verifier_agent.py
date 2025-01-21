@@ -27,7 +27,6 @@ from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
 from portia.context import get_execution_context
 from portia.errors import (
-    InvalidAgentOutputError,
     InvalidWorkflowStateError,
 )
 from portia.llm_wrapper import LLMWrapper
