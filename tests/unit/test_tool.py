@@ -4,8 +4,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import Response
-from pydantic import SecretStr
+from pydantic import HttpUrl, SecretStr
 
+from portia.clarification import (
+    ActionClarification,
+    InputClarification,
+    MultiChoiceClarification,
+    ValueConfirmationClarification,
+)
 from portia.context import empty_context, get_execution_context
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.tool import PortiaRemoteTool
@@ -154,6 +160,39 @@ def test_remote_tool_soft_error() -> None:
         )
 
 
+def test_remote_tool_bad_response() -> None:
+    """Test remote soft errors come back to soft errors."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={"not_output": {"value": "ToolSoftError: An error occurred."}},
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+        with pytest.raises(ToolHardError):
+            tool.run(empty_context())
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
 def test_remote_tool_hard_error() -> None:
     """Test remote hard errors come back to hard errors."""
     mock_response = MagicMock(spec=Response)
@@ -175,6 +214,189 @@ def test_remote_tool_hard_error() -> None:
         )
         with pytest.raises(ToolHardError):
             tool.run(empty_context())
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_action_clarifications() -> None:
+    """Test action clarifications."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={
+            "output": {
+                "value": [
+                    {
+                        "type": "Action Clarification",
+                        "action_url": "https://example.com",
+                        "user_guidance": "blah",
+                    },
+                ],
+            },
+        },
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+
+        output = tool.run(empty_context())
+        assert output is not None
+        assert isinstance(output, ActionClarification)
+        assert output.action_url == HttpUrl("https://example.com")
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_input_clarifications() -> None:
+    """Test Input clarifications."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={
+            "output": {
+                "value": [
+                    {
+                        "type": "Input Clarification",
+                        "user_guidance": "blah",
+                        "argument_name": "t",
+                    },
+                ],
+            },
+        },
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+
+        output = tool.run(empty_context())
+        assert output is not None
+        assert isinstance(output, InputClarification)
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_mc_clarifications() -> None:
+    """Test Multi Choice clarifications."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={
+            "output": {
+                "value": [
+                    {
+                        "type": "Multi Choice Clarification",
+                        "user_guidance": "blah",
+                        "argument_name": "t",
+                        "options": [1],
+                    },
+                ],
+            },
+        },
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+
+        output = tool.run(empty_context())
+        assert output is not None
+        assert isinstance(output, MultiChoiceClarification)
+        assert output.options == [1]
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/run/",
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_value_confirm_clarifications() -> None:
+    """Test value confirm clarifications."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={
+            "output": {
+                "value": [
+                    {
+                        "type": "Value Confirmation Clarification",
+                        "user_guidance": "blah",
+                        "argument_name": "t",
+                    },
+                ],
+            },
+        },
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+
+        output = tool.run(empty_context())
+        assert output is not None
+        assert isinstance(output, ValueConfirmationClarification)
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",

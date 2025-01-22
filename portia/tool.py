@@ -30,6 +30,7 @@ from portia.clarification import (
     Clarification,
     InputClarification,
     MultiChoiceClarification,
+    ValueConfirmationClarification,
 )
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.context import ExecutionContext
@@ -262,6 +263,13 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                             options=clarification["options"],
+                        ),
+                    )
+                case "Value Confirmation Clarification":
+                    return Output(
+                        value=ValueConfirmationClarification(
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
                         ),
                     )
         return output

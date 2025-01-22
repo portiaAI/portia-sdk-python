@@ -98,7 +98,7 @@ def generate_clarification_context(clarifications: ClarificationListType, step: 
             ],
         )
         for clarification in current_step_clarifications:
-            if isinstance(clarification, (ArgumentClarification)) and clarification.step == step:
+            if isinstance(clarification, (ArgumentClarification)):
                 clarification_context.extend(
                     [
                         f"input_name: {clarification.argument_name}",
@@ -110,13 +110,13 @@ def generate_clarification_context(clarifications: ClarificationListType, step: 
     if other_step_clarifications:
         clarification_context.extend(
             [
-                "This section contains the user provided response to previous tasks.",
+                "This section contains the user provided response to previous questions.",
                 "You may use the values here if no other context is provided but should not use",
                 "values from here if there is another value provided.",
             ],
         )
         for clarification in other_step_clarifications:
-            if isinstance(clarification, (ArgumentClarification)) and clarification.step == step:
+            if isinstance(clarification, (ArgumentClarification)):
                 clarification_context.extend(
                     [
                         f"input_name: {clarification.argument_name}",
