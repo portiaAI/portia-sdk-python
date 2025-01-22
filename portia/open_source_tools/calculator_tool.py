@@ -21,13 +21,13 @@ class CalculatorToolSchema(BaseModel):
 class CalculatorTool(Tool[float]):
     """Takes a basic maths question in natural language and returns the result.
 
-    Works best for maths expressions containing only numbers and the operators +, -, *, /.
+    Works best for maths expressions containing only numbers and the operators +, -, *, x, /.
     """
 
     id: str = "calculator_tool"
     name: str = "Calculator Tool"
     description: str = "Takes a basic maths question and returns the result."
-    "Works best for maths expressions containing only numbers and the operators +, -, *, /."
+    "Works best for maths expressions containing only numbers and the operators +, -, *, x, /."
     args_schema: type[BaseModel] = CalculatorToolSchema
     output_schema: tuple[str, str] = ("str", "A string dump of the computed result")
 

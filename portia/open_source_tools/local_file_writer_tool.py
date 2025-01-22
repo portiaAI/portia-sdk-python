@@ -1,4 +1,4 @@
-"""Simple file writer tool."""
+"""Local file writer tool."""
 
 from pathlib import Path
 

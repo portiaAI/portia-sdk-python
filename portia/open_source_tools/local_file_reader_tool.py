@@ -1,4 +1,4 @@
-"""Tool for reading files."""
+"""Tool for reading files from disk."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class FileReaderToolSchema(BaseModel):
 
     filename: str = Field(
         ...,
-        description="The location where the file should be read from",
+        description="The path (either full or relative) where the file should be read from",
     )
 
 

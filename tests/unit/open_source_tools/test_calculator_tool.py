@@ -33,6 +33,9 @@ def test_run_valid_expressions(calculator_tool: CalculatorTool) -> None:
     assert calculator_tool.run(context, "10 divided by 2") == 5.0
     assert calculator_tool.run(context, "6 times 3") == 18.0
     assert calculator_tool.run(context, "15 minus 4") == 11.0
+    assert calculator_tool.run(context, "212 + 14") == 226
+    assert calculator_tool.run(context, "300 - 14") == 286
+    assert calculator_tool.run(context, "3 x 2") == 6
 
 
 def test_run_invalid_expressions(calculator_tool: CalculatorTool) -> None:
