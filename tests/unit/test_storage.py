@@ -9,7 +9,8 @@ import pytest
 
 from portia.errors import StorageError
 from portia.plan import Plan, PlanContext
-from portia.storage import PlanStorage, PortiaCloudStorage, WorkflowStorage
+from portia.storage import PlanStorage, PortiaCloudStorage, ToolCallStorage, WorkflowStorage
+from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import Workflow
 from tests.utils import get_test_config
 
@@ -17,7 +18,7 @@ from tests.utils import get_test_config
 def test_storage_base_classes() -> None:
     """Test PlanStorage raises."""
 
-    class MyStorage(WorkflowStorage, PlanStorage):
+    class MyStorage(WorkflowStorage, PlanStorage, ToolCallStorage):
         """Override to test base."""
 
         def save_plan(self, plan: Plan) -> None:
@@ -32,11 +33,26 @@ def test_storage_base_classes() -> None:
         def get_workflow(self, workflow_id: UUID) -> Workflow:
             return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
 
+        def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+            return super().save_tool_call(tool_call)  # type: ignore  # noqa: PGH003
+
     storage = MyStorage()
     plan = Plan(plan_context=PlanContext(query="", tool_ids=[]), steps=[])
     workflow = Workflow(
         plan_id=plan.id,
     )
+    tool_call = ToolCallRecord(
+        tool_name="",
+        workflow_id=workflow.id,
+        step=1,
+        end_user_id="1",
+        additional_data={},
+        output={},
+        input={},
+        latency_seconds=10,
+        status=ToolCallStatus.SUCCESS,
+    )
+
     with pytest.raises(NotImplementedError):
         storage.save_plan(plan)
 
@@ -48,6 +64,9 @@ def test_storage_base_classes() -> None:
 
     with pytest.raises(NotImplementedError):
         storage.get_workflow(workflow.id)
+
+    with pytest.raises(NotImplementedError):
+        storage.save_tool_call(tool_call)
 
 
 def test_portia_cloud_storage() -> None:

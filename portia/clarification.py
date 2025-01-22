@@ -51,8 +51,8 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
         """Resolve the clarification with the given response."""
-        self.response = response
         self.resolved = True
+        self.response = response
 
 
 class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
@@ -96,7 +96,7 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """
 
     type: str = "Multiple Choice Clarification"
-    options: list[str]
+    options: list[SERIALIZABLE_TYPE_VAR]
 
     @model_validator(mode="after")
     def validate_response(self) -> Self:
@@ -105,16 +105,23 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
+    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
+        """Validate response is in options."""
+        if response not in self.options:
+            raise ValueError(f"{self.response} is not a supported option")
+        self.resolved = True
+        self.response = response
+
 
 class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
-    """A value acceptance clarification.
+    """A value confirmation clarification.
 
     Represents a clarification where the user is presented a value and needs to accept it.
     The clarification should be created with the response field already set. The user will
     denote acceptance by setting the resolved flag.
     """
 
-    type: str = "Value Acceptance Clarification"
+    type: str = "Value Confirmation Clarification"
 
     def resolve(self, response: str | None) -> None:  # noqa: ARG002
         """Resolve the clarification but don't update the response."""

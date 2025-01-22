@@ -10,10 +10,12 @@ from uuid import UUID
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from portia.context import ExecutionContext
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, Step
-from portia.workflow import Workflow
+from portia.tool_call import ToolCallRecord, ToolCallStatus
+from portia.workflow import Workflow, WorkflowOutputs, WorkflowState
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -49,11 +51,42 @@ class WorkflowStorage(ABC):
         raise NotImplementedError("get_workflow is not implemented")
 
 
-class Storage(PlanStorage, WorkflowStorage):
+class ToolCallStorage(ABC):
+    """Base class for storing tool calls."""
+
+    @abstractmethod
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Save a ToolCall."""
+        raise NotImplementedError("save_tool_call is not implemented")
+
+
+class LogToolCallStorage(ToolCallStorage):
+    """ToolCallStorage that logs calls."""
+
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Log the tool call."""
+        logger().info(
+            "Invoked {tool_name} with args: {tool_input}",
+            tool_name=tool_call.tool_name,
+            tool_input=tool_call.input,
+        )
+        logger().debug(
+            f"Tool {tool_call.tool_name} executed in {tool_call.latency_seconds:.2f} seconds",
+        )
+        match tool_call.status:
+            case ToolCallStatus.SUCCESS:
+                logger().info("Tool output: {output}", output=tool_call.output)
+            case ToolCallStatus.FAILED:
+                logger().error("Tool returned error {output}", output=tool_call.output)
+            case ToolCallStatus.NEED_CLARIFICATION:
+                logger().error("Tool returned clarifications {output}", output=tool_call.output)
+
+
+class Storage(PlanStorage, WorkflowStorage, ToolCallStorage):
     """Combined base class for Plan + Workflow storage."""
 
 
-class InMemoryStorage(Storage):
+class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
     """Simple storage class that keeps plans + workflows in memory."""
 
     plans: ClassVar[dict[UUID, Plan]] = {}
@@ -80,7 +113,7 @@ class InMemoryStorage(Storage):
         raise WorkflowNotFoundError(workflow_id)
 
 
-class DiskFileStorage(Storage):
+class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
     """Disk-based implementation of the Storage interface.
 
     Stores serialized Plan and Workflow objects as JSON files on disk.
@@ -273,4 +306,34 @@ class PortiaCloudStorage(Storage):
             },
         )
         self.check_response(response)
-        return Workflow.model_validate(response.json()["json"])
+        response_json = response.json()
+        return Workflow(
+            id=response_json["id"],
+            plan_id=response_json["plan"]["id"],
+            current_step_index=response_json["current_step_index"],
+            state=WorkflowState(response_json["state"]),
+            execution_context=ExecutionContext.model_validate(response_json["execution_context"]),
+            outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
+        )
+
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Save a tool call in the backend."""
+        response = httpx.post(
+            url=f"{self.api_endpoint}/api/v0/tool-calls/",
+            json={
+                "workflow": str(tool_call.workflow_id),
+                "tool_name": tool_call.tool_name,
+                "step": tool_call.step,
+                "end_user_id": tool_call.end_user_id or "",
+                "additional_data": tool_call.additional_data,
+                "input": tool_call.input,
+                "output": tool_call.output,
+                "status": tool_call.status,
+                "latency_seconds": tool_call.latency_seconds,
+            },
+            headers={
+                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                "Content-Type": "application/json",
+            },
+        )
+        self.check_response(response)

@@ -18,7 +18,6 @@ from portia.workflow import WorkflowState
 from tests.utils import AdditionTool
 
 
-@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -37,7 +36,6 @@ def test_runner_run_query_with_cloud() -> None:
     storage.get_workflow(workflow.id)
 
 
-@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_run_tool_error() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -58,7 +56,6 @@ def test_run_tool_error() -> None:
         tool.run(ctx)
 
 
-@pytest.mark.skip(reason="Disabled while we are migrating to a synced plan model.")
 def test_runner_run_query_with_cloud_and_local() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -74,7 +71,7 @@ def test_runner_run_query_with_cloud_and_local() -> None:
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
 
-@pytest.mark.skip(reason="Broken for now")
+
 def test_runner_run_query_with_oauth() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default()

@@ -22,7 +22,12 @@ from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
 from portia.logger import logger, logger_manager
 from portia.plan import Plan, ReadOnlyStep, Step
 from portia.planner import Planner
-from portia.storage import DiskFileStorage, InMemoryStorage, PortiaCloudStorage
+from portia.storage import (
+    DiskFileStorage,
+    InMemoryStorage,
+    PortiaCloudStorage,
+)
+from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
 
 if TYPE_CHECKING:
@@ -259,7 +264,12 @@ class Runner:
     ) -> BaseAgent:
         tool = None
         if step.tool_name:
-            tool = self.tool_registry.get_tool(step.tool_name)
+            child_tool = self.tool_registry.get_tool(step.tool_name)
+            tool = ToolCallWrapper(
+                child_tool=child_tool,
+                storage=self.storage,
+                workflow=workflow,
+            )
         cls: type[BaseAgent]
         match config.default_agent_type:
             case AgentType.TOOL_LESS:

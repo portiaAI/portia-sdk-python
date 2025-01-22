@@ -8,7 +8,6 @@ with their specific logic.
 from __future__ import annotations
 
 import json
-import time
 from abc import abstractmethod
 from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, Self
@@ -31,8 +30,10 @@ from portia.clarification import (
     Clarification,
     InputClarification,
     MultiChoiceClarification,
+    ValueConfirmationClarification,
 )
-from portia.common import SERIALIZABLE_TYPE_VAR
+from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
+from portia.context import ExecutionContext
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.logger import logger
 from portia.templates.render import render_template
@@ -102,24 +103,14 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         **kwargs: Any,  # noqa: ANN401
     ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
         """Run the Tool function and generate an Output object with descriptions."""
-        args_dict = {f"{i}": arg for i, arg in enumerate(args)}
-        data = {**args_dict, **kwargs}
-        logger().info(f"Invoking: {self.name} with {data} and context {ctx}")
-        start_time = time.time()
-
         try:
             output = self.run(ctx, *args, **kwargs)
         except Exception as e:
-            logger().error(f"Tool: {self.name} returned error {e}")
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
                 raise ToolSoftError(e) from e
             raise
-        else:
-            execution_time = time.time() - start_time
-            logger().debug(f"Tool {self.name} executed in {execution_time:.2f} seconds")
-            logger().info("Tool output: {output}", output=output)
 
         # handle clarifications cleanly
         if isinstance(output, Clarification) or (
@@ -274,6 +265,13 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             options=clarification["options"],
                         ),
                     )
+                case "Value Confirmation Clarification":
+                    return Output(
+                        value=ValueConfirmationClarification(
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                        ),
+                    )
         return output
 
     def run(
@@ -284,15 +282,12 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     ) -> SERIALIZABLE_TYPE_VAR | None | Clarification:
         """Invoke the run endpoint and handle response."""
         try:
-            # Combine args and kwargs
-            args_dict = {f"{i}": arg for i, arg in enumerate(args)}
-            data = {**args_dict, **kwargs}
             # Send to Cloud
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
                 content=json.dumps(
                     {
-                        "arguments": data,
+                        "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user_id or "",
                             "additional_data": ctx.additional_data or {},

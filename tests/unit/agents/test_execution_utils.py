@@ -1,4 +1,5 @@
 """Test execution utilities."""
+
 from __future__ import annotations
 
 import pytest
@@ -115,3 +116,43 @@ def test_process_output_with_invalid_message() -> None:
 
     with pytest.raises(InvalidAgentOutputError):
         process_output(invalid_message)
+
+
+def test_process_output_with_output_artifacts() -> None:
+    """Test process_output with outpu artifacts."""
+    message = ToolMessage(tool_call_id="1", content="", artifact=Output(value="test"))
+
+    result = process_output(message, clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.value == "test"
+
+
+def test_process_output_with_artifacts() -> None:
+    """Test process_output with artifacts."""
+    message = ToolMessage(tool_call_id="1", content="", artifact="test")
+
+    result = process_output(message, clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.value == "test"
+
+
+def test_process_output_with_content() -> None:
+    """Test process_output with content."""
+    message = ToolMessage(tool_call_id="1", content="test")
+
+    result = process_output(message, clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.value == "test"
+
+
+def test_process_output_with_human_message() -> None:
+    """Test process_output with outpu artifacts."""
+    message = HumanMessage(tool_call_id="1", content="test")
+
+    result = process_output(message, clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.value == "test"
