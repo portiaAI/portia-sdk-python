@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-import stat
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict

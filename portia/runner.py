@@ -25,7 +25,6 @@ from portia.planner import Planner
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
-    PortiaCloudStorage,
     PortiaToolCallStorage,
 )
 from portia.tool_wrapper import ToolCallWrapper
