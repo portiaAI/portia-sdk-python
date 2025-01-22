@@ -98,7 +98,7 @@ def generate_clarification_context(clarifications: ClarificationListType, step: 
             ],
         )
         for clarification in current_step_clarifications:
-            if isinstance(clarification, (ArgumentClarification)):
+            if isinstance(clarification, (ArgumentClarification)) and clarification.step == step:
                 clarification_context.extend(
                     [
                         f"input_name: {clarification.argument_name}",
@@ -116,7 +116,7 @@ def generate_clarification_context(clarifications: ClarificationListType, step: 
             ],
         )
         for clarification in other_step_clarifications:
-            if isinstance(clarification, (ArgumentClarification)):
+            if isinstance(clarification, (ArgumentClarification)) and clarification.step == step:
                 clarification_context.extend(
                     [
                         f"input_name: {clarification.argument_name}",

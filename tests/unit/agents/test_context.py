@@ -164,10 +164,6 @@ input_value: bob@bla.com
 This section contains the user provided response to previous questions.
 You may use the values here if no other context is provided but should not use
 values from here if there is another value provided.
-input_name: $email_cc
-clarification_reason: email cc list
-input_value: bob@bla.com
-----------
 Metadata: This section contains general context about this execution.
 end_user_id: 123
 context_key_name: email context_key_value: hello@world.com
