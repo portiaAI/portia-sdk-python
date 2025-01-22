@@ -329,7 +329,7 @@ class PortiaCloudStorage(Storage):
                 current_step_index=response_json["current_step_index"],
                 state=WorkflowState(response_json["state"]),
                 execution_context=ExecutionContext.model_validate(
-                    response_json["execution_context"]
+                    response_json["execution_context"],
                 ),
                 outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
             )

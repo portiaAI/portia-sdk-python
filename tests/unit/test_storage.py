@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 from uuid import UUID
 
@@ -10,9 +11,11 @@ import pytest
 from portia.errors import StorageError
 from portia.plan import Plan, PlanContext
 from portia.storage import PlanStorage, PortiaCloudStorage, ToolCallStorage, WorkflowStorage
-from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import Workflow
 from tests.utils import get_test_config, get_test_tool_call
+
+if TYPE_CHECKING:
+    from portia.tool_call import ToolCallRecord
 
 
 def test_storage_base_classes() -> None:

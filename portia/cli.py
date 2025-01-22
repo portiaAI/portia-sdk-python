@@ -17,7 +17,6 @@ from typing import Any, Callable
 import click
 from dotenv import load_dotenv
 
-from portia import storage
 from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification
 from portia.config import Config, LLMModel, LLMProvider, LogLevel, StorageClass
 from portia.context import execution_context
