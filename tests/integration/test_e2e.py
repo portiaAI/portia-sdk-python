@@ -362,5 +362,4 @@ def test_runner_run_query_with_multiple_clarifications(
         runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
     # 498 = 456 (clarification - value a - step 1) + 2 (value b - step 1) + 40 (value b - step 2)
-    print(workflow.outputs.final_output)
     assert workflow.outputs.final_output == Output(value=498)

@@ -6,7 +6,6 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
-from portia import tool_call
 from portia.agents.base_agent import Output
 from portia.agents.execution_utils import (
     MAX_RETRIES,

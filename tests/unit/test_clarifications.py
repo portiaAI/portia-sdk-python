@@ -1,11 +1,9 @@
 """Test simple agent."""
 
 from __future__ import annotations
-from pydoc import resolve
 
-import py
-from pydantic import HttpUrl
 import pytest
+from pydantic import HttpUrl
 
 from portia.clarification import (
     ActionClarification,
