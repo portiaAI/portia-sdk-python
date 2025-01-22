@@ -67,7 +67,7 @@ class ToolCallWrapper(Tool):
         else:
             if isinstance(output, Clarification):
                 record.status = ToolCallStatus.NEED_CLARIFICATION
-                record.output = output.model_dump_json()
+                record.output = output.model_dump(mode="json")
             else:
                 record.output = output
                 record.status = ToolCallStatus.SUCCESS
