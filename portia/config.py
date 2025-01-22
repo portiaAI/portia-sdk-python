@@ -250,8 +250,8 @@ class Config(BaseModel):
             if self.llm_model_name not in supported_models:
                 raise InvalidConfigError(
                     "llm_model_name",
-                    "Unsupported model please use one of"
-                    f"{", ".join(model.value for model in supported_models)}",
+                    "Unsupported model please use one of: " +
+                    ", ".join(model.value for model in supported_models),
                 )
 
         match self.llm_provider:
