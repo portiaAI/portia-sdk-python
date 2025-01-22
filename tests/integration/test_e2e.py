@@ -51,7 +51,10 @@ def test_runner_run_query(
         default_agent_type=agent,
     )
 
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
+    addition_tool = AdditionTool()
+    addition_tool.should_summarize = True
+
+    tool_registry = InMemoryToolRegistry.from_local_tools([addition_tool])
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Add 1 + 2 together"
 
@@ -60,6 +63,8 @@ def test_runner_run_query(
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
     assert workflow.outputs.final_output.value == 3
+    for output in workflow.outputs.step_outputs.values():
+        assert output.summary is not None
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)

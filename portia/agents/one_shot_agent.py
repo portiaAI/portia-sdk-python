@@ -7,32 +7,34 @@ be more successful on anything but simple tool calls.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
+from portia.agents.agent_node_utils.summarizer import LLMSummarizer
 from portia.agents.base_agent import BaseAgent, Output
+from portia.agents.execution_utils import (
+    AgentNode,
+    next_state_after_tool_call,
+    process_output,
+    tool_call_or_end,
+)
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.context import get_execution_context
-from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.llm_wrapper import LLMWrapper
+from portia.workflow import Workflow
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
     from langchain_core.language_models.chat_models import BaseChatModel
 
-    from portia.agents.verifier_agent import VerifiedToolInputs
     from portia.config import Config
     from portia.plan import Step
     from portia.tool import Tool
     from portia.workflow import Workflow
-
-
-# MAX_RETRIES controls how many times errors will be retried by the OneShotAgent
-MAX_RETRIES = 4
 
 
 class OneShotToolCallingModel:
@@ -110,64 +112,19 @@ class OneShotAgent(BaseAgent):
     ) -> None:
         """Initialize the agent."""
         super().__init__(step, workflow, config, tool)
-        self.verified_args: VerifiedToolInputs | None = None
-
-    @staticmethod
-    def retry_tool_or_finish(state: MessagesState) -> Literal["tool_agent", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should retry calling the tool if there was an error."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        errors = [msg for msg in messages if "ToolSoftError" in msg.content]
-        if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
-            return "tool_agent"
-        return END
-
-    @staticmethod
-    def call_tool_or_return(state: MessagesState) -> Literal["tools", END]:  # type: ignore  # noqa: PGH003
-        """Determine if we should continue or not.
-
-        This is only to catch issues when the agent does not figure out how to use the tool
-        to achieve the goal.
-        """
-        last_message = state["messages"][-1]
-        # If the LLM makes a tool call, then we route to the "tools" node
-        if hasattr(last_message, "tool_calls"):
-            return "tools"
-        # Otherwise, we stop (reply to the user).
-        return END
-
-    def process_output(self, last_message: BaseMessage) -> Output:
-        """Process the output of the agent."""
-        if "ToolSoftError" in last_message.content and self.tool:
-            raise ToolRetryError(self.tool.name, str(last_message.content))
-        if "ToolHardError" in last_message.content and self.tool:
-            raise ToolFailedError(self.tool.name, str(last_message.content))
-        if isinstance(last_message, ToolMessage):
-            if last_message.artifact and isinstance(last_message.artifact, Output):
-                tool_output = last_message.artifact
-            elif last_message.artifact:
-                tool_output = Output(value=last_message.artifact)
-            else:
-                tool_output = Output(value=last_message.content)
-            return tool_output
-        if isinstance(last_message, HumanMessage):
-            return Output(value=last_message.content)
-        raise InvalidAgentOutputError(str(last_message.content))
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
         if not self.tool:
-            single_tool_agent = ToolLessAgent(
+            return ToolLessAgent(
                 self.step,
                 self.workflow,
                 self.config,
                 self.tool,
-            )
-            return single_tool_agent.execute_sync()
+            ).execute_sync()
 
         context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()
-
         tools = [
             self.tool.to_langchain(
                 return_artifact=True,
@@ -177,18 +134,26 @@ class OneShotAgent(BaseAgent):
         tool_node = ToolNode(tools)
 
         workflow = StateGraph(MessagesState)
-        workflow.add_node("tool_agent", OneShotToolCallingModel(llm, context, tools, self).invoke)
-        workflow.add_node("tools", tool_node)
-        workflow.add_edge(START, "tool_agent")
-        workflow.add_conditional_edges("tool_agent", self.call_tool_or_return)
-
-        workflow.add_conditional_edges(
-            "tools",
-            OneShotAgent.retry_tool_or_finish,
+        workflow.add_node(
+            AgentNode.TOOL_AGENT,
+            OneShotToolCallingModel(llm, context, tools, self).invoke,
         )
+        workflow.add_node(AgentNode.TOOLS, tool_node)
+        workflow.add_node(AgentNode.SUMMARIZER, LLMSummarizer(llm).invoke)
+        workflow.add_edge(START, AgentNode.TOOL_AGENT)
+
+        # Use execution manager for state transitions
+        workflow.add_conditional_edges(
+            AgentNode.TOOL_AGENT,
+            tool_call_or_end,
+        )
+        workflow.add_conditional_edges(
+            AgentNode.TOOLS,
+            lambda state: next_state_after_tool_call(state, self.tool),
+        )
+        workflow.add_edge(AgentNode.SUMMARIZER, END)
 
         app = workflow.compile()
-
         invocation_result = app.invoke({"messages": []})
 
-        return self.process_output(invocation_result["messages"][-1])
+        return process_output(invocation_result["messages"][-1], self.tool)

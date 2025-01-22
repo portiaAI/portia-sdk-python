@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langgraph.graph import END
+if TYPE_CHECKING:
+    import pytest
+
+from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.agents.toolless_agent import ToolLessModel
-from portia.errors import InvalidAgentOutputError
 from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
 
@@ -83,60 +83,3 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     output = agent.execute_sync()
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
-
-
-def test_oneshot_agent_end_criteria() -> None:
-    """Test process_output."""
-    # check end criteria
-    output = OneShotAgent.call_tool_or_return(
-        {
-            "messages": [
-                HumanMessage(
-                    content="Sent email",
-                ),
-            ],
-        },
-    )
-
-    assert output == END
-
-
-def test_oneshot_agent_process_output_tools() -> None:
-    """Test process_output."""
-    (plan, workflow) = get_test_workflow()
-    agent = OneShotAgent(
-        step=plan.steps[0],
-        workflow=workflow,
-        config=get_test_config(),
-        tool=AdditionTool(),
-    )
-    message = ToolMessage(content="", tool_call_id="call_J")
-    message.artifact = "123"
-    output = agent.process_output(
-        message,
-    )
-    assert isinstance(output, Output)
-    assert isinstance(output.value, str)
-    assert output.value == "123"
-
-    message = ToolMessage(content="456", tool_call_id="call_J")
-    output = agent.process_output(
-        message,
-    )
-    assert isinstance(output, Output)
-    assert isinstance(output.value, str)
-    assert output.value == "456"
-
-    message = HumanMessage(content="789")
-    output = agent.process_output(
-        message,
-    )
-    assert isinstance(output, Output)
-    assert isinstance(output.value, str)
-    assert output.value == "789"
-
-    message = AIMessage(content="456")
-    with pytest.raises(InvalidAgentOutputError):
-        output = agent.process_output(
-            message,
-        )

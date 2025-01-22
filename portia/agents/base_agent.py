@@ -80,6 +80,11 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     model_config = ConfigDict(extra="forbid")
 
     value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")
+    summary: str | None = Field(
+        default=None,
+        description="Textual summary of the output of the tool."
+        "Not all tools generate output summaries",
+    )
 
     @field_serializer("value")
     def serialize_value(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:
