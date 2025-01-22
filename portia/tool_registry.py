@@ -197,7 +197,7 @@ class PortiaToolRegistry(ToolRegistry):
             tool = PortiaRemoteTool(
                 id=raw_tool["tool_id"],
                 name=raw_tool["tool_name"],
-                should_summarize=getattr(raw_tool, "should_summarize", False),
+                should_summarize=raw_tool.get("should_summarize", False),
                 description=raw_tool["description"]["overview_description"],
                 args_schema=self._generate_pydantic_model(
                     raw_tool["tool_name"],
