@@ -197,7 +197,7 @@ def _get_config(
         message = "Multiple LLM keys found, but no default provided: Select a provider or model"
         raise click.UsageError(message)
 
-    # Add the tool registry
+    # Set storage based on whether Portia API Key is set
     storage_class = StorageClass.MEMORY
     if os.getenv("PORTIA_API_KEY"):
         storage_class = StorageClass.CLOUD
