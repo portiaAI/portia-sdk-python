@@ -59,7 +59,7 @@ class ToolCallWrapper(Tool):
         try:
             output = self._child_tool.run(ctx, *args, **kwargs)
         except Exception as e:
-            record.output = e
+            record.output = str(e)
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             record.status = ToolCallStatus.FAILED
             self._storage.save_tool_call(record)
