@@ -25,7 +25,7 @@ from portia.planner import Planner
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
-    PortiaToolCallStorage,
+    PortiaCloudStorage,
 )
 from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
@@ -59,7 +59,7 @@ class Runner:
             case StorageClass.DISK:
                 self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
             case StorageClass.CLOUD:
-                self.storage = PortiaToolCallStorage(config=config)
+                self.storage = PortiaCloudStorage(config=config)
 
     def execute_query(
         self,

@@ -10,11 +10,12 @@ from uuid import UUID
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from portia.context import ExecutionContext
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, Step
 from portia.tool_call import ToolCallRecord, ToolCallStatus
-from portia.workflow import Workflow
+from portia.workflow import Workflow, WorkflowOutputs, WorkflowState
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -307,45 +308,15 @@ class PortiaCloudStorage(Storage):
             },
         )
         self.check_response(response)
-        return Workflow.model_validate(response.json()["json"])
-
-    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
-        """Save a tool call in the backend."""
-        response = httpx.post(
-            url=f"{self.api_endpoint}/api/v0/tool-calls/",
-            json={
-                "workflow": tool_call.workflow_id,
-                "tool_name": tool_call.tool_name,
-                "step": tool_call.step,
-                "end_user_id": tool_call.end_user_id,
-                "additional_data": tool_call.additional_data,
-                "input": tool_call.input,
-                "output": tool_call.output,
-                "status": tool_call.status,
-                "latency_seconds": tool_call.latency_seconds,
-            },
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
+        response_json = response.json()
+        return Workflow(
+            id=response_json["id"],
+            plan_id=response_json["plan"]["id"],
+            current_step_index=response_json["current_step_index"],
+            state=WorkflowState(response_json["state"]),
+            execution_context=ExecutionContext.model_validate(response_json["execution_context"]),
+            outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
         )
-        self.check_response(response)
-
-
-class PortiaToolCallStorage(InMemoryStorage):
-    """Save tool calls to portia cloud only."""
-
-    def __init__(self, config: Config) -> None:
-        """Store tools in a tool set for easy access."""
-        self.api_key = config.must_get_api_key("portia_api_key")
-        self.api_endpoint = config.must_get("portia_api_endpoint", str)
-
-    def check_response(self, response: httpx.Response) -> None:
-        """Validate response from Portia API."""
-        if not response.is_success:
-            error_str = str(response.content)
-            logger().error(f"Error from Portia Cloud: {error_str}")
-            raise StorageError(error_str)
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save a tool call in the backend."""
