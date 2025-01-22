@@ -226,63 +226,56 @@ class PortiaCloudStorage(Storage):
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to cloud."""
-        response = httpx.post(
-            url=f"{self.api_endpoint}/api/v0/plans/",
-            json={
-                "id": str(plan.id),
-                "query": plan.plan_context.query,
-                "tool_ids": plan.plan_context.tool_ids,
-                "steps": [step.model_dump(mode="json") for step in plan.steps],
-            },
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-        )
-        self.check_response(response)
+        try:
+            response = httpx.post(
+                url=f"{self.api_endpoint}/api/v0/plans/",
+                json={
+                    "id": str(plan.id),
+                    "query": plan.plan_context.query,
+                    "tool_ids": plan.plan_context.tool_ids,
+                    "steps": [step.model_dump(mode="json") for step in plan.steps],
+                },
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
 
     def get_plan(self, plan_id: UUID) -> Plan:
         """Get plan from cloud."""
-        response = httpx.get(
-            url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-        )
-        self.check_response(response)
-        response_json = response.json()
-        return Plan(
-            id=UUID(response_json["id"]),
-            plan_context=PlanContext(
-                query=response_json["query"],
-                tool_ids=response_json["tool_ids"],
-            ),
-            steps=[Step.model_validate(step) for step in response_json["steps"]],
-        )
+        try:
+            response = httpx.get(
+                url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Plan(
+                id=UUID(response_json["id"]),
+                plan_context=PlanContext(
+                    query=response_json["query"],
+                    tool_ids=response_json["tool_ids"],
+                ),
+                steps=[Step.model_validate(step) for step in response_json["steps"]],
+            )
 
     def save_workflow(self, workflow: Workflow) -> None:
         """Add workflow to cloud."""
-        response = httpx.post(
-            url=f"{self.api_endpoint}/api/v0/workflows/",
-            json={
-                "id": str(workflow.id),
-                "current_step_index": workflow.current_step_index,
-                "state": workflow.state,
-                "execution_context": workflow.execution_context.model_dump(mode="json"),
-                "outputs": workflow.outputs.model_dump(mode="json"),
-                "plan_id": str(workflow.plan_id),
-            },
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-        )
-        # If the workflow exists, update it instead
-        if "workflow with this id already exists." in str(response.content):
-            response = httpx.patch(
-                url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
+        try:
+            response = httpx.post(
+                url=f"{self.api_endpoint}/api/v0/workflows/",
                 json={
+                    "id": str(workflow.id),
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
                     "execution_context": workflow.execution_context.model_dump(mode="json"),
@@ -294,46 +287,75 @@ class PortiaCloudStorage(Storage):
                     "Content-Type": "application/json",
                 },
             )
-        self.check_response(response)
+            # If the workflow exists, update it instead
+            if "workflow with this id already exists." in str(response.content):
+                response = httpx.patch(
+                    url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
+                    json={
+                        "current_step_index": workflow.current_step_index,
+                        "state": workflow.state,
+                        "execution_context": workflow.execution_context.model_dump(mode="json"),
+                        "outputs": workflow.outputs.model_dump(mode="json"),
+                        "plan_id": str(workflow.plan_id),
+                    },
+                    headers={
+                        "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                        "Content-Type": "application/json",
+                    },
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
 
     def get_workflow(self, workflow_id: UUID) -> Workflow:
         """Get workflow from cloud."""
-        response = httpx.get(
-            url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-        )
-        self.check_response(response)
-        response_json = response.json()
-        return Workflow(
-            id=response_json["id"],
-            plan_id=response_json["plan"]["id"],
-            current_step_index=response_json["current_step_index"],
-            state=WorkflowState(response_json["state"]),
-            execution_context=ExecutionContext.model_validate(response_json["execution_context"]),
-            outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
-        )
+        try:
+            response = httpx.get(
+                url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Workflow(
+                id=response_json["id"],
+                plan_id=response_json["plan"]["id"],
+                current_step_index=response_json["current_step_index"],
+                state=WorkflowState(response_json["state"]),
+                execution_context=ExecutionContext.model_validate(
+                    response_json["execution_context"]
+                ),
+                outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
+            )
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save a tool call in the backend."""
-        response = httpx.post(
-            url=f"{self.api_endpoint}/api/v0/tool-calls/",
-            json={
-                "workflow": str(tool_call.workflow_id),
-                "tool_name": tool_call.tool_name,
-                "step": tool_call.step,
-                "end_user_id": tool_call.end_user_id or "",
-                "additional_data": tool_call.additional_data,
-                "input": tool_call.input,
-                "output": tool_call.output,
-                "status": tool_call.status,
-                "latency_seconds": tool_call.latency_seconds,
-            },
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-        )
-        self.check_response(response)
+        try:
+            response = httpx.post(
+                url=f"{self.api_endpoint}/api/v0/tool-calls/",
+                json={
+                    "workflow": str(tool_call.workflow_id),
+                    "tool_name": tool_call.tool_name,
+                    "step": tool_call.step,
+                    "end_user_id": tool_call.end_user_id or "",
+                    "additional_data": tool_call.additional_data,
+                    "input": tool_call.input,
+                    "output": tool_call.output,
+                    "status": tool_call.status,
+                    "latency_seconds": tool_call.latency_seconds,
+                },
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)

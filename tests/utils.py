@@ -12,6 +12,7 @@ from portia.context import ExecutionContext, empty_context
 from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.tool import Tool
+from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
@@ -36,6 +37,21 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
         steps=[step1],
     )
     return plan, Workflow(plan_id=plan.id, current_step_index=1)
+
+
+def get_test_tool_call(workflow: Workflow) -> ToolCallRecord:
+    """Return a test tool call record."""
+    return ToolCallRecord(
+        tool_name="",
+        workflow_id=workflow.id,
+        step=1,
+        end_user_id="1",
+        additional_data={},
+        output={},
+        input={},
+        latency_seconds=10,
+        status=ToolCallStatus.SUCCESS,
+    )
 
 
 def get_test_config(**kwargs) -> Config:  # noqa: ANN003
