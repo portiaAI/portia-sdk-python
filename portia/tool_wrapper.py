@@ -65,10 +65,11 @@ class ToolCallWrapper(Tool):
             self._storage.save_tool_call(record)
             raise
         else:
-            record.output = output
             if isinstance(output, Clarification):
                 record.status = ToolCallStatus.NEED_CLARIFICATION
+                record.output = output.model_dump(mode="json")
             else:
+                record.output = output
                 record.status = ToolCallStatus.SUCCESS
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             self._storage.save_tool_call(record)
