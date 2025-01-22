@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar
 from uuid import UUID
 
 import httpx
@@ -14,6 +13,7 @@ from pydantic import BaseModel, ValidationError
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, Step
+from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
@@ -49,27 +49,6 @@ class WorkflowStorage(ABC):
         """Retrieve a workflow by its ID."""
         raise NotImplementedError("get_workflow is not implemented")
 
-
-class ToolCallStatus(str, Enum):
-    """State of a tool call."""
-
-    IN_PROGRESS = "IN_PROGRESS"
-    SUCCESS = "SUCCESS"
-    NEED_CLARIFICATION = "NEED_CLARIFICATION"
-    FAILED = "FAILED"
-
-
-class ToolCallRecord(BaseModel):
-    """Records an individual tool call."""
-
-    tool_name: str
-    workflow_id: UUID
-    end_user_id: str | None
-    additional_data: dict[str, str]
-    status: ToolCallStatus
-    step: int
-    input: Any
-    output: Any
     latency_seconds: float
 
 
@@ -365,7 +344,7 @@ class PortiaToolCallStorage(InMemoryStorage):
         """Validate response from Portia API."""
         if not response.is_success:
             error_str = str(response.content)
-            logger.error(f"Error from Portia Cloud: {error_str}")
+            logger().error(f"Error from Portia Cloud: {error_str}")
             raise StorageError(error_str)
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
