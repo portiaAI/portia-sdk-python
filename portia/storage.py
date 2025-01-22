@@ -50,8 +50,6 @@ class WorkflowStorage(ABC):
         """Retrieve a workflow by its ID."""
         raise NotImplementedError("get_workflow is not implemented")
 
-    latency_seconds: float
-
 
 class ToolCallStorage(ABC):
     """Base class for storing tool calls."""
