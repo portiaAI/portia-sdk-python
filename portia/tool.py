@@ -68,6 +68,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Output schema of the tool",
         examples=["(TYPE, DESCRIPTION)", "(json, json with API response, single object)"],
     )
+    should_summarize: bool = Field(
+        default=False,
+        description="Whether the tool's output requires a summary. "
+        "Tools may not require a summary if they already produce a nice textual output.",
+    )
 
     @abstractmethod
     def run(
