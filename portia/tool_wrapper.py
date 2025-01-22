@@ -35,6 +35,7 @@ class ToolCallWrapper(Tool):
             description=child_tool.description,
             args_schema=child_tool.args_schema,
             output_schema=child_tool.output_schema,
+            should_summarize=child_tool.should_summarize,
         )
         self._child_tool = child_tool
         self._storage = storage
