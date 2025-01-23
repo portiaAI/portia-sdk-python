@@ -44,6 +44,25 @@ class StepsOrError(BaseModel):
 class Planner:
     """planner class."""
 
+    PLANNER_SYSTEM_PROMPT = (
+        "You are an outstanding task planner who can leverage many "
+        "tools as their disposal. Your job is to provide a detailed plan of action in the form "
+        "of a set of steps to respond to a user's prompt. When using multiple tools, pay "
+        "attention to the arguments that tools need to make sure the chain of calls works. "
+        "If you are missing information do not make up placeholder variables like "
+        "example@example.com.If you can't come up with a plan provide a descriptive "
+        "error instead - do not return plans with no steps."
+    )
+
+    SUMMARIZE_STEP_TASK = (
+        "Summarize all previous tasks and outputs. Make sure the "
+        "summary is including all the previous tasks and outputs and biased towards "
+        "the last step output of the plan. Your summary "
+        "should be concise and to the point with maximum 500 characters."
+    )
+
+    PORTIA_SUMMARY_VARIABLE = "$portia_summary_final_step"
+
     def __init__(self, llm_wrapper: BaseLLMWrapper) -> None:
         """Init with the config."""
         self.llm_wrapper = llm_wrapper
@@ -53,6 +72,7 @@ class Planner:
         query: str,
         tool_list: list[Tool],
         examples: list[Plan] | None = None,
+        should_summarize_output: bool = True, # noqa: FBT001, FBT002
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         ctx = get_execution_context()
@@ -62,28 +82,37 @@ class Planner:
             ctx.planner_system_context_extension,
             examples,
         )
+
         response = self.llm_wrapper.to_instructor(
             response_model=StepsOrError,
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an outstanding task planner who can leverage many \
-    tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
-    steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
-    that tools need to make sure the chain of calls works. If you are missing information do not \
-    make up placeholder variables like example@example.com. If you can't come up with a plan \
-    provide a descriptive error instead - do not return plans with no steps.",
+                    "content": Planner.PLANNER_SYSTEM_PROMPT,
                 },
                 {"role": "user", "content": prompt},
             ],
         )
+        steps = [
+            *response.steps,
+            *(
+                [Step(
+                    task=Planner.SUMMARIZE_STEP_TASK,
+                    inputs=[],
+                    output=Planner.PORTIA_SUMMARY_VARIABLE,
+                )]
+                if should_summarize_output and response.steps
+                else []
+            ),
+        ]
+
         return PlanOrError(
             plan=Plan(
                 plan_context=PlanContext(
                     query=query,
                     tool_ids=[tool.id for tool in tool_list],
                 ),
-                steps=response.steps,
+                steps=steps,
             ),
             error=response.error,
         )

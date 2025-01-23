@@ -205,34 +205,12 @@ class Runner:
                     output=str(step_output.value),
                 )
 
-            # if a clarification was returned append it to the set of clarifications needed
-            if isinstance(step_output.value, Clarification) or (
-                isinstance(step_output.value, list)
-                and len(step_output.value) > 0
-                and all(isinstance(item, Clarification) for item in step_output.value)
-            ):
-                new_clarifications = (
-                    [step_output.value]
-                    if isinstance(step_output.value, Clarification)
-                    else step_output.value
-                )
-                for clarification in new_clarifications:
-                    clarification.step = workflow.current_step_index
-
-                workflow.outputs.clarifications = (
-                    workflow.outputs.clarifications + new_clarifications
-                )
-                workflow.state = WorkflowState.NEED_CLARIFICATION
-                self.storage.save_workflow(workflow)
-                logger().info(
-                    f"{len(new_clarifications)} Clarification(s) requested",
-                    extra={"plan": plan.id, "workflow": workflow.id},
-                )
+            if self._handle_clarifications(workflow, step_output, plan):
                 return workflow
 
             # set final output if is last step (accounting for zero index)
             if index == len(plan.steps) - 1:
-                workflow.outputs.final_output = step_output
+                self._set_final_output(plan, workflow, step_output)
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
@@ -255,6 +233,46 @@ class Runner:
                 output=str(workflow.outputs.final_output.value),
             )
         return workflow
+
+    def _set_final_output(self, plan: Plan, workflow: Workflow, step_output: Output) -> None:
+        """Set the final output for the workflow based on the last step's output."""
+        last_step = plan.steps[-1]
+        if last_step.output == Planner.PORTIA_SUMMARY_VARIABLE and len(plan.steps) > 1:
+            prev_output_var = plan.steps[-2].output
+            workflow.outputs.final_output = Output(
+                value=workflow.outputs.step_outputs[prev_output_var].value,
+                summary=step_output.value,
+            )
+        else:
+            workflow.outputs.final_output = step_output
+
+    def _handle_clarifications(self, workflow: Workflow, step_output: Output, plan: Plan) -> bool:
+        """Handle any clarifications needed during workflow execution.
+
+        Returns True if clarification is needed and workflow execution should stop.
+        """
+        if isinstance(step_output.value, Clarification) or (
+            isinstance(step_output.value, list)
+            and len(step_output.value) > 0
+            and all(isinstance(item, Clarification) for item in step_output.value)
+        ):
+            new_clarifications = (
+                [step_output.value]
+                if isinstance(step_output.value, Clarification)
+                else step_output.value
+            )
+            for clarification in new_clarifications:
+                clarification.step = workflow.current_step_index
+
+            workflow.outputs.clarifications = workflow.outputs.clarifications + new_clarifications
+            workflow.state = WorkflowState.NEED_CLARIFICATION
+            self.storage.save_workflow(workflow)
+            logger().info(
+                f"{len(new_clarifications)} Clarification(s) requested",
+                extra={"plan": plan.id, "workflow": workflow.id},
+            )
+            return True
+        return False
 
     def _get_agent_for_step(
         self,

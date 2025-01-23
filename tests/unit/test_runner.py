@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 
+from portia.agents.base_agent import Output
 from portia.config import AgentType, StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
@@ -207,3 +208,55 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
 
     with pytest.raises(InvalidWorkflowStateError):
         runner.execute_workflow(workflow)
+
+
+def test_runner_sets_final_output_correctly(runner: Runner) -> None:
+    """Test that final output is set correctly with summary from last step."""
+    query = "What activities can I do in Cairo based on weather?"
+
+    # Mock planner to return 2 steps
+    mock_plan_response = StepsOrError(
+        steps=[
+            Step(
+                task="Get current weather in Cairo",
+                tool_name="Add Tool",
+                output="$weather",
+            ),
+            Step(
+                task="Suggest activities based on weather",
+                tool_name="Add Tool",
+                output="$activities",
+            ),
+        ],
+        error=None,
+    )
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_plan_response)
+
+    # Create plan and workflow
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow(plan)
+
+    # Mock agent responses for each step
+    weather_response = "Sunny and 75°F in Cairo"
+    activities_response = "Perfect weather for visiting the pyramids and walking along the Nile"
+    final_summary = "Cairo has 75°F weather, you can visit the pyramids and walk along the Nile"
+
+    mock_agent = MagicMock()
+    mock_agent.execute_sync.side_effect = [
+        Output(value=weather_response),
+        Output(value=activities_response),
+        Output(value=final_summary),
+    ]
+    runner._get_agent_for_step = MagicMock(return_value=mock_agent) # noqa: SLF001
+
+    # Execute workflow
+    workflow = runner.execute_workflow(workflow)
+
+    # Verify outputs
+    assert workflow.outputs.step_outputs["$weather"].value == weather_response
+    assert workflow.outputs.step_outputs["$activities"].value == activities_response
+
+    # Verify final output
+    assert workflow.outputs.final_output.value == final_summary # pyright: ignore[reportOptionalMemberAccess]
+    assert workflow.outputs.final_output.summary == final_summary  # pyright: ignore[reportOptionalMemberAccess]
+    assert workflow.state == WorkflowState.COMPLETE

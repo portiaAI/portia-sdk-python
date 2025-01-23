@@ -43,6 +43,7 @@ def test_generate_plan_or_error_success(planner: Planner) -> None:
     result = planner.generate_plan_or_error(query=query, tool_list=[])
 
     assert result.plan.plan_context.query == query
+    assert result.plan.steps == []
     assert result.error is None
 
 
@@ -127,3 +128,43 @@ def test_render_prompt() -> None:
     assert "test query" in request_content
     assert "Add Tool" in request_content
     assert "extension" in system_context_content
+
+
+def test_generate_plan_with_summary_step(planner: Planner) -> None:
+    """Test that generated plan includes summary step as the last step."""
+    query = "What activities can I do in Cairo based on weather?"
+
+    weather_step = Step(
+        task="Get current weather in Cairo",
+        tool_name="weather",
+        output="$weather",
+    )
+    activities_step = Step(
+        task="Suggest activities based on weather",
+        tool_name="activities",
+        output="$activities",
+    )
+    mock_response = StepsOrError(
+        steps=[
+            weather_step,
+            activities_step,
+        ],
+        error=None,
+    )
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    result = planner.generate_plan_or_error(query=query, tool_list=[])
+
+    # Assert plan has 3 steps (2 original + 1 summary)
+    assert len(result.plan.steps) == 3
+
+    # Verify the last step is the summary step
+    last_step = result.plan.steps[-1]
+    assert last_step.task == Planner.SUMMARIZE_STEP_TASK
+    assert last_step.output == Planner.PORTIA_SUMMARY_VARIABLE
+    assert last_step.tool_name is None
+    assert last_step.inputs == []
+
+    # Verify the original steps are preserved
+    assert result.plan.steps[0] == weather_step
+    assert result.plan.steps[1] == activities_step
