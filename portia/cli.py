@@ -18,7 +18,7 @@ import click
 from dotenv import load_dotenv
 
 from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification
-from portia.config import Config, LLMModel, LLMProvider, LogLevel
+from portia.config import Config, LLMModel, LLMProvider, LogLevel, StorageClass
 from portia.context import execution_context
 from portia.logger import logger
 from portia.open_source_tools import example_tool_registry
@@ -153,11 +153,12 @@ def run(  # noqa: PLR0913
 @click.command()
 @common_options
 @click.argument("query")
-def plan(
+def plan(  # noqa: PLR0913
     query: str,
     log_level: str,
     llm_provider: str | None,
     llm_model: str | None,
+    end_user_id: str | None,
     env_location: str,
 ) -> None:
     """Plan a query."""
@@ -171,8 +172,32 @@ def plan(
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.generate_plan(query)
+    with execution_context(end_user_id=end_user_id):
+        output = runner.generate_plan(query)
     click.echo(output.model_dump_json(indent=4))
+
+
+@click.command()
+@common_options
+def list_tools(
+    log_level: str,
+    llm_provider: str | None,
+    llm_model: str | None,
+    end_user_id: str | None,  # noqa: ARG001
+    env_location: str,
+) -> None:
+    """Plan a query."""
+    config = _get_config(
+        log_level=LogLevel[log_level.upper()],
+        llm_provider=LLMProvider(llm_provider.upper()) if llm_provider else None,
+        llm_model=LLMModel(llm_model.upper()) if llm_model else None,
+        env_location=EnvLocation(env_location.upper()),
+    )
+    registry = example_tool_registry
+    if config.has_api_key(PORTIA_API_KEY):
+        registry += PortiaToolRegistry(config)
+    for tool in registry.get_tools():
+        click.echo(tool.model_dump_json(indent=4))
 
 
 def _get_config(
@@ -196,6 +221,11 @@ def _get_config(
         message = "Multiple LLM keys found, but no default provided: Select a provider or model"
         raise click.UsageError(message)
 
+    # Set storage based on whether Portia API Key is set
+    storage_class = StorageClass.MEMORY
+    if os.getenv("PORTIA_API_KEY"):
+        storage_class = StorageClass.CLOUD
+
     if llm_provider or llm_model:
         provider = (
             llm_provider
@@ -208,15 +238,20 @@ def _get_config(
             llm_provider=provider,
             llm_model_name=model,
             default_log_level=log_level,
+            storage_class=storage_class,
         )
     else:
-        config = Config.from_default(default_log_level=log_level)
+        config = Config.from_default(
+            default_log_level=log_level,
+            storage_class=storage_class,
+        )
 
     return config
 
 
 cli.add_command(run)
 cli.add_command(plan)
+cli.add_command(list_tools)
 
 if __name__ == "__main__":
     cli(obj={})  # Pass empty dict as the initial context object
