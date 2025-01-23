@@ -158,6 +158,7 @@ def plan(
     log_level: str,
     llm_provider: str | None,
     llm_model: str | None,
+    end_user_id: str | None,
     env_location: str,
 ) -> None:
     """Plan a query."""
@@ -171,8 +172,32 @@ def plan(
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
     runner = Runner(config=config, tool_registry=registry)
-    output = runner.generate_plan(query)
+    with execution_context(end_user_id=end_user_id):
+        output = runner.generate_plan(query)
     click.echo(output.model_dump_json(indent=4))
+
+
+@click.command()
+@common_options
+def list_tools(
+    log_level: str,
+    llm_provider: str | None,
+    llm_model: str | None,
+    end_user_id: str | None,  # noqa: ARG001
+    env_location: str,
+) -> None:
+    """Plan a query."""
+    config = _get_config(
+        log_level=LogLevel[log_level.upper()],
+        llm_provider=LLMProvider(llm_provider.upper()) if llm_provider else None,
+        llm_model=LLMModel(llm_model.upper()) if llm_model else None,
+        env_location=EnvLocation(env_location.upper()),
+    )
+    registry = example_tool_registry
+    if config.has_api_key(PORTIA_API_KEY):
+        registry += PortiaToolRegistry(config)
+    for tool in registry.get_tools():
+        click.echo(tool.model_dump_json(indent=4))
 
 
 def _get_config(
@@ -217,6 +242,7 @@ def _get_config(
 
 cli.add_command(run)
 cli.add_command(plan)
+cli.add_command(list_tools)
 
 if __name__ == "__main__":
     cli(obj={})  # Pass empty dict as the initial context object
