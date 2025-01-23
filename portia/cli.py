@@ -18,7 +18,7 @@ import click
 from dotenv import load_dotenv
 
 from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification
-from portia.config import Config, LLMModel, LLMProvider, LogLevel
+from portia.config import Config, LLMModel, LLMProvider, LogLevel, StorageClass
 from portia.context import execution_context
 from portia.logger import logger
 from portia.open_source_tools import example_tool_registry
@@ -196,6 +196,11 @@ def _get_config(
         message = "Multiple LLM keys found, but no default provided: Select a provider or model"
         raise click.UsageError(message)
 
+    # Set storage based on whether Portia API Key is set
+    storage_class = StorageClass.MEMORY
+    if os.getenv("PORTIA_API_KEY"):
+        storage_class = StorageClass.CLOUD
+
     if llm_provider or llm_model:
         provider = (
             llm_provider
@@ -208,9 +213,13 @@ def _get_config(
             llm_provider=provider,
             llm_model_name=model,
             default_log_level=log_level,
+            storage_class=storage_class,
         )
     else:
-        config = Config.from_default(default_log_level=log_level)
+        config = Config.from_default(
+            default_log_level=log_level,
+            storage_class=storage_class,
+        )
 
     return config
 
