@@ -30,12 +30,7 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         default_factory=uuid4,
         description="A unique ID for this clarification",
     )
-    type: str = Field(
-        init=False,
-        repr=False,
-        default="clarification",
-        description="type of clarification",
-    )
+    type: str
     response: SERIALIZABLE_TYPE_VAR | None = Field(
         default=None,
         description="The response from the user to this clarification.",
