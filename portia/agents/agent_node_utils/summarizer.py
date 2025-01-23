@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Any
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 from langchain_core.messages import BaseMessage, ToolMessage
+from langgraph.graph import MessagesState  # noqa: TC002
 
 from portia.agents.base_agent import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
-    from langgraph.graph import MessagesState
 
 class LLMSummarizer:
     """Model to generate a summary for the textual output of a tool.
