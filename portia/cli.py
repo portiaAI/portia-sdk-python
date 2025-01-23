@@ -153,7 +153,7 @@ def run(  # noqa: PLR0913
 @click.command()
 @common_options
 @click.argument("query")
-def plan(
+def plan(  # noqa: PLR0913
     query: str,
     log_level: str,
     llm_provider: str | None,
