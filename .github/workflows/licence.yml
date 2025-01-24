@@ -1,16 +1,10 @@
 name: License Check
 
 on:
-  workflow_dispatch:
-
   push:
-    branches: [ licence-check ]
-
-
-#   push:
-#     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   license-check:
