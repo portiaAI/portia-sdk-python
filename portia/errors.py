@@ -51,41 +51,41 @@ class WorkflowNotFoundError(Exception):
 class ToolNotFoundError(Exception):
     """Custom error class when tools aren't found."""
 
-    def __init__(self, tool_name: str) -> None:
+    def __init__(self, tool_id: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Tool with name {tool_name} not found.")
+        super().__init__(f"Tool with id {tool_id} not found.")
 
 
 class DuplicateToolError(Exception):
     """Custom error class when tools are registered with the same name."""
 
-    def __init__(self, tool_name: str) -> None:
+    def __init__(self, tool_id: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Tool with name {tool_name} already exists.")
+        super().__init__(f"Tool with id {tool_id} already exists.")
 
 
 class InvalidToolDescriptionError(Exception):
     """Raised when the tool description is invalid."""
 
-    def __init__(self, tool_name: str) -> None:
+    def __init__(self, tool_id: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Invalid Description for tool with name {tool_name}")
+        super().__init__(f"Invalid Description for tool with id {tool_id}")
 
 
 class ToolRetryError(Exception):
     """Raised when a tool fails on a retry."""
 
-    def __init__(self, tool_name: str, error_string: str) -> None:
+    def __init__(self, tool_id: str, error_string: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Tool {tool_name} failed after retries: {error_string}")
+        super().__init__(f"Tool {tool_id} failed after retries: {error_string}")
 
 
 class ToolFailedError(Exception):
     """Raised when a tool fails with a hard error."""
 
-    def __init__(self, tool_name: str, error_string: str) -> None:
+    def __init__(self, tool_id: str, error_string: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Tool {tool_name} failed: {error_string}")
+        super().__init__(f"Tool {tool_id} failed: {error_string}")
 
 
 class InvalidWorkflowStateError(Exception):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID
 
 import httpx
@@ -50,6 +50,11 @@ class WorkflowStorage(ABC):
         """Retrieve a workflow by its ID."""
         raise NotImplementedError("get_workflow is not implemented")
 
+    @abstractmethod
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+        """List workflows by state."""
+        raise NotImplementedError("get_workflows is not implemented")
+
 
 class ToolCallStorage(ABC):
     """Base class for storing tool calls."""
@@ -89,8 +94,13 @@ class Storage(PlanStorage, WorkflowStorage, ToolCallStorage):
 class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
     """Simple storage class that keeps plans + workflows in memory."""
 
-    plans: ClassVar[dict[UUID, Plan]] = {}
-    workflows: ClassVar[dict[UUID, Workflow]] = {}
+    plans: dict[UUID, Plan]
+    workflows: dict[UUID, Workflow]
+
+    def __init__(self) -> None:
+        """Initialize Storage."""
+        self.plans = {}
+        self.workflows = {}
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to dict."""
@@ -111,6 +121,14 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         if workflow_id in self.workflows:
             return self.workflows[workflow_id]
         raise WorkflowNotFoundError(workflow_id)
+
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+        """Get workflow from dict."""
+        if not workflow_state:
+            return list(self.workflows.values())
+        return [
+            workflow for workflow in self.workflows.values() if workflow.state == workflow_state
+        ]
 
 
 class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
@@ -208,6 +226,21 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         except (ValidationError, FileNotFoundError) as e:
             raise WorkflowNotFoundError(workflow_id) from e
 
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+        """Find all workflows in storage that match state."""
+        self._ensure_storage()
+
+        workflows = []
+
+        directory_path = Path(self.storage_dir)
+        for f in directory_path.iterdir():
+            if f.is_file() and f.name.startswith("workflow"):
+                workflow = self._read(f.name, Workflow)
+                if not workflow_state or workflow.state == workflow_state:
+                    workflows.append(workflow)
+
+        return workflows
+
 
 class PortiaCloudStorage(Storage):
     """Save plans and workflows to portia cloud."""
@@ -239,6 +272,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -254,6 +288,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -286,6 +321,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
             # If the workflow exists, update it instead
             if "workflow with this id already exists." in str(response.content):
@@ -302,6 +338,7 @@ class PortiaCloudStorage(Storage):
                         "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                         "Content-Type": "application/json",
                     },
+                    timeout=10,
                 )
         except Exception as e:
             raise StorageError(e) from e
@@ -317,6 +354,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -333,6 +371,39 @@ class PortiaCloudStorage(Storage):
                 ),
                 outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
             )
+
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+        """Get workflow from cloud."""
+        try:
+            query = ""
+            if workflow_state:
+                query = f"?workflow_state={workflow_state.value}"
+            response = httpx.get(
+                url=f"{self.api_endpoint}/api/v0/workflows/{query}",
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+                timeout=10,
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return [
+                Workflow(
+                    id=workflow["id"],
+                    plan_id=workflow["plan"]["id"],
+                    current_step_index=workflow["current_step_index"],
+                    state=WorkflowState(workflow["state"]),
+                    execution_context=ExecutionContext.model_validate(
+                        workflow["execution_context"],
+                    ),
+                    outputs=WorkflowOutputs.model_validate(workflow["outputs"]),
+                )
+                for workflow in response_json
+            ]
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save a tool call in the backend."""
@@ -354,6 +425,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e

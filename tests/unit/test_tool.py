@@ -1,6 +1,7 @@
 """Tests for the Tool class."""
 
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from httpx import Response
@@ -9,7 +10,7 @@ from pydantic import HttpUrl, SecretStr
 from portia.clarification import (
     ActionClarification,
     InputClarification,
-    MultiChoiceClarification,
+    MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
 from portia.context import empty_context, get_execution_context
@@ -118,7 +119,7 @@ def test_remote_tool_hard_error_from_server() -> None:
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -151,7 +152,7 @@ def test_remote_tool_soft_error() -> None:
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -184,7 +185,7 @@ def test_remote_tool_bad_response() -> None:
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -217,7 +218,7 @@ def test_remote_tool_hard_error() -> None:
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -236,6 +237,7 @@ def test_remote_tool_action_clarifications() -> None:
             "output": {
                 "value": [
                     {
+                        "id": str(uuid4()),
                         "type": "Action Clarification",
                         "action_url": "https://example.com",
                         "user_guidance": "blah",
@@ -263,7 +265,7 @@ def test_remote_tool_action_clarifications() -> None:
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -282,6 +284,7 @@ def test_remote_tool_input_clarifications() -> None:
             "output": {
                 "value": [
                     {
+                        "id": str(uuid4()),
                         "type": "Input Clarification",
                         "user_guidance": "blah",
                         "argument_name": "t",
@@ -308,7 +311,7 @@ def test_remote_tool_input_clarifications() -> None:
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -327,7 +330,8 @@ def test_remote_tool_mc_clarifications() -> None:
             "output": {
                 "value": [
                     {
-                        "type": "Multi Choice Clarification",
+                        "id": str(uuid4()),
+                        "type": "Multiple Choice Clarification",
                         "user_guidance": "blah",
                         "argument_name": "t",
                         "options": [1],
@@ -350,12 +354,12 @@ def test_remote_tool_mc_clarifications() -> None:
 
         output = tool.run(empty_context())
         assert output is not None
-        assert isinstance(output, MultiChoiceClarification)
+        assert isinstance(output, MultipleChoiceClarification)
         assert output.options == [1]
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -374,6 +378,7 @@ def test_remote_tool_value_confirm_clarifications() -> None:
             "output": {
                 "value": [
                     {
+                        "id": str(uuid4()),
                         "type": "Value Confirmation Clarification",
                         "user_guidance": "blah",
                         "argument_name": "t",
@@ -400,7 +405,7 @@ def test_remote_tool_value_confirm_clarifications() -> None:
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "additional_data": {}}}',  # noqa: E501
+            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",

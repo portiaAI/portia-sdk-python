@@ -128,6 +128,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
         args_schema=_TestToolSchema,
@@ -164,6 +165,7 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
         args_schema=_TestToolSchema,
@@ -214,6 +216,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
@@ -253,6 +256,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
@@ -312,6 +316,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",

@@ -2,6 +2,7 @@
 
 This module contains utility functions for managing agent execution flow.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -29,6 +30,7 @@ class AgentNode(str, Enum):
 
 
 MAX_RETRIES = 4
+
 
 def next_state_after_tool_call(
     state: MessagesState,
@@ -72,9 +74,9 @@ def process_output(
 ) -> Output:
     """Process the output of the agent."""
     if "ToolSoftError" in last_message.content and tool:
-        raise ToolRetryError(tool.name, str(last_message.content))
+        raise ToolRetryError(tool.id, str(last_message.content))
     if "ToolHardError" in last_message.content and tool:
-        raise ToolFailedError(tool.name, str(last_message.content))
+        raise ToolFailedError(tool.id, str(last_message.content))
     if clarifications and len(clarifications) > 0:
         return Output[list[Clarification]](
             value=clarifications,

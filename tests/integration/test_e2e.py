@@ -91,7 +91,7 @@ def test_runner_generate_plan(
     plan = runner.generate_plan(query)
 
     assert len(plan.steps) == 2
-    assert plan.steps[0].tool_name == "Add Tool"
+    assert plan.steps[0].tool_id == "add_tool"
     assert plan.steps[0].inputs
     assert len(plan.steps[0].inputs) == 2
     assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
@@ -121,7 +121,7 @@ def test_runner_run_query_with_clarifications(
     tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
-        tool_name="Clarification Tool",
+        tool_id="clarification_tool",
         task="Use tool",
         output="",
         inputs=[
@@ -148,7 +148,11 @@ def test_runner_run_query_with_clarifications(
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
 
-    workflow.get_outstanding_clarifications()[0].resolve(response="False")  # type: ignore  # noqa: PGH003
+    workflow = runner.resolve_clarification(
+        workflow,
+        workflow.get_outstanding_clarifications()[0],
+        "False",
+    )
     with execution_context(additional_data={"raise_clarification": "False"}):
         runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
@@ -170,7 +174,7 @@ def test_runner_run_query_with_hard_error(
     tool_registry = InMemoryToolRegistry.from_local_tools([ErrorTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
-        tool_name="Error Tool",
+        tool_id="error_tool",
         task="Use tool",
         output="",
         inputs=[
@@ -230,7 +234,7 @@ def test_runner_run_query_with_soft_error(
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
     runner = Runner(config=config, tool_registry=tool_registry)
     clarification_step = Step(
-        tool_name="Add Tool",
+        tool_id="add_tool",
         task="Use tool",
         output="",
         inputs=[
@@ -260,7 +264,7 @@ def test_runner_run_query_with_soft_error(
     assert workflow.state == WorkflowState.FAILED
     assert workflow.outputs.final_output
     assert isinstance(workflow.outputs.final_output.value, str)
-    assert "Tool failed after retries" in workflow.outputs.final_output.value
+    assert "Tool add_tool failed after retries" in workflow.outputs.final_output.value
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
@@ -312,7 +316,7 @@ def test_runner_run_query_with_multiple_clarifications(
     runner = Runner(config=config, tool_registry=tool_registry)
 
     step_one = Step(
-        tool_name="Add Tool",
+        tool_id="add_tool",
         task="Use tool",
         output="$step_one",
         inputs=[
@@ -329,7 +333,7 @@ def test_runner_run_query_with_multiple_clarifications(
         ],
     )
     step_two = Step(
-        tool_name="Add Tool",
+        tool_id="add_tool",
         task="Use tool",
         output="",
         inputs=[
@@ -360,7 +364,11 @@ def test_runner_run_query_with_multiple_clarifications(
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "please try again"
 
-    workflow.get_outstanding_clarifications()[0].resolve(response=456)  # type: ignore  # noqa: PGH003
+    workflow = runner.resolve_clarification(
+        workflow,
+        workflow.get_outstanding_clarifications()[0],
+        456,
+    )
     with execution_context(additional_data={"raise_clarification": "False"}):
         runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE

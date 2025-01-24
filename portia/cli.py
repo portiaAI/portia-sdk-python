@@ -17,7 +17,11 @@ from typing import Any, Callable
 import click
 from dotenv import load_dotenv
 
-from portia.clarification import ActionClarification, InputClarification, MultiChoiceClarification
+from portia.clarification import (
+    ActionClarification,
+    InputClarification,
+    MultipleChoiceClarification,
+)
 from portia.config import Config, LLMModel, LLMProvider, LogLevel, StorageClass
 from portia.context import execution_context
 from portia.logger import logger
@@ -94,13 +98,15 @@ def cli() -> None:
 @click.command()
 @common_options
 @click.argument("query")
+@click.option("--confirm/--no-confirm", default=True)
 def run(  # noqa: PLR0913
     query: str,
     log_level: str,
+    env_location: str,
+    confirm: bool,  # noqa: FBT001
     llm_provider: str | None,
     llm_model: str | None,
     end_user_id: str | None,
-    env_location: str,
 ) -> None:
     """Run a query."""
     config = _get_config(
@@ -118,33 +124,36 @@ def run(  # noqa: PLR0913
     runner = Runner(config=config, tool_registry=registry)
 
     with execution_context(end_user_id=end_user_id):
-        workflow = runner.execute_query(query)
+        plan = runner.generate_plan(query)
+
+        if confirm:
+            click.echo(plan.model_dump_json(indent=4))
+            if not click.prompt("Do you want to execute the plan?"):
+                return
+
+        workflow = runner.create_workflow(plan)
+        workflow = runner.execute_workflow(workflow)
 
         final_states = [WorkflowState.COMPLETE, WorkflowState.FAILED]
         while workflow.state not in final_states:
             for clarification in workflow.get_outstanding_clarifications():
-                if isinstance(clarification, MultiChoiceClarification):
-                    user_input = input(
-                        clarification.user_guidance
-                        + "\nPlease enter an option from below:\n"
-                        + "\n".join(clarification.options)
-                        + "\nchoice: ",
+                if isinstance(clarification, MultipleChoiceClarification):
+                    choices = click.Choice(clarification.options)
+                    user_input = click.prompt(
+                        clarification.user_guidance + "\nPlease choose a value:\n",
+                        type=choices,
                     )
-                    clarification.resolve(user_input)
+                    workflow = runner.resolve_clarification(workflow, clarification, user_input)
                 if isinstance(clarification, ActionClarification):
                     webbrowser.open(str(clarification.action_url))
                     logger().info("Please complete authentication to continue")
-                    auth_complete = False
-                    while not auth_complete:
-                        user_input = input("Is Authentication Complete [Y/N]")
-                        if user_input.lower() == "y":
-                            auth_complete = True
-                    clarification.resolve(None)
+                    workflow = runner.wait_for_ready(workflow)
                 if isinstance(clarification, InputClarification):
-                    user_input = input(
+                    user_input = click.prompt(
                         clarification.user_guidance + "\nPlease enter a value:\n",
+                        type=type(clarification.response),
                     )
-                    clarification.resolve(user_input)
+                    workflow = runner.resolve_clarification(workflow, clarification, user_input)
             runner.execute_workflow(workflow)
 
         click.echo(workflow.model_dump_json(indent=4))

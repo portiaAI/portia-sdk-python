@@ -133,7 +133,7 @@ class MockToolSchema(BaseModel):
 class MockTool(Tool):
     """A mock tool class for testing purposes."""
 
-    id: str = "mock_tool"
+    name: str = "Mock Tool"
     description: str = "do nothing"
     args_schema: type[BaseModel] = MockToolSchema
     output_schema: tuple[str, str] = ("None", "None: returns nothing")

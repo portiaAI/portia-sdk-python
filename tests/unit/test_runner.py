@@ -1,6 +1,8 @@
 """Tests for runner classes."""
 
 import tempfile
+import threading
+import time
 from pathlib import Path
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -97,7 +99,7 @@ def test_runner_generate_plan_with_tools(runner: Runner) -> None:
     mock_response = StepsOrError(steps=[], error=None)
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    plan = runner.generate_plan(query, tools=["Add Tool"])
+    plan = runner.generate_plan(query, tools=["add_tool"])
 
     assert plan.plan_context.query == query
     assert plan.plan_context.tool_ids == ["add_tool"]
@@ -126,7 +128,7 @@ def test_runner_toolless_agent() -> None:
         steps=[
             Step(
                 task="Find and summarize the latest news on artificial intelligence",
-                tool_name="Add Tool",
+                tool_id="add_tool",
                 output="$ai_search_results",
             ),
         ],
@@ -208,6 +210,40 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
 
     with pytest.raises(InvalidWorkflowStateError):
         runner.execute_workflow(workflow)
+
+
+def test_runner_wait_for_ready(runner: Runner) -> None:
+    """Test wait for ready."""
+    query = "example query"
+
+    mock_response = StepsOrError(steps=[], error=None)
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow(plan)
+
+    workflow.state = WorkflowState.FAILED
+    with pytest.raises(InvalidWorkflowStateError):
+        runner.wait_for_ready(workflow)
+
+    workflow.state = WorkflowState.IN_PROGRESS
+    workflow = runner.wait_for_ready(workflow)
+    assert workflow.state == WorkflowState.IN_PROGRESS
+
+    def update_workflow_state() -> None:
+        """Update the workflow state after sleeping."""
+        time.sleep(1)  # Simulate some delay before state changes
+        workflow.state = WorkflowState.READY_TO_RESUME
+        runner.storage.save_workflow(workflow)
+
+    workflow.state = WorkflowState.NEED_CLARIFICATION
+
+    # start a thread to update in status
+    update_thread = threading.Thread(target=update_workflow_state)
+    update_thread.start()
+
+    workflow = runner.wait_for_ready(workflow)
+    assert workflow.state == WorkflowState.READY_TO_RESUME
 
 
 def test_runner_sets_final_output_correctly(runner: Runner) -> None:

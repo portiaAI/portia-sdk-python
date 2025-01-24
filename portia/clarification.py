@@ -44,11 +44,6 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Whether this clarification has been resolved.",
     )
 
-    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
-        """Resolve the clarification with the given response."""
-        self.resolved = True
-        self.response = response
-
 
 class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     """A clarification about a specific argument for a tool.
@@ -59,7 +54,7 @@ class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     argument_name: str
 
 
-class ActionClarification(Clarification[bool]):
+class ActionClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     """An action based clarification.
 
     Represents a clarification where the user needs to click on a link. Set the response to true
@@ -84,7 +79,7 @@ class InputClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     type: str = "Input Clarification"
 
 
-class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
+class MultipleChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """A multiple choice based clarification.
 
     Represents a clarification where the user needs to select an option for a specific argument.
@@ -100,13 +95,6 @@ class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
-    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
-        """Validate response is in options."""
-        if response not in self.options:
-            raise ValueError(f"{self.response} is not a supported option")
-        self.resolved = True
-        self.response = response
-
 
 class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """A value confirmation clarification.
@@ -118,17 +106,13 @@ class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR
 
     type: str = "Value Confirmation Clarification"
 
-    def resolve(self, response: str | None) -> None:  # noqa: ARG002
-        """Resolve the clarification but don't update the response."""
-        self.resolved = True
-
 
 ClarificationListType = list[
     Union[
         Clarification,
         InputClarification,
         ActionClarification,
-        MultiChoiceClarification,
+        MultipleChoiceClarification,
         ValueConfirmationClarification,
     ]
 ]

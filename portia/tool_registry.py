@@ -26,7 +26,7 @@ class ToolRegistry(ABC):
         raise NotImplementedError("register_tool is not implemented")
 
     @abstractmethod
-    def get_tool(self, tool_name: str) -> Tool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Retrieve a tool's information."""
         raise NotImplementedError("get_tool is not implemented")
 
@@ -47,11 +47,11 @@ class ToolRegistry(ABC):
         # Ensure uniqueness of tools
         self_tools = self.get_tools()
         other_tools = other.get_tools()
-        tool_names = set()
+        tool_ids = set()
         for tool in [*self_tools, *other_tools]:
-            if tool.name in tool_names:
-                raise DuplicateToolError(tool.name)
-            tool_names.add(tool.name)
+            if tool.id in tool_ids:
+                raise DuplicateToolError(tool.id)
+            tool_ids.add(tool.id)
 
         return AggregatedToolRegistry([self, other])
 
@@ -67,14 +67,14 @@ class AggregatedToolRegistry(ToolRegistry):
         """Tool registration should happen in individual registries."""
         raise NotImplementedError("tool registration should happen in individual registries.")
 
-    def get_tool(self, tool_name: str) -> Tool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Search across all registries for a given tool, returning first match."""
         for registry in self.registries:
             try:
-                return registry.get_tool(tool_name)
+                return registry.get_tool(tool_id)
             except ToolNotFoundError:  # noqa: PERF203
                 continue
-        raise ToolNotFoundError(tool_name)
+        raise ToolNotFoundError(tool_id)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools from all registries."""
@@ -108,21 +108,21 @@ class InMemoryToolRegistry(ToolRegistry):
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""
-        if self._get_tool(tool.name):
-            raise DuplicateToolError(tool.name)
+        if self._get_tool(tool.id):
+            raise DuplicateToolError(tool.id)
         self.tools.append(tool)
 
-    def _get_tool(self, tool_name: str) -> Tool | None:
+    def _get_tool(self, tool_id: str) -> Tool | None:
         for tool in self.tools:
-            if tool.name == tool_name:
+            if tool.id == tool_id:
                 return tool
         return None
 
-    def get_tool(self, tool_name: str) -> Tool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Get the tool from the registry."""
-        tool = self._get_tool(tool_name)
+        tool = self._get_tool(tool_id)
         if not tool:
-            raise ToolNotFoundError(tool_name)
+            raise ToolNotFoundError(tool_id)
         return tool
 
     def get_tools(self) -> list[Tool]:
@@ -190,6 +190,7 @@ class PortiaToolRegistry(ToolRegistry):
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
+            timeout=10,
         )
         response.raise_for_status()
         tools = {}
@@ -211,19 +212,19 @@ class PortiaToolRegistry(ToolRegistry):
                 api_key=self.api_key,
                 api_endpoint=self.api_endpoint,
             )
-            tools[raw_tool["tool_name"]] = tool
+            tools[raw_tool["tool_id"]] = tool
         self.tools = tools
 
     def register_tool(self, tool: Tool) -> None:
         """Register tool in registry."""
         raise ToolRegistrationFailedError(tool)
 
-    def get_tool(self, tool_name: str) -> PortiaRemoteTool:
+    def get_tool(self, tool_id: str) -> PortiaRemoteTool:
         """Get the tool from the registry."""
-        if tool_name in self.tools:
-            return self.tools[tool_name]
+        if tool_id in self.tools:
+            return self.tools[tool_id]
 
-        raise ToolNotFoundError(tool_name)
+        raise ToolNotFoundError(tool_id)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools."""
