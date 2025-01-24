@@ -171,6 +171,7 @@ class Runner:
             # we pass read only copies of the state to the agent so that the runner remains
             # responsible for handling the output of the agent and updating the state.
             agent = self._get_agent_for_step(
+                plan,
                 step=ReadOnlyStep.from_step(step),
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
                 config=self.config,
@@ -276,6 +277,7 @@ class Runner:
 
     def _get_agent_for_step(
         self,
+        plan: Plan,
         step: Step,
         workflow: Workflow,
         config: Config,
@@ -298,6 +300,7 @@ class Runner:
                 cls = VerifierAgent
 
         return cls(
+            plan,
             step,
             workflow,
             config,

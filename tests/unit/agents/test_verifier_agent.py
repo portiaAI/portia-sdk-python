@@ -90,6 +90,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
@@ -400,6 +401,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
@@ -456,6 +458,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 
     (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
@@ -522,6 +525,7 @@ def test_get_last_resolved_clarification() -> None:
         unresolved_clarification,
     ]
     agent = VerifierAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
@@ -541,6 +545,7 @@ def test_clarifications_or_continue() -> None:
 
     (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
@@ -578,6 +583,7 @@ def test_clarifications_or_continue() -> None:
     (plan, workflow) = get_test_workflow()
     workflow.outputs.clarifications = [clarification]
     agent = VerifierAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),

@@ -278,6 +278,7 @@ def test_toolless_agent(llm_provider: LLMProvider, llm_model_name: LLMModel) -> 
         llm_model_name=llm_model_name,
     )
     agent = ToolLessAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=Workflow(plan_id=plan.id),
         config=config,

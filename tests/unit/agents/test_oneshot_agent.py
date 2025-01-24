@@ -28,7 +28,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
 
     (plan, workflow) = get_test_workflow()
-    agent = OneShotAgent(step=plan.steps[0], workflow=workflow, config=get_test_config())
+    agent = OneShotAgent(plan, step=plan.steps[0], workflow=workflow, config=get_test_config())
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
@@ -74,6 +74,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     (plan, workflow) = get_test_workflow()
     agent = OneShotAgent(
+        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),

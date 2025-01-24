@@ -14,7 +14,7 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ToolLessModel, "invoke", mock_invoke)
 
     (plan, workflow) = get_test_workflow()
-    agent = ToolLessAgent(step=plan.steps[0], workflow=workflow, config=get_test_config())
+    agent = ToolLessAgent(plan, step=plan.steps[0], workflow=workflow, config=get_test_config())
 
     output = agent.execute_sync()
     assert mock_invoke.called

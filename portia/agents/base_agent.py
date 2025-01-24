@@ -10,9 +10,10 @@ from typing import TYPE_CHECKING, Generic
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from portia.agents.context import build_context
+from portia.agents.context import build_context, get_tasks_and_outputs_context
 from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.context import get_execution_context
+from portia.plan import Plan
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -36,6 +37,7 @@ class BaseAgent:
 
     def __init__(
         self,
+        plan: Plan,
         step: Step,
         workflow: Workflow,
         config: Config,
@@ -48,6 +50,7 @@ class BaseAgent:
         but can not be edited. The agent should return output via the response
         of the execute_sync method.
         """
+        self.plan = plan
         self.step = step
         self.tool = tool
         self.config = config
@@ -69,6 +72,10 @@ class BaseAgent:
             self.step,
             self.workflow,
         )
+
+    def get_tasks_and_outputs_context(self) -> str:
+        """Build a context string from the tasks and outputs of the workflow."""
+        return get_tasks_and_outputs_context(self.plan, self.workflow)
 
 
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):

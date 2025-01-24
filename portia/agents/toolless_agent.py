@@ -16,6 +16,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 
 from portia.agents.base_agent import BaseAgent, Output
 from portia.llm_wrapper import LLMWrapper
+from portia.planner import Planner
 
 
 class ToolLessModel:
@@ -43,6 +44,7 @@ class ToolLessModel:
     def invoke(self, _: MessagesState) -> dict[str, Any]:
         """Invoke the model with the given message state."""
         model = self.llm
+        print("Omar ", self.context)
         response = model.invoke(
             self.prompt.format_messages(
                 input=self.agent.step.task + self.context,
@@ -57,7 +59,12 @@ class ToolLessAgent(BaseAgent):
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
-        context = self.get_system_context()
+
+        context = (
+            self.get_tasks_and_outputs_context()
+            if self.step.task == Planner.SUMMARIZE_STEP_TASK
+            else self.get_system_context()
+        )
         llm = LLMWrapper(self.config).to_langchain()
         task_prompt = ChatPromptTemplate.from_messages(
             [

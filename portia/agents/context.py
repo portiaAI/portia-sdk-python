@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from portia.clarification import ArgumentClarification, ClarificationListType
+from portia.plan import Plan
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import Output
@@ -165,4 +166,16 @@ def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     # Append System Context
     context.extend(system_context)
 
+    return "\n".join(context)
+
+def get_tasks_and_outputs_context(plan: Plan, workflow: Workflow) -> str:
+    """Get the tasks and outputs context."""
+    context = []
+    for step in plan.steps:
+        outputs = workflow.outputs.step_outputs
+        if step.output in outputs:
+            context.append(f"Task: {step.task}")
+            context.append(f"Output: {outputs[step.output].value}")
+            context.append("----------")
+    print(context)
     return "\n".join(context)
