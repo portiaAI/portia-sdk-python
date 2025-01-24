@@ -63,6 +63,13 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
     )
 
 
+def get_execution_ctx(workflow: Workflow | None = None) -> ExecutionContext:
+    """Return an execution context from a workflow."""
+    if workflow:
+        return workflow.execution_context
+    return empty_context()
+
+
 class AdditionToolSchema(BaseModel):
     """Input for AdditionTool."""
 
@@ -117,13 +124,6 @@ class ClarificationTool(Tool):
                 argument_name="raise_clarification",
             )
         return None
-
-
-def get_execution_ctx(workflow: Workflow | None = None) -> ExecutionContext:
-    """Return an execution context from a workflow."""
-    if workflow:
-        return workflow.execution_context
-    return empty_context()
 
 
 class MockToolSchema(BaseModel):
