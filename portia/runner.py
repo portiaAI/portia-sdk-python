@@ -205,6 +205,9 @@ class Runner:
 
             # refresh state
             workflow = self.storage.get_workflow(workflow.id)
+            logger().debug(f"New workflow state for {workflow.id} is {workflow.state}")
+
+        logger().info(f"Workflow {workflow.id} is ready to resume")
 
         return workflow
 
