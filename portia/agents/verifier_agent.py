@@ -140,7 +140,7 @@ class ParserModel:
             self.arg_parser_prompt.format_messages(
                 context=self.context,
                 task=self.agent.step.task,
-                tool_name=self.agent.tool.id,
+                tool_name=self.agent.tool.name,
                 tool_args=self.agent.tool.args_json_schema(),
                 tool_description=self.agent.tool.description,
                 previous_errors=",".join(self.previous_errors),
