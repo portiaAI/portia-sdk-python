@@ -236,9 +236,7 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         for f in directory_path.iterdir():
             if f.is_file() and f.name.startswith("workflow"):
                 workflow = self._read(f.name, Workflow)
-                if not workflow_state:
-                    workflows.append(workflow)
-                if workflow_state and workflow.state == workflow_state:
+                if not workflow_state or workflow.state == workflow_state:
                     workflows.append(workflow)
 
         return workflows
