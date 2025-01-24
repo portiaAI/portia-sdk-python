@@ -127,6 +127,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
         args_schema=_TestToolSchema,
@@ -145,7 +146,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "You are a highly capable assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
+    assert "TOOL_ID" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert mock_invoker.output_format == ToolInputs
@@ -163,6 +164,7 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
         args_schema=_TestToolSchema,
@@ -213,6 +215,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
@@ -252,6 +255,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
@@ -311,6 +315,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
