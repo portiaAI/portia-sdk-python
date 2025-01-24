@@ -18,7 +18,6 @@ from portia.context import (
     execution_context,
     get_execution_context,
     is_execution_context_set,
-    set_execution_context,
 )
 from portia.errors import (
     InvalidWorkflowStateError,
