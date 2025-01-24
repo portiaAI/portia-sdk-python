@@ -146,7 +146,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "You are a highly capable assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_ID" in messages[1].content  # type: ignore  # noqa: PGH003
+    assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert mock_invoker.output_format == ToolInputs
