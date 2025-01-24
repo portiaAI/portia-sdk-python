@@ -28,7 +28,6 @@ class ExecutionContextTrackerTool(Tool):
         ctx: ExecutionContext,
     ) -> None:
         """Save the context."""
-        print("tool ctx:", ctx)
         self.execution_context = ctx
 
 
