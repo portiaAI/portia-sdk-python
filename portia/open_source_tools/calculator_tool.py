@@ -90,7 +90,5 @@ class CalculatorTool(Tool[float]):
         else:
             prompt = prompt.replace("multiply", "*")
 
-        if not re.match(r"^[\d\s\+\-\*/\(\)\.]+$", prompt):
-            raise ToolHardError("Invalid characters in the expression.")
         # Extract the mathematical expression
         return "".join(re.findall(r"[\d\+\-\*/\(\)\.\s]", prompt))
