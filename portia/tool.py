@@ -291,7 +291,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user_id or "",
-                            # "workflow_id": ctx.workflow_id, - Update this when the backend is updated  # noqa: E501
+                            "workflow_id": ctx.workflow_id,
                             "additional_data": ctx.additional_data or {},
                         },
                     },
