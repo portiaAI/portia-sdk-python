@@ -247,6 +247,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case "Action Clarification":
                     return Output(
                         value=ActionClarification(
+                            id=clarification["id"],
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
                         ),
@@ -254,6 +255,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case "Input Clarification":
                     return Output(
                         value=InputClarification(
+                            id=clarification["id"],
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                         ),
@@ -261,6 +263,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case "Multiple Choice Clarification":
                     return Output(
                         value=MultipleChoiceClarification(
+                            id=clarification["id"],
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                             options=clarification["options"],
@@ -269,6 +272,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case "Value Confirmation Clarification":
                     return Output(
                         value=ValueConfirmationClarification(
+                            id=clarification["id"],
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                         ),
@@ -291,7 +295,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user_id or "",
-                            # "workflow_id": ctx.workflow_id, - Update this when the backend is updated  # noqa: E501
+                            "workflow_id": ctx.workflow_id,
                             "additional_data": ctx.additional_data or {},
                         },
                     },
