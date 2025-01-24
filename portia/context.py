@@ -30,6 +30,8 @@ class ExecutionContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    workflow_id: str | None = None
+
     # end_user_id is used by the system to identify the actual user for who a workflow is running.
     # This is used to identify the user for Authentication purposes and also to assist with
     # debugging and reporting. If provided the value should be a string that uniquely identifies
@@ -56,6 +58,7 @@ class ExecutionContext(BaseModel):
 def empty_context() -> ExecutionContext:
     """Return an empty context."""
     return ExecutionContext(
+        workflow_id=None,
         end_user_id=None,
         additional_data={},
         planner_system_context_extension=None,

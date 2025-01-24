@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from portia.clarification import Clarification, MultiChoiceClarification
+from portia.clarification import Clarification, MultipleChoiceClarification
 from portia.errors import ToolHardError
 from portia.tool import Tool
 
@@ -63,7 +63,7 @@ class FileReaderTool(Tool[str]):
 
         alt_file_paths = self.find_file(filename)
         if alt_file_paths:
-            return MultiChoiceClarification(
+            return MultipleChoiceClarification(
                 argument_name="filename",
                 user_guidance=f"Found {filename} in these location(s)."
                 "Pick one to continue:\n{alt_file_paths}",

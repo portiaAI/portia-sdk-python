@@ -190,6 +190,7 @@ class PortiaToolRegistry(ToolRegistry):
                 "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                 "Content-Type": "application/json",
             },
+            timeout=10,
         )
         response.raise_for_status()
         tools = {}

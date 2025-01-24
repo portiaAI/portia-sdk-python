@@ -29,7 +29,7 @@ from portia.clarification import (
     ActionClarification,
     Clarification,
     InputClarification,
-    MultiChoiceClarification,
+    MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
@@ -233,6 +233,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     def parse_response(self, response: dict[str, Any]) -> Output:
         """Parse a JSON response into domain models/errors."""
         output = Output.model_validate(response["output"])
+
         # Handle Tool Errors
         if isinstance(output.value, str):
             if "ToolSoftError" in output.value:
@@ -257,9 +258,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             user_guidance=clarification["user_guidance"],
                         ),
                     )
-                case "Multi Choice Clarification":
+                case "Multiple Choice Clarification":
                     return Output(
-                        value=MultiChoiceClarification(
+                        value=MultipleChoiceClarification(
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                             options=clarification["options"],
@@ -290,6 +291,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user_id or "",
+                            # "workflow_id": ctx.workflow_id, - Update this when the backend is updated  # noqa: E501
                             "additional_data": ctx.additional_data or {},
                         },
                     },

@@ -22,6 +22,7 @@ class WorkflowState(PortiaEnum):
     COMPLETE = "COMPLETE"
     NEED_CLARIFICATION = "NEED_CLARIFICATION"
     FAILED = "FAILED"
+    READY_TO_RESUME = "READY_TO_RESUME"
 
 
 class WorkflowOutputs(BaseModel):
