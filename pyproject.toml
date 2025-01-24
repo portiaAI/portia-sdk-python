@@ -41,7 +41,6 @@ pytest-rerunfailures = "^14.0"
 pytest-cov = "^5.0.0"
 pyright = "^1.1.382"
 pytest-httpx = "^0.33.0"
-py = "^1.11.0"
 pytest-xdist = {extras = ["psutil"], version = "^3.6.1"}
 
 [tool.ruff]
