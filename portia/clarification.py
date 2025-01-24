@@ -59,7 +59,7 @@ class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     argument_name: str
 
 
-class ActionClarification(Clarification[bool]):
+class ActionClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     """An action based clarification.
 
     Represents a clarification where the user needs to click on a link. Set the response to true
