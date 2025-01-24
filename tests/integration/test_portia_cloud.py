@@ -23,7 +23,7 @@ def test_runner_run_query_with_cloud() -> None:
     config = Config.from_default(storage_class=StorageClass.CLOUD)
     tool_registry = PortiaToolRegistry(config=config)
     runner = Runner(config=config, tool_registry=tool_registry)
-    query = "Whats the weather in London"
+    query = "Where is the next Olympics being hosted?"
 
     workflow = runner.execute_query(query)
 
@@ -49,7 +49,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolRegistrationFailedError):
         registry.register_tool(AdditionTool())
 
-    tool = registry.get_tool("Portia Weather Tool")
+    tool = registry.get_tool("Portia Search Tool")
     tool.api_key = SecretStr("123")
     ctx = get_execution_context()
     with pytest.raises(ToolHardError):
