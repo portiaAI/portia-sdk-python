@@ -139,6 +139,7 @@ class Runner:
             WorkflowState.NOT_STARTED,
             WorkflowState.IN_PROGRESS,
             WorkflowState.NEED_CLARIFICATION,
+            WorkflowState.READY_TO_RESUME,
         ]:
             raise InvalidWorkflowStateError(workflow.id)
 

@@ -269,6 +269,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -284,6 +285,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -308,7 +310,10 @@ class PortiaCloudStorage(Storage):
                     "id": str(workflow.id),
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
-                    "execution_context": workflow.execution_context.model_dump(mode="json"),
+                    "execution_context": workflow.execution_context.model_dump(
+                        mode="json",
+                        exclude={"workflow_id"},  # remove this when on backend
+                    ),
                     "outputs": workflow.outputs.model_dump(mode="json"),
                     "plan_id": str(workflow.plan_id),
                 },
@@ -316,6 +321,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
             # If the workflow exists, update it instead
             if "workflow with this id already exists." in str(response.content):
@@ -324,7 +330,10 @@ class PortiaCloudStorage(Storage):
                     json={
                         "current_step_index": workflow.current_step_index,
                         "state": workflow.state,
-                        "execution_context": workflow.execution_context.model_dump(mode="json"),
+                        "execution_context": workflow.execution_context.model_dump(
+                            mode="json",
+                            exclude={"workflow_id"},  # remove this when on backend
+                        ),
                         "outputs": workflow.outputs.model_dump(mode="json"),
                         "plan_id": str(workflow.plan_id),
                     },
@@ -332,6 +341,7 @@ class PortiaCloudStorage(Storage):
                         "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                         "Content-Type": "application/json",
                     },
+                    timeout=10,
                 )
         except Exception as e:
             raise StorageError(e) from e
@@ -347,6 +357,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -373,6 +384,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -413,6 +425,7 @@ class PortiaCloudStorage(Storage):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
+                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
