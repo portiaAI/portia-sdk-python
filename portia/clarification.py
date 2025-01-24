@@ -95,13 +95,6 @@ class MultipleChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
-    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
-        """Validate response is in options."""
-        if response not in self.options:
-            raise ValueError(f"{self.response} is not a supported option")
-        self.resolved = True
-        self.response = response
-
 
 class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """A value confirmation clarification.
@@ -112,10 +105,6 @@ class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR
     """
 
     type: str = "Value Confirmation Clarification"
-
-    def resolve(self, response: str | None) -> None:  # noqa: ARG002
-        """Resolve the clarification but don't update the response."""
-        self.resolved = True
 
 
 ClarificationListType = list[

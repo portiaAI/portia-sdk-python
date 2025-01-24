@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 from uuid import UUID
 
 import httpx
@@ -51,7 +51,7 @@ class WorkflowStorage(ABC):
         raise NotImplementedError("get_workflow is not implemented")
 
     @abstractmethod
-    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
         """List workflows by state."""
         raise NotImplementedError("get_workflows is not implemented")
 
@@ -94,8 +94,13 @@ class Storage(PlanStorage, WorkflowStorage, ToolCallStorage):
 class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
     """Simple storage class that keeps plans + workflows in memory."""
 
-    plans: ClassVar[dict[UUID, Plan]] = {}
-    workflows: ClassVar[dict[UUID, Workflow]] = {}
+    plans: dict[UUID, Plan]
+    workflows: dict[UUID, Workflow]
+
+    def __init__(self) -> None:
+        """Initialize Storage."""
+        self.plans = {}
+        self.workflows = {}
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to dict."""
@@ -117,7 +122,7 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
             return self.workflows[workflow_id]
         raise WorkflowNotFoundError(workflow_id)
 
-    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
         """Get workflow from dict."""
         if not workflow_state:
             return list(self.workflows.values())
@@ -221,7 +226,7 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         except (ValidationError, FileNotFoundError) as e:
             raise WorkflowNotFoundError(workflow_id) from e
 
-    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
         """Find all workflows in storage that match state."""
         self._ensure_storage()
 
@@ -231,9 +236,9 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         for f in directory_path.iterdir():
             if f.is_file() and f.name.startswith("workflow"):
                 workflow = self._read(f.name, Workflow)
-                if workflow_state and workflow.state == workflow_state:
+                if not workflow_state:
                     workflows.append(workflow)
-                else:
+                if workflow_state and workflow.state == workflow_state:
                     workflows.append(workflow)
 
         return workflows
@@ -375,11 +380,14 @@ class PortiaCloudStorage(Storage):
                 outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
             )
 
-    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
         """Get workflow from cloud."""
         try:
+            query = ""
+            if workflow_state:
+                query = f"?workflow_state={workflow_state.value}"
             response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/workflows/?workflow_state={workflow_state}",
+                url=f"{self.api_endpoint}/api/v0/workflows/{query}",
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",

@@ -12,7 +12,7 @@ from portia.storage import (
     PlanNotFoundError,
     WorkflowNotFoundError,
 )
-from portia.workflow import Workflow
+from portia.workflow import Workflow, WorkflowState
 
 
 def test_in_memory_storage_save_and_get_plan() -> None:
@@ -70,6 +70,22 @@ def test_disk_file_storage_save_and_get_workflow(tmp_path: Path) -> None:
 
     with pytest.raises(WorkflowNotFoundError):
         storage.get_workflow(uuid4())
+
+
+def test_disk_file_storage_save_and_get_workflows(tmp_path: Path) -> None:
+    """Test saving and retrieving a Workflow in DiskFileStorage."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+    plan = Plan(
+        plan_context=PlanContext(query="query", tool_ids=[]),
+        steps=[],
+    )
+    workflow = Workflow(plan_id=plan.id, state=WorkflowState.IN_PROGRESS)
+    storage.save_workflow(workflow)
+    workflow = Workflow(plan_id=plan.id, state=WorkflowState.FAILED)
+    storage.save_workflow(workflow)
+
+    workflows = storage.get_workflows(WorkflowState.IN_PROGRESS)
+    assert len(workflows) == 1
 
 
 def test_disk_file_storage_invalid_plan_retrieval(tmp_path: Path) -> None:
