@@ -29,13 +29,17 @@ jobs:
 
     - name: Check licenses
       run: |
-        echo "Checking for disallowed licenses (GPL, LGPL, AGPL, Proprietary, Commercial)..."
-        if ! python -m licensecheck \
-          --file pyproject.toml \
-          --fail-licenses GPL LGPL AGPL Proprietary Commercial \
-          --only-licenses MIT Apache-2.0 BSD-2-Clause BSD-3-Clause ISC; then
+        echo "Checking for disallowed licenses..."
+        # Save the output to analyze it
+        if ! python -m licensecheck > license_report.txt; then
+          echo "::group::Found problematic licenses"
+          grep -B 1 -A 1 "License:" license_report.txt | grep -v "^--$"
+          echo "::endgroup::"
           echo "::error::❌ License check failed! Found dependencies with disallowed licenses."
           echo "Please ensure all dependencies use permissive licenses (MIT, Apache-2.0, BSD, ISC)."
           exit 1
         fi
         echo "✅ All dependency licenses are compliant!"
+        echo "::group::License Report"
+        cat license_report.txt
+        echo "::endgroup::"

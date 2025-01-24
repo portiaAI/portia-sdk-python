@@ -115,3 +115,8 @@ sidebar_top_level_label=""
 [tool.poetry.scripts]
 portia-cli = "portia.cli:cli"
 
+[tool.licensecheck]
+using = "poetry"
+fail_licenses = ["GPL", "LGPL", "AGPL", "Proprietary", "Commercial"]
+only_licenses = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"]
+
