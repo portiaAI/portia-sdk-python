@@ -11,7 +11,6 @@ from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
-    ActionClarification,
     Clarification,
 )
 from portia.config import AgentType, Config, StorageClass
@@ -158,6 +157,20 @@ class Runner:
 
         return self._execute_workflow(plan, workflow)
 
+    def resolve_clarification(
+        self,
+        workflow: Workflow,
+        clarification: Clarification,
+        response: object,
+    ) -> Workflow:
+        """Resolve a clarification updating the workflow state as needed."""
+        clarification.resolved = True
+        clarification.response = response
+        if len(workflow.get_outstanding_clarifications()) == 0:
+            workflow.state = WorkflowState.READY_TO_RESUME
+        self.storage.save_workflow(workflow)
+        return workflow
+
     def wait_for_ready(self, workflow: Workflow) -> Workflow:
         """Wait for the workflow to be in a state that it can be re-run.
 
@@ -165,8 +178,9 @@ class Runner:
         """
         if workflow.state not in [
             WorkflowState.IN_PROGRESS,
-            WorkflowState.NEED_CLARIFICATION,
             WorkflowState.NOT_STARTED,
+            WorkflowState.READY_TO_RESUME,
+            WorkflowState.NEED_CLARIFICATION,
         ]:
             raise InvalidWorkflowStateError("Cannot wait for workflow that is not ready to run")
 
@@ -174,19 +188,16 @@ class Runner:
         if workflow.state in [
             WorkflowState.IN_PROGRESS,
             WorkflowState.NOT_STARTED,
+            WorkflowState.READY_TO_RESUME,
         ]:
             return workflow
 
-        unresolved_clarification = any(not c.resolved for c in workflow.outputs.clarifications)
-        while unresolved_clarification:
+        while workflow.state != WorkflowState.READY_TO_RESUME:
             # wait a couple of seconds as we're long polling
             time.sleep(2)
 
             # refresh state
             workflow = self.storage.get_workflow(workflow.id)
-
-            # See if there are any un-resolved clarifications
-            unresolved_clarification = any(not c.resolved for c in workflow.outputs.clarifications)
 
         return workflow
 

@@ -35,7 +35,7 @@ workflow = runner.storage.get_workflow(workflow.id)
 # Update clarifications
 if workflow.state == WorkflowState.NEED_CLARIFICATION:
     for c in workflow.get_outstanding_clarifications():
-        c.resolve(response=None)
+        workflow = runner.resolve_clarification(workflow, c, "New Value")
 
     # Execute again with the same execution context
     with execution_context(context=workflow.execution_context):

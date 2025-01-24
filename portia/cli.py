@@ -144,7 +144,7 @@ def run(  # noqa: PLR0913
                         clarification.user_guidance + "\nPlease choose a value:\n",
                         type=choices,
                     )
-                    clarification.resolve(user_input)
+                    workflow = runner.resolve_clarification(workflow, clarification, user_input)
                 if isinstance(clarification, ActionClarification):
                     webbrowser.open(str(clarification.action_url))
                     logger().info("Please complete authentication to continue")
@@ -154,7 +154,7 @@ def run(  # noqa: PLR0913
                         clarification.user_guidance + "\nPlease enter a value:\n",
                         type=type(clarification.response),
                     )
-                    clarification.resolve(user_input)
+                    workflow = runner.resolve_clarification(workflow, clarification, user_input)
             runner.execute_workflow(workflow)
 
         click.echo(workflow.model_dump_json(indent=4))

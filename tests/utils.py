@@ -119,6 +119,13 @@ class ClarificationTool(Tool):
         return None
 
 
+def get_execution_ctx(workflow: Workflow | None = None) -> ExecutionContext:
+    """Return an execution context from a workflow."""
+    if workflow:
+        return workflow.execution_context
+    return empty_context()
+
+
 class MockToolSchema(BaseModel):
     """Input for MockTool."""
 

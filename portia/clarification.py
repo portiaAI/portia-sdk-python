@@ -44,11 +44,6 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Whether this clarification has been resolved.",
     )
 
-    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
-        """Resolve the clarification with the given response."""
-        self.resolved = True
-        self.response = response
-
 
 class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     """A clarification about a specific argument for a tool.
