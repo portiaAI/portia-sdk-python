@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
+    ActionClarification,
     Clarification,
 )
 from portia.config import AgentType, Config, StorageClass
@@ -145,14 +147,48 @@ class Runner:
 
         # if the workflow has execution context associated, but none is set then use it
         if not is_execution_context_set() and workflow.execution_context:
+            workflow.execution_context.workflow_id = str(workflow.id)
             with execution_context(workflow.execution_context):
                 return self._execute_workflow(plan, workflow)
 
         # if there is execution context set, make sure we update the workflow before running
         if is_execution_context_set():
+            workflow.execution_context.workflow_id = str(workflow.id)
             workflow.execution_context = get_execution_context()
 
         return self._execute_workflow(plan, workflow)
+
+    def wait_for_ready(self, workflow: Workflow) -> Workflow:
+        """Wait for the workflow to be in a state that it can be re-run.
+
+        This is usually because Authentication needs to happen out of band.
+        """
+        if workflow.state not in [
+            WorkflowState.IN_PROGRESS,
+            WorkflowState.NEED_CLARIFICATION,
+            WorkflowState.NOT_STARTED,
+        ]:
+            raise InvalidWorkflowStateError("Cannot wait for workflow that is not ready to run")
+
+        # These states can continue straight away
+        if workflow.state in [
+            WorkflowState.IN_PROGRESS,
+            WorkflowState.NOT_STARTED,
+        ]:
+            return workflow
+
+        unresolved_clarification = any(not c.resolved for c in workflow.outputs.clarifications)
+        while unresolved_clarification:
+            # wait a couple of seconds as we're long polling
+            time.sleep(2)
+
+            # refresh state
+            workflow = self.storage.get_workflow(workflow.id)
+
+            # See if there are any un-resolved clarifications
+            unresolved_clarification = any(not c.resolved for c in workflow.outputs.clarifications)
+
+        return workflow
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
         workflow.state = WorkflowState.IN_PROGRESS

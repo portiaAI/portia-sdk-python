@@ -9,7 +9,7 @@ from pydantic import HttpUrl, SecretStr
 from portia.clarification import (
     ActionClarification,
     InputClarification,
-    MultiChoiceClarification,
+    MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
 from portia.context import empty_context, get_execution_context
@@ -350,7 +350,7 @@ def test_remote_tool_mc_clarifications() -> None:
 
         output = tool.run(empty_context())
         assert output is not None
-        assert isinstance(output, MultiChoiceClarification)
+        assert isinstance(output, MultipleChoiceClarification)
         assert output.options == [1]
 
         mock_post.assert_called_once_with(

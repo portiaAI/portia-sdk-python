@@ -10,6 +10,7 @@ from uuid import UUID
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from portia import workflow
 from portia.context import ExecutionContext
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.logger import logger
@@ -49,6 +50,11 @@ class WorkflowStorage(ABC):
     def get_workflow(self, workflow_id: UUID) -> Workflow:
         """Retrieve a workflow by its ID."""
         raise NotImplementedError("get_workflow is not implemented")
+
+    @abstractmethod
+    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+        """List workflows by state."""
+        raise NotImplementedError("get_workflows is not implemented")
 
 
 class ToolCallStorage(ABC):
@@ -111,6 +117,14 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         if workflow_id in self.workflows:
             return self.workflows[workflow_id]
         raise WorkflowNotFoundError(workflow_id)
+
+    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+        """Get workflow from dict."""
+        if not workflow_state:
+            return list(self.workflows.values())
+        return [
+            workflow for workflow in self.workflows.values() if workflow.state == workflow_state
+        ]
 
 
 class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
@@ -207,6 +221,23 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
             return self._read(f"workflow-{workflow_id}.json", Workflow)
         except (ValidationError, FileNotFoundError) as e:
             raise WorkflowNotFoundError(workflow_id) from e
+
+    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+        """Find all workflows in storage that match state."""
+        self._ensure_storage()
+
+        workflows = []
+
+        directory_path = Path(self.storage_dir)
+        for f in directory_path.iterdir():
+            if f.is_file() and f.name.startswith("workflow"):
+                workflow = self._read(f.name, Workflow)
+                if workflow_state and workflow.state == workflow_state:
+                    workflows.append(workflow)
+                else:
+                    workflows.append(workflow)
+
+        return workflows
 
 
 class PortiaCloudStorage(Storage):
@@ -333,6 +364,35 @@ class PortiaCloudStorage(Storage):
                 ),
                 outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
             )
+
+    def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+        """Get workflow from cloud."""
+        try:
+            response = httpx.get(
+                url=f"{self.api_endpoint}/api/v0/workflows/?workflow_state={workflow_state}",
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return [
+                Workflow(
+                    id=workflow["id"],
+                    plan_id=workflow["plan"]["id"],
+                    current_step_index=workflow["current_step_index"],
+                    state=WorkflowState(workflow["state"]),
+                    execution_context=ExecutionContext.model_validate(
+                        workflow["execution_context"],
+                    ),
+                    outputs=WorkflowOutputs.model_validate(workflow["outputs"]),
+                )
+                for workflow in response_json["items"]
+            ]
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save a tool call in the backend."""

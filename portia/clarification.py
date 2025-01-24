@@ -84,7 +84,7 @@ class InputClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     type: str = "Input Clarification"
 
 
-class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
+class MultipleChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     """A multiple choice based clarification.
 
     Represents a clarification where the user needs to select an option for a specific argument.
@@ -128,7 +128,7 @@ ClarificationListType = list[
         Clarification,
         InputClarification,
         ActionClarification,
-        MultiChoiceClarification,
+        MultipleChoiceClarification,
         ValueConfirmationClarification,
     ]
 ]

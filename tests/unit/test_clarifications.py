@@ -8,7 +8,7 @@ from pydantic import HttpUrl
 from portia.clarification import (
     ActionClarification,
     InputClarification,
-    MultiChoiceClarification,
+    MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
 
@@ -48,7 +48,7 @@ def test_action_clarification_ser() -> None:
 
 def test_value_multi_choice_validation() -> None:
     """Test clarifications error on invalid response."""
-    clarification = MultiChoiceClarification(
+    clarification = MultipleChoiceClarification(
         argument_name="test",
         user_guidance="test",
         options=["yes"],
@@ -58,7 +58,7 @@ def test_value_multi_choice_validation() -> None:
     clarification.resolve("yes")
 
     with pytest.raises(ValueError):  # noqa: PT011
-        clarification = MultiChoiceClarification(
+        clarification = MultipleChoiceClarification(
             argument_name="test",
             user_guidance="test",
             options=["yes"],
@@ -66,7 +66,7 @@ def test_value_multi_choice_validation() -> None:
             response="No",
         )
 
-    MultiChoiceClarification(
+    MultipleChoiceClarification(
         argument_name="test",
         user_guidance="test",
         options=["yes"],

@@ -29,12 +29,12 @@ from portia.clarification import (
     ActionClarification,
     Clarification,
     InputClarification,
-    MultiChoiceClarification,
+    MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.context import ExecutionContext
-from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.errors import InvalidToolDescriptionError, ToolFailedError, ToolHardError, ToolSoftError
 from portia.logger import logger
 from portia.templates.render import render_template
 
@@ -74,6 +74,10 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Whether the tool's output requires a summary. "
         "Tools may not require a summary if they already produce a nice textual output.",
     )
+
+    def ready(self, ctx: ExecutionContext) -> bool:  # noqa: ARG002
+        """Return whether the tool is ready to run for the given execution context."""
+        return True
 
     @abstractmethod
     def run(
@@ -233,6 +237,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     def parse_response(self, response: dict[str, Any]) -> Output:
         """Parse a JSON response into domain models/errors."""
         output = Output.model_validate(response["output"])
+
         # Handle Tool Errors
         if isinstance(output.value, str):
             if "ToolSoftError" in output.value:
@@ -257,9 +262,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             user_guidance=clarification["user_guidance"],
                         ),
                     )
-                case "Multi Choice Clarification":
+                case "Multiple Choice Clarification":
                     return Output(
-                        value=MultiChoiceClarification(
+                        value=MultipleChoiceClarification(
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                             options=clarification["options"],
@@ -273,6 +278,34 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
         return output
+
+    def ready(self, ctx: ExecutionContext) -> bool:
+        """Check with backend to see if tool ready."""
+        try:
+            # Send to Cloud
+            response = httpx.post(
+                url=f"{self.api_endpoint}/api/v0/tools/{self.id}/ready/",
+                content=json.dumps(
+                    {
+                        "execution_context": {
+                            "end_user_id": ctx.end_user_id or "",
+                            "additional_data": ctx.additional_data or {},
+                        },
+                    },
+                ),
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+        except Exception as e:
+            logger().error(f"Unhandled error from Portia Cloud: {e}")
+            raise ToolFailedError(tool_name=self.name, error_string=str(e)) from e
+        else:
+            json_response = response.json()
+            return "success" in json_response
 
     def run(
         self,
@@ -290,6 +323,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user_id or "",
+                            "workflow_id": ctx.workflow_id,
                             "additional_data": ctx.additional_data or {},
                         },
                     },
