@@ -80,7 +80,7 @@ def test_render_prompt() -> None:
             steps=[
                 Step(
                     task="plan task 1",
-                    tool_name="plan_tool1a",
+                    tool_id="plan_tool1a",
                     inputs=[Variable(name="$plan_input1", description="plan description 1")],
                     output="$plan_output1",
                 ),
@@ -122,8 +122,8 @@ def test_render_prompt() -> None:
     assert "$plan_output1" in response_match
 
     assert "Takes two numbers and adds them together" in tools_content
-    assert "Add Tool" in tools_content
+    assert "add_tool" in tools_content
 
     assert "test query" in request_content
-    assert "Add Tool" in request_content
+    assert "add_tool" in request_content
     assert "extension" in system_context_content

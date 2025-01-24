@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 # TODO(Emma): This is a temporary class while we are migrating to a synced plan model. #noqa: FIX002
 # Evals should be updated to use the new StepsOrError class.
 # https://linear.app/portialabs/issue/POR-381
@@ -30,6 +31,7 @@ class PlanOrError(BaseModel):
         default=None,
         description="An error message if the plan could not be created.",
     )
+
 
 class StepsOrError(BaseModel):
     """A list of steps or an error."""
@@ -88,6 +90,7 @@ class Planner:
             error=response.error,
         )
 
+
 def _render_prompt_insert_defaults(
     query: str,
     tool_list: list[Tool],
@@ -123,4 +126,6 @@ def _default_query_system_context(
 
 def _get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
     """Given a list of tool names, return the descriptions of the tools."""
-    return [{"name": tool.name, "description": tool.description} for tool in tool_list]
+    return [
+        {"id": tool.id, "name": tool.name, "description": tool.description} for tool in tool_list
+    ]
