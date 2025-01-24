@@ -410,7 +410,7 @@ class PortiaCloudStorage(Storage):
                     ),
                     outputs=WorkflowOutputs.model_validate(workflow["outputs"]),
                 )
-                for workflow in response_json["items"]
+                for workflow in response_json
             ]
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
