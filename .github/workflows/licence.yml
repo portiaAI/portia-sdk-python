@@ -1,0 +1,36 @@
+name: License Check
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches: [ licence-check ]
+
+
+#   push:
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main ]
+
+jobs:
+  license-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install licensecheck
+      run: pip install licensecheck
+
+    - name: Check licenses
+      run: |
+        licensecheck \
+          --strategy pyproject \
+          --failon AGPL,Proprietary,Commercial \
+          --allowed GPL,LGPL,MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC \
+          pyproject.toml
