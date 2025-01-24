@@ -11,6 +11,7 @@ from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
 from portia.context import ExecutionContext, execution_context
 from portia.errors import ToolSoftError
 from portia.plan import Plan, PlanContext, Step, Variable
+from portia.planner import Planner
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import Workflow, WorkflowState
@@ -63,8 +64,9 @@ def test_runner_run_query(
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
     assert workflow.outputs.final_output.value == 3
-    for output in workflow.outputs.step_outputs.values():
-        assert output.summary is not None
+    for name, output in workflow.outputs.step_outputs.items():
+        if name != Planner.PORTIA_SUMMARY_VARIABLE:
+            assert output.summary is not None
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
@@ -88,7 +90,7 @@ def test_runner_generate_plan(
 
     plan = runner.generate_plan(query)
 
-    assert len(plan.steps) == 1
+    assert len(plan.steps) == 2
     assert plan.steps[0].tool_name == "Add Tool"
     assert plan.steps[0].inputs
     assert len(plan.steps[0].inputs) == 2
@@ -99,7 +101,7 @@ def test_runner_generate_plan(
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
     assert workflow.outputs.final_output.value == 3
-
+    assert workflow.outputs.final_output.summary is not None
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
