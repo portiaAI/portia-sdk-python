@@ -14,7 +14,12 @@ from portia.clarification import (
     Clarification,
 )
 from portia.config import AgentType, Config, StorageClass
-from portia.context import execution_context, get_execution_context, is_execution_context_set
+from portia.context import (
+    execution_context,
+    get_execution_context,
+    is_execution_context_set,
+    set_execution_context,
+)
 from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
@@ -153,8 +158,9 @@ class Runner:
 
         # if there is execution context set, make sure we update the workflow before running
         if is_execution_context_set():
-            workflow.execution_context.workflow_id = str(workflow.id)
             workflow.execution_context = get_execution_context()
+            workflow.execution_context.workflow_id = str(workflow.id)
+            set_execution_context(workflow.execution_context)
 
         return self._execute_workflow(plan, workflow)
 
