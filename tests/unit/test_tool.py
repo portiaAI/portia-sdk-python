@@ -327,7 +327,7 @@ def test_remote_tool_mc_clarifications() -> None:
             "output": {
                 "value": [
                     {
-                        "type": "Multi Choice Clarification",
+                        "type": "Multiple Choice Clarification",
                         "user_guidance": "blah",
                         "argument_name": "t",
                         "options": [1],

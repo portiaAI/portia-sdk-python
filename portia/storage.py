@@ -10,7 +10,6 @@ from uuid import UUID
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from portia import workflow
 from portia.context import ExecutionContext
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.logger import logger

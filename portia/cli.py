@@ -17,7 +17,6 @@ from typing import Any, Callable
 import click
 from dotenv import load_dotenv
 
-from portia import workflow
 from portia.clarification import (
     ActionClarification,
     InputClarification,

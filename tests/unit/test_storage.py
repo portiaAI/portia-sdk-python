@@ -11,7 +11,7 @@ import pytest
 from portia.errors import StorageError
 from portia.plan import Plan, PlanContext
 from portia.storage import PlanStorage, PortiaCloudStorage, ToolCallStorage, WorkflowStorage
-from portia.workflow import Workflow
+from portia.workflow import Workflow, WorkflowState
 from tests.utils import get_test_config, get_test_tool_call
 
 if TYPE_CHECKING:
@@ -35,6 +35,9 @@ def test_storage_base_classes() -> None:
 
         def get_workflow(self, workflow_id: UUID) -> Workflow:
             return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
+
+        def get_workflows(self, workflow_state: WorkflowState | None) -> list[Workflow]:
+            return super().get_workflows(workflow_state)  # type: ignore  # noqa: PGH003
 
         def save_tool_call(self, tool_call: ToolCallRecord) -> None:
             return super().save_tool_call(tool_call)  # type: ignore  # noqa: PGH003
