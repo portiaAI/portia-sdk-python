@@ -95,28 +95,6 @@ runner = Runner(
 runner.execute_query("Get the weather in Sydney and London then email me with a summary at hello@portialabs.ai")
 ```
 
-
-## Tests
-
-We write two types of tests:
-- Unit tests should mock out the LLM providers, and aim to give quick feedback. They should mock out LLM providers.
-- Integration tests actually call LLM providers, are much slower but test the system works fully.
-
-To run tests:
-- Run all tests with `poetry run pytest`.
-- Run unit tests with `poetry run pytest tests/unit`.
-- Run integration tests with `poetry run pytest tests/integration`.
-
-We utilize [pytest-parallel](https://pypi.org/project/pytest-parallel/) to execute tests in parallel. You can add the `--workers=4` argument to the commands above to run in parallel. If you run into issues running this try setting `export NO_PROXY=true` first.
-
-## Release
-
-Releases are controlled via Github Actions and the version field of the `pyproject.toml`. To release:
-
-1. Create a PR that updates the version field in the `pyproject.toml`.
-2. Merge the PR to main.
-3. Github Actions will create a new tag and push the new version to PyPi.
-
 ## CLI 
 
 To test the CLI locally run 
