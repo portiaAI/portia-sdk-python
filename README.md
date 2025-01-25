@@ -1,7 +1,7 @@
 # Portia SDK Python
 
 Welcome to our repository! Portia AI is an open source developer framework for stateful, authenticated agentic workflows. The core product accessible in this repository is extensible with our complimentary cloud features which are aimed at making production deployments easier and faster.
-Play around, break things and tell us how you're getting on in our <a href="[docs.portialabs.ai](https://discord.gg/DvAJz9ffaR)" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank">**Code of Conduct(↗)**</a>). 
+Play around, break things and tell us how you're getting on in our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">**Code of Conduct (↗)**</a>). 
 
 
 ## Why Portia AI
