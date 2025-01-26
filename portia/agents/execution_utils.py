@@ -27,7 +27,7 @@ class AgentNode(str, Enum):
     TOOLS = "tools"
     ARGUMENT_VERIFIER = "argument_verifier"
     ARGUMENT_PARSER = "argument_parser"
-
+    TOOLLESS_AGENT = "toolless_agent"
 
 MAX_RETRIES = 4
 
