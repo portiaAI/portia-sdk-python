@@ -112,7 +112,7 @@ print(workflow.model_dump_json(indent=2))
 ```
 
 ## Learn more
-- Head over to our docs at <a href="docs.portialabs.ai" target="_blank">**docs.portialabs.ai (↗)**</a>.
+- Head over to our docs at <a href="https://docs.portialabs.ai" target="_blank">**docs.portialabs.ai (↗)**</a>.
 - Join the conversation on our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>.
 - Watch us embarrass ourselves on our <a href="https://www.youtube.com/@PortiaAI" target="_blank">**YouTube channel (↗)**</a>.
 - Follow us on <a href="https://www.producthunt.com/posts/portia-ai" target="_blank">**Product Hunt (↗)**</a>.
