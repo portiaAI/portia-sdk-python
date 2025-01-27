@@ -13,8 +13,8 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
-from portia.context import empty_context, get_execution_context
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.execution_context import empty_context, get_execution_context
 from portia.tool import PortiaRemoteTool
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from portia.agents.base_agent import BaseAgent
-from portia.context import execution_context
+from portia.execution_context import execution_context
 from tests.utils import get_test_config, get_test_workflow
 
 

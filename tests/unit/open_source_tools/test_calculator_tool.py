@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from portia.context import ExecutionContext
 from portia.errors import ToolHardError
+from portia.execution_context import ExecutionContext
 from portia.open_source_tools.calculator_tool import CalculatorTool
 
 

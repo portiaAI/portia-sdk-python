@@ -1,4 +1,28 @@
-"""Central definition of error classes."""
+"""Central definition of error classes.
+
+This module defines custom exception classes used throughout the application. These exceptions
+help identify specific error conditions, particularly related to configuration, planning, workflows,
+tools, and storage. They provide more context and clarity than generic exceptions.
+
+Classes in this file include:
+
+- `ConfigNotFoundError`: Raised when a required configuration value is not found.
+- `InvalidConfigError`: Raised when a configuration value is invalid.
+- `PlanError`: A base class for exceptions in the query planner module.
+- `PlanNotFoundError`: Raised when a plan is not found.
+- `WorkflowNotFoundError`: Raised when a workflow is not found.
+- `ToolNotFoundError`: Raised when a tool is not found.
+- `DuplicateToolError`: Raised when a tool is registered with the same name.
+- `InvalidToolDescriptionError`: Raised when a tool description is invalid.
+- `ToolRetryError`: Raised when a tool fails after retries.
+- `ToolFailedError`: Raised when a tool fails with a hard error.
+- `InvalidWorkflowStateError`: Raised when a workflow is in an invalid state.
+- `InvalidAgentOutputError`: Raised when the agent produces invalid output.
+- `ToolHardError`: Raised when a tool encounters an unrecoverable error.
+- `ToolSoftError`: Raised when a tool encounters an error that can be retried.
+- `StorageError`: Raised when an issue occurs with storage.
+
+"""
 
 from __future__ import annotations
 
@@ -8,116 +32,195 @@ if TYPE_CHECKING:
     from uuid import UUID
 
 
-class ConfigNotFoundError(Exception):
-    """Raised when a needed config value is not present."""
+class PortiaBaseError(Exception):
+    """Base class for all our errors."""
+
+
+class ConfigNotFoundError(PortiaBaseError):
+    """Raised when a required configuration value is not found.
+
+    Args:
+        value (str): The name of the configuration value that is missing.
+
+    """
 
     def __init__(self, value: str) -> None:
         """Set custom error message."""
         super().__init__(f"Config value {value} is not set")
 
 
-class InvalidConfigError(Exception):
-    """Raised when a needed config value is invalid."""
+class InvalidConfigError(PortiaBaseError):
+    """Raised when a configuration value is invalid.
+
+    Args:
+        value (str): The name of the invalid configuration value.
+        issue (str): A description of the issue with the configuration value.
+
+    """
 
     def __init__(self, value: str, issue: str) -> None:
         """Set custom error message."""
         super().__init__(f"Config value {value.upper()} is not valid - {issue}")
 
 
-class PlanError(Exception):
-    """Base class for exceptions in the query planner module. Indicates an error in planning."""
+class PlanError(PortiaBaseError):
+    """Base class for exceptions in the query planner module.
+
+    This exception indicates an error that occurred during the planning phase.
+
+    Args:
+        error_string (str): A description of the error encountered during planning.
+
+    """
 
     def __init__(self, error_string: str) -> None:
         """Set custom error message."""
         super().__init__(f"Error during planning: {error_string}")
 
 
-class PlanNotFoundError(Exception):
-    """Indicate a plan was not found."""
+class PlanNotFoundError(PortiaBaseError):
+    """Raised when a plan with a specific ID is not found.
+
+    Args:
+        plan_id (UUID): The ID of the plan that was not found.
+
+    """
 
     def __init__(self, plan_id: UUID) -> None:
         """Set custom error message."""
         super().__init__(f"Plan with id {plan_id} not found.")
 
 
-class WorkflowNotFoundError(Exception):
-    """Indicate a workflow was not found."""
+class WorkflowNotFoundError(PortiaBaseError):
+    """Raised when a workflow with a specific ID is not found.
+
+    Args:
+        workflow_id (UUID | str | None): The ID or name of the workflow that was not found.
+
+    """
 
     def __init__(self, workflow_id: UUID | str | None) -> None:
         """Set custom error message."""
         super().__init__(f"Workflow with id {workflow_id} not found.")
 
 
-class ToolNotFoundError(Exception):
-    """Custom error class when tools aren't found."""
+class ToolNotFoundError(PortiaBaseError):
+    """Raised when a tool with a specific ID is not found.
+
+    Args:
+        tool_id (str): The ID of the tool that was not found.
+
+    """
 
     def __init__(self, tool_id: str) -> None:
         """Set custom error message."""
         super().__init__(f"Tool with id {tool_id} not found.")
 
 
-class DuplicateToolError(Exception):
-    """Custom error class when tools are registered with the same name."""
+class DuplicateToolError(PortiaBaseError):
+    """Raised when a tool is registered with the same name.
+
+    Args:
+        tool_id (str): The ID of the tool that already exists.
+
+    """
 
     def __init__(self, tool_id: str) -> None:
         """Set custom error message."""
         super().__init__(f"Tool with id {tool_id} already exists.")
 
 
-class InvalidToolDescriptionError(Exception):
-    """Raised when the tool description is invalid."""
+class InvalidToolDescriptionError(PortiaBaseError):
+    """Raised when a tool description is invalid.
+
+    Args:
+        tool_id (str): The ID of the tool with an invalid description.
+
+    """
 
     def __init__(self, tool_id: str) -> None:
         """Set custom error message."""
         super().__init__(f"Invalid Description for tool with id {tool_id}")
 
 
-class ToolRetryError(Exception):
-    """Raised when a tool fails on a retry."""
+class ToolRetryError(PortiaBaseError):
+    """Raised when a tool fails after retrying.
+
+    Args:
+        tool_id (str): The ID of the tool that failed.
+        error_string (str): A description of the error that occurred.
+
+    """
 
     def __init__(self, tool_id: str, error_string: str) -> None:
         """Set custom error message."""
         super().__init__(f"Tool {tool_id} failed after retries: {error_string}")
 
 
-class ToolFailedError(Exception):
-    """Raised when a tool fails with a hard error."""
+class ToolFailedError(PortiaBaseError):
+    """Raised when a tool fails with a hard error.
+
+    Args:
+        tool_id (str): The ID of the tool that failed.
+        error_string (str): A description of the error that occurred.
+
+    """
 
     def __init__(self, tool_id: str, error_string: str) -> None:
         """Set custom error message."""
         super().__init__(f"Tool {tool_id} failed: {error_string}")
 
 
-class InvalidWorkflowStateError(Exception):
-    """The given workflow is in an invalid state."""
+class InvalidWorkflowStateError(PortiaBaseError):
+    """Raised when a workflow is in an invalid state."""
 
 
-class InvalidAgentOutputError(Exception):
-    """The agent returned output that could not be processed."""
+class InvalidAgentOutputError(PortiaBaseError):
+    """Raised when the agent produces invalid output.
+
+    Args:
+        content (str): The invalid content returned by the agent.
+
+    """
 
     def __init__(self, content: str) -> None:
         """Set custom error message."""
         super().__init__(f"Agent returned invalid content: {content}")
 
 
-class ToolHardError(Exception):
-    """Raised when a tool hits an error it can't retry."""
+class ToolHardError(PortiaBaseError):
+    """Raised when a tool encounters an error it cannot retry.
+
+    Args:
+        cause (Exception | str): The underlying exception or error message.
+
+    """
 
     def __init__(self, cause: Exception | str) -> None:
         """Set custom error message."""
         super().__init__(cause)
 
 
-class ToolSoftError(Exception):
-    """Raised when a tool hits an error it can retry."""
+class ToolSoftError(PortiaBaseError):
+    """Raised when a tool encounters an error that can be retried.
+
+    Args:
+        cause (Exception | str): The underlying exception or error message.
+
+    """
 
     def __init__(self, cause: Exception | str) -> None:
         """Set custom error message."""
         super().__init__(cause)
 
 
-class StorageError(Exception):
-    """Raised when there's an issue with the storage."""
+class StorageError(PortiaBaseError):
+    """Raised when there's an issue with storage.
+
+    Args:
+        cause (Exception | str): The underlying exception or error message.
+
+    """
 
     def __init__(self, cause: Exception | str) -> None:
         """Set custom error message."""

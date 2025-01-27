@@ -6,13 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from portia.config import Config
+from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
+from portia.planners.context import default_query_system_context, render_prompt_insert_defaults
+from portia.planners.one_shot_planner import OneShotPlanner
 from portia.planners.planner import (
-    Planner,
     StepsOrError,
-    _default_query_system_context,
-    _render_prompt_insert_defaults,
 )
 from tests.utils import AdditionTool
 
@@ -24,12 +24,12 @@ def mock_config() -> Config:
 
 
 @pytest.fixture
-def planner(mock_config: Config) -> Planner:
+def planner(mock_config: Config) -> OneShotPlanner:
     """Create an instance of the Planner with mocked config."""
-    return Planner(llm_wrapper=LLMWrapper(config=mock_config))
+    return OneShotPlanner(config=mock_config)
 
 
-def test_generate_plan_or_error_success(planner: Planner) -> None:
+def test_generate_plan_or_error_success(planner: OneShotPlanner) -> None:
     """Test successful plan generation with valid inputs."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
@@ -40,13 +40,17 @@ def test_generate_plan_or_error_success(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_list=[])
+    result = planner.generate_plan_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[],
+    )
 
     assert result.plan.plan_context.query == query
     assert result.error is None
 
 
-def test_generate_plan_or_error_failure(planner: Planner) -> None:
+def test_generate_plan_or_error_failure(planner: OneShotPlanner) -> None:
     """Test handling of error when generating a plan fails."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
@@ -57,7 +61,7 @@ def test_generate_plan_or_error_failure(planner: Planner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_plan_or_error(query=query, tool_list=[])
+    result = planner.generate_plan_or_error(ctx=get_execution_context(), query=query, tool_list=[])
 
     assert result.error == "Unable to generate a plan"
     assert result.plan.plan_context.query == query
@@ -65,7 +69,7 @@ def test_generate_plan_or_error_failure(planner: Planner) -> None:
 
 def test_planner_default_context_with_extensions() -> None:
     """Test default context."""
-    context = _default_query_system_context(system_context_extension=["456"])
+    context = default_query_system_context(system_context_extension=["456"])
     assert "456" in context
 
 
@@ -87,7 +91,7 @@ def test_render_prompt() -> None:
             ],
         ),
     ]
-    rendered_prompt = _render_prompt_insert_defaults(
+    rendered_prompt = render_prompt_insert_defaults(
         query="test query",
         tool_list=[AdditionTool()],
         examples=plans,

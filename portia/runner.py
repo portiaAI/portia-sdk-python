@@ -33,14 +33,14 @@ from portia.clarification import (
     Clarification,
 )
 from portia.config import AgentType, Config, PlannerType, StorageClass
-from portia.context import (
-    execution_context,
-    get_execution_context,
-    is_execution_context_set,
-)
 from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
+)
+from portia.execution_context import (
+    execution_context,
+    get_execution_context,
+    is_execution_context_set,
 )
 from portia.logger import logger, logger_manager
 from portia.plan import Plan, ReadOnlyStep, Step

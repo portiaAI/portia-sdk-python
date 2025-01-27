@@ -9,7 +9,7 @@ and analytics, capturing contextual information relevant to the workflow's execu
 
 Key Components
 --------------
-- **WorkflowState**: Tracks the current status of the workflow (e.g., NOT_STARTED, IN_PROGRESS, etc.).
+- **WorkflowState**: Tracks the current status of the workflow (e.g., NOT_STARTED, IN_PROGRESS).
 - **current_step_index**: Represents the step within the plan currently being executed.
 - **outputs**: Stores the intermediate and final results of the workflow.
 - **ExecutionContext**: Provides contextual metadata useful for logging and performance analysis.
@@ -26,7 +26,7 @@ from portia.clarification import (
     ClarificationListType,  # noqa: TC001
 )
 from portia.common import PortiaBaseModel, PortiaEnum, PortiaReadOnlyModel
-from portia.context import ExecutionContext, empty_context
+from portia.execution_context import ExecutionContext, empty_context
 
 
 class WorkflowState(PortiaEnum):

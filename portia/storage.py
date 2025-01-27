@@ -33,8 +33,8 @@ from uuid import UUID
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from portia.context import ExecutionContext
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
+from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, Step
 from portia.tool_call import ToolCallRecord, ToolCallStatus

@@ -41,13 +41,13 @@ from portia.clarification import (
     ValueConfirmationClarification,
 )
 from portia.common import SERIALIZABLE_TYPE_VAR, PortiaBaseModel, combine_args_kwargs
-from portia.context import ExecutionContext
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
-    from portia.context import ExecutionContext
+    from portia.execution_context import ExecutionContext
 
 """MAX_TOOL_DESCRIPTION_LENGTH is the max length tool descriptions can be to respect API limits."""
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
@@ -336,7 +336,7 @@ class Tool(PortiaBaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def serialize_args_schema(self, value: type[BaseModel]) -> str:
         """Serialize the args_schema by returning its class name.
 
-        This function serializes the arguments schema by returning the class name of the schema type.
+        This function serializes the arguments schema by returning the class name of the schema.
 
         Args:
             value (type[BaseModel]): The argument schema class.

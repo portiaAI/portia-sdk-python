@@ -5,8 +5,8 @@ from pydantic import SecretStr
 
 from portia.clarification import ActionClarification
 from portia.config import Config, StorageClass
-from portia.context import get_execution_context
 from portia.errors import ToolNotFoundError
+from portia.execution_context import get_execution_context
 from portia.runner import Runner
 from portia.storage import PortiaCloudStorage
 from portia.tool import ToolHardError

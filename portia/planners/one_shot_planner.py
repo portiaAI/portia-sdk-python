@@ -1,20 +1,15 @@
-"""Planner module creates plans from queries."""
+"""One shot planner is a single best effort attempt at planning based on the given query + tools."""
 
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
-
-from portia.context import ExecutionContext, get_execution_context
+from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Plan, PlanContext, Step
-from portia.planners.planner import PlanOrError, Planner, StepsOrError
-from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
-from portia.templates.render import render_template
+from portia.plan import Plan, PlanContext
+from portia.planners.context import render_prompt_insert_defaults
+from portia.planners.planner import Planner, PlanOrError, StepsOrError
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -39,7 +34,7 @@ class OneShotPlanner(Planner):
     ) -> PlanOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         ctx = get_execution_context()
-        prompt = _render_prompt_insert_defaults(
+        prompt = render_prompt_insert_defaults(
             query,
             tool_list,
             ctx.planner_system_context_extension,
@@ -70,43 +65,3 @@ class OneShotPlanner(Planner):
             ),
             error=response.error,
         )
-
-
-def _render_prompt_insert_defaults(
-    query: str,
-    tool_list: list[Tool],
-    system_context_extension: list[str] | None = None,
-    examples: list[Plan] | None = None,
-) -> str:
-    """Render the prompt for the query planner with defaults inserted if not provided."""
-    system_context = _default_query_system_context(system_context_extension)
-
-    if examples is None:
-        examples = DEFAULT_EXAMPLE_PLANS
-
-    tools_with_descriptions = _get_tool_descriptions_for_tools(tool_list=tool_list)
-
-    return render_template(
-        "query_planner.xml.jinja",
-        query=query,
-        tools=tools_with_descriptions,
-        examples=examples,
-        system_context=system_context,
-    )
-
-
-def _default_query_system_context(
-    system_context_extension: list[str] | None = None,
-) -> list[str]:
-    """Return the default system context."""
-    base_context = [f"Today is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
-    if system_context_extension:
-        base_context.extend(system_context_extension)
-    return base_context
-
-
-def _get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
-    """Given a list of tool names, return the descriptions of the tools."""
-    return [
-        {"id": tool.id, "name": tool.name, "description": tool.description} for tool in tool_list
-    ]
