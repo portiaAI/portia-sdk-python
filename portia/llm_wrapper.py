@@ -1,4 +1,21 @@
-"""Wrapper around different LLM providers allowing us to treat them the same."""
+"""Wrapper around different LLM providers, standardizing their usage.
+
+This module provides an abstraction layer around various large language model (LLM) providers,
+allowing them to be treated uniformly in the application. It defines a base class `BaseLLMWrapper`
+and a concrete implementation `LLMWrapper` that handles communication with different LLM providers
+such as OpenAI, Anthropic, and MistralAI.
+
+The `LLMWrapper` class includes methods to convert the provider's model to LangChain-compatible
+models and to generate responses using the instructor tool.
+
+Classes in this file include:
+
+- `BaseLLMWrapper`: An abstract base class for all LLM wrappers, providing a template for conversion
+methods.
+- `LLMWrapper`: A concrete implementation that supports different LLM providers and provides
+functionality for converting to LangChain models and generating responses using instructor.
+
+"""
 
 from __future__ import annotations
 
@@ -29,15 +46,42 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class BaseLLMWrapper(ABC):
-    """Abstract base class for LLM wrappers."""
+    """Abstract base class for LLM wrappers.
+
+    This abstract class defines the interface that all LLM wrappers should implement.
+    It requires conversion methods for LangChain models (`to_langchain`) and for generating
+    responses using the instructor tool (`to_instructor`).
+
+    Methods:
+        to_langchain: Convert the LLM to a LangChain-compatible model.
+        to_instructor: Generate a response using the instructor tool.
+
+    """
 
     def __init__(self, config: Config) -> None:
-        """Initialize the base LLM wrapper."""
+        """Initialize the base LLM wrapper.
+
+        Args:
+            config (Config): The configuration object containing settings for the LLM.
+
+        """
         self.config = config
 
     @abstractmethod
     def to_langchain(self) -> BaseChatModel:
-        """Convert to a LangChain-compatible model."""
+        """Return a LangChain chat model based on the LLM provider.
+
+        Converts the LLM provider's model to a LangChain-compatible model for interaction
+        within the LangChain framework.
+
+        Returns:
+            BaseChatModel: A LangChain-compatible model.
+
+        Raises:
+            NotImplementedError: If the function is not implemented
+
+        """
+        raise NotImplementedError("to_langchain is not implemented")
 
     @abstractmethod
     def to_instructor(
@@ -45,17 +89,51 @@ class BaseLLMWrapper(ABC):
         response_model: type[T],
         messages: list[ChatCompletionMessageParam],
     ) -> T:
-        """Generate a response using instructor."""
+        """Generate a response using instructor.
+
+        Args:
+            response_model (type[T]): The Pydantic model to deserialize the response into.
+            messages (list[ChatCompletionMessageParam]): The messages to send to the LLM.
+
+        Returns:
+            T: The deserialized response.
+
+        Raises:
+            NotImplementedError: If the function is not implemented
+
+        """
+        raise NotImplementedError("to_instructor is not implemented")
 
 
 class LLMWrapper(BaseLLMWrapper):
-    """LLMWrapper class for different LLMs."""
+    """LLMWrapper class for different LLMs.
+
+    This class provides functionality for working with various LLM providers, such as OpenAI,
+    Anthropic, and MistralAI. It includes methods to convert the LLM provider's model to a
+    LangChain-compatible model and to generate responses using the instructor tool.
+
+    Attributes:
+        llm_provider (LLMProvider): The LLM provider to use (e.g., OpenAI, Anthropic, MistralAI).
+        model_name (str): The name of the model to use.
+        model_temperature (float): The temperature setting for the model.
+        model_seed (int): The seed for the model's random generation.
+
+    Methods:
+        to_langchain: Converts the LLM provider's model to a LangChain-compatible model.
+        to_instructor: Generates a response using instructor for the selected LLM provider.
+
+    """
 
     def __init__(
         self,
         config: Config,
     ) -> None:
-        """Initialize the wrapper."""
+        """Initialize the wrapper.
+
+        Args:
+            config (Config): The configuration object containing settings for the LLM.
+
+        """
         super().__init__(config)
         self.llm_provider = config.llm_provider
         self.model_name = config.llm_model_name.value
@@ -63,7 +141,15 @@ class LLMWrapper(BaseLLMWrapper):
         self.model_seed = config.llm_model_seed
 
     def to_langchain(self) -> BaseChatModel:
-        """Return a langchain chat model."""
+        """Return a LangChain chat model based on the LLM provider.
+
+        Converts the LLM provider's model to a LangChain-compatible model for interaction
+        within the LangChain framework.
+
+        Returns:
+            BaseChatModel: A LangChain-compatible model.
+
+        """
         match self.llm_provider:
             case LLMProvider.OPENAI:
                 return ChatOpenAI(
@@ -95,7 +181,16 @@ class LLMWrapper(BaseLLMWrapper):
         response_model: type[T],
         messages: list[ChatCompletionMessageParam],
     ) -> T:
-        """Use instructor to generate an object of response_model type."""
+        """Use instructor to generate an object of the specified response model type.
+
+        Args:
+            response_model (type[T]): The Pydantic model to deserialize the response into.
+            messages (list[ChatCompletionMessageParam]): The messages to send to the LLM.
+
+        Returns:
+            T: The deserialized response from the LLM provider.
+
+        """
         match self.llm_provider:
             case LLMProvider.OPENAI:
                 client = instructor.from_openai(

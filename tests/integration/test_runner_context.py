@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from portia.config import Config
-from portia.context import ExecutionContext, execution_context
+from portia.execution_context import ExecutionContext, execution_context
 from portia.plan import Plan, PlanContext, Step
 from portia.runner import Runner
 from portia.tool import Tool

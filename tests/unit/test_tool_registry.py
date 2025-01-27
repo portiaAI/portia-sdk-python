@@ -2,8 +2,8 @@
 
 import pytest
 
-from portia.context import get_execution_context
 from portia.errors import DuplicateToolError, ToolNotFoundError
+from portia.execution_context import get_execution_context
 from portia.tool import Tool
 from portia.tool_registry import (
     AggregatedToolRegistry,

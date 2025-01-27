@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from portia.context import empty_context
 from portia.errors import ToolHardError, ToolSoftError
+from portia.execution_context import empty_context
 from portia.open_source_tools.weather import WeatherTool
 
 

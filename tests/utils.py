@@ -8,15 +8,15 @@ from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
 from portia.config import Config, LogLevel
-from portia.context import ExecutionContext, empty_context
 from portia.errors import ToolHardError, ToolSoftError
+from portia.execution_context import ExecutionContext, empty_context
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.tool import Tool
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
-    from portia.context import ExecutionContext
+    from portia.execution_context import ExecutionContext
 
 
 def get_test_workflow() -> tuple[Plan, Workflow]:

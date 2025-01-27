@@ -5,15 +5,14 @@ from pydantic import SecretStr
 
 from portia.clarification import ActionClarification
 from portia.config import Config, StorageClass
-from portia.context import get_execution_context
 from portia.errors import ToolNotFoundError
+from portia.execution_context import get_execution_context
 from portia.runner import Runner
 from portia.storage import PortiaCloudStorage
 from portia.tool import ToolHardError
 from portia.tool_registry import (
     InMemoryToolRegistry,
     PortiaToolRegistry,
-    ToolRegistrationFailedError,
 )
 from portia.workflow import WorkflowState
 from tests.utils import AdditionTool, get_test_workflow
@@ -47,7 +46,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolNotFoundError):
         registry.get_tool("Not a Tool")
 
-    with pytest.raises(ToolRegistrationFailedError):
+    with pytest.raises(NotImplementedError):
         registry.register_tool(AdditionTool())
 
     tool = registry.get_tool("portia::search_tool")
