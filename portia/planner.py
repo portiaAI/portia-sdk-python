@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from portia.context import get_execution_context
+from portia.execution_context import get_execution_context
 from portia.plan import Plan, PlanContext, Step
 from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template

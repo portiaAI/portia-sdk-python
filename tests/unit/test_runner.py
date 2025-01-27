@@ -15,7 +15,7 @@ from portia.config import AgentType, StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
-from portia.planner import StepsOrError
+from portia.planners.planner import StepsOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState

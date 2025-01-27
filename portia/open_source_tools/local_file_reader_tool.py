@@ -14,7 +14,7 @@ from portia.errors import ToolHardError
 from portia.tool import Tool
 
 if TYPE_CHECKING:
-    from portia.context import ExecutionContext
+    from portia.execution_context import ExecutionContext
 
 
 class FileReaderToolSchema(BaseModel):

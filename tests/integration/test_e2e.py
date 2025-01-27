@@ -8,8 +8,8 @@ from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent
 from portia.clarification import Clarification, InputClarification
 from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
-from portia.context import ExecutionContext, execution_context
 from portia.errors import ToolSoftError
+from portia.execution_context import ExecutionContext, execution_context
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
@@ -370,4 +370,6 @@ def test_runner_run_query_with_multiple_clarifications(
         runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
     # 498 = 456 (clarification - value a - step 1) + 2 (value b - step 1) + 40 (value b - step 2)
+    assert workflow.outputs.final_output is not None
     assert workflow.outputs.final_output.value == 498
+    assert workflow.outputs.final_output.summary is not None

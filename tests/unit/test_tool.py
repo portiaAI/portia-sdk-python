@@ -13,8 +13,8 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
-from portia.context import empty_context, get_execution_context
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.execution_context import empty_context, get_execution_context
 from portia.tool import PortiaRemoteTool
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
 
@@ -50,7 +50,7 @@ def test_tool_initialization_long_description() -> None:
 def test_tool_to_langchain() -> None:
     """Test langchain rep of a Tool."""
     tool = AdditionTool()
-    tool.to_langchain(ctx=empty_context(), return_artifact=False)
+    tool.to_langchain(ctx=empty_context())
 
 
 def test_run_method(add_tool: AdditionTool) -> None:

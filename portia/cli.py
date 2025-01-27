@@ -4,6 +4,7 @@ Usage:
 
 portia-cli run "add 4 + 8" - run a query
 portia-cli plan "add 4 + 8" - plan a query
+portia-cli list-tools
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from portia.clarification import (
     MultipleChoiceClarification,
 )
 from portia.config import Config, LLMModel, LLMProvider, LogLevel, StorageClass
-from portia.context import execution_context
+from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.open_source_tools import example_tool_registry
 from portia.runner import Runner

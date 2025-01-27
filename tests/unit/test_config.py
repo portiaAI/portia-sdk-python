@@ -12,6 +12,7 @@ from portia.config import (
     LLMModel,
     LLMProvider,
     LogLevel,
+    PlannerType,
     StorageClass,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
@@ -27,7 +28,8 @@ def test_runner_config_from_file() -> None:
 "llm_provider": "OPENAI",
 "llm_model_name": "GPT_4_O_MINI",
 "llm_model_seed": 443,
-"default_agent_type": "VERIFIER"
+"default_agent_type": "VERIFIER",
+"default_planner": "ONE_SHOT"
 }"""
 
     with tempfile.NamedTemporaryFile("w", delete=True, suffix=".json") as temp_file:
@@ -135,6 +137,7 @@ def test_getters() -> None:
             llm_model_temperature=0,
             llm_model_seed=443,
             default_agent_type=AgentType.VERIFIER,
+            default_planner=PlannerType.ONE_SHOT,
         )
 
     # no api key for provider model
@@ -148,6 +151,7 @@ def test_getters() -> None:
                 llm_model_temperature=0,
                 llm_model_seed=443,
                 default_agent_type=AgentType.VERIFIER,
+                default_planner=PlannerType.ONE_SHOT,
             )
 
     # negative temperature
@@ -159,6 +163,7 @@ def test_getters() -> None:
             llm_model_temperature=0,
             llm_model_seed=-443,
             default_agent_type=AgentType.VERIFIER,
+            default_planner=PlannerType.ONE_SHOT,
         )
     # no Portia API KEy
     with pytest.raises(InvalidConfigError):
@@ -170,6 +175,7 @@ def test_getters() -> None:
             llm_model_temperature=0,
             llm_model_seed=443,
             default_agent_type=AgentType.VERIFIER,
+            default_planner=PlannerType.ONE_SHOT,
         )
 
 
