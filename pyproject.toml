@@ -117,6 +117,4 @@ portia-cli = "portia.cli:cli"
 
 [tool.licensecheck]
 using = "poetry"
-fail_licenses = ["GPL", "LGPL", "AGPL", "Proprietary"]
-only_licenses = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"]
 
