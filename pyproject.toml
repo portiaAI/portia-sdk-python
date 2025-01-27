@@ -6,7 +6,7 @@ authors = ["Tech <tech@portialabs.ai>"]
 readme = "README.md"
 repository = "https://pypi.org/project/portia-sdk-python/"
 homepage = "https://www.portialabs.ai/"
-license = "GPL"
+license = "GPLv3"
 packages = [
   {include = "portia"}
 ]
