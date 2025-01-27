@@ -13,7 +13,18 @@ from pydantic import (
     model_validator,
 )
 
-from portia.common import SERIALIZABLE_TYPE_VAR
+from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
+
+
+class ClarificationCategory(PortiaEnum):
+    """The category of a clarification."""
+
+    ARGUMENT = "Argument"
+    ACTION = "Action"
+    BASE = "Base"
+    INPUT = "Input"
+    MULTIPLE_CHOICE = "Multiple Choice"
+    VALUE_CONFIRMATION = "Value Confirmation"
 
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
@@ -30,7 +41,10 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         default_factory=uuid4,
         description="A unique ID for this clarification",
     )
-    type: str
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.BASE,
+        description="The category of this clarification",
+    )
     response: SERIALIZABLE_TYPE_VAR | None = Field(
         default=None,
         description="The response from the user to this clarification.",
@@ -52,6 +66,10 @@ class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     """
 
     argument_name: str
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.ARGUMENT,
+        description="The category of this clarification",
+    )
 
 
 class ActionClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
@@ -61,7 +79,10 @@ class ActionClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     once the user has clicked on the link and done the associated action.
     """
 
-    type: str = "Action Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.ACTION,
+        description="The category of this clarification",
+    )
     action_url: HttpUrl
 
     @field_serializer("action_url")
@@ -76,7 +97,10 @@ class InputClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     Represents a clarification where the user needs to provide a value for a specific argument.
     """
 
-    type: str = "Input Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.INPUT,
+        description="The category of this clarification",
+    )
 
 
 class MultipleChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
@@ -85,7 +109,10 @@ class MultipleChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
     Represents a clarification where the user needs to select an option for a specific argument.
     """
 
-    type: str = "Multiple Choice Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.MULTIPLE_CHOICE,
+        description="The category of this clarification",
+    )
     options: list[SERIALIZABLE_TYPE_VAR]
 
     @model_validator(mode="after")
@@ -104,15 +131,17 @@ class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR
     denote acceptance by setting the resolved flag.
     """
 
-    type: str = "Value Confirmation Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.VALUE_CONFIRMATION,
+        description="The category of this clarification",
+    )
 
-
-ClarificationListType = list[
-    Union[
-        Clarification,
-        InputClarification,
-        ActionClarification,
-        MultipleChoiceClarification,
-        ValueConfirmationClarification,
-    ]
+ClarificationType = Union[
+    Clarification,
+    InputClarification,
+    ActionClarification,
+    MultipleChoiceClarification,
+    ValueConfirmationClarification,
 ]
+
+ClarificationListType = list[ClarificationType]
