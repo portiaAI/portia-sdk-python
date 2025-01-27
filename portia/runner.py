@@ -410,7 +410,14 @@ class Runner:
         return cls(self.config)
 
     def _set_final_output(self, plan: Plan, workflow: Workflow, step_output: Output) -> None:
-        """Set the final output and add summarization to it."""
+        """Set the final output and add summarization to it.
+
+        Args:
+            plan (Plan): The plan to execute.
+            workflow (Workflow): The workflow to execute.
+            step_output (Output): The output of the last step.
+
+        """
         workflow.outputs.final_output = Output(
             value=step_output.value,
             summary=None,
@@ -444,7 +451,14 @@ class Runner:
     def _handle_clarifications(self, workflow: Workflow, step_output: Output, plan: Plan) -> bool:
         """Handle any clarifications needed during workflow execution.
 
-        Returns True if clarification is needed and workflow execution should stop.
+        Args:
+            workflow (Workflow): The workflow to execute.
+            step_output (Output): The output of the last step.
+            plan (Plan): The plan to execute.
+
+        Returns:
+            bool: True if clarification is needed and workflow execution should stop.
+
         """
         if isinstance(step_output.value, Clarification) or (
             isinstance(step_output.value, list)

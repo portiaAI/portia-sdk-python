@@ -2,13 +2,13 @@
 
 from portia.config import Config, LogLevel
 from portia.execution_context import execution_context
+from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
-from portia.tool_registry import PortiaToolRegistry
 from portia.workflow import WorkflowState
 
 runner = Runner(
     Config.from_default(default_log_level=LogLevel.DEBUG),
-    tool_registry=PortiaToolRegistry(Config.from_default(default_log_level=LogLevel.DEBUG)),
+    tool_registry=example_tool_registry,
 )
 
 
