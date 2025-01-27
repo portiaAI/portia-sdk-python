@@ -6,7 +6,7 @@ authors = ["Tech <tech@portialabs.ai>"]
 readme = "README.md"
 repository = "https://pypi.org/project/portia-sdk-python/"
 homepage = "https://www.portialabs.ai/"
-license = "Apache-2.0"
+license = "MIT License"
 packages = [
   {include = "portia"}
 ]
@@ -117,4 +117,7 @@ portia-cli = "portia.cli:cli"
 
 [tool.licensecheck]
 using = "poetry"
+ignore_packages = [
+  "mistralai", # MistralAI is Apache 2.0 licensed: https://github.com/mistralai/client-python?tab=Apache-2.0-1-ov-file
+] 
 
