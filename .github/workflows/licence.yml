@@ -55,5 +55,3 @@ jobs:
         
         echo "::endgroup::"
         echo "✅ All dependency licenses are compliant!"
-    
-        - name: install poetry
