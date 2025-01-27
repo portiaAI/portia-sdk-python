@@ -30,7 +30,7 @@ jobs:
         echo "Checking for disallowed licenses..."
         echo "::group::License Report"
         # Run license check and always show output
-        python -m licensecheck --zero | tee license_output.txt
+        poetry run python -m licensecheck --zero | tee license_output.txt
         EXIT_CODE=${PIPESTATUS[0]}
         
         # If there are failures, extract incompatible packages and show their reverse dependencies
@@ -44,7 +44,7 @@ jobs:
             echo "$INCOMPATIBLE" | while read -r line; do
               PKG=$(echo "$line" | awk '{print $3}')
               echo -e "\nDependency tree for $PKG:"
-              pipdeptree --reverse --packages "$PKG"
+              poetry run pipdeptree --reverse --packages "$PKG"
             done
           fi
           
