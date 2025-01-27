@@ -1,4 +1,23 @@
-"""Runner classes which actually plan + run queries."""
+"""Runner classes that plan and execute workflows for queries.
+
+This module contains the core classes responsible for generating, managing, and executing workflows
+in response to queries. The `Runner` class serves as the main entry point, orchestrating the
+planning and execution process. It uses various agents and tools to carry out tasks step by step,
+saving the state of the workflow at each stage. It also handles error cases, clarification
+requests, and workflow state transitions.
+
+The `Runner` class provides methods to:
+
+- Generate a plan for executing a query.
+- Create and manage workflows.
+- Execute workflows step by step, using agents to handle the execution of tasks.
+- Resolve clarifications required during the execution of workflows.
+- Wait for workflows to reach a state where they can be resumed.
+
+Modules in this file work with different storage backends (memory, disk, cloud) and can handle
+complex queries using various planner and agent configurations.
+
+"""
 
 from __future__ import annotations
 
@@ -13,20 +32,19 @@ from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
 )
-from portia.config import AgentType, Config, StorageClass
-from portia.context import (
-    execution_context,
-    get_execution_context,
-    is_execution_context_set,
-)
+from portia.config import AgentType, Config, PlannerType, StorageClass
 from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
 )
-from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper
+from portia.execution_context import (
+    execution_context,
+    get_execution_context,
+    is_execution_context_set,
+)
 from portia.logger import logger, logger_manager
 from portia.plan import Plan, ReadOnlyStep, Step
-from portia.planner import Planner
+from portia.planners.one_shot_planner import OneShotPlanner
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
@@ -39,24 +57,32 @@ if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
     from portia.config import Config
     from portia.plan import Plan, Step
+    from portia.planners.planner import Planner
     from portia.tool import Tool
     from portia.tool_registry import ToolRegistry
 
 
 class Runner:
-    """Create and run plans for queries."""
+    """Runner class is the top level abstraction and entrypoint for most programs using the SDK.
+
+    The runner is responsible for intermediating planning via Planners and execution via Agents.
+    """
 
     def __init__(
         self,
         config: Config,
         tool_registry: ToolRegistry,
-        llm_wrapper_class: type[BaseLLMWrapper] | None = None,
     ) -> None:
-        """Initialize storage and tools."""
+        """Initialize storage and tools.
+
+        Args:
+            config (Config): The configuration to initialize the runner.
+            tool_registry (ToolRegistry): The registry of tools to use for planning and execution.
+
+        """
         logger_manager.configure_from_config(config)
         self.config = config
         self.tool_registry = tool_registry
-        self.llm_wrapper_class = llm_wrapper_class or LLMWrapper
 
         match config.storage_class:
             case StorageClass.MEMORY:
@@ -72,7 +98,21 @@ class Runner:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
     ) -> Workflow:
-        """End to end function to generate a plan and then execute it."""
+        """End-to-end function to generate a plan and then execute it.
+
+        This is the simplest way to plan and execute a query using the SDK.
+
+        Args:
+            query (str): The query to be executed.
+            tools (list[Tool] | list[str] | None): List of tools to use for the query.
+            If not provided all tools in the registry will be used.
+            example_plans (list[Plan] | None): Optional list of example plans. If not
+            provide a default set of example plans will be used.
+
+        Returns:
+            Workflow: The workflow resulting from executing the query.
+
+        """
         plan = self.generate_plan(query, tools, example_plans)
         workflow = self.create_workflow(plan)
         return self.execute_workflow(workflow)
@@ -83,7 +123,22 @@ class Runner:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
     ) -> Plan:
-        """Plans how to do the query given the set of tools and any examples."""
+        """Plans how to do the query given the set of tools and any examples.
+
+        Args:
+            query (str): The query to generate the plan for.
+            tools (list[Tool] | list[str] | None): List of tools to use for the query.
+            If not provided all tools in the registry will be used.
+            example_plans (list[Plan] | None): Optional list of example plans. If not
+            provide a default set of example plans will be used.
+
+        Returns:
+            Plan: The plan for executing the query.
+
+        Raises:
+            PlanError: If there is an error while generating the plan.
+
+        """
         if isinstance(tools, list):
             tools = [
                 self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
@@ -94,8 +149,9 @@ class Runner:
             tools = self.tool_registry.match_tools(query)
 
         logger().debug(f"Running planner for query - {query}")
-        planner = Planner(self.llm_wrapper_class(self.config))
+        planner = self._get_planner()
         outcome = planner.generate_plan_or_error(
+            ctx=get_execution_context(),
             query=query,
             tool_list=tools,
             examples=example_plans,
@@ -117,7 +173,15 @@ class Runner:
         return outcome.plan
 
     def create_workflow(self, plan: Plan) -> Workflow:
-        """Create a workflow from a Plan."""
+        """Create a workflow from a Plan.
+
+        Args:
+            plan (Plan): The plan to create a workflow from.
+
+        Returns:
+            Workflow: The created workflow.
+
+        """
         workflow = Workflow(
             plan_id=plan.id,
             state=WorkflowState.NOT_STARTED,
@@ -131,7 +195,20 @@ class Runner:
         workflow: Workflow | None = None,
         workflow_id: UUID | str | None = None,
     ) -> Workflow:
-        """Run a workflow."""
+        """Run a workflow.
+
+        Args:
+            workflow (Workflow | None): The workflow to execute. Defaults to None.
+            workflow_id (UUID | str | None): The ID of the workflow to execute. Defaults to None.
+
+        Returns:
+            Workflow: The resulting workflow after execution.
+
+        Raises:
+            ValueError: If neither workflow nor workflow_id is provided.
+            InvalidWorkflowStateError: If the workflow is not in a valid state to be executed.
+
+        """
         if not workflow:
             if not workflow_id:
                 raise ValueError("Either workflow or workflow_id must be provided")
@@ -167,7 +244,17 @@ class Runner:
         clarification: Clarification,
         response: object,
     ) -> Workflow:
-        """Resolve a clarification updating the workflow state as needed."""
+        """Resolve a clarification updating the workflow state as needed.
+
+        Args:
+            workflow (Workflow): The workflow being updated.
+            clarification (Clarification): The clarification to resolve.
+            response (object): The response to the clarification.
+
+        Returns:
+            Workflow: The updated workflow.
+
+        """
         clarification.resolved = True
         clarification.response = response
         if len(workflow.get_outstanding_clarifications()) == 0:
@@ -178,7 +265,17 @@ class Runner:
     def wait_for_ready(self, workflow: Workflow) -> Workflow:
         """Wait for the workflow to be in a state that it can be re-run.
 
-        This is usually because Authentication needs to happen out of band.
+        This is generally because there are outstanding clarifications that need to be resolved.
+
+        Args:
+            workflow (Workflow): The workflow to wait for.
+
+        Returns:
+            Workflow: The updated workflow once it is ready to be re-run.
+
+        Raises:
+            InvalidWorkflowStateError: If the workflow cannot be waited for.
+
         """
         if workflow.state not in [
             WorkflowState.IN_PROGRESS,
@@ -209,6 +306,16 @@ class Runner:
         return workflow
 
     def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
+        """Execute the workflow steps, updating the workflow state as needed.
+
+        Args:
+            plan (Plan): The plan to execute.
+            workflow (Workflow): The workflow to execute.
+
+        Returns:
+            Workflow: The updated workflow after execution.
+
+        """
         workflow.state = WorkflowState.IN_PROGRESS
         self.storage.save_workflow(workflow)
         logger().debug(
@@ -227,7 +334,6 @@ class Runner:
             agent = self._get_agent_for_step(
                 step=ReadOnlyStep.from_step(step),
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
-                config=self.config,
             )
             logger().debug(
                 f"Using agent: {type(agent)}",
@@ -310,12 +416,35 @@ class Runner:
             )
         return workflow
 
+    def _get_planner(self) -> Planner:
+        """Get the planner based on the configuration.
+
+        Returns:
+            Planner: The planner to be used for generating plans.
+
+        """
+        cls: type[Planner]
+        match self.config.default_planner:
+            case PlannerType.ONE_SHOT:
+                cls = OneShotPlanner
+
+        return cls(self.config)
+
     def _get_agent_for_step(
         self,
         step: Step,
         workflow: Workflow,
-        config: Config,
     ) -> BaseAgent:
+        """Get the appropriate agent for executing a given step.
+
+        Args:
+            step (Step): The step for which the agent is needed.
+            workflow (Workflow): The workflow associated with the step.
+
+        Returns:
+            BaseAgent: The agent to execute the step.
+
+        """
         tool = None
         if step.tool_id:
             child_tool = self.tool_registry.get_tool(step.tool_id)
@@ -325,7 +454,7 @@ class Runner:
                 workflow=workflow,
             )
         cls: type[BaseAgent]
-        match config.default_agent_type:
+        match self.config.default_agent_type:
             case AgentType.TOOL_LESS:
                 cls = ToolLessAgent
             case AgentType.ONE_SHOT:
@@ -336,6 +465,6 @@ class Runner:
         return cls(
             step,
             workflow,
-            config,
+            self.config,
             tool,
         )
