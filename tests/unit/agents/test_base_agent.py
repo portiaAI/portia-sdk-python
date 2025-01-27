@@ -11,6 +11,7 @@ def test_base_agent_default_context() -> None:
     """Test default context."""
     plan, workflow = get_test_workflow()
     agent = BaseAgent(
+        plan,
         plan.steps[0],
         workflow,
         get_test_config(),
@@ -25,6 +26,7 @@ def test_base_agent_default_context_with_extensions() -> None:
     """Test default context."""
     plan, workflow = get_test_workflow()
     agent = BaseAgent(
+        plan,
         plan.steps[0],
         workflow,
         get_test_config(

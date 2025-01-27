@@ -255,12 +255,12 @@ def test_runner_sets_final_output_correctly(runner: Runner) -> None:
         steps=[
             Step(
                 task="Get current weather in Cairo",
-                tool_name="Add Tool",
+                tool_id="add_tool",
                 output="$weather",
             ),
             Step(
                 task="Suggest activities based on weather",
-                tool_name="Add Tool",
+                tool_id="add_tool",
                 output="$activities",
             ),
         ],
@@ -272,7 +272,6 @@ def test_runner_sets_final_output_correctly(runner: Runner) -> None:
     plan = runner.generate_plan(query)
     workflow = runner.create_workflow(plan)
 
-    # Mock agent responses for each step
     weather_response = "Sunny and 75°F in Cairo"
     activities_response = "Perfect weather for visiting the pyramids and walking along the Nile"
     final_summary = "Cairo has 75°F weather, you can visit the pyramids and walk along the Nile"
@@ -293,6 +292,6 @@ def test_runner_sets_final_output_correctly(runner: Runner) -> None:
     assert workflow.outputs.step_outputs["$activities"].value == activities_response
 
     # Verify final output
-    assert workflow.outputs.final_output.value == final_summary # pyright: ignore[reportOptionalMemberAccess]
+    assert workflow.outputs.final_output.value == activities_response # pyright: ignore[reportOptionalMemberAccess]
     assert workflow.outputs.final_output.summary == final_summary  # pyright: ignore[reportOptionalMemberAccess]
     assert workflow.state == WorkflowState.COMPLETE

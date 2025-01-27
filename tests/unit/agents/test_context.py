@@ -6,7 +6,7 @@ import pytest
 from pydantic import HttpUrl
 
 from portia.agents.base_agent import Output
-from portia.agents.context import build_context
+from portia.agents.context import build_context, build_tasks_and_outputs_context
 from portia.clarification import ActionClarification, InputClarification
 from portia.context import ExecutionContext
 from portia.plan import Step, Variable
@@ -214,3 +214,82 @@ def test_context_inputs_outputs_clarifications(
             assert output.value in context
     assert "email cc list" in context
     assert "bob@bla.com" in context
+
+
+def test_build_tasks_and_outputs_context() -> None:
+    """Test that the tasks and outputs context is built correctly."""
+    (plan, workflow) = get_test_workflow()
+
+    # Set up test data
+    plan.steps = [
+        Step(
+            task="Get weather in London",
+            output="$london_weather",
+        ),
+        Step(
+            task="Suggest activities based on weather",
+            output="$activities",
+        ),
+    ]
+
+    workflow.outputs.step_outputs = {
+        "$london_weather": Output(value="Sunny and warm"),
+        "$activities": Output(value="Visit Hyde Park and have a picnic"),
+    }
+
+    context = build_tasks_and_outputs_context(plan, workflow)
+
+    # Verify exact output format
+    assert context == (
+        "Task: Get weather in London\n"
+        "Output: Sunny and warm\n"
+        "----------\n"
+        "Task: Suggest activities based on weather\n"
+        "Output: Visit Hyde Park and have a picnic\n"
+        "----------"
+    )
+
+
+def test_build_tasks_and_outputs_context_empty() -> None:
+    """Test that the tasks and outputs context handles empty steps and outputs."""
+    (plan, workflow) = get_test_workflow()
+
+    # Empty plan and workflow
+    plan.steps = []
+    workflow.outputs.step_outputs = {}
+
+    context = build_tasks_and_outputs_context(plan, workflow)
+    assert context == ""
+
+
+def test_build_tasks_and_outputs_context_partial_outputs() -> None:
+    """Test that the context builder handles steps with missing outputs."""
+    (plan, workflow) = get_test_workflow()
+
+    # Set up test data with missing output
+    plan.steps = [
+        Step(
+            task="Get weather in London",
+            output="$london_weather",
+        ),
+        Step(
+            task="Suggest activities based on weather",
+            output="$activities",
+        ),
+    ]
+
+    # Only provide output for first step
+    workflow.outputs.step_outputs = {
+        "$london_weather": Output(value="Sunny and warm"),
+    }
+
+    context = build_tasks_and_outputs_context(plan, workflow)
+
+    # Verify only step with output is included
+    assert context == (
+        "Task: Get weather in London\n"
+        "Output: Sunny and warm\n"
+        "----------"
+    )
+
+

@@ -10,14 +10,13 @@ from typing import TYPE_CHECKING, Generic
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from portia.agents.context import build_context, get_tasks_and_outputs_context
+from portia.agents.context import build_context, build_tasks_and_outputs_context
 from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.context import get_execution_context
-from portia.plan import Plan
 
 if TYPE_CHECKING:
     from portia.config import Config
-    from portia.plan import Step
+    from portia.plan import Plan, Step
     from portia.tool import Tool
     from portia.workflow import Workflow
 
@@ -75,7 +74,7 @@ class BaseAgent:
 
     def get_tasks_and_outputs_context(self) -> str:
         """Build a context string from the tasks and outputs of the workflow."""
-        return get_tasks_and_outputs_context(self.plan, self.workflow)
+        return build_tasks_and_outputs_context(self.plan, self.workflow)
 
 
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):

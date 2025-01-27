@@ -136,12 +136,12 @@ def test_generate_plan_with_summary_step(planner: Planner) -> None:
 
     weather_step = Step(
         task="Get current weather in Cairo",
-        tool_name="weather",
+        tool_id="weather",
         output="$weather",
     )
     activities_step = Step(
         task="Suggest activities based on weather",
-        tool_name="activities",
+        tool_id="activities",
         output="$activities",
     )
     mock_response = StepsOrError(
@@ -162,7 +162,7 @@ def test_generate_plan_with_summary_step(planner: Planner) -> None:
     last_step = result.plan.steps[-1]
     assert last_step.task == Planner.SUMMARIZE_STEP_TASK
     assert last_step.output == Planner.PORTIA_SUMMARY_VARIABLE
-    assert last_step.tool_name is None
+    assert last_step.tool_id is None
     assert last_step.inputs == []
 
     # Verify the original steps are preserved
