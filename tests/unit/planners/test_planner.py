@@ -1,20 +1,25 @@
 """Tests for the Planner module."""
 
+from __future__ import annotations
+
 import re
 from unittest.mock import MagicMock
 
 import pytest
 
 from portia.config import Config
-from portia.execution_context import get_execution_context
+from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planners.context import default_query_system_context, render_prompt_insert_defaults
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.planners.planner import (
+    PlanOrError,
+    Planner,
     StepsOrError,
 )
-from tests.utils import AdditionTool
+from portia.tool import Tool
+from tests.utils import AdditionTool, get_test_config
 
 
 @pytest.fixture
@@ -48,6 +53,27 @@ def test_generate_plan_or_error_success(planner: OneShotPlanner) -> None:
 
     assert result.plan.plan_context.query == query
     assert result.error is None
+
+
+def test_base_classes() -> None:
+    """Test PlanStorage raises."""
+
+    class MyPlanner(Planner):
+        """Override to test base."""
+
+        def generate_plan_or_error(
+            self,
+            ctx: ExecutionContext,
+            query: str,
+            tool_list: list[Tool],
+            examples: list[Plan] | None = None,
+        ) -> PlanOrError:
+            return super().generate_plan_or_error(ctx, query, tool_list, examples)  # type: ignore  # noqa: PGH003
+
+    wrapper = MyPlanner(get_test_config())
+
+    with pytest.raises(NotImplementedError):
+        wrapper.generate_plan_or_error(get_execution_context(), "", [], [])
 
 
 def test_generate_plan_or_error_failure(planner: OneShotPlanner) -> None:
