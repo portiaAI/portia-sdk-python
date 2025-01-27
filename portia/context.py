@@ -130,11 +130,6 @@ def get_execution_context() -> ExecutionContext:
     return _execution_context.get() or empty_context()
 
 
-def set_execution_context(ctx: ExecutionContext) -> None:
-    """Retrieve the current end-user from the context."""
-    _execution_context.set(ctx)
-
-
 def is_execution_context_set() -> bool:
     """Check whether there is currently context set."""
     return _execution_context.get() is not None

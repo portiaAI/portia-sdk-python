@@ -84,7 +84,7 @@ class LogToolCallStorage(ToolCallStorage):
             case ToolCallStatus.FAILED:
                 logger().error("Tool returned error {output}", output=tool_call.output)
             case ToolCallStatus.NEED_CLARIFICATION:
-                logger().error("Tool returned clarifications {output}", output=tool_call.output)
+                logger().info("Tool returned clarifications {output}", output=tool_call.output)
 
 
 class Storage(PlanStorage, WorkflowStorage, ToolCallStorage):
