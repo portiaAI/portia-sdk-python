@@ -20,7 +20,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
-from portia.common import PortiaBaseModel
+from mistralai import Field
+from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -32,7 +33,7 @@ _execution_context: ContextVar[ExecutionContext | None] = ContextVar(
 )
 
 
-class ExecutionContext(PortiaBaseModel):
+class ExecutionContext(BaseModel):
     """Execution context provides runtime information to the runner, planner, and agents.
 
     Unlike configuration settings, it is designed to be used on a per-request basis,
@@ -49,11 +50,13 @@ class ExecutionContext(PortiaBaseModel):
 
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     workflow_id: str | None = None
 
     end_user_id: str | None = None
 
-    additional_data: dict[str, str]
+    additional_data: dict[str, str] = Field(default={})
 
     planner_system_context_extension: list[str] | None = None
 

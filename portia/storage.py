@@ -41,7 +41,6 @@ from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import Workflow, WorkflowOutputs, WorkflowState
 
 if TYPE_CHECKING:
-    from portia.common import PortiaBaseModel
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -317,12 +316,12 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         """
         Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
 
-    def _write(self, file_name: str, content: PortiaBaseModel) -> None:
+    def _write(self, file_name: str, content: BaseModel) -> None:
         """Write a serialized Plan or Workflow to a JSON file.
 
         Args:
             file_name (str): Name of the file to write.
-            content (PortiaBaseModel): The Plan or Workflow object to serialize.
+            content (BaseModel): The Plan or Workflow object to serialize.
 
         """
         self._ensure_storage()  # Ensure storage directory exists

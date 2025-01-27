@@ -15,19 +15,20 @@ from typing import Annotated, Self, TypeVar
 
 from pydantic import (
     AfterValidator,
+    BaseModel,
+    ConfigDict,
     Field,
     SecretStr,
     field_validator,
     model_validator,
 )
 
-from portia.common import PortiaBaseModel, PortiaEnum
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 T = TypeVar("T")
 
 
-class StorageClass(PortiaEnum):
+class StorageClass(Enum):
     """Enum representing locations plans and workflows are stored.
 
     Attributes
@@ -43,7 +44,7 @@ class StorageClass(PortiaEnum):
     CLOUD = "CLOUD"
 
 
-class LLMProvider(PortiaEnum):
+class LLMProvider(Enum):
     """Enum for supported LLM providers.
 
     Attributes:
@@ -88,7 +89,7 @@ class LLMProvider(PortiaEnum):
                 return LLMModel.MISTRAL_LARGE_LATEST
 
 
-class LLMModel(PortiaEnum):
+class LLMModel(Enum):
     """Enum for supported LLM models.
 
     Models are grouped by provider, with the following providers:
@@ -151,7 +152,7 @@ SUPPORTED_MISTRALAI_MODELS = [
 ]
 
 
-class AgentType(PortiaEnum):
+class AgentType(Enum):
     """Enum for types of agents used for executing a step.
 
     Attributes:
@@ -166,7 +167,7 @@ class AgentType(PortiaEnum):
     VERIFIER = "VERIFIER"
 
 
-class PlannerType(PortiaEnum):
+class PlannerType(Enum):
     """Enum for planners used for planning queries.
 
     Attributes:
@@ -177,7 +178,7 @@ class PlannerType(PortiaEnum):
     ONE_SHOT = "ONE_SHOT"
 
 
-class LogLevel(PortiaEnum):
+class LogLevel(Enum):
     """Enum for available log levels.
 
     Attributes:
@@ -251,7 +252,7 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     )
 
 
-class Config(PortiaBaseModel):
+class Config(BaseModel):
     """General configuration for the SDK.
 
     This class holds the configuration for the SDK, including API keys, LLM
@@ -278,6 +279,8 @@ class Config(PortiaBaseModel):
         default_planner: The default planner type.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -491,6 +494,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         storage_class=kwargs.pop("storage_class", StorageClass.MEMORY),
         llm_provider=kwargs.pop("llm_provider", LLMProvider.OPENAI),
         llm_model_name=kwargs.pop("llm_model_name", LLMModel.GPT_4_O_MINI),
+        default_planner=kwargs.pop("default_planner", PlannerType.ONE_SHOT),
         llm_model_temperature=kwargs.pop("llm_model_temperature", 0),
         llm_model_seed=kwargs.pop("llm_model_seed", 443),
         default_agent_type=kwargs.pop("default_agent_type", AgentType.VERIFIER),

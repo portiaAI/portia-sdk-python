@@ -13,7 +13,6 @@ from portia.tool import ToolHardError
 from portia.tool_registry import (
     InMemoryToolRegistry,
     PortiaToolRegistry,
-    ToolRegistrationFailedError,
 )
 from portia.workflow import WorkflowState
 from tests.utils import AdditionTool, get_test_workflow
@@ -47,7 +46,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolNotFoundError):
         registry.get_tool("Not a Tool")
 
-    with pytest.raises(ToolRegistrationFailedError):
+    with pytest.raises(NotImplementedError):
         registry.register_tool(AdditionTool())
 
     tool = registry.get_tool("portia::search_tool")

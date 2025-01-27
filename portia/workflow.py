@@ -19,13 +19,13 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from portia.agents.base_agent import Output  # noqa: TC001
+from portia.agents.base_agent import Output
 from portia.clarification import (
-    ClarificationListType,  # noqa: TC001
+    ClarificationListType,
 )
-from portia.common import PortiaBaseModel, PortiaEnum, PortiaReadOnlyModel
+from portia.common import PortiaEnum
 from portia.execution_context import ExecutionContext, empty_context
 
 
@@ -57,7 +57,7 @@ class WorkflowState(PortiaEnum):
     FAILED = "FAILED"
 
 
-class WorkflowOutputs(PortiaBaseModel):
+class WorkflowOutputs(BaseModel):
     """Outputs of a workflow, including clarifications.
 
     Attributes
@@ -71,6 +71,8 @@ class WorkflowOutputs(PortiaBaseModel):
         The final consolidated output of the workflow, if available.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     clarifications: ClarificationListType = Field(
         default=[],
@@ -88,7 +90,7 @@ class WorkflowOutputs(PortiaBaseModel):
     )
 
 
-class Workflow(PortiaBaseModel):
+class Workflow(BaseModel):
     """A workflow represents a running instance of a Plan.
 
     Attributes
@@ -107,6 +109,8 @@ class Workflow(PortiaBaseModel):
         Outputs of the workflow, including clarifications.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: UUID = Field(
         default_factory=uuid4,
@@ -163,12 +167,14 @@ class Workflow(PortiaBaseModel):
         )
 
 
-class ReadOnlyWorkflow(PortiaReadOnlyModel, Workflow):
+class ReadOnlyWorkflow(Workflow):
     """A read-only copy of a workflow, passed to agents for reference.
 
     This class provides a non-modifiable view of a workflow instance,
     ensuring that agents can access workflow details without altering them.
     """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     @classmethod
     def from_workflow(cls, workflow: Workflow) -> ReadOnlyWorkflow:

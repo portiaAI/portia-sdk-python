@@ -23,12 +23,10 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, field_serializer
-
-from portia.common import PortiaBaseModel, PortiaReadOnlyModel
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
-class Variable(PortiaBaseModel):
+class Variable(BaseModel):
     """A variable in the plan.
 
     A variable is a way of referencing other parts of the plan, usually either another step's output
@@ -42,6 +40,8 @@ class Variable(PortiaBaseModel):
         description (str): A description of the variable.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(
         description=(
@@ -58,7 +58,7 @@ class Variable(PortiaBaseModel):
     )
 
 
-class Step(PortiaBaseModel):
+class Step(BaseModel):
     """A step in a workflow.
 
     A step represents a task in the workflow to be executed. It contains inputs (variables) and
@@ -71,6 +71,8 @@ class Step(PortiaBaseModel):
         output (str): The unique output ID for the result of this step.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     task: str = Field(
         description="The task that needs to be completed by this step",
@@ -93,7 +95,7 @@ class Step(PortiaBaseModel):
     )
 
 
-class ReadOnlyStep(Step, PortiaReadOnlyModel):
+class ReadOnlyStep(Step):
     """A read-only copy of a step, passed to agents for reference.
 
     This class creates an immutable representation of a step, which is used to ensure agents
@@ -103,6 +105,8 @@ class ReadOnlyStep(Step, PortiaReadOnlyModel):
         step (Step): A step object from which to create a read-only version.
 
     """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     @classmethod
     def from_step(cls, step: Step) -> ReadOnlyStep:
@@ -123,7 +127,7 @@ class ReadOnlyStep(Step, PortiaReadOnlyModel):
         )
 
 
-class PlanContext(PortiaBaseModel):
+class PlanContext(BaseModel):
     """Context for a plan.
 
     The plan context contains information about the original query and the tools available
@@ -135,11 +139,13 @@ class PlanContext(PortiaBaseModel):
 
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     query: str = Field(description="The original query given by the user.")
     tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
 
 
-class Plan(PortiaBaseModel):
+class Plan(BaseModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
 
     A plan defines the entire sequence of steps required to process a query and generate a result.
@@ -151,6 +157,8 @@ class Plan(PortiaBaseModel):
         steps (list[Step]): The set of steps that make up the plan.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: UUID = Field(
         default_factory=uuid4,

@@ -12,14 +12,14 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from pydantic import Field
+from openai import BaseModel
+from pydantic import ConfigDict, Field
 
-from portia.common import PortiaBaseModel
+from portia.plan import Plan, Step  # noqa: TC001
 
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.execution_context import ExecutionContext
-    from portia.plan import Plan, Step
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ class Planner(ABC):
 # TODO(Emma): This is a temporary class while we are migrating to a synced plan model. #noqa: FIX002
 # Evals should be updated to use the new StepsOrError class.
 # https://linear.app/portialabs/issue/POR-381
-class PlanOrError(PortiaBaseModel):
+class PlanOrError(BaseModel):
     """A plan or an error.
 
     This model represents either a successful plan or an error message if the plan could
@@ -87,6 +87,8 @@ class PlanOrError(PortiaBaseModel):
 
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     plan: Plan
     error: str | None = Field(
         default=None,
@@ -94,7 +96,7 @@ class PlanOrError(PortiaBaseModel):
     )
 
 
-class StepsOrError(PortiaBaseModel):
+class StepsOrError(BaseModel):
     """A list of steps or an error.
 
     This model represents either a list of steps for a plan or an error message if
@@ -105,6 +107,8 @@ class StepsOrError(PortiaBaseModel):
         error (str | None): An error message if the steps could not be created.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     steps: list[Step]
     error: str | None = Field(

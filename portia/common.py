@@ -8,8 +8,6 @@ use in the Portia framework.
 from enum import Enum
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, ConfigDict
-
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
 
@@ -52,25 +50,3 @@ def combine_args_kwargs(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
     """
     args_dict = {f"{i}": arg for i, arg in enumerate(args)}
     return {**args_dict, **kwargs}
-
-
-class PortiaBaseModel(BaseModel):
-    """Base model class with additional configuration.
-
-    This class extends `BaseModel` from Pydantic and includes a custom `model_config` that forbids
-    the inclusion of extra fields not defined in the model. It serves as the base class for other
-    models that require such a configuration.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class PortiaReadOnlyModel(BaseModel):
-    """Read-only base model class.
-
-    This class extends `BaseModel` from Pydantic and includes a custom `model_config` that freezes
-    all fields, making them immutable after creation. It is intended to be used for models where the
-    fields should not be modified.
-    """
-
-    model_config = ConfigDict(frozen=True, extra="forbid")

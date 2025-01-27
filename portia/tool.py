@@ -24,6 +24,7 @@ import httpx
 from langchain_core.tools import StructuredTool
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     HttpUrl,
     SecretStr,
@@ -40,7 +41,7 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
-from portia.common import SERIALIZABLE_TYPE_VAR, PortiaBaseModel, combine_args_kwargs
+from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
@@ -57,7 +58,7 @@ class _ArgsSchemaPlaceholder(BaseModel):
     """Placeholder ArgsSchema for tools that take no arguments."""
 
 
-class Tool(PortiaBaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Abstract base class for a tool.
 
     This class serves as the blueprint for all tools. Child classes must implement the `run` method.
@@ -87,6 +88,8 @@ class Tool(PortiaBaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         that fetches raw price data).
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(description="ID of the tool")
     name: str = Field(description="Name of the tool")

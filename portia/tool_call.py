@@ -7,14 +7,14 @@ The `ToolCallRecord` class is a Pydantic model used to capture details about a
 specific tool call, including its status, input, output, and associated metadata.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from portia.common import PortiaBaseModel, PortiaEnum
+from pydantic import BaseModel, ConfigDict
 
-if TYPE_CHECKING:
-    from uuid import UUID
+from portia.common import PortiaEnum
+from uuid import UUID
 
 
 class ToolCallStatus(PortiaEnum):
@@ -39,7 +39,7 @@ class ToolCallStatus(PortiaEnum):
     FAILED = "FAILED"
 
 
-class ToolCallRecord(PortiaBaseModel):
+class ToolCallRecord(BaseModel):
     """Model that records the details of an individual tool call.
 
     This class captures all relevant information about a single tool call
@@ -58,6 +58,8 @@ class ToolCallRecord(PortiaBaseModel):
         latency_seconds (float): The latency in seconds for the tool call to complete.
 
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     tool_name: str
     workflow_id: UUID
