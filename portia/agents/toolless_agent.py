@@ -16,7 +16,6 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 
 from portia.agents.base_agent import BaseAgent, Output
 from portia.llm_wrapper import LLMWrapper
-from portia.planner import Planner
 
 
 class ToolLessModel:
@@ -56,13 +55,16 @@ class ToolLessModel:
 class ToolLessAgent(BaseAgent):
     """Agent responsible for achieving a task by using langgraph."""
 
+    _context = None
+
+    def execute_sync_with_context(self, context: str) -> Output:
+        """Run the core execution logic of the task with a custom context."""
+        self._context = context
+        return self.execute_sync()
+
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
-        context = (
-            self.get_tasks_and_outputs_context()
-            if self.step.task == Planner.SUMMARIZE_STEP_TASK
-            else self.get_system_context()
-        )
+        self._context = self.get_system_context() if self._context is None else self._context
         llm = LLMWrapper(self.config).to_langchain()
         task_prompt = ChatPromptTemplate.from_messages(
             [
@@ -81,7 +83,7 @@ class ToolLessAgent(BaseAgent):
         workflow = StateGraph(MessagesState)
 
         # The agent node is the only node in the graph
-        workflow.add_node("agent", ToolLessModel(llm, context, self).invoke)
+        workflow.add_node("agent", ToolLessModel(llm, self._context, self).invoke)
         workflow.add_edge(START, "agent")
         workflow.add_edge("agent", END)
 
@@ -89,7 +91,7 @@ class ToolLessAgent(BaseAgent):
         invocation_result = app.invoke(
             {
                 "messages": task_prompt.format_messages(
-                    context=context,
+                    context=self._context,
                     input=self.step.task,
                     clarification_prompt="",
                 ),

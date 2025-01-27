@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
 
     from portia.config import Config
-    from portia.plan import Plan, Step
+    from portia.plan import Step
     from portia.tool import Tool
     from portia.workflow import Workflow
 
@@ -105,20 +105,18 @@ class OneShotAgent(BaseAgent):
 
     def __init__(
         self,
-        plan: Plan,
         step: Step,
         workflow: Workflow,
         config: Config,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the agent."""
-        super().__init__(plan, step, workflow, config, tool)
+        super().__init__(step, workflow, config, tool)
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task."""
         if not self.tool:
             return ToolLessAgent(
-                self.plan,
                 self.step,
                 self.workflow,
                 self.config,

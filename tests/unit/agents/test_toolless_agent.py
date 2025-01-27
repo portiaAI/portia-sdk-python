@@ -5,10 +5,8 @@ from unittest import mock
 import pytest
 from langgraph.graph import MessagesState
 
-from portia.agents.base_agent import Output
 from portia.agents.toolless_agent import ToolLessAgent, ToolLessModel
 from portia.plan import Step
-from portia.planner import Planner
 from tests.utils import get_test_config, get_test_workflow
 
 
@@ -18,66 +16,11 @@ def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ToolLessModel, "invoke", mock_invoke)
 
     (plan, workflow) = get_test_workflow()
-    agent = ToolLessAgent(plan, step=plan.steps[0], workflow=workflow, config=get_test_config())
+    agent = ToolLessAgent(step=plan.steps[0], workflow=workflow, config=get_test_config())
 
     output = agent.execute_sync()
     assert mock_invoke.called
     assert output.value == "invoked"
-
-
-def test_toolless_agent_summary_task(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test running a summary task uses the correct context."""
-    # Mock the invoke method to capture the context
-    captured_context = None
-    def mock_invoke(self: ToolLessModel, _: MessagesState) -> dict[str, list[str]]:
-        nonlocal captured_context
-        captured_context = self.context
-        return {"messages": ["Summary response"]}
-
-    monkeypatch.setattr(ToolLessModel, "invoke", mock_invoke)
-
-    (plan, workflow) = get_test_workflow()
-    plan.steps = [
-        Step(
-            task="Get weather in London",
-            output="$london_weather",
-        ),
-        Step(
-            task="Suggest activities based on weather",
-            output="$activities",
-        ),
-        Step(
-            task=Planner.SUMMARIZE_STEP_TASK,
-            output=Planner.PORTIA_SUMMARY_VARIABLE,
-        ),
-    ]
-
-    workflow.outputs.step_outputs = {
-        "$london_weather": Output(value="Sunny and warm"),
-        "$activities": Output(value="Visit Hyde Park and have a picnic"),
-    }
-    workflow.current_step_index = 2  # Set to last step (summary step)
-
-    agent = ToolLessAgent(
-        plan=plan,
-        step=plan.steps[-1],
-        workflow=workflow,
-        config=get_test_config(),
-    )
-
-    output = agent.execute_sync()
-
-    # Verify the context used was from get_tasks_and_outputs_context
-    expected_context = (
-        "Task: Get weather in London\n"
-        "Output: Sunny and warm\n"
-        "----------\n"
-        "Task: Suggest activities based on weather\n"
-        "Output: Visit Hyde Park and have a picnic\n"
-        "----------"
-    )
-    assert captured_context == expected_context
-    assert output.value == "Summary response"
 
 
 def test_toolless_agent_regular_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -102,7 +45,6 @@ def test_toolless_agent_regular_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Create agent for a regular step
     agent = ToolLessAgent(
-        plan=plan,
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
