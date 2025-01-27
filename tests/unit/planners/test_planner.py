@@ -3,23 +3,26 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
 
-from portia.config import Config
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planners.context import default_query_system_context, render_prompt_insert_defaults
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.planners.planner import (
-    PlanOrError,
     Planner,
+    PlanOrError,
     StepsOrError,
 )
-from portia.tool import Tool
 from tests.utils import AdditionTool, get_test_config
+
+if TYPE_CHECKING:
+    from portia.config import Config
+    from portia.tool import Tool
 
 
 @pytest.fixture
