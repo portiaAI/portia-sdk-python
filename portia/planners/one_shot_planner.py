@@ -3,55 +3,36 @@
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from portia.context import get_execution_context
+from portia.context import ExecutionContext, get_execution_context
+from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step
+from portia.planners.planner import PlanOrError, Planner, StepsOrError
 from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
-    from portia.llm_wrapper import BaseLLMWrapper
+    from portia.config import Config
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
 
 
-# TODO(Emma): This is a temporary class while we are migrating to a synced plan model. #noqa: FIX002
-# Evals should be updated to use the new StepsOrError class.
-# https://linear.app/portialabs/issue/POR-381
-class PlanOrError(BaseModel):
-    """A plan or an error."""
-
-    plan: Plan
-    error: str | None = Field(
-        default=None,
-        description="An error message if the plan could not be created.",
-    )
-
-
-class StepsOrError(BaseModel):
-    """A list of steps or an error."""
-
-    steps: list[Step]
-    error: str | None = Field(
-        default=None,
-        description="An error message if the steps could not be created.",
-    )
-
-
-class Planner:
+class OneShotPlanner(Planner):
     """planner class."""
 
-    def __init__(self, llm_wrapper: BaseLLMWrapper) -> None:
+    def __init__(self, config: Config) -> None:
         """Init with the config."""
-        self.llm_wrapper = llm_wrapper
+        self.llm_wrapper = LLMWrapper(config)
 
     def generate_plan_or_error(
         self,
+        ctx: ExecutionContext,
         query: str,
         tool_list: list[Tool],
         examples: list[Plan] | None = None,

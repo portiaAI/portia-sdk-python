@@ -9,20 +9,19 @@ from typing import Annotated, Self, TypeVar
 
 from pydantic import (
     AfterValidator,
-    BaseModel,
-    ConfigDict,
     Field,
     SecretStr,
     field_validator,
     model_validator,
 )
 
+from portia.common import PortiaBaseModel, PortiaEnum
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 T = TypeVar("T")
 
 
-class StorageClass(Enum):
+class StorageClass(PortiaEnum):
     """Represent locations plans and workflows are written to."""
 
     MEMORY = "MEMORY"
@@ -30,7 +29,7 @@ class StorageClass(Enum):
     CLOUD = "CLOUD"
 
 
-class LLMProvider(Enum):
+class LLMProvider(PortiaEnum):
     """Enum of LLM providers."""
 
     OPENAI = "OPENAI"
@@ -58,7 +57,7 @@ class LLMProvider(Enum):
                 return LLMModel.MISTRAL_LARGE_LATEST
 
 
-class LLMModel(Enum):
+class LLMModel(PortiaEnum):
     """Supported Models."""
 
     # OpenAI
@@ -100,7 +99,7 @@ SUPPORTED_MISTRALAI_MODELS = [
 ]
 
 
-class AgentType(Enum):
+class AgentType(PortiaEnum):
     """Type of agent to use for executing a step."""
 
     TOOL_LESS = "TOOL_LESS"
@@ -108,7 +107,13 @@ class AgentType(Enum):
     VERIFIER = "VERIFIER"
 
 
-class LogLevel(Enum):
+class PlannerType(PortiaEnum):
+    """Planner to use for planning queries."""
+
+    ONE_SHOT = "ONE_SHOT"
+
+
+class LogLevel(PortiaEnum):
     """Available Log Levels."""
 
     DEBUG = "DEBUG"
@@ -150,7 +155,7 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     )
 
 
-class Config(BaseModel):
+class Config(PortiaBaseModel):
     """General configuration for the library."""
 
     # Portia Cloud Options
@@ -231,7 +236,14 @@ class Config(BaseModel):
         """Parse default_agent_type to enum if string provided."""
         return parse_str_to_enum(value, AgentType)
 
-    model_config = ConfigDict(frozen=True)
+    # Planner Options
+    default_planner: PlannerType
+
+    @field_validator("default_planner", mode="before")
+    @classmethod
+    def parse_default_planner(cls, value: str | PlannerType) -> PlannerType:
+        """Parse default_planner to enum if string provided."""
+        return parse_str_to_enum(value, PlannerType)
 
     @model_validator(mode="after")
     def check_config(self) -> Self:
@@ -250,8 +262,8 @@ class Config(BaseModel):
             if self.llm_model_name not in supported_models:
                 raise InvalidConfigError(
                     "llm_model_name",
-                    "Unsupported model please use one of: " +
-                    ", ".join(model.value for model in supported_models),
+                    "Unsupported model please use one of: "
+                    + ", ".join(model.value for model in supported_models),
                 )
 
         match self.llm_provider:

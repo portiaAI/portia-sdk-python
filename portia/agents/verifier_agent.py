@@ -373,8 +373,7 @@ class VerifierAgent(BaseAgent):
         context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()
         tools = [
-            self.tool.to_langchain(
-                return_artifact=True,
+            self.tool.to_langchain_with_artifact(
                 ctx=get_execution_context(),
             ),
         ]

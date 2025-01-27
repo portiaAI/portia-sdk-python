@@ -8,7 +8,7 @@ import pytest
 from portia.config import Config
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
-from portia.planner import (
+from portia.planners.planner import (
     Planner,
     StepsOrError,
     _default_query_system_context,

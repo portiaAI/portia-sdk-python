@@ -263,7 +263,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -323,7 +323,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -490,7 +490,7 @@ def test_verifier_agent_edge_cases() -> None:
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidWorkflowStateError):
