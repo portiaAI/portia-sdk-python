@@ -1,12 +1,14 @@
 """Portia Cloud Tests."""
 
+import uuid
+
 import pytest
 from pydantic import SecretStr
 
 from portia.clarification import ActionClarification
 from portia.config import Config, StorageClass
 from portia.errors import ToolNotFoundError
-from portia.execution_context import get_execution_context
+from portia.execution_context import execution_context, get_execution_context
 from portia.runner import Runner
 from portia.storage import PortiaCloudStorage
 from portia.tool import ToolHardError
@@ -79,7 +81,8 @@ def test_runner_run_query_with_oauth() -> None:
     runner = Runner(config=config, tool_registry=tool_registry)
     query = "Star the portiaai/portia-sdk-repo"
 
-    workflow = runner.execute_query(query)
+    with execution_context(end_user_id=str(uuid.uuid4())):
+        workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
     assert len(workflow.outputs.clarifications) == 1
