@@ -424,12 +424,11 @@ class Runner:
         )
 
         try:
-            agent = FinalOutputSummarizer(
+            agent = FinalOutputSummarizer(config=self.config)
+            summary = agent.create_summary(
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
                 plan=ReadOnlyPlan.from_plan(plan),
-                config=self.config,
             )
-            summary = agent.create_summary()
             final_output.summary = summary
 
         except Exception as e:  # noqa: BLE001

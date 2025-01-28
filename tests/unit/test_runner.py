@@ -14,11 +14,11 @@ from portia.agents.base_agent import Output
 from portia.config import AgentType, StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Step
+from portia.plan import ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import WorkflowState
+from portia.workflow import ReadOnlyWorkflow, WorkflowState
 from tests.utils import AdditionTool, ClarificationTool, get_test_config, get_test_workflow
 
 
@@ -297,6 +297,12 @@ def test_runner_execute_query_with_summary(runner: Runner) -> None:
         assert workflow.outputs.final_output.value == activities_output.value
         assert workflow.outputs.final_output.summary == expected_summary
 
+        # Verify create_summary was called with correct args
+        mock_summarizer_agent.create_summary.assert_called_once_with(
+            plan=mock.ANY,
+            workflow=mock.ANY,
+        )
+
 
 def test_runner_sets_final_output_with_summary(runner: Runner) -> None:
     """Test that final output is set with correct summary."""
@@ -333,8 +339,13 @@ def test_runner_sets_final_output_with_summary(runner: Runner) -> None:
         assert output.value == "Visit Hyde Park and have a picnic"
         assert output.summary == expected_summary
 
-        # Verify SummarizerAgent was called with correct arguments
+        # Verify create_summary was called with correct args
         mock_summarizer.create_summary.assert_called_once()
+        call_args = mock_summarizer.create_summary.call_args[1]
+        assert isinstance(call_args["plan"], ReadOnlyPlan)
+        assert isinstance(call_args["workflow"], ReadOnlyWorkflow)
+        assert call_args["plan"].id == plan.id
+        assert call_args["workflow"].id == workflow.id
 
 
 def test_runner_get_final_output_handles_summary_error(runner: Runner) -> None:

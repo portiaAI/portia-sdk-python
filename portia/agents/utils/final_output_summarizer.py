@@ -24,42 +24,51 @@ class FinalOutputSummarizer:
         "not used in the context.\n"
     )
 
-    def __init__(self, workflow: Workflow, plan: Plan, config: Config) -> None:
+    def __init__(self, config: Config) -> None:
         """Initialize the summarizer agent.
 
         Args:
-            workflow (Workflow): The workflow to summarize
-            plan (Plan): The plan containing the steps
-            config: The configuration for the agent
+            config(Config): The configuration for the agent
 
         """
-        self.plan = plan
-        self.workflow = workflow
         self.config = config
 
-    def build_tasks_and_outputs_context(self) -> str:
-        """Get the tasks and outputs context."""
+    def _build_tasks_and_outputs_context(self, plan: Plan, workflow: Workflow) -> str:
+        """Build the query, tasks and outputs context.
+
+        Args:
+            plan(Plan): The plan containing the steps
+            workflow(Workflow): The workflow to get the outputs from.
+
+        Returns:
+            str: The formatted context string
+
+        """
         context = []
-        context.append(f"Query: {self.plan.plan_context.query}")
+        context.append(f"Query: {plan.plan_context.query}")
         context.append("----------")
-        for step in self.plan.steps:
-            outputs = self.workflow.outputs.step_outputs
+        for step in plan.steps:
+            outputs = workflow.outputs.step_outputs
             if step.output in outputs:
                 context.append(f"Task: {step.task}")
                 context.append(f"Output: {outputs[step.output].value}")
                 context.append("----------")
         return "\n".join(context)
 
-    def create_summary(self) -> str | None:
+    def create_summary(self, plan: Plan, workflow: Workflow) -> str | None:
         """Execute the summarizer llm and return the summary as an output.
 
+        Args:
+            plan: The plan containing the steps
+            workflow: The workflow to summarize
+
         Returns:
-            Output: The generated summary.
+            str | None: The generated summary or None if generation fails
 
         """
         llm = LLMWrapper(self.config).to_langchain()
-        context = self.build_tasks_and_outputs_context()
+        context = self._build_tasks_and_outputs_context(plan, workflow)
         response = llm.invoke(
             self.SUMMARIZE_TASK + context,
         )
-        return str(response.content) if response.content is not None else None
+        return str(response.content) if response.content else None
