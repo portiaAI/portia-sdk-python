@@ -424,8 +424,8 @@ class Runner:
         )
 
         try:
-            agent = FinalOutputSummarizer(config=self.config)
-            summary = agent.create_summary(
+            summarizer = FinalOutputSummarizer(config=self.config)
+            summary = summarizer.create_summary(
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
                 plan=ReadOnlyPlan.from_plan(plan),
             )

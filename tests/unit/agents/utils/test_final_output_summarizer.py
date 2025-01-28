@@ -37,8 +37,8 @@ def test_summarizer_agent_execute_sync() -> None:
     with mock.patch("portia.agents.utils.final_output_summarizer.LLMWrapper") as mock_wrapper:
         mock_wrapper.return_value.to_langchain.return_value = mock_llm
 
-        agent = FinalOutputSummarizer(config=get_test_config())
-        output = agent.create_summary(plan=plan, workflow=workflow)
+        summarizer = FinalOutputSummarizer(config=get_test_config())
+        output = summarizer.create_summary(plan=plan, workflow=workflow)
 
         assert output == expected_summary
 
@@ -70,8 +70,8 @@ def test_summarizer_agent_empty_workflow() -> None:
     with mock.patch("portia.agents.utils.final_output_summarizer.LLMWrapper") as mock_wrapper:
         mock_wrapper.return_value.to_langchain.return_value = mock_llm
 
-        agent = FinalOutputSummarizer(config=get_test_config())
-        output = agent.create_summary(plan=plan, workflow=workflow)
+        summarizer = FinalOutputSummarizer(config=get_test_config())
+        output = summarizer.create_summary(plan=plan, workflow=workflow)
 
         # Verify empty context case
         assert output == "Empty summary"
@@ -93,8 +93,8 @@ def test_summarizer_agent_handles_none_response() -> None:
     with mock.patch("portia.agents.utils.final_output_summarizer.LLMWrapper") as mock_wrapper:
         mock_wrapper.return_value.to_langchain.return_value = mock_llm
 
-        agent = FinalOutputSummarizer(config=get_test_config())
-        output = agent.create_summary(plan=plan, workflow=workflow)
+        summarizer = FinalOutputSummarizer(config=get_test_config())
+        output = summarizer.create_summary(plan=plan, workflow=workflow)
 
         # Verify None handling
         assert output is None
@@ -122,8 +122,11 @@ def test_build_tasks_and_outputs_context() -> None:
         "$activities": Output(value="Visit Hyde Park and have a picnic"),
     }
 
-    agent = FinalOutputSummarizer(config=get_test_config())
-    context = agent._build_tasks_and_outputs_context(plan=plan, workflow=workflow)  # noqa: SLF001
+    summarizer = FinalOutputSummarizer(config=get_test_config())
+    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+        plan=plan,
+        workflow=workflow,
+    )
 
     # Verify exact output format including query
     assert context == (
@@ -147,8 +150,11 @@ def test_build_tasks_and_outputs_context_empty() -> None:
     plan.steps = []
     workflow.outputs.step_outputs = {}
 
-    agent = FinalOutputSummarizer(config=get_test_config())
-    context = agent._build_tasks_and_outputs_context(plan=plan, workflow=workflow)  # noqa: SLF001
+    summarizer = FinalOutputSummarizer(config=get_test_config())
+    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+        plan=plan,
+        workflow=workflow,
+    )
 
     # Should still include query even if no steps/outputs
     assert context == (
@@ -179,8 +185,11 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
         "$london_weather": Output(value="Sunny and warm"),
     }
 
-    agent = FinalOutputSummarizer(config=get_test_config())
-    context = agent._build_tasks_and_outputs_context(plan=plan, workflow=workflow)  # noqa: SLF001
+    summarizer = FinalOutputSummarizer(config=get_test_config())
+    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+        plan=plan,
+        workflow=workflow,
+    )
 
     # Verify only step with output is included, but query is always present
     assert context == (

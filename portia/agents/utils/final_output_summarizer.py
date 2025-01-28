@@ -13,7 +13,12 @@ if TYPE_CHECKING:
 
 
 class FinalOutputSummarizer:
-    """Agent responsible for generating summaries of workflow outputs."""
+    """Summarizer responsible for summarizing the workflow outputs for final output's summary.
+
+    Attributes:
+        config (Config): The configuration for the llm.
+
+    """
 
     SUMMARIZE_TASK = (
         "Summarize all tasks and outputs that answers the query given. Make sure the "
@@ -56,11 +61,11 @@ class FinalOutputSummarizer:
         return "\n".join(context)
 
     def create_summary(self, plan: Plan, workflow: Workflow) -> str | None:
-        """Execute the summarizer llm and return the summary as an output.
+        """Execute the summarizer llm and return the summary as a string.
 
         Args:
-            plan: The plan containing the steps
-            workflow: The workflow to summarize
+            plan (Plan): The plan containing the steps
+            workflow (Workflow): The workflow to summarize
 
         Returns:
             str | None: The generated summary or None if generation fails
