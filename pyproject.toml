@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.0.1-alpha.35"
+version = "0.0.1-alpha.36"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Tech <tech@portialabs.ai>"]
 readme = "README.md"
@@ -119,4 +119,3 @@ using = "poetry"
 ignore_packages = [
   "mistralai", # MistralAI is Apache 2.0 licensed: https://github.com/mistralai/client-python?tab=Apache-2.0-1-ov-file
 ] 
-
