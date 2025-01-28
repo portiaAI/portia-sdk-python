@@ -384,6 +384,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             if "ToolHardError" in output.value:
                 raise ToolHardError(output.value)
         # Handle Clarifications
+        print(output.value)
         if isinstance(output.value, list) and output.value and "type" in output.value[0]:
             clarification = output.value[0]
             match clarification["type"]:
