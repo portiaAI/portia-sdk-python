@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from portia.agents.base_agent import BaseAgent
-from portia.context import execution_context
+from portia.execution_context import execution_context
 from tests.utils import get_test_config, get_test_workflow
 
 
@@ -27,9 +27,7 @@ def test_base_agent_default_context_with_extensions() -> None:
     agent = BaseAgent(
         plan.steps[0],
         workflow,
-        get_test_config(
-            agent_system_context_extension=["456"],
-        ),
+        get_test_config(),
         None,
     )
     with execution_context(agent_system_context_extension=["456"]):

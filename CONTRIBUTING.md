@@ -18,11 +18,32 @@ Thank you for your interest in contributing to Portia SDK! We welcome contributi
 2. **Create a Branch**: Create a branch for your feature or bug fix. Use a descriptive name for your branch (e.g., `fix-typo`, `add-feature-x`).
 3. **Install the dependencies** We use Poetry to manage dependencies. Run ``poetry install``
 4. **Make Your Changes**: Implement your changes in small, focused commits. Be sure to follow our linting rules and style guide.
-5. **Run Tests**: If your changes affect functionality, please run ``pytest``. We encourage you to test thoroughly 🌡️
+5. **Run Tests**: If your changes affect functionality, please test thoroughly 🌡️ Details on how run tests are in the **Tests** section below.
 6. **Lint Your Code**: We use [ruff](https://github.com/charliermarsh/ruff) for linting. Please ensure your code passes all linting checks. We prefer per-line disables for rules rather than global ignores, and please leave comments explaining why you disable any rules.
-7. **Open a Pull Request**: Once you're happy with your changes, open a pull request. Ensure that your PR description clearly explains the changes and the problem it addresses.
+7. **Open a Pull Request**: Once you're happy with your changes, open a pull request. Ensure that your PR description clearly explains the changes and the problem it addresses. The **Release** section below has some useful tips on this process.
 8. **Code Review**: Your PR will be reviewed by the maintainers. They may suggest improvements or request changes. We will do our best to review your PRs promptly but we're still a tiny team with limited resource. Please bear with us 🙏
 10. **Merge Your PR**: Once approved, the author of the PR can merge the changes. 🚀
+
+## Tests
+
+We write two types of tests:
+- Unit tests should mock out the LLM providers, and aim to give quick feedback. They should mock out LLM providers.
+- Integration tests actually call LLM providers, are much slower but test the system works fully.
+
+To run tests:
+- Run all tests with `poetry run pytest`.
+- Run unit tests with `poetry run pytest tests/unit`.
+- Run integration tests with `poetry run pytest tests/integration`.
+
+We utilize [pytest-parallel](https://pypi.org/project/pytest-parallel/) to execute tests in parallel. You can add the `--workers=4` argument to the commands above to run in parallel. If you run into issues running this try setting `export NO_PROXY=true` first.
+
+## Release
+
+Releases are controlled via Github Actions and the version field of the `pyproject.toml`. To release:
+
+1. Create a PR that updates the version field in the `pyproject.toml`.
+2. Merge the PR to main.
+3. Github Actions will create a new tag and push the new version to PyPi.
 
 ## Contributor License Agreement (CLA)
 

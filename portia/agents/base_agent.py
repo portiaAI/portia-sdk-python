@@ -1,6 +1,6 @@
 """Agents are responsible for executing steps of a workflow.
 
-The BaseAgent class is the base class all agents must extend.
+The BaseAgent class is the base class that all agents must extend.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from portia.agents.context import build_context
 from portia.common import SERIALIZABLE_TYPE_VAR
-from portia.context import get_execution_context
+from portia.execution_context import get_execution_context
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -24,13 +24,13 @@ if TYPE_CHECKING:
 class BaseAgent:
     """An Agent is responsible for carrying out the task defined in the given Step.
 
-    This Base agent is the class all agents must extend. Critically agents must implement the
+    This Base agent is the class all agents must extend. Critically, agents must implement the
     execute_sync function which is responsible for actually carrying out the task as given in
-    the step. They have access to copies of the step, workflow and config but changes to those
+    the step. They have access to copies of the step, workflow, and config but changes to those
     objects are forbidden.
 
-    Optionally new agents may also override the get_context function which is responsible for
-    the system_context for the agent. This should be done with thought as the details of the system
+    Optionally, new agents may also override the get_context function, which is responsible for
+    the system context for the agent. This should be done with thought, as the details of the system
     context are critically important for LLM performance.
     """
 
@@ -43,10 +43,17 @@ class BaseAgent:
     ) -> None:
         """Initialize the base agent with the given args.
 
-        Importantly the models here are frozen copies of those used in the Runner.
-        They are meant as a read only reference, useful for execution of the task
-        but can not be edited. The agent should return output via the response
+        Importantly, the models here are frozen copies of those used in the Runner.
+        They are meant as read-only references, useful for execution of the task
+        but cannot be edited. The agent should return output via the response
         of the execute_sync method.
+
+        Args:
+            step (Step): The step that defines the task to be executed.
+            workflow (Workflow): The workflow that contains the step and related data.
+            config (Config): The configuration settings for the agent.
+            tool (Tool | None): An optional tool associated with the agent (default is None).
+
         """
         self.step = step
         self.tool = tool
@@ -57,12 +64,24 @@ class BaseAgent:
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task synchronously.
 
-        Implementation of this function is deferred to individual agent implementations
+        Implementation of this function is deferred to individual agent implementations,
         making it simple to write new ones.
+
+        Returns:
+            Output: The output of the task execution.
+
         """
 
     def get_system_context(self) -> str:
-        """Build a generic system context string from the step and workflow provided."""
+        """Build a generic system context string from the step and workflow provided.
+
+        This function retrieves the execution context and generates a system context
+        based on the step and workflow provided to the agent.
+
+        Returns:
+            str: A string containing the system context for the agent.
+
+        """
         ctx = get_execution_context()
         return build_context(
             ctx,
@@ -72,9 +91,14 @@ class BaseAgent:
 
 
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
-    """Output of a tool with wrapper for data, summaries and LLM interpretation.
+    """Output of a tool with a wrapper for data, summaries, and LLM interpretation.
 
-    Contains a generic value T bound to Serializable.
+    This class contains a generic value `T` bound to `Serializable`.
+
+    Attributes:
+        value (SERIALIZABLE_TYPE_VAR | None): The output of the tool.
+        summary (str | None): A textual summary of the output. Not all tools generate summaries.
+
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -82,11 +106,18 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     value: SERIALIZABLE_TYPE_VAR | None = Field(default=None, description="The output of the tool")
     summary: str | None = Field(
         default=None,
-        description="Textual summary of the output of the tool."
-        "Not all tools generate output summaries",
+        description="Textual summary of the output of the tool. Not all tools generate summaries.",
     )
 
     @field_serializer("value")
     def serialize_value(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:
-        """Serialize the value to a string."""
+        """Serialize the value to a string.
+
+        Args:
+            value (SERIALIZABLE_TYPE_VAR | None): The value to serialize.
+
+        Returns:
+            str: The serialized value as a string.
+
+        """
         return f"{value}"

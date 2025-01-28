@@ -27,8 +27,8 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.context import empty_context
 from portia.errors import InvalidWorkflowStateError
+from portia.execution_context import empty_context
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
 from tests.utils import AdditionTool, get_test_config, get_test_workflow
@@ -127,6 +127,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
         args_schema=_TestToolSchema,
@@ -163,6 +164,7 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema.model_json_schema,
         args_schema=_TestToolSchema,
@@ -213,6 +215,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
@@ -252,6 +255,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
@@ -259,7 +263,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -311,6 +315,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
+        id="TOOL_ID",
         name="TOOL_NAME",
         args_json_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
@@ -318,7 +323,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -485,7 +490,7 @@ def test_verifier_agent_edge_cases() -> None:
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain(ctx=empty_context(), return_artifact=True)],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidWorkflowStateError):

@@ -1,4 +1,10 @@
-"""Clarification Primitives."""
+"""Clarification Primitives.
+
+This module defines base classes and utilities for handling clarifications in the Portia system.
+Clarifications represent questions or actions requiring user input to resolve, with different types
+of clarifications for various use cases such as arguments, actions, inputs, multiple choices,
+and value confirmations.
+"""
 
 from __future__ import annotations
 
@@ -13,28 +19,49 @@ from pydantic import (
     model_validator,
 )
 
-from portia.common import SERIALIZABLE_TYPE_VAR
+from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
+
+
+class ClarificationCategory(PortiaEnum):
+    """The category of a clarification.
+
+    This enum defines the different categories of clarifications that can exist, such as arguments,
+    actions, inputs, and more. It helps to categorize clarifications for easier
+    handling and processing.
+    """
+
+    ARGUMENT = "Argument"
+    ACTION = "Action"
+    BASE = "Base"
+    INPUT = "Input"
+    MULTIPLE_CHOICE = "Multiple Choice"
+    VALUE_CONFIRMATION = "Value Confirmation"
 
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Base Model for Clarifications.
 
-    A Clarification represents some question that requires user input to resolve.
-    For example it could be:
-    - That authentication via OAuth needs to happen and the user needs to go through an OAuth flow.
-    - That one argument provided for a tool is missing and the user needs to provide it.
-    - That the user has given an input that is not allowed and needs to choose from a list.
+    A Clarification represents a question or action that requires user input to resolve. For example
+    it could indicate the need for OAuth authentication, missing arguments for a tool
+    or a user choice from a list.
+
+    Attributes:
+        id (UUID): A unique identifier for this clarification.
+        category (ClarificationCategory): The category of this clarification, indicating its type.
+        response (SERIALIZABLE_TYPE_VAR | None): The user's response to this clarification, if any.
+        step (int | None): The step this clarification is associated with, if applicable.
+        user_guidance (str): Guidance provided to the user to assist with the clarification.
+        resolved (bool): Whether the clarification has been resolved by the user.
+
     """
 
     id: UUID = Field(
         default_factory=uuid4,
         description="A unique ID for this clarification",
     )
-    type: str = Field(
-        init=False,
-        repr=False,
-        default="clarification",
-        description="type of clarification",
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.BASE,
+        description="The category of this clarification",
     )
     response: SERIALIZABLE_TYPE_VAR | None = Field(
         default=None,
@@ -49,91 +76,141 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Whether this clarification has been resolved.",
     )
 
-    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
-        """Resolve the clarification with the given response."""
-        self.resolved = True
-        self.response = response
-
 
 class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
-    """A clarification about a specific argument for a tool.
+    """Clarification about a specific argument for a tool.
 
-    The name of the argument should be given within the clarification.
+    This clarification is used when a tool's argument is missing or requires further clarification.
+    The name of the argument is provided within the clarification.
+
+    Attributes:
+        argument_name (str): The name of the argument that is being clarified.
+        category (ClarificationCategory): The category for this clarification, 'Argument'.
+
     """
 
     argument_name: str
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.ARGUMENT,
+        description="The category of this clarification",
+    )
 
 
-class ActionClarification(Clarification[bool]):
-    """An action based clarification.
+class ActionClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+    """Action-based clarification.
 
-    Represents a clarification where the user needs to click on a link. Set the response to true
-    once the user has clicked on the link and done the associated action.
+    Represents a clarification that involves an action, such as clicking a link. The response is set
+    to `True` once the user has completed the action associated with the link.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification, 'Action'.
+        action_url (HttpUrl): The URL for the action that the user needs to complete.
+
     """
 
-    type: str = "Action Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.ACTION,
+        description="The category of this clarification",
+    )
     action_url: HttpUrl
 
     @field_serializer("action_url")
     def serialize_action_url(self, action_url: HttpUrl) -> str:
-        """Serialize the action URL to a string."""
+        """Serialize the action URL to a string.
+
+        Args:
+            action_url (HttpUrl): The URL to be serialized.
+
+        Returns:
+            str: The serialized string representation of the URL.
+
+        """
         return str(action_url)
 
 
 class InputClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
-    """An input based clarification.
+    """Input-based clarification.
 
     Represents a clarification where the user needs to provide a value for a specific argument.
+    This type of clarification is used when the user is prompted to enter a value.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification, 'Input'.
+
     """
 
-    type: str = "Input Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.INPUT,
+        description="The category of this clarification",
+    )
 
 
-class MultiChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
-    """A multiple choice based clarification.
+class MultipleChoiceClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
+    """Multiple choice-based clarification.
 
     Represents a clarification where the user needs to select an option for a specific argument.
+    The available options are provided, and the user must select one.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification 'Multiple Choice'.
+        options (list[SERIALIZABLE_TYPE_VAR]): The available options for the user to choose from.
+
+    Methods:
+        validate_response: Ensures that the user's response is one of the available options.
+
     """
 
-    type: str = "Multiple Choice Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.MULTIPLE_CHOICE,
+        description="The category of this clarification",
+    )
     options: list[SERIALIZABLE_TYPE_VAR]
 
     @model_validator(mode="after")
     def validate_response(self) -> Self:
-        """Ensure provided response is an option."""
+        """Ensure the provided response is an option.
+
+        This method checks that the response provided by the user is one of the options. If not,
+        it raises an error.
+
+        Returns:
+            Self: The validated instance.
+
+        Raises:
+            ValueError: If the response is not one of the available options.
+
+        """
         if self.resolved and self.response not in self.options:
             raise ValueError(f"{self.response} is not a supported option")
         return self
 
-    def resolve(self, response: SERIALIZABLE_TYPE_VAR | None) -> None:
-        """Validate response is in options."""
-        if response not in self.options:
-            raise ValueError(f"{self.response} is not a supported option")
-        self.resolved = True
-        self.response = response
-
 
 class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR]):
-    """A value confirmation clarification.
+    """Value confirmation clarification.
 
-    Represents a clarification where the user is presented a value and needs to accept it.
-    The clarification should be created with the response field already set. The user will
-    denote acceptance by setting the resolved flag.
+    Represents a clarification where the user is presented with a value and must confirm or deny it.
+    The clarification should be created with the response field already set, and the user indicates
+    acceptance by setting the resolved flag to `True`.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification, 'Value Confirmation'.
+
     """
 
-    type: str = "Value Confirmation Clarification"
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.VALUE_CONFIRMATION,
+        description="The category of this clarification",
+    )
 
-    def resolve(self, response: str | None) -> None:  # noqa: ARG002
-        """Resolve the clarification but don't update the response."""
-        self.resolved = True
 
-
-ClarificationListType = list[
-    Union[
-        Clarification,
-        InputClarification,
-        ActionClarification,
-        MultiChoiceClarification,
-        ValueConfirmationClarification,
-    ]
+"""Type that encompasses all possible clarification types."""
+ClarificationType = Union[
+    Clarification,
+    InputClarification,
+    ActionClarification,
+    MultipleChoiceClarification,
+    ValueConfirmationClarification,
 ]
+
+"""A list of clarifications of any type."""
+ClarificationListType = list[ClarificationType]

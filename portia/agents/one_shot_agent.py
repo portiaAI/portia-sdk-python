@@ -1,8 +1,9 @@
-"""A simple OneShotAgent that is optimized for simple tool calling tasks.
+"""A simple OneShotAgent optimized for simple tool calling tasks.
 
-It invokes the OneShotToolCallingModel up to four times but each individual attempt is a one shot.
-This agent is useful when the tool call is simple as it minimizes cost, but the VerifierAgent will
-be more successful on anything but simple tool calls.
+This agent invokes the OneShotToolCallingModel up to four times, but each individual
+attempt is a one-shot call. It is useful when the tool call is simple, minimizing cost.
+However, for more complex tool calls, the VerifierAgent is recommended as it will
+be more successful than the OneShotAgent.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from portia.agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.context import get_execution_context
+from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.workflow import Workflow
 
@@ -38,14 +39,25 @@ if TYPE_CHECKING:
 
 
 class OneShotToolCallingModel:
-    """OneShotToolCallingModel is a one shot model for calling the given tool.
+    """One-shot model for calling a given tool.
 
-    The tool and context are given directly to the LLM and we return the results.
-    This model is useful for simple tasks where the arguments are in the correct form
-    and are all present. The OneShotToolModel will not carry out validation of arguments,
-    for example it will not complain about missing arguments.
+    This model directly passes the tool and context to the language model (LLM)
+    to generate a response. It is suitable for simple tasks where the arguments
+    are already correctly formatted and complete. This model does not validate
+    arguments (e.g., it will not catch missing arguments).
 
-    Prefer to use the VerifierAgent if you have more complicated needs.
+    It is recommended to use the VerifierAgent for more complex tasks.
+
+    Args:
+        llm (BaseChatModel): The language model to use for generating responses.
+        context (str): The context to provide to the language model when generating a response.
+        tools (list[StructuredTool]): A list of tools that can be used during the task.
+        agent (OneShotAgent): The agent responsible for managing the task.
+
+    Methods:
+        invoke(MessagesState): Invokes the LLM to generate a response based on the query, context,
+                               and past errors.
+
     """
 
     tool_calling_prompt = ChatPromptTemplate.from_messages(
@@ -74,14 +86,33 @@ class OneShotToolCallingModel:
         tools: list[StructuredTool],
         agent: OneShotAgent,
     ) -> None:
-        """Initialize the model."""
+        """Initialize the OneShotToolCallingModel.
+
+        Args:
+            llm (BaseChatModel): The language model to use for generating responses.
+            context (str): The context to be used when generating the response.
+            tools (list[StructuredTool]): A list of tools that can be used during the task.
+            agent (OneShotAgent): The agent that is managing the task.
+
+        """
         self.llm = llm
         self.context = context
         self.agent = agent
         self.tools = tools
 
     def invoke(self, state: MessagesState) -> dict[str, Any]:
-        """Invoke the model with the given message state."""
+        """Invoke the model with the given message state.
+
+        This method formats the input for the language model using the query, context,
+        and past errors, then generates a response by invoking the model.
+
+        Args:
+            state (MessagesState): The state containing the messages and other necessary data.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the model's generated response.
+
+        """
         model = self.llm.bind_tools(self.tools)
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
@@ -98,9 +129,20 @@ class OneShotToolCallingModel:
 class OneShotAgent(BaseAgent):
     """Agent responsible for achieving a task by using langgraph.
 
-    This agent does the following things:
+    This agent performs the following steps:
     1. Calls the tool with unverified arguments.
     2. Retries tool calls up to 4 times.
+
+    Args:
+        step (Step): The current step in the task plan.
+        workflow (Workflow): The workflow that defines the task execution process.
+        config (Config): The configuration settings for the agent.
+        tool (Tool | None): The tool to be used for the task (optional).
+
+    Methods:
+        execute_sync(): Executes the core logic of the agent's task, using the provided tool
+                        or falling back to the ToolLessAgent if no tool is available.
+
     """
 
     def __init__(
@@ -110,11 +152,28 @@ class OneShotAgent(BaseAgent):
         config: Config,
         tool: Tool | None = None,
     ) -> None:
-        """Initialize the agent."""
+        """Initialize the OneShotAgent.
+
+        Args:
+            step (Step): The current step in the task plan.
+            workflow (Workflow): The workflow that defines the task execution process.
+            config (Config): The configuration settings for the agent.
+            tool (Tool | None): The tool to be used for the task (optional).
+
+        """
         super().__init__(step, workflow, config, tool)
 
     def execute_sync(self) -> Output:
-        """Run the core execution logic of the task."""
+        """Run the core execution logic of the task.
+
+        This method will either invoke the tool with unverified arguments or fall back
+        to the ToolLessAgent if no tool is available. It handles task execution through
+        a workflow that includes retries for up to four tool calls.
+
+        Returns:
+            Output: The result of the agent's execution, containing the tool call result.
+
+        """
         if not self.tool:
             return ToolLessAgent(
                 self.step,
@@ -126,8 +185,7 @@ class OneShotAgent(BaseAgent):
         context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()
         tools = [
-            self.tool.to_langchain(
-                return_artifact=True,
+            self.tool.to_langchain_with_artifact(
                 ctx=get_execution_context(),
             ),
         ]
