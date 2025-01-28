@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
 from portia.agents.base_agent import Output
-from portia.agents.utils.summarizer import LLMSummarizer
+from portia.agents.utils.step_summarizer import LLMSummarizer
 from portia.llm_wrapper import LLMWrapper
 from tests.utils import get_test_config
 

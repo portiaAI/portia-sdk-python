@@ -30,7 +30,6 @@ class CalculatorTool(Tool[float]):
     "Works best for maths expressions containing only numbers and the operators +, -, *, x, /."
     args_schema: type[BaseModel] = CalculatorToolSchema
     output_schema: tuple[str, str] = ("str", "A string dump of the computed result")
-    should_summarize: bool = True
 
     def run(self, _: ExecutionContext, math_question: str) -> float:
         """Run the CalculatorTool."""

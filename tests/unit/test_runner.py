@@ -277,11 +277,12 @@ def test_runner_execute_query_with_summary(runner: Runner) -> None:
     mock_step_agent.execute_sync.side_effect = [weather_output, activities_output]
 
     mock_summarizer_agent = mock.MagicMock()
-    mock_summarizer_agent.execute_sync.return_value = Output(value=expected_summary)
+    mock_summarizer_agent.create_summary.side_effect = [expected_summary]
 
-    with mock.patch("portia.runner.SummarizerAgent", return_value=mock_summarizer_agent), \
-         mock.patch.object(runner, "_get_agent_for_step", return_value=mock_step_agent):
-
+    with mock.patch(
+        "portia.runner.FinalOutputSummarizer",
+        return_value=mock_summarizer_agent,
+    ), mock.patch.object(runner, "_get_agent_for_step", return_value=mock_step_agent):
         workflow = runner.execute_query(query)
 
         # Verify workflow completed successfully
@@ -318,9 +319,12 @@ def test_runner_sets_final_output_with_summary(runner: Runner) -> None:
 
     expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
     mock_summarizer = mock.MagicMock()
-    mock_summarizer.execute_sync.return_value = Output(value=expected_summary)
+    mock_summarizer.create_summary.side_effect = [expected_summary]
 
-    with mock.patch("portia.runner.SummarizerAgent", return_value=mock_summarizer):
+    with mock.patch(
+        "portia.runner.FinalOutputSummarizer",
+        return_value=mock_summarizer,
+    ):
         last_step_output = Output(value="Visit Hyde Park and have a picnic")
         output = runner._get_final_output(plan, workflow, last_step_output)  # noqa: SLF001
 
@@ -330,18 +334,21 @@ def test_runner_sets_final_output_with_summary(runner: Runner) -> None:
         assert output.summary == expected_summary
 
         # Verify SummarizerAgent was called with correct arguments
-        mock_summarizer.execute_sync.assert_called_once()
+        mock_summarizer.create_summary.assert_called_once()
 
 
-def test_runner_sets_final_output_handles_summary_error(runner: Runner) -> None:
+def test_runner_get_final_output_handles_summary_error(runner: Runner) -> None:
     """Test that final output is set even if summary generation fails."""
     (plan, workflow) = get_test_workflow()
 
-    # Mock the ToolLessAgent to raise an exception
+    # Mock the SummarizerAgent to raise an exception
     mock_agent = mock.MagicMock()
-    mock_agent.execute_sync.side_effect = Exception("Summary failed")
+    mock_agent.create_summary.side_effect = Exception("Summary failed")
 
-    with mock.patch("portia.runner.ToolLessAgent", return_value=mock_agent):
+    with mock.patch(
+        "portia.agents.utils.final_output_summarizer.FinalOutputSummarizer",
+        return_value=mock_agent,
+    ):
         step_output = Output(value="Some output")
         final_output = runner._get_final_output(plan, workflow, step_output)  # noqa: SLF001
 

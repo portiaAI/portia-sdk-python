@@ -29,7 +29,6 @@ class WeatherTool(Tool[str]):
     description: str = "Get the weather for a given city"
     args_schema: type[BaseModel] = WeatherToolSchema
     output_schema: tuple[str, str] = ("str", "String output of the weather with temp and city")
-    should_summarize: bool = True
 
     def run(self, _: ExecutionContext, city: str) -> str:
         """Run the WeatherTool."""

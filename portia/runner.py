@@ -28,7 +28,7 @@ from uuid import UUID
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.agents.utils.summarizer_agent import SummarizerAgent
+from portia.agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
@@ -424,13 +424,14 @@ class Runner:
         )
 
         try:
-            agent = SummarizerAgent(
+            agent = FinalOutputSummarizer(
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
                 plan=ReadOnlyPlan.from_plan(plan),
                 config=self.config,
             )
-            summary = agent.execute_sync()
-            final_output.summary = summary.value
+            summary = agent.create_summary()
+            final_output.summary = summary
+
         except Exception as e:  # noqa: BLE001
             logger().warning(f"Error summarising workflow: {e}")
 

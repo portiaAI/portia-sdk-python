@@ -23,7 +23,7 @@ from portia.agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.agents.toolless_agent import ToolLessAgent
-from portia.agents.utils.summarizer import LLMSummarizer
+from portia.agents.utils.step_summarizer import LLMSummarizer
 from portia.clarification import Clarification, InputClarification
 from portia.errors import (
     InvalidWorkflowStateError,
