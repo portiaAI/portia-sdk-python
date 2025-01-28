@@ -1,4 +1,4 @@
-"""Summarizer agent implementation."""
+"""Utility class for final output summarizer."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class FinalOutputSummarizer:
-    """Summarizer responsible for summarizing the workflow outputs for final output's summary.
+    """Utility class responsible for summarizing the workflow outputs for final output's summary.
 
     Attributes:
         config (Config): The configuration for the llm.
@@ -33,7 +33,7 @@ class FinalOutputSummarizer:
         """Initialize the summarizer agent.
 
         Args:
-            config(Config): The configuration for the agent
+            config (Config): The configuration for the llm.
 
         """
         self.config = config
@@ -42,7 +42,7 @@ class FinalOutputSummarizer:
         """Build the query, tasks and outputs context.
 
         Args:
-            plan(Plan): The plan containing the steps
+            plan(Plan): The plan containing the steps.
             workflow(Workflow): The workflow to get the outputs from.
 
         Returns:
@@ -64,11 +64,11 @@ class FinalOutputSummarizer:
         """Execute the summarizer llm and return the summary as a string.
 
         Args:
-            plan (Plan): The plan containing the steps
-            workflow (Workflow): The workflow to summarize
+            plan (Plan): The plan containing the steps.
+            workflow (Workflow): The workflow to summarize.
 
         Returns:
-            str | None: The generated summary or None if generation fails
+            str | None: The generated summary or None if generation fails.
 
         """
         llm = LLMWrapper(self.config).to_langchain()
