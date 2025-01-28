@@ -247,71 +247,6 @@ def test_runner_wait_for_ready(runner: Runner) -> None:
     assert workflow.state == WorkflowState.READY_TO_RESUME
 
 
-def test_runner_sets_final_output_with_summary(runner: Runner) -> None:
-    """Test that final output is set with correct summary."""
-    (plan, workflow) = get_test_workflow()
-    plan.steps = [
-        Step(
-            task="Get weather in London",
-            output="$london_weather",
-        ),
-        Step(
-            task="Suggest activities based on weather",
-            output="$activities",
-        ),
-    ]
-
-    workflow.outputs.step_outputs = {
-        "$london_weather": Output(value="Sunny and warm"),
-        "$activities": Output(value="Visit Hyde Park and have a picnic"),
-    }
-
-    expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
-    mock_agent = mock.MagicMock()
-    mock_agent.execute_sync_with_context.return_value = Output(value=expected_summary)
-
-    with mock.patch("portia.runner.ToolLessAgent", return_value=mock_agent):
-
-        last_step_output = Output(value="Visit Hyde Park and have a picnic")
-
-        runner._set_final_output(plan, workflow, last_step_output)  # noqa: SLF001
-
-        # Verify the final output
-        assert workflow.outputs.final_output is not None
-        assert workflow.outputs.final_output.value == "Visit Hyde Park and have a picnic"
-        assert workflow.outputs.final_output.summary == expected_summary
-
-        # Verify ToolLessAgent was called with correct context
-        expected_context = (
-            "Task: Get weather in London\n"
-            "Output: Sunny and warm\n"
-            "----------\n"
-            "Task: Suggest activities based on weather\n"
-            "Output: Visit Hyde Park and have a picnic\n"
-            "----------"
-        )
-        mock_agent.execute_sync_with_context.assert_called_once_with(context=expected_context)
-
-
-def test_runner_sets_final_output_handles_summary_error(runner: Runner) -> None:
-    """Test that final output is set even if summary generation fails."""
-    (plan, workflow) = get_test_workflow()
-
-    # Mock the ToolLessAgent to raise an exception
-    mock_agent = mock.MagicMock()
-    mock_agent.execute_sync_with_context.side_effect = Exception("Summary failed")
-
-    with mock.patch("portia.runner.ToolLessAgent", return_value=mock_agent):
-        # Call _set_final_output
-        step_output = Output(value="Some output")
-        runner._set_final_output(plan, workflow, step_output)  # noqa: SLF001
-
-        # Verify the final output is set without summary
-        assert workflow.outputs.final_output is not None
-        assert workflow.outputs.final_output.value == "Some output"
-        assert workflow.outputs.final_output.summary is None
-
-
 def test_runner_execute_query_with_summary(runner: Runner) -> None:
     """Test execute_query sets both final output and summary correctly."""
     query = "What activities can I do in London based on weather?"
@@ -341,10 +276,10 @@ def test_runner_execute_query_with_summary(runner: Runner) -> None:
     mock_step_agent = mock.MagicMock()
     mock_step_agent.execute_sync.side_effect = [weather_output, activities_output]
 
-    mock_summary_agent = mock.MagicMock()
-    mock_summary_agent.execute_sync_with_context.return_value = Output(value=expected_summary)
+    mock_summarizer_agent = mock.MagicMock()
+    mock_summarizer_agent.execute_sync.return_value = Output(value=expected_summary)
 
-    with mock.patch("portia.runner.ToolLessAgent", return_value=mock_summary_agent), \
+    with mock.patch("portia.runner.SummarizerAgent", return_value=mock_summarizer_agent), \
          mock.patch.object(runner, "_get_agent_for_step", return_value=mock_step_agent):
 
         workflow = runner.execute_query(query)
@@ -360,3 +295,57 @@ def test_runner_execute_query_with_summary(runner: Runner) -> None:
         assert workflow.outputs.final_output is not None
         assert workflow.outputs.final_output.value == activities_output.value
         assert workflow.outputs.final_output.summary == expected_summary
+
+
+def test_runner_sets_final_output_with_summary(runner: Runner) -> None:
+    """Test that final output is set with correct summary."""
+    (plan, workflow) = get_test_workflow()
+    plan.steps = [
+        Step(
+            task="Get weather in London",
+            output="$london_weather",
+        ),
+        Step(
+            task="Suggest activities based on weather",
+            output="$activities",
+        ),
+    ]
+
+    workflow.outputs.step_outputs = {
+        "$london_weather": Output(value="Sunny and warm"),
+        "$activities": Output(value="Visit Hyde Park and have a picnic"),
+    }
+
+    expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
+    mock_summarizer = mock.MagicMock()
+    mock_summarizer.execute_sync.return_value = Output(value=expected_summary)
+
+    with mock.patch("portia.runner.SummarizerAgent", return_value=mock_summarizer):
+        last_step_output = Output(value="Visit Hyde Park and have a picnic")
+        output = runner._get_final_output(plan, workflow, last_step_output)  # noqa: SLF001
+
+        # Verify the final output
+        assert output is not None
+        assert output.value == "Visit Hyde Park and have a picnic"
+        assert output.summary == expected_summary
+
+        # Verify SummarizerAgent was called with correct arguments
+        mock_summarizer.execute_sync.assert_called_once()
+
+
+def test_runner_sets_final_output_handles_summary_error(runner: Runner) -> None:
+    """Test that final output is set even if summary generation fails."""
+    (plan, workflow) = get_test_workflow()
+
+    # Mock the ToolLessAgent to raise an exception
+    mock_agent = mock.MagicMock()
+    mock_agent.execute_sync.side_effect = Exception("Summary failed")
+
+    with mock.patch("portia.runner.ToolLessAgent", return_value=mock_agent):
+        step_output = Output(value="Some output")
+        final_output = runner._get_final_output(plan, workflow, step_output)  # noqa: SLF001
+
+        # Verify the final output is set without summary
+        assert final_output is not None
+        assert final_output.value == "Some output"
+        assert final_output.summary is None

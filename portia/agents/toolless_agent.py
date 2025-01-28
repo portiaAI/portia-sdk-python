@@ -94,29 +94,10 @@ class ToolLessAgent(BaseAgent):
     and context.
 
     Methods:
-        execute_sync_with_context(context: str): Executes the core logic of the agent's task
-        by invoking the ToolLessModel with the provided context.
-
         execute_sync(): Executes the core logic of the agent's task by invoking the
                         ToolLessModel with the appropriate inputs.
 
     """
-
-    def execute_sync_with_context(self, context: str) -> Output:
-        """Run the core execution logic of the task.
-
-        This method generates a task-specific prompt and invokes the ToolLessModel
-        within a StateGraph to produce a response based on the current context and task.
-
-        Args:
-            context (str): The context to be used when generating the response.
-
-        Returns:
-            Output: The result of the agent's execution, containing the generated response.
-
-        """
-        return self._execute_sync(context)
-
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.
@@ -128,11 +109,7 @@ class ToolLessAgent(BaseAgent):
             Output: The result of the agent's execution, containing the generated response.
 
         """
-        return self._execute_sync(self.get_system_context())
-
-
-    def _execute_sync(self, context: str) -> Output:
-        """Run the core execution logic of the task with the provided context."""
+        context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()
         task_prompt = ChatPromptTemplate.from_messages(
             [

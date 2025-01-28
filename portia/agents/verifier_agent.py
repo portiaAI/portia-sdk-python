@@ -14,7 +14,6 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from portia.agents.agent_node_utils.summarizer import LLMSummarizer
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.execution_utils import (
     MAX_RETRIES,
@@ -24,6 +23,7 @@ from portia.agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.agents.toolless_agent import ToolLessAgent
+from portia.agents.utils.summarizer import LLMSummarizer
 from portia.clarification import Clarification, InputClarification
 from portia.errors import (
     InvalidWorkflowStateError,

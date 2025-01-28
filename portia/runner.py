@@ -26,9 +26,9 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from portia.agents.base_agent import Output
-from portia.agents.context import build_tasks_and_outputs_context
 from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.toolless_agent import ToolLessAgent
+from portia.agents.utils.summarizer_agent import SummarizerAgent
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
@@ -44,7 +44,7 @@ from portia.execution_context import (
     is_execution_context_set,
 )
 from portia.logger import logger, logger_manager
-from portia.plan import Plan, ReadOnlyStep, Step
+from portia.plan import Plan, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.storage import (
     DiskFileStorage,
@@ -371,7 +371,7 @@ class Runner:
 
             # set final output if is last step (accounting for zero index)
             if index == len(plan.steps) - 1:
-                self._set_final_output(plan, workflow, step_output)
+                workflow.outputs.final_output = self._get_final_output(plan, workflow, step_output)
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
@@ -409,8 +409,8 @@ class Runner:
 
         return cls(self.config)
 
-    def _set_final_output(self, plan: Plan, workflow: Workflow, step_output: Output) -> None:
-        """Set the final output and add summarization to it.
+    def _get_final_output(self, plan: Plan, workflow: Workflow, step_output: Output) -> Output:
+        """Get the final output and add summarization to it.
 
         Args:
             plan (Plan): The plan to execute.
@@ -418,35 +418,23 @@ class Runner:
             step_output (Output): The output of the last step.
 
         """
-        workflow.outputs.final_output = Output(
+        final_output = Output(
             value=step_output.value,
             summary=None,
         )
-        summarize_task = (
-            "Summarize all previous tasks and outputs. Make sure the "
-            "summary is including all the previous tasks and outputs and biased towards "
-            "the last step output of the plan. Your summary "
-            "should be concise and to the point with maximum 500 characters."
-        )
 
-        summary_variable = "$portia_summary_final_step"
         try:
-            agent = ToolLessAgent(
-                step=Step(
-                    task=summarize_task,
-                    inputs=[],
-                    output=summary_variable,
-                ),
-                # it doesn't matter what workflow is, so passing read only of the original workflow.
+            agent = SummarizerAgent(
                 workflow=ReadOnlyWorkflow.from_workflow(workflow),
+                plan=ReadOnlyPlan.from_plan(plan),
                 config=self.config,
             )
-            summary = agent.execute_sync_with_context(
-                context=build_tasks_and_outputs_context(plan, workflow),
-            )
-            workflow.outputs.final_output.summary = summary.value
+            summary = agent.execute_sync()
+            final_output.summary = summary.value
         except Exception as e:  # noqa: BLE001
             logger().warning(f"Error summarising workflow: {e}")
+
+        return final_output
 
     def _handle_clarifications(self, workflow: Workflow, step_output: Output, plan: Plan) -> bool:
         """Handle any clarifications needed during workflow execution.
