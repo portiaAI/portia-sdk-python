@@ -37,6 +37,7 @@ from portia.agents.base_agent import Output
 from portia.clarification import (
     ActionClarification,
     Clarification,
+    ClarificationCategory,
     InputClarification,
     MultipleChoiceClarification,
     ValueConfirmationClarification,
@@ -384,11 +385,10 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             if "ToolHardError" in output.value:
                 raise ToolHardError(output.value)
         # Handle Clarifications
-        print(output.value)
-        if isinstance(output.value, list) and output.value and "type" in output.value[0]:
+        if isinstance(output.value, list) and output.value and "category" in output.value[0]:
             clarification = output.value[0]
-            match clarification["type"]:
-                case "Action Clarification":
+            match clarification["category"]:
+                case ClarificationCategory.ACTION:
                     return Output(
                         value=ActionClarification(
                             id=clarification["id"],
@@ -396,7 +396,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             user_guidance=clarification["user_guidance"],
                         ),
                     )
-                case "Input Clarification":
+                case ClarificationCategory.INPUT:
                     return Output(
                         value=InputClarification(
                             id=clarification["id"],
@@ -404,7 +404,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             user_guidance=clarification["user_guidance"],
                         ),
                     )
-                case "Multiple Choice Clarification":
+                case ClarificationCategory.MULTIPLE_CHOICE:
                     return Output(
                         value=MultipleChoiceClarification(
                             id=clarification["id"],
@@ -413,7 +413,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             options=clarification["options"],
                         ),
                     )
-                case "Value Confirmation Clarification":
+                case ClarificationCategory.VALUE_CONFIRMATION:
                     return Output(
                         value=ValueConfirmationClarification(
                             id=clarification["id"],
