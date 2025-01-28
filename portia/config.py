@@ -1,4 +1,10 @@
-"""Configuration for the SDK."""
+"""Configuration module for the SDK.
+
+This module defines the configuration classes and enumerations used in the SDK,
+including settings for storage, API keys, LLM providers, logging, and agent options.
+It also provides validation for configuration values and loading mechanisms for
+config files and default settings.
+"""
 
 from __future__ import annotations
 
@@ -23,7 +29,15 @@ T = TypeVar("T")
 
 
 class StorageClass(Enum):
-    """Represent locations plans and workflows are written to."""
+    """Enum representing locations plans and workflows are stored.
+
+    Attributes
+    ----------
+        MEMORY: Stored in memory.
+        DISK: Stored on disk.
+        CLOUD: Stored in the cloud.
+
+    """
 
     MEMORY = "MEMORY"
     DISK = "DISK"
@@ -31,14 +45,26 @@ class StorageClass(Enum):
 
 
 class LLMProvider(Enum):
-    """Enum of LLM providers."""
+    """Enum for supported LLM providers.
+
+    Attributes:
+        OPENAI: OpenAI provider.
+        ANTHROPIC: Anthropic provider.
+        MISTRALAI: MistralAI provider.
+
+    """
 
     OPENAI = "OPENAI"
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
 
     def associated_models(self) -> list[LLMModel]:
-        """Get the associated models for the provider."""
+        """Get the associated models for the provider.
+
+        Returns:
+            list[LLMModel]: List of supported models for the provider.
+
+        """
         match self:
             case LLMProvider.OPENAI:
                 return SUPPORTED_OPENAI_MODELS
@@ -48,7 +74,12 @@ class LLMProvider(Enum):
                 return SUPPORTED_MISTRALAI_MODELS
 
     def default_model(self) -> LLMModel:
-        """Get the default model for the provider."""
+        """Get the default model for the provider.
+
+        Returns:
+            LLMModel: The default model for the provider.
+
+        """
         match self:
             case LLMProvider.OPENAI:
                 return LLMModel.GPT_4_O_MINI
@@ -59,7 +90,23 @@ class LLMProvider(Enum):
 
 
 class LLMModel(Enum):
-    """Supported Models."""
+    """Enum for supported LLM models.
+
+    Models are grouped by provider, with the following providers:
+    - OpenAI
+    - Anthropic
+    - MistralAI
+
+    Attributes:
+        GPT_4_O: GPT-4 model by OpenAI.
+        GPT_4_O_MINI: Mini GPT-4 model by OpenAI.
+        GPT_3_5_TURBO: GPT-3.5 Turbo model by OpenAI.
+        CLAUDE_3_5_SONNET: Claude 3.5 Sonnet model by Anthropic.
+        CLAUDE_3_5_HAIKU: Claude 3.5 Haiku model by Anthropic.
+        CLAUDE_3_OPUS_LATEST: Claude 3.0 Opus latest model by Anthropic.
+        MISTRAL_LARGE_LATEST: Mistral Large Latest model by MistralAI.
+
+    """
 
     # OpenAI
     GPT_4_O = "gpt-4o"
@@ -75,7 +122,12 @@ class LLMModel(Enum):
     MISTRAL_LARGE_LATEST = "mistral-large-latest"
 
     def provider(self) -> LLMProvider:
-        """Get the associated provider for the model."""
+        """Get the associated provider for the model.
+
+        Returns:
+            LLMProvider: The provider associated with the model.
+
+        """
         if self in SUPPORTED_ANTHROPIC_MODELS:
             return LLMProvider.ANTHROPIC
         if self in SUPPORTED_MISTRALAI_MODELS:
@@ -101,15 +153,42 @@ SUPPORTED_MISTRALAI_MODELS = [
 
 
 class AgentType(Enum):
-    """Type of agent to use for executing a step."""
+    """Enum for types of agents used for executing a step.
+
+    Attributes:
+        TOOL_LESS: A tool-less agent.
+        ONE_SHOT: A one-shot agent.
+        VERIFIER: A verifier agent.
+
+    """
 
     TOOL_LESS = "TOOL_LESS"
     ONE_SHOT = "ONE_SHOT"
     VERIFIER = "VERIFIER"
 
 
+class PlannerType(Enum):
+    """Enum for planners used for planning queries.
+
+    Attributes:
+        ONE_SHOT: A one-shot planner.
+
+    """
+
+    ONE_SHOT = "ONE_SHOT"
+
+
 class LogLevel(Enum):
-    """Available Log Levels."""
+    """Enum for available log levels.
+
+    Attributes:
+        DEBUG: Debug log level.
+        INFO: Info log level.
+        WARNING: Warning log level.
+        ERROR: Error log level.
+        CRITICAL: Critical log level.
+
+    """
 
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -119,7 +198,18 @@ class LogLevel(Enum):
 
 
 def is_greater_than_zero(value: int) -> int:
-    """Validate greater than zero."""
+    """Ensure the value is greater than zero.
+
+    Args:
+        value (int): The value to validate.
+
+    Raises:
+        ValueError: If the value is less than or equal to zero.
+
+    Returns:
+        int: The validated value.
+
+    """
     if value < 0:
         raise ValueError(f"{value} must be greater than zero")
     return value
@@ -132,7 +222,19 @@ E = TypeVar("E", bound=Enum)
 
 
 def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
-    """Parse a string to enum or just return raw enum."""
+    """Parse a string to an enum or return the enum as is.
+
+    Args:
+        value (str | E): The value to parse.
+        enum_type (type[E]): The enum type to parse the value into.
+
+    Raises:
+        InvalidConfigError: If the value cannot be parsed into the enum.
+
+    Returns:
+        E: The corresponding enum value.
+
+    """
     if isinstance(value, str):
         try:
             return enum_type[value.upper()]
@@ -151,7 +253,34 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
 
 
 class Config(BaseModel):
-    """General configuration for the library."""
+    """General configuration for the SDK.
+
+    This class holds the configuration for the SDK, including API keys, LLM
+    settings, logging options, and storage settings. It also provides validation
+    for configuration consistency and offers methods for loading configuration
+    from files or default values.
+
+    Attributes:
+        portia_api_endpoint: The endpoint for the Portia API.
+        portia_api_key: The API key for Portia.
+        openai_api_key: The API key for OpenAI.
+        anthropic_api_key: The API key for Anthropic.
+        mistralai_api_key: The API key for MistralAI.
+        storage_class: The storage class used (e.g., MEMORY, DISK, CLOUD).
+        storage_dir: The directory for storage, if applicable.
+        default_log_level: The default log level (e.g., DEBUG, INFO).
+        default_log_sink: The default destination for logs (e.g., sys.stdout).
+        json_log_serialize: Whether to serialize logs in JSON format.
+        llm_provider: The LLM provider (e.g., OpenAI, Anthropic).
+        llm_model_name: The model to use for LLM tasks.
+        llm_model_temperature: The temperature for LLM generation.
+        llm_model_seed: The seed for LLM generation.
+        default_agent_type: The default agent type.
+        default_planner: The default planner type.
+
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -231,7 +360,14 @@ class Config(BaseModel):
         """Parse default_agent_type to enum if string provided."""
         return parse_str_to_enum(value, AgentType)
 
-    model_config = ConfigDict(frozen=True)
+    # Planner Options
+    default_planner: PlannerType
+
+    @field_validator("default_planner", mode="before")
+    @classmethod
+    def parse_default_planner(cls, value: str | PlannerType) -> PlannerType:
+        """Parse default_planner to enum if string provided."""
+        return parse_str_to_enum(value, PlannerType)
 
     @model_validator(mode="after")
     def check_config(self) -> Self:
@@ -250,8 +386,8 @@ class Config(BaseModel):
             if self.llm_model_name not in supported_models:
                 raise InvalidConfigError(
                     "llm_model_name",
-                    "Unsupported model please use one of: " +
-                    ", ".join(model.value for model in supported_models),
+                    "Unsupported model please use one of: "
+                    + ", ".join(model.value for model in supported_models),
                 )
 
         match self.llm_provider:
@@ -265,13 +401,23 @@ class Config(BaseModel):
 
     @classmethod
     def from_file(cls, file_path: Path) -> Config:
-        """Load configuration from a JSON file."""
+        """Load configuration from a JSON file.
+
+        Returns:
+            Config: The default config
+
+        """
         with Path.open(file_path) as f:
             return cls.model_validate_json(f.read())
 
     @classmethod
     def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
-        """Create a Config instance with default values, allowing overrides."""
+        """Create a Config instance with default values, allowing overrides.
+
+        Returns:
+            Config: The default config
+
+        """
         return default_config(**kwargs)
 
     def has_api_key(self, name: str) -> bool:
@@ -284,16 +430,45 @@ class Config(BaseModel):
             return True
 
     def must_get_api_key(self, name: str) -> SecretStr:
-        """Get an api key as a SecretStr or error if not set."""
+        """Retrieve the required API key for the configured provider.
+
+        Raises:
+            ConfigNotFoundError: If no API key is found for the provider.
+
+        Returns:
+            SecretStr: The required API key.
+
+        """
         return self.must_get(name, SecretStr)
 
     def must_get_raw_api_key(self, name: str) -> str:
-        """Get a raw api key as a string or errors if not set."""
+        """Retrieve the raw API key for the configured provider.
+
+        Raises:
+            ConfigNotFoundError: If no API key is found for the provider.
+
+        Returns:
+            str: The raw API key.
+
+        """
         key = self.must_get_api_key(name)
         return key.get_secret_value()
 
     def must_get(self, name: str, expected_type: type[T]) -> T:
-        """Get a given value in the config ensuring a type match."""
+        """Retrieve any value from the config, ensuring its of the correct type.
+
+        Args:
+            name (str): The name of the config record.
+            expected_type (type[T]): The expected type of the value.
+
+        Raises:
+            ConfigNotFoundError: If no API key is found for the provider.
+            InvalidConfigError: If the config isn't valid
+
+        Returns:
+            T: The config value
+
+        """
         if not hasattr(self, name):
             raise ConfigNotFoundError(name)
         value = getattr(self, name)
@@ -309,11 +484,17 @@ class Config(BaseModel):
 
 
 def default_config(**kwargs) -> Config:  # noqa: ANN003
-    """Return default config with values that can be overridden."""
+    """Return default config with values that can be overridden.
+
+    Returns:
+        Config: The default config
+
+    """
     return Config(
         storage_class=kwargs.pop("storage_class", StorageClass.MEMORY),
         llm_provider=kwargs.pop("llm_provider", LLMProvider.OPENAI),
         llm_model_name=kwargs.pop("llm_model_name", LLMModel.GPT_4_O_MINI),
+        default_planner=kwargs.pop("default_planner", PlannerType.ONE_SHOT),
         llm_model_temperature=kwargs.pop("llm_model_temperature", 0),
         llm_model_seed=kwargs.pop("llm_model_seed", 443),
         default_agent_type=kwargs.pop("default_agent_type", AgentType.VERIFIER),

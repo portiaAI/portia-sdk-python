@@ -4,8 +4,8 @@ import re
 
 from pydantic import BaseModel, Field
 
-from portia.context import ExecutionContext
 from portia.errors import ToolHardError
+from portia.execution_context import ExecutionContext
 from portia.tool import Tool
 
 
@@ -90,7 +90,5 @@ class CalculatorTool(Tool[float]):
         else:
             prompt = prompt.replace("multiply", "*")
 
-        if not re.match(r"^[\d\s\+\-\*/\(\)\.]+$", prompt):
-            raise ToolHardError("Invalid characters in the expression.")
         # Extract the mathematical expression
         return "".join(re.findall(r"[\d\+\-\*/\(\)\.\s]", prompt))

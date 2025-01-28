@@ -3,8 +3,8 @@
 import pytest
 
 from portia.clarification import Clarification
-from portia.context import get_execution_context
 from portia.errors import ToolHardError
+from portia.execution_context import get_execution_context
 from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper

@@ -1,4 +1,7 @@
-"""Summarizer model implementation."""
+"""Summarizer model implementation.
+
+The Summarizer model can be used by agents to summarize the output of a given tool.
+"""
 
 from __future__ import annotations
 
@@ -15,39 +18,69 @@ from portia.logger import logger
 if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
 
+
 class LLMSummarizer:
     """Model to generate a summary for the textual output of a tool.
 
     This model is used only on the tool output message.
+
+    Attributes:
+        summarizer_prompt (ChatPromptTemplate): The prompt template used to generate the summary.
+        llm (BaseChatModel): The language model used for summarization.
+        summary_max_length (int): The maximum length of the summary.
+
     """
 
-    summarizer_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage(
-            content=(
-                "You are a highly skilled summarizer. Your task is to create a textual summary"
-                "of the provided output make sure to follow the guidelines provided.\n"
-                "- Focus on the key information and maintain accuracy.\n"
-                "- Make sure to not exceed the max limit of {max_length} characters.\n"
-                "- Don't produce an overly long summary if it doesn't make sense.\n"
+    summarizer_prompt = ChatPromptTemplate.from_messages(
+        [
+            SystemMessage(
+                content=(
+                    "You are a highly skilled summarizer. Your task is to create a textual summary"
+                    "of the provided output make sure to follow the guidelines provided.\n"
+                    "- Focus on the key information and maintain accuracy.\n"
+                    "- Make sure to not exceed the max limit of {max_length} characters.\n"
+                    "- Don't produce an overly long summary if it doesn't make sense.\n"
+                ),
             ),
-        ),
-        HumanMessagePromptTemplate.from_template(
-            "Please summarize the following output:\n{tool_output}\n",
-        ),
-    ])
+            HumanMessagePromptTemplate.from_template(
+                "Please summarize the following output:\n{tool_output}\n",
+            ),
+        ],
+    )
 
     def __init__(self, llm: BaseChatModel, summary_max_length: int = 500) -> None:
-        """Initialize the model."""
+        """Initialize the model.
+
+        Args:
+            llm (BaseChatModel): The language model used for summarization.
+            summary_max_length (int): The maximum length of the summary. Default is 500 characters.
+
+        """
         self.llm = llm
         self.summary_max_length = summary_max_length
 
     def invoke(self, state: MessagesState) -> dict[str, Any]:
-        """Invoke the model with the given message state."""
+        """Invoke the model with the given message state.
+
+        This method processes the last message in the state, checks if it's a tool message with an
+        output, and if so, generates a summary of the tool's output. The summary is then added to
+        the artifact of the last message.
+
+        Args:
+            state (MessagesState): The current state of the messages, which includes the output.
+
+        Returns:
+            dict[str, Any]: A dict containing the updated message state, including the summary.
+
+        Raises:
+            Exception: If an error occurs during the invocation of the summarizer model.
+
+        """
         messages = state["messages"]
         last_message = messages[-1] if len(messages) > 0 else None
-        if (
-            not isinstance(last_message, ToolMessage)
-            or not isinstance(last_message.artifact, Output)
+        if not isinstance(last_message, ToolMessage) or not isinstance(
+            last_message.artifact,
+            Output,
         ):
             return {"messages": [last_message]}
 

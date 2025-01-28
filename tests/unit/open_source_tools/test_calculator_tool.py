@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from portia.context import ExecutionContext
 from portia.errors import ToolHardError
+from portia.execution_context import ExecutionContext
 from portia.open_source_tools.calculator_tool import CalculatorTool
 
 
@@ -36,6 +36,7 @@ def test_run_valid_expressions(calculator_tool: CalculatorTool) -> None:
     assert calculator_tool.run(context, "212 + 14") == 226
     assert calculator_tool.run(context, "300 - 14") == 286
     assert calculator_tool.run(context, "3 x 2") == 6
+    assert calculator_tool.run(context, "What is the sum of 17.42 and 16.72") == 34.14
 
 
 def test_run_invalid_expressions(calculator_tool: CalculatorTool) -> None:
@@ -58,7 +59,7 @@ def test_run_invalid_expressions(calculator_tool: CalculatorTool) -> None:
     with pytest.raises(ToolHardError):
         calculator_tool.run(context, "5 + 3 * x")
 
-    with pytest.raises(ToolHardError, match="Invalid characters in the expression."):
+    with pytest.raises(ToolHardError, match="Error evaluating expression."):
         calculator_tool.run(context, "subtract (def myclass) from 10")
 
 
