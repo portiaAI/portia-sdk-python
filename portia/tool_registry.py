@@ -85,11 +85,16 @@ class ToolRegistry(ABC):
         """
         raise NotImplementedError("get_tools is not implemented")
 
-    def match_tools(self, query: str) -> list[Tool]:  # noqa: ARG002 - useful to have variable name
+    def match_tools(
+        self,
+        query: str | None = None,  # noqa: ARG002 - useful to have variable name
+        tool_ids: list[str] | None = None,
+    ) -> list[Tool]:
         """Provide a set of tools that match a given query.
 
         Args:
-            query (str): The query to match tools against.
+            query (str | None): The query to match tools against.
+            tool_ids (list[str] | None): The list of tool ids to match.
 
         Returns:
             list[Tool]: A list of tools matching the query.
@@ -99,9 +104,9 @@ class ToolRegistry(ABC):
         This method is optional to implement and will default to providing all tools.
 
         """
-        return self.get_tools()
+        return [self.get_tool(tool_id) for tool_id in tool_ids] if tool_ids else self.get_tools()
 
-    def __add__(self, other: ToolRegistry) -> ToolRegistry:
+    def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries.
 
         Tool IDs must be unique across the two registries otherwise an error will be thrown.
@@ -116,11 +121,15 @@ class ToolRegistry(ABC):
             DuplicateToolError: If any tool ID is duplicated across the registries.
 
         """
+        if isinstance(other, list):
+            # TODO(Emma): Test what happens if we pass in a list of tools containing some portia tools, would it still work?
+            other = InMemoryToolRegistry.from_local_tools(other)
         self_tools = self.get_tools()
         other_tools = other.get_tools()
         tool_ids = set()
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
+                # TODO(Emma): Consider removing this and just de-duping?
                 raise DuplicateToolError(tool.id)
             tool_ids.add(tool.id)
 

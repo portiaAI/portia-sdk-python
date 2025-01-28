@@ -24,7 +24,7 @@ def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
     tool_registry = PortiaToolRegistry(config=config)
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
     query = "Where is the next Olympics being hosted?"
 
     workflow = runner.execute_query(query)
@@ -66,7 +66,7 @@ def test_runner_run_query_with_cloud_and_local() -> None:
         config=config,
     )
 
-    runner = Runner(config=config, tool_registry=registry)
+    runner = Runner(config=config, tools=registry)
     query = "Get the temperature in London and Sydney and then add the two temperatures together."
 
     workflow = runner.execute_query(query)
@@ -78,7 +78,7 @@ def test_runner_run_query_with_oauth() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default()
     tool_registry = PortiaToolRegistry(config=config)
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
     query = "Star the portiaai/portia-sdk-repo"
 
     with execution_context(end_user_id=str(uuid.uuid4())):

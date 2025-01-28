@@ -84,6 +84,15 @@ def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
         required=False,
         help="Run with an end user id",
     )
+    @click.option(
+        "--tool_ids",
+        type=click.STRING,
+        required=False,
+        help=(
+            "Run with a list of tool ids. Tools must exist in either the PortiaToolRegistry or "
+            "the example_tool_registry"
+        ),
+    )
     @wraps(f)
     def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         return f(*args, **kwargs)
@@ -108,6 +117,7 @@ def run(  # noqa: PLR0913
     llm_provider: str | None,
     llm_model: str | None,
     end_user_id: str | None,
+    tool_ids: list[str] | None,
 ) -> None:
     """Run a query."""
     config = _get_config(
@@ -122,7 +132,8 @@ def run(  # noqa: PLR0913
         registry += PortiaToolRegistry(config)
 
     # Run the query
-    runner = Runner(config=config, tool_registry=registry)
+    runner = Runner(config=config,
+                    tools=registry.match_tools(tool_ids=tool_ids) if tool_ids else registry)
 
     with execution_context(end_user_id=end_user_id):
         plan = runner.generate_plan(query)
@@ -181,7 +192,7 @@ def plan(  # noqa: PLR0913
     registry = example_tool_registry
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
-    runner = Runner(config=config, tool_registry=registry)
+    runner = Runner(config=config, tools=registry)
     with execution_context(end_user_id=end_user_id):
         output = runner.generate_plan(query)
     click.echo(output.model_dump_json(indent=4))

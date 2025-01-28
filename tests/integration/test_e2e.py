@@ -55,7 +55,7 @@ def test_runner_run_query(
     addition_tool.should_summarize = True
 
     tool_registry = InMemoryToolRegistry.from_local_tools([addition_tool])
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
     query = "Add 1 + 2 together"
 
     workflow = runner.execute_query(query)
@@ -83,7 +83,7 @@ def test_runner_generate_plan(
     )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
     query = "Add 1 + 2 together"
 
     plan = runner.generate_plan(query)
@@ -117,7 +117,7 @@ def test_runner_run_query_with_clarifications(
     )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="clarification_tool",
         task="Use tool",
@@ -170,7 +170,7 @@ def test_runner_run_query_with_hard_error(
         default_agent_type=agent,
     )
     tool_registry = InMemoryToolRegistry.from_local_tools([ErrorTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="error_tool",
         task="Use tool",
@@ -230,7 +230,7 @@ def test_runner_run_query_with_soft_error(
             raise ToolSoftError("Server Timeout")
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="add_tool",
         task="Use tool",
@@ -310,7 +310,7 @@ def test_runner_run_query_with_multiple_clarifications(
             return a + b
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
 
     step_one = Step(
         tool_id="add_tool",
