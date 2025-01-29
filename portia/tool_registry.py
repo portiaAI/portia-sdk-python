@@ -44,9 +44,9 @@ class ToolRegistry(ABC):
             Retrieves a tool by its ID.
         get_tools() -> list[Tool]:
             Retrieves all tools in the registry.
-        match_tools(query: str) -> list[Tool]:
-            Optionally, retrieve tools that match a given query. Useful to implement tool filtering.
-            Defaults to returning all tools.
+        match_tools(query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
+            Optionally, retrieve tools that match a given query and tool_ids. Useful to implement
+            tool filtering.
 
     """
 
@@ -91,7 +91,7 @@ class ToolRegistry(ABC):
         query: str | None = None,  # noqa: ARG002 - useful to have variable name
         tool_ids: list[str] | None = None,
     ) -> list[Tool]:
-        """Provide a set of tools that match a given query.
+        """Provide a set of tools that match a given query and tool_ids.
 
         Args:
             query (str | None): The query to match tools against.
@@ -105,7 +105,7 @@ class ToolRegistry(ABC):
         This method is optional to implement and will default to providing all tools.
 
         """
-        return [self.get_tool(tool_id) for tool_id in tool_ids] if tool_ids else self.get_tools()
+        return [tool for tool in self.get_tools() if tool.id in tool_ids] if tool_ids else self.get_tools()
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
@@ -204,11 +204,13 @@ class AggregatedToolRegistry(ToolRegistry):
             tools += registry.get_tools()
         return tools
 
-    def match_tools(self, query: str) -> list[Tool]:
-        """Get all tools from all registries that match the query.
+    def match_tools(
+            self, query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
+        """Get all tools from all registries that match the query and tool_ids.
 
         Args:
-            query (str): The query to match tools against.
+            query (str | None): The query to match tools against.
+            tool_ids (list[str] | None): The list of tool ids to match.
 
         Returns:
             list[Tool]: A list of tools matching the query from all registries.
@@ -216,7 +218,7 @@ class AggregatedToolRegistry(ToolRegistry):
         """
         tools = []
         for registry in self.registries:
-            tools += registry.match_tools(query)
+            tools += registry.match_tools(query, tool_ids)
         return tools
 
 

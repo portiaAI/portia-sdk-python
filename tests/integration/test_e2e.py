@@ -99,7 +99,7 @@ def test_runner_generate_plan(
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.outputs.final_output
     assert workflow.outputs.final_output.value == 3
-
+    assert workflow.outputs.final_output.summary is not None
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
@@ -370,4 +370,6 @@ def test_runner_run_query_with_multiple_clarifications(
         runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
     # 498 = 456 (clarification - value a - step 1) + 2 (value b - step 1) + 40 (value b - step 2)
-    assert workflow.outputs.final_output == Output(value=498)
+    assert workflow.outputs.final_output is not None
+    assert workflow.outputs.final_output.value == 498
+    assert workflow.outputs.final_output.summary is not None

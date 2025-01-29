@@ -55,6 +55,7 @@ def test_generate_plan_or_error_success(planner: OneShotPlanner) -> None:
     )
 
     assert result.plan.plan_context.query == query
+    assert result.plan.steps == []
     assert result.error is None
 
 
@@ -160,3 +161,4 @@ def test_render_prompt() -> None:
     assert "test query" in request_content
     assert "add_tool" in request_content
     assert "extension" in system_context_content
+

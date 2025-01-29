@@ -15,7 +15,6 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.agents.agent_node_utils.summarizer import LLMSummarizer
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.execution_utils import (
     AgentNode,
@@ -24,6 +23,7 @@ from portia.agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.agents.toolless_agent import ToolLessAgent
+from portia.agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.workflow import Workflow
@@ -197,7 +197,7 @@ class OneShotAgent(BaseAgent):
             OneShotToolCallingModel(llm, context, tools, self).invoke,
         )
         workflow.add_node(AgentNode.TOOLS, tool_node)
-        workflow.add_node(AgentNode.SUMMARIZER, LLMSummarizer(llm).invoke)
+        workflow.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm).invoke)
         workflow.add_edge(START, AgentNode.TOOL_AGENT)
 
         # Use execution manager for state transitions

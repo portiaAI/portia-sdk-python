@@ -28,6 +28,7 @@ from uuid import UUID
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.toolless_agent import ToolLessAgent
+from portia.agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
@@ -43,7 +44,7 @@ from portia.execution_context import (
     is_execution_context_set,
 )
 from portia.logger import logger, logger_manager
-from portia.plan import Plan, ReadOnlyStep, Step
+from portia.plan import Plan, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.storage import (
     DiskFileStorage,
@@ -57,7 +58,7 @@ from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
     from portia.config import Config
-    from portia.plan import Plan, Step
+    from portia.plan import Plan
     from portia.planners.planner import Planner
     from portia.tool import Tool
 
@@ -266,13 +267,24 @@ class Runner:
         self.storage.save_workflow(workflow)
         return workflow
 
-    def wait_for_ready(self, workflow: Workflow) -> Workflow:
+    def wait_for_ready(
+        self,
+        workflow: Workflow,
+        max_retries: int = 6,
+        backoff_start_time_seconds: int = 7 * 60,
+        backoff_time_seconds: int = 2,
+    ) -> Workflow:
         """Wait for the workflow to be in a state that it can be re-run.
 
         This is generally because there are outstanding clarifications that need to be resolved.
 
         Args:
             workflow (Workflow): The workflow to wait for.
+            max_retries (int): The maximum number of retries to wait for the workflow to be ready
+                after the backoff period starts.
+            backoff_start_time_seconds (int): The time after which the backoff period starts.
+            backoff_time_seconds (int): The time to wait between retries after the backoff period
+                starts.
 
         Returns:
             Workflow: The updated workflow once it is ready to be re-run.
@@ -281,6 +293,8 @@ class Runner:
             InvalidWorkflowStateError: If the workflow cannot be waited for.
 
         """
+        start_time = time.time()
+        tries = 0
         if workflow.state not in [
             WorkflowState.IN_PROGRESS,
             WorkflowState.NOT_STARTED,
@@ -298,8 +312,16 @@ class Runner:
             return workflow
 
         while workflow.state != WorkflowState.READY_TO_RESUME:
+            if tries >= max_retries:
+                raise InvalidWorkflowStateError("Workflow is not ready to resume after max retries")
+
+            # if we've waited longer than the backoff time, start the backoff period
+            if time.time() - start_time > backoff_start_time_seconds:
+                tries += 1
+                backoff_time_seconds *= 2
+
             # wait a couple of seconds as we're long polling
-            time.sleep(2)
+            time.sleep(backoff_time_seconds)
 
             # refresh state
             workflow = self.storage.get_workflow(workflow.id)
@@ -369,34 +391,12 @@ class Runner:
                     output=str(step_output.value),
                 )
 
-            # if a clarification was returned append it to the set of clarifications needed
-            if isinstance(step_output.value, Clarification) or (
-                isinstance(step_output.value, list)
-                and len(step_output.value) > 0
-                and all(isinstance(item, Clarification) for item in step_output.value)
-            ):
-                new_clarifications = (
-                    [step_output.value]
-                    if isinstance(step_output.value, Clarification)
-                    else step_output.value
-                )
-                for clarification in new_clarifications:
-                    clarification.step = workflow.current_step_index
-
-                workflow.outputs.clarifications = (
-                    workflow.outputs.clarifications + new_clarifications
-                )
-                workflow.state = WorkflowState.NEED_CLARIFICATION
-                self.storage.save_workflow(workflow)
-                logger().info(
-                    f"{len(new_clarifications)} Clarification(s) requested",
-                    extra={"plan": plan.id, "workflow": workflow.id},
-                )
+            if self._handle_clarifications(workflow, step_output, plan):
                 return workflow
 
             # set final output if is last step (accounting for zero index)
             if index == len(plan.steps) - 1:
-                workflow.outputs.final_output = step_output
+                workflow.outputs.final_output = self._get_final_output(plan, workflow, step_output)
 
             # persist at the end of each step
             self.storage.save_workflow(workflow)
@@ -433,6 +433,68 @@ class Runner:
                 cls = OneShotPlanner
 
         return cls(self.config)
+
+    def _get_final_output(self, plan: Plan, workflow: Workflow, step_output: Output) -> Output:
+        """Get the final output and add summarization to it.
+
+        Args:
+            plan (Plan): The plan to execute.
+            workflow (Workflow): The workflow to execute.
+            step_output (Output): The output of the last step.
+
+        """
+        final_output = Output(
+            value=step_output.value,
+            summary=None,
+        )
+
+        try:
+            summarizer = FinalOutputSummarizer(config=self.config)
+            summary = summarizer.create_summary(
+                workflow=ReadOnlyWorkflow.from_workflow(workflow),
+                plan=ReadOnlyPlan.from_plan(plan),
+            )
+            final_output.summary = summary
+
+        except Exception as e:  # noqa: BLE001
+            logger().warning(f"Error summarising workflow: {e}")
+
+        return final_output
+
+    def _handle_clarifications(self, workflow: Workflow, step_output: Output, plan: Plan) -> bool:
+        """Handle any clarifications needed during workflow execution.
+
+        Args:
+            workflow (Workflow): The workflow to execute.
+            step_output (Output): The output of the last step.
+            plan (Plan): The plan to execute.
+
+        Returns:
+            bool: True if clarification is needed and workflow execution should stop.
+
+        """
+        if isinstance(step_output.value, Clarification) or (
+            isinstance(step_output.value, list)
+            and len(step_output.value) > 0
+            and all(isinstance(item, Clarification) for item in step_output.value)
+        ):
+            new_clarifications = (
+                [step_output.value]
+                if isinstance(step_output.value, Clarification)
+                else step_output.value
+            )
+            for clarification in new_clarifications:
+                clarification.step = workflow.current_step_index
+
+            workflow.outputs.clarifications = workflow.outputs.clarifications + new_clarifications
+            workflow.state = WorkflowState.NEED_CLARIFICATION
+            self.storage.save_workflow(workflow)
+            logger().info(
+                f"{len(new_clarifications)} Clarification(s) requested",
+                extra={"plan": plan.id, "workflow": workflow.id},
+            )
+            return True
+        return False
 
     def _get_agent_for_step(
         self,

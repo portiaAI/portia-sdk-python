@@ -1,4 +1,3 @@
-[TODO] Add links to license once selected and to Discord channel 🔧
 # Contributing to Portia SDK 🏗️
 
 Thank you for your interest in contributing to Portia SDK! We welcome contributions that improve the library and help us build a great experience for the community.
@@ -8,7 +7,7 @@ Thank you for your interest in contributing to Portia SDK! We welcome contributi
 * **Examples** Show our community what you can do with our SDK. We particularly encourage end-to-end, real-world applications
 * **Bug reports** Please include a detailed method to reproduce any bugs you spot. We would be grateful if you give the [Issue Tracker](https://github.com/portiaAI/portia-sdk-python/issues) a quick skim first to avoid duplicates 🙌
 * **Bug fixes** Those are our favourites! Please avoid breaking changes. The next section has some helpful tips for that.
-* **Feedback** Help us be better. Come chat to us on our Discord channel about your experience using the SDK 🫶
+* **Feedback** Help us be better. Come chat to us on [Discord](https://discord.gg/DvAJz9ffaR) about your experience using the SDK 🫶
 
 ⚠️ **A note on new features** If you have something in mind, please give us a shout on our Discord channel. Features like new core abstractions, changes to infra or to dependencies will require careful consideration before we can move forward with them.
 
@@ -47,7 +46,7 @@ Releases are controlled via Github Actions and the version field of the `pyproje
 
 ## Contributor License Agreement (CLA)
 
-By submitting a pull request, you agree to sign our Contributor License Agreement (CLA), which ensures that contributions can be included in the project under the terms of our current license. We will ask you to sign this CLA when submitting your first contribution.
+By submitting a pull request, you agree to sign our Contributor License Agreement (CLA), which ensures that contributions can be included in the project under the terms of our current [license](https://github.com/portiaAI/portia-sdk-python/edit/main/CONTRIBUTING.md#:~:text=CONTRIBUTING.md-,LICENSE,-Logo_Portia_Stacked_Black.png). We will ask you to sign this CLA when submitting your first contribution.
 
 ## Thank you
 

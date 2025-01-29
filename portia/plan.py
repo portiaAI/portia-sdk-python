@@ -192,3 +192,30 @@ class Plan(BaseModel):
             f"plan_context={self.plan_context!r}, "
             f"steps={self.steps!r}"
         )
+
+
+class ReadOnlyPlan(Plan):
+    """A read-only copy of a plan, passed to agents for reference.
+
+    This class provides a non-modifiable view of a plan instance,
+    ensuring that agents can access plan details without altering them.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @classmethod
+    def from_plan(cls, plan: Plan) -> ReadOnlyPlan:
+        """Create a read-only plan from a normal plan.
+
+        Args:
+            plan (Plan): The original plan instance to create a read-only copy from.
+
+        Returns:
+            ReadOnlyPlan: A new read-only instance of the provided plan.
+
+        """
+        return cls(
+            id=plan.id,
+            plan_context=plan.plan_context,
+            steps=plan.steps,
+        )
