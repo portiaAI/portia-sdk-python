@@ -280,29 +280,37 @@ class Config(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
         default_factory=lambda: os.getenv("PORTIA_API_ENDPOINT") or "https://api.portialabs.ai",
+        description="The API endpoint for the Portia Cloud API",
     )
     portia_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
+        description="The API Key for the Portia Cloud API available from the dashboard at https://app.portialabs.ai",
     )
 
     # LLM API Keys
     openai_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""),
+        description="The API Key for OpenAI. Must be set if llm-provider is OPENAI",
     )
     anthropic_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("ANTHROPIC_API_KEY") or ""),
+        description="The API Key for Anthropic. Must be set if llm-provider is ANTHROPIC",
     )
     mistralai_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
+        description="The API Key for Mistral AI. Must be set if llm-provider is MISTRALAI",
     )
 
     # Storage Options
-    storage_class: StorageClass
+    storage_class: StorageClass = Field(
+        default=StorageClass.MEMORY,
+        description="Where to store Plans and Workflows. By default these will be kept in memory.",
+    )
 
     @field_validator("storage_class", mode="before")
     @classmethod
@@ -310,13 +318,20 @@ class Config(BaseModel):
         """Parse storage class to enum if string provided."""
         return parse_str_to_enum(value, StorageClass)
 
-    storage_dir: str | None = None
+    storage_dir: str | None = Field(
+        default=None,
+        description="If storage class is set to DISK this will be the location where plans "
+        "and workflows are written in a JSON format.",
+    )
 
     # Logging Options
 
     # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
     # where as setting it to ERROR will only display ERROR and above.
-    default_log_level: LogLevel = LogLevel.INFO
+    default_log_level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="The log level to log at. Only respected when the default logger is used.",
+    )
 
     @field_validator("default_log_level", mode="before")
     @classmethod
@@ -327,12 +342,21 @@ class Config(BaseModel):
     # default_log_sink controls where default logs are sent. By default this is STDOUT (sys.stdout)
     # but can also be set to STDERR (sys.stderr)
     # or to a file by setting this to a file path ("./logs.txt")
-    default_log_sink: str = "sys.stdout"
+    default_log_sink: str = Field(
+        default="sys.stdout",
+        description="Where to send logs. By default logs will be sent to sys.stdout",
+    )
     # json_log_serialize sets whether logs are JSON serialized before sending to the log sink.
-    json_log_serialize: bool = False
+    json_log_serialize: bool = Field(
+        default=False,
+        description="Whether to serialize logs to JSON",
+    )
 
     # LLM Options
-    llm_provider: LLMProvider
+    llm_provider: LLMProvider = Field(
+        default=LLMProvider.OPENAI,
+        description="Which LLM Provider to use.",
+    )
 
     @field_validator("llm_provider", mode="before")
     @classmethod
@@ -340,7 +364,10 @@ class Config(BaseModel):
         """Parse llm_provider to enum if string provided."""
         return parse_str_to_enum(value, LLMProvider)
 
-    llm_model_name: LLMModel
+    llm_model_name: LLMModel = Field(
+        default=LLMModel.GPT_4_O_MINI,
+        description="Which LLM Model to use.",
+    )
 
     @field_validator("llm_model_name", mode="before")
     @classmethod
@@ -348,11 +375,21 @@ class Config(BaseModel):
         """Parse llm_model_name to enum if string provided."""
         return parse_str_to_enum(value, LLMModel)
 
-    llm_model_temperature: PositiveNumber
-    llm_model_seed: PositiveNumber
+    llm_model_temperature: PositiveNumber = Field(
+        default=0,
+        description="The model temperature to use. A lower number leads to more repeatable results"
+        ", a higher number more creativity.",
+    )
+    llm_model_seed: PositiveNumber = Field(
+        default=443,
+        description="The model seed to use.",
+    )
 
     # Agent Options
-    default_agent_type: AgentType
+    default_agent_type: AgentType = Field(
+        default=AgentType.VERIFIER,
+        description="The default agent type to use.",
+    )
 
     @field_validator("default_agent_type", mode="before")
     @classmethod
@@ -361,7 +398,10 @@ class Config(BaseModel):
         return parse_str_to_enum(value, AgentType)
 
     # Planner Options
-    default_planner: PlannerType
+    default_planner: PlannerType = Field(
+        default=PlannerType.ONE_SHOT,
+        description="The default planner to use.",
+    )
 
     @field_validator("default_planner", mode="before")
     @classmethod
