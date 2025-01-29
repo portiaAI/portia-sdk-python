@@ -1,6 +1,6 @@
-"""Summarizer model implementation.
+"""StepSummarizer implementation.
 
-The Summarizer model can be used by agents to summarize the output of a given tool.
+The StepSummarizer can be used by agents to summarize the output of a given tool.
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
 
 
-class LLMSummarizer:
-    """Model to generate a summary for the textual output of a tool.
+class StepSummarizer:
+    """Class to summarize the output of a tool using llm.
 
-    This model is used only on the tool output message.
+    This is used only on the tool output message.
 
     Attributes:
         summarizer_prompt (ChatPromptTemplate): The prompt template used to generate the summary.

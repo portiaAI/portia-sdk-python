@@ -14,7 +14,6 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from portia.agents.agent_node_utils.summarizer import LLMSummarizer
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.execution_utils import (
     MAX_RETRIES,
@@ -24,6 +23,7 @@ from portia.agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.agents.toolless_agent import ToolLessAgent
+from portia.agents.utils.step_summarizer import StepSummarizer
 from portia.clarification import Clarification, InputClarification
 from portia.errors import (
     InvalidWorkflowStateError,
@@ -563,7 +563,7 @@ class VerifierAgent(BaseAgent):
             )
 
         workflow.add_node(AgentNode.TOOLS, tool_node)
-        workflow.add_node(AgentNode.SUMMARIZER, LLMSummarizer(llm).invoke)
+        workflow.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm).invoke)
         workflow.add_conditional_edges(
             AgentNode.TOOLS,
             lambda state: next_state_after_tool_call(state, self.tool),
