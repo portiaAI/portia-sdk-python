@@ -88,6 +88,7 @@ import os
 from dotenv import load_dotenv
 from portia.runner import Runner
 from portia.config import Config, StorageClass, LogLevel, LLMProvider, LLMModel
+from portia.open_source_tools.registry import example_tool_registry
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -101,7 +102,7 @@ my_config = Config.from_default(
     openai_api_key=OPENAI_API_KEY # Use `mistralai_api_key=MISTRALAI` or `anthropic_api_key=ANTHROPIC_API_KEY` instead
 )
 
-# Instantiate a Portia runner. Load it with the default config and with the simple tool above.
+# Instantiate a Portia runner. Load it with the config and with the open source example tool registry
 runner = Runner(config=my_config, tool_registry=example_tool_registry)
 
 # Execute a workflow from the user query
