@@ -270,6 +270,7 @@ class Runner:
 
         Args:
             workflow (Workflow): The workflow to wait for.
+            max_retries (int): The maximum number of retries to wait for the workflow to be ready.
 
         Returns:
             Workflow: The updated workflow once it is ready to be re-run.
@@ -298,9 +299,7 @@ class Runner:
 
         while workflow.state != WorkflowState.READY_TO_RESUME:
             if tries >= max_retries:
-                raise InvalidWorkflowStateError(
-                    "Workflow is not ready to resume after max retries"
-                )
+                raise InvalidWorkflowStateError("Workflow is not ready to resume after max retries")
             # wait a couple of seconds as we're long polling
             time.sleep(backoff_time)
             tries += 1

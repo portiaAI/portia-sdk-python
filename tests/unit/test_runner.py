@@ -279,10 +279,13 @@ def test_runner_execute_query_with_summary(runner: Runner) -> None:
     mock_summarizer_agent = mock.MagicMock()
     mock_summarizer_agent.create_summary.side_effect = [expected_summary]
 
-    with mock.patch(
-        "portia.runner.FinalOutputSummarizer",
-        return_value=mock_summarizer_agent,
-    ), mock.patch.object(runner, "_get_agent_for_step", return_value=mock_step_agent):
+    with (
+        mock.patch(
+            "portia.runner.FinalOutputSummarizer",
+            return_value=mock_summarizer_agent,
+        ),
+        mock.patch.object(runner, "_get_agent_for_step", return_value=mock_step_agent),
+    ):
         workflow = runner.execute_query(query)
 
         # Verify workflow completed successfully
