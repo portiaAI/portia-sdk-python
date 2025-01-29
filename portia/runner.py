@@ -279,6 +279,8 @@ class Runner:
             max_retries (int): The maximum number of retries to wait for the workflow to be ready
                 after the backoff period starts.
             backoff_start_time_seconds (int): The time after which the backoff period starts.
+            backoff_time_seconds (int): The time to wait between retries after the backoff period
+                starts.
 
         Returns:
             Workflow: The updated workflow once it is ready to be re-run.
