@@ -13,7 +13,6 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from regex import F
 
 from portia.agents.base_agent import BaseAgent, Output
 from portia.agents.execution_utils import (
@@ -218,7 +217,6 @@ class ParserModel:
         try:
             self.agent.tool.args_schema.model_validate(test_args)
         except ValidationError as e:
-            print(e)
             err = str(e)
             self.previous_errors.append(err)
             self.retries += 1
@@ -231,8 +229,6 @@ class ParserModel:
             #
             # Here is a Linear ticket to fix this:
             # https://linear.app/portialabs/issue/POR-456
-        except Exception as e:
-            print("other error")
 
         return {"messages": [response.model_dump_json(indent=2)]}
 
