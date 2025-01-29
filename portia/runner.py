@@ -306,7 +306,7 @@ class Runner:
             return workflow
 
         while workflow.state != WorkflowState.READY_TO_RESUME:
-            if tries >= max_retries and time.time():
+            if tries >= max_retries:
                 raise InvalidWorkflowStateError("Workflow is not ready to resume after max retries")
 
             # if we've waited longer than the backoff time, start the backoff period
