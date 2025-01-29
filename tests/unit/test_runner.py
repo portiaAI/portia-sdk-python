@@ -367,3 +367,11 @@ def test_runner_get_final_output_handles_summary_error(runner: Runner) -> None:
         assert final_output is not None
         assert final_output.value == "Some output"
         assert final_output.summary is None
+
+
+def test_runner_wait_for_ready_max_retries(runner: Runner) -> None:
+    """Test wait for ready with max retries."""
+    plan, workflow = get_test_workflow()
+    workflow.state = WorkflowState.NEED_CLARIFICATION
+    with pytest.raises(InvalidWorkflowStateError):
+        runner.wait_for_ready(workflow, max_retries=0)

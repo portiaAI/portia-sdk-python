@@ -263,7 +263,7 @@ class Runner:
         self.storage.save_workflow(workflow)
         return workflow
 
-    def wait_for_ready(self, workflow: Workflow) -> Workflow:
+    def wait_for_ready(self, workflow: Workflow, max_retries: int = 6) -> Workflow:
         """Wait for the workflow to be in a state that it can be re-run.
 
         This is generally because there are outstanding clarifications that need to be resolved.
@@ -278,6 +278,8 @@ class Runner:
             InvalidWorkflowStateError: If the workflow cannot be waited for.
 
         """
+        backoff_time = 2
+        tries = 0
         if workflow.state not in [
             WorkflowState.IN_PROGRESS,
             WorkflowState.NOT_STARTED,
@@ -295,8 +297,14 @@ class Runner:
             return workflow
 
         while workflow.state != WorkflowState.READY_TO_RESUME:
+            if tries >= max_retries:
+                raise InvalidWorkflowStateError(
+                    "Workflow is not ready to resume after max retries"
+                )
             # wait a couple of seconds as we're long polling
-            time.sleep(2)
+            time.sleep(backoff_time)
+            tries += 1
+            backoff_time *= 2
 
             # refresh state
             workflow = self.storage.get_workflow(workflow.id)
