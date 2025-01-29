@@ -21,6 +21,7 @@ import httpx
 from pydantic import BaseModel, Field, create_model
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
+from portia.logger import logger
 from portia.tool import PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
@@ -107,7 +108,7 @@ class ToolRegistry(ABC):
         return [self.get_tool(tool_id) for tool_id in tool_ids] if tool_ids else self.get_tools()
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
-        """Return an aggregated tool registry combining two registries.
+        """Return an aggregated tool registry combining two registries or a registry and tool list.
 
         Tool IDs must be unique across the two registries otherwise an error will be thrown.
 
@@ -117,25 +118,39 @@ class ToolRegistry(ABC):
         Returns:
             AggregatedToolRegistry: A new tool registry containing tools from both registries.
 
-        Raises:
-            DuplicateToolError: If any tool ID is duplicated across the registries.
+        """
+        return self._add(other)
+
+    def __radd__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
+        """Return an aggregated tool registry combining two registries or a registry and tool list.
+
+        Tool IDs must be unique across the two registries otherwise an error will be thrown.
+
+        Args:
+            other (ToolRegistry): Another tool registry to be combined.
+
+        Returns:
+            AggregatedToolRegistry: A new tool registry containing tools from both registries.
 
         """
-        # TODO(Emma): Test what happens if we pass in a list of tools containing some portia tools, would it still work?
+        return self._add(other)
+
+    def _add(self, other: ToolRegistry | list[Tool]) -> AggregatedToolRegistry:
+        """Add a tool registry or Tool list to the current registry."""
         other_registry = (
-            other if isinstance(other, ToolRegistry) else InMemoryToolRegistry.from_local_tools(other)
+            other
+            if isinstance(other, ToolRegistry) else InMemoryToolRegistry.from_local_tools(other)
         )
         self_tools = self.get_tools()
         other_tools = other_registry.get_tools()
         tool_ids = set()
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
-                # TODO(Emma): Consider removing this and just de-duping?
-                raise DuplicateToolError(tool.id)
+                logger().warning(
+                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.")
             tool_ids.add(tool.id)
 
         return AggregatedToolRegistry([self, other_registry])
-
 
 class AggregatedToolRegistry(ToolRegistry):
     """An interface over a set of tool registries.
