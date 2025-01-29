@@ -263,14 +263,21 @@ class Runner:
         self.storage.save_workflow(workflow)
         return workflow
 
-    def wait_for_ready(self, workflow: Workflow, max_retries: int = 6) -> Workflow:
+    def wait_for_ready(
+        self,
+        workflow: Workflow,
+        max_retries: int = 6,
+        backoff_start_time_seconds: int = 7 * 60,
+    ) -> Workflow:
         """Wait for the workflow to be in a state that it can be re-run.
 
         This is generally because there are outstanding clarifications that need to be resolved.
 
         Args:
             workflow (Workflow): The workflow to wait for.
-            max_retries (int): The maximum number of retries to wait for the workflow to be ready.
+            max_retries (int): The maximum number of retries to wait for the workflow to be ready
+                after the backoff period starts.
+            backoff_start_time_seconds (int): The time after which the backoff period starts.
 
         Returns:
             Workflow: The updated workflow once it is ready to be re-run.
@@ -279,6 +286,7 @@ class Runner:
             InvalidWorkflowStateError: If the workflow cannot be waited for.
 
         """
+        start_time = time.time()
         backoff_time = 2
         tries = 0
         if workflow.state not in [
@@ -298,12 +306,16 @@ class Runner:
             return workflow
 
         while workflow.state != WorkflowState.READY_TO_RESUME:
-            if tries >= max_retries:
+            if tries >= max_retries and time.time():
                 raise InvalidWorkflowStateError("Workflow is not ready to resume after max retries")
+
+            # if we've waited longer than the backoff time, start the backoff period
+            if time.time() - start_time > backoff_start_time_seconds:
+                tries += 1
+                backoff_time *= 2
+
             # wait a couple of seconds as we're long polling
             time.sleep(backoff_time)
-            tries += 1
-            backoff_time *= 2
 
             # refresh state
             workflow = self.storage.get_workflow(workflow.id)
