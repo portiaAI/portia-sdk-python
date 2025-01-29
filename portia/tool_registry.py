@@ -121,11 +121,12 @@ class ToolRegistry(ABC):
             DuplicateToolError: If any tool ID is duplicated across the registries.
 
         """
-        if isinstance(other, list):
-            # TODO(Emma): Test what happens if we pass in a list of tools containing some portia tools, would it still work?
-            other = InMemoryToolRegistry.from_local_tools(other)
+        # TODO(Emma): Test what happens if we pass in a list of tools containing some portia tools, would it still work?
+        other_registry = (
+            other if isinstance(other, ToolRegistry) else InMemoryToolRegistry.from_local_tools(other)
+        )
         self_tools = self.get_tools()
-        other_tools = other.get_tools()
+        other_tools = other_registry.get_tools()
         tool_ids = set()
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
@@ -133,7 +134,7 @@ class ToolRegistry(ABC):
                 raise DuplicateToolError(tool.id)
             tool_ids.add(tool.id)
 
-        return AggregatedToolRegistry([self, other])
+        return AggregatedToolRegistry([self, other_registry])
 
 
 class AggregatedToolRegistry(ToolRegistry):
