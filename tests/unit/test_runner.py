@@ -382,7 +382,8 @@ def test_runner_wait_for_ready_max_retries(runner: Runner) -> None:
 
 def test_runner_wait_for_ready_backoff_period(runner: Runner) -> None:
     """Test wait for ready with backoff period."""
-    plan, workflow = get_test_workflow()
+    _, workflow = get_test_workflow()
     workflow.state = WorkflowState.NEED_CLARIFICATION
+    runner.storage.get_workflow = mock.MagicMock(return_value=workflow)
     with pytest.raises(InvalidWorkflowStateError):
-        runner.wait_for_ready(workflow, max_retries=0, backoff_start_time_seconds=0)
+        runner.wait_for_ready(workflow, max_retries=1, backoff_start_time_seconds=0)
