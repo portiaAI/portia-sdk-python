@@ -19,8 +19,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import click
 from dotenv import load_dotenv
-from mistralai import Field
-from openai import BaseModel
+from pydantic import BaseModel, Field
 
 from portia.clarification import (
     ActionClarification,
