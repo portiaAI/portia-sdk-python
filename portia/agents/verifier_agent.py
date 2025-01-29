@@ -96,6 +96,7 @@ class VerifiedToolArgument(BaseModel):
     # We call this "made_up" and not "hallucinated" because the latter was making OpenAI's model
     # produce invalid JSON.
     made_up: bool = Field(
+        default=False,
         description="Whether the value was made up or not. "
         "Should be false if the value was provided by the user, even if in a different format."
         "User provided values can be in the context, in the goal or the result of previous steps.",

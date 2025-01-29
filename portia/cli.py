@@ -61,7 +61,8 @@ class CLIConfig(BaseModel):
         description="The location of the JSON config file for the CLI to use.",
     )
 
-    end_user_id: str | None = Field(
+    end_user_id: str = Field(
+        default="",
         description="The end user id to use in the execution context.",
     )
 
