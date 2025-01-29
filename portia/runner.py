@@ -268,6 +268,7 @@ class Runner:
         workflow: Workflow,
         max_retries: int = 6,
         backoff_start_time_seconds: int = 7 * 60,
+        backoff_time_seconds: int = 2,
     ) -> Workflow:
         """Wait for the workflow to be in a state that it can be re-run.
 
@@ -287,7 +288,6 @@ class Runner:
 
         """
         start_time = time.time()
-        backoff_time = 2
         tries = 0
         if workflow.state not in [
             WorkflowState.IN_PROGRESS,
@@ -312,10 +312,10 @@ class Runner:
             # if we've waited longer than the backoff time, start the backoff period
             if time.time() - start_time > backoff_start_time_seconds:
                 tries += 1
-                backoff_time *= 2
+                backoff_time_seconds *= 2
 
             # wait a couple of seconds as we're long polling
-            time.sleep(backoff_time)
+            time.sleep(backoff_time_seconds)
 
             # refresh state
             workflow = self.storage.get_workflow(workflow.id)
