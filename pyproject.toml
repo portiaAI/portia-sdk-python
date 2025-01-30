@@ -33,6 +33,7 @@ click = "^8.1.7"
 loguru = "^0.7.3"
 python-dotenv = "^1.0.1"
 pandas = "^2.2.3"
+pytest-mock = "^3.14.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"

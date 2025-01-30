@@ -1,6 +1,7 @@
 """tests for the ToolRegistry classes."""
 
 import pytest
+from pytest_mock import MockerFixture
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.execution_context import get_execution_context
@@ -179,8 +180,12 @@ def test_aggregated_tool_registry_match_tools() -> None:
     assert len(matched_tools) == 0
 
 
-def test_tool_registry_add_operators() -> None:
+def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
     """Test the __add__ and __radd__ operators for ToolRegistry."""
+    # Mock the logger
+    mock_logger = mocker.Mock()
+    mocker.patch("portia.tool_registry.logger", return_value=mock_logger)
+
     # Create registries and tools
     registry1 = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
     registry2 = InMemoryToolRegistry.from_local_tools([MockTool(id=OTHER_MOCK_TOOL_ID)])
@@ -205,7 +210,7 @@ def test_tool_registry_add_operators() -> None:
     assert {tool.id for tool in combined.get_tools()} == {MOCK_TOOL_ID, "tool3"}
 
     # Test warning on duplicate tools
-    print("got to duplicate registry check")
     duplicate_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
-    with pytest.warns(UserWarning, match=f"Duplicate tool ID found: {MOCK_TOOL_ID}"):
-        combined = registry1 + duplicate_registry
+    combined = registry1 + duplicate_registry
+    mock_logger.warning.assert_called_once_with(
+        f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur.")

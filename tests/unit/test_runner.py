@@ -44,6 +44,20 @@ def test_runner_run_query(runner: Runner) -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
 
+def test_runner_run_query_tool_list() -> None:
+    """Test running a query using the Runner."""
+    query = "example query"
+    runner = Runner(config=get_test_config(), tools=[AdditionTool(), ClarificationTool()])
+
+    mock_response = StepsOrError(
+        steps=[],
+        error=None,
+    )
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    workflow = runner.execute_query(query)
+
+    assert workflow.state == WorkflowState.COMPLETE
 
 def test_runner_run_query_disk_storage() -> None:
     """Test running a query using the Runner."""
