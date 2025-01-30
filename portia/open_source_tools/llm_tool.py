@@ -116,4 +116,4 @@ class LLMTool(Tool[str]):
         response = llm.invoke(messages)
 
         # Print the response
-        return(response.content)
+        return(str(response.content))
