@@ -587,8 +587,6 @@ class PortiaCloudStorage(Storage):
         except Exception as e:
             raise StorageError(e) from e
         else:
-            print("saved workflow")
-            print(response)
             self.check_response(response)
 
     def get_workflow(self, workflow_id: UUID) -> Workflow:
