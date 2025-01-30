@@ -312,6 +312,7 @@ class Runner:
         ]:
             return workflow
 
+        plan = self.storage.get_plan(workflow.plan_id)
         while workflow.state != WorkflowState.READY_TO_RESUME:
             if tries >= max_retries:
                 raise InvalidWorkflowStateError("Workflow is not ready to resume after max retries")
@@ -326,6 +327,18 @@ class Runner:
 
             # refresh state
             workflow = self.storage.get_workflow(workflow.id)
+
+            # if its not ready we can see if the tool is ready
+            if workflow.state != WorkflowState.READY_TO_RESUME:
+                step = plan.steps[workflow.current_step_index]
+                next_tool = self._get_tool_for_step(step, workflow)
+                if next_tool:
+                    tool_ready = next_tool.ready(workflow.execution_context)
+                    logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
+                    if tool_ready:
+                        workflow.state = WorkflowState.READY_TO_RESUME
+                        self.storage.save_workflow(workflow)
+
             logger().debug(f"New workflow state for {workflow.id} is {workflow.state}")
 
         logger().info(f"Workflow {workflow.id} is ready to resume")
@@ -497,6 +510,16 @@ class Runner:
             return True
         return False
 
+    def _get_tool_for_step(self, step: Step, workflow: Workflow) -> Tool | None:
+        if not step.tool_id:
+            return None
+        child_tool = self.tool_registry.get_tool(step.tool_id)
+        return ToolCallWrapper(
+            child_tool=child_tool,
+            storage=self.storage,
+            workflow=workflow,
+        )
+
     def _get_agent_for_step(
         self,
         step: Step,
@@ -512,14 +535,7 @@ class Runner:
             BaseAgent: The agent to execute the step.
 
         """
-        tool = None
-        if step.tool_id:
-            child_tool = self.tool_registry.get_tool(step.tool_id)
-            tool = ToolCallWrapper(
-                child_tool=child_tool,
-                storage=self.storage,
-                workflow=workflow,
-            )
+        tool = self._get_tool_for_step(step, workflow)
         cls: type[BaseAgent]
         match self.config.default_agent_type:
             case AgentType.ONE_SHOT:
