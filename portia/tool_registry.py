@@ -105,7 +105,11 @@ class ToolRegistry(ABC):
         This method is optional to implement and will default to providing all tools.
 
         """
-        return [tool for tool in self.get_tools() if tool.id in tool_ids] if tool_ids else self.get_tools()
+        return (
+            [tool for tool in self.get_tools() if tool.id in tool_ids]
+            if tool_ids
+            else self.get_tools()
+        )
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
