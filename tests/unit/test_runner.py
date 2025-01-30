@@ -279,10 +279,13 @@ def test_runner_execute_query_with_summary(runner: Runner) -> None:
     mock_summarizer_agent = mock.MagicMock()
     mock_summarizer_agent.create_summary.side_effect = [expected_summary]
 
-    with mock.patch(
-        "portia.runner.FinalOutputSummarizer",
-        return_value=mock_summarizer_agent,
-    ), mock.patch.object(runner, "_get_agent_for_step", return_value=mock_step_agent):
+    with (
+        mock.patch(
+            "portia.runner.FinalOutputSummarizer",
+            return_value=mock_summarizer_agent,
+        ),
+        mock.patch.object(runner, "_get_agent_for_step", return_value=mock_step_agent),
+    ):
         workflow = runner.execute_query(query)
 
         # Verify workflow completed successfully
@@ -367,3 +370,20 @@ def test_runner_get_final_output_handles_summary_error(runner: Runner) -> None:
         assert final_output is not None
         assert final_output.value == "Some output"
         assert final_output.summary is None
+
+
+def test_runner_wait_for_ready_max_retries(runner: Runner) -> None:
+    """Test wait for ready with max retries."""
+    plan, workflow = get_test_workflow()
+    workflow.state = WorkflowState.NEED_CLARIFICATION
+    with pytest.raises(InvalidWorkflowStateError):
+        runner.wait_for_ready(workflow, max_retries=0)
+
+
+def test_runner_wait_for_ready_backoff_period(runner: Runner) -> None:
+    """Test wait for ready with backoff period."""
+    _, workflow = get_test_workflow()
+    workflow.state = WorkflowState.NEED_CLARIFICATION
+    runner.storage.get_workflow = mock.MagicMock(return_value=workflow)
+    with pytest.raises(InvalidWorkflowStateError):
+        runner.wait_for_ready(workflow, max_retries=1, backoff_start_time_seconds=0)
