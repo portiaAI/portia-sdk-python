@@ -2,8 +2,7 @@
 
 from typing import TypedDict
 
-import bs4
-from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import RecursiveUrlLoader
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.vectorstores import InMemoryVectorStore
@@ -40,13 +39,8 @@ class RetrievalAugmentQueryTool(Tool[str]):
 
     def run(self, _: ExecutionContext, question: str) -> str:
         """Run the Rag Tool."""
-        loader = WebBaseLoader(
-            web_paths=(self.domain,),
-            bs_kwargs={
-                # "parse_only": bs4.SoupStrainer(
-                #     class_=("post-content", "post-title", "post-header"),
-                # ),
-            },
+        loader = RecursiveUrlLoader(
+            url=self.domain,
         )
 
         docs = loader.load()
@@ -105,7 +99,7 @@ runner = Runner(
     tool_registry=InMemoryToolRegistry.from_local_tools(
         [
             RetrievalAugmentQueryTool(
-                domain="https://docs.portialabs.ai/manage-end-users",
+                domain="https://docs.portialabs.ai",
                 description="Used to retrieve information from the Portia SDK docs.",
             ),
         ],
@@ -114,5 +108,5 @@ runner = Runner(
 
 
 workflow = runner.execute_query(
-    "What is the execution context in the Portia SDK?",
+    "How do I identify which user is running a workflow in the portia sdk?",
 )
