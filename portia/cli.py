@@ -108,6 +108,8 @@ def generate_cli_option_from_pydantic_field(
             field_type = click.BOOL
         case builtins.str:
             field_type = click.STRING
+        case builtins.list:
+            field_type = click.Tuple([str])
         case _:
             if isinstance(info.annotation, type) and issubclass(info.annotation, Enum):
                 field_type = click.Choice(
