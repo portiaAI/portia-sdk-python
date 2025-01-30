@@ -1,7 +1,9 @@
 """tests for the ToolRegistry classes."""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
-from pytest_mock import MockerFixture
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.execution_context import get_execution_context
@@ -12,6 +14,12 @@ from portia.tool_registry import (
     ToolRegistry,
 )
 from tests.utils import AdditionTool, MockTool
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
+    from portia.tool import Tool
+
 
 MOCK_TOOL_ID = "mock_tool"
 OTHER_MOCK_TOOL_ID = "other_mock_tool"
@@ -32,8 +40,12 @@ def test_registry_base_classes() -> None:
         def register_tool(self, tool: Tool) -> None:
             return super().register_tool(tool)  # type: ignore  # noqa: PGH003
 
-        def match_tools(self, query: str) -> list[Tool]:
-            return super().match_tools(query)
+        def match_tools(
+            self,
+            query: str | None = None,
+            tool_ids: list[str] | None = None,
+        ) -> list[Tool]:
+            return super().match_tools(query, tool_ids)
 
     registry = MyRegistry()
 
