@@ -116,13 +116,13 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
-            step=1,
+            step=0,
         ),
         InputClarification(
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
-            step=2,
+            step=1,
         ),
         ActionClarification(
             action_url=HttpUrl("http://example.com"),
@@ -188,12 +188,12 @@ def test_context_inputs_outputs_clarifications(
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
-            step=1,
+            step=0,
         ),
         ActionClarification(
             action_url=HttpUrl("http://example.com"),
             user_guidance="click on the link",
-            step=2,
+            step=1,
         ),
     ]
     (plan, workflow) = get_test_workflow()

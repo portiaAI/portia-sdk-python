@@ -1,5 +1,6 @@
 """Tests for runner classes."""
 
+from pdb import run
 import tempfile
 import threading
 import time
@@ -364,14 +365,16 @@ def test_runner_wait_for_ready_max_retries(runner: Runner) -> None:
     """Test wait for ready with max retries."""
     plan, workflow = get_test_workflow()
     workflow.state = WorkflowState.NEED_CLARIFICATION
+    runner.storage.save_plan(plan)
     with pytest.raises(InvalidWorkflowStateError):
         runner.wait_for_ready(workflow, max_retries=0)
 
 
 def test_runner_wait_for_ready_backoff_period(runner: Runner) -> None:
     """Test wait for ready with backoff period."""
-    _, workflow = get_test_workflow()
+    plan, workflow = get_test_workflow()
     workflow.state = WorkflowState.NEED_CLARIFICATION
+    runner.storage.save_plan(plan)
     runner.storage.get_workflow = mock.MagicMock(return_value=workflow)
     with pytest.raises(InvalidWorkflowStateError):
         runner.wait_for_ready(workflow, max_retries=1, backoff_start_time_seconds=0)
