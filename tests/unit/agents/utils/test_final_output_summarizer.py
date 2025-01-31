@@ -75,9 +75,7 @@ def test_summarizer_agent_empty_workflow() -> None:
 
         # Verify empty context case
         assert output == "Empty summary"
-        expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + (
-            "Query: Empty query\n----------"
-        )
+        expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + ("Query: Empty query\n----------")
         mock_llm.invoke.assert_called_once_with(expected_prompt)
 
 

@@ -174,12 +174,11 @@ def run(
     )
 
     # Run the query
-    runner = Runner(config=config,
-                    tools=(
-                        registry.match_tools(tool_ids=[cli_config.tool_id])
-                        if cli_config.tool_id
-                        else registry
-                    ),
+    runner = Runner(
+        config=config,
+        tools=(
+            registry.match_tools(tool_ids=[cli_config.tool_id]) if cli_config.tool_id else registry
+        ),
     )
 
     with execution_context(end_user_id=cli_config.end_user_id):

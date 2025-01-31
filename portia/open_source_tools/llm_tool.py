@@ -60,6 +60,7 @@ class LLMTool(Tool[str]):
          only. This includes using your general knowledge, your in-built reasoning and
          your code interpreter capabilities.
         """
+    context: str = ""
 
     def run(self, _: ExecutionContext, query: str) -> str:
         """Run the LLMTool."""
@@ -73,9 +74,10 @@ class LLMTool(Tool[str]):
         llm_wrapper = LLMWrapper(config)
         llm = llm_wrapper.to_langchain()
         # Define system and user messages
+        content = query if not self.context else f"{self.context}\n\n{query}"
         messages = [
             SystemMessage(content=self.prompt),
-            HumanMessage(content=query),
+            HumanMessage(content=content),
         ]
 
         # Get a response
