@@ -26,7 +26,7 @@ from portia.clarification import (
     InputClarification,
     MultipleChoiceClarification,
 )
-from portia.config import Config
+from portia.config import Config, StorageClass
 from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.open_source_tools import example_tool_registry
