@@ -76,9 +76,5 @@ class LLMTool(Tool[str]):
             SystemMessage(content=self.prompt),
             HumanMessage(content=content),
         ]
-
-        # Get a response
         response = llm.invoke(messages)
-
-        # Print the response
         return str(response.content)
