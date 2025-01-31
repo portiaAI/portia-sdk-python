@@ -26,7 +26,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.errors import InvalidWorkflowStateError
+from portia.errors import InvalidAgentError, InvalidWorkflowStateError
 from portia.execution_context import empty_context
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
@@ -581,3 +581,15 @@ def test_clarifications_or_continue() -> None:
     assert output == "tool_agent"
     assert isinstance(agent.new_clarifications, list)
     assert len(agent.new_clarifications) == 0
+
+
+def test_verifier_agent_without_tool_raises() -> None:
+    """Test verifier agent without tool raises."""
+    (plan, workflow) = get_test_workflow()
+    with pytest.raises(InvalidAgentError):
+        VerifierAgent(
+            step=plan.steps[0],
+            workflow=workflow,
+            config=get_test_config(),
+            tool=None,
+        ).execute_sync()

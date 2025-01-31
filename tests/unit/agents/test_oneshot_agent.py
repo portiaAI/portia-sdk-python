@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    import pytest
-
+import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
+from portia.errors import InvalidAgentError
 from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
 
@@ -62,3 +61,15 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     output = agent.execute_sync()
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
+
+
+def test_oneshot_agent_without_tool_raises() -> None:
+    """Test oneshot agent without tool raises."""
+    (plan, workflow) = get_test_workflow()
+    with pytest.raises(InvalidAgentError):
+        OneShotAgent(
+            step=plan.steps[0],
+            workflow=workflow,
+            config=get_test_config(),
+            tool=None,
+        ).execute_sync()
