@@ -1,6 +1,5 @@
 """Tests for runner classes."""
 
-from pdb import run
 import tempfile
 import threading
 import time
