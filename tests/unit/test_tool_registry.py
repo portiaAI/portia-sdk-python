@@ -227,5 +227,5 @@ def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
     duplicate_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
     combined = registry1 + duplicate_registry
     mock_logger.warning.assert_called_once_with(
-        f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur."
+        f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur.",
     )

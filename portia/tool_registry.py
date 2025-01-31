@@ -152,7 +152,7 @@ class ToolRegistry(ABC):
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
                 logger().warning(
-                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur."
+                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.",
                 )
             tool_ids.add(tool.id)
 
@@ -212,7 +212,9 @@ class AggregatedToolRegistry(ToolRegistry):
         return tools
 
     def match_tools(
-        self, query: str | None = None, tool_ids: list[str] | None = None
+        self,
+        query: str | None = None,
+        tool_ids: list[str] | None = None,
     ) -> list[Tool]:
         """Get all tools from all registries that match the query and tool_ids.
 

@@ -35,7 +35,6 @@ from portia.clarification import (
 from portia.config import AgentType, Config, PlannerType, StorageClass
 from portia.errors import (
     InvalidWorkflowStateError,
-    InvalidAgentError,
     PlanError,
 )
 from portia.execution_context import (
