@@ -27,7 +27,7 @@ def runner() -> Runner:
     """Fixture to create a Runner instance for testing."""
     config = get_test_config()
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    return Runner(config=config, tool_registry=tool_registry)
+    return Runner(config=config, tools=tool_registry)
 
 
 def test_runner_run_query(runner: Runner) -> None:
@@ -44,6 +44,20 @@ def test_runner_run_query(runner: Runner) -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
 
+def test_runner_run_query_tool_list() -> None:
+    """Test running a query using the Runner."""
+    query = "example query"
+    runner = Runner(config=get_test_config(), tools=[AdditionTool(), ClarificationTool()])
+
+    mock_response = StepsOrError(
+        steps=[],
+        error=None,
+    )
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    workflow = runner.execute_query(query)
+
+    assert workflow.state == WorkflowState.COMPLETE
 
 def test_runner_run_query_disk_storage() -> None:
     """Test running a query using the Runner."""
@@ -54,7 +68,7 @@ def test_runner_run_query_disk_storage() -> None:
             storage_dir=tmp_dir,
         )
         tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-        runner = Runner(config=config, tool_registry=tool_registry)
+        runner = Runner(config=config, tools=tool_registry)
 
         mock_response = StepsOrError(steps=[], error=None)
         LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
@@ -141,7 +155,7 @@ def test_runner_toolless_agent() -> None:
         default_agent_type=AgentType.TOOL_LESS,
     )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    runner = Runner(config=config, tool_registry=tool_registry)
+    runner = Runner(config=config, tools=tool_registry)
 
     plan = runner.generate_plan(query)
     workflow = runner.create_workflow(plan)

@@ -8,7 +8,7 @@ from portia.workflow import WorkflowState
 
 runner = Runner(
     Config.from_default(default_log_level=LogLevel.DEBUG),
-    tool_registry=example_tool_registry,
+    tools=example_tool_registry,
 )
 
 
