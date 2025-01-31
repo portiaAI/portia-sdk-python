@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from portia.execution_context import ExecutionContext
 
 
-
 class LLMToolSchema(BaseModel):
     """Input for UserSelectionTool."""
 
