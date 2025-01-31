@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dotenv import load_dotenv
 from langchain.schema import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -15,7 +14,6 @@ from portia.tool import Tool
 if TYPE_CHECKING:
     from portia.execution_context import ExecutionContext
 
-load_dotenv(override=True)
 
 
 class LLMToolSchema(BaseModel):
