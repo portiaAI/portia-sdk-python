@@ -101,6 +101,7 @@ def test_runner_generate_plan(
     assert workflow.outputs.final_output.value == 3
     assert workflow.outputs.final_output.summary is not None
 
+
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 def test_runner_run_query_with_clarifications(

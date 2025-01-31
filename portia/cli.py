@@ -30,6 +30,7 @@ from portia.config import Config, StorageClass
 from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.open_source_tools import example_tool_registry
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
 from portia.workflow import WorkflowState
@@ -156,6 +157,16 @@ def run(
     registry = example_tool_registry
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
+
+    # Add the LLMTool
+    registry.register_tool(
+        LLMTool(
+            model_name=config.llm_model_name.value,
+            provider=config.llm_provider.value,
+            temperature=config.llm_model_temperature,
+            seed=config.llm_model_seed,
+        ),
+    )
 
     # Run the query
     runner = Runner(config=config, tool_registry=registry)

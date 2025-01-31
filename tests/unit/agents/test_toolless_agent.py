@@ -27,6 +27,7 @@ def test_toolless_agent_regular_task(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test running a regular task uses the system context."""
     # Mock the invoke method to capture the context
     captured_context = None
+
     def mock_invoke(self: ToolLessModel, _: MessagesState) -> dict[str, list[str]]:
         nonlocal captured_context
         captured_context = self.context

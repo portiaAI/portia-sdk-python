@@ -76,8 +76,7 @@ def test_summarizer_agent_empty_workflow() -> None:
         # Verify empty context case
         assert output == "Empty summary"
         expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + (
-            "Query: Empty query\n"
-            "----------"
+            "Query: Empty query\n----------"
         )
         mock_llm.invoke.assert_called_once_with(expected_prompt)
 
@@ -157,10 +156,7 @@ def test_build_tasks_and_outputs_context_empty() -> None:
     )
 
     # Should still include query even if no steps/outputs
-    assert context == (
-        "Query: Empty query\n"
-        "----------"
-    )
+    assert context == ("Query: Empty query\n----------")
 
 
 def test_build_tasks_and_outputs_context_partial_outputs() -> None:
