@@ -28,6 +28,7 @@ from portia.errors import InvalidWorkflowStateError
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
+from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -558,7 +559,11 @@ class VerifierAgent(BaseAgent):
 
         tools = [
             self.tool.to_langchain_with_artifact(
-                ctx=execution_context,
+                ctx=ToolRunContext(
+                    execution_context=get_execution_context(),
+                    workflow_id=self.workflow.id,
+                    config=self.config,
+                ),
             ),
         ]
         tool_node = ToolNode(tools)

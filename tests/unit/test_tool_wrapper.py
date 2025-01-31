@@ -4,11 +4,16 @@ import pytest
 
 from portia.clarification import Clarification
 from portia.errors import ToolHardError
-from portia.execution_context import get_execution_context
 from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
-from tests.utils import AdditionTool, ClarificationTool, ErrorTool, get_test_workflow
+from tests.utils import (
+    AdditionTool,
+    ClarificationTool,
+    ErrorTool,
+    get_test_tool_context,
+    get_test_workflow,
+)
 
 
 class MockStorage(ToolCallStorage):
@@ -47,7 +52,7 @@ def test_tool_call_wrapper_run_success(mock_tool: Tool, mock_storage: MockStorag
     """Test successful run of the ToolCallWrapper."""
     (_, workflow) = get_test_workflow()
     wrapper = ToolCallWrapper(mock_tool, mock_storage, workflow)
-    ctx = get_execution_context()
+    ctx = get_test_tool_context()
     result = wrapper.run(ctx, 1, 2)
     assert result == 3
     assert mock_storage.records[-1].status == ToolCallStatus.SUCCESS
@@ -60,7 +65,7 @@ def test_tool_call_wrapper_run_with_exception(
     tool = ErrorTool()
     (_, workflow) = get_test_workflow()
     wrapper = ToolCallWrapper(tool, mock_storage, workflow)
-    ctx = get_execution_context()
+    ctx = get_test_tool_context()
     with pytest.raises(ToolHardError, match="Test error"):
         wrapper.run(ctx, "Test error", False, False)  # noqa: FBT003
     assert mock_storage.records[-1].status == ToolCallStatus.FAILED
@@ -73,8 +78,8 @@ def test_tool_call_wrapper_run_with_clarification(
     (_, workflow) = get_test_workflow()
     tool = ClarificationTool()
     wrapper = ToolCallWrapper(tool, mock_storage, workflow)
-    ctx = get_execution_context()
-    ctx.additional_data["raise_clarification"] = "True"
+    ctx = get_test_tool_context()
+    ctx.execution_context.additional_data["raise_clarification"] = "True"
     result = wrapper.run(ctx, "new clarification")
     assert isinstance(result, Clarification)
     assert mock_storage.records[-1].status == ToolCallStatus.NEED_CLARIFICATION
@@ -84,6 +89,6 @@ def test_tool_call_wrapper_run_records_latency(mock_tool: Tool, mock_storage: Mo
     """Test that the ToolCallWrapper records latency correctly."""
     (_, workflow) = get_test_workflow()
     wrapper = ToolCallWrapper(mock_tool, mock_storage, workflow)
-    ctx = get_execution_context()
+    ctx = get_test_tool_context()
     wrapper.run(ctx, 1, 2)
     assert mock_storage.records[-1].latency_seconds > 0

@@ -17,12 +17,10 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
-from portia.execution_context import ExecutionContext
 from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
-from portia.tool import Tool
+from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
-    from portia.execution_context import ExecutionContext
     from portia.workflow import Workflow
 
 
@@ -69,11 +67,11 @@ class ToolCallWrapper(Tool):
         self._storage = storage
         self._workflow = workflow
 
-    def ready(self, ctx: ExecutionContext) -> bool:
+    def ready(self, ctx: ToolRunContext) -> bool:
         """Check if the child tool is ready.
 
         Args:
-            ctx (ExecutionContext): Context of the execution environment
+            ctx (ToolRunContext): Context of the tool run
 
         Returns:
             bool: Whether the tool is ready to run
@@ -81,14 +79,14 @@ class ToolCallWrapper(Tool):
         """
         return self._child_tool.ready(ctx)
 
-    def run(self, ctx: ExecutionContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
+    def run(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
         """Run the child tool and store the outcome.
 
         This method executes the child tool with the provided arguments, records the input,
         output, latency, and status of the execution, and stores the details in `ToolCallStorage`.
 
         Args:
-            ctx (ExecutionContext): The execution context containing user data and metadata.
+            ctx (ToolRunContext): The context containing user data and metadata.
             *args (Any): Positional arguments for the child tool.
             **kwargs (Any): Keyword arguments for the child tool.
 
@@ -108,8 +106,8 @@ class ToolCallWrapper(Tool):
             tool_name=self._child_tool.name,
             workflow_id=self._workflow.id,
             step=self._workflow.current_step_index,
-            end_user_id=ctx.end_user_id,
-            additional_data=ctx.additional_data,
+            end_user_id=ctx.execution_context.end_user_id,
+            additional_data=ctx.execution_context.additional_data,
             status=ToolCallStatus.IN_PROGRESS,
         )
         start_time = datetime.now(tz=UTC)

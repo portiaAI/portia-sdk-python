@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from portia.clarification import Clarification, InputClarification
@@ -13,6 +15,9 @@ from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool
+
+if TYPE_CHECKING:
+    from portia.tool import ToolRunContext
 
 PROVIDER_MODELS = [
     (
@@ -225,7 +230,7 @@ def test_runner_run_query_with_soft_error(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, _: ExecutionContext, a: int, b: int) -> int:  # noqa: ARG002
+        def run(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
             raise ToolSoftError("Server Timeout")
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])

@@ -41,7 +41,6 @@ class ExecutionContext(BaseModel):
     information to planners and agents for dynamic adjustments.
 
     Attributes:
-        workflow_id (Optional[str]): An identifier for the workflow, if applicable.
         end_user_id (Optional[str]): The identifier of the user for whom the workflow is running.
             Used for authentication and debugging purposes.
         additional_data (dict[str, str]): Arbitrary additional data useful for debugging.
@@ -52,8 +51,6 @@ class ExecutionContext(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-
-    workflow_id: str | None = None
 
     end_user_id: str | None = None
 
@@ -74,7 +71,6 @@ def empty_context() -> ExecutionContext:
 
     """
     return ExecutionContext(
-        workflow_id=None,
         end_user_id=None,
         additional_data={},
         planner_system_context_extension=None,
