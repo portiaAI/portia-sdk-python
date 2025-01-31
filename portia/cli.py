@@ -76,6 +76,11 @@ class CLIConfig(BaseModel):
         description="Where to output to",
     )
 
+    tool_id: str | None = Field(
+        default=None,
+        description="The tool ID to use. If not provided, all tools will be used.",
+    )
+
 
 def generate_cli_option_from_pydantic_field(
     f: Callable[..., Any],
@@ -158,7 +163,13 @@ def run(
         registry += PortiaToolRegistry(config)
 
     # Run the query
-    runner = Runner(config=config, tool_registry=registry)
+    runner = Runner(config=config,
+                    tools=(
+                        registry.match_tools(tool_ids=[cli_config.tool_id])
+                        if cli_config.tool_id
+                        else registry
+                    ),
+    )
 
     with execution_context(end_user_id=cli_config.end_user_id):
         plan = runner.generate_plan(query)
@@ -210,7 +221,7 @@ def plan(
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
 
-    runner = Runner(config=config, tool_registry=registry)
+    runner = Runner(config=config, tools=registry)
 
     with execution_context(end_user_id=cli_config.end_user_id):
         output = runner.generate_plan(query)

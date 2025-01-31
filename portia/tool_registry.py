@@ -21,6 +21,7 @@ import httpx
 from pydantic import BaseModel, Field, create_model
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
+from portia.logger import logger
 from portia.tool import PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
@@ -43,9 +44,9 @@ class ToolRegistry(ABC):
             Retrieves a tool by its ID.
         get_tools() -> list[Tool]:
             Retrieves all tools in the registry.
-        match_tools(query: str) -> list[Tool]:
-            Optionally, retrieve tools that match a given query. Useful to implement tool filtering.
-            Defaults to returning all tools.
+        match_tools(query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
+            Optionally, retrieve tools that match a given query and tool_ids. Useful to implement
+            tool filtering.
 
     """
 
@@ -85,11 +86,16 @@ class ToolRegistry(ABC):
         """
         raise NotImplementedError("get_tools is not implemented")
 
-    def match_tools(self, query: str) -> list[Tool]:  # noqa: ARG002 - useful to have variable name
-        """Provide a set of tools that match a given query.
+    def match_tools(
+        self,
+        query: str | None = None,  # noqa: ARG002 - useful to have variable name
+        tool_ids: list[str] | None = None,
+    ) -> list[Tool]:
+        """Provide a set of tools that match a given query and tool_ids.
 
         Args:
-            query (str): The query to match tools against.
+            query (str | None): The query to match tools against.
+            tool_ids (list[str] | None): The list of tool ids to match.
 
         Returns:
             list[Tool]: A list of tools matching the query.
@@ -99,10 +105,14 @@ class ToolRegistry(ABC):
         This method is optional to implement and will default to providing all tools.
 
         """
-        return self.get_tools()
+        return (
+            [tool for tool in self.get_tools() if tool.id in tool_ids]
+            if tool_ids
+            else self.get_tools()
+        )
 
-    def __add__(self, other: ToolRegistry) -> ToolRegistry:
-        """Return an aggregated tool registry combining two registries.
+    def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
+        """Return an aggregated tool registry combining two registries or a registry and tool list.
 
         Tool IDs must be unique across the two registries otherwise an error will be thrown.
 
@@ -112,20 +122,39 @@ class ToolRegistry(ABC):
         Returns:
             AggregatedToolRegistry: A new tool registry containing tools from both registries.
 
-        Raises:
-            DuplicateToolError: If any tool ID is duplicated across the registries.
+        """
+        return self._add(other)
+
+    def __radd__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
+        """Return an aggregated tool registry combining two registries or a registry and tool list.
+
+        Tool IDs must be unique across the two registries otherwise an error will be thrown.
+
+        Args:
+            other (ToolRegistry): Another tool registry to be combined.
+
+        Returns:
+            AggregatedToolRegistry: A new tool registry containing tools from both registries.
 
         """
+        return self._add(other)
+
+    def _add(self, other: ToolRegistry | list[Tool]) -> AggregatedToolRegistry:
+        """Add a tool registry or Tool list to the current registry."""
+        other_registry = (
+            other
+            if isinstance(other, ToolRegistry) else InMemoryToolRegistry.from_local_tools(other)
+        )
         self_tools = self.get_tools()
-        other_tools = other.get_tools()
+        other_tools = other_registry.get_tools()
         tool_ids = set()
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
-                raise DuplicateToolError(tool.id)
+                logger().warning(
+                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.")
             tool_ids.add(tool.id)
 
-        return AggregatedToolRegistry([self, other])
-
+        return AggregatedToolRegistry([self, other_registry])
 
 class AggregatedToolRegistry(ToolRegistry):
     """An interface over a set of tool registries.
@@ -179,11 +208,13 @@ class AggregatedToolRegistry(ToolRegistry):
             tools += registry.get_tools()
         return tools
 
-    def match_tools(self, query: str) -> list[Tool]:
-        """Get all tools from all registries that match the query.
+    def match_tools(
+            self, query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
+        """Get all tools from all registries that match the query and tool_ids.
 
         Args:
-            query (str): The query to match tools against.
+            query (str | None): The query to match tools against.
+            tool_ids (list[str] | None): The list of tool ids to match.
 
         Returns:
             list[Tool]: A list of tools matching the query from all registries.
@@ -191,7 +222,7 @@ class AggregatedToolRegistry(ToolRegistry):
         """
         tools = []
         for registry in self.registries:
-            tools += registry.match_tools(query)
+            tools += registry.match_tools(query, tool_ids)
         return tools
 
 

@@ -51,6 +51,7 @@ from portia.storage import (
     InMemoryStorage,
     PortiaCloudStorage,
 )
+from portia.tool_registry import InMemoryToolRegistry, ToolRegistry
 from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
 
@@ -60,7 +61,6 @@ if TYPE_CHECKING:
     from portia.plan import Plan
     from portia.planners.planner import Planner
     from portia.tool import Tool
-    from portia.tool_registry import ToolRegistry
 
 
 class Runner:
@@ -72,18 +72,22 @@ class Runner:
     def __init__(
         self,
         config: Config,
-        tool_registry: ToolRegistry,
+        tools: ToolRegistry | list[Tool],
     ) -> None:
         """Initialize storage and tools.
 
         Args:
             config (Config): The configuration to initialize the runner.
-            tool_registry (ToolRegistry): The registry of tools to use for planning and execution.
+            tools (ToolRegistry | list[Tool]): The registry or list of tools to use.
 
         """
         logger_manager.configure_from_config(config)
         self.config = config
-        self.tool_registry = tool_registry
+        self.tool_registry = (
+            InMemoryToolRegistry.from_local_tools(tools)
+            if isinstance(tools, list)
+            else tools
+        )
 
         match config.storage_class:
             case StorageClass.MEMORY:
