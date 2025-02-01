@@ -208,17 +208,23 @@ class ParserModel:
         )
         response = ToolInputs.model_validate(response)
 
+        test_args = {}
+        errors = []
+        for arg in response.args:
+            test_args[arg.name] = arg.value
+            if not arg.valid:
+                errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
+
         # also test the ToolInputs that have come back
         # actually work for the schema of the tool
         # if not we can retry
-        test_args = {}
-        for arg in response.args:
-            test_args[arg.name] = arg.value
         try:
             self.agent.tool.args_schema.model_validate(test_args)
         except ValidationError as e:
-            err = str(e)
-            self.previous_errors.append(err)
+            errors.append(str(e) + "\n")
+
+        if errors:
+            self.previous_errors.append("".join(errors))
             self.retries += 1
             if self.retries <= MAX_RETRIES:
                 return self.invoke(state)
@@ -317,9 +323,39 @@ class VerifierModel:
             ),
         )
         response = VerifiedToolInputs.model_validate(response)
+
+        # Validate the arguments against the tool's schema
+        response = self._validate_args_against_schema(response)
         self.agent.verified_args = response
+
         return {"messages": [response.model_dump_json(indent=2)]}
 
+    def _validate_args_against_schema(self, tool_inputs: VerifiedToolInputs) -> VerifiedToolInputs:
+        """Validate tool arguments against the tool's schema and mark invalid ones as made up.
+
+        Args:
+            tool_inputs (VerifiedToolInputs): The tool_inputs to validate against the tool schema.
+
+        Returns:
+            Updated VerifiedToolInputs with invalid/missing args marked with made_up=True if found.
+
+        """
+        arg_dict = {arg.name: arg.value for arg in tool_inputs.args}
+
+        try:
+            if self.agent.tool:
+                self.agent.tool.args_schema.model_validate(arg_dict)
+        except ValidationError as e:
+            invalid_arg_names = {
+                error["loc"][0]
+                for error in e.errors()
+                if error.get("loc") and len(error["loc"]) > 0
+            }
+            for arg in tool_inputs.args:
+                if arg.name in invalid_arg_names:
+                    arg.made_up = True
+
+        return tool_inputs
 
 class ToolCallingModel:
     """Model to call the tool with the verified arguments."""

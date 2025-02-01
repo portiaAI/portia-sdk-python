@@ -104,7 +104,10 @@ def test_disk_storage(tmp_path: Path) -> None:
 
 def test_portia_cloud_storage() -> None:
     """Test PortiaCloudStorage raises StorageError on failure responses."""
-    config = get_test_config(portia_api_key="test_api_key")
+    config = get_test_config(
+        portia_api_key="test_api_key",
+        portia_api_endpoint="https://api.porita.dev",
+    )
     storage = PortiaCloudStorage(config)
 
     plan = Plan(
@@ -270,7 +273,10 @@ def test_portia_cloud_storage() -> None:
 
 def test_portia_cloud_storage_errors() -> None:
     """Test PortiaCloudStorage raises StorageError on failure responses."""
-    config = get_test_config(portia_api_key="test_api_key")
+    config = get_test_config(
+        portia_api_key="test_api_key",
+        portia_api_endpoint="https://api.porita.dev",
+    )
     storage = PortiaCloudStorage(config)
 
     plan = Plan(
