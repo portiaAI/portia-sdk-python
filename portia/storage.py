@@ -36,9 +36,15 @@ from pydantic import BaseModel, ValidationError
 from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
-from portia.plan import Plan, PlanContext, Step
+from portia.plan import Plan, PlanContext, Step, PlanUUID
 from portia.tool_call import ToolCallRecord, ToolCallStatus
-from portia.workflow import Workflow, WorkflowOutputs, WorkflowState
+from portia.workflow import (
+    Workflow,
+    WorkflowOutputs,
+    WorkflowState,
+    WorkflowUUID,
+    WORKFLOW_UUID_PREFIX,
+)
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -54,7 +60,7 @@ class PlanStorage(ABC):
     Methods:
         save_plan(self, plan: Plan) -> None:
             Save a plan.
-        get_plan(self, plan_id: UUID) -> Plan:
+        get_plan(self, plan_id: PlanUUID) -> Plan:
             Get a plan by ID.
 
     """
@@ -73,11 +79,11 @@ class PlanStorage(ABC):
         raise NotImplementedError("save_plan is not implemented")
 
     @abstractmethod
-    def get_plan(self, plan_id: UUID) -> Plan:
+    def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a plan by its ID.
 
         Args:
-            plan_id (UUID): The UUID of the plan to retrieve.
+            plan_id (PlanUUID): The UUID of the plan to retrieve.
 
         Returns:
             Plan: The Plan object associated with the provided plan_id.
@@ -97,7 +103,7 @@ class WorkflowStorage(ABC):
     Methods:
         save_workflow(self, workflow: Workflow) -> None:
             Save a workflow.
-        get_workflow(self, workflow_id: UUID) -> Workflow:
+        get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
             Get a workflow by ID.
         get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
             Return workflows that match the given workflow_state
@@ -118,11 +124,11 @@ class WorkflowStorage(ABC):
         raise NotImplementedError("save_workflow is not implemented")
 
     @abstractmethod
-    def get_workflow(self, workflow_id: UUID) -> Workflow:
+    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
         """Retrieve a workflow by its ID.
 
         Args:
-            workflow_id (UUID): The UUID of the workflow to retrieve.
+            workflow_id (WorkflowUUID): The UUID of the workflow to retrieve.
 
         Returns:
             Workflow: The Workflow object associated with the provided workflow_id.
@@ -215,8 +221,8 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
     Tool Calls are logged via the LogToolCallStorage.
     """
 
-    plans: dict[UUID, Plan]
-    workflows: dict[UUID, Workflow]
+    plans: dict[PlanUUID, Plan]
+    workflows: dict[WorkflowUUID, Workflow]
 
     def __init__(self) -> None:
         """Initialize Storage."""
@@ -232,11 +238,11 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         """
         self.plans[plan.id] = plan
 
-    def get_plan(self, plan_id: UUID) -> Plan:
+    def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Get plan from dict.
 
         Args:
-            plan_id (UUID): The UUID of the plan to retrieve.
+            plan_id (PlanUUID): The UUID of the plan to retrieve.
 
         Returns:
             Plan: The Plan object associated with the provided plan_id.
@@ -258,11 +264,11 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         """
         self.workflows[workflow.id] = workflow
 
-    def get_workflow(self, workflow_id: UUID) -> Workflow:
+    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
         """Get workflow from dict.
 
         Args:
-            workflow_id (UUID): The UUID of the workflow to retrieve.
+            workflow_id (WorkflowUUID): The UUID of the workflow to retrieve.
 
         Returns:
             Workflow: The Workflow object associated with the provided workflow_id.
@@ -354,13 +360,13 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
             plan (Plan): The Plan object to save.
 
         """
-        self._write(f"plan-{plan.id}.json", plan)
+        self._write(f"{plan.id}.json", plan)
 
-    def get_plan(self, plan_id: UUID) -> Plan:
+    def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a Plan object by its ID.
 
         Args:
-            plan_id (UUID): The ID of the Plan to retrieve.
+            plan_id (PlanUUID): The ID of the Plan to retrieve.
 
         Returns:
             Plan: The retrieved Plan object.
@@ -370,7 +376,8 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
 
         """
         try:
-            return self._read(f"plan-{plan_id}.json", Plan)
+            print(f"{plan_id}.json")
+            return self._read(f"{plan_id}.json", Plan)
         except (ValidationError, FileNotFoundError) as e:
             raise PlanNotFoundError(plan_id) from e
 
@@ -381,13 +388,13 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
             workflow (Workflow): The Workflow object to save.
 
         """
-        self._write(f"workflow-{workflow.id}.json", workflow)
+        self._write(f"{workflow.id}.json", workflow)
 
-    def get_workflow(self, workflow_id: UUID) -> Workflow:
+    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
         """Retrieve a Workflow object by its ID.
 
         Args:
-            workflow_id (UUID): The ID of the Workflow to retrieve.
+            workflow_id (WorkflowUUID): The ID of the Workflow to retrieve.
 
         Returns:
             Workflow: The retrieved Workflow object.
@@ -397,7 +404,7 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
 
         """
         try:
-            return self._read(f"workflow-{workflow_id}.json", Workflow)
+            return self._read(f"{workflow_id}.json", Workflow)
         except (ValidationError, FileNotFoundError) as e:
             raise WorkflowNotFoundError(workflow_id) from e
 
@@ -417,7 +424,7 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
 
         directory_path = Path(self.storage_dir)
         for f in directory_path.iterdir():
-            if f.is_file() and f.name.startswith("workflow"):
+            if f.is_file() and f.name.startswith(WORKFLOW_UUID_PREFIX):
                 workflow = self._read(f.name, Workflow)
                 if not workflow_state or workflow.state == workflow_state:
                     workflows.append(workflow)
@@ -483,11 +490,11 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
 
-    def get_plan(self, plan_id: UUID) -> Plan:
+    def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a plan from Portia Cloud.
 
         Args:
-            plan_id (UUID): The ID of the plan to retrieve.
+            plan_id (PlanUUID): The ID of the plan to retrieve.
 
         Returns:
             Plan: The Plan object retrieved from Portia Cloud.
@@ -511,7 +518,7 @@ class PortiaCloudStorage(Storage):
             self.check_response(response)
             response_json = response.json()
             return Plan(
-                id=UUID(response_json["id"]),
+                id=PlanUUID.from_string(response_json["id"]),
                 plan_context=PlanContext(
                     query=response_json["query"],
                     tool_ids=response_json["tool_ids"],
@@ -533,12 +540,12 @@ class PortiaCloudStorage(Storage):
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/workflows/",
                 json={
-                    "id": str(workflow.id),
+                    "id": workflow.id.id,
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
                     "execution_context": workflow.execution_context.model_dump(mode="json"),
                     "outputs": workflow.outputs.model_dump(mode="json"),
-                    "plan_id": str(workflow.plan_id),
+                    "plan_id": workflow.plan_id.id,
                 },
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
@@ -555,7 +562,7 @@ class PortiaCloudStorage(Storage):
                         "state": workflow.state,
                         "execution_context": workflow.execution_context.model_dump(mode="json"),
                         "outputs": workflow.outputs.model_dump(mode="json"),
-                        "plan_id": str(workflow.plan_id),
+                        "plan_id": workflow.plan_id.id,
                     },
                     headers={
                         "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
@@ -568,11 +575,11 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
 
-    def get_workflow(self, workflow_id: UUID) -> Workflow:
+    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
         """Retrieve a workflow from Portia Cloud.
 
         Args:
-            workflow_id (UUID): The ID of the workflow to retrieve.
+            workflow_id (WorkflowUUID): The ID of the workflow to retrieve.
 
         Returns:
             Workflow: The Workflow object retrieved from Portia Cloud.
@@ -596,8 +603,8 @@ class PortiaCloudStorage(Storage):
             self.check_response(response)
             response_json = response.json()
             return Workflow(
-                id=response_json["id"],
-                plan_id=response_json["plan"]["id"],
+                id=WorkflowUUID.from_string(response_json["id"]),
+                plan_id=PlanUUID.from_string(response_json["plan"]["id"]),
                 current_step_index=response_json["current_step_index"],
                 state=WorkflowState(response_json["state"]),
                 execution_context=ExecutionContext.model_validate(
@@ -638,8 +645,8 @@ class PortiaCloudStorage(Storage):
             response_json = response.json()
             return [
                 Workflow(
-                    id=workflow["id"],
-                    plan_id=workflow["plan"]["id"],
+                    id=WorkflowUUID.from_string(workflow["id"]),
+                    plan_id=PlanUUID.from_string(workflow["plan"]["id"]),
                     current_step_index=workflow["current_step_index"],
                     state=WorkflowState(workflow["state"]),
                     execution_context=ExecutionContext.model_validate(
@@ -664,7 +671,7 @@ class PortiaCloudStorage(Storage):
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tool-calls/",
                 json={
-                    "workflow": str(tool_call.workflow_id),
+                    "workflow": tool_call.workflow_id.id,
                     "tool_name": tool_call.tool_name,
                     "step": tool_call.step,
                     "end_user_id": tool_call.end_user_id or "",

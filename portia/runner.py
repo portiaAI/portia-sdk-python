@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import time
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
@@ -53,7 +52,7 @@ from portia.storage import (
 )
 from portia.tool_registry import InMemoryToolRegistry, ToolRegistry
 from portia.tool_wrapper import ToolCallWrapper
-from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
@@ -198,13 +197,14 @@ class Runner:
     def execute_workflow(
         self,
         workflow: Workflow | None = None,
-        workflow_id: UUID | str | None = None,
+        workflow_id: WorkflowUUID | str | None = None,
     ) -> Workflow:
         """Run a workflow.
 
         Args:
             workflow (Workflow | None): The workflow to execute. Defaults to None.
-            workflow_id (UUID | str | None): The ID of the workflow to execute. Defaults to None.
+            workflow_id (WorkflowUUID | str | None): The ID of the workflow to execute. Defaults to
+                None.
 
         Returns:
             Workflow: The resulting workflow after execution.
@@ -218,7 +218,11 @@ class Runner:
             if not workflow_id:
                 raise ValueError("Either workflow or workflow_id must be provided")
 
-            parsed_id = UUID(workflow_id) if isinstance(workflow_id, str) else workflow_id
+            parsed_id = (
+                WorkflowUUID.from_string(workflow_id)
+                if isinstance(workflow_id, str)
+                else workflow_id
+            )
             workflow = self.storage.get_workflow(parsed_id)
 
         if workflow.state not in [

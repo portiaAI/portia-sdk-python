@@ -17,7 +17,8 @@ Key Components
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+import json
+from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,8 +26,11 @@ from portia.agents.base_agent import Output
 from portia.clarification import (
     ClarificationListType,
 )
-from portia.common import PortiaEnum
+from portia.common import PortiaEnum, PrefixedUUID
 from portia.execution_context import ExecutionContext, empty_context
+from portia.plan import PlanUUID
+
+WORKFLOW_UUID_PREFIX = "wkfl"
 
 
 class WorkflowState(PortiaEnum):
@@ -95,9 +99,9 @@ class Workflow(BaseModel):
 
     Attributes
     ----------
-    id : UUID
+    id : WorkflowUUID
         A unique ID for this workflow.
-    plan_id : UUID
+    plan_id : PlanUUID
         The ID of the Plan this Workflow uses.
     current_step_index : int
         The current step that is being executed.
@@ -112,11 +116,11 @@ class Workflow(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID = Field(
-        default_factory=uuid4,
+    id: WorkflowUUID = Field(
+        default_factory=lambda: WorkflowUUID(),
         description="A unique ID for this workflow.",
     )
-    plan_id: UUID = Field(
+    plan_id: PlanUUID = Field(
         description="The ID of the Plan this Workflow uses.",
     )
     current_step_index: int = Field(
@@ -150,6 +154,20 @@ class Workflow(BaseModel):
             for clarification in self.outputs.clarifications
             if not clarification.resolved
         ]
+
+    '''
+    @classmethod
+    def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
+        """Validate JSON and deserialize the UUID field."""
+        if isinstance(json_data, bytes):
+            json_data = json_data.decode()
+        data = json.loads(json_data)
+        if isinstance(data.get("id"), str):
+            data["id"] = WorkflowUUID.from_string(data["id"])
+        if isinstance(data.get("plan_id"), str):
+            data["plan_id"] = PlanUUID.from_string(data["plan_id"])
+        return cls.model_validate(data)
+    '''
 
     def __str__(self) -> str:
         """Return the string representation of the workflow.
@@ -199,3 +217,8 @@ class ReadOnlyWorkflow(Workflow):
             state=workflow.state,
             execution_context=workflow.execution_context,
         )
+
+class WorkflowUUID(PrefixedUUID):
+    """A UUID for a workflow."""
+
+    prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX

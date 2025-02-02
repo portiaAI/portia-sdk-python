@@ -20,11 +20,15 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
-from typing import Any
-from uuid import UUID, uuid4
+from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
+from portia.common import PrefixedUUID
+
+import json
+
+PLAN_UUID_PREFIX = "plan"
 
 class Variable(BaseModel):
     """A variable in the plan.
@@ -160,25 +164,37 @@ class Plan(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID = Field(
-        default_factory=uuid4,
+    id: PlanUUID = Field(
+        default_factory=lambda: PlanUUID(),
         description="A unique ID for this plan.",
     )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
 
+    '''
     @field_serializer("id")
-    def serialize_id(self, plan_id: UUID) -> str:
+    def serialize_id(self, plan_id: PlanUUID) -> str:
         """Serialize the ID to a string.
 
         Args:
-            plan_id (UUID): The UUID of the plan.
+            plan_id (PlanUUID): The UUID of the plan.
 
         Returns:
             str: The serialized string representation of the plan's ID.
 
         """
-        return str(plan_id)
+        return plan_id.serialize()
+
+    @classmethod
+    def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
+        """Validate JSON and deserialize the UUID field."""
+        if isinstance(json_data, bytes):
+            json_data = json_data.decode()
+        data = json.loads(json_data)
+        if isinstance(data.get("id"), str):
+            data["id"] = PlanUUID.from_string(data["id"])
+        return cls.model_validate(data)
+    '''
 
     def __str__(self) -> str:
         """Return the string representation of the plan.
@@ -219,3 +235,11 @@ class ReadOnlyPlan(Plan):
             plan_context=plan.plan_context,
             steps=plan.steps,
         )
+
+class PlanUUID(PrefixedUUID):
+    """A UUID for a plan.
+
+    This class is a wrapper around the PrefixedUUID class, with the prefix set to PLAN_UUID_PREFIX.
+    """
+
+    prefix: ClassVar[str] = PLAN_UUID_PREFIX

@@ -7,14 +7,12 @@ The `ToolCallRecord` class is a Pydantic model used to capture details about a
 specific tool call, including its status, input, output, and associated metadata.
 """
 
-from __future__ import annotations  # noqa: I001
-
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from portia.common import PortiaEnum
-from uuid import UUID
+from portia.workflow import WorkflowUUID
 
 
 class ToolCallStatus(PortiaEnum):
@@ -62,7 +60,7 @@ class ToolCallRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tool_name: str
-    workflow_id: UUID
+    workflow_id: WorkflowUUID
     step: int
     # execution context is tracked here so we get a snapshot if its updated
     end_user_id: str | None
