@@ -152,7 +152,7 @@ class ParserModel:
                 "Argument schema for the tool:\n{tool_args}\n"
                 "Description of the tool: {tool_description}\n"
                 "\n\n----------\n\n"
-                "The following section contains previous schema errors. "
+                "The following section contains previous errors. "
                 "Ensure your response avoids these errors:\n"
                 "{previous_errors}\n"
                 "\n\n----------\n\n"

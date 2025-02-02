@@ -430,8 +430,6 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
 
 
-
-
 def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the tool calling model."""
     verified_tool_inputs = VerifiedToolInputs(
