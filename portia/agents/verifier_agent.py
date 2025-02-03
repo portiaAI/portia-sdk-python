@@ -99,6 +99,11 @@ class VerifiedToolArgument(BaseModel):
         "User provided values can be in the context, in the goal or the result of previous steps.",
     )
 
+    missing: bool = Field(
+        default=False,
+        description="Whether the value is missing or not.",
+    )
+
 
 class VerifiedToolInputs(BaseModel):
     """Represents the inputs for a tool after being verified by an agent.
@@ -149,7 +154,7 @@ class ParserModel:
                 "Argument schema for the tool:\n{tool_args}\n"
                 "Description of the tool: {tool_description}\n"
                 "\n\n----------\n\n"
-                "The following section contains previous schema errors. "
+                "The following section contains previous errors. "
                 "Ensure your response avoids these errors:\n"
                 "{previous_errors}\n"
                 "\n\n----------\n\n"
@@ -205,17 +210,23 @@ class ParserModel:
         )
         response = ToolInputs.model_validate(response)
 
+        test_args = {}
+        errors = []
+        for arg in response.args:
+            test_args[arg.name] = arg.value
+            if not arg.valid:
+                errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
+
         # also test the ToolInputs that have come back
         # actually work for the schema of the tool
         # if not we can retry
-        test_args = {}
-        for arg in response.args:
-            test_args[arg.name] = arg.value
         try:
             self.agent.tool.args_schema.model_validate(test_args)
         except ValidationError as e:
-            err = str(e)
-            self.previous_errors.append(err)
+            errors.append(str(e) + "\n")
+
+        if errors:
+            self.previous_errors.extend(errors)
             self.retries += 1
             if self.retries <= MAX_RETRIES:
                 return self.invoke(state)
@@ -314,9 +325,44 @@ class VerifierModel:
             ),
         )
         response = VerifiedToolInputs.model_validate(response)
+
+        # Validate the arguments against the tool's schema
+        response = self._validate_args_against_schema(response)
         self.agent.verified_args = response
+
         return {"messages": [response.model_dump_json(indent=2)]}
 
+    def _validate_args_against_schema(self, tool_inputs: VerifiedToolInputs) -> VerifiedToolInputs:
+        """Validate tool arguments against the tool's schema and mark invalid ones as made up.
+
+        Args:
+            tool_inputs (VerifiedToolInputs): The tool_inputs to validate against the tool schema.
+
+        Returns:
+            Updated VerifiedToolInputs with invalid/missing args marked with missing=True if found.
+
+        """
+        arg_dict = {arg.name: arg.value for arg in tool_inputs.args}
+
+        try:
+            if self.agent.tool:
+                self.agent.tool.args_schema.model_validate(arg_dict)
+        except ValidationError as e:
+            # Extract the arg names from the pydantic error to mark them as missing = True.
+            # At this point we know the arguments are invalid, so we can trigger a clarification
+            # request.
+            invalid_arg_names = {
+                error["loc"][0]
+                for error in e.errors()
+                if error.get("loc") and len(error["loc"]) > 0
+            }
+            [
+                setattr(arg, "missing", True)
+                for arg in tool_inputs.args
+                if arg.name in invalid_arg_names
+            ]
+
+        return tool_inputs
 
 class ToolCallingModel:
     """Model to call the tool with the verified arguments."""
@@ -379,6 +425,7 @@ class ToolCallingModel:
                 if matching_clarification and arg.value != matching_clarification.response:
                     arg.value = matching_clarification.response
                     arg.made_up = False
+                    arg.missing = False
 
         model = self.llm.bind_tools(self.tools)
 
@@ -449,7 +496,7 @@ class VerifierAgent(BaseAgent):
         arguments = VerifiedToolInputs.model_validate_json(str(last_message.content))
 
         for arg in arguments.args:
-            if not arg.made_up:
+            if not arg.made_up and not arg.missing:
                 continue
             matching_clarification = self.get_last_resolved_clarification(arg.name)
 
