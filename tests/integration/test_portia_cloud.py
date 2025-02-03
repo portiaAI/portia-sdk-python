@@ -98,4 +98,4 @@ def test_portia_cloud_storage() -> None:
     assert storage.get_plan(plan.id) == plan
     storage.save_workflow(workflow)
     assert storage.get_workflow(workflow.id) == workflow
-    assert isinstance(storage.get_workflows(WorkflowState.IN_PROGRESS), list)
+    assert isinstance(storage.get_workflows(WorkflowState.IN_PROGRESS).results, list)

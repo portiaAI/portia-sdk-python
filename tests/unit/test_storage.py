@@ -170,17 +170,16 @@ def test_portia_cloud_storage() -> None:
         )
 
     with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
+        patch("httpx.put", return_value=mock_response) as mock_put,
         patch("httpx.get", return_value=mock_response) as mock_get,
     ):
         # Test save_workflow failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.save_workflow(workflow)
 
-        mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/",
+        mock_put.assert_called_once_with(
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
             json={
-                "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
                 "state": workflow.state,
                 "execution_context": workflow.execution_context.model_dump(mode="json"),
@@ -331,17 +330,16 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
+        patch("httpx.put", side_effect=TimeoutError()) as mock_put,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
     ):
         # Test save_workflow failure
         with pytest.raises(StorageError):
             storage.save_workflow(workflow)
 
-        mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/",
+        mock_put.assert_called_once_with(
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
             json={
-                "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
                 "state": workflow.state,
                 "execution_context": workflow.execution_context.model_dump(mode="json"),

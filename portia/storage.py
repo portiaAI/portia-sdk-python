@@ -569,10 +569,9 @@ class PortiaCloudStorage(Storage):
 
         """
         try:
-            response = httpx.post(
-                url=f"{self.api_endpoint}/api/v0/workflows/",
+            response = httpx.put(
+                url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
                 json={
-                    "id": str(workflow.id),
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
                     "execution_context": workflow.execution_context.model_dump(mode="json"),
@@ -585,23 +584,6 @@ class PortiaCloudStorage(Storage):
                 },
                 timeout=10,
             )
-            # If the workflow exists, update it instead
-            if "workflow with this id already exists." in str(response.content):
-                response = httpx.patch(
-                    url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
-                    json={
-                        "current_step_index": workflow.current_step_index,
-                        "state": workflow.state,
-                        "execution_context": workflow.execution_context.model_dump(mode="json"),
-                        "outputs": workflow.outputs.model_dump(mode="json"),
-                        "plan_id": str(workflow.plan_id),
-                    },
-                    headers={
-                        "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=10,
-                )
         except Exception as e:
             raise StorageError(e) from e
         else:
