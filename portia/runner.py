@@ -27,7 +27,6 @@ from uuid import UUID
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent
-from portia.agents.toolless_agent import ToolLessAgent
 from portia.agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
@@ -84,9 +83,7 @@ class Runner:
         logger_manager.configure_from_config(config)
         self.config = config
         self.tool_registry = (
-            InMemoryToolRegistry.from_local_tools(tools)
-            if isinstance(tools, list)
-            else tools
+            InMemoryToolRegistry.from_local_tools(tools) if isinstance(tools, list) else tools
         )
 
         match config.storage_class:
@@ -521,13 +518,10 @@ class Runner:
             )
         cls: type[BaseAgent]
         match self.config.default_agent_type:
-            case AgentType.TOOL_LESS:
-                cls = ToolLessAgent
             case AgentType.ONE_SHOT:
                 cls = OneShotAgent
             case AgentType.VERIFIER:
                 cls = VerifierAgent
-
         return cls(
             step,
             workflow,

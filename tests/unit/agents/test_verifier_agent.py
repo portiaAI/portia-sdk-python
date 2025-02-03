@@ -14,7 +14,6 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from portia.agents.base_agent import Output
-from portia.agents.toolless_agent import ToolLessModel
 from portia.agents.verifier_agent import (
     MAX_RETRIES,
     ParserModel,
@@ -27,7 +26,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.errors import InvalidWorkflowStateError
+from portia.errors import InvalidAgentError, InvalidWorkflowStateError
 from portia.execution_context import empty_context
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
@@ -75,31 +74,6 @@ class MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
         return self
-
-
-def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test running an agent without a tool."""
-
-    def toolless_model(self, state):  # noqa: ANN001, ANN202, ARG001
-        response = AIMessage(
-            content="This is a sentence that should never be hallucinated by the LLM.",
-        )
-        return {"messages": [response]}
-
-    monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
-
-    (plan, workflow) = get_test_workflow()
-    agent = VerifierAgent(
-        step=plan.steps[0],
-        workflow=workflow,
-        config=get_test_config(),
-        tool=None,
-    )
-
-    output = agent.execute_sync()
-    assert isinstance(output, Output)
-    assert isinstance(output.value, str)
-    assert output.value == "This is a sentence that should never be hallucinated by the LLM."
 
 
 class _TestToolSchema(BaseModel):
@@ -759,3 +733,15 @@ def test_clarifications_or_continue() -> None:
     assert output == "tool_agent"
     assert isinstance(agent.new_clarifications, list)
     assert len(agent.new_clarifications) == 0
+
+
+def test_verifier_agent_without_tool_raises() -> None:
+    """Test verifier agent without tool raises."""
+    (plan, workflow) = get_test_workflow()
+    with pytest.raises(InvalidAgentError):
+        VerifierAgent(
+            step=plan.steps[0],
+            workflow=workflow,
+            config=get_test_config(),
+            tool=None,
+        ).execute_sync()

@@ -218,4 +218,3 @@ def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     context.extend(system_context)
 
     return "\n".join(context)
-

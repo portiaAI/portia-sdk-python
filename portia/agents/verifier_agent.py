@@ -22,12 +22,9 @@ from portia.agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.agents.toolless_agent import ToolLessAgent
 from portia.agents.utils.step_summarizer import StepSummarizer
 from portia.clarification import Clarification, InputClarification
-from portia.errors import (
-    InvalidWorkflowStateError,
-)
+from portia.errors import InvalidAgentError, InvalidWorkflowStateError
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 
@@ -537,21 +534,14 @@ class VerifierAgent(BaseAgent):
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.
 
-        This method will either invoke the tool with unverified arguments or fall back
-        to the ToolLessAgent if no tool is available. It handles task execution through
-        a workflow that includes retries for up to four tool calls.
+        This method will invoke the tool with arguments that are parsed and verified first.
 
         Returns:
             Output: The result of the agent's execution, containing the tool call result.
 
         """
         if not self.tool:
-            return ToolLessAgent(
-                self.step,
-                self.workflow,
-                self.config,
-                self.tool,
-            ).execute_sync()
+            raise InvalidAgentError("No tool available")
 
         context = self.get_system_context()
         llm = LLMWrapper(self.config).to_langchain()

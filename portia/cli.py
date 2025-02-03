@@ -30,6 +30,7 @@ from portia.config import Config, StorageClass
 from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.open_source_tools import example_tool_registry
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.runner import Runner
 from portia.tool_registry import PortiaToolRegistry
 from portia.workflow import WorkflowState
@@ -162,13 +163,25 @@ def run(
     if config.has_api_key(PORTIA_API_KEY):
         registry += PortiaToolRegistry(config)
 
+    # Add the LLMTool
+    # This is a general purpose LLM tool that can be used to respond to a prompt by relying
+    # solely on LLM capabilities. It won't call other tools. Recommended for steps that don't
+    # require any external tools.
+    registry.register_tool(
+        LLMTool(
+            model_name=config.llm_model_name.value,
+            provider=config.llm_provider.value,
+            temperature=config.llm_model_temperature,
+            seed=config.llm_model_seed,
+        ),
+    )
+
     # Run the query
-    runner = Runner(config=config,
-                    tools=(
-                        registry.match_tools(tool_ids=[cli_config.tool_id])
-                        if cli_config.tool_id
-                        else registry
-                    ),
+    runner = Runner(
+        config=config,
+        tools=(
+            registry.match_tools(tool_ids=[cli_config.tool_id]) if cli_config.tool_id else registry
+        ),
     )
 
     with execution_context(end_user_id=cli_config.end_user_id):
