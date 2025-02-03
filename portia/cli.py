@@ -164,6 +164,9 @@ def run(
         registry += PortiaToolRegistry(config)
 
     # Add the LLMTool
+    # This is a general purpose LLM tool that can be used to respond to a prompt by relying
+    # solely on LLM capabilities. It won't call other tools. Recommended for steps that don't
+    # require any external tools.
     registry.register_tool(
         LLMTool(
             model_name=config.llm_model_name.value,
