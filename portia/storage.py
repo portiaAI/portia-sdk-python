@@ -28,6 +28,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
+from urllib.parse import urlencode
 from uuid import UUID
 
 import httpx
@@ -663,11 +664,13 @@ class PortiaCloudStorage(Storage):
 
         """
         try:
-            query = f"?page={page}"
+            query = {}
+            if page:
+                query["page"] = page
             if workflow_state:
-                query += f"&workflow_state={workflow_state.value}"
+                query["workflow_state"] = workflow_state.value
             response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/workflows/{query}",
+                url=f"{self.api_endpoint}/api/v0/workflows/?{urlencode(query)}",
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",

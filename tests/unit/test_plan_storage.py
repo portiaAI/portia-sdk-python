@@ -85,7 +85,7 @@ def test_disk_file_storage_save_and_get_workflows(tmp_path: Path) -> None:
     storage.save_workflow(workflow)
 
     workflows = storage.get_workflows(WorkflowState.IN_PROGRESS)
-    assert len(workflows) == 1
+    assert len(workflows.results) == 1
 
 
 def test_disk_file_storage_invalid_plan_retrieval(tmp_path: Path) -> None:
