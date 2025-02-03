@@ -27,6 +27,7 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
             Variable(name="a", value=1, description=""),
             Variable(name="b", value=2, description=""),
         ],
+        tool_id="add_tool",
         output="$sum",
     )
     plan = Plan(

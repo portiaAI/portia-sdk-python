@@ -303,10 +303,12 @@ def test_runner_sets_final_output_with_summary(runner: Runner) -> None:
         Step(
             task="Get weather in London",
             output="$london_weather",
-        ),
+            tool_id="weather_tool",
+        ),  
         Step(
             task="Suggest activities based on weather",
             output="$activities",
+            tool_id="activity_tool",
         ),
     ]
 

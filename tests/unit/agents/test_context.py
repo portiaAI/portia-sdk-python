@@ -41,7 +41,7 @@ def test_context_empty() -> None:
     (_, workflow) = get_test_workflow()
     context = build_context(
         ExecutionContext(),
-        Step(inputs=[], output="", task=""),
+        Step(inputs=[], output="", task="", tool_id="tool1"),
         workflow,
     )
     assert "System Context:" in context
