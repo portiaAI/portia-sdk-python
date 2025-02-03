@@ -88,7 +88,7 @@ class PlanNotFoundError(PortiaBaseError):
 
     def __init__(self, plan_id: PlanUUID) -> None:
         """Set custom error message."""
-        super().__init__(f"Plan with id {plan_id.id} not found.")
+        super().__init__(f"Plan with id {plan_id!s} not found.")
 
 
 class WorkflowNotFoundError(PortiaBaseError):
@@ -101,7 +101,7 @@ class WorkflowNotFoundError(PortiaBaseError):
 
     def __init__(self, workflow_id: WorkflowUUID | str | None) -> None:
         """Set custom error message."""
-        super().__init__(f"Workflow with id {workflow_id} not found.")
+        super().__init__(f"Workflow with id {workflow_id!s} not found.")
 
 
 class ToolNotFoundError(PortiaBaseError):

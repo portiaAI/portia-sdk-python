@@ -20,12 +20,11 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
-import json
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from portia.common import PrefixedUUID
+from portia.common import BaseUUIDModel, PrefixedUUID
 
 PLAN_UUID_PREFIX = "plan"
 
@@ -148,7 +147,16 @@ class PlanContext(BaseModel):
     tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
 
 
-class Plan(BaseModel):
+class PlanUUID(PrefixedUUID):
+    """A UUID for a plan.
+
+    This class is a wrapper around the PrefixedUUID class, with the prefix set to PLAN_UUID_PREFIX.
+    """
+
+    prefix: ClassVar[str] = PLAN_UUID_PREFIX
+
+
+class Plan(BaseUUIDModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
 
     A plan defines the entire sequence of steps required to process a query and generate a result.
@@ -165,27 +173,10 @@ class Plan(BaseModel):
 
     id: PlanUUID = Field(
         default_factory=lambda: PlanUUID(),
-        description="A unique ID for this plan.",
+        description="The ID of the plan.",
     )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
-
-    @field_validator("id", mode="before")
-    def validate_id(cls, v: str) -> PlanUUID:
-        """Validate the ID field."""
-        if isinstance(v, PlanUUID):
-            return v
-        return PlanUUID.from_string(v)
-
-    @classmethod
-    def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
-        """Validate JSON and deserialize the UUID field."""
-        if isinstance(json_data, bytes):
-            json_data = json_data.decode()
-        data = json.loads(json_data)
-        if isinstance(data.get("id"), str):
-            data["id"] = PlanUUID.from_string(data["id"])
-        return cls.model_validate(data)
 
     def __str__(self) -> str:
         """Return the string representation of the plan.
@@ -226,11 +217,3 @@ class ReadOnlyPlan(Plan):
             plan_context=plan.plan_context,
             steps=plan.steps,
         )
-
-class PlanUUID(PrefixedUUID):
-    """A UUID for a plan.
-
-    This class is a wrapper around the PrefixedUUID class, with the prefix set to PLAN_UUID_PREFIX.
-    """
-
-    prefix: ClassVar[str] = PLAN_UUID_PREFIX

@@ -5,14 +5,14 @@ It includes a custom Enum class, helper functions, and base models with special 
 use in the Portia framework.
 """
 
-from enum import Enum
-from typing import Any, ClassVar, Self, TypeVar
-from uuid import UUID, uuid4
 import json
+from enum import Enum
+from typing import Any, ClassVar, Generic, Self, TypeVar
+from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, computed_field, model_serializer
-from pydantic.json_schema import JsonSchemaValue
-from pydantic_core.core_schema import CoreSchema, str_schema
+from pydantic import BaseModel, Field, field_validator, model_serializer
+
+from typing import get_type_hints
 
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
@@ -71,20 +71,6 @@ class PrefixedUUID(BaseModel):
     prefix: ClassVar[str] = ""
     uuid: UUID = Field(default_factory=uuid4)
 
-    # TODO(Emma): Do we like this or is it overcomplicating things?
-    @computed_field
-    @property
-    def id(self) -> str:
-        """Combines the prefix and UUID into a single string.
-
-        Returns:
-            str: The prefixed UUID string.
-
-        """
-        if self.prefix == "":
-            return str(self.uuid)
-        return f"{self.prefix}-{self.uuid}"
-
     def __str__(self) -> str:
         """Return the string representation of the PrefixedUUID.
 
@@ -92,17 +78,18 @@ class PrefixedUUID(BaseModel):
             str: The prefixed UUID string.
 
         """
-        return self.id
+        return f"{self.prefix}-{self.uuid}"
 
-    # TODO(Emma): Need to use this for the cloud storage but won't work for the disk storage.
+
     @model_serializer
     def serialize_model(self) -> str:
         """Serialize the PrefixedUUID to a string using the id property.
 
         Returns:
             str: The prefixed UUID string.
+
         """
-        return self.id
+        return str(self)
 
 
     @classmethod
@@ -126,3 +113,35 @@ class PrefixedUUID(BaseModel):
             raise ValueError(f"Prefix {prefix} does not match expected prefix {cls.prefix}")
         return cls(uuid=UUID(uuid_str))
 
+ID_TYPE = TypeVar("ID_TYPE", bound=PrefixedUUID)
+
+
+class BaseUUIDModel(BaseModel):
+    """A base model for UUID fields."""
+
+    id: PrefixedUUID = Field(
+        default_factory=lambda: BaseUUIDModel._create_uuid(),
+        description="A unique ID for this model.",
+    )
+
+    @classmethod
+    def _create_uuid(cls) -> PrefixedUUID:
+        """Create a UUID for this model."""
+        return get_type_hints(cls)["id"]()
+
+    @field_validator("id", mode="before")
+    def validate_id(cls, v: str) -> PrefixedUUID:
+        """Validate the ID field."""
+        if isinstance(v, PrefixedUUID):
+            return v
+        return get_type_hints(cls)["id"].from_string(v)
+
+    @classmethod
+    def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
+        """Validate JSON and deserialize the UUID field."""
+        if isinstance(json_data, bytes):
+            json_data = json_data.decode()
+        data = json.loads(json_data)
+        if isinstance(data.get("id"), str):
+            data["id"] = get_type_hints(cls)["id"].from_string(data["id"])
+        return cls.model_validate(data)

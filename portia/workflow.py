@@ -26,7 +26,7 @@ from portia.agents.base_agent import Output
 from portia.clarification import (
     ClarificationListType,
 )
-from portia.common import PortiaEnum, PrefixedUUID
+from portia.common import BaseUUIDModel, PortiaEnum, PrefixedUUID
 from portia.execution_context import ExecutionContext, empty_context
 from portia.plan import PlanUUID
 
@@ -94,7 +94,7 @@ class WorkflowOutputs(BaseModel):
     )
 
 
-class Workflow(BaseModel):
+class Workflow(BaseUUIDModel):
     """A workflow represents a running instance of a Plan.
 
     Attributes
@@ -168,8 +168,6 @@ class Workflow(BaseModel):
         if isinstance(json_data, bytes):
             json_data = json_data.decode()
         data = json.loads(json_data)
-        if isinstance(data.get("id"), str):
-            data["id"] = WorkflowUUID.from_string(data["id"])
         if isinstance(data.get("plan_id"), str):
             data["plan_id"] = PlanUUID.from_string(data["plan_id"])
         return cls.model_validate(data)

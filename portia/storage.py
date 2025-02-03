@@ -538,17 +538,17 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
-        print(f"POST: {self.api_endpoint}/api/v0/workflows/, id was {workflow.id.id}")
+        print(f"POST: {self.api_endpoint}/api/v0/workflows/, id was {workflow.id!s}")
         try:
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/workflows/",
                 json={
-                    "id": workflow.id.id,
+                    "id": str(workflow.id),
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
                     "execution_context": workflow.execution_context.model_dump(mode="json"),
                     "outputs": workflow.outputs.model_dump(mode="json"),
-                    "plan_id": workflow.plan_id.id,
+                    "plan_id": str(workflow.plan_id),
                 },
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
@@ -566,7 +566,7 @@ class PortiaCloudStorage(Storage):
                         "state": workflow.state,
                         "execution_context": workflow.execution_context.model_dump(mode="json"),
                         "outputs": workflow.outputs.model_dump(mode="json"),
-                        "plan_id": workflow.plan_id.id,
+                        "plan_id": str(workflow.plan_id),
                     },
                     headers={
                         "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
