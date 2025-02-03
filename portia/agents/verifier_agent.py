@@ -99,6 +99,11 @@ class VerifiedToolArgument(BaseModel):
         "User provided values can be in the context, in the goal or the result of previous steps.",
     )
 
+    missing: bool = Field(
+        default=False,
+        description="Whether the value is missing or not.",
+    )
+
 
 class VerifiedToolInputs(BaseModel):
     """Represents the inputs for a tool after being verified by an agent.
@@ -334,7 +339,7 @@ class VerifierModel:
             tool_inputs (VerifiedToolInputs): The tool_inputs to validate against the tool schema.
 
         Returns:
-            Updated VerifiedToolInputs with invalid/missing args marked with made_up=True if found.
+            Updated VerifiedToolInputs with invalid/missing args marked with missing=True if found.
 
         """
         arg_dict = {arg.name: arg.value for arg in tool_inputs.args}
@@ -343,7 +348,7 @@ class VerifierModel:
             if self.agent.tool:
                 self.agent.tool.args_schema.model_validate(arg_dict)
         except ValidationError as e:
-            # Extract the arg names from the pydantic error to mark them as made_up = True.
+            # Extract the arg names from the pydantic error to mark them as missing = True.
             # At this point we know the arguments are invalid, so we can trigger a clarification
             # request.
             invalid_arg_names = {
@@ -352,7 +357,7 @@ class VerifierModel:
                 if error.get("loc") and len(error["loc"]) > 0
             }
             [
-                setattr(arg, "made_up", True)
+                setattr(arg, "missing", True)
                 for arg in tool_inputs.args
                 if arg.name in invalid_arg_names
             ]
@@ -490,7 +495,7 @@ class VerifierAgent(BaseAgent):
         arguments = VerifiedToolInputs.model_validate_json(str(last_message.content))
 
         for arg in arguments.args:
-            if not arg.made_up:
+            if not arg.made_up and not arg.missing:
                 continue
             matching_clarification = self.get_last_resolved_clarification(arg.name)
 

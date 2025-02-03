@@ -320,9 +320,9 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
 
     verified_tool_inputs = VerifiedToolInputs(
         args=[
-            VerifiedToolArgument(name="required_field1", value=None, made_up=False),
-            VerifiedToolArgument(name="required_field2", value=None, made_up=False),
-            VerifiedToolArgument(name="optional_field", value=None, made_up=False),
+            VerifiedToolArgument(name="required_field1", value=None, made_up=False, missing=True),
+            VerifiedToolArgument(name="required_field2", value=None, made_up=False, missing=True),
+            VerifiedToolArgument(name="optional_field", value=None, made_up=False, missing=False),
         ],
     )
     mockinvoker = MockInvoker(response=verified_tool_inputs)
@@ -352,16 +352,16 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
     required_field1 = next(arg for arg in result_inputs.args if arg.name == "required_field1")
     required_field2 = next(arg for arg in result_inputs.args if arg.name == "required_field2")
     assert (
-        required_field1.made_up
-    ), "required_field1 should be marked as made_up when validation fails"
+        required_field1.missing
+    ), "required_field1 should be marked as missing when validation fails"
     assert (
-        required_field2.made_up
-    ), "required_field2 should be marked as made_up when validation fails"
+        required_field2.missing
+    ), "required_field2 should be marked as missing when validation fails"
 
     optional_field = next(arg for arg in result_inputs.args if arg.name == "optional_field")
     assert (
-        not optional_field.made_up
-    ), "optional_field should not be marked as made_up when validation fails"
+        not optional_field.missing
+    ), "optional_field should not be marked as missing when validation fails"
 
 
 def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -> None:
