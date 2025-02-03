@@ -2,38 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    import pytest
-
+import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from portia.agents.base_agent import Output
 from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
-from portia.agents.toolless_agent import ToolLessModel
+from portia.errors import InvalidAgentError
 from tests.utils import AdditionTool, get_test_config, get_test_workflow
-
-
-def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test running an agent without a tool."""
-
-    def toolless_model(self, state) -> dict[str, Any]:  # noqa: ANN001, ARG001
-        response = AIMessage(
-            content="This is a sentence that should never be hallucinated by the LLM.",
-        )
-        return {"messages": [response]}
-
-    monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
-
-    (plan, workflow) = get_test_workflow()
-    agent = OneShotAgent(step=plan.steps[0], workflow=workflow, config=get_test_config())
-
-    output = agent.execute_sync()
-    assert isinstance(output, Output)
-    assert isinstance(output.value, str)
-    assert output.value == "This is a sentence that should never be hallucinated by the LLM."
 
 
 def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -83,3 +61,15 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     output = agent.execute_sync()
     assert isinstance(output, Output)
     assert output.value == "Sent email with id: 0"
+
+
+def test_oneshot_agent_without_tool_raises() -> None:
+    """Test oneshot agent without tool raises."""
+    (plan, workflow) = get_test_workflow()
+    with pytest.raises(InvalidAgentError):
+        OneShotAgent(
+            step=plan.steps[0],
+            workflow=workflow,
+            config=get_test_config(),
+            tool=None,
+        ).execute_sync()

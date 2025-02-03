@@ -143,7 +143,8 @@ class ToolRegistry(ABC):
         """Add a tool registry or Tool list to the current registry."""
         other_registry = (
             other
-            if isinstance(other, ToolRegistry) else InMemoryToolRegistry.from_local_tools(other)
+            if isinstance(other, ToolRegistry)
+            else InMemoryToolRegistry.from_local_tools(other)
         )
         self_tools = self.get_tools()
         other_tools = other_registry.get_tools()
@@ -151,10 +152,12 @@ class ToolRegistry(ABC):
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
                 logger().warning(
-                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.")
+                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.",
+                )
             tool_ids.add(tool.id)
 
         return AggregatedToolRegistry([self, other_registry])
+
 
 class AggregatedToolRegistry(ToolRegistry):
     """An interface over a set of tool registries.
@@ -209,7 +212,10 @@ class AggregatedToolRegistry(ToolRegistry):
         return tools
 
     def match_tools(
-            self, query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
+        self,
+        query: str | None = None,
+        tool_ids: list[str] | None = None,
+    ) -> list[Tool]:
         """Get all tools from all registries that match the query and tool_ids.
 
         Args:

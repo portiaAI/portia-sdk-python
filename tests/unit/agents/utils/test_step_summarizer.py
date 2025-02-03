@@ -114,6 +114,7 @@ def test_summarizer_model_no_messages(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the summarizer model error handling."""
+
     class TestError(Exception):
         """Test error."""
 
