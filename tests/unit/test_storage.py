@@ -132,7 +132,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/plans/",
+            url="https://api.porita.dev/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
@@ -155,7 +155,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.portialabs.ai/api/v0/plans/{plan.id}/",
+            url=f"https://api.porita.dev/api/v0/plans/{plan.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -172,7 +172,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_workflow(workflow)
 
         mock_post.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/workflows/",
+            url="https://api.porita.dev/api/v0/workflows/",
             json={
                 "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
@@ -197,7 +197,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_workflow(workflow.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.portialabs.ai/api/v0/workflows/{workflow.id}/",
+            url=f"https://api.porita.dev/api/v0/workflows/{workflow.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -214,7 +214,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_workflows(WorkflowState.READY_TO_RESUME)
 
         mock_get.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/workflows/?workflow_state=READY_TO_RESUME",
+            url="https://api.porita.dev/api/v0/workflows/?workflow_state=READY_TO_RESUME",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -231,7 +231,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_workflows()
 
         mock_get.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/workflows/",
+            url="https://api.porita.dev/api/v0/workflows/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -248,7 +248,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/tool-calls/",
+            url="https://api.porita.dev/api/v0/tool-calls/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -293,7 +293,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/plans/",
+            url="https://api.porita.dev/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
@@ -316,7 +316,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.portialabs.ai/api/v0/plans/{plan.id}/",
+            url=f"https://api.porita.dev/api/v0/plans/{plan.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -333,7 +333,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_workflow(workflow)
 
         mock_post.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/workflows/",
+            url="https://api.porita.dev/api/v0/workflows/",
             json={
                 "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
@@ -358,7 +358,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_workflow(workflow.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.portialabs.ai/api/v0/workflows/{workflow.id}/",
+            url=f"https://api.porita.dev/api/v0/workflows/{workflow.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -375,7 +375,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_workflows()
 
         mock_get.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/workflows/",
+            url="https://api.porita.dev/api/v0/workflows/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -392,7 +392,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url="https://api.portialabs.ai/api/v0/tool-calls/",
+            url="https://api.porita.dev/api/v0/tool-calls/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
