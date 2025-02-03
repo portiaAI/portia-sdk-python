@@ -224,7 +224,7 @@ class ParserModel:
             errors.append(str(e) + "\n")
 
         if errors:
-            self.previous_errors.append("".join(errors))
+            self.previous_errors.extend(errors)
             self.retries += 1
             if self.retries <= MAX_RETRIES:
                 return self.invoke(state)
@@ -346,14 +346,19 @@ class VerifierModel:
             if self.agent.tool:
                 self.agent.tool.args_schema.model_validate(arg_dict)
         except ValidationError as e:
+            # Extract the arg names from the pydantic error to mark them as made_up = True.
+            # At this point we know the arguments are invalid, so we can trigger a clarification
+            # request.
             invalid_arg_names = {
                 error["loc"][0]
                 for error in e.errors()
                 if error.get("loc") and len(error["loc"]) > 0
             }
-            for arg in tool_inputs.args:
-                if arg.name in invalid_arg_names:
-                    arg.made_up = True
+            [
+                setattr(arg, "made_up", True)
+                for arg in tool_inputs.args
+                if arg.name in invalid_arg_names
+            ]
 
         return tool_inputs
 
