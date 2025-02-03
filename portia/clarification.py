@@ -81,7 +81,6 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     @field_validator("id", mode="before")
     def validate_id(cls, v: str) -> ClarificationUUID:
-        print(f"VALIDATE ID: {v}")
         if isinstance(v, ClarificationUUID):
             return v
         return ClarificationUUID.from_string(v)

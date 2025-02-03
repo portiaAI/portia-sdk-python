@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from portia.common import PrefixedUUID
 
@@ -156,7 +156,7 @@ class Plan(BaseModel):
     It also includes the context in which the plan was created.
 
     Args:
-        id (UUID): A unique ID for the plan.
+        id (PlanUUID): A unique ID for the plan.
         plan_context (PlanContext): The context for when the plan was created.
         steps (list[Step]): The set of steps that make up the plan.
 
@@ -171,19 +171,12 @@ class Plan(BaseModel):
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
 
-    '''
-    @field_serializer("id")
-    def serialize_id(self, plan_id: PlanUUID) -> str:
-        """Serialize the ID to a string.
-
-        Args:
-            plan_id (PlanUUID): The UUID of the plan.
-
-        Returns:
-            str: The serialized string representation of the plan's ID.
-
-        """
-        return plan_id.serialize()
+    @field_validator("id", mode="before")
+    def validate_id(cls, v: str) -> PlanUUID:
+        """Validate the ID field."""
+        if isinstance(v, PlanUUID):
+            return v
+        return PlanUUID.from_string(v)
 
     @classmethod
     def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
@@ -194,7 +187,6 @@ class Plan(BaseModel):
         if isinstance(data.get("id"), str):
             data["id"] = PlanUUID.from_string(data["id"])
         return cls.model_validate(data)
-    '''
 
     def __str__(self) -> str:
         """Return the string representation of the plan.

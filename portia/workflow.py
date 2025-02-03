@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from typing import ClassVar, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
@@ -155,7 +155,13 @@ class Workflow(BaseModel):
             if not clarification.resolved
         ]
 
-    '''
+    @field_validator("id", mode="before")
+    def validate_id(cls, v: str) -> WorkflowUUID:
+        """Validate the ID field."""
+        if isinstance(v, WorkflowUUID):
+            return v
+        return WorkflowUUID.from_string(v)
+
     @classmethod
     def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
         """Validate JSON and deserialize the UUID field."""
@@ -167,7 +173,7 @@ class Workflow(BaseModel):
         if isinstance(data.get("plan_id"), str):
             data["plan_id"] = PlanUUID.from_string(data["plan_id"])
         return cls.model_validate(data)
-    '''
+
 
     def __str__(self) -> str:
         """Return the string representation of the workflow.
