@@ -20,13 +20,12 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
+import json
 from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from portia.common import PrefixedUUID
-
-import json
 
 PLAN_UUID_PREFIX = "plan"
 
