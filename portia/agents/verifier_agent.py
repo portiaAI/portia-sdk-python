@@ -425,6 +425,7 @@ class ToolCallingModel:
                 if matching_clarification and arg.value != matching_clarification.response:
                     arg.value = matching_clarification.response
                     arg.made_up = False
+                    arg.missing = False
 
         model = self.llm.bind_tools(self.tools)
 
