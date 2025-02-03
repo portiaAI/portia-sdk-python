@@ -172,7 +172,7 @@ class Plan(BaseUUIDModel):
     model_config = ConfigDict(extra="forbid")
 
     id: PlanUUID = Field(
-        default_factory=lambda: PlanUUID(),
+        default_factory=PlanUUID,
         description="The ID of the plan.",
     )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")

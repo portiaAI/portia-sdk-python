@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from typing import ClassVar, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
@@ -94,6 +94,12 @@ class WorkflowOutputs(BaseModel):
     )
 
 
+class WorkflowUUID(PrefixedUUID):
+    """A UUID for a workflow."""
+
+    prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX
+
+
 class Workflow(BaseUUIDModel):
     """A workflow represents a running instance of a Plan.
 
@@ -117,7 +123,7 @@ class Workflow(BaseUUIDModel):
     model_config = ConfigDict(extra="forbid")
 
     id: WorkflowUUID = Field(
-        default_factory=lambda: WorkflowUUID(),
+        default_factory=WorkflowUUID,
         description="A unique ID for this workflow.",
     )
     plan_id: PlanUUID = Field(
@@ -155,12 +161,6 @@ class Workflow(BaseUUIDModel):
             if not clarification.resolved
         ]
 
-    @field_validator("id", mode="before")
-    def validate_id(cls, v: str) -> WorkflowUUID:
-        """Validate the ID field."""
-        if isinstance(v, WorkflowUUID):
-            return v
-        return WorkflowUUID.from_string(v)
 
     @classmethod
     def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
@@ -221,8 +221,3 @@ class ReadOnlyWorkflow(Workflow):
             state=workflow.state,
             execution_context=workflow.execution_context,
         )
-
-class WorkflowUUID(PrefixedUUID):
-    """A UUID for a workflow."""
-
-    prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX

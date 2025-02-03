@@ -29,7 +29,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import urlencode
-from uuid import UUID
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -405,7 +404,6 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
 
         """
         try:
-            print(f"{plan_id}.json")
             return self._read(f"{plan_id}.json", Plan)
         except (ValidationError, FileNotFoundError) as e:
             raise PlanNotFoundError(plan_id) from e
@@ -509,7 +507,6 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
-        print(f"POST: {self.api_endpoint}/api/v0/plans/")
         try:
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/plans/",
@@ -543,7 +540,6 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails or the plan does not exist.
 
         """
-        print(f"GET: {self.api_endpoint}/api/v0/plans/{plan_id}/")
         try:
             response = httpx.get(
                 url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
@@ -577,7 +573,6 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
-        print(f"POST: {self.api_endpoint}/api/v0/workflows/, id was {workflow.id!s}")
         try:
             response = httpx.put(
                 url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
@@ -612,7 +607,6 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails or the workflow does not exist.
 
         """
-        print(f"GET: {self.api_endpoint}/api/v0/workflows/{workflow_id}/")
         try:
             response = httpx.get(
                 url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
@@ -627,7 +621,6 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             response_json = response.json()
-            print(f"RESPONSE: {response_json}")
             return Workflow(
                 id=WorkflowUUID.from_string(response_json["id"]),
                 plan_id=PlanUUID.from_string(response_json["plan"]["id"]),
@@ -657,7 +650,6 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
-        print(f"GET: {self.api_endpoint}/api/v0/workflows/")
         try:
             query = {}
             if page:
@@ -706,7 +698,6 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
-        print(f"POST: {self.api_endpoint}/api/v0/tool-calls/")
         try:
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tool-calls/",
@@ -731,26 +722,3 @@ class PortiaCloudStorage(Storage):
             raise StorageError(e) from e
         else:
             self.check_response(response)
-    
-    def _get_workflow_from_response(self, json_workflow: dict) -> Workflow:
-        """Get a workflow from the response.
-
-        Args:
-            json_workflow (dict): The JSON response from the Portia Cloud API.
-
-        Returns:
-            Workflow: The Workflow object retrieved from the response.
-
-        """
-        if "outputs" in json_workflow:
-            outputs = WorkflowOutputs.model_validate(json_workflow["outputs"])
-        else:
-            outputs = None
-        return Workflow(
-            id=WorkflowUUID.from_string(json_workflow["id"]),
-            plan_id=PlanUUID.from_string(json_workflow["plan"]["id"]),
-            current_step_index=json_workflow["current_step_index"],
-            state=WorkflowState(json_workflow["state"]),
-            execution_context=ExecutionContext.model_validate(json_workflow["execution_context"]),
-            outputs=WorkflowOutputs.model_validate(json_workflow["outputs"]),
-        )

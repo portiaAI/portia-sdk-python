@@ -4,15 +4,14 @@ This module defines various types, utilities, and base classes used throughout t
 It includes a custom Enum class, helper functions, and base models with special configurations for
 use in the Portia framework.
 """
+from __future__ import annotations
 
 import json
 from enum import Enum
-from typing import Any, ClassVar, Generic, Self, TypeVar
+from typing import Any, ClassVar, Self, TypeVar, get_type_hints
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
-
-from typing import get_type_hints
 
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
@@ -78,7 +77,7 @@ class PrefixedUUID(BaseModel):
             str: The prefixed UUID string.
 
         """
-        return f"{self.prefix}-{self.uuid}"
+        return str(self.uuid) if self.prefix == "" else f"{self.prefix}-{self.uuid}"
 
 
     @model_serializer
@@ -130,7 +129,7 @@ class BaseUUIDModel(BaseModel):
         return get_type_hints(cls)["id"]()
 
     @field_validator("id", mode="before")
-    def validate_id(cls, v: str) -> PrefixedUUID:
+    def validate_id(cls, v: str) -> PrefixedUUID: # noqa: N805 # This is a class method, but pydantic doesn't call it if annotated with @classmethod.
         """Validate the ID field."""
         if isinstance(v, PrefixedUUID):
             return v

@@ -18,7 +18,7 @@ from portia.plan import ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import ReadOnlyWorkflow, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, WorkflowState, WorkflowUUID
 from tests.utils import AdditionTool, ClarificationTool, get_test_config, get_test_workflow
 
 
@@ -181,7 +181,7 @@ def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
     assert workflow.current_step_index == 1
 
     with pytest.raises(WorkflowNotFoundError):
-        runner.execute_workflow(workflow_id=uuid4())
+        runner.execute_workflow(workflow_id=WorkflowUUID())
 
 
 def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
