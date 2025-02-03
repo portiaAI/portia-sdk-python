@@ -16,6 +16,7 @@ from portia.storage import (
     PlanStorage,
     PortiaCloudStorage,
     ToolCallStorage,
+    WorkflowListResponse,
     WorkflowStorage,
 )
 from portia.workflow import Workflow, WorkflowState
@@ -45,8 +46,12 @@ def test_storage_base_classes() -> None:
         def get_workflow(self, workflow_id: UUID) -> Workflow:
             return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
 
-        def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
-            return super().get_workflows(workflow_state)  # type: ignore  # noqa: PGH003
+        def get_workflows(
+            self,
+            workflow_state: WorkflowState | None = None,
+            page: int | None = None,
+        ) -> WorkflowListResponse:
+            return super().get_workflows(workflow_state, page)  # type: ignore  # noqa: PGH003
 
         def save_tool_call(self, tool_call: ToolCallRecord) -> None:
             return super().save_tool_call(tool_call)  # type: ignore  # noqa: PGH003
@@ -86,8 +91,8 @@ def test_in_memory_storage() -> None:
     assert storage.get_plan(plan.id) == plan
     storage.save_workflow(workflow)
     assert storage.get_workflow(workflow.id) == workflow
-    assert storage.get_workflows() == [workflow]
-    assert storage.get_workflows(WorkflowState.FAILED) == []
+    assert storage.get_workflows().results == [workflow]
+    assert storage.get_workflows(WorkflowState.FAILED).results == []
 
 
 def test_disk_storage(tmp_path: Path) -> None:
@@ -98,8 +103,9 @@ def test_disk_storage(tmp_path: Path) -> None:
     assert storage.get_plan(plan.id) == plan
     storage.save_workflow(workflow)
     assert storage.get_workflow(workflow.id) == workflow
-    assert storage.get_workflows() == [workflow]
-    assert storage.get_workflows(WorkflowState.FAILED) == []
+    all_workflows = storage.get_workflows()
+    assert all_workflows.results == [workflow]
+    assert storage.get_workflows(WorkflowState.FAILED).results == []
 
 
 def test_portia_cloud_storage() -> None:
@@ -132,7 +138,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/plans/",
+            url=f"{config.portia_api_endpoint}/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
@@ -155,7 +161,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.porita.dev/api/v0/plans/{plan.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -164,17 +170,16 @@ def test_portia_cloud_storage() -> None:
         )
 
     with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
+        patch("httpx.put", return_value=mock_response) as mock_put,
         patch("httpx.get", return_value=mock_response) as mock_get,
     ):
         # Test save_workflow failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.save_workflow(workflow)
 
-        mock_post.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/workflows/",
+        mock_put.assert_called_once_with(
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
             json={
-                "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
                 "state": workflow.state,
                 "execution_context": workflow.execution_context.model_dump(mode="json"),
@@ -197,7 +202,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_workflow(workflow.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.porita.dev/api/v0/workflows/{workflow.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -214,7 +219,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_workflows(WorkflowState.READY_TO_RESUME)
 
         mock_get.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/workflows/?workflow_state=READY_TO_RESUME",
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/?workflow_state=READY_TO_RESUME",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -231,7 +236,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_workflows()
 
         mock_get.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/workflows/",
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/?",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -248,7 +253,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/tool-calls/",
+            url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -293,7 +298,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/plans/",
+            url=f"{config.portia_api_endpoint}/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
@@ -316,7 +321,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.porita.dev/api/v0/plans/{plan.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -325,17 +330,16 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
+        patch("httpx.put", side_effect=TimeoutError()) as mock_put,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
     ):
         # Test save_workflow failure
         with pytest.raises(StorageError):
             storage.save_workflow(workflow)
 
-        mock_post.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/workflows/",
+        mock_put.assert_called_once_with(
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
             json={
-                "id": str(workflow.id),
                 "current_step_index": workflow.current_step_index,
                 "state": workflow.state,
                 "execution_context": workflow.execution_context.model_dump(mode="json"),
@@ -358,7 +362,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_workflow(workflow.id)
 
         mock_get.assert_called_once_with(
-            url=f"https://api.porita.dev/api/v0/workflows/{workflow.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -375,7 +379,24 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_workflows()
 
         mock_get.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/workflows/",
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/?",
+            headers={
+                "Authorization": "Api-Key test_api_key",
+                "Content-Type": "application/json",
+            },
+            timeout=10,
+        )
+
+    with (
+        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
+        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+    ):
+        # Test get_workflow failure
+        with pytest.raises(StorageError):
+            storage.get_workflows(workflow_state=WorkflowState.COMPLETE, page=10)
+
+        mock_get.assert_called_once_with(
+            url=f"{config.portia_api_endpoint}/api/v0/workflows/?page=10&workflow_state=COMPLETE",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -392,7 +413,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url="https://api.porita.dev/api/v0/tool-calls/",
+            url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",

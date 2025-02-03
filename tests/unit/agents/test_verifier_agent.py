@@ -14,7 +14,6 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from portia.agents.base_agent import Output
-from portia.agents.toolless_agent import ToolLessModel
 from portia.agents.verifier_agent import (
     MAX_RETRIES,
     ParserModel,
@@ -27,7 +26,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.errors import InvalidWorkflowStateError
+from portia.errors import InvalidAgentError, InvalidWorkflowStateError
 from portia.execution_context import empty_context
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
@@ -75,31 +74,6 @@ class MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
         return self
-
-
-def test_toolless_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test running an agent without a tool."""
-
-    def toolless_model(self, state):  # noqa: ANN001, ANN202, ARG001
-        response = AIMessage(
-            content="This is a sentence that should never be hallucinated by the LLM.",
-        )
-        return {"messages": [response]}
-
-    monkeypatch.setattr(ToolLessModel, "invoke", toolless_model)
-
-    (plan, workflow) = get_test_workflow()
-    agent = VerifierAgent(
-        step=plan.steps[0],
-        workflow=workflow,
-        config=get_test_config(),
-        tool=None,
-    )
-
-    output = agent.execute_sync()
-    assert isinstance(output, Output)
-    assert isinstance(output.value, str)
-    assert output.value == "This is a sentence that should never be hallucinated by the LLM."
 
 
 class _TestToolSchema(BaseModel):
@@ -193,6 +167,104 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     assert invoke_count == MAX_RETRIES + 1
 
 
+def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the parser model handling of invalid arguments and retries."""
+    # First response contains one valid and one invalid argument
+    invalid_tool_inputs = ToolInputs(
+        args=[
+            ToolArgument(
+                name="content",
+                value="VALID_CONTENT",
+                valid=True,
+                explanation="Valid content string",
+            ),
+            ToolArgument(
+                name="number",
+                value=42,
+                valid=False,
+                explanation="The number should be more than 42",
+            ),
+        ],
+    )
+
+    # Second response contains all valid arguments
+    valid_tool_inputs = ToolInputs(
+        args=[
+            ToolArgument(
+                name="content",
+                value="VALID_CONTENT",
+                valid=True,
+                explanation="Valid content string",
+            ),
+            ToolArgument(
+                name="number",
+                value=43,
+                valid=True,
+                explanation="Valid number value",
+            ),
+        ],
+    )
+
+    responses = [invalid_tool_inputs, valid_tool_inputs]
+    current_response_index = 0
+
+    class MockInvoker:
+        def invoke(self, *_, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG002
+            nonlocal current_response_index
+            response = responses[current_response_index]
+            current_response_index += 1
+            return response
+
+        def with_structured_output(self, _):  # noqa: ANN001, ANN202
+            return self
+
+    monkeypatch.setattr(ChatOpenAI, "invoke", MockInvoker().invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", MockInvoker().with_structured_output)
+
+    class TestSchema(BaseModel):
+        content: str
+        number: int
+
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=TestSchema.model_json_schema,
+        args_schema=TestSchema,
+        description="TOOL_DESCRIPTION",
+    )
+
+    parser_model = ParserModel(
+        llm=LLMWrapper(get_test_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+
+    # First call should store the error and retry
+    result = parser_model.invoke({"messages": []})
+
+    # Verify that the error was stored
+    assert len(parser_model.previous_errors) == 1
+    assert (
+        parser_model.previous_errors[0]
+        == "Error in argument number: The number should be more than 42\n"
+    )
+
+    # Verify that we got the valid response after retry
+    result_inputs = ToolInputs.model_validate_json(result["messages"][0])
+    assert len(result_inputs.args) == 2
+
+    # Check both arguments in final result
+    content_arg = next(arg for arg in result_inputs.args if arg.name == "content")
+    number_arg = next(arg for arg in result_inputs.args if arg.name == "number")
+
+    assert content_arg.valid
+    assert content_arg.value == "VALID_CONTENT"
+    assert number_arg.valid
+    assert number_arg.value == 43
+
+
 def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the verifier model."""
     tool_inputs = ToolInputs(
@@ -217,7 +289,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
         name="TOOL_NAME",
-        args_json_schema=_TestToolSchema,
+        args_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
     verifier_model = VerifierModel(
@@ -236,6 +308,60 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert mockinvoker.output_format == VerifiedToolInputs
+
+
+def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the verifier model schema validation."""
+
+    class TestSchema(BaseModel):
+        required_field1: str
+        required_field2: int
+        optional_field: str | None = None
+
+    verified_tool_inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="required_field1", value=None, made_up=False, missing=True),
+            VerifiedToolArgument(name="required_field2", value=None, made_up=False, missing=True),
+            VerifiedToolArgument(name="optional_field", value=None, made_up=False, missing=False),
+        ],
+    )
+    mockinvoker = MockInvoker(response=verified_tool_inputs)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mockinvoker.with_structured_output)
+
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_schema=TestSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    verifier_model = VerifierModel(
+        llm=LLMWrapper(get_test_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+
+    result = verifier_model.invoke(
+        {"messages": [AIMessage(content=verified_tool_inputs.model_dump_json(indent=2))]},
+    )
+
+    result_inputs = VerifiedToolInputs.model_validate_json(result["messages"][0])
+
+    required_field1 = next(arg for arg in result_inputs.args if arg.name == "required_field1")
+    required_field2 = next(arg for arg in result_inputs.args if arg.name == "required_field2")
+    assert (
+        required_field1.missing
+    ), "required_field1 should be marked as missing when validation fails"
+    assert (
+        required_field2.missing
+    ), "required_field2 should be marked as missing when validation fails"
+
+    optional_field = next(arg for arg in result_inputs.args if arg.name == "optional_field")
+    assert (
+        not optional_field.missing
+    ), "optional_field should not be marked as missing when validation fails"
 
 
 def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -607,3 +733,15 @@ def test_clarifications_or_continue() -> None:
     assert output == "tool_agent"
     assert isinstance(agent.new_clarifications, list)
     assert len(agent.new_clarifications) == 0
+
+
+def test_verifier_agent_without_tool_raises() -> None:
+    """Test verifier agent without tool raises."""
+    (plan, workflow) = get_test_workflow()
+    with pytest.raises(InvalidAgentError):
+        VerifierAgent(
+            step=plan.steps[0],
+            workflow=workflow,
+            config=get_test_config(),
+            tool=None,
+        ).execute_sync()

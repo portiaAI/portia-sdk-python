@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 
 from portia.agents.base_agent import Output
-from portia.config import AgentType, StorageClass
+from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import ReadOnlyPlan, Step
@@ -44,6 +44,7 @@ def test_runner_run_query(runner: Runner) -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
 
+
 def test_runner_run_query_tool_list() -> None:
     """Test running a query using the Runner."""
     query = "example query"
@@ -58,6 +59,7 @@ def test_runner_run_query_tool_list() -> None:
     workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
+
 
 def test_runner_run_query_disk_storage() -> None:
     """Test running a query using the Runner."""
@@ -133,33 +135,6 @@ def test_runner_create_and_execute_workflow(runner: Runner) -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.plan_id == plan.id
-
-
-def test_runner_toolless_agent() -> None:
-    """Test running a plan using the Runner."""
-    query = "example query"
-
-    mock_response = StepsOrError(
-        steps=[
-            Step(
-                task="Find and summarize the latest news on artificial intelligence",
-                tool_id="add_tool",
-                output="$ai_search_results",
-            ),
-        ],
-        error=None,
-    )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
-
-    config = get_test_config(
-        default_agent_type=AgentType.TOOL_LESS,
-    )
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
-    runner = Runner(config=config, tools=tool_registry)
-
-    plan = runner.generate_plan(query)
-    workflow = runner.create_workflow(plan)
-    workflow = runner.execute_workflow(workflow)
 
 
 def test_runner_execute_workflow(runner: Runner) -> None:

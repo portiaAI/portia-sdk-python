@@ -1,4 +1,5 @@
 """tests for the ToolRegistry classes."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -139,6 +140,7 @@ def test_aggregated_tool_registry_duplicate_tool() -> None:
     tool1 = aggregated_tool_registry.get_tool(MOCK_TOOL_ID)
     assert tool1.id == MOCK_TOOL_ID
 
+
 def test_aggregated_tool_registry_get_tool() -> None:
     """Test searching across multiple registries in AggregatedToolRegistry."""
     local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
@@ -216,7 +218,7 @@ def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
     assert {tool.id for tool in combined.get_tools()} == {MOCK_TOOL_ID, "tool3"}
 
     # Test list + registry (radd)
-    combined = tool_list + registry1 # type: ignore reportOperatorIssue
+    combined = tool_list + registry1  # type: ignore reportOperatorIssue
     assert isinstance(combined, AggregatedToolRegistry)
     assert len(combined.get_tools()) == 2
     assert {tool.id for tool in combined.get_tools()} == {MOCK_TOOL_ID, "tool3"}
@@ -225,4 +227,5 @@ def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
     duplicate_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
     combined = registry1 + duplicate_registry
     mock_logger.warning.assert_called_once_with(
-        f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur.")
+        f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur.",
+    )

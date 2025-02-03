@@ -175,6 +175,14 @@ class InvalidWorkflowStateError(PortiaBaseError):
     """Raised when a workflow is in an invalid state."""
 
 
+class InvalidAgentError(PortiaBaseError):
+    """Raised when an agent is in an invalid state."""
+
+    def __init__(self, state: str) -> None:
+        """Set custom error message."""
+        super().__init__(f"Agent returned invalid state: {state}")
+
+
 class InvalidAgentOutputError(PortiaBaseError):
     """Raised when the agent produces invalid output.
 

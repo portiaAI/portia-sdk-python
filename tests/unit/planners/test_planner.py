@@ -161,4 +161,3 @@ def test_render_prompt() -> None:
     assert "test query" in request_content
     assert "add_tool" in request_content
     assert "extension" in system_context_content
-

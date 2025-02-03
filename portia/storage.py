@@ -28,6 +28,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
+from urllib.parse import urlencode
 from uuid import UUID
 
 import httpx
@@ -95,6 +96,15 @@ class PlanStorage(ABC):
         raise NotImplementedError("get_plan is not implemented")
 
 
+class WorkflowListResponse(BaseModel):
+    """Response for the get_workflows operation. Can support pagination."""
+
+    results: list[Workflow]
+    count: int
+    total_pages: int
+    current_page: int
+
+
 class WorkflowStorage(ABC):
     """Abstract base class for storing and retrieving workflows.
 
@@ -105,7 +115,8 @@ class WorkflowStorage(ABC):
             Save a workflow.
         get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
             Get a workflow by ID.
-        get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+        get_workflows(self, workflow_state: WorkflowState | None = None, page=int | None = None)
+            -> WorkflowListResponse:
             Return workflows that match the given workflow_state
 
     """
@@ -140,11 +151,16 @@ class WorkflowStorage(ABC):
         raise NotImplementedError("get_workflow is not implemented")
 
     @abstractmethod
-    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+    def get_workflows(
+        self,
+        workflow_state: WorkflowState | None = None,
+        page: int | None = None,
+    ) -> WorkflowListResponse:
         """List workflows by their state.
 
         Args:
             workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            page (int | None): Optional pagination data
 
         Returns:
             list[Workflow]: A list of Workflow objects that match the given state.
@@ -281,21 +297,34 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
             return self.workflows[workflow_id]
         raise WorkflowNotFoundError(workflow_id)
 
-    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+    def get_workflows(
+        self,
+        workflow_state: WorkflowState | None = None,
+        page: int | None = None,  # noqa: ARG002
+    ) -> WorkflowListResponse:
         """Get workflow from dict.
 
         Args:
             workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            page (int | None): Optional pagination data which is not used for in memory storage.
 
         Returns:
             list[Workflow]: A list of Workflow objects that match the given state.
 
         """
         if not workflow_state:
-            return list(self.workflows.values())
-        return [
-            workflow for workflow in self.workflows.values() if workflow.state == workflow_state
-        ]
+            results = list(self.workflows.values())
+        else:
+            results = [
+                workflow for workflow in self.workflows.values() if workflow.state == workflow_state
+            ]
+
+        return WorkflowListResponse(
+            results=results,
+            count=len(results),
+            current_page=1,
+            total_pages=1,
+        )
 
 
 class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
@@ -408,11 +437,16 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         except (ValidationError, FileNotFoundError) as e:
             raise WorkflowNotFoundError(workflow_id) from e
 
-    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
+    def get_workflows(
+        self,
+        workflow_state: WorkflowState | None = None,
+        page: int | None = None,  # noqa: ARG002
+    ) -> WorkflowListResponse:
         """Find all workflows in storage that match state.
 
         Args:
             workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            page (int | None): Optional pagination data which is not used for in memory storage.
 
         Returns:
             list[Workflow]: A list of Workflow objects that match the given state.
@@ -429,7 +463,12 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
                 if not workflow_state or workflow.state == workflow_state:
                     workflows.append(workflow)
 
-        return workflows
+        return WorkflowListResponse(
+            results=workflows,
+            count=len(workflows),
+            current_page=1,
+            total_pages=1,
+        )
 
 
 class PortiaCloudStorage(Storage):
@@ -540,10 +579,9 @@ class PortiaCloudStorage(Storage):
         """
         print(f"POST: {self.api_endpoint}/api/v0/workflows/, id was {workflow.id!s}")
         try:
-            response = httpx.post(
-                url=f"{self.api_endpoint}/api/v0/workflows/",
+            response = httpx.put(
+                url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
                 json={
-                    "id": str(workflow.id),
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
                     "execution_context": workflow.execution_context.model_dump(mode="json"),
@@ -556,24 +594,6 @@ class PortiaCloudStorage(Storage):
                 },
                 timeout=10,
             )
-            # If the workflow exists, update it instead
-            if "workflow with this id already exists." in str(response.content):
-                print(f"PATCH: {self.api_endpoint}/api/v0/workflows/{workflow.id}/")
-                response = httpx.patch(
-                    url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
-                    json={
-                        "current_step_index": workflow.current_step_index,
-                        "state": workflow.state,
-                        "execution_context": workflow.execution_context.model_dump(mode="json"),
-                        "outputs": workflow.outputs.model_dump(mode="json"),
-                        "plan_id": str(workflow.plan_id),
-                    },
-                    headers={
-                        "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=10,
-                )
         except Exception as e:
             raise StorageError(e) from e
         else:
@@ -619,11 +639,16 @@ class PortiaCloudStorage(Storage):
                 outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
             )
 
-    def get_workflows(self, workflow_state: WorkflowState | None = None) -> list[Workflow]:
-        """Retrieve workflows from Portia Cloud.
+    def get_workflows(
+        self,
+        workflow_state: WorkflowState | None = None,
+        page: int | None = None,
+    ) -> WorkflowListResponse:
+        """Find all workflows in storage that match state.
 
         Args:
             workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            page (int | None): Optional pagination data which is not used for in memory storage.
 
         Returns:
             list[Workflow]: A list of Workflow objects retrieved from Portia Cloud.
@@ -634,11 +659,13 @@ class PortiaCloudStorage(Storage):
         """
         print(f"GET: {self.api_endpoint}/api/v0/workflows/")
         try:
-            query = ""
+            query = {}
+            if page:
+                query["page"] = page
             if workflow_state:
-                query = f"?workflow_state={workflow_state.value}"
+                query["workflow_state"] = workflow_state.value
             response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/workflows/{query}",
+                url=f"{self.api_endpoint}/api/v0/workflows/?{urlencode(query)}",
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
@@ -650,19 +677,24 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             response_json = response.json()
-            return [
-                Workflow(
-                    id=WorkflowUUID.from_string(workflow["id"]),
-                    plan_id=PlanUUID.from_string(workflow["plan"]["id"]),
-                    current_step_index=workflow["current_step_index"],
-                    state=WorkflowState(workflow["state"]),
-                    execution_context=ExecutionContext.model_validate(
-                        workflow["execution_context"],
-                    ),
-                    outputs=WorkflowOutputs.model_validate(workflow["outputs"]),
-                )
-                for workflow in response_json
-            ]
+            return WorkflowListResponse(
+                results=[
+                    Workflow(
+                        id=WorkflowUUID.from_string(workflow["id"]),
+                        plan_id=PlanUUID.from_string(workflow["plan"]["id"]),
+                        current_step_index=workflow["current_step_index"],
+                        state=WorkflowState(workflow["state"]),
+                        execution_context=ExecutionContext.model_validate(
+                            workflow["execution_context"],
+                        ),
+                        outputs=WorkflowOutputs.model_validate(workflow["outputs"]),
+                    )
+                    for workflow in response_json["results"]
+                ],
+                count=response_json["count"],
+                current_page=response_json["current_page"],
+                total_pages=response_json["total_pages"],
+            )
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save a tool call to Portia Cloud.

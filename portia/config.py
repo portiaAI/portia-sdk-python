@@ -162,7 +162,6 @@ class AgentType(Enum):
 
     """
 
-    TOOL_LESS = "TOOL_LESS"
     ONE_SHOT = "ONE_SHOT"
     VERIFIER = "VERIFIER"
 
