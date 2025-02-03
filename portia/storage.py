@@ -39,11 +39,11 @@ from portia.logger import logger
 from portia.plan import Plan, PlanContext, Step, PlanUUID
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import (
+    WORKFLOW_UUID_PREFIX,
     Workflow,
     WorkflowOutputs,
     WorkflowState,
     WorkflowUUID,
-    WORKFLOW_UUID_PREFIX,
 )
 
 if TYPE_CHECKING:
