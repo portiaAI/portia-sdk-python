@@ -389,14 +389,13 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         if isinstance(output.value, list) and output.value and "category" in output.value[0]:
             clarification = output.value[0]
             match clarification["category"]:
-                # TODO(Emma): Tidy up this shit.
                 case ClarificationCategory.ACTION:
                     return Output(
                         value=ActionClarification(
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
-                        )
+                        ),
                     )
                 case ClarificationCategory.INPUT:
                     return Output(

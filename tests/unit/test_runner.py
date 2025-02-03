@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
