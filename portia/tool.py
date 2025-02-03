@@ -377,10 +377,13 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolHardError: If a hard error is encountered in the response.
 
         """
+        print(f"RESPONSE: {response}")
         output = Output.model_validate(response["output"])
+        print(f"OUTPUT: {output}")
 
         # Handle Tool Errors
         if isinstance(output.value, str):
+            print("got here for some reason")
             if "ToolSoftError" in output.value:
                 raise ToolSoftError(output.value)
             if "ToolHardError" in output.value:
@@ -388,16 +391,22 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         # Handle Clarifications
         if isinstance(output.value, list) and output.value and "category" in output.value[0]:
             clarification = output.value[0]
+            print(f"CLARIFICATION: {clarification}")
             match clarification["category"]:
+                # TODO(Emma): Tidy up this shit.
                 case ClarificationCategory.ACTION:
+                    print("go to action clarification")
+                    id = ClarificationUUID.from_string(clarification["id"])
+                    action_clarification = ActionClarification(
+                        id=id,
+                        action_url=HttpUrl(clarification["action_url"]),
+                        user_guidance=clarification["user_guidance"],
+                    )
                     return Output(
-                        value=ActionClarification(
-                            id=ClarificationUUID.from_string(clarification["id"]),
-                            action_url=HttpUrl(clarification["action_url"]),
-                            user_guidance=clarification["user_guidance"],
-                        ),
+                        value=action_clarification,
                     )
                 case ClarificationCategory.INPUT:
+                    print("go to input clarification")
                     return Output(
                         value=InputClarification(
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -406,6 +415,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.MULTIPLE_CHOICE:
+                    print("go to multiple choice clarification")
                     return Output(
                         value=MultipleChoiceClarification(
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -415,6 +425,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.VALUE_CONFIRMATION:
+                    print("go to value confirmation clarification")
                     return Output(
                         value=ValueConfirmationClarification(
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -468,7 +479,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
                 },
-                timeout=60,
+                timeout=1000,
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -479,7 +490,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             raise ToolHardError(e) from e
         else:
             try:
+                print("ABOUT TO PARSE OUTPUT")
                 output = self.parse_response(response.json())
+                print(f"PARSED_OUTPUT: {output}")
             except (ValidationError, KeyError) as e:
                 logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e

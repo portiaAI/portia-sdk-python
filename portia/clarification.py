@@ -15,6 +15,7 @@ from pydantic import (
     Field,
     HttpUrl,
     field_serializer,
+    field_validator,
     model_validator,
 )
 
@@ -77,6 +78,13 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         default=False,
         description="Whether this clarification has been resolved.",
     )
+
+    @field_validator("id", mode="before")
+    def validate_id(cls, v: str) -> ClarificationUUID:
+        print(f"VALIDATE ID: {v}")
+        if isinstance(v, ClarificationUUID):
+            return v
+        return ClarificationUUID.from_string(v)
 
 
 class ArgumentClarification(Clarification[SERIALIZABLE_TYPE_VAR]):

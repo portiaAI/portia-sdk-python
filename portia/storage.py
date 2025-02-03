@@ -470,6 +470,7 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
+        print(f"POST: {self.api_endpoint}/api/v0/plans/")
         try:
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/plans/",
@@ -503,6 +504,7 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails or the plan does not exist.
 
         """
+        print(f"GET: {self.api_endpoint}/api/v0/plans/{plan_id}/")
         try:
             response = httpx.get(
                 url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
@@ -536,6 +538,7 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
+        print(f"POST: {self.api_endpoint}/api/v0/workflows/, id was {workflow.id.id}")
         try:
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/workflows/",
@@ -555,6 +558,7 @@ class PortiaCloudStorage(Storage):
             )
             # If the workflow exists, update it instead
             if "workflow with this id already exists." in str(response.content):
+                print(f"PATCH: {self.api_endpoint}/api/v0/workflows/{workflow.id}/")
                 response = httpx.patch(
                     url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
                     json={
@@ -588,6 +592,7 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails or the workflow does not exist.
 
         """
+        print(f"GET: {self.api_endpoint}/api/v0/workflows/{workflow_id}/")
         try:
             response = httpx.get(
                 url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
@@ -602,6 +607,7 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             response_json = response.json()
+            print(f"RESPONSE: {response_json}")
             return Workflow(
                 id=WorkflowUUID.from_string(response_json["id"]),
                 plan_id=PlanUUID.from_string(response_json["plan"]["id"]),
@@ -626,6 +632,7 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
+        print(f"GET: {self.api_endpoint}/api/v0/workflows/")
         try:
             query = ""
             if workflow_state:
@@ -667,11 +674,12 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
+        print(f"POST: {self.api_endpoint}/api/v0/tool-calls/")
         try:
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tool-calls/",
                 json={
-                    "workflow": tool_call.workflow_id.id,
+                    "workflow_id": str(tool_call.workflow_id),
                     "tool_name": tool_call.tool_name,
                     "step": tool_call.step,
                     "end_user_id": tool_call.end_user_id or "",
@@ -691,3 +699,26 @@ class PortiaCloudStorage(Storage):
             raise StorageError(e) from e
         else:
             self.check_response(response)
+    
+    def _get_workflow_from_response(self, json_workflow: dict) -> Workflow:
+        """Get a workflow from the response.
+
+        Args:
+            json_workflow (dict): The JSON response from the Portia Cloud API.
+
+        Returns:
+            Workflow: The Workflow object retrieved from the response.
+
+        """
+        if "outputs" in json_workflow:
+            outputs = WorkflowOutputs.model_validate(json_workflow["outputs"])
+        else:
+            outputs = None
+        return Workflow(
+            id=WorkflowUUID.from_string(json_workflow["id"]),
+            plan_id=PlanUUID.from_string(json_workflow["plan"]["id"]),
+            current_step_index=json_workflow["current_step_index"],
+            state=WorkflowState(json_workflow["state"]),
+            execution_context=ExecutionContext.model_validate(json_workflow["execution_context"]),
+            outputs=WorkflowOutputs.model_validate(json_workflow["outputs"]),
+        )

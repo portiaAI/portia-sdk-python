@@ -81,6 +81,8 @@ class PrefixedUUID(BaseModel):
             str: The prefixed UUID string.
 
         """
+        if self.prefix == "":
+            return str(self.uuid)
         return f"{self.prefix}-{self.uuid}"
 
     def __str__(self) -> str:
@@ -91,6 +93,17 @@ class PrefixedUUID(BaseModel):
 
         """
         return self.id
+
+    # TODO(Emma): Need to use this for the cloud storage but won't work for the disk storage.
+    @model_serializer
+    def serialize_model(self) -> str:
+        """Serialize the PrefixedUUID to a string using the id property.
+
+        Returns:
+            str: The prefixed UUID string.
+        """
+        return self.id
+
 
     @classmethod
     def from_string(cls, prefixed_uuid: str) -> Self:
