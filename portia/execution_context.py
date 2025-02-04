@@ -47,6 +47,7 @@ class ExecutionContext(BaseModel):
         additional_data (dict[str, str]): Arbitrary additional data useful for debugging.
         planner_system_context_extension (Optional[list[str]]): Additional context for planner LLMs.
         agent_system_context_extension (Optional[list[str]]): Additional context for agent LLMs.
+        workflow_run_context (Optional[str]): Additional context for the workflow run.
 
     """
 
