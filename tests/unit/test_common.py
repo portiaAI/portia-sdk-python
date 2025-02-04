@@ -100,6 +100,10 @@ class TestPrefixedUUID:
         assert isinstance(model.id.uuid, UUID)
         assert model.id.prefix == "test"
 
+        json_data = f'{{"id": "monkey-{uuid_str}"}}'
+        with pytest.raises(ValueError, match="Prefix monkey does not match expected prefix test"):
+            TestModel.model_validate_json(json_data)
+
         class TestModelNoPrefix(BaseModel):
             id: PrefixedUUID
 
