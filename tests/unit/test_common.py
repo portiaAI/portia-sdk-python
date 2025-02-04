@@ -3,9 +3,9 @@
 import json
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from portia.common import BaseUUIDModel, PortiaEnum, PrefixedUUID, combine_args_kwargs
+from portia.common import PortiaEnum, PrefixedUUID, combine_args_kwargs
 
 
 def test_portia_enum() -> None:
@@ -66,36 +66,12 @@ class TestPrefixedUUID:
         uuid = PrefixedUUID()
         assert str(uuid) == uuid.model_dump_json().strip('"')
 
-
-class TestBaseUUIDModel:
-    """Tests for BaseUUIDModel."""
-
-    def test_default_id(self) -> None:
-        """Test default ID generation."""
-        class TestModel(BaseUUIDModel):
-            pass
-
-        model = TestModel()
-        assert isinstance(model.id, PrefixedUUID)
-
-    def test_custom_id_type(self) -> None:
-        """Test custom ID type."""
-        class CustomID(PrefixedUUID):
-            prefix = "test"
-
-        class TestModel(BaseUUIDModel):
-            id: CustomID = Field(default_factory=CustomID)
-
-        model = TestModel()
-        assert isinstance(model.id, CustomID)
-        assert str(model.id).startswith("test-")
-
-    def test_model_validate_json(self) -> None:
+    def test_model_validation(self) -> None:
         """Test JSON validation and deserialization."""
         class CustomID(PrefixedUUID):
             prefix = "test"
 
-        class TestModel(BaseUUIDModel):
+        class TestModel(BaseModel):
             id: CustomID = Field(default_factory=CustomID)
 
         uuid_str = "123e4567-e89b-12d3-a456-426614174000"
@@ -111,7 +87,6 @@ class TestBaseUUIDModel:
         # Test with full representation of ID
         json_data = json.dumps({
             "id": {
-                "prefix": "test",
                 "uuid": uuid_str,
             },
         })
@@ -120,3 +95,4 @@ class TestBaseUUIDModel:
         assert str(model.id.uuid) == uuid_str
         assert isinstance(model.id.uuid, UUID)
         assert model.id.prefix == "test"
+

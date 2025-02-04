@@ -20,11 +20,11 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, ClassVar
+from typing import Any, ClassVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from portia.common import PrefixedUUID, uuid_serializer
+from portia.common import PrefixedUUID
 
 PLAN_UUID_PREFIX = "plan"
 
@@ -155,7 +155,6 @@ class PlanUUID(PrefixedUUID):
 
     prefix: ClassVar[str] = PLAN_UUID_PREFIX
 
-plan_uuid_type = Annotated[PlanUUID, BeforeValidator(lambda v: uuid_serializer(PlanUUID, v))]
 
 class Plan(BaseModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
@@ -172,7 +171,7 @@ class Plan(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: plan_uuid_type = Field(
+    id: PlanUUID = Field(
         default_factory=PlanUUID,
         description="The ID of the plan.",
     )

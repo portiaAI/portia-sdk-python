@@ -17,17 +17,17 @@ Key Components
 
 from __future__ import annotations
 
-from typing import Annotated, ClassVar
+from typing import ClassVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
     ClarificationListType,
 )
-from portia.common import PortiaEnum, PrefixedUUID, uuid_serializer
+from portia.common import PortiaEnum, PrefixedUUID
 from portia.execution_context import ExecutionContext, empty_context
-from portia.plan import plan_uuid_type
+from portia.plan import PlanUUID
 
 WORKFLOW_UUID_PREFIX = "wkfl"
 
@@ -97,10 +97,6 @@ class WorkflowUUID(PrefixedUUID):
 
     prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX
 
-
-workflow_uuid_type = Annotated[WorkflowUUID,
-                               BeforeValidator(lambda v: uuid_serializer(WorkflowUUID, v))]
-
 class Workflow(BaseModel):
     """A workflow represents a running instance of a Plan.
 
@@ -123,11 +119,11 @@ class Workflow(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: workflow_uuid_type = Field(
+    id: WorkflowUUID = Field(
         default_factory=WorkflowUUID,
         description="A unique ID for this workflow.",
     )
-    plan_id: plan_uuid_type = Field(
+    plan_id: PlanUUID = Field(
         description="The ID of the Plan this Workflow uses.",
     )
     current_step_index: int = Field(

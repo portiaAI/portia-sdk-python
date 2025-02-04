@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, ClassVar, Self, TypeVar
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_serializer
+from pydantic import BaseModel, Field, model_serializer, model_validator
 
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
@@ -111,11 +111,21 @@ class PrefixedUUID(BaseModel):
             raise ValueError(f"Prefix {prefix} does not match expected prefix {cls.prefix}")
         return cls(uuid=UUID(uuid_str))
 
-
-def uuid_serializer(class_type: type[PrefixedUUID], v: str) -> PrefixedUUID:
-    """Validate the ID field."""
-    if isinstance(v, class_type):
-        return v
-    if isinstance(v, dict):
-        return class_type.model_validate(v)
-    return class_type.from_string(v)
+    @model_validator(mode="before")
+    @classmethod
+    def validate_model(cls, v: str | dict | PrefixedUUID) -> dict:
+        """Validate the ID field."""
+        if isinstance(v, dict):
+            return v
+        if not isinstance(v, str):
+            raise ValueError(f"Invalid type {type(v)} for PrefixedUUID")
+        if cls.prefix == "":
+            return {
+                "uuid": UUID(v),
+            }
+        prefix, uuid_str = v.split("-", maxsplit=1)
+        if prefix != cls.prefix:
+            raise ValueError(f"Prefix {prefix} does not match expected prefix {cls.prefix}")
+        return {
+            "uuid": UUID(uuid_str),
+        }
