@@ -1,7 +1,6 @@
 """Tests for the Storage classes."""
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
@@ -10,7 +9,9 @@ from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
     PlanNotFoundError,
+    PlanUUID,
     WorkflowNotFoundError,
+    WorkflowUUID,
 )
 from portia.workflow import Workflow, WorkflowState
 
@@ -25,7 +26,7 @@ def test_in_memory_storage_save_and_get_plan() -> None:
     assert retrieved_plan.id == plan.id
 
     with pytest.raises(PlanNotFoundError):
-        storage.get_plan(uuid4())
+        storage.get_plan(PlanUUID())
 
 
 def test_in_memory_storage_save_and_get_workflow() -> None:
@@ -39,7 +40,7 @@ def test_in_memory_storage_save_and_get_workflow() -> None:
     assert retrieved_workflow.id == workflow.id
 
     with pytest.raises(WorkflowNotFoundError):
-        storage.get_workflow(uuid4())
+        storage.get_workflow(WorkflowUUID())
 
 
 def test_disk_file_storage_save_and_get_plan(tmp_path: Path) -> None:
@@ -52,7 +53,7 @@ def test_disk_file_storage_save_and_get_plan(tmp_path: Path) -> None:
     assert retrieved_plan.id == plan.id
 
     with pytest.raises(PlanNotFoundError):
-        storage.get_plan(uuid4())
+        storage.get_plan(PlanUUID())
 
 
 def test_disk_file_storage_save_and_get_workflow(tmp_path: Path) -> None:
@@ -69,7 +70,7 @@ def test_disk_file_storage_save_and_get_workflow(tmp_path: Path) -> None:
     assert retrieved_workflow.id == workflow.id
 
     with pytest.raises(WorkflowNotFoundError):
-        storage.get_workflow(uuid4())
+        storage.get_workflow(WorkflowUUID())
 
 
 def test_disk_file_storage_save_and_get_workflows(tmp_path: Path) -> None:
@@ -95,7 +96,7 @@ def test_disk_file_storage_invalid_plan_retrieval(tmp_path: Path) -> None:
     invalid_file.write_text('{"id": "not-a-valid-uuid"}')  # Write invalid JSON
 
     with pytest.raises(PlanNotFoundError):
-        storage.get_plan(uuid4())
+        storage.get_plan(PlanUUID())
 
 
 def test_disk_file_storage_invalid_workflow_retrieval(tmp_path: Path) -> None:
@@ -105,4 +106,4 @@ def test_disk_file_storage_invalid_workflow_retrieval(tmp_path: Path) -> None:
     invalid_file.write_text('{"id": "not-a-valid-uuid"}')  # Write invalid JSON
 
     with pytest.raises(WorkflowNotFoundError):
-        storage.get_workflow(uuid4())
+        storage.get_workflow(WorkflowUUID())
