@@ -79,7 +79,7 @@ def test_runner_run_query_disk_storage() -> None:
         assert workflow.state == WorkflowState.COMPLETE
         # Use Path to check for the files
         plan_files = list(Path(tmp_dir).glob("plan-*.json"))
-        workflow_files = list(Path(tmp_dir).glob("workflow-*.json"))
+        workflow_files = list(Path(tmp_dir).glob("wkfl-*.json"))
 
         assert len(plan_files) == 1
         assert len(workflow_files) == 1
