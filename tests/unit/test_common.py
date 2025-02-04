@@ -3,6 +3,7 @@
 import json
 from uuid import UUID
 
+import pytest
 from pydantic import BaseModel, Field
 
 from portia.common import PortiaEnum, PrefixedUUID, combine_args_kwargs
@@ -61,6 +62,9 @@ class TestPrefixedUUID:
         assert str(prefixed_uuid) == prefixed_str
         assert str(prefixed_uuid)[5:] == str(prefixed_uuid.uuid)
 
+        with pytest.raises(ValueError, match="Prefix monkey does not match expected prefix test"):
+            CustomPrefixUUID.from_string("monkey-123e4567-e89b-12d3-a456-426614174000")
+
     def test_serialization(self) -> None:
         """Test PrefixedUUID serialization."""
         uuid = PrefixedUUID()
@@ -95,4 +99,14 @@ class TestPrefixedUUID:
         assert str(model.id.uuid) == uuid_str
         assert isinstance(model.id.uuid, UUID)
         assert model.id.prefix == "test"
+
+        class TestModelNoPrefix(BaseModel):
+            id: PrefixedUUID
+
+        json_data = f'{{"id": "{uuid_str}"}}'
+        model = TestModelNoPrefix.model_validate_json(json_data)
+        assert isinstance(model.id, PrefixedUUID)
+        assert str(model.id.uuid) == uuid_str
+        assert isinstance(model.id.uuid, UUID)
+        assert model.id.prefix == ""
 

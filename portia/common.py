@@ -113,12 +113,10 @@ class PrefixedUUID(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_model(cls, v: str | dict | PrefixedUUID) -> dict:
+    def validate_model(cls, v: str | dict) -> dict:
         """Validate the ID field."""
         if isinstance(v, dict):
             return v
-        if not isinstance(v, str):
-            raise ValueError(f"Invalid type {type(v)} for PrefixedUUID")
         if cls.prefix == "":
             return {
                 "uuid": UUID(v),

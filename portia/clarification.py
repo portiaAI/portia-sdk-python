@@ -53,7 +53,7 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     or a user choice from a list.
 
     Attributes:
-        id (UUID): A unique identifier for this clarification.
+        id (ClarificationUUID): A unique identifier for this clarification.
         category (ClarificationCategory): The category of this clarification, indicating its type.
         response (SERIALIZABLE_TYPE_VAR | None): The user's response to this clarification, if any.
         step (int | None): The step this clarification is associated with, if applicable.
