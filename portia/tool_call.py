@@ -46,7 +46,8 @@ class ToolCallRecord(BaseModel):
     Attributes
     ----------
         tool_name (str): The name of the tool being called.
-        workflow_id (WorkflowUUID): The unique identifier of the workflow to which this tool call belongs.
+        workflow_id (WorkflowUUID): The unique identifier of the workflow to which this tool call
+            belongs.
         step (int): The step number of the tool call in the workflow.
         end_user_id (str | None): The ID of the end user, if applicable. Can be None.
         additional_data (dict[str, str]): Additional data from the execution context.

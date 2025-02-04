@@ -82,7 +82,7 @@ class PlanNotFoundError(PortiaBaseError):
     """Raised when a plan with a specific ID is not found.
 
     Args:
-        plan_id (UUID): The ID of the plan that was not found.
+        plan_id (PlanUUID): The ID of the plan that was not found.
 
     """
 
