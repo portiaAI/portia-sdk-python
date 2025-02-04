@@ -5,10 +5,10 @@ The BaseAgent class is the base class that all agents must extend.
 
 from __future__ import annotations
 
+import json
 from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
-import json
 from typing import TYPE_CHECKING, Generic
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
