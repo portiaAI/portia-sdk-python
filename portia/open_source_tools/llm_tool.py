@@ -23,6 +23,7 @@ class LLMToolSchema(BaseModel):
         description="The task to be completed by the LLM tool.",
     )
 
+
 class LLMTool(Tool[str]):
     """General purpose LLM tool. Customizable to user requirements. Won't call other tools."""
 
@@ -54,24 +55,29 @@ class LLMTool(Tool[str]):
         capabilities. YOU NEVER CALL OTHER TOOLS. You use your native capabilities as an LLM
          only. This includes using your general knowledge, your in-built reasoning and
          your code interpreter capabilities. You exist as part of a wider system of tool calls
-         for a multi-step task to be used to answers questions, summarize outputs of other tools and 
-         to make general language model queries. You might not have all the context of the wider 
-         task, so you should use your general knowledge and reasoning capabilities to make 
+         for a multi-step task to be used to answers questions, summarize outputs of other tools
+         and to make general language model queries. You might not have all the context of the
+         wider task, so you should use your general knowledge and reasoning capabilities to make
          educated guesses and assumptions where you don't have all the information.
         """
     tool_context: str = ""
+
     def run(self, ctx: ExecutionContext, task: str) -> str:
         """Run the LLMTool."""
         config = Config.from_default(
-                model_name=self.model_name,
-                provider=self.provider,
-                temperature=self.temperature,
-                seed=self.seed,
-            )
+            model_name=self.model_name,
+            provider=self.provider,
+            temperature=self.temperature,
+            seed=self.seed,
+        )
         llm_wrapper = LLMWrapper(config)
         llm = llm_wrapper.to_langchain()
         # Define system and user messages
-        context = "Additional context for the LLM tool to use to complete the task, provided by the workflow run information and results of other tool calls. Use this to resolve any tasks"
+        context = (
+            "Additional context for the LLM tool to use to complete the task, provided by the "
+            "workflow run information and results of other tool calls. Use this to resolve any "
+            "tasks"
+        )
         if ctx.workflow_run_context:
             context += f"\nWorkflow run context: {ctx.workflow_run_context}"
         if self.tool_context:
@@ -86,10 +92,10 @@ class LLMTool(Tool[str]):
 
     @classmethod
     def from_config(cls, config: Config) -> LLMTool:
+        """Create an LLMTool from a config."""
         return cls(
             model_name=config.llm_model_name.value,
             provider=config.llm_provider.value,
             temperature=config.llm_model_temperature,
             seed=config.llm_model_seed,
         )
-

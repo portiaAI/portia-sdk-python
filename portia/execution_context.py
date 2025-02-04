@@ -64,6 +64,7 @@ class ExecutionContext(BaseModel):
 
     workflow_run_context: str | None = None
 
+
 def empty_context() -> ExecutionContext:
     """Return an empty execution context.
 

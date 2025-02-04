@@ -365,6 +365,7 @@ class VerifierModel:
 
         return tool_inputs
 
+
 class ToolCallingModel:
     """Model to call the tool with the verified arguments."""
 
@@ -555,7 +556,7 @@ class VerifierAgent(BaseAgent):
         if self.workflow.outputs and self.workflow.outputs.step_outputs:
             execution_context.workflow_run_context = str(self.workflow.outputs.step_outputs)
         llm = LLMWrapper(self.config).to_langchain()
-        
+
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=execution_context,
