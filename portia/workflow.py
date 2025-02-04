@@ -17,7 +17,7 @@ Key Components
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,8 +25,11 @@ from portia.agents.base_agent import Output
 from portia.clarification import (
     ClarificationListType,
 )
-from portia.common import PortiaEnum
+from portia.common import PortiaEnum, PrefixedUUID
 from portia.execution_context import ExecutionContext, empty_context
+from portia.plan import PlanUUID
+
+WORKFLOW_UUID_PREFIX = "wkfl"
 
 
 class WorkflowState(PortiaEnum):
@@ -55,7 +58,6 @@ class WorkflowState(PortiaEnum):
     READY_TO_RESUME = "READY_TO_RESUME"
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
-
 
 class WorkflowOutputs(BaseModel):
     """Outputs of a workflow, including clarifications.
@@ -90,14 +92,19 @@ class WorkflowOutputs(BaseModel):
     )
 
 
+class WorkflowUUID(PrefixedUUID):
+    """A UUID for a workflow."""
+
+    prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX
+
 class Workflow(BaseModel):
     """A workflow represents a running instance of a Plan.
 
     Attributes
     ----------
-    id : UUID
+    id : WorkflowUUID
         A unique ID for this workflow.
-    plan_id : UUID
+    plan_id : PlanUUID
         The ID of the Plan this Workflow uses.
     current_step_index : int
         The current step that is being executed.
@@ -112,11 +119,11 @@ class Workflow(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID = Field(
-        default_factory=uuid4,
+    id: WorkflowUUID = Field(
+        default_factory=WorkflowUUID,
         description="A unique ID for this workflow.",
     )
-    plan_id: UUID = Field(
+    plan_id: PlanUUID = Field(
         description="The ID of the Plan this Workflow uses.",
     )
     current_step_index: int = Field(

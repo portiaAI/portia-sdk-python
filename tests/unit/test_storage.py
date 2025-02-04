@@ -9,7 +9,7 @@ from uuid import UUID
 import pytest
 
 from portia.errors import StorageError
-from portia.plan import Plan, PlanContext
+from portia.plan import Plan, PlanContext, PlanUUID
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
@@ -19,7 +19,7 @@ from portia.storage import (
     WorkflowListResponse,
     WorkflowStorage,
 )
-from portia.workflow import Workflow, WorkflowState
+from portia.workflow import Workflow, WorkflowState, WorkflowUUID
 from tests.utils import get_test_config, get_test_tool_call, get_test_workflow
 
 if TYPE_CHECKING:
@@ -37,13 +37,13 @@ def test_storage_base_classes() -> None:
         def save_plan(self, plan: Plan) -> None:
             return super().save_plan(plan)  # type: ignore  # noqa: PGH003
 
-        def get_plan(self, plan_id: UUID) -> Plan:
+        def get_plan(self, plan_id: PlanUUID) -> Plan:
             return super().get_plan(plan_id)  # type: ignore  # noqa: PGH003
 
         def save_workflow(self, workflow: Workflow) -> None:
             return super().save_workflow(workflow)  # type: ignore  # noqa: PGH003
 
-        def get_workflow(self, workflow_id: UUID) -> Workflow:
+        def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
             return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
 
         def get_workflows(
@@ -114,12 +114,12 @@ def test_portia_cloud_storage() -> None:
     storage = PortiaCloudStorage(config)
 
     plan = Plan(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
     )
     workflow = Workflow(
-        id=UUID("87654321-4321-8765-4321-876543218765"),
+        id=WorkflowUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
     )
     tool_call = get_test_tool_call(workflow)
@@ -259,7 +259,7 @@ def test_portia_cloud_storage() -> None:
                 "Content-Type": "application/json",
             },
             json={
-                "workflow": str(tool_call.workflow_id),
+                "workflow_id": str(tool_call.workflow_id),
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
@@ -279,12 +279,12 @@ def test_portia_cloud_storage_errors() -> None:
     storage = PortiaCloudStorage(config)
 
     plan = Plan(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
     )
     workflow = Workflow(
-        id=UUID("87654321-4321-8765-4321-876543218765"),
+        id=WorkflowUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
     )
 
@@ -419,7 +419,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "Content-Type": "application/json",
             },
             json={
-                "workflow": str(tool_call.workflow_id),
+                "workflow_id": str(tool_call.workflow_id),
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
