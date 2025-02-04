@@ -6,6 +6,9 @@ The BaseAgent class is the base class that all agents must extend.
 from __future__ import annotations
 
 from abc import abstractmethod
+from datetime import date, datetime
+from enum import Enum
+import json
 from typing import TYPE_CHECKING, Generic
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -120,4 +123,31 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             str: The serialized value as a string.
 
         """
-        return f"{value}"
+        if value is None:
+            return ""
+
+        if isinstance(value, (dict, list, tuple)):
+            return json.dumps(value, ensure_ascii=False)  # Ensure proper JSON formatting
+
+        if isinstance(value, set):
+            return json.dumps(
+                list(value),
+                ensure_ascii=False,
+            )  # Convert set to list before serialization
+
+        if isinstance(value, (int, float, bool, str)):
+            return json.dumps(value, ensure_ascii=False)  # Ensures booleans become "true"/"false"
+
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()  # Convert date/time to ISO format
+
+        if isinstance(value, Enum):
+            return str(value.value)  # Convert Enums to their values
+
+        if isinstance(value, BaseModel):
+            return value.model_dump_json()  # Use Pydantic's built-in serialization for models
+
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="ignore")  # Convert bytes to string
+
+        return str(value)  # Fallback for other types
