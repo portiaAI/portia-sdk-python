@@ -259,7 +259,7 @@ def test_portia_cloud_storage() -> None:
                 "Content-Type": "application/json",
             },
             json={
-                "workflow": str(tool_call.workflow_id),
+                "workflow_id": str(tool_call.workflow_id),
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
@@ -419,7 +419,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "Content-Type": "application/json",
             },
             json={
-                "workflow": str(tool_call.workflow_id),
+                "workflow_id": str(tool_call.workflow_id),
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",

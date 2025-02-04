@@ -110,3 +110,8 @@ class TestPrefixedUUID:
         assert isinstance(model.id.uuid, UUID)
         assert model.id.prefix == ""
 
+    def test_hash(self) -> None:
+        """Test PrefixedUUID hash."""
+        uuid = PrefixedUUID()
+        assert hash(uuid) == hash(uuid.uuid)
+

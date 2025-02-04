@@ -127,3 +127,12 @@ class PrefixedUUID(BaseModel):
         return {
             "uuid": UUID(uuid_str),
         }
+
+    def __hash__(self) -> int:
+        """Make PrefixedUUID hashable by using the UUID's hash.
+
+        Returns:
+            int: Hash value of the UUID.
+
+        """
+        return hash(self.uuid)
