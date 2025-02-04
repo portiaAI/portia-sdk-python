@@ -8,8 +8,7 @@ and value confirmations.
 
 from __future__ import annotations
 
-from typing import Generic, Self, Union
-from uuid import UUID, uuid4
+from typing import ClassVar, Generic, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -19,8 +18,11 @@ from pydantic import (
     model_validator,
 )
 
-from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
+from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum, PrefixedUUID
 
+# TODO(Emma): This will be changed to "clar" in the future once the backend is # noqa: FIX002 TD003
+# updated to use this field.
+CLARIFICATION_UUID_PREFIX = ""
 
 class ClarificationCategory(PortiaEnum):
     """The category of a clarification.
@@ -38,6 +40,11 @@ class ClarificationCategory(PortiaEnum):
     VALUE_CONFIRMATION = "Value Confirmation"
 
 
+class ClarificationUUID(PrefixedUUID):
+    """A UUID for a clarification."""
+
+    prefix: ClassVar[str] = CLARIFICATION_UUID_PREFIX
+
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Base Model for Clarifications.
 
@@ -46,7 +53,7 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     or a user choice from a list.
 
     Attributes:
-        id (UUID): A unique identifier for this clarification.
+        id (ClarificationUUID): A unique identifier for this clarification.
         category (ClarificationCategory): The category of this clarification, indicating its type.
         response (SERIALIZABLE_TYPE_VAR | None): The user's response to this clarification, if any.
         step (int | None): The step this clarification is associated with, if applicable.
@@ -55,8 +62,8 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     """
 
-    id: UUID = Field(
-        default_factory=uuid4,
+    id: ClarificationUUID = Field(
+        default_factory=ClarificationUUID,
         description="A unique ID for this clarification",
     )
     category: ClarificationCategory = Field(

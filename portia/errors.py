@@ -29,8 +29,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
+    from portia.plan import PlanUUID
+    from portia.workflow import WorkflowUUID
 
 class PortiaBaseError(Exception):
     """Base class for all our errors."""
@@ -82,13 +82,13 @@ class PlanNotFoundError(PortiaBaseError):
     """Raised when a plan with a specific ID is not found.
 
     Args:
-        plan_id (UUID): The ID of the plan that was not found.
+        plan_id (PlanUUID): The ID of the plan that was not found.
 
     """
 
-    def __init__(self, plan_id: UUID) -> None:
+    def __init__(self, plan_id: PlanUUID) -> None:
         """Set custom error message."""
-        super().__init__(f"Plan with id {plan_id} not found.")
+        super().__init__(f"Plan with id {plan_id!s} not found.")
 
 
 class WorkflowNotFoundError(PortiaBaseError):
@@ -99,9 +99,9 @@ class WorkflowNotFoundError(PortiaBaseError):
 
     """
 
-    def __init__(self, workflow_id: UUID | str | None) -> None:
+    def __init__(self, workflow_id: WorkflowUUID | str | None) -> None:
         """Set custom error message."""
-        super().__init__(f"Workflow with id {workflow_id} not found.")
+        super().__init__(f"Workflow with id {workflow_id!s} not found.")
 
 
 class ToolNotFoundError(PortiaBaseError):

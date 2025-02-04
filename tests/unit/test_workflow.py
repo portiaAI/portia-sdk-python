@@ -1,6 +1,6 @@
 """Tests for Workflow primitives."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from portia.agents.base_agent import Output
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
-from portia.plan import ReadOnlyStep, Step
+from portia.plan import PlanUUID, ReadOnlyStep, Step
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowOutputs, WorkflowState
 
 
@@ -22,7 +22,7 @@ def mock_clarification() -> InputClarification:
 def workflow(mock_clarification: InputClarification) -> Workflow:
     """Create a Workflow instance for testing."""
     return Workflow(
-        plan_id=uuid4(),
+        plan_id=PlanUUID(),
         current_step_index=1,
         state=WorkflowState.IN_PROGRESS,
         outputs=WorkflowOutputs(
@@ -34,11 +34,12 @@ def workflow(mock_clarification: InputClarification) -> Workflow:
 
 def test_workflow_initialization() -> None:
     """Test initialization of a Workflow instance."""
-    plan_id = uuid4()
+    plan_id = PlanUUID()
     workflow = Workflow(plan_id=plan_id)
 
     assert workflow.id is not None
     assert workflow.plan_id == plan_id
+    assert isinstance(workflow.plan_id.uuid, UUID)
     assert workflow.current_step_index == 0
     assert workflow.outputs.clarifications == []
     assert workflow.state == WorkflowState.NOT_STARTED
@@ -58,7 +59,7 @@ def test_workflow_get_outstanding_clarifications(
 
 def test_workflow_get_outstanding_clarifications_none() -> None:
     """Test get_outstanding_clarifications when no clarifications are outstanding."""
-    workflow = Workflow(plan_id=uuid4(), outputs=WorkflowOutputs(clarifications=[]))
+    workflow = Workflow(plan_id=PlanUUID(), outputs=WorkflowOutputs(clarifications=[]))
 
     assert workflow.get_outstanding_clarifications() == []
 
@@ -74,7 +75,7 @@ def test_workflow_state_enum() -> None:
 
 def test_read_only_workflow_immutable() -> None:
     """Test immutability of workflow."""
-    workflow = Workflow(plan_id=uuid4())
+    workflow = Workflow(plan_id=PlanUUID(uuid=uuid4()))
     read_only = ReadOnlyWorkflow.from_workflow(workflow)
 
     with pytest.raises(ValidationError):
@@ -93,7 +94,7 @@ def test_read_only_step_immutable() -> None:
 def test_workflow_serialization() -> None:
     """Test workflow can be serialized to string."""
     workflow = Workflow(
-        plan_id=uuid4(),
+        plan_id=PlanUUID(),
         outputs=WorkflowOutputs(
             clarifications=[
                 InputClarification(

@@ -38,6 +38,7 @@ from portia.clarification import (
     ActionClarification,
     Clarification,
     ClarificationCategory,
+    ClarificationUUID,
     InputClarification,
     MultipleChoiceClarification,
     ValueConfirmationClarification,
@@ -391,7 +392,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.ACTION:
                     return Output(
                         value=ActionClarification(
-                            id=clarification["id"],
+                            id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
                         ),
@@ -399,7 +400,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.INPUT:
                     return Output(
                         value=InputClarification(
-                            id=clarification["id"],
+                            id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                         ),
@@ -407,7 +408,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.MULTIPLE_CHOICE:
                     return Output(
                         value=MultipleChoiceClarification(
-                            id=clarification["id"],
+                            id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                             options=clarification["options"],
@@ -416,7 +417,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.VALUE_CONFIRMATION:
                     return Output(
                         value=ValueConfirmationClarification(
-                            id=clarification["id"],
+                            id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                         ),
