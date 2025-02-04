@@ -2,7 +2,7 @@
 name = "portia-sdk-python"
 version = "0.0.1-alpha.42"
 description = "Portia Labs Python SDK for building agentic workflows."
-authors = ["Tech <tech@portialabs.ai>"]
+authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
 repository = "https://pypi.org/project/portia-sdk-python/"
 homepage = "https://www.portialabs.ai/"
