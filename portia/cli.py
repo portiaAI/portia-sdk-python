@@ -160,14 +160,12 @@ def run(
 
     # Add the tool registry
     registry = example_tool_registry
-    if config.has_api_key(PORTIA_API_KEY):
-        registry += PortiaToolRegistry(config)
 
     # Add the LLMTool
     # This is a general purpose LLM tool that can be used to respond to a prompt by relying
     # solely on LLM capabilities. It won't call other tools. Recommended for steps that don't
     # require any external tools.
-    registry.register_tool(
+    example_tool_registry.register_tool(
         LLMTool(
             model_name=config.llm_model_name.value,
             provider=config.llm_provider.value,
@@ -175,6 +173,9 @@ def run(
             seed=config.llm_model_seed,
         ),
     )
+
+    if config.has_api_key(PORTIA_API_KEY):
+        registry += PortiaToolRegistry(config)
 
     # Run the query
     runner = Runner(
@@ -280,9 +281,9 @@ def _get_config(
 ) -> tuple[CLIConfig, Config]:
     """Init config."""
     cli_config = CLIConfig(**kwargs)
-    config = Config.from_default(**kwargs)
     if cli_config.env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
+    config = Config.from_default(**kwargs)
 
     keys = [
         os.getenv("OPENAI_API_KEY"),
@@ -300,6 +301,7 @@ def _get_config(
 
     if os.getenv("PORTIA_API_KEY"):
         config.storage_class = StorageClass.CLOUD
+        config.portia_api_endpoint = os.getenv("PORTIA_API_ENDPOINT") or config.portia_api_endpoint
 
     if llm_provider or llm_model:
         config.llm_provider = llm_provider if llm_provider else llm_model.provider()
