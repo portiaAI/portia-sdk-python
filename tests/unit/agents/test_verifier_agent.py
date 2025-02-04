@@ -26,7 +26,7 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.errors import InvalidAgentError, InvalidWorkflowStateError
+from portia.errors import InvalidWorkflowStateError
 from portia.execution_context import empty_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
@@ -745,6 +745,5 @@ def test_verifier_agent_without_tool_uses_llm_tool() -> None:
         config=get_test_config(),
         tool=None,
     )
-    with pytest.raises(Exception):
-        agent.execute_sync()
+    agent.execute_sync()
     assert isinstance(agent.tool, LLMTool)
