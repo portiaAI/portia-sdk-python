@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 import pytest
 
@@ -18,7 +17,7 @@ from portia.plan import ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import ReadOnlyWorkflow, WorkflowState
+from portia.workflow import ReadOnlyWorkflow, WorkflowState, WorkflowUUID
 from tests.utils import AdditionTool, ClarificationTool, get_test_config, get_test_workflow
 
 
@@ -80,7 +79,7 @@ def test_runner_run_query_disk_storage() -> None:
         assert workflow.state == WorkflowState.COMPLETE
         # Use Path to check for the files
         plan_files = list(Path(tmp_dir).glob("plan-*.json"))
-        workflow_files = list(Path(tmp_dir).glob("workflow-*.json"))
+        workflow_files = list(Path(tmp_dir).glob("wkfl-*.json"))
 
         assert len(plan_files) == 1
         assert len(workflow_files) == 1
@@ -181,7 +180,7 @@ def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
     assert workflow.current_step_index == 1
 
     with pytest.raises(WorkflowNotFoundError):
-        runner.execute_workflow(workflow_id=uuid4())
+        runner.execute_workflow(workflow_id=WorkflowUUID())
 
 
 def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:

@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.0.1-alpha.41"
+version = "0.0.1-alpha.42"
 description = "Portia Labs Python SDK for building agentic workflows."
-authors = ["Tech <tech@portialabs.ai>"]
+authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
 repository = "https://pypi.org/project/portia-sdk-python/"
 homepage = "https://www.portialabs.ai/"
@@ -34,6 +34,7 @@ loguru = "^0.7.3"
 python-dotenv = "^1.0.1"
 pandas = "^2.2.3"
 pytest-mock = "^3.14.0"
+openpyxl = "^3.1.5"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"

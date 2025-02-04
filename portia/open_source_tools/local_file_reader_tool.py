@@ -61,7 +61,7 @@ class FileReaderTool(Tool[str]):
                         "Supported formats are .txt, .log, .csv, .json, .xls, .xlsx.",
                     )
 
-        alt_file_paths = self.find_file(filename)
+        alt_file_paths = self.find_file(file_path)
         if alt_file_paths:
             return MultipleChoiceClarification(
                 argument_name="filename",
@@ -72,7 +72,8 @@ class FileReaderTool(Tool[str]):
 
         raise ToolHardError(f"No file found on disk with the path {filename}.")
 
-    def find_file(self, filename: str) -> list[str]:
+    def find_file(self, file_path: Path) -> list[str]:
         """Return a full file path or None."""
-        search_path = Path("../")
+        search_path = file_path.parent
+        filename = file_path.name
         return [str(filepath) for filepath in search_path.rglob(filename) if filepath.is_file()]

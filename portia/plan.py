@@ -20,11 +20,13 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
-from typing import Any
-from uuid import UUID, uuid4
+from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field
 
+from portia.common import PrefixedUUID
+
+PLAN_UUID_PREFIX = "plan"
 
 class Variable(BaseModel):
     """A variable in the plan.
@@ -145,6 +147,15 @@ class PlanContext(BaseModel):
     tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
 
 
+class PlanUUID(PrefixedUUID):
+    """A UUID for a plan.
+
+    This class is a wrapper around the PrefixedUUID class, with the prefix set to PLAN_UUID_PREFIX.
+    """
+
+    prefix: ClassVar[str] = PLAN_UUID_PREFIX
+
+
 class Plan(BaseModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
 
@@ -152,7 +163,7 @@ class Plan(BaseModel):
     It also includes the context in which the plan was created.
 
     Args:
-        id (UUID): A unique ID for the plan.
+        id (PlanUUID): A unique ID for the plan.
         plan_context (PlanContext): The context for when the plan was created.
         steps (list[Step]): The set of steps that make up the plan.
 
@@ -160,25 +171,12 @@ class Plan(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID = Field(
-        default_factory=uuid4,
-        description="A unique ID for this plan.",
+    id: PlanUUID = Field(
+        default_factory=PlanUUID,
+        description="The ID of the plan.",
     )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
-
-    @field_serializer("id")
-    def serialize_id(self, plan_id: UUID) -> str:
-        """Serialize the ID to a string.
-
-        Args:
-            plan_id (UUID): The UUID of the plan.
-
-        Returns:
-            str: The serialized string representation of the plan's ID.
-
-        """
-        return str(plan_id)
 
     def __str__(self) -> str:
         """Return the string representation of the plan.

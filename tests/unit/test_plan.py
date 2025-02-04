@@ -1,11 +1,10 @@
 """Plan tests."""
 
-from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
 
-from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
+from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step
 from tests.utils import get_test_workflow
 
 
@@ -25,13 +24,7 @@ def test_plan_uuid_assign() -> None:
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
     )
-    assert isinstance(plan.id, UUID)
-
-    clarification = Plan(
-        plan_context=PlanContext(query="", tool_ids=[]),
-        steps=[],
-    )
-    assert isinstance(clarification.id, UUID)
+    assert isinstance(plan.id, PlanUUID)
 
 
 def test_read_only_plan_immutable() -> None:
