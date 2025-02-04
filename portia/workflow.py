@@ -17,17 +17,17 @@ Key Components
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
     ClarificationListType,
 )
-from portia.common import BaseUUIDModel, PortiaEnum, PrefixedUUID
+from portia.common import PortiaEnum, PrefixedUUID, uuid_serializer
 from portia.execution_context import ExecutionContext, empty_context
-from portia.plan import PlanUUID
+from portia.plan import plan_uuid_type
 
 WORKFLOW_UUID_PREFIX = "wkfl"
 
@@ -58,7 +58,6 @@ class WorkflowState(PortiaEnum):
     READY_TO_RESUME = "READY_TO_RESUME"
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
-
 
 class WorkflowOutputs(BaseModel):
     """Outputs of a workflow, including clarifications.
@@ -99,7 +98,10 @@ class WorkflowUUID(PrefixedUUID):
     prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX
 
 
-class Workflow(BaseUUIDModel):
+workflow_uuid_type = Annotated[WorkflowUUID,
+                               BeforeValidator(lambda v: uuid_serializer(WorkflowUUID, v))]
+
+class Workflow(BaseModel):
     """A workflow represents a running instance of a Plan.
 
     Attributes
@@ -121,11 +123,11 @@ class Workflow(BaseUUIDModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: WorkflowUUID = Field(
+    id: workflow_uuid_type = Field(
         default_factory=WorkflowUUID,
         description="A unique ID for this workflow.",
     )
-    plan_id: PlanUUID = Field(
+    plan_id: plan_uuid_type = Field(
         description="The ID of the Plan this Workflow uses.",
     )
     current_step_index: int = Field(
@@ -159,15 +161,6 @@ class Workflow(BaseUUIDModel):
             for clarification in self.outputs.clarifications
             if not clarification.resolved
         ]
-
-    @field_validator("plan_id", mode="before")
-    def validate_plan_id(cls, v: str | dict | PlanUUID) -> PlanUUID: # noqa: N805 # This is a class method, but pydantic doesn't call it if annotated with @classmethod.
-        """Validate the plan_id field."""
-        if isinstance(v, PlanUUID):
-            return v
-        if isinstance(v, dict):
-            return PlanUUID.model_validate(v)
-        return PlanUUID.from_string(v)
 
     def __str__(self) -> str:
         """Return the string representation of the workflow.

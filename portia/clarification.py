@@ -8,16 +8,18 @@ and value confirmations.
 
 from __future__ import annotations
 
-from typing import ClassVar, Generic, Self, Union
+from typing import Annotated, ClassVar, Generic, Self, Union
 
 from pydantic import (
+    BaseModel,
+    BeforeValidator,
     Field,
     HttpUrl,
     field_serializer,
     model_validator,
 )
 
-from portia.common import SERIALIZABLE_TYPE_VAR, BaseUUIDModel, PortiaEnum, PrefixedUUID
+from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum, PrefixedUUID, uuid_serializer
 
 # TODO(Emma): This will be changed to "clar" in the future once the backend is # noqa: FIX002 TD003
 # updated to use this field.
@@ -44,8 +46,10 @@ class ClarificationUUID(PrefixedUUID):
 
     prefix: ClassVar[str] = CLARIFICATION_UUID_PREFIX
 
+clarification_uuid_type = Annotated[ClarificationUUID, BeforeValidator(
+    lambda v: uuid_serializer(ClarificationUUID, v))]
 
-class Clarification(BaseUUIDModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Base Model for Clarifications.
 
     A Clarification represents a question or action that requires user input to resolve. For example
@@ -62,7 +66,7 @@ class Clarification(BaseUUIDModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     """
 
-    id: ClarificationUUID = Field(
+    id: clarification_uuid_type = Field(
         default_factory=ClarificationUUID,
         description="A unique ID for this clarification",
     )

@@ -7,10 +7,10 @@ use in the Portia framework.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, ClassVar, Self, TypeVar, get_type_hints
+from typing import Any, ClassVar, Self, TypeVar
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_serializer
+from pydantic import BaseModel, Field, model_serializer
 
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
@@ -112,25 +112,10 @@ class PrefixedUUID(BaseModel):
         return cls(uuid=UUID(uuid_str))
 
 
-class BaseUUIDModel(BaseModel):
-    """A base model for UUID fields."""
-
-    id: PrefixedUUID = Field(
-        default_factory=lambda: BaseUUIDModel._create_uuid(),
-        description="A unique ID for this model.",
-    )
-
-    @classmethod
-    def _create_uuid(cls) -> PrefixedUUID:
-        """Create a UUID for this model."""
-        return get_type_hints(cls)["id"]()
-
-    @field_validator("id", mode="before")
-    def validate_id(cls, v: str) -> PrefixedUUID: # noqa: N805 # This is a class method, but pydantic doesn't call it if annotated with @classmethod.
-        """Validate the ID field."""
-        if isinstance(v, PrefixedUUID):
-            return v
-        if isinstance(v, dict):
-            return get_type_hints(cls)["id"].model_validate(v)
-        return get_type_hints(cls)["id"].from_string(v)
-
+def uuid_serializer(class_type: type[PrefixedUUID], v: str) -> PrefixedUUID:
+    """Validate the ID field."""
+    if isinstance(v, class_type):
+        return v
+    if isinstance(v, dict):
+        return class_type.model_validate(v)
+    return class_type.from_string(v)
