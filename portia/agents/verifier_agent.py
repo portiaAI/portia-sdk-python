@@ -553,8 +553,7 @@ class VerifierAgent(BaseAgent):
 
         context = self.get_system_context()
         execution_context = get_execution_context()
-        if self.workflow.outputs and self.workflow.outputs.step_outputs:
-            execution_context.workflow_run_context = str(self.workflow.outputs.step_outputs)
+        execution_context.workflow_run_context = context
         llm = LLMWrapper(self.config).to_langchain()
 
         tools = [

@@ -58,7 +58,8 @@ class LLMTool(Tool[str]):
          for a multi-step task to be used to answers questions, summarize outputs of other tools
          and to make general language model queries. You might not have all the context of the
          wider task, so you should use your general knowledge and reasoning capabilities to make
-         educated guesses and assumptions where you don't have all the information.
+         educated guesses and assumptions where you don't have all the information. Be concise and
+         to the point.
         """
     tool_context: str = ""
 
