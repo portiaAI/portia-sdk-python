@@ -472,7 +472,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             logger().error(f"Error from Portia Cloud: {e.response.content}")
-            raise ToolHardError(str(e.response.content)) from e
+            raise ToolHardError(str(e.response.json())) from e
         except Exception as e:
             logger().error(f"Unhandled error from Portia Cloud: {e}")
             raise ToolHardError(e) from e
