@@ -213,7 +213,6 @@ def run(
                 if isinstance(clarification, InputClarification):
                     user_input = click.prompt(
                         clarification.user_guidance + "\nPlease enter a value:\n",
-                        type=type(clarification.response),
                     )
                     workflow = runner.resolve_clarification(workflow, clarification, user_input)
             runner.execute_workflow(workflow)
