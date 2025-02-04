@@ -113,7 +113,7 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     )
 
     @field_serializer("value")
-    def serialize_value(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:
+    def serialize_value(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:  # noqa: PLR0911
         """Serialize the value to a string.
 
         Args:
@@ -126,6 +126,9 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         if value is None:
             return ""
 
+        if isinstance(value, str):
+            return value
+
         if isinstance(value, (dict, list, tuple)):
             return json.dumps(value, ensure_ascii=False)  # Ensure proper JSON formatting
 
@@ -135,7 +138,7 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 ensure_ascii=False,
             )  # Convert set to list before serialization
 
-        if isinstance(value, (int, float, bool, str)):
+        if isinstance(value, (int, float, bool)):
             return json.dumps(value, ensure_ascii=False)  # Ensures booleans become "true"/"false"
 
         if isinstance(value, (datetime, date)):
