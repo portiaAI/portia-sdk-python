@@ -6,7 +6,6 @@ use in the Portia framework.
 """
 from __future__ import annotations
 
-import json
 from enum import Enum
 from typing import Any, ClassVar, Self, TypeVar, get_type_hints
 from uuid import UUID, uuid4
@@ -112,8 +111,6 @@ class PrefixedUUID(BaseModel):
             raise ValueError(f"Prefix {prefix} does not match expected prefix {cls.prefix}")
         return cls(uuid=UUID(uuid_str))
 
-ID_TYPE = TypeVar("ID_TYPE", bound=PrefixedUUID)
-
 
 class BaseUUIDModel(BaseModel):
     """A base model for UUID fields."""
@@ -133,14 +130,7 @@ class BaseUUIDModel(BaseModel):
         """Validate the ID field."""
         if isinstance(v, PrefixedUUID):
             return v
+        if isinstance(v, dict):
+            return get_type_hints(cls)["id"].model_validate(v)
         return get_type_hints(cls)["id"].from_string(v)
 
-    @classmethod
-    def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
-        """Validate JSON and deserialize the UUID field."""
-        if isinstance(json_data, bytes):
-            json_data = json_data.decode()
-        data = json.loads(json_data)
-        if isinstance(data.get("id"), str):
-            data["id"] = get_type_hints(cls)["id"].from_string(data["id"])
-        return cls.model_validate(data)

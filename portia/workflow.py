@@ -17,10 +17,9 @@ Key Components
 
 from __future__ import annotations
 
-import json
-from typing import ClassVar, Self
+from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
@@ -161,17 +160,14 @@ class Workflow(BaseUUIDModel):
             if not clarification.resolved
         ]
 
-
-    @classmethod
-    def model_validate_json(cls: type[Self], json_data: str | bytes) -> Self:
-        """Validate JSON and deserialize the UUID field."""
-        if isinstance(json_data, bytes):
-            json_data = json_data.decode()
-        data = json.loads(json_data)
-        if isinstance(data.get("plan_id"), str):
-            data["plan_id"] = PlanUUID.from_string(data["plan_id"])
-        return cls.model_validate(data)
-
+    @field_validator("plan_id", mode="before")
+    def validate_plan_id(cls, v: str | dict | PlanUUID) -> PlanUUID: # noqa: N805 # This is a class method, but pydantic doesn't call it if annotated with @classmethod.
+        """Validate the plan_id field."""
+        if isinstance(v, PlanUUID):
+            return v
+        if isinstance(v, dict):
+            return PlanUUID.model_validate(v)
+        return PlanUUID.from_string(v)
 
     def __str__(self) -> str:
         """Return the string representation of the workflow.
