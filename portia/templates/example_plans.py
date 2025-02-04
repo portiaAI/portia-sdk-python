@@ -82,7 +82,6 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="Weather of a city in the northern hemisphere",
                     ),
                 ],
-                tool_id="llm_tool",
                 output="$weather_comparison",
             ),
             Step(

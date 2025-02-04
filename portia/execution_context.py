@@ -62,7 +62,7 @@ class ExecutionContext(BaseModel):
 
     agent_system_context_extension: list[str] | None = None
 
-    workflow_run_context: str | None = None
+    workflow_run_context: str | None = Field(default=None, exclude=True)
 
 
 def empty_context() -> ExecutionContext:

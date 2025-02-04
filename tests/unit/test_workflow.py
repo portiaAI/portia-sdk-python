@@ -83,7 +83,7 @@ def test_read_only_workflow_immutable() -> None:
 
 def test_read_only_step_immutable() -> None:
     """Test immutability of step."""
-    step = Step(task="add", output="$out", tool_id="add_tool")
+    step = Step(task="add", output="$out")
     read_only = ReadOnlyStep.from_step(step)
 
     with pytest.raises(ValidationError):

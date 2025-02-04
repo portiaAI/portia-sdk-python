@@ -39,7 +39,7 @@ def test_read_only_plan_immutable() -> None:
     plan = Plan(
         plan_context=PlanContext(query="test query", tool_ids=[]),
         steps=[
-            Step(task="test task", output="$output", tool_id="tool1"),
+            Step(task="test task", output="$output"),
         ],
     )
     read_only = ReadOnlyPlan.from_plan(plan)
@@ -59,8 +59,8 @@ def test_read_only_plan_preserves_data() -> None:
             tool_ids=["weather_tool"],
         ),
         steps=[
-            Step(task="Get weather", output="$weather", tool_id="weather_tool"),
-            Step(task="Format response", output="$response", tool_id="format_tool"),
+            Step(task="Get weather", output="$weather"),
+            Step(task="Format response", output="$response"),
         ],
     )
 
@@ -80,7 +80,7 @@ def test_read_only_plan_serialization() -> None:
     """Test that ReadOnlyPlan can be serialized and deserialized."""
     original_plan = Plan(
         plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
-        steps=[Step(task="test task", output="$output", tool_id="tool1")],
+        steps=[Step(task="test task", output="$output")],
     )
     read_only = ReadOnlyPlan.from_plan(original_plan)
 

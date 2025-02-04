@@ -99,7 +99,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
         name="TOOL_NAME",
@@ -136,7 +136,7 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
         name="TOOL_NAME",
@@ -226,7 +226,7 @@ def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None
         number: int
 
     agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
         name="TOOL_NAME",
@@ -285,7 +285,7 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mockinvoker.with_structured_output)
 
     agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
         name="TOOL_NAME",
@@ -330,7 +330,7 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mockinvoker.with_structured_output)
 
     agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
         name="TOOL_NAME",
@@ -378,7 +378,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
         verified_args=verified_tool_inputs,
         clarifications=[],
     )
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
@@ -438,7 +438,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         if arg_name == "content"
         else None,
     )
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.workflow = workflow
     agent.tool = SimpleNamespace(
         id="TOOL_ID",
@@ -602,7 +602,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 def test_verifier_agent_edge_cases() -> None:
     """Tests edge cases are handled."""
     agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out", tool_id="tool1")
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),

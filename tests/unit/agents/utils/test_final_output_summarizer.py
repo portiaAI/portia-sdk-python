@@ -17,12 +17,10 @@ def test_summarizer_agent_execute_sync() -> None:
         Step(
             task="Get weather in London",
             output="$london_weather",
-            tool_id="weather_tool",
         ),
         Step(
             task="Suggest activities based on weather",
             output="$activities",
-            tool_id="activity_tool",
         ),
     ]
 
@@ -109,12 +107,10 @@ def test_build_tasks_and_outputs_context() -> None:
         Step(
             task="Get weather in London",
             output="$london_weather",
-            tool_id="weather_tool",
         ),
         Step(
             task="Suggest activities based on weather",
             output="$activities",
-            tool_id="activity_tool",
         ),
     ]
 
@@ -171,12 +167,10 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
         Step(
             task="Get weather in London",
             output="$london_weather",
-            tool_id="weather_tool",
         ),
         Step(
             task="Suggest activities based on weather",
             output="$activities",
-            tool_id="activity_tool",
         ),
     ]
 
