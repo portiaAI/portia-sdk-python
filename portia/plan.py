@@ -85,7 +85,8 @@ class Step(BaseModel):
             "necessarily, but all the inputs to the step."
         ),
     )
-    tool_id: str = Field(
+    tool_id: str | None = Field(
+        default=None,
         description="The ID of the tool listed in <Tools/>",
     )
     output: str = Field(

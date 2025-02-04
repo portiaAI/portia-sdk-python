@@ -24,9 +24,10 @@ from portia.agents.execution_utils import (
 )
 from portia.agents.utils.step_summarizer import StepSummarizer
 from portia.clarification import Clarification, InputClarification
-from portia.errors import InvalidAgentError, InvalidWorkflowStateError
+from portia.errors import InvalidWorkflowStateError
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
+from portia.open_source_tools.llm_tool import LLMTool
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -547,13 +548,17 @@ class VerifierAgent(BaseAgent):
 
         """
         if not self.tool:
-            raise InvalidAgentError("No tool available")
+            self.tool = LLMTool.from_config(self.config)
 
         context = self.get_system_context()
+        execution_context = get_execution_context()
+        if self.workflow.outputs and self.workflow.outputs.step_outputs:
+            execution_context.workflow_run_context = str(self.workflow.outputs.step_outputs)
         llm = LLMWrapper(self.config).to_langchain()
+        
         tools = [
             self.tool.to_langchain_with_artifact(
-                ctx=get_execution_context(),
+                ctx=execution_context,
             ),
         ]
         tool_node = ToolNode(tools)

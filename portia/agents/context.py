@@ -192,7 +192,7 @@ def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     clarifications = workflow.outputs.clarifications
 
     system_context = generate_main_system_context(ctx.agent_system_context_extension)
-
+    
     # exit early if no additional information
     if not inputs and not clarifications and not previous_outputs:
         return "\n".join(system_context)

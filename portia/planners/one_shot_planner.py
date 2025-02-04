@@ -50,8 +50,7 @@ class OneShotPlanner(Planner):
     steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
     that tools need to make sure the chain of calls works. If you are missing information do not \
     make up placeholder variables like example@example.com. If you can't come up with a plan \
-    provide a descriptive error instead - do not return plans with no steps. Each step should \
-    have a tool associated with it.",
+    provide a descriptive error instead - do not return plans with no steps.",
                 },
                 {"role": "user", "content": prompt},
             ],

@@ -62,6 +62,7 @@ class ExecutionContext(BaseModel):
 
     agent_system_context_extension: list[str] | None = None
 
+    workflow_run_context: str | None = None
 
 def empty_context() -> ExecutionContext:
     """Return an empty execution context.
@@ -76,6 +77,7 @@ def empty_context() -> ExecutionContext:
         additional_data={},
         planner_system_context_extension=None,
         agent_system_context_extension=None,
+        workflow_run_context=None,
     )
 
 
