@@ -113,7 +113,7 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     )
 
     @field_serializer("value")
-    def serialize_value(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:  # noqa: PLR0911
+    def serialize_value(self, value: SERIALIZABLE_TYPE_VAR | None) -> str:  # noqa: C901, PLR0911
         """Serialize the value to a string.
 
         Args:
