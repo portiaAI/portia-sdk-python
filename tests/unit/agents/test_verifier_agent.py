@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import suppress
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -26,9 +27,10 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.errors import InvalidAgentError, InvalidWorkflowStateError
+from portia.errors import InvalidWorkflowStateError
 from portia.execution_context import empty_context
 from portia.llm_wrapper import LLMWrapper
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step
 from tests.utils import AdditionTool, get_test_config, get_test_workflow
 
@@ -735,13 +737,16 @@ def test_clarifications_or_continue() -> None:
     assert len(agent.new_clarifications) == 0
 
 
-def test_verifier_agent_without_tool_raises() -> None:
-    """Test verifier agent without tool raises."""
+def test_verifier_agent_without_tool_uses_llm_tool() -> None:
+    """Test verifier agent without tool uses LLM tool."""
     (plan, workflow) = get_test_workflow()
-    with pytest.raises(InvalidAgentError):
-        VerifierAgent(
-            step=plan.steps[0],
-            workflow=workflow,
-            config=get_test_config(),
-            tool=None,
-        ).execute_sync()
+    agent = VerifierAgent(
+        step=plan.steps[0],
+        workflow=workflow,
+        config=get_test_config(),
+        tool=None,
+    )
+    with suppress(Exception):
+        # try to run the tool and fail, but sets the tool to an LLM tool
+        agent.execute_sync()
+    assert isinstance(agent.tool, LLMTool)
