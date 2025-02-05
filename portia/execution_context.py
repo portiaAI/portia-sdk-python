@@ -47,6 +47,7 @@ class ExecutionContext(BaseModel):
         additional_data (dict[str, str]): Arbitrary additional data useful for debugging.
         planner_system_context_extension (Optional[list[str]]): Additional context for planner LLMs.
         agent_system_context_extension (Optional[list[str]]): Additional context for agent LLMs.
+        workflow_run_context (Optional[str]): Additional context for the workflow run.
 
     """
 
@@ -62,6 +63,8 @@ class ExecutionContext(BaseModel):
 
     agent_system_context_extension: list[str] | None = None
 
+    workflow_run_context: str | None = Field(default=None, exclude=True)
+
 
 def empty_context() -> ExecutionContext:
     """Return an empty execution context.
@@ -76,6 +79,7 @@ def empty_context() -> ExecutionContext:
         additional_data={},
         planner_system_context_extension=None,
         agent_system_context_extension=None,
+        workflow_run_context=None,
     )
 
 

@@ -37,7 +37,7 @@ def test_llm_tool_run(
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
     mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
-
+    mock_execution_context.workflow_run_context = None
     # Define task input
     task = "What is the capital of France?"
 
@@ -87,21 +87,20 @@ def test_llm_tool_run_with_context(
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
     mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
-
+    mock_execution_context.workflow_run_context = "Workflow run context"
     # Define task and context
-    mock_llm_tool.context = "Context for task"
+    mock_llm_tool.tool_context = "Context for task"
     task = "What is the capital of France?"
 
     # Run the tool
     result = mock_llm_tool.run(mock_execution_context, task)
 
     # Verify that the LLMWrapper's invoke method is called
-    mock_llm.invoke.assert_called_once_with(
-        [
-            HumanMessage(content=mock_llm_tool.prompt),
-            HumanMessage(content=f"{mock_llm_tool.context}\n\n{task}"),
-        ],
-    )
-
+    called_with = mock_llm.invoke.call_args_list[0].args[0]
+    assert len(called_with) == 2
+    assert isinstance(called_with[0], HumanMessage)
+    assert isinstance(called_with[1], HumanMessage)
+    assert mock_llm_tool.tool_context in called_with[1].content
+    assert task in called_with[1].content
     # Assert the result is the expected response
     assert result == "Test response content"
