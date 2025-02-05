@@ -129,7 +129,16 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         if isinstance(value, str):
             return value
 
-        if isinstance(value, (dict, list, tuple)):
+        if isinstance(value, list):
+            return json.dumps(
+                [
+                    item.model_dump(mode="json") if isinstance(item, BaseModel) else item
+                    for item in value
+                ],
+                ensure_ascii=False,
+            )
+
+        if isinstance(value, (dict, tuple)):
             return json.dumps(value, ensure_ascii=False)  # Ensure proper JSON formatting
 
         if isinstance(value, set):

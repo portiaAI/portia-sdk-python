@@ -7,8 +7,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from openai import BaseModel
+from pydantic import HttpUrl
 
 from portia.agents.base_agent import BaseAgent, Output
+from portia.clarification import ActionClarification
 from portia.config import LLMModel
 from portia.execution_context import execution_context
 from tests.utils import get_test_config, get_test_workflow
@@ -57,6 +59,8 @@ def test_output_serialize() -> None:
 
     not_a_model = NotAModel(id="123")
     now = datetime.now(tz=UTC)
+    clarification = ActionClarification(user_guidance="", action_url=HttpUrl("https://example.com"))
+
     tcs: list[tuple[Any, Any]] = [
         ("Hello World!", "Hello World!"),
         (None, ""),
@@ -72,6 +76,7 @@ def test_output_serialize() -> None:
         (b"Hello World!", "Hello World!"),
         (now, now.isoformat()),
         (not_a_model, str(not_a_model)),
+        ([clarification], json.dumps([clarification.model_dump(mode="json")])),
     ]
 
     for tc in tcs:
