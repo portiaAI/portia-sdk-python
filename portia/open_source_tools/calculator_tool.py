@@ -5,7 +5,6 @@ import re
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError
-from portia.execution_context import ExecutionContext
 from portia.tool import Tool, ToolRunContext
 
 

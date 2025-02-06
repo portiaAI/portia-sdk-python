@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -12,9 +11,6 @@ from pydantic import BaseModel, Field
 from portia.clarification import Clarification, MultipleChoiceClarification
 from portia.errors import ToolHardError
 from portia.tool import Tool, ToolRunContext
-
-if TYPE_CHECKING:
-    from portia.execution_context import ExecutionContext
 
 
 class FileReaderToolSchema(BaseModel):

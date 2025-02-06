@@ -17,7 +17,7 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
-from portia.storage import ToolCallRecord, ToolCallStatus, AdditionalStorage
+from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:

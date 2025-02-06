@@ -1,13 +1,12 @@
 """tests for llm tool."""
 
 import os
-from unittest.mock import MagicMock, patch
 import uuid
+from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain.schema import HumanMessage
 
-from portia.config import LLMModel
 from portia.open_source_tools.llm_tool import LLMTool, LLMToolSchema
 from portia.tool import ToolRunContext
 from tests.utils import get_test_config

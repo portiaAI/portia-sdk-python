@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
 
 import httpx
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError, ToolSoftError
 from portia.tool import Tool, ToolRunContext
-
-if TYPE_CHECKING:
-    from portia.execution_context import ExecutionContext
 
 
 class SearchToolSchema(BaseModel):

@@ -4,7 +4,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from portia.execution_context import ExecutionContext
 from portia.tool import Tool, ToolRunContext
 
 
