@@ -9,7 +9,6 @@ import pytest
 from portia.clarification import Clarification, InputClarification
 from portia.config import AgentType, Config, LLMModel, LLMProvider, LogLevel
 from portia.errors import ToolSoftError
-from portia.execution_context import execution_context
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry

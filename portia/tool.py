@@ -57,7 +57,20 @@ MAX_TOOL_DESCRIPTION_LENGTH = 1024
 
 
 class ToolRunContext(BaseModel):
-    """Context passed to tools when running."""
+    """Context passed to tools when running.
+
+    Attributes
+    ----------
+    execution_context : ExecutionContext
+        The execution context the tool is running in.
+    workflow_id : WorkflowUUID
+        The workflow id the tool run is part of.
+    config : Config
+        The config for the SDK as a whole.
+    clarifications : ClarificationListType
+        Relevant clarifications for this tool run.
+
+    """
 
     model_config = ConfigDict(extra="forbid")
 
