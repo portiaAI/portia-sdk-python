@@ -51,8 +51,8 @@ class OneShotPlanner(Planner):
     that tools need to make sure the chain of calls works. If you are missing information do not \
     make up placeholder variables like example@example.com. If you can't come up with a plan \
     provide a descriptive error instead - do not return plans with no steps. For tools that \
-    require a users id, make sure to check if there's a list users tool or some other way to get\
-    the user id from natural language.",
+    require an id, make sure to check if there's a list tool, id map tool, or some other way to get\
+    the id from natural language as part of the steps.",
                 },
                 {"role": "user", "content": prompt},
             ],
