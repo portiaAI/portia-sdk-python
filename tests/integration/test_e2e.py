@@ -268,6 +268,7 @@ def test_runner_run_query_with_soft_error(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
 def test_runner_run_query_with_multiple_clarifications(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,

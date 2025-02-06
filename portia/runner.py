@@ -262,6 +262,14 @@ class Runner:
         if workflow is None:
             workflow = self.storage.get_workflow(clarification.workflow_id)
 
+        matched_clarification = next(
+            (c for c in workflow.outputs.clarifications if c.id == clarification.id),
+            None,
+        )
+
+        if not matched_clarification:
+            raise InvalidWorkflowStateError("Could not match clarification to workflow")
+
         clarification.resolved = True
         clarification.response = response
 
