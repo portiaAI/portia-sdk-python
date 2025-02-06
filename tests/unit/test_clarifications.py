@@ -13,8 +13,8 @@ from portia.clarification import (
     CustomClarification,
     MultipleChoiceClarification,
 )
-from portia.storage import DiskFileStorage
 from portia.prefixed_uuid import WorkflowUUID
+from portia.storage import DiskFileStorage
 from tests.utils import get_test_workflow
 
 if TYPE_CHECKING:
