@@ -79,7 +79,6 @@ def test_tool_call_wrapper_run_with_clarification(
     tool = ClarificationTool()
     wrapper = ToolCallWrapper(tool, mock_storage, workflow)
     ctx = get_test_tool_context()
-    ctx.execution_context.additional_data["raise_clarification"] = "True"
     result = wrapper.run(ctx, "new clarification")
     assert isinstance(result, Clarification)
     assert mock_storage.records[-1].status == ToolCallStatus.NEED_CLARIFICATION

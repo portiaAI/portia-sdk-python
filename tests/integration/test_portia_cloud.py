@@ -90,7 +90,7 @@ def test_runner_run_query_with_oauth() -> None:
 
 
 def test_portia_cloud_storage() -> None:
-    """Test disk storage."""
+    """Test cloud storage."""
     config = Config.from_default()
     storage = PortiaCloudStorage(config)
     (plan, workflow) = get_test_workflow()

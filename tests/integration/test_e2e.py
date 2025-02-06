@@ -143,9 +143,8 @@ def test_runner_run_query_with_clarifications(
     )
     runner.storage.save_plan(plan)
 
-    with execution_context(additional_data={"raise_clarification": "True"}):
-        workflow = runner.create_workflow(plan)
-        workflow = runner.execute_workflow(workflow)
+    workflow = runner.create_workflow(plan)
+    workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.NEED_CLARIFICATION
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
@@ -155,8 +154,8 @@ def test_runner_run_query_with_clarifications(
         workflow.get_outstanding_clarifications()[0],
         "False",
     )
-    with execution_context(additional_data={"raise_clarification": "False"}):
-        runner.execute_workflow(workflow)
+
+    runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
 
 
@@ -347,8 +346,8 @@ def test_runner_run_query_with_multiple_clarifications(
         workflow.get_outstanding_clarifications()[0],
         456,
     )
-    with execution_context(additional_data={"raise_clarification": "False"}):
-        runner.execute_workflow(workflow)
+
+    runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
     # 498 = 456 (clarification - value a - step 1) + 2 (value b - step 1) + 40 (value b - step 2)
     assert workflow.outputs.final_output is not None
