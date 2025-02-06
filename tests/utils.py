@@ -27,7 +27,7 @@ def get_test_tool_context(
     if not workflow_id:
         workflow_id = WorkflowUUID()
     if not config:
-        config = Config.from_default()
+        config = get_test_config()
     return ToolRunContext(
         execution_context=get_execution_ctx(),
         workflow_id=workflow_id,

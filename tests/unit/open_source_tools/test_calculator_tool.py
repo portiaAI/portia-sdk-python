@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from portia.errors import ToolHardError
-from portia.execution_context import ExecutionContext
 from portia.open_source_tools.calculator_tool import CalculatorTool
+from tests.utils import get_test_tool_context
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def test_math_expression_conversion(calculator_tool: CalculatorTool) -> None:
 
 def test_run_valid_expressions(calculator_tool: CalculatorTool) -> None:
     """Test valid expressions."""
-    context = ExecutionContext()
+    context = get_test_tool_context()
     assert calculator_tool.run(context, "3 plus 5") == 8.0
     assert calculator_tool.run(context, "10 divided by 2") == 5.0
     assert calculator_tool.run(context, "6 times 3") == 18.0
@@ -41,7 +41,7 @@ def test_run_valid_expressions(calculator_tool: CalculatorTool) -> None:
 
 def test_run_invalid_expressions(calculator_tool: CalculatorTool) -> None:
     """Test invalid expressions."""
-    context = ExecutionContext()
+    context = get_test_tool_context()
     with pytest.raises(ToolHardError):
         calculator_tool.run(context, "what is the meaning of life?")
 
@@ -65,20 +65,20 @@ def test_run_invalid_expressions(calculator_tool: CalculatorTool) -> None:
 
 def test_run_division_by_zero(calculator_tool: CalculatorTool) -> None:
     """Test divide by zero."""
-    context = ExecutionContext()
+    context = get_test_tool_context()
     with pytest.raises(ToolHardError, match="Error: Division by zero"):
         calculator_tool.run(context, "10 divided by 0")
 
 
 def test_run_complex_expressions(calculator_tool: CalculatorTool) -> None:
     """Test complex."""
-    context = ExecutionContext()
+    context = get_test_tool_context()
     assert calculator_tool.run(context, "(3 plus 5) times 2") == 16.0
     assert calculator_tool.run(context, "(10 minus 3) divided by 2") == 3.5
 
 
 def test_run_decimal_numbers(calculator_tool: CalculatorTool) -> None:
     """Test decimals."""
-    context = ExecutionContext()
+    context = get_test_tool_context()
     assert calculator_tool.run(context, "3.5 plus 2.5") == 6.0
     assert calculator_tool.run(context, "7.2 divided by 3.6") == 2.0

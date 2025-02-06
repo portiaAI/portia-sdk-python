@@ -264,7 +264,7 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
                 action_url=HttpUrl(""),
             )
 
-        def ready(self, ctx: ExecutionContext) -> bool:  # noqa: ARG002
+        def ready(self, ctx: ToolRunContext) -> bool:  # noqa: ARG002
             mock_call_count.count += 1
             return mock_call_count.count == 3
 

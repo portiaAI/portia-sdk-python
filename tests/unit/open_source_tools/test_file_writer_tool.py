@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from portia.execution_context import empty_context
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
+from tests.utils import get_test_tool_context
 
 
 def test_file_writer_tool_successful_write(tmp_path: Path) -> None:
     """Test that FileWriterTool successfully writes content to a file."""
     tool = FileWriterTool()
-    ctx = empty_context()
+    ctx = get_test_tool_context()
     filename = tmp_path / "test_file.txt"
     content = "Hello, world!"
 
@@ -23,7 +23,7 @@ def test_file_writer_tool_successful_write(tmp_path: Path) -> None:
 def test_file_writer_tool_overwrite_existing_file(tmp_path: Path) -> None:
     """Test that FileWriterTool overwrites an existing file."""
     tool = FileWriterTool()
-    ctx = empty_context()
+    ctx = get_test_tool_context()
     filename = tmp_path / "existing_file.txt"
     filename.write_text("Old content")
     content = "New content!"
@@ -36,7 +36,7 @@ def test_file_writer_tool_overwrite_existing_file(tmp_path: Path) -> None:
 def test_file_writer_tool_handles_file_creation_error(tmp_path: Path) -> None:
     """Test that FileWriterTool raises an error if file creation fails."""
     tool = FileWriterTool()
-    ctx = empty_context()
+    ctx = get_test_tool_context()
     filename = tmp_path / "error_file.txt"
 
     # Make the directory read-only to simulate permission error

@@ -5,15 +5,15 @@ from unittest.mock import Mock, patch
 import pytest
 
 from portia.errors import ToolHardError, ToolSoftError
-from portia.execution_context import empty_context
 from portia.open_source_tools.weather import WeatherTool
+from tests.utils import get_test_tool_context
 
 
 def test_weather_tool_missing_api_key() -> None:
     """Test that WeatherTool raises ToolHardError if API key is missing."""
     tool = WeatherTool()
     with patch("os.getenv", return_value=""):
-        ctx = empty_context()
+        ctx = get_test_tool_context()
         with pytest.raises(ToolHardError):
             tool.run(ctx, "paris")
 
@@ -25,7 +25,7 @@ def test_weather_tool_successful_response() -> None:
     mock_response = {"main": {"temp": 10}, "weather": [{"description": "sunny"}]}
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = empty_context()
+        ctx = get_test_tool_context()
         with patch("httpx.get") as mock_post:
             mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
 
@@ -40,7 +40,7 @@ def test_weather_tool_no_answer_in_response() -> None:
     mock_response = {"no_answer": "No relevant information found."}
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = empty_context()
+        ctx = get_test_tool_context()
         with patch("httpx.get") as mock_post:
             mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
 
@@ -58,7 +58,7 @@ def test_weather_tool_no_main_answer_in_response() -> None:
     }
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = empty_context()
+        ctx = get_test_tool_context()
         with patch("httpx.get") as mock_post:
             mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
 
@@ -73,6 +73,6 @@ def test_weather_tool_http_error() -> None:
 
     with patch("os.getenv", return_value=mock_api_key):  # noqa: SIM117
         with patch("httpx.get", side_effect=Exception("HTTP Error")):
-            ctx = empty_context()
+            ctx = get_test_tool_context()
             with pytest.raises(Exception, match="HTTP Error"):
                 tool.run(ctx, "Paris")

@@ -166,12 +166,7 @@ def run(
     # solely on LLM capabilities. It won't call other tools. Recommended for steps that don't
     # require any external tools.
     example_tool_registry.register_tool(
-        LLMTool(
-            model_name=config.llm_model_name.value,
-            provider=config.llm_provider.value,
-            temperature=config.llm_model_temperature,
-            seed=config.llm_model_seed,
-        ),
+        LLMTool(),
     )
 
     if config.has_api_key(PORTIA_API_KEY):
