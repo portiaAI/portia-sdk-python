@@ -20,9 +20,7 @@ from pydantic import (
 
 from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum, PrefixedUUID
 
-# TODO(Emma): This will be changed to "clar" in the future once the backend is # noqa: FIX002 TD003
-# updated to use this field.
-CLARIFICATION_UUID_PREFIX = ""
+CLARIFICATION_UUID_PREFIX = "clar"
 
 class ClarificationCategory(PortiaEnum):
     """The category of a clarification.
