@@ -550,7 +550,7 @@ class VerifierAgent(BaseAgent):
 
         """
         if not self.tool:
-            self.tool = LLMTool.from_config(self.config)
+            self.tool = LLMTool()
 
         context = self.get_system_context()
         execution_context = get_execution_context()

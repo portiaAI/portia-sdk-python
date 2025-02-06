@@ -745,7 +745,7 @@ def test_verifier_agent_without_tool_uses_llm_tool() -> None:
         config=get_test_config(),
         tool=None,
     )
+    # try to run the tool and fail, but sets the tool to an LLM tool
     with suppress(Exception):
-        # try to run the tool and fail, but sets the tool to an LLM tool
         agent.execute_sync()
     assert isinstance(agent.tool, LLMTool)

@@ -9,7 +9,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError, ToolSoftError
-from portia.tool import Tool
+from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from portia.execution_context import ExecutionContext
@@ -30,7 +30,7 @@ class WeatherTool(Tool[str]):
     args_schema: type[BaseModel] = WeatherToolSchema
     output_schema: tuple[str, str] = ("str", "String output of the weather with temp and city")
 
-    def run(self, _: ExecutionContext, city: str) -> str:
+    def run(self, _: ToolRunContext, city: str) -> str:
         """Run the WeatherTool."""
         api_key = os.getenv("OPENWEATHERMAP_API_KEY")
         if not api_key or api_key == "":

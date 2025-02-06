@@ -258,7 +258,7 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
             "Clarification: The value of the Clarification",
         )
 
-        def run(self, ctx: ExecutionContext, user_guidance: str) -> Clarification:  # noqa: ARG002
+        def run(self, ctx: ToolRunContext, user_guidance: str) -> Clarification:  # noqa: ARG002
             return ActionClarification(
                 user_guidance="",
                 action_url=HttpUrl(""),

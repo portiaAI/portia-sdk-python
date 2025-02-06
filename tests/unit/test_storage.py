@@ -15,7 +15,7 @@ from portia.storage import (
     InMemoryStorage,
     PlanStorage,
     PortiaCloudStorage,
-    ToolCallStorage,
+    AdditionalStorage,
     WorkflowListResponse,
     WorkflowStorage,
 )
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def test_storage_base_classes() -> None:
     """Test PlanStorage raises."""
 
-    class MyStorage(WorkflowStorage, PlanStorage, ToolCallStorage):
+    class MyStorage(WorkflowStorage, PlanStorage, AdditionalStorage):
         """Override to test base."""
 
         def save_plan(self, plan: Plan) -> None:

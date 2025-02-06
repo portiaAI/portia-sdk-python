@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from portia.execution_context import ExecutionContext
-from portia.tool import Tool
+from portia.tool import Tool, ToolRunContext
 
 
 class FileWriterToolSchema(BaseModel):
@@ -30,7 +30,7 @@ class FileWriterTool(Tool[str]):
     args_schema: type[BaseModel] = FileWriterToolSchema
     output_schema: tuple[str, str] = ("str", "A string indicating where the content was written to")
 
-    def run(self, _: ExecutionContext, filename: str, content: str) -> str:
+    def run(self, _: ToolRunContext, filename: str, content: str) -> str:
         """Run the FileWriterTool."""
         filepath = Path(filename)
         if filepath.is_file():

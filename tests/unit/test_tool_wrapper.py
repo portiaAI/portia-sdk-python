@@ -4,7 +4,7 @@ import pytest
 
 from portia.clarification import Clarification
 from portia.errors import ToolHardError
-from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
+from portia.storage import ToolCallRecord, ToolCallStatus, AdditionalStorage
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
 from tests.utils import (
@@ -16,8 +16,8 @@ from tests.utils import (
 )
 
 
-class MockStorage(ToolCallStorage):
-    """Mock implementation of ToolCallStorage for testing."""
+class MockStorage(AdditionalStorage):
+    """Mock implementation of AdditionalStorage for testing."""
 
     def __init__(self) -> None:
         """Save records in array."""

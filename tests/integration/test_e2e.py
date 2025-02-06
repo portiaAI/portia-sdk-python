@@ -285,7 +285,7 @@ def test_runner_run_query_with_multiple_clarifications(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, _: ExecutionContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+        def run(self, _: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
             if a == 1:
                 return InputClarification(argument_name="a", user_guidance="please try again")
             return a + b
