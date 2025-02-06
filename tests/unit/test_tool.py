@@ -81,6 +81,12 @@ def test_run_method_with_uncaught_error() -> None:
         )
 
 
+def test_ready() -> None:
+    """Test the ready method."""
+    tool = ErrorTool()
+    assert tool.ready(get_execution_context())
+
+
 def test_tool_serialization() -> None:
     """Test tools can be serialized to string."""
     tool = AdditionTool()
@@ -219,6 +225,74 @@ def test_remote_tool_hard_error() -> None:
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
             content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_ready() -> None:
+    """Test remote tool ready."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = True
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value={"success": "true"},
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+
+        assert tool.ready(empty_context())
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/ready/",
+            content='{"execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            headers={
+                "Authorization": "Api-Key ",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+
+def test_remote_tool_ready_error() -> None:
+    """Test remote tool ready."""
+    mock_response = MagicMock(spec=Response)
+    mock_response.is_success = False
+    mock_response.raise_for_status = MagicMock(
+        side_effect=Exception(),
+    )
+    mock_response.json = MagicMock(
+        return_value={"success": "true"},
+    )
+    with (
+        patch("httpx.post", return_value=mock_response) as mock_post,
+    ):
+        tool = PortiaRemoteTool(
+            id="test",
+            name="test",
+            description="",
+            output_schema=("", ""),
+            api_key=SecretStr(""),
+            api_endpoint="https://example.com",
+        )
+
+        assert not tool.ready(empty_context())
+
+        mock_post.assert_called_once_with(
+            url="https://example.com/api/v0/tools/test/ready/",
+            content='{"execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",

@@ -108,6 +108,22 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "Tools may not require a summary if they already produce a nice textual output.",
     )
 
+    def ready(self, ctx: ExecutionContext) -> bool:  # noqa: ARG002
+        """Check whether the tool can be run.
+
+        This method can be implemented by subclasses to allow checking if the tool can be run.
+        It may run any authentication logic or other required checks before returning its status.
+        If left unimplemented will always return true.
+
+        Args:
+            ctx (ExecutionContext): Context of the execution environment
+
+        Returns:
+            bool: Whether the tool is ready to run
+
+        """
+        return True
+
     @abstractmethod
     def run(
         self,
@@ -423,6 +439,43 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
         return output
+
+    def ready(self, ctx: ExecutionContext) -> bool:
+        """Check if the remote tool is ready by calling the /ready endpoint.
+
+        Args:
+            ctx (ExecutionContext): Context of the execution environment
+
+        Returns:
+            bool: Whether the tool is ready to run
+
+        """
+        try:
+            # Send to Cloud
+            response = httpx.post(
+                url=f"{self.api_endpoint}/api/v0/tools/{self.id}/ready/",
+                content=json.dumps(
+                    {
+                        "execution_context": {
+                            "end_user_id": ctx.end_user_id or "",
+                            "workflow_id": ctx.workflow_id,
+                            "additional_data": ctx.additional_data or {},
+                        },
+                    },
+                ),
+                headers={
+                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
+                    "Content-Type": "application/json",
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+        except Exception as e:  # noqa: BLE001
+            logger().error(f"Unhandled error from Portia Cloud: {e}")
+            return False
+        else:
+            response_json = response.json()
+            return "success" in response_json
 
     def run(
         self,

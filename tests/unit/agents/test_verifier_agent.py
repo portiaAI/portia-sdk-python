@@ -632,21 +632,21 @@ def test_get_last_resolved_clarification() -> None:
         response="2",
         user_guidance="FAILED",
         resolved=True,
-        step=1,
+        step=0,
     )
     resolved_clarification2 = InputClarification(
         argument_name="arg",
         response="2",
         user_guidance="SUCCESS",
         resolved=True,
-        step=1,
+        step=0,
     )
     unresolved_clarification = InputClarification(
         argument_name="arg",
         response="2",
         user_guidance="",
         resolved=False,
-        step=1,
+        step=0,
     )
     (plan, workflow) = get_test_workflow()
     workflow.outputs.clarifications = [
@@ -705,7 +705,7 @@ def test_clarifications_or_continue() -> None:
         response="1",
         user_guidance="",
         resolved=True,
-        step=1,
+        step=0,
     )
 
     (plan, workflow) = get_test_workflow()

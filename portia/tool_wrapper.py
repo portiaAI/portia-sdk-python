@@ -17,6 +17,7 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
+from portia.execution_context import ExecutionContext
 from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
 from portia.tool import Tool
 
@@ -67,6 +68,18 @@ class ToolCallWrapper(Tool):
         self._child_tool = child_tool
         self._storage = storage
         self._workflow = workflow
+
+    def ready(self, ctx: ExecutionContext) -> bool:
+        """Check if the child tool is ready.
+
+        Args:
+            ctx (ExecutionContext): Context of the execution environment
+
+        Returns:
+            bool: Whether the tool is ready to run
+
+        """
+        return self._child_tool.ready(ctx)
 
     def run(self, ctx: ExecutionContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
         """Run the child tool and store the outcome.
