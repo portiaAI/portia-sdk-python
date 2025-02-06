@@ -50,7 +50,7 @@ class ExecutionContext(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     end_user_id: str | None = None
 
