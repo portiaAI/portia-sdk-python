@@ -37,7 +37,11 @@ if workflow.state == WorkflowState.NEED_CLARIFICATION:
         # Here you prompt the user for the response to the clarification
         # via whatever mechanism makes sense for your use-case.
         new_value = "Answer"
-        workflow = runner.resolve_clarification(workflow, c, new_value)
+        workflow = runner.resolve_clarification(
+            workflow=workflow,
+            clarification=c,
+            response=new_value,
+        )
 
 # Execute again with the same execution context
 with execution_context(context=workflow.execution_context):

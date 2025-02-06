@@ -200,7 +200,7 @@ def run(
                         clarification.user_guidance + "\nPlease choose a value:\n",
                         type=choices,
                     )
-                    workflow = runner.resolve_clarification(workflow, clarification, user_input)
+                    workflow = runner.resolve_clarification(clarification, user_input, workflow)
                 if isinstance(clarification, ActionClarification):
                     webbrowser.open(str(clarification.action_url))
                     logger().info("Please complete authentication to continue")
@@ -209,7 +209,7 @@ def run(
                     user_input = click.prompt(
                         clarification.user_guidance + "\nPlease enter a value:\n",
                     )
-                    workflow = runner.resolve_clarification(workflow, clarification, user_input)
+                    workflow = runner.resolve_clarification(clarification, user_input, workflow)
             runner.execute_workflow(workflow)
 
         click.echo(workflow.model_dump_json(indent=4))
