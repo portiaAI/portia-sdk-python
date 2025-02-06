@@ -42,7 +42,7 @@ from portia.execution_context import (
     is_execution_context_set,
 )
 from portia.logger import logger, logger_manager
-from portia.plan import Plan, ReadOnlyPlan, ReadOnlyStep, Step
+from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.storage import (
     DiskFileStorage,
@@ -56,7 +56,6 @@ from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowU
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
     from portia.config import Config
-    from portia.plan import Plan
     from portia.planners.planner import Planner
     from portia.tool import Tool
 
@@ -151,7 +150,7 @@ class Runner:
 
         logger().debug(f"Running planner for query - {query}")
         planner = self._get_planner()
-        outcome = planner.generate_plan_or_error(
+        outcome = planner.generate_steps_or_error(
             ctx=get_execution_context(),
             query=query,
             tool_list=tools,
@@ -160,18 +159,25 @@ class Runner:
         if outcome.error:
             logger().error(f"Error in planning - {outcome.error}")
             raise PlanError(outcome.error)
-        self.storage.save_plan(outcome.plan)
+        plan = Plan(
+            plan_context=PlanContext(
+                query=query,
+                tool_ids=[tool.id for tool in tools],
+            ),
+            steps=outcome.steps,
+        )
+        self.storage.save_plan(plan)
         logger().info(
-            f"Plan created with {len(outcome.plan.steps)} steps",
-            extra={"plan": outcome.plan.id},
+            f"Plan created with {len(plan.steps)} steps",
+            extra={"plan": plan.id},
         )
         logger().debug(
             "Plan: {plan}",
-            extra={"plan": outcome.plan.id},
-            plan=outcome.plan.model_dump_json(indent=4),
+            extra={"plan": plan.id},
+            plan=plan.model_dump_json(indent=4),
         )
 
-        return outcome.plan
+        return plan
 
     def create_workflow(self, plan: Plan) -> Workflow:
         """Create a workflow from a Plan.
