@@ -264,6 +264,7 @@ class Runner:
 
         clarification.resolved = True
         clarification.response = response
+
         if len(workflow.get_outstanding_clarifications()) == 0:
             workflow.state = WorkflowState.READY_TO_RESUME
 

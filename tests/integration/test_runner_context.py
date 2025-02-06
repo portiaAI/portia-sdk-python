@@ -61,7 +61,7 @@ def test_runner_no_execution_context_new() -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == str(workflow.id)
+    assert tool.tool_context.workflow_id == workflow.id
 
 
 def test_runner_no_execution_context_existing() -> None:
@@ -77,7 +77,7 @@ def test_runner_no_execution_context_existing() -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == str(workflow.id)
+    assert tool.tool_context.workflow_id == workflow.id
     assert tool.tool_context.execution_context.end_user_id == "123"
 
 
@@ -95,7 +95,7 @@ def test_runner_with_execution_context_new() -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == str(workflow.id)
+    assert tool.tool_context.workflow_id == workflow.id
     assert tool.tool_context.execution_context.end_user_id == "123"
 
 
@@ -114,5 +114,5 @@ def test_runner_with_execution_context_existing() -> None:
 
     assert workflow.state == WorkflowState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == str(workflow.id)
+    assert tool.tool_context.workflow_id == workflow.id
     assert tool.tool_context.execution_context.end_user_id == "123"
