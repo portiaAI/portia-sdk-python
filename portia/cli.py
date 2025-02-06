@@ -227,7 +227,7 @@ def run(
 
                 if isinstance(clarification, CustomClarification):
                     click.echo(clarification.user_guidance)
-                    click.echo(json.dumps(clarification.data))
+                    click.echo(f"Additional data: {json.dumps(clarification.data)}")
                     user_input = click.prompt("\nPlease enter a value:\n")
                     workflow = runner.resolve_clarification(clarification, user_input, workflow)
 
