@@ -336,6 +336,7 @@ class Runner:
                             execution_context=workflow.execution_context,
                             workflow_id=workflow.id,
                             config=self.config,
+                            clarifications=workflow.get_clarifications_for_step(),
                         ),
                     )
                     logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")

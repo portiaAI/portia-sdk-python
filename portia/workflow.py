@@ -59,6 +59,7 @@ class WorkflowState(PortiaEnum):
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
 
+
 class WorkflowOutputs(BaseModel):
     """Outputs of a workflow, including clarifications.
 
@@ -96,6 +97,7 @@ class WorkflowUUID(PrefixedUUID):
     """A UUID for a workflow."""
 
     prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX
+
 
 class Workflow(BaseModel):
     """A workflow represents a running instance of a Plan.
@@ -156,6 +158,27 @@ class Workflow(BaseModel):
             clarification
             for clarification in self.outputs.clarifications
             if not clarification.resolved
+        ]
+
+    def get_clarifications_for_step(self, step: int | None = None) -> ClarificationListType:
+        """Return clarifications for the given step.
+
+        Args:
+        ----
+        step( int| None): the step to get clarifications for. Defaults to current step.
+
+        Returns:
+        -------
+        ClarificationListType
+            A list of clarifications for the given step.
+
+        """
+        if step is None:
+            step = self.current_step_index
+        return [
+            clarification
+            for clarification in self.outputs.clarifications
+            if clarification.step == step
         ]
 
     def __str__(self) -> str:

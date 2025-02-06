@@ -32,6 +32,7 @@ def get_test_tool_context(
         execution_context=get_execution_ctx(),
         workflow_id=workflow_id,
         config=config,
+        clarifications=[],
     )
 
 

@@ -563,6 +563,7 @@ class VerifierAgent(BaseAgent):
                     execution_context=get_execution_context(),
                     workflow_id=self.workflow.id,
                     config=self.config,
+                    clarifications=self.workflow.get_clarifications_for_step(),
                 ),
             ),
         ]

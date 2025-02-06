@@ -38,6 +38,7 @@ from portia.clarification import (
     ActionClarification,
     Clarification,
     ClarificationCategory,
+    ClarificationListType,
     ClarificationUUID,
     InputClarification,
     MultipleChoiceClarification,
@@ -58,9 +59,12 @@ MAX_TOOL_DESCRIPTION_LENGTH = 1024
 class ToolRunContext(BaseModel):
     """Context passed to tools when running."""
 
+    model_config = ConfigDict(extra="forbid")
+
     execution_context: ExecutionContext
     workflow_id: WorkflowUUID
     config: Config
+    clarifications: ClarificationListType
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
