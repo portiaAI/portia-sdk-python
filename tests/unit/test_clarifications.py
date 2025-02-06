@@ -10,11 +10,13 @@ from portia.clarification import (
     ClarificationUUID,
     MultipleChoiceClarification,
 )
+from portia.uuid import WorkflowUUID
 
 
 def test_action_clarification_ser() -> None:
     """Test action clarifications can be serialized."""
     clarification = ActionClarification(
+        workflow_id=WorkflowUUID(),
         user_guidance="test",
         action_url=HttpUrl("https://example.com"),
     )
@@ -25,6 +27,7 @@ def test_action_clarification_ser() -> None:
 def test_clarification_uuid_assign() -> None:
     """Test clarification assign correct UUIDs."""
     clarification = ActionClarification(
+        workflow_id=WorkflowUUID(),
         user_guidance="test",
         action_url=HttpUrl("https://example.com"),
     )
@@ -35,6 +38,7 @@ def test_value_multi_choice_validation() -> None:
     """Test clarifications error on invalid response."""
     with pytest.raises(ValueError):  # noqa: PT011
         MultipleChoiceClarification(
+            workflow_id=WorkflowUUID(),
             argument_name="test",
             user_guidance="test",
             options=["yes"],
@@ -43,6 +47,7 @@ def test_value_multi_choice_validation() -> None:
         )
 
     MultipleChoiceClarification(
+        workflow_id=WorkflowUUID(),
         argument_name="test",
         user_guidance="test",
         options=["yes"],

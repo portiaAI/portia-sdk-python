@@ -259,6 +259,7 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
 
         def run(self, ctx: ToolRunContext, user_guidance: str) -> Clarification:  # noqa: ARG002
             return ActionClarification(
+                workflow_id=ctx.workflow_id,
                 user_guidance="",
                 action_url=HttpUrl(""),
             )

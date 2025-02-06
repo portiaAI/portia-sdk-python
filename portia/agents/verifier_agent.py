@@ -506,6 +506,7 @@ class VerifierAgent(BaseAgent):
             if not matching_clarification:
                 self.new_clarifications.append(
                     InputClarification(
+                        workflow_id=self.workflow.id,
                         argument_name=arg.name,
                         user_guidance=f"Missing Argument: {arg.name}",
                         step=self.workflow.current_step_index,

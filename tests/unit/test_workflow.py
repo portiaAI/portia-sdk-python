@@ -9,13 +9,19 @@ from portia.agents.base_agent import Output
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import PlanUUID, ReadOnlyStep, Step
+from portia.uuid import WorkflowUUID
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowOutputs, WorkflowState
 
 
 @pytest.fixture
 def mock_clarification() -> InputClarification:
     """Create a mock clarification for testing."""
-    return InputClarification(user_guidance="test", resolved=False, argument_name="test")
+    return InputClarification(
+        workflow_id=WorkflowUUID(),
+        user_guidance="test",
+        resolved=False,
+        argument_name="test",
+    )
 
 
 @pytest.fixture
@@ -93,11 +99,14 @@ def test_read_only_step_immutable() -> None:
 
 def test_workflow_serialization() -> None:
     """Test workflow can be serialized to string."""
+    workflow_id = WorkflowUUID()
     workflow = Workflow(
+        id=workflow_id,
         plan_id=PlanUUID(),
         outputs=WorkflowOutputs(
             clarifications=[
                 InputClarification(
+                    workflow_id=workflow_id,
                     step=0,
                     argument_name="test",
                     user_guidance="help",

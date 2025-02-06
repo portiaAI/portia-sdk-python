@@ -8,7 +8,7 @@ and value confirmations.
 
 from __future__ import annotations
 
-from typing import ClassVar, Generic, Self, Union
+from typing import Generic, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -18,9 +18,9 @@ from pydantic import (
     model_validator,
 )
 
-from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum, PrefixedUUID
+from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
+from portia.uuid import ClarificationUUID, WorkflowUUID
 
-CLARIFICATION_UUID_PREFIX = "clar"
 
 class ClarificationCategory(PortiaEnum):
     """The category of a clarification.
@@ -37,11 +37,6 @@ class ClarificationCategory(PortiaEnum):
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
 
-
-class ClarificationUUID(PrefixedUUID):
-    """A UUID for a clarification."""
-
-    prefix: ClassVar[str] = CLARIFICATION_UUID_PREFIX
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Base Model for Clarifications.
@@ -63,6 +58,9 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     id: ClarificationUUID = Field(
         default_factory=ClarificationUUID,
         description="A unique ID for this clarification",
+    )
+    workflow_id: WorkflowUUID = Field(
+        description="The workflow this clarification is for",
     )
     category: ClarificationCategory = Field(
         default=ClarificationCategory.BASE,

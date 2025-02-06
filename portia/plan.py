@@ -20,13 +20,12 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.common import PrefixedUUID
+from portia.uuid import PlanUUID
 
-PLAN_UUID_PREFIX = "plan"
 
 class Variable(BaseModel):
     """A variable in the plan.
@@ -145,15 +144,6 @@ class PlanContext(BaseModel):
 
     query: str = Field(description="The original query given by the user.")
     tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
-
-
-class PlanUUID(PrefixedUUID):
-    """A UUID for a plan.
-
-    This class is a wrapper around the PrefixedUUID class, with the prefix set to PLAN_UUID_PREFIX.
-    """
-
-    prefix: ClassVar[str] = PLAN_UUID_PREFIX
 
 
 class Plan(BaseModel):

@@ -6,7 +6,8 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel, Field
 
-from portia.common import PortiaEnum, PrefixedUUID, combine_args_kwargs
+from portia.common import PortiaEnum, combine_args_kwargs
+from portia.uuid import PrefixedUUID
 
 
 def test_portia_enum() -> None:
@@ -36,6 +37,7 @@ class TestPrefixedUUID:
 
     def test_custom_prefix(self) -> None:
         """Test PrefixedUUID with custom prefix."""
+
         class CustomPrefixUUID(PrefixedUUID):
             prefix = "test"
 
@@ -72,6 +74,7 @@ class TestPrefixedUUID:
 
     def test_model_validation(self) -> None:
         """Test JSON validation and deserialization."""
+
         class CustomID(PrefixedUUID):
             prefix = "test"
 
@@ -89,11 +92,13 @@ class TestPrefixedUUID:
         assert model.id.prefix == "test"
 
         # Test with full representation of ID
-        json_data = json.dumps({
-            "id": {
-                "uuid": uuid_str,
+        json_data = json.dumps(
+            {
+                "id": {
+                    "uuid": uuid_str,
+                },
             },
-        })
+        )
         model = TestModel.model_validate_json(json_data)
         assert isinstance(model.id, CustomID)
         assert str(model.id.uuid) == uuid_str
@@ -118,4 +123,3 @@ class TestPrefixedUUID:
         """Test PrefixedUUID hash."""
         uuid = PrefixedUUID()
         assert hash(uuid) == hash(uuid.uuid)
-

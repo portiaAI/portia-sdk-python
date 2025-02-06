@@ -244,25 +244,29 @@ class Runner:
 
     def resolve_clarification(
         self,
-        workflow: Workflow,
         clarification: Clarification,
         response: object,
+        workflow: Workflow | None = None,
     ) -> Workflow:
         """Resolve a clarification updating the workflow state as needed.
 
         Args:
-            workflow (Workflow): The workflow being updated.
             clarification (Clarification): The clarification to resolve.
             response (object): The response to the clarification.
+            workflow (Workflow | None): Optional - the workflow being updated.
 
         Returns:
             Workflow: The updated workflow.
 
         """
+        if workflow is None:
+            workflow = self.storage.get_workflow(clarification.workflow_id)
+
         clarification.resolved = True
         clarification.response = response
         if len(workflow.get_outstanding_clarifications()) == 0:
             workflow.state = WorkflowState.READY_TO_RESUME
+
         self.storage.save_workflow(workflow)
         return workflow
 
