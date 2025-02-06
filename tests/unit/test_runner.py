@@ -14,12 +14,11 @@ from portia.agents.base_agent import Output
 from portia.clarification import ActionClarification, Clarification
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
-from portia.execution_context import ExecutionContext
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
-from portia.tool import Tool
+from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 from tests.utils import AdditionTool, ClarificationTool, get_test_config, get_test_workflow
@@ -258,13 +257,13 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
             "Clarification: The value of the Clarification",
         )
 
-        def run(self, ctx: ExecutionContext, user_guidance: str) -> Clarification:  # noqa: ARG002
+        def run(self, ctx: ToolRunContext, user_guidance: str) -> Clarification:  # noqa: ARG002
             return ActionClarification(
                 user_guidance="",
                 action_url=HttpUrl(""),
             )
 
-        def ready(self, ctx: ExecutionContext) -> bool:  # noqa: ARG002
+        def ready(self, ctx: ToolRunContext) -> bool:  # noqa: ARG002
             mock_call_count.count += 1
             return mock_call_count.count == 3
 

@@ -2,7 +2,7 @@
 
 This module contains the `ToolCallWrapper` class, which wraps around an existing tool and records
 information about the tool's execution, such as input, output, latency, and status. The recorded
-data is stored in `ToolCallStorage` for later use.
+data is stored in `AdditionalStorage` for later use.
 
 Classes:
     ToolCallWrapper: A wrapper that intercepts tool calls, records execution data, and stores it.
@@ -17,27 +17,25 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
-from portia.execution_context import ExecutionContext
-from portia.storage import ToolCallRecord, ToolCallStatus, ToolCallStorage
-from portia.tool import Tool
+from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
+from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
-    from portia.execution_context import ExecutionContext
     from portia.workflow import Workflow
 
 
 class ToolCallWrapper(Tool):
-    """Tool Wrapper that records calls to its child tool and sends them to the ToolCallStorage.
+    """Tool Wrapper that records calls to its child tool and sends them to the AdditionalStorage.
 
     This class is a wrapper around a child tool. It captures the input and output, measures latency,
     and records the status of the execution. The results are then stored in the provided
-    `ToolCallStorage`.
+    `AdditionalStorage`.
 
     Attributes
     ----------
         model_config (ConfigDict): Pydantic configuration that allows arbitrary types.
         _child_tool (Tool): The child tool to be wrapped and executed.
-        _storage (ToolCallStorage): Storage mechanism to save tool call records.
+        _storage (AdditionalStorage): Storage mechanism to save tool call records.
         _workflow (Workflow): The workflow context for the current execution.
 
     """
@@ -45,15 +43,15 @@ class ToolCallWrapper(Tool):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     _child_tool: Tool
-    _storage: ToolCallStorage
+    _storage: AdditionalStorage
     _workflow: Workflow
 
-    def __init__(self, child_tool: Tool, storage: ToolCallStorage, workflow: Workflow) -> None:
+    def __init__(self, child_tool: Tool, storage: AdditionalStorage, workflow: Workflow) -> None:
         """Initialize parent fields using child_tool's attributes.
 
         Args:
             child_tool (Tool): The child tool to be wrapped.
-            storage (ToolCallStorage): The storage to save execution records.
+            storage (AdditionalStorage): The storage to save execution records.
             workflow (Workflow): The current workflow for the execution.
 
         """
@@ -69,11 +67,11 @@ class ToolCallWrapper(Tool):
         self._storage = storage
         self._workflow = workflow
 
-    def ready(self, ctx: ExecutionContext) -> bool:
+    def ready(self, ctx: ToolRunContext) -> bool:
         """Check if the child tool is ready.
 
         Args:
-            ctx (ExecutionContext): Context of the execution environment
+            ctx (ToolRunContext): Context of the tool run
 
         Returns:
             bool: Whether the tool is ready to run
@@ -81,14 +79,14 @@ class ToolCallWrapper(Tool):
         """
         return self._child_tool.ready(ctx)
 
-    def run(self, ctx: ExecutionContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
+    def run(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
         """Run the child tool and store the outcome.
 
         This method executes the child tool with the provided arguments, records the input,
-        output, latency, and status of the execution, and stores the details in `ToolCallStorage`.
+        output, latency, and status of the execution, and stores the details in `AdditionalStorage`.
 
         Args:
-            ctx (ExecutionContext): The execution context containing user data and metadata.
+            ctx (ToolRunContext): The context containing user data and metadata.
             *args (Any): Positional arguments for the child tool.
             **kwargs (Any): Keyword arguments for the child tool.
 
@@ -108,8 +106,8 @@ class ToolCallWrapper(Tool):
             tool_name=self._child_tool.name,
             workflow_id=self._workflow.id,
             step=self._workflow.current_step_index,
-            end_user_id=ctx.end_user_id,
-            additional_data=ctx.additional_data,
+            end_user_id=ctx.execution_context.end_user_id,
+            additional_data=ctx.execution_context.additional_data,
             status=ToolCallStatus.IN_PROGRESS,
         )
         start_time = datetime.now(tz=UTC)

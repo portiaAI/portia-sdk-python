@@ -49,6 +49,7 @@ from portia.storage import (
     InMemoryStorage,
     PortiaCloudStorage,
 )
+from portia.tool import ToolRunContext
 from portia.tool_registry import InMemoryToolRegistry, ToolRegistry
 from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
@@ -234,15 +235,12 @@ class Runner:
 
         # if the workflow has execution context associated, but none is set then use it
         if not is_execution_context_set():
-            workflow.execution_context.workflow_id = str(workflow.id)
             with execution_context(workflow.execution_context):
                 return self._execute_workflow(plan, workflow)
 
         # if there is execution context set, make sure we update the workflow before running
         workflow.execution_context = get_execution_context()
-        workflow.execution_context.workflow_id = str(workflow.id)
-        with execution_context(workflow.execution_context):
-            return self._execute_workflow(plan, workflow)
+        return self._execute_workflow(plan, workflow)
 
     def resolve_clarification(
         self,
@@ -333,7 +331,14 @@ class Runner:
                 step = plan.steps[workflow.current_step_index]
                 next_tool = self._get_tool_for_step(step, workflow)
                 if next_tool:
-                    tool_ready = next_tool.ready(workflow.execution_context)
+                    tool_ready = next_tool.ready(
+                        ToolRunContext(
+                            execution_context=workflow.execution_context,
+                            workflow_id=workflow.id,
+                            config=self.config,
+                            clarifications=workflow.get_clarifications_for_step(),
+                        ),
+                    )
                     logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
                     if tool_ready:
                         workflow.state = WorkflowState.READY_TO_RESUME

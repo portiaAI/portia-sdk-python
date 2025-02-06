@@ -8,7 +8,7 @@ from pydantic import SecretStr
 from portia.clarification import ActionClarification
 from portia.config import Config, StorageClass
 from portia.errors import ToolNotFoundError
-from portia.execution_context import execution_context, get_execution_context
+from portia.execution_context import execution_context
 from portia.runner import Runner
 from portia.storage import PortiaCloudStorage
 from portia.tool import ToolHardError
@@ -17,7 +17,7 @@ from portia.tool_registry import (
     PortiaToolRegistry,
 )
 from portia.workflow import WorkflowState
-from tests.utils import AdditionTool, get_test_workflow
+from tests.utils import AdditionTool, get_test_tool_context, get_test_workflow
 
 
 def test_runner_run_query_with_cloud() -> None:
@@ -53,7 +53,7 @@ def test_run_tool_error() -> None:
 
     tool = registry.get_tool("portia::search_tool")
     tool.api_key = SecretStr("123")
-    ctx = get_execution_context()
+    ctx = get_test_tool_context()
     with pytest.raises(ToolHardError):
         tool.run(ctx)
 
@@ -90,7 +90,7 @@ def test_runner_run_query_with_oauth() -> None:
 
 
 def test_portia_cloud_storage() -> None:
-    """Test disk storage."""
+    """Test cloud storage."""
     config = Config.from_default()
     storage = PortiaCloudStorage(config)
     (plan, workflow) = get_test_workflow()

@@ -6,7 +6,7 @@ from portia.config import Config
 from portia.execution_context import ExecutionContext, execution_context
 from portia.plan import Plan, PlanContext, Step
 from portia.runner import Runner
-from portia.tool import Tool
+from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import Workflow, WorkflowState
 
@@ -16,19 +16,19 @@ class ExecutionContextTrackerTool(Tool):
 
     id: str = "execution_tracker_tool"
     name: str = "Execution Tracker Tool"
-    description: str = "Tracks execution context"
+    description: str = "Tracks tool execution context"
     output_schema: tuple[str, str] = (
         "None",
         "Nothing",
     )
-    execution_context: ExecutionContext | None = None
+    tool_context: ToolRunContext | None = None
 
     def run(
         self,
-        ctx: ExecutionContext,
+        ctx: ToolRunContext,
     ) -> None:
         """Save the context."""
-        self.execution_context = ctx
+        self.tool_context = ctx
 
 
 def get_test_workflow() -> tuple[Plan, Workflow]:
@@ -60,8 +60,8 @@ def test_runner_no_execution_context_new() -> None:
     workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
-    assert tool.execution_context
-    assert tool.execution_context.workflow_id == str(workflow.id)
+    assert tool.tool_context
+    assert tool.tool_context.workflow_id == str(workflow.id)
 
 
 def test_runner_no_execution_context_existing() -> None:
@@ -71,14 +71,14 @@ def test_runner_no_execution_context_existing() -> None:
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
     runner = Runner(config=config, tools=tool_registry)
     (plan, workflow) = get_test_workflow()
-    workflow.execution_context = ExecutionContext(workflow_id=str(workflow.id), end_user_id="123")
+    workflow.execution_context = ExecutionContext(end_user_id="123")
     runner.storage.save_plan(plan)
     workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
-    assert tool.execution_context
-    assert tool.execution_context.workflow_id == str(workflow.id)
-    assert tool.execution_context.end_user_id == "123"
+    assert tool.tool_context
+    assert tool.tool_context.workflow_id == str(workflow.id)
+    assert tool.tool_context.execution_context.end_user_id == "123"
 
 
 def test_runner_with_execution_context_new() -> None:
@@ -94,9 +94,9 @@ def test_runner_with_execution_context_new() -> None:
         workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
-    assert tool.execution_context
-    assert tool.execution_context.workflow_id == str(workflow.id)
-    assert tool.execution_context.end_user_id == "123"
+    assert tool.tool_context
+    assert tool.tool_context.workflow_id == str(workflow.id)
+    assert tool.tool_context.execution_context.end_user_id == "123"
 
 
 def test_runner_with_execution_context_existing() -> None:
@@ -106,13 +106,13 @@ def test_runner_with_execution_context_existing() -> None:
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
     runner = Runner(config=config, tools=tool_registry)
     (plan, workflow) = get_test_workflow()
-    workflow.execution_context = ExecutionContext(workflow_id=str(workflow.id))
+    workflow.execution_context = ExecutionContext()
     runner.storage.save_plan(plan)
 
     with execution_context(end_user_id="123"):
         workflow = runner.execute_workflow(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
-    assert tool.execution_context
-    assert tool.execution_context.workflow_id == str(workflow.id)
-    assert tool.execution_context.end_user_id == "123"
+    assert tool.tool_context
+    assert tool.tool_context.workflow_id == str(workflow.id)
+    assert tool.tool_context.execution_context.end_user_id == "123"

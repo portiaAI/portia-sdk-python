@@ -4,17 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pandas as pd
 from pydantic import BaseModel, Field
 
 from portia.clarification import Clarification, MultipleChoiceClarification
 from portia.errors import ToolHardError
-from portia.tool import Tool
-
-if TYPE_CHECKING:
-    from portia.execution_context import ExecutionContext
+from portia.tool import Tool, ToolRunContext
 
 
 class FileReaderToolSchema(BaseModel):
@@ -35,7 +31,7 @@ class FileReaderTool(Tool[str]):
     args_schema: type[BaseModel] = FileReaderToolSchema
     output_schema: tuple[str, str] = ("str", "A string dump or JSON of the file content")
 
-    def run(self, _: ExecutionContext, filename: str) -> str | Clarification:  # noqa: PLR0911
+    def run(self, _: ToolRunContext, filename: str) -> str | Clarification:  # noqa: PLR0911
         """Run the FileReaderTool."""
         file_path = Path(filename)
         suffix = file_path.suffix.lower()

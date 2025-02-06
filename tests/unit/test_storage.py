@@ -11,11 +11,11 @@ import pytest
 from portia.errors import StorageError
 from portia.plan import Plan, PlanContext, PlanUUID
 from portia.storage import (
+    AdditionalStorage,
     DiskFileStorage,
     InMemoryStorage,
     PlanStorage,
     PortiaCloudStorage,
-    ToolCallStorage,
     WorkflowListResponse,
     WorkflowStorage,
 )
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def test_storage_base_classes() -> None:
     """Test PlanStorage raises."""
 
-    class MyStorage(WorkflowStorage, PlanStorage, ToolCallStorage):
+    class MyStorage(WorkflowStorage, PlanStorage, AdditionalStorage):
         """Override to test base."""
 
         def save_plan(self, plan: Plan) -> None:

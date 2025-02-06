@@ -1,5 +1,6 @@
 """Tests for the Tool class."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,9 +15,8 @@ from portia.clarification import (
     ValueConfirmationClarification,
 )
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
-from portia.execution_context import empty_context, get_execution_context
 from portia.tool import PortiaRemoteTool
-from tests.utils import AdditionTool, ClarificationTool, ErrorTool
+from tests.utils import AdditionTool, ClarificationTool, ErrorTool, get_test_tool_context
 
 
 @pytest.fixture
@@ -50,13 +50,13 @@ def test_tool_initialization_long_description() -> None:
 def test_tool_to_langchain() -> None:
     """Test langchain rep of a Tool."""
     tool = AdditionTool()
-    tool.to_langchain(ctx=empty_context())
+    tool.to_langchain(ctx=get_test_tool_context())
 
 
 def test_run_method(add_tool: AdditionTool) -> None:
     """Test the run method of the AddTool."""
     a, b = 1, 2
-    ctx = get_execution_context()
+    ctx = get_test_tool_context()
     result = add_tool.run(ctx, a, b)
     assert result == a + b
 
@@ -64,7 +64,7 @@ def test_run_method(add_tool: AdditionTool) -> None:
 def test_handle(add_tool: AdditionTool) -> None:
     """Test the run method of the AddTool."""
     a, b = 1, 2
-    ctx = get_execution_context()
+    ctx = get_test_tool_context()
     result = add_tool.run(ctx, a, b)
     assert result == a + b
 
@@ -74,7 +74,7 @@ def test_run_method_with_uncaught_error() -> None:
     tool = ErrorTool()
     with pytest.raises(ToolSoftError):
         tool._run(  # noqa: SLF001
-            ctx=empty_context(),
+            ctx=get_test_tool_context(),
             error_str="this is an error",
             return_uncaught_error=True,
             return_soft_error=False,
@@ -84,7 +84,7 @@ def test_run_method_with_uncaught_error() -> None:
 def test_ready() -> None:
     """Test the ready method."""
     tool = ErrorTool()
-    assert tool.ready(get_execution_context())
+    assert tool.ready(get_test_tool_context())
 
 
 def test_tool_serialization() -> None:
@@ -120,12 +120,22 @@ def test_remote_tool_hard_error_from_server() -> None:
             api_key=SecretStr(""),
             api_endpoint="https://example.com",
         )
+        ctx = get_test_tool_context()
         with pytest.raises(ToolHardError):
-            tool.run(empty_context())
+            tool.run(ctx)
+
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -153,12 +163,22 @@ def test_remote_tool_soft_error() -> None:
             api_key=SecretStr(""),
             api_endpoint="https://example.com",
         )
-        with pytest.raises(ToolSoftError):
-            tool.run(empty_context())
 
+        ctx = get_test_tool_context()
+        with pytest.raises(ToolSoftError):
+            tool.run(ctx)
+
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -186,12 +206,23 @@ def test_remote_tool_bad_response() -> None:
             api_key=SecretStr(""),
             api_endpoint="https://example.com",
         )
+
+        ctx = get_test_tool_context()
         with pytest.raises(ToolHardError):
-            tool.run(empty_context())
+            tool.run(ctx)
+
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -219,12 +250,22 @@ def test_remote_tool_hard_error() -> None:
             api_key=SecretStr(""),
             api_endpoint="https://example.com",
         )
-        with pytest.raises(ToolHardError):
-            tool.run(empty_context())
 
+        ctx = get_test_tool_context()
+        with pytest.raises(ToolHardError):
+            tool.run(ctx)
+
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -252,12 +293,20 @@ def test_remote_tool_ready() -> None:
             api_key=SecretStr(""),
             api_endpoint="https://example.com",
         )
+        ctx = get_test_tool_context()
+        assert tool.ready(ctx)
 
-        assert tool.ready(empty_context())
+        content = {
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/ready/",
-            content='{"execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -288,11 +337,20 @@ def test_remote_tool_ready_error() -> None:
             api_endpoint="https://example.com",
         )
 
-        assert not tool.ready(empty_context())
+        ctx = get_test_tool_context()
+        assert not tool.ready(ctx)
+
+        content = {
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
 
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/ready/",
-            content='{"execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -331,15 +389,24 @@ def test_remote_tool_action_clarifications() -> None:
             api_key=SecretStr(""),
             api_endpoint="https://example.com",
         )
-
-        output = tool.run(empty_context())
+        ctx = get_test_tool_context()
+        output = tool.run(ctx)
         assert output is not None
         assert isinstance(output, ActionClarification)
         assert output.action_url == HttpUrl("https://example.com")
 
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
+
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -379,13 +446,23 @@ def test_remote_tool_input_clarifications() -> None:
             api_endpoint="https://example.com",
         )
 
-        output = tool.run(empty_context())
+        ctx = get_test_tool_context()
+        output = tool.run(ctx)
         assert output is not None
         assert isinstance(output, InputClarification)
 
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
+
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -426,14 +503,24 @@ def test_remote_tool_mc_clarifications() -> None:
             api_endpoint="https://example.com",
         )
 
-        output = tool.run(empty_context())
+        ctx = get_test_tool_context()
+        output = tool.run(ctx)
         assert output is not None
         assert isinstance(output, MultipleChoiceClarification)
         assert output.options == [1]
 
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
+
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",
@@ -473,13 +560,23 @@ def test_remote_tool_value_confirm_clarifications() -> None:
             api_endpoint="https://example.com",
         )
 
-        output = tool.run(empty_context())
+        ctx = get_test_tool_context()
+        output = tool.run(ctx)
         assert output is not None
         assert isinstance(output, ValueConfirmationClarification)
 
+        content = {
+            "arguments": {},
+            "execution_context": {
+                "end_user_id": ctx.execution_context.end_user_id or "",
+                "workflow_id": str(ctx.workflow_id),
+                "additional_data": ctx.execution_context.additional_data or {},
+            },
+        }
+
         mock_post.assert_called_once_with(
             url="https://example.com/api/v0/tools/test/run/",
-            content='{"arguments": {}, "execution_context": {"end_user_id": "", "workflow_id": null, "additional_data": {}}}',  # noqa: E501
+            content=json.dumps(content),
             headers={
                 "Authorization": "Api-Key ",
                 "Content-Type": "application/json",

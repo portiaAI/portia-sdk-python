@@ -26,6 +26,7 @@ from portia.agents.utils.step_summarizer import StepSummarizer
 from portia.errors import InvalidAgentError
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
+from portia.tool import ToolRunContext
 from portia.workflow import Workflow
 
 if TYPE_CHECKING:
@@ -178,7 +179,12 @@ class OneShotAgent(BaseAgent):
         llm = LLMWrapper(self.config).to_langchain()
         tools = [
             self.tool.to_langchain_with_artifact(
-                ctx=get_execution_context(),
+                ctx=ToolRunContext(
+                    execution_context=get_execution_context(),
+                    workflow_id=self.workflow.id,
+                    config=self.config,
+                    clarifications=self.workflow.get_clarifications_for_step(),
+                ),
             ),
         ]
         tool_node = ToolNode(tools)
