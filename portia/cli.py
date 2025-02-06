@@ -10,7 +10,9 @@ portia-cli list-tools
 from __future__ import annotations
 
 import builtins
+import json
 import os
+from re import I
 import webbrowser
 from enum import Enum
 from functools import wraps
@@ -23,8 +25,10 @@ from pydantic import BaseModel, Field
 
 from portia.clarification import (
     ActionClarification,
+    CustomClarification,
     InputClarification,
     MultipleChoiceClarification,
+    ValueConfirmationClarification,
 )
 from portia.config import Config, StorageClass
 from portia.execution_context import execution_context
@@ -210,6 +214,23 @@ def run(
                         clarification.user_guidance + "\nPlease enter a value:\n",
                     )
                     workflow = runner.resolve_clarification(clarification, user_input, workflow)
+                if isinstance(clarification, ValueConfirmationClarification):
+                    if click.confirm(text=clarification.user_guidance, default=False):
+                        workflow = runner.resolve_clarification(
+                            clarification,
+                            response=True,
+                            workflow=workflow,
+                        )
+                    else:
+                        workflow.state = WorkflowState.FAILED
+                        runner.storage.save_workflow(workflow)
+
+                if isinstance(clarification, CustomClarification):
+                    click.echo(clarification.user_guidance)
+                    click.echo(json.dumps(clarification.data))
+                    user_input = click.prompt("\nPlease enter a value:\n")
+                    workflow = runner.resolve_clarification(clarification, user_input, workflow)
+
             runner.execute_workflow(workflow)
 
         click.echo(workflow.model_dump_json(indent=4))
