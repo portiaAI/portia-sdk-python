@@ -311,7 +311,7 @@ def test_remote_tool_action_clarifications() -> None:
             "output": {
                 "value": [
                     {
-                        "id": ClarificationUUID(),
+                        "id": str(ClarificationUUID()),
                         "category": "Action",
                         "action_url": "https://example.com",
                         "user_guidance": "blah",
@@ -358,7 +358,7 @@ def test_remote_tool_input_clarifications() -> None:
             "output": {
                 "value": [
                     {
-                        "id": ClarificationUUID(),
+                        "id": str(ClarificationUUID()),
                         "category": "Input",
                         "user_guidance": "blah",
                         "argument_name": "t",
@@ -404,7 +404,7 @@ def test_remote_tool_mc_clarifications() -> None:
             "output": {
                 "value": [
                     {
-                        "id": ClarificationUUID(),
+                        "id": str(ClarificationUUID()),
                         "category": "Multiple Choice",
                         "user_guidance": "blah",
                         "argument_name": "t",
@@ -452,7 +452,7 @@ def test_remote_tool_value_confirm_clarifications() -> None:
             "output": {
                 "value": [
                     {
-                        "id": ClarificationUUID(),
+                        "id": str(ClarificationUUID()),
                         "category": "Value Confirmation",
                         "user_guidance": "blah",
                         "argument_name": "t",
