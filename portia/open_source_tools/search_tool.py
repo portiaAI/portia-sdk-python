@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 
 import httpx
@@ -30,8 +31,9 @@ class SearchTool(Tool[str]):
     name: str = "Search Tool"
     description: str = (
         "Searches the internet to find answers to the search query provided and "
-        "returns those answers. The search tool has access to general information but "
-        "can not return specific information on users or information not available on the internet"
+        "returns those answers, including images, links and a natural language answer. "
+        "The search tool has access to general information but can not return specific "
+        "information on users or information not available on the internet"
     )
     args_schema: type[BaseModel] = SearchToolSchema
     output_schema: tuple[str, str] = ("str", "str: output of the search results")
@@ -55,5 +57,5 @@ class SearchTool(Tool[str]):
         response.raise_for_status()
         json_response = response.json()
         if "answer" in json_response:
-            return str(json_response["answer"])
+            return json.dumps(json_response, indent=2)
         raise ToolSoftError(f"Failed to get answer to search: {json_response}")
