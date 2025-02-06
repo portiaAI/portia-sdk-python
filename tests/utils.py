@@ -36,7 +36,7 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
         ),
         steps=[step1],
     )
-    return plan, Workflow(plan_id=plan.id, current_step_index=1)
+    return plan, Workflow(plan_id=plan.id, current_step_index=0)
 
 
 def get_test_tool_call(workflow: Workflow) -> ToolCallRecord:

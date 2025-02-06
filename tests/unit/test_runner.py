@@ -8,16 +8,20 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import HttpUrl
 
 from portia.agents.base_agent import Output
+from portia.clarification import ActionClarification, Clarification
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
+from portia.execution_context import ExecutionContext
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import ReadOnlyPlan, Step
+from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
+from portia.tool import Tool
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import ReadOnlyWorkflow, WorkflowState, WorkflowUUID
+from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 from tests.utils import AdditionTool, ClarificationTool, get_test_config, get_test_workflow
 
 
@@ -235,6 +239,61 @@ def test_runner_wait_for_ready(runner: Runner) -> None:
     assert workflow.state == WorkflowState.READY_TO_RESUME
 
 
+def test_runner_wait_for_ready_tool(runner: Runner) -> None:
+    """Test wait for ready."""
+    mock_call_count = MagicMock()
+    mock_call_count.__iadd__ = (
+        lambda self, other: setattr(self, "count", self.count + other) or self
+    )
+    mock_call_count.count = 0
+
+    class ReadyTool(Tool):
+        """Returns ready."""
+
+        id: str = "ready_tool"
+        name: str = "Ready Tool"
+        description: str = "Returns a clarification"
+        output_schema: tuple[str, str] = (
+            "Clarification",
+            "Clarification: The value of the Clarification",
+        )
+
+        def run(self, ctx: ExecutionContext, user_guidance: str) -> Clarification:  # noqa: ARG002
+            return ActionClarification(
+                user_guidance="",
+                action_url=HttpUrl(""),
+            )
+
+        def ready(self, ctx: ExecutionContext) -> bool:  # noqa: ARG002
+            mock_call_count.count += 1
+            return mock_call_count.count == 3
+
+    runner.tool_registry = InMemoryToolRegistry.from_local_tools([ReadyTool()])
+
+    step1 = Step(
+        task="Save Context",
+        inputs=[],
+        output="$ctx",
+        tool_id="ready_tool",
+    )
+    plan = Plan(
+        plan_context=PlanContext(
+            query="run the tool",
+            tool_ids=["ready_tool"],
+        ),
+        steps=[step1],
+    )
+    workflow = Workflow(
+        plan_id=plan.id,
+        current_step_index=0,
+        state=WorkflowState.NEED_CLARIFICATION,
+    )
+    runner.storage.save_plan(plan)
+    runner.storage.save_workflow(workflow)
+    workflow = runner.wait_for_ready(workflow)
+    assert workflow.state == WorkflowState.READY_TO_RESUME
+
+
 def test_runner_execute_query_with_summary(runner: Runner) -> None:
     """Test execute_query sets both final output and summary correctly."""
     query = "What activities can I do in London based on weather?"
@@ -364,14 +423,16 @@ def test_runner_wait_for_ready_max_retries(runner: Runner) -> None:
     """Test wait for ready with max retries."""
     plan, workflow = get_test_workflow()
     workflow.state = WorkflowState.NEED_CLARIFICATION
+    runner.storage.save_plan(plan)
     with pytest.raises(InvalidWorkflowStateError):
         runner.wait_for_ready(workflow, max_retries=0)
 
 
 def test_runner_wait_for_ready_backoff_period(runner: Runner) -> None:
     """Test wait for ready with backoff period."""
-    _, workflow = get_test_workflow()
+    plan, workflow = get_test_workflow()
     workflow.state = WorkflowState.NEED_CLARIFICATION
+    runner.storage.save_plan(plan)
     runner.storage.get_workflow = mock.MagicMock(return_value=workflow)
     with pytest.raises(InvalidWorkflowStateError):
         runner.wait_for_ready(workflow, max_retries=1, backoff_start_time_seconds=0)
