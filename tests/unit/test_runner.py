@@ -14,7 +14,6 @@ from portia.agents.base_agent import Output
 from portia.clarification import ActionClarification, Clarification
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
-from portia.execution_context import ExecutionContext
 from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
