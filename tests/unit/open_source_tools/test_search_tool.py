@@ -22,7 +22,9 @@ def test_search_tool_successful_response() -> None:
     """Test that SearchTool successfully processes a valid response."""
     tool = SearchTool()
     mock_api_key = "mock-api-key"
-    mock_response = {"answer": "Paris"}
+    mock_response = {"query": "What is the capital of France?", "follow_up_questions": "",
+                     "answer": "The capital of France is Paris.", "images": [], "results": [],
+                     "response_time": 2.43}
 
     with patch("os.getenv", return_value=mock_api_key):
         ctx = get_test_tool_context()
@@ -30,7 +32,7 @@ def test_search_tool_successful_response() -> None:
             mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
 
             result = tool.run(ctx, "What is the capital of France?")
-            assert result == "Paris"
+            assert result == mock_response
 
 
 def test_search_tool_no_answer_in_response() -> None:
