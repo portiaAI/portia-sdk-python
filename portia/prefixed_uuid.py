@@ -1,8 +1,6 @@
-"""Types and utilities useful across the package.
+"""Prefixed UUIDs.
 
-This module defines various types, utilities, and base classes used throughout the package.
-It includes a custom Enum class, helper functions, and base models with special configurations for
-use in the Portia framework.
+Support for various prefixed UUIDs that append the type of UUID to the ID.
 """
 
 from __future__ import annotations
