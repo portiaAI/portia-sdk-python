@@ -8,7 +8,7 @@ and value confirmations.
 
 from __future__ import annotations
 
-from typing import Generic, Self, Union
+from typing import Any, Generic, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -36,6 +36,7 @@ class ClarificationCategory(PortiaEnum):
     INPUT = "Input"
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
+    CUSTOM = "Custom"
 
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
@@ -206,6 +207,27 @@ class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR
     )
 
 
+class CustomClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+    """Custom clarifications.
+
+    Allows the user to extend clarifications with arbitrary data.
+    The user is responsible for handling this clarification type.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification, 'Value Confirmation'.
+
+    """
+
+    name: str = Field(
+        description="The name of this clarification."
+        "Used to differentiate between different types of custom clarifications.",
+    )
+    data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional data for this clarification. Can include any serializable type.",
+    )
+
+
 """Type that encompasses all possible clarification types."""
 ClarificationType = Union[
     Clarification,
@@ -213,6 +235,7 @@ ClarificationType = Union[
     ActionClarification,
     MultipleChoiceClarification,
     ValueConfirmationClarification,
+    CustomClarification,
 ]
 
 """A list of clarifications of any type."""
