@@ -241,7 +241,11 @@ def test_runner_wait_for_ready(runner: Runner) -> None:
 
 def test_runner_wait_for_ready_tool(runner: Runner) -> None:
     """Test wait for ready."""
-    call_count = 0
+    mock_call_count = MagicMock()
+    mock_call_count.__iadd__ = (
+        lambda self, other: setattr(self, "count", self.count + other) or self
+    )
+    mock_call_count.count = 0
 
     class ReadyTool(Tool):
         """Returns ready."""
@@ -261,9 +265,8 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
             )
 
         def ready(self, ctx: ExecutionContext) -> bool:  # noqa: ARG002
-            nonlocal call_count
-            call_count += 1
-            return call_count == 3
+            mock_call_count.count += 1
+            return mock_call_count.count == 3
 
     runner.tool_registry = InMemoryToolRegistry.from_local_tools([ReadyTool()])
 
