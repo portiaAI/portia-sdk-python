@@ -669,7 +669,6 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             response_json = response.json()
-            print(response_json)
             return WorkflowListResponse(
                 results=[
                     Workflow(
