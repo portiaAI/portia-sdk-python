@@ -12,7 +12,6 @@ from __future__ import annotations
 import builtins
 import json
 import os
-from re import I
 import webbrowser
 from enum import Enum
 from functools import wraps
@@ -155,7 +154,7 @@ def cli() -> None:
 @click.command()
 @common_options
 @click.argument("query")
-def run(
+def run(  # noqa: C901
     query: str,
     **kwargs,  # noqa: ANN003
 ) -> None:
