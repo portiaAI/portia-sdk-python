@@ -7,14 +7,13 @@ from typing import TYPE_CHECKING
 import pytest
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
-from portia.execution_context import get_execution_context
 from portia.tool import Tool
 from portia.tool_registry import (
     AggregatedToolRegistry,
     InMemoryToolRegistry,
     ToolRegistry,
 )
-from tests.utils import AdditionTool, MockTool
+from tests.utils import AdditionTool, MockTool, get_test_tool_context
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -86,7 +85,7 @@ def test_local_tool_registry_get_and_run() -> None:
     local_tool_registry = InMemoryToolRegistry()
     local_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))
     tool1 = local_tool_registry.get_tool(MOCK_TOOL_ID)
-    ctx = get_execution_context()
+    ctx = get_test_tool_context()
     tool1.run(ctx)
 
 

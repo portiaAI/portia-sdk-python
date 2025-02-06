@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from langchain.schema import HumanMessage
 from pydantic import BaseModel, Field
 
-from portia.config import Config, LLMModel, LLMProvider
 from portia.llm_wrapper import LLMWrapper
-from portia.tool import Tool
-
-if TYPE_CHECKING:
-    from portia.execution_context import ExecutionContext
+from portia.tool import Tool, ToolRunContext
 
 
 class LLMToolSchema(BaseModel):
@@ -44,12 +38,6 @@ class LLMTool(Tool[str]):
         "str",
         "The LLM's response to the user query.",
     )
-    # Provide customizable parameters for the LLM so that it can be initialized
-    # per user requirements
-    model_name: str = LLMModel.GPT_4_O.value
-    provider: str = LLMProvider.OPENAI.value
-    temperature: float = 0.0
-    seed: int = 42
     prompt: str = """
         You are a Jack of all trades used to respond to a prompt by relying solely on LLM.
         capabilities. YOU NEVER CALL OTHER TOOLS. You use your native capabilities as an LLM
@@ -63,24 +51,19 @@ class LLMTool(Tool[str]):
         """
     tool_context: str = ""
 
-    def run(self, ctx: ExecutionContext, task: str) -> str:
+    def run(self, ctx: ToolRunContext, task: str) -> str:
         """Run the LLMTool."""
-        config = Config.from_default(
-            model_name=self.model_name,
-            provider=self.provider,
-            temperature=self.temperature,
-            seed=self.seed,
-        )
-        llm_wrapper = LLMWrapper(config)
+        llm_wrapper = LLMWrapper(ctx.config)
         llm = llm_wrapper.to_langchain()
+
         # Define system and user messages
         context = (
             "Additional context for the LLM tool to use to complete the task, provided by the "
             "workflow run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
-        if ctx.workflow_run_context:
-            context += f"\nWorkflow run context: {ctx.workflow_run_context}"
+        if ctx.execution_context.workflow_run_context:
+            context += f"\nWorkflow run context: {ctx.execution_context.workflow_run_context}"
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
         content = task if not len(context.split("\n")) > 1 else f"{context}\n\n{task}"
@@ -90,13 +73,3 @@ class LLMTool(Tool[str]):
         ]
         response = llm.invoke(messages)
         return str(response.content)
-
-    @classmethod
-    def from_config(cls, config: Config) -> LLMTool:
-        """Create an LLMTool from a config."""
-        return cls(
-            model_name=config.llm_model_name.value,
-            provider=config.llm_provider.value,
-            temperature=config.llm_model_temperature,
-            seed=config.llm_model_seed,
-        )

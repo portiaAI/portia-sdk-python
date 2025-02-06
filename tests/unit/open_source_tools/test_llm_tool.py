@@ -1,26 +1,27 @@
 """tests for llm tool."""
 
 import os
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain.schema import HumanMessage
 
-from portia.config import LLMModel
-from portia.execution_context import ExecutionContext
 from portia.open_source_tools.llm_tool import LLMTool, LLMToolSchema
+from portia.tool import ToolRunContext
+from tests.utils import get_test_config
 
 
 @pytest.fixture
-def mock_execution_context() -> ExecutionContext:
+def mock_execution_context() -> ToolRunContext:
     """Fixture to mock ExecutionContext."""
-    return MagicMock(spec=ExecutionContext)
+    return MagicMock(spec=ToolRunContext)
 
 
 @pytest.fixture
 def mock_llm_tool() -> LLMTool:
     """Fixture to create an instance of LLMTool."""
-    return LLMTool(id="test_tool", name="Test LLM Tool", model_name=LLMModel.GPT_4_O.value)
+    return LLMTool(id="test_tool", name="Test LLM Tool")
 
 
 @patch("portia.open_source_tools.llm_tool.LLMWrapper")
@@ -37,7 +38,10 @@ def test_llm_tool_run(
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
     mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
-    mock_execution_context.workflow_run_context = None
+    mock_execution_context.execution_context = MagicMock()
+    mock_execution_context.config = get_test_config()
+    mock_execution_context.workflow_id = uuid.uuid4()
+    mock_execution_context.execution_context.workflow_run_context = None
     # Define task input
     task = "What is the capital of France?"
 
@@ -70,7 +74,6 @@ def test_llm_tool_initialization(mock_llm_tool: LLMTool) -> None:
     """Test that LLMTool is correctly initialized."""
     assert mock_llm_tool.id == "test_tool"
     assert mock_llm_tool.name == "Test LLM Tool"
-    assert mock_llm_tool.model_name == LLMModel.GPT_4_O.value
 
 
 @patch("portia.open_source_tools.llm_tool.LLMWrapper")
@@ -87,7 +90,9 @@ def test_llm_tool_run_with_context(
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
     mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
-    mock_execution_context.workflow_run_context = "Workflow run context"
+    mock_execution_context.execution_context = MagicMock()
+    mock_execution_context.config = get_test_config()
+    mock_execution_context.workflow_id = uuid.uuid4()
     # Define task and context
     mock_llm_tool.tool_context = "Context for task"
     task = "What is the capital of France?"

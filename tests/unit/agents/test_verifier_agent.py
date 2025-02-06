@@ -28,11 +28,10 @@ from portia.agents.verifier_agent import (
 )
 from portia.clarification import InputClarification
 from portia.errors import InvalidWorkflowStateError
-from portia.execution_context import empty_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step
-from tests.utils import AdditionTool, get_test_config, get_test_workflow
+from tests.utils import AdditionTool, get_test_config, get_test_tool_context, get_test_workflow
 
 if TYPE_CHECKING:
     from langchain_core.prompt_values import ChatPromptValue
@@ -391,7 +390,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -451,7 +450,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
@@ -618,7 +617,7 @@ def test_verifier_agent_edge_cases() -> None:
     tool_calling_model = ToolCallingModel(
         llm=LLMWrapper(get_test_config()).to_langchain(),
         context="CONTEXT_STRING",
-        tools=[AdditionTool().to_langchain_with_artifact(ctx=empty_context())],
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidWorkflowStateError):
@@ -746,7 +745,7 @@ def test_verifier_agent_without_tool_uses_llm_tool() -> None:
         config=get_test_config(),
         tool=None,
     )
+    # try to run the tool and fail, but sets the tool to an LLM tool
     with suppress(Exception):
-        # try to run the tool and fail, but sets the tool to an LLM tool
         agent.execute_sync()
     assert isinstance(agent.tool, LLMTool)

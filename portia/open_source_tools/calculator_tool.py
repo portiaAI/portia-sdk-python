@@ -5,8 +5,7 @@ import re
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError
-from portia.execution_context import ExecutionContext
-from portia.tool import Tool
+from portia.tool import Tool, ToolRunContext
 
 
 class CalculatorToolSchema(BaseModel):
@@ -31,7 +30,7 @@ class CalculatorTool(Tool[float]):
     args_schema: type[BaseModel] = CalculatorToolSchema
     output_schema: tuple[str, str] = ("str", "A string dump of the computed result")
 
-    def run(self, _: ExecutionContext, math_question: str) -> float:
+    def run(self, _: ToolRunContext, math_question: str) -> float:
         """Run the CalculatorTool."""
         expression = self.math_expression(math_question)
         if not expression:

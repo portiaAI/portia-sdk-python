@@ -171,10 +171,10 @@ class WorkflowStorage(ABC):
         raise NotImplementedError("get_workflows is not implemented")
 
 
-class ToolCallStorage(ABC):
-    """Abstract base class for storing tool_calls.
+class AdditionalStorage(ABC):
+    """Abstract base class for additional storage.
 
-    Subclasses must implement the method to save a tool_call.
+    Subclasses must implement the methods.
 
     Methods:
         save_tool_call(self, tool_call: ToolCallRecord) -> None:
@@ -196,10 +196,10 @@ class ToolCallStorage(ABC):
         raise NotImplementedError("save_tool_call is not implemented")
 
 
-class LogToolCallStorage(ToolCallStorage):
-    """ToolCallStorage that logs calls rather than persisting them.
+class LogAdditionalStorage(AdditionalStorage):
+    """AdditionalStorage that logs calls rather than persisting them.
 
-    Useful for storages that don't care about tool_calls.
+    Useful for storages that don't care about tool_calls etc.
     """
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
@@ -226,14 +226,14 @@ class LogToolCallStorage(ToolCallStorage):
                 logger().info("Tool returned clarifications {output}", output=tool_call.output)
 
 
-class Storage(PlanStorage, WorkflowStorage, ToolCallStorage):
-    """Combined base class for Plan Workflow + Tool storages."""
+class Storage(PlanStorage, WorkflowStorage, AdditionalStorage):
+    """Combined base class for Plan Workflow + Additional storages."""
 
 
-class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
+class InMemoryStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
     """Simple storage class that keeps plans + workflows in memory.
 
-    Tool Calls are logged via the LogToolCallStorage.
+    Tool Calls are logged via the LogAdditionalStorage.
     """
 
     plans: dict[PlanUUID, Plan]
@@ -326,7 +326,7 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
         )
 
 
-class DiskFileStorage(PlanStorage, WorkflowStorage, LogToolCallStorage):
+class DiskFileStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
     """Disk-based implementation of the Storage interface.
 
     Stores serialized Plan and Workflow objects as JSON files on disk.

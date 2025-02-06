@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from abc import abstractmethod
 from functools import partial
-from typing import TYPE_CHECKING, Any, Generic, Self
+from typing import Any, Generic, Self
 
 import httpx
 from langchain_core.tools import StructuredTool
@@ -38,22 +38,46 @@ from portia.clarification import (
     ActionClarification,
     Clarification,
     ClarificationCategory,
+    ClarificationListType,
     ClarificationUUID,
     InputClarification,
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
+from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.templates.render import render_template
-
-if TYPE_CHECKING:
-    from portia.execution_context import ExecutionContext
+from portia.workflow import WorkflowUUID
 
 """MAX_TOOL_DESCRIPTION_LENGTH is the max length tool descriptions can be to respect API limits."""
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
+
+
+class ToolRunContext(BaseModel):
+    """Context passed to tools when running.
+
+    Attributes
+    ----------
+    execution_context : ExecutionContext
+        The execution context the tool is running in.
+    workflow_id : WorkflowUUID
+        The workflow id the tool run is part of.
+    config : Config
+        The config for the SDK as a whole.
+    clarifications : ClarificationListType
+        Relevant clarifications for this tool run.
+
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    execution_context: ExecutionContext
+    workflow_id: WorkflowUUID
+    config: Config
+    clarifications: ClarificationListType
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
@@ -108,7 +132,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "Tools may not require a summary if they already produce a nice textual output.",
     )
 
-    def ready(self, ctx: ExecutionContext) -> bool:  # noqa: ARG002
+    def ready(self, ctx: ToolRunContext) -> bool:  # noqa: ARG002
         """Check whether the tool can be run.
 
         This method can be implemented by subclasses to allow checking if the tool can be run.
@@ -116,7 +140,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         If left unimplemented will always return true.
 
         Args:
-            ctx (ExecutionContext): Context of the execution environment
+            ctx (ToolRunContext): Context of the tool run
 
         Returns:
             bool: Whether the tool is ready to run
@@ -127,7 +151,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     @abstractmethod
     def run(
         self,
-        ctx: ExecutionContext,
+        ctx: ToolRunContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> SERIALIZABLE_TYPE_VAR | Clarification:
@@ -136,7 +160,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         This method must be implemented by subclasses to define the tool's specific behavior.
 
         Args:
-            ctx (ExecutionContext): Context of the execution environment
+            ctx (ToolRunContext): Context of the tool execution
             args (Any): The arguments passed to the tool for execution.
             kwargs (Any): The keyword arguments passed to the tool for execution.
 
@@ -148,7 +172,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def _run(
         self,
-        ctx: ExecutionContext,
+        ctx: ToolRunContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
@@ -157,7 +181,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         This is the entry point for agents to invoke a tool.
 
         Args:
-            ctx (ExecutionContext): The execution context for the tool.
+            ctx (ToolRunContext): The context for the tool.
             *args (Any): Additional positional arguments for the tool function.
             **kwargs (Any): Additional keyword arguments for the tool function.
 
@@ -192,7 +216,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def _run_with_artifacts(
         self,
-        ctx: ExecutionContext,
+        ctx: ToolRunContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> tuple[str, Output[SERIALIZABLE_TYPE_VAR]]:
@@ -203,7 +227,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         it to a string first.
 
         Args:
-            ctx (ExecutionContext): The execution context for the tool.
+            ctx (ToolRunContext): The context for the tool.
             *args (Any): Additional positional arguments for the tool function.
             **kwargs (Any): Additional keyword arguments for the tool function.
 
@@ -276,7 +300,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise InvalidToolDescriptionError(self.name)
         return self
 
-    def to_langchain(self, ctx: ExecutionContext) -> StructuredTool:
+    def to_langchain(self, ctx: ToolRunContext) -> StructuredTool:
         """Return a LangChain representation of this tool.
 
         This function provides a LangChain-compatible version of the tool. The response format is
@@ -284,7 +308,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         StructuredTool via a partial run function.
 
         Args:
-            ctx (ExecutionContext): The execution context for the tool.
+            ctx (ToolRunContext): The context for the tool.
 
         Returns:
             StructuredTool: The LangChain-compatible representation of the tool, including the
@@ -299,15 +323,15 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             func=partial(self._run, ctx),
         )
 
-    def to_langchain_with_artifact(self, ctx: ExecutionContext) -> StructuredTool:
+    def to_langchain_with_artifact(self, ctx: ToolRunContext) -> StructuredTool:
         """Return a LangChain representation of this tool with content and artifact.
 
         This function provides a LangChain-compatible version of the tool, where the response format
-        includes both the content and the artifact. The ExecutionContext is baked into the
+        includes both the content and the artifact. The ToolRunContext is baked into the
         StructuredTool via a partial run function for capturing output directly.
 
         Args:
-            ctx (ExecutionContext): The execution context for the tool.
+            ctx (ToolRunContext): The context for the tool.
 
         Returns:
             StructuredTool: The LangChain-compatible representation of the tool, including the
@@ -440,11 +464,11 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     )
         return output
 
-    def ready(self, ctx: ExecutionContext) -> bool:
+    def ready(self, ctx: ToolRunContext) -> bool:
         """Check if the remote tool is ready by calling the /ready endpoint.
 
         Args:
-            ctx (ExecutionContext): Context of the execution environment
+            ctx (ToolRunContext): Context of the environment
 
         Returns:
             bool: Whether the tool is ready to run
@@ -457,9 +481,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 content=json.dumps(
                     {
                         "execution_context": {
-                            "end_user_id": ctx.end_user_id or "",
-                            "workflow_id": ctx.workflow_id,
-                            "additional_data": ctx.additional_data or {},
+                            "end_user_id": ctx.execution_context.end_user_id or "",
+                            "workflow_id": str(ctx.workflow_id),
+                            "additional_data": ctx.execution_context.additional_data or {},
                         },
                     },
                 ),
@@ -479,7 +503,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def run(
         self,
-        ctx: ExecutionContext,
+        ctx: ToolRunContext,
         *args: Any,  # noqa: ANN401
         **kwargs: Any,  #  noqa: ANN401
     ) -> SERIALIZABLE_TYPE_VAR | None | Clarification:
@@ -490,7 +514,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         during the request or parsing are raised as `ToolHardError`.
 
         Args:
-            ctx (ExecutionContext): The context of the execution, including end user ID, workflow ID
+            ctx (ToolRunContext): The context of the execution, including end user ID, workflow ID
             and additional data.
             *args (Any): The positional arguments for the tool.
             **kwargs (Any): The keyword arguments for the tool.
@@ -511,9 +535,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
-                            "end_user_id": ctx.end_user_id or "",
-                            "workflow_id": ctx.workflow_id,
-                            "additional_data": ctx.additional_data or {},
+                            "end_user_id": ctx.execution_context.end_user_id or "",
+                            "workflow_id": str(ctx.workflow_id),
+                            "additional_data": ctx.execution_context.additional_data or {},
                         },
                     },
                 ),

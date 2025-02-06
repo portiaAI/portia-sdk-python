@@ -11,12 +11,29 @@ from portia.config import Config, LogLevel
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
 from portia.plan import Plan, PlanContext, Step, Variable
-from portia.tool import Tool
+from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
-from portia.workflow import Workflow
+from portia.workflow import Workflow, WorkflowUUID
 
 if TYPE_CHECKING:
     from portia.execution_context import ExecutionContext
+
+
+def get_test_tool_context(
+    workflow_id: WorkflowUUID | None = None,
+    config: Config | None = None,
+) -> ToolRunContext:
+    """Return a test tool context."""
+    if not workflow_id:
+        workflow_id = WorkflowUUID()
+    if not config:
+        config = get_test_config()
+    return ToolRunContext(
+        execution_context=get_execution_ctx(),
+        workflow_id=workflow_id,
+        config=config,
+        clarifications=[],
+    )
 
 
 def get_test_workflow() -> tuple[Plan, Workflow]:
@@ -86,7 +103,7 @@ class AdditionTool(Tool):
     args_schema: type[BaseModel] = AdditionToolSchema
     output_schema: tuple[str, str] = ("int", "int: The value of the addition")
 
-    def run(self, _: ExecutionContext, a: int, b: int) -> int:
+    def run(self, _: ToolRunContext, a: int, b: int) -> int:
         """Add the numbers."""
         return a + b
 
@@ -111,14 +128,11 @@ class ClarificationTool(Tool):
 
     def run(
         self,
-        ctx: ExecutionContext,
+        ctx: ToolRunContext,
         user_guidance: str,
     ) -> Clarification | None:
         """Add the numbers."""
-        if (
-            "raise_clarification" in ctx.additional_data
-            and ctx.additional_data["raise_clarification"] == "True"
-        ):
+        if len(ctx.clarifications) == 0:
             return InputClarification(
                 user_guidance=user_guidance,
                 argument_name="raise_clarification",
@@ -140,7 +154,7 @@ class MockTool(Tool):
 
     def run(
         self,
-        _: ExecutionContext,
+        _: ToolRunContext,
     ) -> None:
         """Do nothing."""
         return
@@ -168,7 +182,7 @@ class ErrorTool(Tool):
 
     def run(
         self,
-        _: ExecutionContext,
+        _: ToolRunContext,
         error_str: str,
         return_uncaught_error: bool,  # noqa: FBT001
         return_soft_error: bool,  # noqa: FBT001
