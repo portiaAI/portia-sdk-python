@@ -19,7 +19,7 @@ from pydantic import (
 )
 
 from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
-from portia.uuid import ClarificationUUID, WorkflowUUID
+from portia.prefixed_uuid import ClarificationUUID, WorkflowUUID
 
 
 class ClarificationCategory(PortiaEnum):

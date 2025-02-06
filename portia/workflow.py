@@ -25,7 +25,7 @@ from portia.clarification import (
 )
 from portia.common import PortiaEnum
 from portia.execution_context import ExecutionContext, empty_context
-from portia.uuid import PlanUUID, WorkflowUUID
+from portia.prefixed_uuid import PlanUUID, WorkflowUUID
 
 
 class WorkflowState(PortiaEnum):

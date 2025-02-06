@@ -16,7 +16,7 @@ from portia.agents.execution_utils import (
 )
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.uuid import WorkflowUUID
+from portia.prefixed_uuid import WorkflowUUID
 from tests.utils import AdditionTool
 
 

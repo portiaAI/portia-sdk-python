@@ -24,7 +24,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.uuid import PlanUUID
+from portia.prefixed_uuid import PlanUUID
 
 
 class Variable(BaseModel):

@@ -9,7 +9,7 @@ from portia.agents.base_agent import Output
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
 from portia.plan import PlanUUID, ReadOnlyStep, Step
-from portia.uuid import WorkflowUUID
+from portia.prefixed_uuid import WorkflowUUID
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowOutputs, WorkflowState
 
 

@@ -38,7 +38,7 @@ from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanUUID, Step
 from portia.tool_call import ToolCallRecord, ToolCallStatus
-from portia.uuid import WORKFLOW_UUID_PREFIX
+from portia.prefixed_uuid import WORKFLOW_UUID_PREFIX
 from portia.workflow import (
     Workflow,
     WorkflowOutputs,

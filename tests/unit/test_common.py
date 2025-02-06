@@ -7,7 +7,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from portia.common import PortiaEnum, combine_args_kwargs
-from portia.uuid import PrefixedUUID
+from portia.prefixed_uuid import PrefixedUUID
 
 
 def test_portia_enum() -> None:

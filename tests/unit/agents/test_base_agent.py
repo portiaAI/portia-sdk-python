@@ -13,7 +13,7 @@ from portia.agents.base_agent import BaseAgent, Output
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
 from portia.execution_context import execution_context
-from portia.uuid import WorkflowUUID
+from portia.prefixed_uuid import WorkflowUUID
 from tests.utils import get_test_config, get_test_workflow
 
 
