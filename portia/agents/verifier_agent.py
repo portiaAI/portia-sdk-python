@@ -101,9 +101,9 @@ class VerifiedToolArgument(BaseModel):
         "User provided values can be in the context, in the goal or the result of previous steps.",
     )
 
-    missing: bool = Field(
+    schema_invalid: bool = Field(
         default=False,
-        description="Whether the value is missing or not.",
+        description="Whether the pydantic schema is invalid or not for this arg.",
     )
 
 
@@ -341,7 +341,7 @@ class VerifierModel:
             tool_inputs (VerifiedToolInputs): The tool_inputs to validate against the tool schema.
 
         Returns:
-            Updated VerifiedToolInputs with invalid/missing args marked with missing=True if found.
+            Updated VerifiedToolInputs with invalid args marked with schema_invalid=True.
 
         """
         arg_dict = {arg.name: arg.value for arg in tool_inputs.args}
@@ -350,7 +350,7 @@ class VerifierModel:
             if self.agent.tool:
                 self.agent.tool.args_schema.model_validate(arg_dict)
         except ValidationError as e:
-            # Extract the arg names from the pydantic error to mark them as missing = True.
+            # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
             # At this point we know the arguments are invalid, so we can trigger a clarification
             # request.
             invalid_arg_names = {
@@ -359,7 +359,7 @@ class VerifierModel:
                 if error.get("loc") and len(error["loc"]) > 0
             }
             [
-                setattr(arg, "missing", True)
+                setattr(arg, "schema_invalid", True)
                 for arg in tool_inputs.args
                 if arg.name in invalid_arg_names
             ]
@@ -428,7 +428,7 @@ class ToolCallingModel:
                 if matching_clarification and arg.value != matching_clarification.response:
                     arg.value = matching_clarification.response
                     arg.made_up = False
-                    arg.missing = False
+                    arg.schema_invalid = False
 
         model = self.llm.bind_tools(self.tools)
 
@@ -499,7 +499,7 @@ class VerifierAgent(BaseAgent):
         arguments = VerifiedToolInputs.model_validate_json(str(last_message.content))
 
         for arg in arguments.args:
-            if not arg.made_up and not arg.missing:
+            if not arg.made_up and not arg.schema_invalid:
                 continue
             matching_clarification = self.get_last_resolved_clarification(arg.name)
 
