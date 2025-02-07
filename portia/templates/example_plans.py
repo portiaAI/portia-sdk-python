@@ -126,4 +126,48 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
         ],
     ),
+    Plan(
+        plan_context=PlanContext(
+            query="Get the latest messages on the Dev channel and send a summary to nathan on Slack",
+            tool_ids=["list_conversation_ids", "conversation_history", "list_user_ids", "send_message"]
+        ),
+        steps=[
+            Step(
+                task="Get the id of the Dev channel",
+                tool_id="list_conversation_ids",
+                output="$conversation_ids",
+            ),
+            Step(
+                task="Get the latest messages on the Dev channel",
+                inputs=[
+                    Variable(
+                        name="$conversation_ids",
+                        description="The id of the Dev channel",
+                    ),
+                ],
+                tool_id="conversation_history",
+                output="$conversation_history",
+            ),
+            Step(
+                task="get the user id of nathan",
+                tool_id="list_user_ids",
+                output="$nathan_user_id",
+            ),
+            Step(
+                task="send a summary of the conversation to nathan",
+                inputs=[
+                    Variable(
+                        name="$conversation_history",
+                        description="The conversation history",
+                    ),
+                    Variable(
+                        name="$nathan_user_id",
+                        description="The user id of nathan",
+                    ),
+                ],
+                tool_id="send_message",
+                output="If the message was successfully sent",
+            )
+        ]
+    )
 ]
