@@ -270,8 +270,8 @@ class Runner:
         if not matched_clarification:
             raise InvalidWorkflowStateError("Could not match clarification to workflow")
 
-        clarification.resolved = True
-        clarification.response = response
+        matched_clarification.resolved = True
+        matched_clarification.response = response
 
         if len(workflow.get_outstanding_clarifications()) == 0:
             workflow.state = WorkflowState.READY_TO_RESUME
