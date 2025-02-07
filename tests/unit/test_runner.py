@@ -11,7 +11,7 @@ import pytest
 from pydantic import HttpUrl
 
 from portia.agents.base_agent import Output
-from portia.clarification import ActionClarification, Clarification
+from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
@@ -259,6 +259,7 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
 
         def run(self, ctx: ToolRunContext, user_guidance: str) -> Clarification:  # noqa: ARG002
             return ActionClarification(
+                workflow_id=ctx.workflow_id,
                 user_guidance="",
                 action_url=HttpUrl(""),
             )
@@ -435,3 +436,39 @@ def test_runner_wait_for_ready_backoff_period(runner: Runner) -> None:
     runner.storage.get_workflow = mock.MagicMock(return_value=workflow)
     with pytest.raises(InvalidWorkflowStateError):
         runner.wait_for_ready(workflow, max_retries=1, backoff_start_time_seconds=0)
+
+
+def test_runner_resolve_clarification_error(runner: Runner) -> None:
+    """Test resolve error."""
+    plan, workflow = get_test_workflow()
+    plan2, workflow2 = get_test_workflow()
+    clarification = InputClarification(
+        user_guidance="",
+        argument_name="",
+        workflow_id=workflow2.id,
+    )
+    runner.storage.save_plan(plan)
+    runner.storage.save_workflow(workflow)
+    runner.storage.save_plan(plan2)
+    runner.storage.save_workflow(workflow2)
+    with pytest.raises(InvalidWorkflowStateError):
+        runner.resolve_clarification(clarification, "test")
+
+    with pytest.raises(InvalidWorkflowStateError):
+        runner.resolve_clarification(clarification, "test", workflow)
+
+
+def test_runner_resolve_clarification(runner: Runner) -> None:
+    """Test resolve success."""
+    plan, workflow = get_test_workflow()
+    clarification = InputClarification(
+        user_guidance="",
+        argument_name="",
+        workflow_id=workflow.id,
+    )
+    workflow.outputs.clarifications = [clarification]
+    runner.storage.save_plan(plan)
+    runner.storage.save_workflow(workflow)
+
+    workflow = runner.resolve_clarification(clarification, "test", workflow)
+    assert workflow.state == WorkflowState.READY_TO_RESUME

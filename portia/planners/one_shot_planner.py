@@ -50,9 +50,11 @@ class OneShotPlanner(Planner):
     steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
     that tools need to make sure the chain of calls works. If you are missing information do not \
     make up placeholder variables like example@example.com. If you can't come up with a plan \
-    provide a descriptive error instead - do not return plans with no steps. For tools that \
-    require an id, make sure to check if there's a list tool, id map tool, or some other way to get\
-    the id from natural language as part of the steps.",
+    provide a descriptive error instead - do not return plans with no steps. For EVERY tool that \
+    requires an id as an input, make sure to check if there's a corresponding tool call that\
+    provides the id from natural language if possible. For example, if a tool asks for a user ID\
+    check if there's a tool call that provides the user IDs before making the tool call that \
+    requires the user ID.",
                 },
                 {"role": "user", "content": prompt},
             ],

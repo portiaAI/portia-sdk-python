@@ -244,25 +244,38 @@ class Runner:
 
     def resolve_clarification(
         self,
-        workflow: Workflow,
         clarification: Clarification,
         response: object,
+        workflow: Workflow | None = None,
     ) -> Workflow:
         """Resolve a clarification updating the workflow state as needed.
 
         Args:
-            workflow (Workflow): The workflow being updated.
             clarification (Clarification): The clarification to resolve.
             response (object): The response to the clarification.
+            workflow (Workflow | None): Optional - the workflow being updated.
 
         Returns:
             Workflow: The updated workflow.
 
         """
-        clarification.resolved = True
-        clarification.response = response
+        if workflow is None:
+            workflow = self.storage.get_workflow(clarification.workflow_id)
+
+        matched_clarification = next(
+            (c for c in workflow.outputs.clarifications if c.id == clarification.id),
+            None,
+        )
+
+        if not matched_clarification:
+            raise InvalidWorkflowStateError("Could not match clarification to workflow")
+
+        matched_clarification.resolved = True
+        matched_clarification.response = response
+
         if len(workflow.get_outstanding_clarifications()) == 0:
             workflow.state = WorkflowState.READY_TO_RESUME
+
         self.storage.save_workflow(workflow)
         return workflow
 

@@ -8,7 +8,7 @@ and value confirmations.
 
 from __future__ import annotations
 
-from typing import ClassVar, Generic, Self, Union
+from typing import Any, Generic, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -18,9 +18,9 @@ from pydantic import (
     model_validator,
 )
 
-from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum, PrefixedUUID
+from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
+from portia.prefixed_uuid import ClarificationUUID, WorkflowUUID
 
-CLARIFICATION_UUID_PREFIX = "clar"
 
 class ClarificationCategory(PortiaEnum):
     """The category of a clarification.
@@ -32,16 +32,11 @@ class ClarificationCategory(PortiaEnum):
 
     ARGUMENT = "Argument"
     ACTION = "Action"
-    BASE = "Base"
     INPUT = "Input"
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
+    CUSTOM = "Custom"
 
-
-class ClarificationUUID(PrefixedUUID):
-    """A UUID for a clarification."""
-
-    prefix: ClassVar[str] = CLARIFICATION_UUID_PREFIX
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Base Model for Clarifications.
@@ -64,8 +59,10 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         default_factory=ClarificationUUID,
         description="A unique ID for this clarification",
     )
+    workflow_id: WorkflowUUID = Field(
+        description="The workflow this clarification is for",
+    )
     category: ClarificationCategory = Field(
-        default=ClarificationCategory.BASE,
         description="The category of this clarification",
     )
     response: SERIALIZABLE_TYPE_VAR | None = Field(
@@ -208,6 +205,31 @@ class ValueConfirmationClarification(ArgumentClarification[SERIALIZABLE_TYPE_VAR
     )
 
 
+class CustomClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+    """Custom clarifications.
+
+    Allows the user to extend clarifications with arbitrary data.
+    The user is responsible for handling this clarification type.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification, 'Custom'.
+
+    """
+
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.CUSTOM,
+        description="The category of this clarification",
+    )
+    name: str = Field(
+        description="The name of this clarification."
+        "Used to differentiate between different types of custom clarifications.",
+    )
+    data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional data for this clarification. Can include any serializable type.",
+    )
+
+
 """Type that encompasses all possible clarification types."""
 ClarificationType = Union[
     Clarification,
@@ -215,6 +237,7 @@ ClarificationType = Union[
     ActionClarification,
     MultipleChoiceClarification,
     ValueConfirmationClarification,
+    CustomClarification,
 ]
 
 """A list of clarifications of any type."""

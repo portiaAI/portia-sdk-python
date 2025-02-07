@@ -13,6 +13,7 @@ from portia.agents.base_agent import BaseAgent, Output
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
 from portia.execution_context import execution_context
+from portia.prefixed_uuid import WorkflowUUID
 from tests.utils import get_test_config, get_test_workflow
 
 
@@ -59,7 +60,11 @@ def test_output_serialize() -> None:
 
     not_a_model = NotAModel(id="123")
     now = datetime.now(tz=UTC)
-    clarification = ActionClarification(user_guidance="", action_url=HttpUrl("https://example.com"))
+    clarification = ActionClarification(
+        workflow_id=WorkflowUUID(),
+        user_guidance="",
+        action_url=HttpUrl("https://example.com"),
+    )
 
     tcs: list[tuple[Any, Any]] = [
         ("Hello World!", "Hello World!"),
