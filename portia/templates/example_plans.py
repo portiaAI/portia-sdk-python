@@ -128,8 +128,13 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     ),
     Plan(
         plan_context=PlanContext(
-            query="Get the latest messages on the Dev channel and send a summary to nathan on Slack",
-            tool_ids=["list_conversation_ids", "conversation_history", "list_user_ids", "send_message"]
+            query="Get the latest messages on the Dev channel and send a summary to nathan",
+            tool_ids=[
+                "list_conversation_ids",
+                "conversation_history",
+                "list_user_ids",
+                "send_message",
+            ],
         ),
         steps=[
             Step(
@@ -167,7 +172,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                 ],
                 tool_id="send_message",
                 output="If the message was successfully sent",
-            )
-        ]
-    )
+            ),
+        ],
+    ),
 ]
