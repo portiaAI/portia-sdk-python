@@ -113,18 +113,21 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     workflow.outputs.step_outputs = outputs
     clarifications = [
         InputClarification(
+            workflow_id=workflow.id,
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
             step=0,
         ),
         InputClarification(
+            workflow_id=workflow.id,
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
             step=1,
         ),
         ActionClarification(
+            workflow_id=workflow.id,
             action_url=HttpUrl("http://example.com"),
             user_guidance="click on the link",
         ),
@@ -183,20 +186,22 @@ def test_context_inputs_outputs_clarifications(
     outputs: dict[str, Output],
 ) -> None:
     """Test that the context is set up correctly with inputs, outputs, and missing args."""
+    (plan, workflow) = get_test_workflow()
     clarifications = [
         InputClarification(
+            workflow_id=workflow.id,
             argument_name="$email_cc",
             user_guidance="email cc list",
             response="bob@bla.com",
             step=0,
         ),
         ActionClarification(
+            workflow_id=workflow.id,
             action_url=HttpUrl("http://example.com"),
             user_guidance="click on the link",
             step=1,
         ),
     ]
-    (plan, workflow) = get_test_workflow()
     plan.steps[0].inputs = inputs
     workflow.outputs.step_outputs = outputs
     workflow.outputs.clarifications = clarifications

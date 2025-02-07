@@ -149,7 +149,6 @@ def test_runner_run_query_with_clarifications(
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
 
     workflow = runner.resolve_clarification(
-        workflow,
         workflow.get_outstanding_clarifications()[0],
         "False",
     )
@@ -269,6 +268,7 @@ def test_runner_run_query_with_soft_error(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
 def test_runner_run_query_with_multiple_clarifications(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
@@ -283,9 +283,13 @@ def test_runner_run_query_with_multiple_clarifications(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, _: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+        def run(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
             if a == 1:
-                return InputClarification(argument_name="a", user_guidance="please try again")
+                return InputClarification(
+                    workflow_id=ctx.workflow_id,
+                    argument_name="a",
+                    user_guidance="please try again",
+                )
             return a + b
 
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
@@ -341,9 +345,9 @@ def test_runner_run_query_with_multiple_clarifications(
     assert workflow.get_outstanding_clarifications()[0].user_guidance == "please try again"
 
     workflow = runner.resolve_clarification(
-        workflow,
         workflow.get_outstanding_clarifications()[0],
         456,
+        workflow,
     )
 
     runner.execute_workflow(workflow)
