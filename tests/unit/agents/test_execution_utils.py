@@ -16,6 +16,7 @@ from portia.agents.execution_utils import (
 )
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
+from portia.prefixed_uuid import WorkflowUUID
 from tests.utils import AdditionTool
 
 
@@ -87,7 +88,13 @@ def test_tool_call_or_end() -> None:
 
 def test_process_output_with_clarifications() -> None:
     """Test process_output with clarifications."""
-    clarifications = [InputClarification(argument_name="test", user_guidance="test")]
+    clarifications = [
+        InputClarification(
+            argument_name="test",
+            user_guidance="test",
+            workflow_id=WorkflowUUID(),
+        ),
+    ]
     message = HumanMessage(content="test")
 
     result = process_output(message, clarifications=clarifications)  # type: ignore  # noqa: PGH003

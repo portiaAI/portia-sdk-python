@@ -17,19 +17,15 @@ Key Components
 
 from __future__ import annotations
 
-from typing import ClassVar
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.agents.base_agent import Output
 from portia.clarification import (
     ClarificationListType,
 )
-from portia.common import PortiaEnum, PrefixedUUID
+from portia.common import PortiaEnum
 from portia.execution_context import ExecutionContext, empty_context
-from portia.plan import PlanUUID
-
-WORKFLOW_UUID_PREFIX = "wkfl"
+from portia.prefixed_uuid import PlanUUID, WorkflowUUID
 
 
 class WorkflowState(PortiaEnum):
@@ -91,12 +87,6 @@ class WorkflowOutputs(BaseModel):
         default=None,
         description="The final consolidated output of the workflow, if available.",
     )
-
-
-class WorkflowUUID(PrefixedUUID):
-    """A UUID for a workflow."""
-
-    prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX
 
 
 class Workflow(BaseModel):
