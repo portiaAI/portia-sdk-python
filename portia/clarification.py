@@ -32,7 +32,6 @@ class ClarificationCategory(PortiaEnum):
 
     ARGUMENT = "Argument"
     ACTION = "Action"
-    BASE = "Base"
     INPUT = "Input"
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
@@ -64,7 +63,6 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="The workflow this clarification is for",
     )
     category: ClarificationCategory = Field(
-        default=ClarificationCategory.BASE,
         description="The category of this clarification",
     )
     response: SERIALIZABLE_TYPE_VAR | None = Field(
@@ -214,10 +212,14 @@ class CustomClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     The user is responsible for handling this clarification type.
 
     Attributes:
-        category (ClarificationCategory): The category for this clarification, 'Value Confirmation'.
+        category (ClarificationCategory): The category for this clarification, 'Custom'.
 
     """
 
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.CUSTOM,
+        description="The category of this clarification",
+    )
     name: str = Field(
         description="The name of this clarification."
         "Used to differentiate between different types of custom clarifications.",

@@ -10,6 +10,7 @@ portia-cli list-tools
 from __future__ import annotations
 
 import builtins
+import importlib.metadata
 import json
 import os
 import webbrowser
@@ -149,6 +150,12 @@ def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
 @click.group(context_settings={"max_content_width": 240})
 def cli() -> None:
     """Portia CLI."""
+
+
+@click.command()
+def version() -> None:
+    """Print the CLI tool version."""
+    click.echo(importlib.metadata.version("portia-sdk-python"))
 
 
 @click.command()
@@ -324,6 +331,7 @@ def _get_config(
     return (cli_config, config)
 
 
+cli.add_command(version)
 cli.add_command(run)
 cli.add_command(plan)
 cli.add_command(list_tools)
