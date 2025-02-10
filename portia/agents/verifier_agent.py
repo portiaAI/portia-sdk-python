@@ -434,7 +434,6 @@ class ToolCallingModel:
 
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
-        print(f"\n\n past_errors: {past_errors}\n\n")
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 verified_args=verified_args.model_dump_json(indent=2),
