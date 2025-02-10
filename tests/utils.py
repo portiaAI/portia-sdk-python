@@ -134,6 +134,7 @@ class ClarificationTool(Tool):
         """Add the numbers."""
         if len(ctx.clarifications) == 0:
             return InputClarification(
+                workflow_id=ctx.workflow_id,
                 user_guidance=user_guidance,
                 argument_name="raise_clarification",
             )

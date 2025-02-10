@@ -31,7 +31,7 @@ class FileReaderTool(Tool[str]):
     args_schema: type[BaseModel] = FileReaderToolSchema
     output_schema: tuple[str, str] = ("str", "A string dump or JSON of the file content")
 
-    def run(self, _: ToolRunContext, filename: str) -> str | Clarification:  # noqa: PLR0911
+    def run(self, ctx: ToolRunContext, filename: str) -> str | Clarification:  # noqa: PLR0911
         """Run the FileReaderTool."""
         file_path = Path(filename)
         suffix = file_path.suffix.lower()
@@ -60,6 +60,7 @@ class FileReaderTool(Tool[str]):
         alt_file_paths = self.find_file(file_path)
         if alt_file_paths:
             return MultipleChoiceClarification(
+                workflow_id=ctx.workflow_id,
                 argument_name="filename",
                 user_guidance=f"Found {filename} in these location(s)."
                 "Pick one to continue:\n{alt_file_paths}",

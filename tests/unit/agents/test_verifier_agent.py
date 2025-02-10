@@ -321,9 +321,9 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
 
     verified_tool_inputs = VerifiedToolInputs(
         args=[
-            VerifiedToolArgument(name="required_field1", value=None, made_up=False, missing=True),
-            VerifiedToolArgument(name="required_field2", value=None, made_up=False, missing=True),
-            VerifiedToolArgument(name="optional_field", value=None, made_up=False, missing=False),
+            VerifiedToolArgument(name="required_field1", value=None, schema_invalid=True),
+            VerifiedToolArgument(name="required_field2", value=None, schema_invalid=True),
+            VerifiedToolArgument(name="optional_field", value=None, schema_invalid=False),
         ],
     )
     mockinvoker = MockInvoker(response=verified_tool_inputs)
@@ -353,15 +353,15 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
     required_field1 = next(arg for arg in result_inputs.args if arg.name == "required_field1")
     required_field2 = next(arg for arg in result_inputs.args if arg.name == "required_field2")
     assert (
-        required_field1.missing
+        required_field1.schema_invalid
     ), "required_field1 should be marked as missing when validation fails"
     assert (
-        required_field2.missing
+        required_field2.schema_invalid
     ), "required_field2 should be marked as missing when validation fails"
 
     optional_field = next(arg for arg in result_inputs.args if arg.name == "optional_field")
     assert (
-        not optional_field.missing
+        not optional_field.schema_invalid
     ), "optional_field should not be marked as missing when validation fails"
 
 
@@ -415,7 +415,10 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     )
     monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
 
+    (_, workflow) = get_test_workflow()
+
     clarification = InputClarification(
+        workflow_id=workflow.id,
         user_guidance="USER_GUIDANCE",
         response="CLARIFICATION_RESPONSE",
         argument_name="content",
@@ -423,13 +426,13 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     )
 
     failed_clarification = InputClarification(
+        workflow_id=workflow.id,
         user_guidance="USER_GUIDANCE_FAILED",
         response="FAILED",
         argument_name="content",
         resolved=True,
     )
 
-    (_, workflow) = get_test_workflow()
     workflow.outputs.clarifications = [clarification]
     agent = SimpleNamespace(
         verified_args=verified_tool_inputs,
@@ -626,7 +629,9 @@ def test_verifier_agent_edge_cases() -> None:
 
 def test_get_last_resolved_clarification() -> None:
     """Test get_last_resolved_clarification."""
+    (plan, workflow) = get_test_workflow()
     resolved_clarification1 = InputClarification(
+        workflow_id=workflow.id,
         argument_name="arg",
         response="2",
         user_guidance="FAILED",
@@ -634,6 +639,7 @@ def test_get_last_resolved_clarification() -> None:
         step=0,
     )
     resolved_clarification2 = InputClarification(
+        workflow_id=workflow.id,
         argument_name="arg",
         response="2",
         user_guidance="SUCCESS",
@@ -641,13 +647,13 @@ def test_get_last_resolved_clarification() -> None:
         step=0,
     )
     unresolved_clarification = InputClarification(
+        workflow_id=workflow.id,
         argument_name="arg",
         response="2",
         user_guidance="",
         resolved=False,
         step=0,
     )
-    (plan, workflow) = get_test_workflow()
     workflow.outputs.clarifications = [
         resolved_clarification1,
         resolved_clarification2,
@@ -664,14 +670,15 @@ def test_get_last_resolved_clarification() -> None:
 
 def test_clarifications_or_continue() -> None:
     """Test clarifications_or_continue."""
+    (plan, workflow) = get_test_workflow()
     clarification = InputClarification(
+        workflow_id=workflow.id,
         argument_name="arg",
         response="2",
         user_guidance="",
         resolved=True,
     )
 
-    (plan, workflow) = get_test_workflow()
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
@@ -700,6 +707,7 @@ def test_clarifications_or_continue() -> None:
 
     # when clarifications match expect to call tools
     clarification = InputClarification(
+        workflow_id=workflow.id,
         argument_name="arg",
         response="1",
         user_guidance="",

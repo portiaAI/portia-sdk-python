@@ -399,7 +399,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     api_key: SecretStr
     api_endpoint: str
 
-    def parse_response(self, response: dict[str, Any]) -> Output:
+    def parse_response(self, ctx: ToolRunContext, response: dict[str, Any]) -> Output:
         """Parse a JSON response into domain models or errors.
 
         This method handles the response from the Portia Cloud API, converting it into domain
@@ -407,6 +407,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         as well as clarifications of different types.
 
         Args:
+            ctx (ToolRunContext): Context of the environment
             response (dict[str, Any]): The JSON response returned by the Portia Cloud API.
 
         Returns:
@@ -417,14 +418,13 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolHardError: If a hard error is encountered in the response.
 
         """
+        print("got here 555\n")
         output = Output.model_validate(response["output"])
+        print(f"got here 666, output: {output!s}\n")
 
         # Handle Tool Errors
-        if isinstance(output.value, str):
-            if "ToolSoftError" in output.value:
-                raise ToolSoftError(output.value)
-            if "ToolHardError" in output.value:
-                raise ToolHardError(output.value)
+        if isinstance(output.value, str) and "ToolSoftError" in output.value:
+            raise ToolSoftError(output.value)
         # Handle Clarifications
         if isinstance(output.value, list) and output.value and "category" in output.value[0]:
             clarification = output.value[0]
@@ -432,6 +432,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.ACTION:
                     return Output(
                         value=ActionClarification(
+                            workflow_id=ctx.workflow_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
@@ -440,6 +441,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.INPUT:
                     return Output(
                         value=InputClarification(
+                            workflow_id=ctx.workflow_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -448,6 +450,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.MULTIPLE_CHOICE:
                     return Output(
                         value=MultipleChoiceClarification(
+                            workflow_id=ctx.workflow_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -457,6 +460,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.VALUE_CONFIRMATION:
                     return Output(
                         value=ValueConfirmationClarification(
+                            workflow_id=ctx.workflow_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -527,6 +531,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolHardError: If the request fails or there is an error parsing the response.
 
         """
+        print(f"Running tool {self.id} with context {ctx}, args {args} and kwargs {kwargs}")
         try:
             # Send to Cloud
             response = httpx.post(
@@ -556,7 +561,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             raise ToolHardError(e) from e
         else:
             try:
-                output = self.parse_response(response.json())
+                output = self.parse_response(ctx, response.json())
             except (ValidationError, KeyError) as e:
                 logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e
