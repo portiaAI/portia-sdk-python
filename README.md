@@ -20,6 +20,11 @@ Play around, break things and tell us how you're getting on in our <a href="http
 
 ### Installation
 
+0. Ensure you have python 3.10 or higher installed. If you need to update your python version please visit their [docs](https://www.python.org/downloads/).
+```bash
+python --version
+```
+
 1. Install the Portia Python SDK
 ```bash
 pip install portia-sdk-python 
