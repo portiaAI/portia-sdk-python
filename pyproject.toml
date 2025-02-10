@@ -10,7 +10,7 @@ license = "MIT License"
 packages = [
   {include = "portia"}
 ]
-documentation = "https://www.portialabs.ai/docs"
+documentation = "https://docs.portialabs.ai"
 keywords = ["LLM", "agentic", "workflow"]
 classifiers = [
     "Development Status :: 3 - Alpha"
