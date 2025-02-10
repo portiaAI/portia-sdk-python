@@ -62,8 +62,7 @@ class FileReaderTool(Tool[str]):
             return MultipleChoiceClarification(
                 workflow_id=ctx.workflow_id,
                 argument_name="filename",
-                user_guidance=f"Found {filename} in these location(s)."
-                "Pick one to continue:\n{alt_file_paths}",
+                user_guidance=f"Found {filename} in these location(s). Pick one to continue:\n{alt_file_paths}",
                 options=alt_file_paths,
             )
 

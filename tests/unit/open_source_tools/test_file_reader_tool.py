@@ -25,7 +25,7 @@ def test_file_reader_tool_read_txt(tmp_path: Path) -> None:
 
 
 def test_file_reader_tool_read_log(tmp_path: Path) -> None:
-    """Test that FileReaderTool reads content from a .txt file."""
+    """Test that FileReaderTool reads content from a .log file."""
     tool = FileReaderTool()
     ctx = get_test_tool_context()
     filename = tmp_path / "test.log"
@@ -120,6 +120,7 @@ def test_file_reader_tool_file_alt_files(tmp_path: Path) -> None:
     assert isinstance(output.options, list)
     assert len(output.options) == 1
     assert output.options[0] == str(alt_filename)
+    assert str(filename) in output.user_guidance and str(alt_filename) in output.user_guidance
 
 
 def test_file_reader_tool_file_no_files(tmp_path: Path) -> None:
