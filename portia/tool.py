@@ -418,13 +418,14 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolHardError: If a hard error is encountered in the response.
 
         """
-        print("got here 555\n")
         output = Output.model_validate(response["output"])
-        print(f"got here 666, output: {output!s}\n")
 
         # Handle Tool Errors
-        if isinstance(output.value, str) and "ToolSoftError" in output.value:
-            raise ToolSoftError(output.value)
+        if isinstance(output.value, str):
+            if "ToolSoftError" in output.value:
+                raise ToolSoftError(output.value)
+            if "ToolHardError" in output.value:
+                raise ToolHardError(output.value)
         # Handle Clarifications
         if isinstance(output.value, list) and output.value and "category" in output.value[0]:
             clarification = output.value[0]
@@ -531,7 +532,6 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolHardError: If the request fails or there is an error parsing the response.
 
         """
-        print(f"Running tool {self.id} with context {ctx}, args {args} and kwargs {kwargs}")
         try:
             # Send to Cloud
             response = httpx.post(
