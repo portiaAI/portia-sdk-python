@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
-from portia.plan import Plan, PlanContext
 from portia.planners.context import render_prompt_insert_defaults
-from portia.planners.planner import Planner, PlanOrError, StepsOrError
+from portia.planners.planner import Planner, StepsOrError
 
 if TYPE_CHECKING:
     from portia.config import Config
+    from portia.plan import Plan
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -25,13 +25,13 @@ class OneShotPlanner(Planner):
         """Init with the config."""
         self.llm_wrapper = LLMWrapper(config)
 
-    def generate_plan_or_error(
+    def generate_steps_or_error(
         self,
         ctx: ExecutionContext,
         query: str,
         tool_list: list[Tool],
         examples: list[Plan] | None = None,
-    ) -> PlanOrError:
+    ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         ctx = get_execution_context()
         prompt = render_prompt_insert_defaults(
@@ -59,13 +59,7 @@ class OneShotPlanner(Planner):
                 {"role": "user", "content": prompt},
             ],
         )
-        return PlanOrError(
-            plan=Plan(
-                plan_context=PlanContext(
-                    query=query,
-                    tool_ids=[tool.id for tool in tool_list],
-                ),
-                steps=response.steps,
-            ),
+        return StepsOrError(
+            steps=response.steps,
             error=response.error,
         )
