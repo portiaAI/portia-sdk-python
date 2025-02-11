@@ -1,8 +1,10 @@
 name: Python Testing
 
 on:
-  # see https://michaelheap.com/access-secrets-from-forks/
   pull_request_target:
+    types:
+      - opened
+      - synchronize
 
 permissions:
   contents: write
