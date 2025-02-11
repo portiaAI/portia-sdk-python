@@ -23,9 +23,14 @@ def test_search_tool_successful_response() -> None:
     """Test that SearchTool successfully processes a valid response."""
     tool = SearchTool()
     mock_api_key = "mock-api-key"
-    mock_response = {"query": "What is the capital of France?", "follow_up_questions": "",
-                     "answer": "The capital of France is Paris.", "images": [], "results": [],
-                     "response_time": 2.43}
+    mock_response = {
+        "query": "What is the capital of France?",
+        "follow_up_questions": "",
+        "answer": "The capital of France is Paris.",
+        "images": [],
+        "results": [],
+        "response_time": 2.43,
+    }
 
     with patch("os.getenv", return_value=mock_api_key):
         ctx = get_test_tool_context()
