@@ -23,6 +23,10 @@ Thank you for your interest in contributing to Portia SDK! We welcome contributi
 8. **Code Review**: Your PR will be reviewed by the maintainers. They may suggest improvements or request changes. We will do our best to review your PRs promptly but we're still a tiny team with limited resource. Please bear with us 🙏
 10. **Merge Your PR**: Once approved, the author of the PR can merge the changes. 🚀
 
+## Linting
+
+We lint our code using [Ruff](https://github.com/astral-sh/ruff). We also have [pre-commit](https://pre-commit.com/) setup to allow running this easily locally.
+
 ## Tests
 
 We write two types of tests:
