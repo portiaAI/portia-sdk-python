@@ -5,39 +5,38 @@ on:
     types:
       - opened
       - synchronize
+      - labeled
 
 permissions:
-  contents: write
-  checks: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 jobs:
-  testing:
+  check-label:
     runs-on: ubuntu-latest
     steps:
-      - name: Get User Permission
-        id: checkAccess
-        uses: actions-cool/check-user-permission@v2
+      - name: Check for safe_to_test label
+        id: check_label
+        uses: mheap/github-action-required-labels@v5
         with:
-          require: write
-          username: ${{ github.triggering_actor }}
+          mode: exactly
+          count: 1
+          labels: safe_to_test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check User Permission
-        if: steps.checkAccess.outputs.require-result == 'false'
-        run: |
-          echo "${{ github.triggering_actor }} does not have permissions on this repo."
-          echo "Current permission level is ${{ steps.checkAccess.outputs.user-permission }}"
-          echo "Job originally triggered by ${{ github.actor }}"
-          exit 1
+
+  testing:
+    needs: check-label
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          ref: ${{  github.event.pull_request.head.sha }} # This is dangerous without the first access check
-      - uses: actions/checkout@v4
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: install poetry
         run: pipx install poetry
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -46,8 +45,6 @@ jobs:
       - name: install dependencies
         run: poetry install --all-extras
 
-      # run unit tests first without env keys
-      # this is to ensure we're not adding unit tests that need to call LLMs
       - name: unit_tests + coverage
         env:
           PORTIA_API_ENDPOINT: "https://api.porita.dev"
@@ -64,7 +61,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
         run: |
           set -o pipefail
-          poetry run pytest -n 2  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          poetry run pytest -n 2 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
 
       - name: Pytest coverage comment
         uses: MishaKav/pytest-coverage-comment@main
