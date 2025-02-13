@@ -40,4 +40,5 @@ def test_wrapper_methods(llm_provider: LLMProvider, llm_model_name: LLMModel) ->
             {"role": "user", "content": "test"},
         ],
     )
-    wrapper.to_langchain()
+    model = wrapper.to_langchain()
+    assert model.model_name == llm_model_name.value
