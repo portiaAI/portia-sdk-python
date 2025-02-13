@@ -1,23 +1,42 @@
 name: Python Testing
 
 on:
-  pull_request:
-    branches:
-      - "*"
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - labeled
 
 permissions:
-  contents: write
-  checks: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 jobs:
-  testing:
+  check-label:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check for safe_to_test label
+        id: check_label
+        uses: mheap/github-action-required-labels@v5
+        with:
+          mode: exactly
+          count: 1
+          labels: safe_to_test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  testing:
+    needs: check-label
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: install poetry
         run: pipx install poetry
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -26,8 +45,6 @@ jobs:
       - name: install dependencies
         run: poetry install --all-extras
 
-      # run unit tests first without env keys
-      # this is to ensure we're not adding unit tests that need to call LLMs
       - name: unit_tests + coverage
         env:
           PORTIA_API_ENDPOINT: "https://api.porita.dev"
@@ -44,10 +61,4 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
         run: |
           set -o pipefail
-          poetry run pytest -n 2  --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
-
-      - name: Pytest coverage comment
-        uses: MishaKav/pytest-coverage-comment@main
-        with:
-          pytest-coverage-path: ./pytest-coverage.txt
-          junitxml-path: ./pytest.xml
+          poetry run pytest -n 2 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt

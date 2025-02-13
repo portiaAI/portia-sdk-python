@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from portia.plan import PlanUUID
     from portia.workflow import WorkflowUUID
 
+
 class PortiaBaseError(Exception):
     """Base class for all our errors."""
 
