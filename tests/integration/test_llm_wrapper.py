@@ -41,4 +41,7 @@ def test_wrapper_methods(llm_provider: LLMProvider, llm_model_name: LLMModel) ->
         ],
     )
     model = wrapper.to_langchain()
-    assert model.model_name == llm_model_name.value
+    if llm_provider == LLMProvider.OPENAI:
+        assert model.name == llm_model_name.value
+    else:
+        assert model.model == llm_model_name.value
