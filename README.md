@@ -46,7 +46,7 @@ portia-cli run "add 1 + 2"
 
 ### E2E example with open source tools
 This example is meant to get you familiar with a few of our core abstractions:
-- A `Plan` is the set of steps an LLM thinks it should take in order to respond to a user prompt. They immutable, structured and human-readable.
+- A `Plan` is the set of steps an LLM thinks it should take in order to respond to a user prompt. They are immutable, structured and human-readable.
 - A `Workflow` is a unique instantiation of a `Plan`. The purpose of a `Workflow` is to capture the state of a unique plan run at every step in an auditable way.
 - A `Runner` is the main orchestrator of plan generation. It is also capable of workflow creation, execution, pausing and resumption.
 
