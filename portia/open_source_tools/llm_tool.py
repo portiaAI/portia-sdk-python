@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from langchain.schema import HumanMessage
 from pydantic import BaseModel, Field
 
@@ -17,11 +19,11 @@ class LLMToolSchema(BaseModel):
         description="The task to be completed by the LLM tool.",
     )
 
-LLM_TOOL_ID = "llm_tool"
 
 class LLMTool(Tool[str]):
     """General purpose LLM tool. Customizable to user requirements. Won't call other tools."""
 
+    LLM_TOOL_ID: ClassVar[str] = "llm_tool"
     id: str = LLM_TOOL_ID
     name: str = "LLM Tool"
     description: str = (

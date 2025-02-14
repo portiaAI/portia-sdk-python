@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
-from portia.open_source_tools.llm_tool import LLM_TOOL_ID
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
 
@@ -67,7 +67,7 @@ class OneShotPlanner(Planner):
         # Add LLMTool to the steps that don't have a tool_id.
         for step in response.steps:
             if step.tool_id is None:
-                step.tool_id = LLM_TOOL_ID
+                step.tool_id = LLMTool.LLM_TOOL_ID
 
         return StepsOrError(
             steps=response.steps,

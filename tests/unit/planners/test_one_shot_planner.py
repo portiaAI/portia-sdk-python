@@ -10,7 +10,7 @@ import pytest
 
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
-from portia.open_source_tools.llm_tool import LLM_TOOL_ID
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planners.context import default_query_system_context, render_prompt_insert_defaults
 from portia.planners.one_shot_planner import OneShotPlanner
@@ -221,6 +221,6 @@ def test_generate_steps_assigns_llm_tool_id(planner: OneShotPlanner) -> None:
         tool_list=[AdditionTool()],
     )
 
-    assert all(step.tool_id == LLM_TOOL_ID for step in result.steps)
+    assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)
     assert len(result.steps) == 2
     assert result.error is None
