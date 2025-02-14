@@ -7,12 +7,13 @@ from typing import TYPE_CHECKING
 
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
+from portia.open_source_tools.llm_tool import LLM_TOOL_ID
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
 
 if TYPE_CHECKING:
     from portia.config import Config
-    from portia.plan import Plan
+    from portia.plan import Plan, Step
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,40 @@ class OneShotPlanner(Planner):
                 {"role": "user", "content": prompt},
             ],
         )
+
+        if not response.error:
+            response.error = self._validate_tools_in_response(response.steps, tool_list)
+
+        # Add LLMTool to the steps that don't have a tool_id.
+        for step in response.steps:
+            if step.tool_id is None:
+                step.tool_id = LLM_TOOL_ID
+
         return StepsOrError(
             steps=response.steps,
             error=response.error,
         )
+
+    def _validate_tools_in_response(self, steps: list[Step], tool_list: list[Tool]) -> str | None:
+        """Validate that all tools in the response steps exist in the provided tool list.
+
+        Args:
+            steps (list[Step]): List of steps from the response
+            tool_list (list[Tool]): List of available tools
+
+        Returns:
+            Error message if tools are missing, None otherwise
+
+        """
+        tool_ids = [tool.id for tool in tool_list]
+        missing_tools = [
+            step.tool_id
+            for step in steps
+            if step.tool_id and step.tool_id not in tool_ids
+        ]
+        return (
+            f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
+            if missing_tools
+            else None
+        )
+

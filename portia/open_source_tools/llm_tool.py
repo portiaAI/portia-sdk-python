@@ -17,11 +17,12 @@ class LLMToolSchema(BaseModel):
         description="The task to be completed by the LLM tool.",
     )
 
+LLM_TOOL_ID = "llm_tool"
 
 class LLMTool(Tool[str]):
     """General purpose LLM tool. Customizable to user requirements. Won't call other tools."""
 
-    id: str = "llm_tool"
+    id: str = LLM_TOOL_ID
     name: str = "LLM Tool"
     description: str = (
         "Jack of all trades tool to respond to a prompt by relying solely on LLM capabilities. "
