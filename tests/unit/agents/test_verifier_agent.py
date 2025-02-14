@@ -661,7 +661,7 @@ def test_get_last_resolved_clarification() -> None:
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
-        tool=AdditionTool(),
+        tool=None,
     )
     assert agent.get_last_resolved_clarification("arg") == resolved_clarification2
 
@@ -681,7 +681,7 @@ def test_clarifications_or_continue() -> None:
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
-        tool=AdditionTool(),
+        tool=None,
     )
     inputs = VerifiedToolInputs(
         args=[
@@ -719,7 +719,7 @@ def test_clarifications_or_continue() -> None:
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
-        tool=AdditionTool(),
+        tool=None,
     )
 
     inputs = VerifiedToolInputs(

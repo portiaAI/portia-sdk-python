@@ -15,13 +15,11 @@ from portia.clarification import ActionClarification, Clarification, InputClarif
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
-from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import InMemoryToolRegistry
-from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 from tests.utils import AdditionTool, ClarificationTool, get_test_config, get_test_workflow
 
@@ -436,12 +434,6 @@ def test_runner_wait_for_ready_backoff_period(runner: Runner) -> None:
     workflow.state = WorkflowState.NEED_CLARIFICATION
     runner.storage.save_plan(plan)
     runner.storage.get_workflow = mock.MagicMock(return_value=workflow)
-
-    # Mock the tool and its ready method to return False
-    mock_tool = mock.MagicMock()
-    mock_tool.ready.return_value = False
-    runner._get_tool_for_step = mock.MagicMock(return_value=mock_tool)  # noqa: SLF001
-
     with pytest.raises(InvalidWorkflowStateError):
         runner.wait_for_ready(workflow, max_retries=1, backoff_start_time_seconds=0)
 
@@ -496,7 +488,4 @@ def test_runner_get_tool_for_step_none_tool_id() -> None:
     )
 
     tool = runner._get_tool_for_step(step, workflow)  # noqa: SLF001
-
-    # Verify the tool is a ToolCallWrapper with LLMTool as child_tool
-    assert isinstance(tool, ToolCallWrapper)
-    assert isinstance(tool._child_tool, LLMTool)  # noqa: SLF001
+    assert tool is None
