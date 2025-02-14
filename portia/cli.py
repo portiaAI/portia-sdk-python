@@ -326,7 +326,11 @@ def _get_config(
 
     if llm_provider or llm_model:
         config.llm_provider = llm_provider if llm_provider else llm_model.provider()
-        config.llm_model_name = llm_model if llm_model else config.llm_provider.default_model()
+        config.llm_model_name = (
+            llm_model
+            if llm_model in llm_provider.associated_models()
+            else config.llm_provider.default_model()
+        )
 
     return (cli_config, config)
 
