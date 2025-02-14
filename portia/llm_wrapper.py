@@ -153,7 +153,7 @@ class LLMWrapper(BaseLLMWrapper):
         match self.llm_provider:
             case LLMProvider.OPENAI:
                 return ChatOpenAI(
-                    name=self.model_name,
+                    model=self.model_name,
                     temperature=self.model_temperature,
                     seed=self.model_seed,
                     api_key=self.config.openai_api_key,
