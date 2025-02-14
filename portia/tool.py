@@ -126,6 +126,10 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Output schema of the tool",
         examples=["(TYPE, DESCRIPTION)", "(json, json with API response, single object)"],
     )
+    usage_examples: list[str] = Field(
+        default=[],
+        description="Usage examples of the tool",
+    )
     should_summarize: bool = Field(
         default=False,
         description="Whether the tool's output requires a summary. "

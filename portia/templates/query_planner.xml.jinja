@@ -30,6 +30,10 @@
 <Tools>{% for tool in tools %}
     <Tool name={{tool.id}}>
         {{tool.description}}
+        Usage examples:
+        {% for example in tool.usage_examples %}
+            {{example}}
+        {% endfor %}
     </Tool>{% endfor %}
 </Tools>
 

@@ -395,6 +395,7 @@ class PortiaToolRegistry(ToolRegistry):
                     raw_tool["description"]["overview"],
                     raw_tool["description"]["output_description"],
                 ),
+                usage_examples=raw_tool.get("usage_examples", []),
                 # pass API info
                 api_key=self.api_key,
                 api_endpoint=self.api_endpoint,
