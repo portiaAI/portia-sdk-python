@@ -1,6 +1,8 @@
 """wrapper tests."""
 
 import pytest
+from langchain_anthropic import ChatAnthropic
+from langchain_mistralai import ChatMistralAI
 
 from portia.config import Config, LLMModel, LLMProvider
 from portia.llm_wrapper import LLMWrapper
@@ -41,7 +43,9 @@ def test_wrapper_methods(llm_provider: LLMProvider, llm_model_name: LLMModel) ->
         ],
     )
     model = wrapper.to_langchain()
-    if llm_provider == LLMProvider.OPENAI:
-        assert model.name == llm_model_name.value
-    else:
+
+    if isinstance(model, (ChatMistralAI, ChatAnthropic)):
+        # MistralAI and Anthropic get_name() method doesn't give the model name unfortunately
         assert model.model == llm_model_name.value
+    else:
+        assert model.get_name() == llm_model_name.value
