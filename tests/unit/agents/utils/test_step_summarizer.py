@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
 if TYPE_CHECKING:
@@ -14,39 +14,7 @@ if TYPE_CHECKING:
 from portia.agents.base_agent import Output
 from portia.agents.utils.step_summarizer import StepSummarizer
 from portia.llm_wrapper import LLMWrapper
-from tests.utils import get_test_config
-
-
-class MockInvoker:
-    """Mock invoker."""
-
-    called: bool
-    prompt: list[BaseMessage]
-    response: AIMessage | BaseModel | None
-
-    def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
-        """Init worker."""
-        self.called = False
-        self.prompt = []
-        self.response = response
-        self.output_format = None
-
-    def invoke(
-        self,
-        prompt: list[BaseMessage],
-        **_: Any,  # noqa: ANN401
-    ) -> AIMessage | BaseModel:
-        """Mock run for invoking the chain."""
-        self.called = True
-        self.prompt = prompt
-        if self.response:
-            return self.response
-        return AIMessage(content="invoked")
-
-    def with_structured_output(self, output_format: type[BaseModel]) -> MockInvoker:
-        """Model wrapper for structured output."""
-        self.output_format = output_format
-        return self
+from tests.utils import MockInvoker, get_test_config
 
 
 def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -69,7 +37,8 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
     result = summarizer_model.invoke({"messages": [tool_message]})
 
     assert mock_invoker.called
-    messages: list[BaseMessage] = mock_invoker.prompt
+    assert mock_invoker.prompt
+    messages = mock_invoker.prompt
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "Tool output content" in messages[1].content

@@ -6,14 +6,14 @@ and a concrete implementation `LLMWrapper` that handles communication with diffe
 such as OpenAI, Anthropic, and MistralAI.
 
 The `LLMWrapper` class includes methods to convert the provider's model to LangChain-compatible
-models and to generate responses using the instructor tool.
+models.
 
 Classes in this file include:
 
 - `BaseLLMWrapper`: An abstract base class for all LLM wrappers, providing a template for conversion
 methods.
 - `LLMWrapper`: A concrete implementation that supports different LLM providers and provides
-functionality for converting to LangChain models and generating responses using instructor.
+functionality for converting to LangChain models.
 
 """
 
@@ -21,16 +21,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
-import instructor
-from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
 from langchain_mistralai import ChatMistralAI
 from langchain_openai import ChatOpenAI
-from mistralai import Mistral
-from openai import OpenAI
-from pydantic import BaseModel
 
 from portia.config import Config, LLMProvider
 
@@ -38,23 +33,18 @@ if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import (
         BaseChatModel,
     )
-    from openai.types.chat import ChatCompletionMessageParam
 
 logger = logging.getLogger(__name__)
-
-T = TypeVar("T", bound=BaseModel)
 
 
 class BaseLLMWrapper(ABC):
     """Abstract base class for LLM wrappers.
 
     This abstract class defines the interface that all LLM wrappers should implement.
-    It requires conversion methods for LangChain models (`to_langchain`) and for generating
-    responses using the instructor tool (`to_instructor`).
+    It requires conversion methods for LangChain models (`to_langchain`).
 
     Methods:
         to_langchain: Convert the LLM to a LangChain-compatible model.
-        to_instructor: Generate a response using the instructor tool.
 
     """
 
@@ -83,34 +73,13 @@ class BaseLLMWrapper(ABC):
         """
         raise NotImplementedError("to_langchain is not implemented")
 
-    @abstractmethod
-    def to_instructor(
-        self,
-        response_model: type[T],
-        messages: list[ChatCompletionMessageParam],
-    ) -> T:
-        """Generate a response using instructor.
-
-        Args:
-            response_model (type[T]): The Pydantic model to deserialize the response into.
-            messages (list[ChatCompletionMessageParam]): The messages to send to the LLM.
-
-        Returns:
-            T: The deserialized response.
-
-        Raises:
-            NotImplementedError: If the function is not implemented
-
-        """
-        raise NotImplementedError("to_instructor is not implemented")
-
 
 class LLMWrapper(BaseLLMWrapper):
     """LLMWrapper class for different LLMs.
 
     This class provides functionality for working with various LLM providers, such as OpenAI,
     Anthropic, and MistralAI. It includes methods to convert the LLM provider's model to a
-    LangChain-compatible model and to generate responses using the instructor tool.
+    LangChain-compatible model.
 
     Attributes:
         llm_provider (LLMProvider): The LLM provider to use (e.g., OpenAI, Anthropic, MistralAI).
@@ -120,7 +89,6 @@ class LLMWrapper(BaseLLMWrapper):
 
     Methods:
         to_langchain: Converts the LLM provider's model to a LangChain-compatible model.
-        to_instructor: Generates a response using instructor for the selected LLM provider.
 
     """
 
@@ -175,61 +143,4 @@ class LLMWrapper(BaseLLMWrapper):
                     temperature=self.model_temperature,
                     api_key=self.config.mistralai_api_key,
                     max_retries=3,
-                )
-
-    def to_instructor(
-        self,
-        response_model: type[T],
-        messages: list[ChatCompletionMessageParam],
-    ) -> T:
-        """Use instructor to generate an object of the specified response model type.
-
-        Args:
-            response_model (type[T]): The Pydantic model to deserialize the response into.
-            messages (list[ChatCompletionMessageParam]): The messages to send to the LLM.
-
-        Returns:
-            T: The deserialized response from the LLM provider.
-
-        """
-        match self.llm_provider:
-            case LLMProvider.OPENAI:
-                client = instructor.from_openai(
-                    client=OpenAI(
-                        api_key=self.config.must_get_raw_api_key("openai_api_key"),
-                    ),
-                    mode=instructor.Mode.JSON,
-                )
-                return client.chat.completions.create(
-                    response_model=response_model,
-                    messages=messages,
-                    model=self.model_name,
-                    temperature=self.model_temperature,
-                    seed=self.model_seed,
-                )
-            case LLMProvider.ANTHROPIC:
-                client = instructor.from_anthropic(
-                    client=Anthropic(
-                        api_key=self.config.must_get_raw_api_key("anthropic_api_key"),
-                    ),
-                    mode=instructor.Mode.ANTHROPIC_JSON,
-                )
-                return client.chat.completions.create(
-                    model=self.model_name,
-                    response_model=response_model,
-                    messages=messages,
-                    max_tokens=2048,
-                    temperature=self.model_temperature,
-                )
-            case LLMProvider.MISTRALAI:
-                client = instructor.from_mistral(
-                    client=Mistral(
-                        api_key=self.config.must_get_raw_api_key("mistralai_api_key"),
-                    ),
-                )
-                return client.chat.completions.create(  # pyright: ignore[reportReturnType]
-                    model=self.model_name,
-                    response_model=response_model,
-                    messages=messages,
-                    temperature=self.model_temperature,
                 )

@@ -40,12 +40,14 @@ class OneShotPlanner(Planner):
             ctx.planner_system_context_extension,
             examples,
         )
-        response = self.llm_wrapper.to_instructor(
-            response_model=StepsOrError,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an outstanding task planner who can leverage many \
+        response = (
+            self.llm_wrapper.to_langchain()
+            .with_structured_output(StepsOrError)
+            .invoke(
+                [
+                    {
+                        "role": "system",
+                        "content": "You are an outstanding task planner who can leverage many \
     tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
     steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
     that tools need to make sure the chain of calls works. If you are missing information do not \
@@ -55,11 +57,9 @@ class OneShotPlanner(Planner):
     provides the id from natural language if possible. For example, if a tool asks for a user ID\
     check if there's a tool call that provides the user IDs before making the tool call that \
     requires the user ID.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
         )
-        return StepsOrError(
-            steps=response.steps,
-            error=response.error,
-        )
+        return StepsOrError.model_validate(response)

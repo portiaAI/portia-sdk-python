@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from contextlib import suppress
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -31,50 +31,18 @@ from portia.errors import InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step
-from tests.utils import AdditionTool, get_test_config, get_test_tool_context, get_test_workflow
-
-if TYPE_CHECKING:
-    from langchain_core.prompt_values import ChatPromptValue
-    from langchain_core.runnables.config import RunnableConfig
+from tests.utils import (
+    AdditionTool,
+    MockInvoker,
+    get_test_config,
+    get_test_tool_context,
+    get_test_workflow,
+)
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _setup() -> None:
     logging.basicConfig(level=logging.INFO)
-
-
-class MockInvoker:
-    """Mock invoker."""
-
-    called: bool
-    prompt: ChatPromptValue | None
-    response: AIMessage | BaseModel | None
-
-    def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
-        """Init worker."""
-        self.called = False
-        self.prompt = None
-        self.response = response
-        self.output_format = None
-        self.tools = None
-
-    def invoke(
-        self,
-        prompt: ChatPromptValue,
-        _: RunnableConfig | None = None,
-        **kwargs: Any,  # noqa: ANN401, ARG002
-    ) -> AIMessage | BaseModel:
-        """Mock run for invoking the chain."""
-        self.called = True
-        self.prompt = prompt
-        if self.response:
-            return self.response
-        return AIMessage(content="invoked")
-
-    def with_structured_output(self, output_format: Any) -> MockInvoker:  # noqa: ANN401
-        """Model wrapper for structured output."""
-        self.output_format = output_format
-        return self
 
 
 class _TestToolSchema(BaseModel):
@@ -118,12 +86,12 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert mock_invoker.called
     messages = mock_invoker.prompt
     assert messages
-    assert "You are a highly capable assistant" in messages[0].content  # type: ignore  # noqa: PGH003
-    assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
+    assert "You are a highly capable assistant" in messages[0].content
+    assert "CONTEXT_STRING" in messages[1].content
+    assert "DESCRIPTION_STRING" in messages[1].content
+    assert "TOOL_NAME" in messages[1].content
+    assert "TOOL_DESCRIPTION" in messages[1].content
+    assert "INPUT_DESCRIPTION" in messages[1].content
     assert mock_invoker.output_format == ToolInputs
 
 
@@ -302,12 +270,13 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert mockinvoker.called
     messages = mockinvoker.prompt
-    assert "You are an expert reviewer" in messages[0].content  # type: ignore  # noqa: PGH003
-    assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    assert messages
+    assert "You are an expert reviewer" in messages[0].content
+    assert "CONTEXT_STRING" in messages[1].content
+    assert "DESCRIPTION_STRING" in messages[1].content
+    assert "TOOL_NAME" not in messages[1].content
+    assert "TOOL_DESCRIPTION" not in messages[1].content
+    assert "INPUT_DESCRIPTION" not in messages[1].content
     assert mockinvoker.output_format == VerifiedToolInputs
 
 
@@ -397,12 +366,13 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
 
     assert mockinvoker.called
     messages = mockinvoker.prompt
-    assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
-    assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    assert messages
+    assert "You are very powerful assistant" in messages[0].content
+    assert "CONTEXT_STRING" not in messages[1].content
+    assert "DESCRIPTION_STRING" not in messages[1].content
+    assert "TOOL_NAME" not in messages[1].content
+    assert "TOOL_DESCRIPTION" not in messages[1].content
+    assert "INPUT_DESCRIPTION" not in messages[1].content
 
 
 def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -461,12 +431,12 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
     assert mockinvoker.called
     messages = mockinvoker.prompt
     assert messages
-    assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
-    assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    assert "You are very powerful assistant" in messages[0].content
+    assert "CONTEXT_STRING" not in messages[1].content
+    assert "DESCRIPTION_STRING" not in messages[1].content
+    assert "TOOL_NAME" not in messages[1].content
+    assert "TOOL_DESCRIPTION" not in messages[1].content
+    assert "INPUT_DESCRIPTION" not in messages[1].content
 
 
 def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:

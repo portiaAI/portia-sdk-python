@@ -8,20 +8,26 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
+from langchain_openai import ChatOpenAI
 from pydantic import HttpUrl
 
 from portia.agents.base_agent import Output
 from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
-from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
-from tests.utils import AdditionTool, ClarificationTool, get_test_config, get_test_workflow
+from tests.utils import (
+    AdditionTool,
+    ClarificationTool,
+    MockInvoker,
+    get_test_config,
+    get_test_workflow,
+)
 
 
 @pytest.fixture
@@ -32,7 +38,7 @@ def runner() -> Runner:
     return Runner(config=config, tools=tool_registry)
 
 
-def test_runner_run_query(runner: Runner) -> None:
+def test_runner_run_query(runner: Runner, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test running a query using the Runner."""
     query = "example query"
 
@@ -40,14 +46,16 @@ def test_runner_run_query(runner: Runner) -> None:
         steps=[],
         error=None,
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
 
 
-def test_runner_run_query_tool_list() -> None:
+def test_runner_run_query_tool_list(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test running a query using the Runner."""
     query = "example query"
     runner = Runner(config=get_test_config(), tools=[AdditionTool(), ClarificationTool()])
@@ -56,14 +64,16 @@ def test_runner_run_query_tool_list() -> None:
         steps=[],
         error=None,
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     workflow = runner.execute_query(query)
 
     assert workflow.state == WorkflowState.COMPLETE
 
 
-def test_runner_run_query_disk_storage() -> None:
+def test_runner_run_query_disk_storage(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test running a query using the Runner."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         query = "example query"
@@ -75,7 +85,11 @@ def test_runner_run_query_disk_storage() -> None:
         runner = Runner(config=config, tools=tool_registry)
 
         mock_response = StepsOrError(steps=[], error=None)
-        LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+        mock_invoker = MockInvoker(response=mock_response)
+        monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+        monkeypatch.setattr(
+            ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output,
+        )
 
         workflow = runner.execute_query(query)
 
@@ -88,35 +102,41 @@ def test_runner_run_query_disk_storage() -> None:
         assert len(workflow_files) == 1
 
 
-def test_runner_generate_plan(runner: Runner) -> None:
+def test_runner_generate_plan(runner: Runner, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test planning a query using the Runner."""
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error=None)
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     plan = runner.generate_plan(query)
 
     assert plan.plan_context.query == query
 
 
-def test_runner_generate_plan_error(runner: Runner) -> None:
+def test_runner_generate_plan_error(runner: Runner, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test planning a query that returns an error."""
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error="could not plan")
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     with pytest.raises(PlanError):
         runner.generate_plan(query)
 
 
-def test_runner_generate_plan_with_tools(runner: Runner) -> None:
+def test_runner_generate_plan_with_tools(runner: Runner, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test planning a query using the Runner."""
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error=None)
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     plan = runner.generate_plan(query, tools=["add_tool"])
 
@@ -124,12 +144,16 @@ def test_runner_generate_plan_with_tools(runner: Runner) -> None:
     assert plan.plan_context.tool_ids == ["add_tool"]
 
 
-def test_runner_create_and_execute_workflow(runner: Runner) -> None:
+def test_runner_create_and_execute_workflow(
+    runner: Runner, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test running a plan using the Runner."""
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error=None)
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     plan = runner.generate_plan(query)
     workflow = runner.create_workflow(plan)
@@ -139,12 +163,14 @@ def test_runner_create_and_execute_workflow(runner: Runner) -> None:
     assert workflow.plan_id == plan.id
 
 
-def test_runner_execute_workflow(runner: Runner) -> None:
+def test_runner_execute_workflow(runner: Runner, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test resuming a workflow after interruption."""
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error=None)
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     plan = runner.generate_plan(query)
     workflow = runner.create_workflow(plan)
@@ -159,7 +185,9 @@ def test_runner_execute_workflow(runner: Runner) -> None:
     assert workflow.current_step_index == 1
 
 
-def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
+def test_runner_execute_workflow_edge_cases(
+    runner: Runner, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test edge cases for execute."""
     with pytest.raises(ValueError):  # noqa: PT011
         runner.execute_workflow()
@@ -169,7 +197,9 @@ def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
         steps=[],
         error=None,
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     plan = runner.generate_plan(query)
     workflow = runner.create_workflow(plan)
@@ -186,12 +216,16 @@ def test_runner_execute_workflow_edge_cases(runner: Runner) -> None:
         runner.execute_workflow(workflow_id=WorkflowUUID())
 
 
-def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
+def test_runner_execute_workflow_invalid_state(
+    runner: Runner, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test resuming a workflow with an invalid state."""
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error=None)
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     plan = runner.generate_plan(query)
     workflow = runner.create_workflow(plan)
@@ -204,12 +238,14 @@ def test_runner_execute_workflow_invalid_state(runner: Runner) -> None:
         runner.execute_workflow(workflow)
 
 
-def test_runner_wait_for_ready(runner: Runner) -> None:
+def test_runner_wait_for_ready(runner: Runner, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test wait for ready."""
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error=None)
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     plan = runner.generate_plan(query)
     workflow = runner.create_workflow(plan)
@@ -294,7 +330,7 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
     assert workflow.state == WorkflowState.READY_TO_RESUME
 
 
-def test_runner_execute_query_with_summary(runner: Runner) -> None:
+def test_runner_execute_query_with_summary(runner: Runner, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test execute_query sets both final output and summary correctly."""
     query = "What activities can I do in London based on weather?"
 
@@ -309,11 +345,13 @@ def test_runner_execute_query_with_summary(runner: Runner) -> None:
         tool_id="add_tool",
         output="$activities",
     )
-    mock_plan = StepsOrError(
+    mock_response = StepsOrError(
         steps=[weather_step, activities_step],
         error=None,
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_plan)
+    mock_invoker = MockInvoker(response=mock_response)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     # Mock agent responses
     weather_output = Output(value="Sunny and warm")

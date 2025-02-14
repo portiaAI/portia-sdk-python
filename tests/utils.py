@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from langchain_core.messages import AIMessage, BaseMessage
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
@@ -16,6 +17,8 @@ from portia.tool_call import ToolCallRecord, ToolCallStatus
 from portia.workflow import Workflow, WorkflowUUID
 
 if TYPE_CHECKING:
+    from langchain_core.runnables.config import RunnableConfig
+
     from portia.execution_context import ExecutionContext
 
 
@@ -194,3 +197,37 @@ class ErrorTool(Tool):
         if return_soft_error:
             raise ToolSoftError(error_str)
         raise ToolHardError(error_str)
+
+
+class MockInvoker:
+    """Mock invoker."""
+
+    called: bool
+    prompt: list[BaseMessage] | None
+    response: AIMessage | BaseModel | None
+
+    def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
+        """Init worker."""
+        self.called = False
+        self.prompt = None
+        self.response = response
+        self.output_format = None
+        self.tools = None
+
+    def invoke(
+        self,
+        prompt: list[BaseMessage],
+        _: RunnableConfig | None = None,
+        **kwargs: Any,  # noqa: ANN401, ARG002
+    ) -> AIMessage | BaseModel:
+        """Mock run for invoking the chain."""
+        self.called = True
+        self.prompt = prompt
+        if self.response:
+            return self.response
+        return AIMessage(content="invoked")
+
+    def with_structured_output(self, output_format: Any) -> MockInvoker:  # noqa: ANN401
+        """Model wrapper for structured output."""
+        self.output_format = output_format
+        return self
