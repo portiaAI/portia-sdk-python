@@ -742,7 +742,7 @@ def test_clarifications_or_continue() -> None:
     assert len(agent.new_clarifications) == 0
 
 
-def test_verifier_agent_none_tool_init() -> None:
+def test_verifier_agent_none_tool_execute_sync() -> None:
     """Test that executing VerifierAgent with None tool raises an exception."""
     (plan, workflow) = get_test_workflow()
 
