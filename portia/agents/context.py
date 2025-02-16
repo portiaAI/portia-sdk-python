@@ -88,7 +88,9 @@ def generate_input_context(
             input_context.extend(
                 [
                     f"output_name: {output_key}",
-                    f"output_value: {previous_outputs[output_key].value}",
+                    # We truncate the output value to 100 characters to avoid overwhelming the
+                    # LLM with too much information.
+                    f"output_value: {(previous_outputs[output_key].value or '')[:100]}",
                     "----------",
                 ],
             )
