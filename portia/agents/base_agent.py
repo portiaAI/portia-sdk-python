@@ -85,6 +85,7 @@ class BaseAgent:
             str: A string containing the system context for the agent.
 
         """
+        print("get_execution_context()", get_execution_context())
         ctx = get_execution_context()
         return build_context(
             ctx,
