@@ -369,6 +369,7 @@ class VerifierModel:
             for arg in tool_inputs.args
             if arg.value is None
             and arg.made_up
+            and self.agent.tool
             and not self.agent.tool.args_schema.model_fields[arg.name].is_required()
         ]
         # If a required argument value is None, we need to raise a clarification.
@@ -378,6 +379,7 @@ class VerifierModel:
             for arg in tool_inputs.args
             if arg.value is None
             and not arg.made_up
+            and self.agent.tool
             and self.agent.tool.args_schema.model_fields[arg.name].is_required()
         ]
 
