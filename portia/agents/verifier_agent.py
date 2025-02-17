@@ -551,7 +551,6 @@ class VerifierAgent(BaseAgent):
         """
         if not self.tool:
             raise InvalidAgentError("Tool is required for VerifierAgent")
-        print("got here yep monkey YEP")
         context = self.get_system_context()
         execution_context = get_execution_context()
         execution_context.workflow_run_context = context
@@ -560,7 +559,7 @@ class VerifierAgent(BaseAgent):
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=ToolRunContext(
-                    execution_context=get_execution_context(),
+                    execution_context=execution_context,
                     workflow_id=self.workflow.id,
                     config=self.config,
                     clarifications=self.workflow.get_clarifications_for_step(),
