@@ -551,6 +551,7 @@ class VerifierAgent(BaseAgent):
         """
         if not self.tool:
             raise InvalidAgentError("Tool is required for VerifierAgent")
+        print("got here yep monkey YEP")
         context = self.get_system_context()
         execution_context = get_execution_context()
         execution_context.workflow_run_context = context
