@@ -472,3 +472,20 @@ def test_runner_resolve_clarification(runner: Runner) -> None:
 
     workflow = runner.resolve_clarification(clarification, "test", workflow)
     assert workflow.state == WorkflowState.READY_TO_RESUME
+
+
+def test_runner_get_tool_for_step_none_tool_id() -> None:
+    """Test that when step.tool_id is None, LLMTool is used as fallback."""
+    runner = Runner(config=get_test_config(), tools=[AdditionTool()])
+    plan, workflow = get_test_workflow()
+
+    # Create a step with no tool_id
+    step = Step(
+        task="Some task",
+        inputs=[],
+        output="$output",
+        tool_id=None,
+    )
+
+    tool = runner._get_tool_for_step(step, workflow)  # noqa: SLF001
+    assert tool is None

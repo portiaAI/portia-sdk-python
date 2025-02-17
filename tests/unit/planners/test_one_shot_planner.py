@@ -10,6 +10,7 @@ import pytest
 
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planners.context import default_query_system_context, render_prompt_insert_defaults
 from portia.planners.one_shot_planner import OneShotPlanner
@@ -155,3 +156,71 @@ def test_render_prompt() -> None:
     assert "test query" in request_content
     assert "add_tool" in request_content
     assert "extension" in system_context_content
+
+
+def test_generate_steps_or_error_invalid_tool_id(planner: OneShotPlanner) -> None:
+    """Test handling of invalid tool ID in generated steps."""
+    query = "Calculate something"
+
+    mock_response = StepsOrError(
+        steps=[
+            Step(
+                task="Calculate sum",
+                tool_id="no_tool_1",
+                inputs=[],
+                output="$result",
+            ),
+            Step(
+                task="Calculate sum2",
+                tool_id="no_tool_2",
+                inputs=[],
+                output="$result2",
+            ),
+        ],
+        error=None,
+    )
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    result = planner.generate_steps_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[AdditionTool()],
+    )
+
+    assert result.error == "Missing tools no_tool_1, no_tool_2 from the provided tool_list"
+    assert result.steps == mock_response.steps
+
+
+def test_generate_steps_assigns_llm_tool_id(planner: OneShotPlanner) -> None:
+    """Test that steps without tool_id get assigned to LLMTool."""
+    query = "Generate a creative story"
+
+    # Mock response with steps that have no tool_id
+    mock_response = StepsOrError(
+        steps=[
+            Step(
+                task="Write a story opening",
+                tool_id=None,
+                inputs=[],
+                output="$story_opening",
+            ),
+            Step(
+                task="Write story conclusion",
+                tool_id=None,
+                inputs=[],
+                output="$story_conclusion",
+            ),
+        ],
+        error=None,
+    )
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    result = planner.generate_steps_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[AdditionTool()],
+    )
+
+    assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)
+    assert len(result.steps) == 2
+    assert result.error is None
