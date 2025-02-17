@@ -24,10 +24,9 @@ from portia.agents.execution_utils import (
 )
 from portia.agents.utils.step_summarizer import StepSummarizer
 from portia.clarification import Clarification, InputClarification
-from portia.errors import InvalidWorkflowStateError
+from portia.errors import InvalidAgentError, InvalidWorkflowStateError
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
-from portia.open_source_tools.llm_tool import LLMTool
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -551,8 +550,7 @@ class VerifierAgent(BaseAgent):
 
         """
         if not self.tool:
-            self.tool = LLMTool()
-
+            raise InvalidAgentError("Tool is required for VerifierAgent")
         context = self.get_system_context()
         execution_context = get_execution_context()
         execution_context.workflow_run_context = context
