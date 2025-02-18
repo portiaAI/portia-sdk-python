@@ -18,16 +18,11 @@ from portia.workflow import WorkflowUUID
 class ToolCallStatus(PortiaEnum):
     """The status of the tool call.
 
-    Attributes
-    ----------
-    IN_PROGRESS : str
-        The tool is currently in progress.
-    NEED_CLARIFICATION : str
-        The tool raise a clarification.
-    SUCCESS : str
-        The tool executed successfully.
-    FAILED : str
-        The tool raised an error.
+    Attributes:
+        IN_PROGRESS: The tool is currently in progress.
+        NEED_CLARIFICATION: The tool raise a clarification.
+        SUCCESS: The tool executed successfully.
+        FAILED: The tool raised an error.
 
     """
 
@@ -43,8 +38,7 @@ class ToolCallRecord(BaseModel):
     This class captures all relevant information about a single tool call
     within a workflow, including metadata, input and output data, and status.
 
-    Attributes
-    ----------
+    Attributes:
         tool_name (str): The name of the tool being called.
         workflow_id (WorkflowUUID): The unique identifier of the workflow to which this tool call
             belongs.

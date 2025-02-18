@@ -31,8 +31,7 @@ T = TypeVar("T")
 class StorageClass(Enum):
     """Enum representing locations plans and workflows are stored.
 
-    Attributes
-    ----------
+    Attributes:
         MEMORY: Stored in memory.
         DISK: Stored on disk.
         CLOUD: Stored in the cloud.
