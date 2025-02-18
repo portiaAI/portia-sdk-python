@@ -53,7 +53,7 @@ class WorkflowOutputs(BaseModel):
     """Outputs of a workflow, including clarifications.
 
     Attributes:
-        clarifications (ClarificationListType): Clarifications raise by this workflow.
+        clarifications (ClarificationListType): Clarifications raised by this workflow.
         step_outputs (dict[str, Output]): A dictionary containing outputs of individual steps.
             Outputs are indexed by the value given by the `step.output` field of the plan.
         final_output (Output | None): The final consolidated output of the workflow, if available.
