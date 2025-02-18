@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, Callable
 
 import httpx
 from pydantic import BaseModel, Field, create_model
@@ -111,6 +111,20 @@ class ToolRegistry(ABC):
             if tool_ids
             else self.get_tools()
         )
+    
+    def filter_tools() -> ToolRegistry {
+        """Return a tool registry containing the subset of tools from this registry that pass the
+        filter function.
+
+        Args:
+            filter (Callable[[Tool], bool]): A filter to select a subset of tools (return true to include a tool)
+
+        Returns:
+            ToolRegistry: A new tool registry containing only the filtered tools.
+
+        """
+        return self.get_tools()
+    }
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
@@ -337,7 +351,6 @@ class PortiaToolRegistry(ToolRegistry):
     def __init__(
         self,
         config: Config,
-        tool_filter: Callable[[Tool], bool] | None = None,
     ) -> None:
         """Initialize the PortiaToolRegistry with the given configuration.
 
@@ -351,11 +364,7 @@ class PortiaToolRegistry(ToolRegistry):
         self.api_key = config.must_get_api_key("portia_api_key")
         self.api_endpoint = config.must_get("portia_api_endpoint", str)
         self.tools = {}
-        self._load_tools(tool_filter or self.default_tool_filter)
-
-    @staticmethod
-    def default(config: Config) -> PortiaToolRegistry:
-        """Get a registry containing the default tool set."""
+        self._load_tools()
 
     def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
         """Generate a Pydantic model based on a JSON schema.
@@ -431,8 +440,6 @@ class PortiaToolRegistry(ToolRegistry):
                 api_key=self.api_key,
                 api_endpoint=self.api_endpoint,
             )
-            if tool_filter(tool):
-                tools[raw_tool["tool_id"]] = tool
         self.tools = tools
 
     def register_tool(self, tool: Tool) -> None:
