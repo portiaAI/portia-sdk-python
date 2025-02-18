@@ -105,8 +105,14 @@ type = "python"
 
 [[tool.pydoc-markdown.processors]]
 type = "filter"
-expression = "not 'test' in name and not name.startswith('_') and default()"
+expression = "not 'test' in name and not 'cli' in name and not 'prefixed_uuid' in name and not 'common' in name and not 'templates' in name and default()"
 skip_empty_modules = true
+
+[[tool.pydoc-markdown.processors]]
+type = "smart"
+
+[[tool.pydoc-markdown.processors]]
+type = "crossref"
 
 [tool.pydoc-markdown.renderer]
 type = "docusaurus"
