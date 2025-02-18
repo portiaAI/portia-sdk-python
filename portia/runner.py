@@ -42,6 +42,7 @@ from portia.execution_context import (
     is_execution_context_set,
 )
 from portia.logger import logger, logger_manager
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.storage import (
@@ -537,7 +538,11 @@ class Runner:
     def _get_tool_for_step(self, step: Step, workflow: Workflow) -> Tool | None:
         if not step.tool_id:
             return None
-        child_tool = self.tool_registry.get_tool(step.tool_id)
+        if step.tool_id == LLMTool.LLM_TOOL_ID:
+            # Special case LLMTool so it doesn't need to be in all tool registries
+            child_tool = LLMTool()
+        else:
+            child_tool = self.tool_registry.get_tool(step.tool_id)
         return ToolCallWrapper(
             child_tool=child_tool,
             storage=self.storage,
