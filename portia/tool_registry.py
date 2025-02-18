@@ -14,8 +14,9 @@ Classes:
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 import httpx
 from pydantic import BaseModel, Field, create_model
@@ -313,17 +314,36 @@ class PortiaToolRegistry(ToolRegistry):
     This class interacts with the Portia API to retrieve and manage tools.
     """
 
-    def __init__(self, config: Config) -> None:
+    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: ClassVar[frozenset[str]] = frozenset(
+        {
+            # Exclude Outlook by default as it clashes with Gmail
+            "portia::microsoft_outlook::*",
+        },
+    )
+
+    def __init__(
+        self,
+        config: Config,
+        tool_filter: Callable[[Tool], bool] | None = None,
+    ) -> None:
         """Initialize the PortiaToolRegistry with the given configuration.
 
         Args:
             config (Config): The configuration containing the API key and endpoint.
+            tool_filter (Callable[[Tool], bool] | None): A filter to select a subset
+              of tools from Portia Cloud (return true to include a tool). If not provided,
+              the default tool set will be loaded.
 
         """
         self.api_key = config.must_get_api_key("portia_api_key")
         self.api_endpoint = config.must_get("portia_api_endpoint", str)
         self.tools = {}
-        self._load_tools()
+        self._load_tools(tool_filter or self.default_tool_filter)
+
+    @staticmethod
+    def default(config: Config) -> PortiaToolRegistry:
+        """Get a registry containing the default tool set."""
+        return PortiaToolRegistry(config)
 
     def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
         """Generate a Pydantic model based on a JSON schema.
@@ -369,7 +389,7 @@ class PortiaToolRegistry(ToolRegistry):
         # Create the Pydantic model dynamically
         return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
 
-    def _load_tools(self) -> None:
+    def _load_tools(self, tool_filter: Callable[[Tool], bool]) -> None:
         """Load the tools from the API into the into the internal storage."""
         response = httpx.get(
             url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
@@ -399,8 +419,16 @@ class PortiaToolRegistry(ToolRegistry):
                 api_key=self.api_key,
                 api_endpoint=self.api_endpoint,
             )
-            tools[raw_tool["tool_id"]] = tool
+            if tool_filter(tool):
+                tools[raw_tool["tool_id"]] = tool
         self.tools = tools
+
+    @staticmethod
+    def default_tool_filter(tool: Tool) -> bool:
+        """Filter to get the default set of tools offered by Portia cloud."""
+        return not any(
+            re.match(regex, tool.id) for regex in PortiaToolRegistry.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
+        )
 
     def register_tool(self, tool: Tool) -> None:
         """Throw not implemented error as registration can't be done in this registry."""

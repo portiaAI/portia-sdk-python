@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from portia.config import Config
 from portia.execution_context import ExecutionContext, execution_context
 from portia.plan import Plan, PlanContext, Step
 from portia.runner import Runner
@@ -51,10 +50,9 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
 
 def test_runner_no_execution_context_new() -> None:
     """Test running a query using the Runner."""
-    config = Config.from_default()
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(tools=tool_registry)
     (plan, workflow) = get_test_workflow()
     runner.storage.save_plan(plan)
     workflow = runner.execute_workflow(workflow)
@@ -66,10 +64,9 @@ def test_runner_no_execution_context_new() -> None:
 
 def test_runner_no_execution_context_existing() -> None:
     """Test running a query using the Runner."""
-    config = Config.from_default()
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(tools=tool_registry)
     (plan, workflow) = get_test_workflow()
     workflow.execution_context = ExecutionContext(end_user_id="123")
     runner.storage.save_plan(plan)
@@ -83,10 +80,9 @@ def test_runner_no_execution_context_existing() -> None:
 
 def test_runner_with_execution_context_new() -> None:
     """Test running a query using the Runner."""
-    config = Config.from_default()
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(tools=tool_registry)
     (plan, workflow) = get_test_workflow()
     runner.storage.save_plan(plan)
 
@@ -101,10 +97,9 @@ def test_runner_with_execution_context_new() -> None:
 
 def test_runner_with_execution_context_existing() -> None:
     """Test running a query using the Runner."""
-    config = Config.from_default()
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(tools=tool_registry)
     (plan, workflow) = get_test_workflow()
     workflow.execution_context = ExecutionContext()
     runner.storage.save_plan(plan)
