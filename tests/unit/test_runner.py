@@ -507,4 +507,5 @@ def test_get_llm_tool() -> None:
     )
 
     tool = runner._get_tool_for_step(step, workflow)  # noqa: SLF001
-    assert isinstance(tool._child_tool, LLMTool)  # noqa: SLF001
+    assert tool is not None
+    assert isinstance(tool._child_tool, LLMTool)  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
