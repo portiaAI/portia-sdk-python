@@ -12,9 +12,10 @@ from pydantic import HttpUrl
 
 from portia.agents.base_agent import Output
 from portia.clarification import ActionClarification, Clarification, InputClarification
-from portia.config import StorageClass
+from portia.config import Config, StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
+from portia.open_source_tools.registry import open_source_tool_registry
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
@@ -30,6 +31,15 @@ def runner() -> Runner:
     config = get_test_config()
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Runner(config=config, tools=tool_registry)
+
+
+def test_runner_local_default_config() -> None:
+    """Test that the default config is used if no config is provided."""
+    # Unset the env var so that the runner doesn't try to use Portia Cloud
+    with mock.patch.dict("os.environ", {"PORTIA_API_KEY": ""}):
+        runner = Runner()
+        assert runner.config == Config.from_default()
+        assert len(runner.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools())
 
 
 def test_runner_run_query(runner: Runner) -> None:
