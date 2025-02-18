@@ -1,0 +1,40 @@
+name: Update Docs
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout SDK repo
+        uses: actions/checkout@v4
+
+      - name: Generate documentation
+        run: |
+          pip install pydoc-markdown
+          pydoc-markdown
+
+      - name: Checkout Docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: your-org/docs
+          token: ${{ secrets.DOCS_REPO_PAT }}
+          path: docs-repo
+
+      - name: Copy generated docs
+        run: |
+          rm -rf docs-repo/docs/SDK
+          mv docs/SDK docs-repo/docs/SDK
+
+      - name: Commit and push changes
+        run: |
+          cd docs-repo
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update docs from SDK [skip ci]" || echo "No changes to commit"
+          git push origin main
