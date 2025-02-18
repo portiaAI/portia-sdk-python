@@ -362,7 +362,16 @@ class VerifierModel:
                 for arg in tool_inputs.args
                 if arg.name in invalid_arg_names
             ]
-
+        # Mark any made up arguments that are None and optional as not made up.
+        # We don't need to raise a clarification for these
+        [
+            setattr(arg, "made_up", False)
+            for arg in tool_inputs.args
+            if arg.value is None
+            and arg.made_up
+            and self.agent.tool
+            and not self.agent.tool.args_schema.model_fields[arg.name].is_required()
+        ]
         return tool_inputs
 
 
