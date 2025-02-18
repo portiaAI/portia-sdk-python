@@ -59,16 +59,11 @@ MAX_TOOL_DESCRIPTION_LENGTH = 1024
 class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
-    Attributes
-    ----------
-    execution_context : ExecutionContext
-        The execution context the tool is running in.
-    workflow_id : WorkflowUUID
-        The workflow id the tool run is part of.
-    config : Config
-        The config for the SDK as a whole.
-    clarifications : ClarificationListType
-        Relevant clarifications for this tool run.
+    Attributes:
+        execution_context(ExecutionContext): The execution context the tool is running in.
+        workflow_id(WorkflowUUID): The workflow id the tool run is part of.
+        config(Config): The config for the SDK as a whole.
+        clarifications(ClarificationListType): Relevant clarifications for this tool run.
 
     """
 
@@ -89,27 +84,20 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     This class serves as the blueprint for all tools. Child classes must implement the `run` method.
 
-    Attributes
-    ----------
-    id : str
-        A unique identifier for the tool.
+    Attributes:
+    id (str): A unique identifier for the tool.
         This must be unique as collisions in a tool registry will lead to errors.
-    name : str
-        The name of the tool. The name is informational only but useful for debugging.
-    description : str
-        Purpose of the tool and usage.
+    name (str): The name of the tool. The name is informational only but useful for debugging.
+    description (str): Purpose of the tool and usage.
         This is important information for the planner module to know when and how to use this tool.
-    args_schema : type[BaseModel]
-        The schema defining the expected input arguments for the tool.
+    args_schema (type[BaseModel]): The schema defining the expected input arguments for the tool.
         We use Pydantic models to define these types.
-    output_schema : tuple[str, str]
-        A tuple containing the type and description of the tool's output.
-        To maximize the advantages of using an agentic approach this doesn't need to be
+    output_schema (tuple[str, str]): A tuple containing the type and description of the tool's
+        output. To maximize the advantages of using an agentic approach this doesn't need to be
         tightly defined. Instead it should give just a high level overview of the type and
         contents of the tools output.
-    should_summarize : bool
-        Indicates whether the tool's output should be automatically summarized by the
-        summarizer agent. For some tools summarization is useful (for example: a tool
+    should_summarize (bool): Indicates whether the tool's output should be automatically summarized
+        by the summarizer agent. For some tools summarization is useful (for example: a tool
         that fetches the latest news) whereas other tools it's not (for example: a tool
         that fetches raw price data).
 

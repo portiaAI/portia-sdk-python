@@ -31,20 +31,13 @@ from portia.prefixed_uuid import PlanUUID, WorkflowUUID
 class WorkflowState(PortiaEnum):
     """The current state of the Workflow.
 
-    Attributes
-    ----------
-    NOT_STARTED : str
-        The workflow has not been started yet.
-    IN_PROGRESS : str
-        The workflow is currently in progress.
-    NEED_CLARIFICATION : str
-        The workflow requires further clarification before proceeding.
-    READY_TO_RESUME : str
-        The workflow is ready to resume after clarifications have been resolved.
-    COMPLETE : str
-        The workflow has been successfully completed.
-    FAILED : str
-        The workflow has encountered an error and failed.
+    Attributes:
+        NOT_STARTED: The workflow has not been started yet.
+        IN_PROGRESS: The workflow is currently in progress.
+        NEED_CLARIFICATION: The workflow requires further clarification before proceeding.
+        READY_TO_RESUME: The workflow is ready to resume after clarifications have been resolved.
+        COMPLETE: The workflow has been successfully completed.
+        FAILED: The workflow has encountered an error and failed.
 
     """
 
@@ -59,15 +52,11 @@ class WorkflowState(PortiaEnum):
 class WorkflowOutputs(BaseModel):
     """Outputs of a workflow, including clarifications.
 
-    Attributes
-    ----------
-    clarifications : ClarificationListType
-        Clarifications raise by this workflow.
-    step_outputs : dict[str, Output]
-        A dictionary containing outputs of individual workflow steps.
-        Outputs are indexed by the value given by the `step.output` field of the plan.
-    final_output : Output | None
-        The final consolidated output of the workflow, if available.
+    Attributes:
+        clarifications (ClarificationListType): Clarifications raise by this workflow.
+        step_outputs (dict[str, Output]): A dictionary containing outputs of individual workflow steps.
+            Outputs are indexed by the value given by the `step.output` field of the plan.
+        final_output (Output | None): The final consolidated output of the workflow, if available.
 
     """
 
@@ -92,20 +81,13 @@ class WorkflowOutputs(BaseModel):
 class Workflow(BaseModel):
     """A workflow represents a running instance of a Plan.
 
-    Attributes
-    ----------
-    id : WorkflowUUID
-        A unique ID for this workflow.
-    plan_id : PlanUUID
-        The ID of the Plan this Workflow uses.
-    current_step_index : int
-        The current step that is being executed.
-    state : WorkflowState
-        The current state of the workflow.
-    execution_context : ExecutionContext
-        Execution context for the workflow.
-    outputs : WorkflowOutputs
-        Outputs of the workflow, including clarifications.
+    Attributes:
+        id (WorkflowUUID): A unique ID for this workflow.
+        plan_id (PlanUUID): The ID of the Plan this Workflow uses.
+        current_step_index (int): The current step that is being executed.
+        state (WorkflowState): The current state of the workflow.
+        execution_context (ExecutionContext): Execution context for the workflow.
+        outputs (WorkflowOutputs): Outputs of the workflow, including clarifications.
 
     """
 
@@ -138,10 +120,8 @@ class Workflow(BaseModel):
     def get_outstanding_clarifications(self) -> ClarificationListType:
         """Return all outstanding clarifications.
 
-        Returns
-        -------
-        ClarificationListType
-            A list of outstanding clarifications that have not been resolved.
+        Returns:
+            ClarificationListType: A list of outstanding clarifications that have not been resolved.
 
         """
         return [
@@ -154,13 +134,10 @@ class Workflow(BaseModel):
         """Return clarifications for the given step.
 
         Args:
-        ----
-        step( int| None): the step to get clarifications for. Defaults to current step.
+            step (int | None): the step to get clarifications for. Defaults to current step.
 
         Returns:
-        -------
-        ClarificationListType
-            A list of clarifications for the given step.
+            ClarificationListType: A list of clarifications for the given step.
 
         """
         if step is None:
@@ -174,10 +151,8 @@ class Workflow(BaseModel):
     def __str__(self) -> str:
         """Return the string representation of the workflow.
 
-        Returns
-        -------
-        str
-            A string representation containing key workflow attributes.
+        Returns:
+            str: A string representation containing key workflow attributes.
 
         """
         return (
@@ -200,15 +175,11 @@ class ReadOnlyWorkflow(Workflow):
     def from_workflow(cls, workflow: Workflow) -> ReadOnlyWorkflow:
         """Create a read-only workflow from a normal workflow.
 
-        Parameters
-        ----------
-        workflow : Workflow
-            The original workflow instance to create a read-only copy from.
+        Arguments:
+            workflow (Workflow): The original workflow instance to create a read-only copy from.
 
-        Returns
-        -------
-        ReadOnlyWorkflow
-            A new read-only instance of the provided workflow.
+        Returns:
+            ReadOnlyWorkflow: A new read-only instance of the provided workflow.
 
         """
         return cls(

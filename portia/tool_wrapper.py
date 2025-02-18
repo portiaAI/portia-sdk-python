@@ -31,8 +31,7 @@ class ToolCallWrapper(Tool):
     and records the status of the execution. The results are then stored in the provided
     `AdditionalStorage`.
 
-    Attributes
-    ----------
+    Attributes:
         model_config (ConfigDict): Pydantic configuration that allows arbitrary types.
         _child_tool (Tool): The child tool to be wrapped and executed.
         _storage (AdditionalStorage): Storage mechanism to save tool call records.
