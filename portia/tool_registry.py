@@ -308,18 +308,31 @@ class InMemoryToolRegistry(ToolRegistry):
         return self.tools
 
 
+EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
+    {
+        # Exclude Outlook by default as it clashes with Gmail
+        "portia::microsoft_outlook::*",
+    },
+)
+
+
+def get_default_tool_registry(config: Config) -> ToolRegistry:
+    """Get the default tool registry based on the configuration."""
+
+    def default_tool_filter(tool: Tool) -> bool:
+        """Filter to get the default set of tools offered by Portia cloud."""
+        return not any(
+            re.match(regex, tool.id) for regex in PortiaToolRegistry.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
+        )
+
+    return PortiaToolRegistry(config)
+
+
 class PortiaToolRegistry(ToolRegistry):
     """Provides access to Portia tools.
 
     This class interacts with the Portia API to retrieve and manage tools.
     """
-
-    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: ClassVar[frozenset[str]] = frozenset(
-        {
-            # Exclude Outlook by default as it clashes with Gmail
-            "portia::microsoft_outlook::*",
-        },
-    )
 
     def __init__(
         self,
@@ -343,7 +356,6 @@ class PortiaToolRegistry(ToolRegistry):
     @staticmethod
     def default(config: Config) -> PortiaToolRegistry:
         """Get a registry containing the default tool set."""
-        return PortiaToolRegistry(config)
 
     def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
         """Generate a Pydantic model based on a JSON schema.
@@ -422,13 +434,6 @@ class PortiaToolRegistry(ToolRegistry):
             if tool_filter(tool):
                 tools[raw_tool["tool_id"]] = tool
         self.tools = tools
-
-    @staticmethod
-    def default_tool_filter(tool: Tool) -> bool:
-        """Filter to get the default set of tools offered by Portia cloud."""
-        return not any(
-            re.match(regex, tool.id) for regex in PortiaToolRegistry.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
-        )
 
     def register_tool(self, tool: Tool) -> None:
         """Throw not implemented error as registration can't be done in this registry."""

@@ -81,16 +81,7 @@ class Runner:
         """
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
-
-        if tools is None:
-            if self.config.portia_api_key:
-                self.tool_registry = PortiaToolRegistry.default(self.config)
-            else:
-                self.tool_registry = open_source_tool_registry
-        elif isinstance(tools, list):
-            self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
-        else:
-            self.tool_registry = tools
+        self._setup_tool_registry(tools)
 
         match self.config.storage_class:
             case StorageClass.MEMORY:
@@ -99,6 +90,17 @@ class Runner:
                 self.storage = DiskFileStorage(storage_dir=self.config.must_get("storage_dir", str))
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
+
+    def _setup_tool_registry(self, tools: ToolRegistry | list[Tool] | None) -> None:
+        """Set up the tool registry based on the configuration."""
+        if tools is None:
+            self.tool_registry = open_source_tool_registry
+            if self.config.portia_api_key:
+                self.tool_registry += PortiaToolRegistry.default(self.config)
+        elif isinstance(tools, list):
+            self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
+        else:
+            self.tool_registry = tools
 
     def execute_query(
         self,
