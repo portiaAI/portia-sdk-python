@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step
+from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step, Variable
 from tests.utils import get_test_workflow
 
 
@@ -87,3 +87,42 @@ def test_read_only_plan_serialization() -> None:
     assert len(deserialized.steps) == len(read_only.steps)
     assert deserialized.steps[0].task == read_only.steps[0].task
     assert deserialized.steps[0].output == read_only.steps[0].output
+
+
+def test_plan_builder_syntax() -> None:
+    """Test that the plan builder syntax works."""
+    plan_builder = (
+        Plan.context("Find the best offers for a flight from London to New York", ["flight_search"])
+        .step(
+            "Search for flights",
+            "$flights",
+            tool_id="flight_search",
+        )
+        .variable(
+            "$flights",
+        )
+    )
+    base_plan = Plan(
+        plan_context=PlanContext(
+            query="Find the best offers for a flight from London to New York",
+            tool_ids=["flight_search"],
+        ),
+        steps=[
+            Step(
+                task="Search for flights",
+                output="$flights",
+                tool_id="flight_search",
+                inputs=[Variable(name="$flights", description="")],
+            ),
+        ],
+    )
+    assert plan_builder.model_dump(exclude={"id"}) == base_plan.model_dump(exclude={"id"})
+
+
+def test_plan_variable_no_steps() -> None:
+    """Test that the plan variable function raises an error if there are no steps."""
+    plan = Plan.context(
+        "Find the best offers for a flight from London to New York", ["flight_search"],
+    )
+    with pytest.raises(ValueError, match="No steps in the plan"):
+        plan.variable("$flights")

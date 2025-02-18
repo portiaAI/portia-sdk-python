@@ -181,6 +181,89 @@ class Plan(BaseModel):
             f"steps={self.steps!r}"
         )
 
+    @classmethod
+    def context(cls, query: str, tool_ids: list[str]) -> Plan:
+        """Create a plan from a query and a list of tool IDs. Used as part of builder syntax.
+
+        Args:
+            query (str): The original query given by the user.
+            tool_ids (list[str]): A list of tool IDs available to the planner.
+
+        Returns:
+            Plan: A new plan instance.
+
+        Example:
+        Builder syntax:
+            >>> plan = Plan.context(
+                    "Find the best offers for a flight from London to New York",
+                    ["flight_search"],
+                ).step(
+                    "Search for flights",
+                    "$flights",
+                    tool_id="flight_search",
+                ).variable(
+                    "$flights",
+                )
+
+        """
+        return cls(
+            id=PlanUUID(),
+            plan_context=PlanContext(query=query, tool_ids=tool_ids),
+            steps=[],
+        )
+
+    def step(
+        self,
+        task: str,
+        output: str,
+        inputs: list[Variable] | None = None,
+        tool_id: str | None = None,
+    ) -> Plan:
+        """Add a step to the plan. Used as part of builder syntax.
+
+        Args:
+            task (str): The task to be completed by the step.
+            output (str): The unique output ID for the result of this step.
+            inputs (list[Variable] | None): The inputs to the step
+            tool_id (str | None): The ID of the tool used in this step, if applicable.
+
+        Returns:
+            Plan: The plan with the new step added.
+
+        """
+        if inputs is None:
+            inputs = []
+        self.steps.append(Step(task=task, output=output, inputs=inputs, tool_id=tool_id))
+        if tool_id is not None and tool_id not in self.plan_context.tool_ids:
+            self.plan_context.tool_ids.append(tool_id)
+        return self
+
+    def variable(
+        self,
+        name: str,
+        value: Any | None = None,  # noqa: ANN401
+        description: str | None = None,
+    ) -> Plan:
+        """Add a variable to the last step in the plan. Used as part of builder syntax.
+
+        Args:
+            name (str): The name of the variable.
+            value (Any | None): The value of the variable.
+            description (str | None): The description of the variable.
+
+        Returns:
+            Plan: The plan with the new variable added to the last step.
+
+        """
+        if len(self.steps) == 0:
+            raise ValueError("No steps in the plan")
+        if description is None:
+            description = ""
+        self.steps[-1].inputs.append(
+            Variable(name=name, value=value, description=description),
+        )
+        return self
+
 
 class ReadOnlyPlan(Plan):
     """A read-only copy of a plan, passed to agents for reference.
