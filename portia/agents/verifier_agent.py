@@ -372,17 +372,6 @@ class VerifierModel:
             and self.agent.tool
             and not self.agent.tool.args_schema.model_fields[arg.name].is_required()
         ]
-        # If a required argument value is None, we need to raise a clarification.
-        # Mark these as made up to be raised in clarifications_or_continue.
-        [
-            setattr(arg, "made_up", True)
-            for arg in tool_inputs.args
-            if arg.value is None
-            and not arg.made_up
-            and self.agent.tool
-            and self.agent.tool.args_schema.model_fields[arg.name].is_required()
-        ]
-
         return tool_inputs
 
 
