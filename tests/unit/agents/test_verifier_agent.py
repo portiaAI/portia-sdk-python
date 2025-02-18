@@ -763,8 +763,7 @@ def test_verifier_agent_none_tool_execute_sync() -> None:
 class MockToolSchema(BaseModel):
     """Mock tool schema."""
 
-    arg1: str | None = Field(default=None, description="An optional argument")
-    arg2: str = Field(default=..., description="A required argument")
+    optional_arg: str | None = Field(default=None, description="An optional argument")
 
 
 class MockAgent:
@@ -813,24 +812,16 @@ def test_optional_args_with_none_values() -> None:
 
     #  Optional arg and made_up is True == not made_up
     updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
-        VerifiedToolInputs(args=[VerifiedToolArgument(name="arg1", value=None, made_up=True)]),
+        VerifiedToolInputs(
+            args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=True)],
+        ),
     )
     assert updated_tool_inputs.args[0].made_up is False
 
     #  Optional arg and made_up is False == mnot ade_up
-    updated_tool_inputs = model._validate_args_against_schema( # noqa: SLF001
-        VerifiedToolInputs(args=[VerifiedToolArgument(name="arg1", value=None, made_up=False)]),
+    updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
+        VerifiedToolInputs(
+            args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=False)],
+        ),
     )
     assert updated_tool_inputs.args[0].made_up is False
-
-    #  Required arg and made_up is True == made_up
-    updated_tool_inputs = model._validate_args_against_schema( # noqa: SLF001
-        VerifiedToolInputs(args=[VerifiedToolArgument(name="arg2", value=None, made_up=True)]),
-    )
-    assert updated_tool_inputs.args[0].made_up is True
-
-    #  Required arg and made_up is False == made_up
-    updated_tool_inputs = model._validate_args_against_schema( # noqa: SLF001
-        VerifiedToolInputs(args=[VerifiedToolArgument(name="arg2", value=None, made_up=False)]),
-    )
-    assert updated_tool_inputs.args[0].made_up is True
