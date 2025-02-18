@@ -359,17 +359,9 @@ def test_runner_run_query_with_multiple_clarifications(
     assert workflow.outputs.final_output.summary is not None
 
 
-def test_runner_run_query_with_example_registry(
-    llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
-    agent: AgentType,
-) -> None:
-    """Test we can run a query using the example registry"""
-    config = Config.from_default(
-        llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
-        default_agent_type=agent,
-    )
+def test_runner_run_query_with_example_registry() -> None:
+    """Test we can run a query using the example registry."""
+    config = Config.from_default()
 
     runner = Runner(config=config, tools=example_tool_registry)
     query = "Add 1 + 2 together and then write a haiku about the answer"
