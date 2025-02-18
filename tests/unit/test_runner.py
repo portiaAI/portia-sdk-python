@@ -15,6 +15,8 @@ from portia.clarification import ActionClarification, Clarification, InputClarif
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper
+from portia.open_source_tools.llm_tool import LLMTool
+from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.planners.planner import StepsOrError
 from portia.runner import Runner
@@ -489,3 +491,21 @@ def test_runner_get_tool_for_step_none_tool_id() -> None:
 
     tool = runner._get_tool_for_step(step, workflow)  # noqa: SLF001
     assert tool is None
+
+
+def test_get_llm_tool() -> None:
+    """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
+    runner = Runner(config=get_test_config(), tools=example_tool_registry)
+    plan, workflow = get_test_workflow()
+
+    # Create a step with no tool_id
+    step = Step(
+        task="Some task",
+        inputs=[],
+        output="$output",
+        tool_id=LLMTool.LLM_TOOL_ID,
+    )
+
+    tool = runner._get_tool_for_step(step, workflow)  # noqa: SLF001
+    assert tool is not None
+    assert isinstance(tool._child_tool, LLMTool)  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
