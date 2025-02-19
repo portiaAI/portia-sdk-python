@@ -139,6 +139,8 @@ def process_output(
             tool_output = Output(value=last_message.artifact)
         else:
             tool_output = Output(value=last_message.content)
+        if not tool_output.summary:
+            tool_output.summary = tool_output.serialize_value(tool_output.value)
         return tool_output
     if isinstance(last_message, HumanMessage):
         return Output(value=last_message.content)
