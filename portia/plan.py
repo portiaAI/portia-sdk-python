@@ -83,8 +83,8 @@ class PlanBuilder:
     def input(
         self,
         name: str,
-        value: Any | None = None,
-        description: str | None = None,  # noqa: ANN401
+        value: Any | None = None,  # noqa: ANN401
+        description: str | None = None,
     ) -> PlanBuilder:
         """Add an input variable to the last step in the plan.
 
