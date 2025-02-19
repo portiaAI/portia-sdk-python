@@ -43,7 +43,7 @@ from portia.execution_context import (
 )
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.open_source_tools.registry import open_source_tool_registry
+from portia.open_source_tools.registry import get_default_tool_registry
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.storage import (
@@ -52,7 +52,7 @@ from portia.storage import (
     PortiaCloudStorage,
 )
 from portia.tool import ToolRunContext
-from portia.tool_registry import InMemoryToolRegistry, ToolRegistry, get_default_tool_registry
+from portia.tool_registry import InMemoryToolRegistry, ToolRegistry
 from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 
@@ -82,7 +82,13 @@ class Runner:
         """
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
-        self._setup_tool_registry(tools)
+
+        if isinstance(tools, ToolRegistry):
+            self.tool_registry = tools
+        elif isinstance(tools, list):
+            self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
+        else:
+            self.tool_registry = get_default_tool_registry(self.config)
 
         match self.config.storage_class:
             case StorageClass.MEMORY:
@@ -91,17 +97,6 @@ class Runner:
                 self.storage = DiskFileStorage(storage_dir=self.config.must_get("storage_dir", str))
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
-
-    def _setup_tool_registry(self, tools: ToolRegistry | list[Tool] | None) -> None:
-        """Set up the tool registry based on the configuration."""
-        if tools is None:
-            self.tool_registry = open_source_tool_registry
-            if self.config.portia_api_key:
-                self.tool_registry += get_default_tool_registry(self.config)
-        elif isinstance(tools, list):
-            self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
-        else:
-            self.tool_registry = tools
 
     def execute_query(
         self,

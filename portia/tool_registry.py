@@ -14,7 +14,6 @@ Classes:
 
 from __future__ import annotations
 
-import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -111,20 +110,6 @@ class ToolRegistry(ABC):
             if tool_ids
             else self.get_tools()
         )
-
-    @abstractmethod
-    def filter_tools(
-        self,
-        filter_func: Callable[[Tool], bool],
-    ) -> ToolRegistry:
-        """Return a new registry with the tools filtered by the filter function.
-
-        Args:
-            filter_func (Callable[[Tool], bool]): A filter to select a subset of tools (return true
-            to include a tool)
-
-        """
-        raise NotImplementedError("filter_tools is not implemented")
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
@@ -246,14 +231,6 @@ class AggregatedToolRegistry(ToolRegistry):
             tools += registry.match_tools(query, tool_ids)
         return tools
 
-    def filter_tools(
-        self,
-        filter_func: Callable[[Tool], bool],
-    ) -> ToolRegistry:
-        """Return a new registry with the tools filtered by the filter function."""
-        registries = [registry.filter_tools(filter_func) for registry in self.registries]
-        return AggregatedToolRegistry(registries)
-
 
 class InMemoryToolRegistry(ToolRegistry):
     """Provides a simple in-memory tool registry.
@@ -328,33 +305,6 @@ class InMemoryToolRegistry(ToolRegistry):
 
         """
         return self.tools
-
-    def filter_tools(
-        self,
-        filter_func: Callable[[Tool], bool],
-    ) -> ToolRegistry:
-        """Return a new registry with the tools filtered by the filter function."""
-        return InMemoryToolRegistry.from_local_tools(
-            [tool for tool in self.tools if filter_func(tool)],
-        )
-
-
-EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
-    {
-        # Exclude Outlook by default as it clashes with Gmail
-        "portia::microsoft_outlook::*",
-    },
-)
-
-
-def get_default_tool_registry(config: Config) -> ToolRegistry:
-    """Get the default tool registry based on the configuration."""
-
-    def default_tool_filter(tool: Tool) -> bool:
-        """Filter to get the default set of tools offered by Portia cloud."""
-        return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
-
-    return PortiaToolRegistry(config).filter_tools(default_tool_filter)
 
 
 class PortiaToolRegistry(ToolRegistry):
