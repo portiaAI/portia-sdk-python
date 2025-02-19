@@ -23,7 +23,8 @@ from tests.utils import AdditionTool, get_test_tool_context, get_test_workflow
 def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
-    runner = Runner(config=config)
+    tool_registry = PortiaToolRegistry(config=config)
+    runner = Runner(config=config, tools=tool_registry)
     query = "Where is the next Olympics being hosted?"
 
     workflow = runner.execute_query(query)
@@ -108,6 +109,7 @@ def test_default_runner_has_correct_tools() -> None:
     assert not any(tool.id == "portia::microsoft_outlook::draft_email_tool" for tool in tools)
 
 
+@pytest.mark.skip("Disable test until Microsoft tool is enabled in staging")
 def test_runner_with_microsoft_tools() -> None:
     """Test that the default runner has the correct tools."""
 
