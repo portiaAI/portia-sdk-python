@@ -27,6 +27,94 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.prefixed_uuid import PlanUUID
 
 
+class PlanBuilder:
+    """A builder for creating plans.
+
+    This class provides an interface for constructing plans step by step.
+
+    """
+
+    query: str
+    tool_ids: list[str]
+    steps: list[Step]
+
+    def __init__(self, query: str) -> None:
+        """Initialize the builder with the query and tool IDs.
+
+        Args:
+            query (str): The original query given by the user.
+            tool_ids (list[str]): A list of tool IDs available to the planner.
+            variables (list[Variable]): A list of variables available to the planner.
+            steps (list[Step]): A list of steps available to the planner.
+
+        """
+        self.query = query
+        self.tool_ids = []
+        self.steps = []
+
+    def step(
+        self,
+        task: str,
+        tool_id: str | None = None,
+        output: str | None = None,
+        inputs: list[Variable] | None = None,
+    ) -> PlanBuilder:
+        """Add a step to the plan.
+
+        Args:
+            task (str): The task to be completed by the step.
+            tool_id (str | None): The ID of the tool used in this step, if applicable.
+            output (str | None): The unique output ID for the result of this step.
+            inputs (list[Variable] | None): The inputs to the step
+
+        Returns:
+            PlanBuilder: The builder instance with the new step added.
+
+        """
+        if inputs is None:
+            inputs = []
+        if output is None:
+            output = f"$output_{len(self.steps)}"
+        if tool_id is not None and tool_id not in self.tool_ids:
+            self.tool_ids.append(tool_id)
+        self.steps.append(Step(task=task, output=output, inputs=inputs, tool_id=tool_id))
+        return self
+
+    def input(
+        self, name: str, value: Any | None = None, description: str | None = None, # noqa: ANN401
+    ) -> PlanBuilder:
+        """Add an input variable to the last step in the plan.
+
+        Args:
+            name (str): The name of the input.
+            value (Any | None): The value of the input.
+            description (str | None): The description of the input.
+
+        Returns:
+            PlanBuilder: The builder instance with the new input added.
+
+        """
+        if len(self.steps) == 0:
+            raise ValueError("No steps in the plan")
+        if description is None:
+            description = ""
+        self.steps[-1].inputs.append(Variable(name=name, value=value, description=description))
+        return self
+
+    def build(self) -> Plan:
+        """Build the plan.
+
+        Returns:
+            Plan: The built plan.
+
+        """
+        return Plan(
+            id=PlanUUID(),
+            plan_context=PlanContext(query=self.query, tool_ids=self.tool_ids),
+            steps=self.steps,
+        )
+
+
 class Variable(BaseModel):
     """A variable in the plan.
 
@@ -180,89 +268,6 @@ class Plan(BaseModel):
             f"plan_context={self.plan_context!r}, "
             f"steps={self.steps!r}"
         )
-
-    @classmethod
-    def context(cls, query: str, tool_ids: list[str]) -> Plan:
-        """Create a plan from a query and a list of tool IDs. Used as part of builder syntax.
-
-        Args:
-            query (str): The original query given by the user.
-            tool_ids (list[str]): A list of tool IDs available to the planner.
-
-        Returns:
-            Plan: A new plan instance.
-
-        Example:
-        Builder syntax:
-            >>> plan = Plan.context(
-                    "Find the best offers for a flight from London to New York",
-                    ["flight_search"],
-                ).step(
-                    "Search for flights",
-                    "$flights",
-                    tool_id="flight_search",
-                ).variable(
-                    "$flights",
-                )
-
-        """
-        return cls(
-            id=PlanUUID(),
-            plan_context=PlanContext(query=query, tool_ids=tool_ids),
-            steps=[],
-        )
-
-    def step(
-        self,
-        task: str,
-        output: str,
-        inputs: list[Variable] | None = None,
-        tool_id: str | None = None,
-    ) -> Plan:
-        """Add a step to the plan. Used as part of builder syntax.
-
-        Args:
-            task (str): The task to be completed by the step.
-            output (str): The unique output ID for the result of this step.
-            inputs (list[Variable] | None): The inputs to the step
-            tool_id (str | None): The ID of the tool used in this step, if applicable.
-
-        Returns:
-            Plan: The plan with the new step added.
-
-        """
-        if inputs is None:
-            inputs = []
-        self.steps.append(Step(task=task, output=output, inputs=inputs, tool_id=tool_id))
-        if tool_id is not None and tool_id not in self.plan_context.tool_ids:
-            self.plan_context.tool_ids.append(tool_id)
-        return self
-
-    def variable(
-        self,
-        name: str,
-        value: Any | None = None,  # noqa: ANN401
-        description: str | None = None,
-    ) -> Plan:
-        """Add a variable to the last step in the plan. Used as part of builder syntax.
-
-        Args:
-            name (str): The name of the variable.
-            value (Any | None): The value of the variable.
-            description (str | None): The description of the variable.
-
-        Returns:
-            Plan: The plan with the new variable added to the last step.
-
-        """
-        if len(self.steps) == 0:
-            raise ValueError("No steps in the plan")
-        if description is None:
-            description = ""
-        self.steps[-1].inputs.append(
-            Variable(name=name, value=value, description=description),
-        )
-        return self
 
 
 class ReadOnlyPlan(Plan):
