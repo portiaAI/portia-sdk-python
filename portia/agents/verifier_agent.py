@@ -156,7 +156,11 @@ class ParserModel:
                 "Description of the tool: {tool_description}\n"
                 "\n\n----------\n\n"
                 "The following section contains previous errors. "
-                "Ensure your response avoids these errors:\n"
+                "Ensure your response avoids these errors. "
+                "The one exception to this is not providing a value for a required argument. "
+                "If a value cannot be extracted from the context, you can leave it blank. "
+                "Do not assume a default value that meets the type expectation or is a common testing value. "  # noqa: E501
+                "Here are the previous errors:\n"
                 "{previous_errors}\n"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Adhere to the following guidelines:\n"
@@ -263,7 +267,8 @@ class VerifierModel:
                 content="You are an expert reviewer. Your task is to validate and label arguments "
                 "provided. You must return the made_up field based "
                 "on the rules below.\n - An argument is made up if we cannot tell where the value "
-                "came from in the provided context\n- Do not just trust the explanations provided"
+                "came from in the goal or context.\n- You should verify that the explanations are "
+                "grounded in the goal or context before trusting them."
                 "\n- If an argument is marked as invalid it is likely wrong."
                 "\n- We really care if the value of an argument is not in the context, a handled "
                 "clarification or goal at all (then made_up should be TRUE), but it is ok if "
@@ -272,18 +277,22 @@ class VerifierModel:
                 "\nThe output must conform to the following schema:\n\n"
                 "class VerifiedToolArgument:\n"
                 "  name: str  # Name of the argument requested by the tool.\n"
-                "  value: Any | None  # Value of the argument from the goal or context.\n"
+                "  value: Any | None  # Value of the argument from the goal or context. "
+                "Prefer the type of the argument provided in the list of arguments provided to "
+                "label at the end of the response. These have been through an argument parser and "
+                "are more likely to be correct.\n"
                 "  made_up: bool  # if the value is made_up based on the given rules.\n\n"
                 "class VerifiedToolInputs:\n"
                 "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
                 "Please ensure the output matches the VerifiedToolInputs schema.",
             ),
             HumanMessagePromptTemplate.from_template(
-                "Context for user input and past steps:"
-                "\n{context}\n"
                 "You will need to achieve the following goal: {task}\n"
                 "\n\n----------\n\n"
-                "Label of the following arguments as made up or not: {arguments}\n",
+                "Context for user input and past steps:"
+                "\n{context}\n"
+                "\n\n----------\n\n"
+                "Label of the following arguments as made up or not using the goal and context provided: {arguments}\n",  # noqa: E501
             ),
         ],
     )
