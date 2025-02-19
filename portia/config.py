@@ -174,6 +174,7 @@ class PlannerType(Enum):
     """
 
     ONE_SHOT = "ONE_SHOT"
+    TWO_SHOT = "TWO_SHOT"
 
 
 class LogLevel(Enum):

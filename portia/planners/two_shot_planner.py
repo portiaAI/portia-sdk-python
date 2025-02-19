@@ -5,11 +5,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
+from portia.templates.render import render_template
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -19,12 +22,48 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class OneShotPlanner(Planner):
+class ToolListResponse(BaseModel):
+    """Response model for the tool list."""
+
+    tool_ids: list[str]
+
+
+class TwoShotPlanner(Planner):
     """planner class."""
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
         self.llm_wrapper = LLMWrapper(config)
+
+    def get_likely_tools(self, query: str, tool_list: list[Tool]) -> list[Tool]:
+        """Get the likely tools for the query."""
+        prompt = render_template(
+            "tool_filterer.xml.jinja",
+            query=query,
+            tools=tool_list,
+        )
+
+        response = self.llm_wrapper.to_instructor(
+            response_model=ToolListResponse,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert at identifying the tools that are most likely to be "
+                        "useful for a given query. You will be given a query and a list of tools. "
+                        "You will need to return a list of the tool ids that are very likely to be "
+                        "useful for the query. You should err on the side of too many tools rather "
+                        "than too few."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+
+        # Filter the tool list based on the response
+        filtered_tools = [tool for tool in tool_list if tool.id in response.tool_ids]
+        print(f"Filtered tools: {response.tool_ids}")
+        return filtered_tools
 
     def generate_steps_or_error(
         self,
@@ -34,11 +73,14 @@ class OneShotPlanner(Planner):
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
+        print("using two shot planner")
         ctx = get_execution_context()
+
+        likely_tools = self.get_likely_tools(query, tool_list)
 
         prompt = render_prompt_insert_defaults(
             query,
-            tool_list,
+            likely_tools,
             ctx.planner_system_context_extension,
             examples,
         )
@@ -88,13 +130,10 @@ class OneShotPlanner(Planner):
         """
         tool_ids = [tool.id for tool in tool_list]
         missing_tools = [
-            step.tool_id
-            for step in steps
-            if step.tool_id and step.tool_id not in tool_ids
+            step.tool_id for step in steps if step.tool_id and step.tool_id not in tool_ids
         ]
         return (
             f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
             if missing_tools
             else None
         )
-

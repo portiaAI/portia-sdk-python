@@ -44,7 +44,7 @@ from portia.execution_context import (
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
-from portia.planners.one_shot_planner import OneShotPlanner
+from portia.planners.two_shot_planner import TwoShotPlanner
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
@@ -469,7 +469,7 @@ class Runner:
         cls: type[Planner]
         match self.config.default_planner:
             case PlannerType.ONE_SHOT:
-                cls = OneShotPlanner
+                cls = TwoShotPlanner
 
         return cls(self.config)
 

@@ -34,9 +34,6 @@ def render_prompt_insert_defaults(
         examples=examples,
         system_context=system_context,
     )
-    print("\n-------------------------------\n\n")
-    print(template)
-    print("\n-------------------------------\n\n")
     return template
 
 
