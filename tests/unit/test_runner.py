@@ -321,6 +321,10 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
     workflow = runner.wait_for_ready(workflow)
     assert workflow.state == WorkflowState.READY_TO_RESUME
     assert workflow.get_outstanding_clarifications() == []
+    for clarification in workflow.outputs.clarifications:
+        if clarification.step == 1:
+            assert clarification.resolved
+            assert clarification.response == "complete"
 
 
 def test_runner_execute_query_with_summary(runner: Runner) -> None:
