@@ -15,6 +15,12 @@ jobs:
   check-label:
     runs-on: ubuntu-latest
     steps:
+      - name: Add safe_to_test label automatically for maintainers
+        uses: actions-ecosystem/action-add-labels@v1
+        if: ${{ github.event.pull_request.user.organizations_url == 'https://github.com/portiaAI' }}
+        with:
+          labels: safe_to_test
+
       - name: Check for safe_to_test label
         id: check_label
         uses: mheap/github-action-required-labels@v5
