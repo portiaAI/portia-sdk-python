@@ -375,7 +375,7 @@ class PortiaToolRegistry(ToolRegistry):
         # Create the Pydantic model dynamically
         return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
 
-    def _load_tools(self) -> list[Tool]:
+    def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
         response = httpx.get(
             url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
@@ -412,7 +412,7 @@ class PortiaToolRegistry(ToolRegistry):
         """Throw not implemented error as registration can't be done in this registry."""
         raise NotImplementedError("Cannot register tools in the PortiaToolRegistry")
 
-    def get_tool(self, tool_id: str) -> PortiaRemoteTool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Get the tool from the tool set.
 
         Args:

@@ -11,7 +11,7 @@ from portia.errors import ToolNotFoundError
 from portia.execution_context import execution_context
 from portia.runner import Runner
 from portia.storage import PortiaCloudStorage
-from portia.tool import Tool, ToolHardError
+from portia.tool import PortiaRemoteTool, Tool, ToolHardError
 from portia.tool_registry import (
     InMemoryToolRegistry,
     PortiaToolRegistry,
@@ -51,6 +51,7 @@ def test_run_tool_error() -> None:
         registry.register_tool(AdditionTool())
 
     tool = registry.get_tool("portia::search_tool")
+    assert isinstance(tool, PortiaRemoteTool)
     tool.api_key = SecretStr("123")
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError):
