@@ -37,7 +37,7 @@ def runner() -> Runner:
 def test_runner_local_default_config() -> None:
     """Test that the default config is used if no config is provided."""
     # Unset the env var so that the runner doesn't try to use Portia Cloud
-    with mock.patch.dict("os.environ", {"PORTIA_API_KEY": ""}):
+    with mock.patch.dict("os.environ", {"PORTIA_API_KEY": "", "OPENAI_API_KEY": "123"}):
         runner = Runner()
         assert runner.config == Config.from_default()
         assert len(runner.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools())
