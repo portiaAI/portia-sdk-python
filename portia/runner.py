@@ -366,8 +366,8 @@ class Runner:
                         for clarification in current_step_clarifications:
                             if clarification.category is ClarificationCategory.ACTION:
                                 clarification.resolved = True
-                        self.storage.save_workflow(workflow)
                         workflow.state = WorkflowState.READY_TO_RESUME
+                        self.storage.save_workflow(workflow)
 
             logger().debug(f"New workflow state for {workflow.id} is {workflow.state}")
 
