@@ -111,20 +111,20 @@ class ToolRegistry(ABC):
             if tool_ids
             else self.get_tools()
         )
-    
-    def filter_tools() -> ToolRegistry {
-        """Return a tool registry containing the subset of tools from this registry that pass the
-        filter function.
+
+    @abstractmethod
+    def filter_tools(
+        self,
+        filter_func: Callable[[Tool], bool],
+    ) -> ToolRegistry:
+        """Return a new registry with the tools filtered by the filter function.
 
         Args:
-            filter (Callable[[Tool], bool]): A filter to select a subset of tools (return true to include a tool)
-
-        Returns:
-            ToolRegistry: A new tool registry containing only the filtered tools.
+            filter_func (Callable[[Tool], bool]): A filter to select a subset of tools (return true
+            to include a tool)
 
         """
-        return self.get_tools()
-    }
+        raise NotImplementedError("filter_tools is not implemented")
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
@@ -246,6 +246,14 @@ class AggregatedToolRegistry(ToolRegistry):
             tools += registry.match_tools(query, tool_ids)
         return tools
 
+    def filter_tools(
+        self,
+        filter_func: Callable[[Tool], bool],
+    ) -> ToolRegistry:
+        """Return a new registry with the tools filtered by the filter function."""
+        registries = [registry.filter_tools(filter_func) for registry in self.registries]
+        return AggregatedToolRegistry(registries)
+
 
 class InMemoryToolRegistry(ToolRegistry):
     """Provides a simple in-memory tool registry.
@@ -321,6 +329,15 @@ class InMemoryToolRegistry(ToolRegistry):
         """
         return self.tools
 
+    def filter_tools(
+        self,
+        filter_func: Callable[[Tool], bool],
+    ) -> ToolRegistry:
+        """Return a new registry with the tools filtered by the filter function."""
+        return InMemoryToolRegistry.from_local_tools(
+            [tool for tool in self.tools if filter_func(tool)],
+        )
+
 
 EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
     {
@@ -335,11 +352,9 @@ def get_default_tool_registry(config: Config) -> ToolRegistry:
 
     def default_tool_filter(tool: Tool) -> bool:
         """Filter to get the default set of tools offered by Portia cloud."""
-        return not any(
-            re.match(regex, tool.id) for regex in PortiaToolRegistry.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
-        )
+        return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
 
-    return PortiaToolRegistry(config)
+    return PortiaToolRegistry(config).filter_tools(default_tool_filter)
 
 
 class PortiaToolRegistry(ToolRegistry):
@@ -351,20 +366,20 @@ class PortiaToolRegistry(ToolRegistry):
     def __init__(
         self,
         config: Config,
+        tools: dict[str, Tool] | None = None,
     ) -> None:
         """Initialize the PortiaToolRegistry with the given configuration.
 
         Args:
             config (Config): The configuration containing the API key and endpoint.
-            tool_filter (Callable[[Tool], bool] | None): A filter to select a subset
-              of tools from Portia Cloud (return true to include a tool). If not provided,
-              the default tool set will be loaded.
+            tools (list[Tool] | None): A list of tools to create the registry with.
+              If not provided, all tools will be loaded from the Portia API.
 
         """
         self.api_key = config.must_get_api_key("portia_api_key")
+        self.config = config
         self.api_endpoint = config.must_get("portia_api_endpoint", str)
-        self.tools = {}
-        self._load_tools()
+        self.tools = tools or self._load_tools()
 
     def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
         """Generate a Pydantic model based on a JSON schema.
@@ -410,7 +425,7 @@ class PortiaToolRegistry(ToolRegistry):
         # Create the Pydantic model dynamically
         return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
 
-    def _load_tools(self, tool_filter: Callable[[Tool], bool]) -> None:
+    def _load_tools(self) -> list[Tool]:
         """Load the tools from the API into the into the internal storage."""
         response = httpx.get(
             url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
@@ -440,7 +455,8 @@ class PortiaToolRegistry(ToolRegistry):
                 api_key=self.api_key,
                 api_endpoint=self.api_endpoint,
             )
-        self.tools = tools
+            tools[raw_tool["tool_id"]] = tool
+        return tools
 
     def register_tool(self, tool: Tool) -> None:
         """Throw not implemented error as registration can't be done in this registry."""
@@ -472,3 +488,13 @@ class PortiaToolRegistry(ToolRegistry):
 
         """
         return list(self.tools.values())
+
+    def filter_tools(
+        self,
+        filter_func: Callable[[Tool], bool],
+    ) -> ToolRegistry:
+        """Return a new registry with the tools filtered by the filter function."""
+        return PortiaToolRegistry(
+            self.config,
+            {tool.id: tool for tool in self.get_tools() if filter_func(tool)},
+        )

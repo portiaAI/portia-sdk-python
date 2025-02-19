@@ -114,9 +114,8 @@ def test_runner_with_microsoft_tools() -> None:
     def exclude_gmail_filter(tool: Tool) -> bool:
         return not tool.id.startswith("portia::google_gmail::")
 
-    runner = Runner(
-        tools=PortiaToolRegistry(config=Config.from_default(), tool_filter=exclude_gmail_filter),
-    )
+    registry = PortiaToolRegistry(config=Config.from_default()).filter_tools(exclude_gmail_filter)
+    runner = Runner(tools=registry)
     tools = runner.tool_registry.get_tools()
     assert len(tools) > 0
     assert any(tool.id == "portia::microsoft_outlook::draft_email_tool" for tool in tools)

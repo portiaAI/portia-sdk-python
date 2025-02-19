@@ -52,7 +52,7 @@ from portia.storage import (
     PortiaCloudStorage,
 )
 from portia.tool import ToolRunContext
-from portia.tool_registry import InMemoryToolRegistry, PortiaToolRegistry, ToolRegistry
+from portia.tool_registry import InMemoryToolRegistry, ToolRegistry, get_default_tool_registry
 from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 
@@ -97,7 +97,7 @@ class Runner:
         if tools is None:
             self.tool_registry = open_source_tool_registry
             if self.config.portia_api_key:
-                self.tool_registry += PortiaToolRegistry.default(self.config)
+                self.tool_registry += get_default_tool_registry(self.config)
         elif isinstance(tools, list):
             self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
         else:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
@@ -46,6 +46,9 @@ def test_registry_base_classes() -> None:
             tool_ids: list[str] | None = None,
         ) -> list[Tool]:
             return super().match_tools(query, tool_ids)
+
+        def filter_tools(self, filter_func: Callable[[Tool], bool]) -> ToolRegistry:
+            return super().filter_tools(filter_func)
 
     registry = MyRegistry()
 
@@ -128,6 +131,18 @@ def test_local_tool_registry_match_tools() -> None:
     assert {tool.id for tool in matched_tools} == {MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID}
 
 
+def test_local_tool_registry_filter_tools() -> None:
+    """Test matching tools in the InMemoryToolRegistry."""
+    local_tool_registry = InMemoryToolRegistry.from_local_tools(
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
+    )
+
+    # Test matching specific tool ID
+    filtered_registry = local_tool_registry.filter_tools(lambda tool: tool.id == MOCK_TOOL_ID)
+    assert len(filtered_registry.get_tools()) == 1
+    assert filtered_registry.get_tools()[0].id == MOCK_TOOL_ID
+
+
 def test_aggregated_tool_registry_duplicate_tool() -> None:
     """Test searching across multiple registries in AggregatedToolRegistry."""
     local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
@@ -191,6 +206,23 @@ def test_aggregated_tool_registry_match_tools() -> None:
     # Test matching non-existent tool IDs
     matched_tools = aggregated_tool_registry.match_tools(tool_ids=["non_existent_tool"])
     assert len(matched_tools) == 0
+
+
+def test_aggregated_tool_registry_filter_tools() -> None:
+    """Test matching tools in the InMemoryToolRegistry."""
+    local_tool_registry = InMemoryToolRegistry.from_local_tools(
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
+    )
+    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
+    )
+    aggregated_tool_registry = local_tool_registry + other_tool_registry
+
+    # Test matching specific tool ID
+    filtered_registry = aggregated_tool_registry.filter_tools(lambda tool: tool.id == MOCK_TOOL_ID)
+    assert len(filtered_registry.get_tools()) == 2
+    assert filtered_registry.get_tools()[0].id == MOCK_TOOL_ID
+    assert filtered_registry.get_tools()[1].id == MOCK_TOOL_ID
 
 
 def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
