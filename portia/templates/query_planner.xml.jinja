@@ -30,10 +30,12 @@
 <Tools>{% for tool in tools %}
     <Tool name={{tool.id}}>
         {{tool.description}}
-        Usage examples:
-        {% for example in tool.usage_examples %}
-            {{example}}
-        {% endfor %}
+        {% if tool.usage_examples %}
+            Usage examples:
+            {% for example in tool.usage_examples %}
+                {{example}}
+            {% endfor %}
+        {% endif %}
     </Tool>{% endfor %}
 </Tools>
 
@@ -45,6 +47,7 @@
         {{query}}
     </Query>
 </Request>
+
 {% if system_context %}
 <SystemContext>{% for context in system_context %}
     {{context}}{% endfor %}

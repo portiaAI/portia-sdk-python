@@ -27,13 +27,17 @@ def render_prompt_insert_defaults(
 
     tools_with_descriptions = get_tool_descriptions_for_tools(tool_list=tool_list)
 
-    return render_template(
+    template = render_template(
         "query_planner.xml.jinja",
         query=query,
         tools=tools_with_descriptions,
         examples=examples,
         system_context=system_context,
     )
+    print("\n-------------------------------\n\n")
+    print(template)
+    print("\n-------------------------------\n\n")
+    return template
 
 
 def default_query_system_context(
@@ -49,5 +53,11 @@ def default_query_system_context(
 def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
     """Given a list of tool names, return the descriptions of the tools."""
     return [
-        {"id": tool.id, "name": tool.name, "description": tool.description} for tool in tool_list
+        {
+            "id": tool.id,
+            "name": tool.name,
+            "description": tool.description,
+            "usage_examples": tool.usage_examples,
+        }
+        for tool in tool_list
     ]
