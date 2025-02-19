@@ -85,10 +85,13 @@ def generate_input_context(
             "indirectly help you.",
         )
         for output_key in unused_output_keys:
+            # We truncate the output value to 1000 characters to avoid overwhelming the
+            # LLM with too much information.
+            output_val = (str(previous_outputs[output_key].value) or "")[:1000]
             input_context.extend(
                 [
                     f"output_name: {output_key}",
-                    f"output_value: {previous_outputs[output_key].value}",
+                    f"output_value: {output_val}",
                     "----------",
                 ],
             )
@@ -191,7 +194,12 @@ def build_context(ctx: ExecutionContext, step: Step, workflow: Workflow) -> str:
     previous_outputs = workflow.outputs.step_outputs
     clarifications = workflow.outputs.clarifications
 
-    system_context = generate_main_system_context(ctx.agent_system_context_extension)
+    system_context_extension = (
+        ctx.agent_system_context_extension
+        if ctx.agent_system_context_extension
+        else workflow.execution_context.agent_system_context_extension
+    )
+    system_context = generate_main_system_context(system_context_extension)
 
     # exit early if no additional information
     if not inputs and not clarifications and not previous_outputs:

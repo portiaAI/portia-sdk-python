@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from contextlib import suppress
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -27,10 +26,10 @@ from portia.agents.verifier_agent import (
     VerifierModel,
 )
 from portia.clarification import InputClarification
-from portia.errors import InvalidWorkflowStateError
+from portia.errors import InvalidAgentError, InvalidWorkflowStateError
 from portia.llm_wrapper import LLMWrapper
-from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step
+from portia.tool import Tool
 from tests.utils import AdditionTool, get_test_config, get_test_tool_context, get_test_workflow
 
 if TYPE_CHECKING:
@@ -744,16 +743,85 @@ def test_clarifications_or_continue() -> None:
     assert len(agent.new_clarifications) == 0
 
 
-def test_verifier_agent_without_tool_uses_llm_tool() -> None:
-    """Test verifier agent without tool uses LLM tool."""
+def test_verifier_agent_none_tool_execute_sync() -> None:
+    """Test that executing VerifierAgent with None tool raises an exception."""
     (plan, workflow) = get_test_workflow()
+
     agent = VerifierAgent(
         step=plan.steps[0],
         workflow=workflow,
         config=get_test_config(),
         tool=None,
     )
-    # try to run the tool and fail, but sets the tool to an LLM tool
-    with suppress(Exception):
+
+    with pytest.raises(InvalidAgentError) as exc_info:
         agent.execute_sync()
-    assert isinstance(agent.tool, LLMTool)
+
+    assert "Tool is required for VerifierAgent" in str(exc_info.value)
+
+
+class MockToolSchema(BaseModel):
+    """Mock tool schema."""
+
+    optional_arg: str | None = Field(default=None, description="An optional argument")
+
+
+class MockAgent:
+    """Mock agent."""
+
+    def __init__(self) -> None:
+        """Init mock agent."""
+        self.tool = MockTool()
+
+
+class MockTool(Tool):
+    """Mock tool."""
+
+    def __init__(self) -> None:
+        """Init mock tool."""
+        super().__init__(
+            name="Mock Tool",
+            id="mock_tool",
+            description="Mock tool description",
+            args_schema=MockToolSchema,
+            output_schema=("type", "A description of the output"),
+        )
+
+    def run(self, **kwargs: Any) -> Any:  # noqa: ANN401, ARG002
+        """Run mock tool."""
+        return "RUN_RESULT"
+
+
+def test_optional_args_with_none_values() -> None:
+    """Test that optional args with None values are handled correctly.
+
+    Required args with None values should always be marked made_up.
+    Optional args with None values should be marked not made_up.
+    """
+    agent = VerifierAgent(
+        step=Step(task="TASK_STRING", output="$out"),
+        workflow=get_test_workflow()[1],
+        config=get_test_config(),
+        tool=MockTool(),
+    )
+    model = VerifierModel(
+        llm=LLMWrapper(get_test_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,
+    )
+
+    #  Optional arg and made_up is True == not made_up
+    updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
+        VerifiedToolInputs(
+            args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=True)],
+        ),
+    )
+    assert updated_tool_inputs.args[0].made_up is False
+
+    #  Optional arg and made_up is False == mnot ade_up
+    updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
+        VerifiedToolInputs(
+            args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=False)],
+        ),
+    )
+    assert updated_tool_inputs.args[0].made_up is False

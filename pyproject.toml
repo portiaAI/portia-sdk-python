@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.0.1-alpha.52"
+version = "0.0.1-alpha.56"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
@@ -17,7 +17,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.10,<4.0"
 pydantic = "^2.10.3"
 jinja2 = "^3.1.4"
 instructor = "^1.7.0"
@@ -105,8 +105,14 @@ type = "python"
 
 [[tool.pydoc-markdown.processors]]
 type = "filter"
-expression = "not 'test' in name and not name.startswith('_') and default()"
+expression = "not 'test' in name and not 'cli' in name and not 'prefixed_uuid' in name and not 'common' in name and not 'templates' in name and default()"
 skip_empty_modules = true
+
+[[tool.pydoc-markdown.processors]]
+type = "smart"
+
+[[tool.pydoc-markdown.processors]]
+type = "crossref"
 
 [tool.pydoc-markdown.renderer]
 type = "docusaurus"
