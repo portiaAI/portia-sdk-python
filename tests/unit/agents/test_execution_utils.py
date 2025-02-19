@@ -133,6 +133,7 @@ def test_process_output_with_output_artifacts() -> None:
 
     assert isinstance(result, Output)
     assert result.value == "test"
+    assert result.summary == "test"
 
 
 def test_process_output_with_artifacts() -> None:
@@ -163,3 +164,32 @@ def test_process_output_with_human_message() -> None:
 
     assert isinstance(result, Output)
     assert result.value == "test"
+
+
+def test_process_output_summary_matches_serialized_value() -> None:
+    """Test process_output summary matches serialized value."""
+    dict_value = {"key1": "value1", "key2": "value2"}
+    message = ToolMessage(tool_call_id="1", content="test", artifact=Output(value=dict_value))
+
+    result = process_output(message, clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.value == dict_value
+    assert result.summary == result.serialize_value(result.value)
+
+
+def test_process_output_summary_not_updated_if_provided() -> None:
+    """Test process_output does not update summary if already provided."""
+    dict_value = {"key1": "value1", "key2": "value2"}
+    provided_summary = "This is a provided summary."
+    message = ToolMessage(
+        tool_call_id="1",
+        content="test",
+        artifact=Output(value=dict_value, summary=provided_summary),
+    )
+
+    result = process_output(message, clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.value == dict_value
+    assert result.summary == provided_summary
