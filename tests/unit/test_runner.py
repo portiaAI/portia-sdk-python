@@ -11,7 +11,7 @@ import pytest
 from pydantic import HttpUrl
 
 from portia.agents.base_agent import Output
-from portia.clarification import ActionClarification, Clarification, InputClarification
+from portia.clarification import ActionClarification, InputClarification
 from portia.config import StorageClass
 from portia.errors import InvalidWorkflowStateError, PlanError, WorkflowNotFoundError
 from portia.llm_wrapper import LLMWrapper

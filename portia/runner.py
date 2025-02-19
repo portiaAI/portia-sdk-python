@@ -29,7 +29,6 @@ from portia.agents.one_shot_agent import OneShotAgent
 from portia.agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
-    ActionClarification,
     Clarification,
     ClarificationCategory,
 )
@@ -288,7 +287,7 @@ class Runner:
         self.storage.save_workflow(workflow)
         return workflow
 
-    def wait_for_ready(
+    def wait_for_ready(  # noqa: C901
         self,
         workflow: Workflow,
         max_retries: int = 6,
