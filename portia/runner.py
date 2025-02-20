@@ -63,6 +63,8 @@ if TYPE_CHECKING:
     from portia.planners.planner import Planner
     from portia.tool import Tool
 
+MAX_PER_STEP_REPLAN = 3
+
 
 class Runner:
     """Runner class is the top level abstraction and entrypoint for most programs using the SDK.
@@ -380,7 +382,7 @@ class Runner:
 
         return workflow
 
-    def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
+    def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:  # noqa: C901
         """Execute the workflow steps, updating the workflow state as needed.
 
         Args:
@@ -436,7 +438,7 @@ class Runner:
                         return workflow
                     case ReplanningMode.AUTOMATIC:
                         replan = self._replan(plan, workflow, e)
-                        if replan.version > 3:
+                        if replan.version > MAX_PER_STEP_REPLAN:
                             return workflow
                         workflow.plan_id = replan.id
                         self.storage.save_plan(replan)
@@ -495,8 +497,10 @@ class Runner:
 
     def _replan(self, original_plan: Plan, workflow: Workflow, error: Exception) -> Plan:
         replan_prompt = [
-            f"Please replan this from step {workflow.current_step_index} leaving previous steps unchanged.",
-            "This replan was caused by the error below and the new plan should attempt to avoid this error happening again.",
+            f"Please replan this from step {workflow.current_step_index} leaving previous steps "
+            "unchanged.",
+            "This replan was caused by the error below and the new plan should attempt to "
+            "avoid this error happening again.",
             f"Error from original plan: {error}",
         ]
         with execution_context(planner_system_context_extension=replan_prompt):

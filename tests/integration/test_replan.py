@@ -69,7 +69,8 @@ def test_runner_replan_after_error_auto(
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="please call the error_tool and do not return an error by setting all the args to false.",
+            query="please call the error_tool"
+            " and do not return an error by setting all the args to false.",
             tool_ids=["error_tool"],
         ),
         steps=[clarification_step],
@@ -77,7 +78,6 @@ def test_runner_replan_after_error_auto(
     runner.storage.save_plan(plan)
     workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
-    print(workflow)
 
     assert workflow.state == WorkflowState.COMPLETE
     assert workflow.plan_id != plan.id
@@ -128,7 +128,8 @@ def test_runner_replan_after_error_clarification(
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="please call the error_tool and do not return an error by setting all the args to false.",
+            query="please call the error_tool and"
+            " do not return an error by setting all the args to false.",
             tool_ids=["error_tool"],
         ),
         steps=[clarification_step],
