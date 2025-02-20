@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING, Literal
+
+from openai import OpenAI
+from pydantic import BaseModel
 
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.templates.render import render_template
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
-from pydantic import BaseModel
+from portia.templates.render import render_template
+
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.plan import Plan, Step
@@ -24,6 +28,7 @@ class ToolListResponse(BaseModel):
     """Response model for the tool list."""
 
     tool_ids: list[str]
+
 
 class PlanJudgeResponse(BaseModel):
     """Response model for the plan judge."""
@@ -89,27 +94,42 @@ class TwoShotPlanner(Planner):
         prompt = render_template(
             "llm_plan_judge.xml.jinja",
             query=query,
-            plan1=plan1.model_dump_json(),
-            plan2=plan2.model_dump_json(),
+            plan1=plan1.model_dump(),
+            plan2=plan2.model_dump(),
         )
 
-        response = self.llm_wrapper.to_instructor(
-            response_model=PlanJudgeResponse,
+        client = OpenAI()
+
+        response = client.chat.completions.create(
+            model="o3-mini",
             messages=[
                 {
                     "role": "system",
                     "content": (
                         "You are an expert at judging the quality of plans. You will be given two "
                         "plans and a query. You will need to return the id of the plan that is "
-                        "better suited to accomplish the query. You will also need to provide a "
-                        "reason for your choice."
+                        "better suited to accomplish the query and a reason for your choie. "
+                        "A good plan:\n"
+                        "- would achieve the task goal\n"
+                        "- is concise and uses the minimal set of steps and tools required to "
+                        "achieve a task\n"
+                        "- is faithful to the orignal task request and does not hallucinate "
+                        "information\n"
+                        "Please assess which plan is the best and return your choice in JSON "
+                        "format with the following schema:\n"
+                        "{\n"
+                        '  "plan_id": "PLAN1" | "PLAN2",\n'
+                        '  "reason": "<reason>"\n'
+                        "}\n"
                     ),
                 },
                 {"role": "user", "content": prompt},
             ],
+            response_format={"type": "json_object"},
         )
+        response_content = json.loads(response.choices[0].message.content or "")
 
-        if response.plan_id == "PLAN1":
+        if "plan1" in response_content["plan_id"].lower():
             return plan1
         return plan2
 
@@ -178,13 +198,10 @@ class TwoShotPlanner(Planner):
         """
         tool_ids = [tool.id for tool in tool_list]
         missing_tools = [
-            step.tool_id
-            for step in steps
-            if step.tool_id and step.tool_id not in tool_ids
+            step.tool_id for step in steps if step.tool_id and step.tool_id not in tool_ids
         ]
         return (
             f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
             if missing_tools
             else None
         )
-
