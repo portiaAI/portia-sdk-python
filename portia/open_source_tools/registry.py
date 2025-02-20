@@ -36,7 +36,7 @@ open_source_tool_registry = InMemoryToolRegistry.from_local_tools(
 EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
     {
         # Exclude Outlook by default as it clashes with Gmail
-        "portia::microsoft_outlook::*",
+        "portia:microsoft:outlook:*",
     },
 )
 

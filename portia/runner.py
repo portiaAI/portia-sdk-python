@@ -76,8 +76,11 @@ class Runner:
         """Initialize storage and tools.
 
         Args:
-            config (Config): The configuration to initialize the runner.
-            tools (ToolRegistry | list[Tool]): The registry or list of tools to use.
+            config (Config): The configuration to initialize the runner. If not provided, the
+                default configuration will be used.
+            tools (ToolRegistry | list[Tool]): The registry or list of tools to use. If not
+                provided, the open source tool registry will be used, alongside the default tools
+                from Portia cloud if a Portia API key is set.
 
         """
         self.config = config if config else Config.from_default()
