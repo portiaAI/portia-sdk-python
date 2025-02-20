@@ -1,0 +1,16 @@
+The tools you have available are below and the query you are trying to solve is at the bottom.
+
+{% for tool in tools %}
+<Tool>
+    tool_id: {{tool.id}}
+    tool_name: {{tool.name}}
+    tool_description: {{tool.description}}
+    tool_usage_examples:
+    {% for example in tool.usage_examples %}
+        {{example}}
+    {% endfor %}
+</Tool>
+{% endfor %}
+<Query>
+    {{query}}
+</Query>

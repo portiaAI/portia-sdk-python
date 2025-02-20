@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
-
-from pydantic import BaseModel
+from typing import TYPE_CHECKING, Literal
 
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
+from portia.templates.render import render_template
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
-from portia.templates.render import render_template
-
+from pydantic import BaseModel
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.plan import Plan, Step
@@ -26,6 +24,12 @@ class ToolListResponse(BaseModel):
     """Response model for the tool list."""
 
     tool_ids: list[str]
+
+class PlanJudgeResponse(BaseModel):
+    """Response model for the plan judge."""
+
+    plan_id: Literal["PLAN1", "PLAN2"]
+    reason: str
 
 
 class TwoShotPlanner(Planner):
@@ -66,6 +70,50 @@ class TwoShotPlanner(Planner):
         return filtered_tools
 
     def generate_steps_or_error(
+        self,
+        ctx: ExecutionContext,
+        query: str,
+        tool_list: list[Tool],
+        examples: list[Plan] | None = None,
+    ) -> StepsOrError:
+        """Generate a plan or error using an LLM from a query and a list of tools."""
+        likely_tools = self.get_likely_tools(query, tool_list)
+        plan1 = self.sub_generate_steps_or_error(ctx, query, likely_tools, examples)
+        plan2 = self.sub_generate_steps_or_error(ctx, query, tool_list, examples)
+
+        if plan1.error:
+            return plan2
+        if plan2.error:
+            return plan1
+
+        prompt = render_template(
+            "llm_plan_judge.xml.jinja",
+            query=query,
+            plan1=plan1.model_dump_json(),
+            plan2=plan2.model_dump_json(),
+        )
+
+        response = self.llm_wrapper.to_instructor(
+            response_model=PlanJudgeResponse,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert at judging the quality of plans. You will be given two "
+                        "plans and a query. You will need to return the id of the plan that is "
+                        "better suited to accomplish the query. You will also need to provide a "
+                        "reason for your choice."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+
+        if response.plan_id == "PLAN1":
+            return plan1
+        return plan2
+
+    def sub_generate_steps_or_error(
         self,
         ctx: ExecutionContext,
         query: str,
@@ -130,10 +178,13 @@ class TwoShotPlanner(Planner):
         """
         tool_ids = [tool.id for tool in tool_list]
         missing_tools = [
-            step.tool_id for step in steps if step.tool_id and step.tool_id not in tool_ids
+            step.tool_id
+            for step in steps
+            if step.tool_id and step.tool_id not in tool_ids
         ]
         return (
             f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
             if missing_tools
             else None
         )
+
