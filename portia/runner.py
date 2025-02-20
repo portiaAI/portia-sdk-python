@@ -30,6 +30,7 @@ from portia.agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
+    ClarificationCategory,
 )
 from portia.config import AgentType, Config, PlannerType, StorageClass
 from portia.errors import (
@@ -293,7 +294,7 @@ class Runner:
         self.storage.save_workflow(workflow)
         return workflow
 
-    def wait_for_ready(
+    def wait_for_ready(  # noqa: C901
         self,
         workflow: Workflow,
         max_retries: int = 6,
@@ -338,6 +339,7 @@ class Runner:
             return workflow
 
         plan = self.storage.get_plan(workflow.plan_id)
+        current_step_clarifications = workflow.get_clarifications_for_step()
         while workflow.state != WorkflowState.READY_TO_RESUME:
             if tries >= max_retries:
                 raise InvalidWorkflowStateError("Workflow is not ready to resume after max retries")
@@ -363,11 +365,15 @@ class Runner:
                             execution_context=workflow.execution_context,
                             workflow_id=workflow.id,
                             config=self.config,
-                            clarifications=workflow.get_clarifications_for_step(),
+                            clarifications=current_step_clarifications,
                         ),
                     )
                     logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
                     if tool_ready:
+                        for clarification in current_step_clarifications:
+                            if clarification.category is ClarificationCategory.ACTION:
+                                clarification.resolved = True
+                                clarification.response = "complete"
                         workflow.state = WorkflowState.READY_TO_RESUME
                         self.storage.save_workflow(workflow)
 
