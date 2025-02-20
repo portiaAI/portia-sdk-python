@@ -167,7 +167,7 @@ class ErrorToolSchema(BaseModel):
     error_str: str
     return_soft_error: bool
     return_uncaught_error: bool
-    return_error: bool
+    return_hard_error: bool
 
 
 class ErrorTool(Tool):

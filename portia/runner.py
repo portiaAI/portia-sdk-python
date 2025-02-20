@@ -282,6 +282,9 @@ class Runner:
         matched_clarification.resolved = True
         matched_clarification.response = response
 
+        if isinstance(matched_clarification, ReplanClarification):
+            workflow.plan_id = matched_clarification.new_plan_id
+
         if len(workflow.get_outstanding_clarifications()) == 0:
             workflow.state = WorkflowState.READY_TO_RESUME
 
@@ -433,6 +436,8 @@ class Runner:
                         return workflow
                     case ReplanningMode.AUTOMATIC:
                         replan = self._replan(plan, workflow, e)
+                        if replan.version > 3:
+                            return workflow
                         workflow.plan_id = replan.id
                         self.storage.save_plan(replan)
                         self.storage.save_workflow(workflow)
@@ -495,11 +500,13 @@ class Runner:
             f"Error from original plan: {error}",
         ]
         with execution_context(planner_system_context_extension=replan_prompt):
-            return self.generate_plan(
+            new_plan = self.generate_plan(
                 original_plan.plan_context.query,
                 original_plan.plan_context.tool_ids,
                 [original_plan],
             )
+            new_plan.version = original_plan.version + 1
+            return new_plan
 
     def _get_planner(self) -> Planner:
         """Get the planner based on the configuration.

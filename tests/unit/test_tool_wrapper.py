@@ -67,7 +67,7 @@ def test_tool_call_wrapper_run_with_exception(
     wrapper = ToolCallWrapper(tool, mock_storage, workflow)
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError, match="Test error"):
-        wrapper.run(ctx, "Test error", False, False)  # noqa: FBT003
+        wrapper.run(ctx, "Test error", False, False, True)  # noqa: FBT003
     assert mock_storage.records[-1].status == ToolCallStatus.FAILED
 
 
