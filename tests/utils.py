@@ -167,6 +167,7 @@ class ErrorToolSchema(BaseModel):
     error_str: str
     return_soft_error: bool
     return_uncaught_error: bool
+    return_error: bool
 
 
 class ErrorTool(Tool):
@@ -187,10 +188,12 @@ class ErrorTool(Tool):
         error_str: str,
         return_uncaught_error: bool,  # noqa: FBT001
         return_soft_error: bool,  # noqa: FBT001
+        return_hard_error: bool,  # noqa: FBT001
     ) -> None:
         """Return the error."""
         if return_uncaught_error:
             raise Exception(error_str)  # noqa: TRY002
         if return_soft_error:
             raise ToolSoftError(error_str)
-        raise ToolHardError(error_str)
+        if return_hard_error:
+            raise ToolHardError(error_str)

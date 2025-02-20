@@ -176,6 +176,21 @@ class PlannerType(Enum):
     ONE_SHOT = "ONE_SHOT"
 
 
+class ReplanningMode(Enum):
+    """Enum for replanning mode.
+
+    Attributes:
+        NONE: No replanning.
+        AUTOMATIC: Automatic replanning.
+        CLARIFICATION: Replanning with approval.
+
+    """
+
+    NONE = "NONE"
+    AUTOMATIC = "AUTOMATIC"
+    CLARIFICATION = "CLARIFICATION"
+
+
 class LogLevel(Enum):
     """Enum for available log levels.
 
@@ -320,6 +335,11 @@ class Config(BaseModel):
         default=None,
         description="If storage class is set to DISK this will be the location where plans "
         "and workflows are written in a JSON format.",
+    )
+
+    replanning_mode: ReplanningMode = Field(
+        default=ReplanningMode.NONE,
+        description="How to handle re-planning.",
     )
 
     # Logging Options
