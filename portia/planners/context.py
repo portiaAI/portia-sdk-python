@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
+from portia.tool_filtering_exploration.fake_tool import FakeTool
 
 if TYPE_CHECKING:
     from portia.plan import Plan
@@ -55,6 +56,8 @@ def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str
             "name": tool.name,
             "description": tool.description,
             "usage_examples": tool.usage_examples,
+            "args_schema": tool.args_description if isinstance(tool, FakeTool) else tool.args_schema.model_json_schema(),
         }
         for tool in tool_list
     ]
+

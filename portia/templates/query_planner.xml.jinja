@@ -13,10 +13,10 @@
     <Example>
         <Request>
             <Tools>
-            {{example.plan_context.tool_ids}}
+            {{example.plan_context.tool_ids | safe}}
             </Tools>
             <Query>
-            {{example.plan_context.query}}
+            {{example.plan_context.query | safe}}
             </Query>
         </Request>
         <Response>
@@ -36,12 +36,16 @@
                 {{example}}
             {% endfor %}
         {% endif %}
+        {% if tool.args_schema %}
+            Args schema:
+                {{tool.args_schema | safe}}
+        {% endif %}
     </Tool>{% endfor %}
 </Tools>
 
 <Request>
     <Tools>
-        {{tools}}
+        {{tools | map(attribute='id') | join(', ')}}
     </Tools>
     <Query>
         {{query}}

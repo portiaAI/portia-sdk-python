@@ -15,7 +15,11 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
 from portia.templates.render import render_template
+from portia.tool import Tool
 from langsmith import wrappers
+from portia.tool_filtering_exploration.fake_tool import create_fake_tools
+import os
+from pathlib import Path
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -36,6 +40,7 @@ class PlanJudgeResponse(BaseModel):
 
     plan_id: Literal["PLAN1", "PLAN2"]
     reason: str
+
 
 
 class TwoShotPlanner(Planner):
@@ -82,9 +87,14 @@ class TwoShotPlanner(Planner):
         tool_list: list[Tool],
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
+        package_root = Path(__file__).parent.parent
+        fake_tools_path = package_root / "tool_filtering_exploration" / "fake_tools.csv"
+        extra_tools = create_fake_tools(str(fake_tools_path))
+        final_tools = extra_tools + tool_list
+
         """Generate a plan or error using an LLM from a query and a list of tools."""
-        likely_tools = self.get_likely_tools(query, tool_list)
-        plan2 = self.sub_generate_steps_or_error(ctx, query, tool_list, examples)
+        likely_tools = self.get_likely_tools(query, final_tools)
+        plan2 = self.sub_generate_steps_or_error(ctx, query, final_tools, examples)
         plan1 = self.sub_generate_steps_or_error(ctx, query, likely_tools, examples)
 
         if plan1.error:
@@ -93,8 +103,7 @@ class TwoShotPlanner(Planner):
             return plan1
 
         tool_ids_used_in_plans = self._get_tools_used_in_plans([plan1, plan2])
-        print(f"Tool IDs used in plans: {tool_ids_used_in_plans}")
-        tools_used_in_plans = [t for t in tool_list if t.id in tool_ids_used_in_plans]
+        tools_used_in_plans = [t for t in final_tools if t.id in tool_ids_used_in_plans]
 
         prompt = render_template(
             "llm_plan_judge.xml.jinja",
@@ -116,9 +125,9 @@ class TwoShotPlanner(Planner):
                         "plans and a query. You will need to return the id of the plan that is "
                         "better suited to accomplish the query and a reason for your choie. "
                         "A good plan:\n"
-                        "- would achieve the task goal\n"
-                        "- has enough steps to achieve the task goal. Generally, we prefer concise "
-                        " plans, but it is most important that the plan achieves the task goal.\n"
+                        "- would achieve the task goal (this is MOST important)\n"
+                        "- does not use incorrect tools\n"
+                        "- is concise \n"
                         "- is faithful to the original task request and does not hallucinate "
                         "information\n"
                         "Please assess which plan is the best and return your choice in JSON "
@@ -149,11 +158,9 @@ class TwoShotPlanner(Planner):
         """Generate a plan or error using an LLM from a query and a list of tools."""
         ctx = get_execution_context()
 
-        likely_tools = self.get_likely_tools(query, tool_list)
-
         prompt = render_prompt_insert_defaults(
             query,
-            likely_tools,
+            tool_list,
             ctx.planner_system_context_extension,
             examples,
         )
