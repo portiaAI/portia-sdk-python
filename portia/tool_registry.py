@@ -174,7 +174,7 @@ class AggregatedToolRegistry(ToolRegistry):
     any of the registries in the collection.
     """
 
-    def  __init__(self, registries: list[ToolRegistry]) -> None:
+    def __init__(self, registries: list[ToolRegistry]) -> None:
         """Initialize the aggregated tool registry with a list of registries.
 
         Args:
@@ -495,7 +495,7 @@ class DefaultToolRegistry(AggregatedToolRegistry):
             """Filter to get the default set of tools offered by Portia cloud."""
             return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
 
-        registries = [in_memory_registry]
+        registries: list[ToolRegistry] = [in_memory_registry]
         if config.portia_api_key:
             registries.append(PortiaToolRegistry(config).filter_tools(default_tool_filter))
 

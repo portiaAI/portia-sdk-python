@@ -50,7 +50,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(NotImplementedError):
         registry.register_tool(AdditionTool())
 
-    tool = registry.get_tool("portia::search_tool")
+    tool = registry.get_tool("portia:tavily::search")
     assert isinstance(tool, PortiaRemoteTool)
     tool.api_key = SecretStr("123")
     ctx = get_test_tool_context()
@@ -104,8 +104,8 @@ def test_default_runner_has_correct_tools() -> None:
     runner = Runner()
     tools = runner.tool_registry.get_tools()
     assert len(tools) > 0
-    assert any(tool.id == "portia::google_gmail::search_email_tool" for tool in tools)
-    assert not any(tool.id == "portia::microsoft_outlook::draft_email_tool" for tool in tools)
+    assert any(tool.id == "portia:google:gmail:search_email" for tool in tools)
+    assert not any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)
 
 
 @pytest.mark.skip("Disable test until Microsoft tool is enabled in staging")
@@ -120,5 +120,5 @@ def test_runner_with_microsoft_tools() -> None:
     runner = Runner(tools=registry)
     tools = runner.tool_registry.get_tools()
     assert len(tools) > 0
-    assert any(tool.id == "portia::microsoft_outlook::draft_email_tool" for tool in tools)
-    assert not any(tool.id == "portia::google_gmail::search_email_tool" for tool in tools)
+    assert any(tool.id == "portia:google:gmail:search_email" for tool in tools)
+    assert not any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)
