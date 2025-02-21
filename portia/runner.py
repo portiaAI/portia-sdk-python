@@ -52,13 +52,12 @@ from portia.storage import (
     PortiaCloudStorage,
 )
 from portia.tool import ToolRunContext
-from portia.tool_registry import InMemoryToolRegistry, ToolRegistry
+from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry, ToolRegistry
 from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 
 if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
-    from portia.config import Config
     from portia.planners.planner import Planner
     from portia.tool import Tool
 
@@ -71,29 +70,36 @@ class Runner:
 
     def __init__(
         self,
-        config: Config,
-        tools: ToolRegistry | list[Tool],
+        config: Config | None = None,
+        tools: ToolRegistry | list[Tool] | None = None,
     ) -> None:
         """Initialize storage and tools.
 
         Args:
-            config (Config): The configuration to initialize the runner.
-            tools (ToolRegistry | list[Tool]): The registry or list of tools to use.
+            config (Config): The configuration to initialize the runner. If not provided, the
+                default configuration will be used.
+            tools (ToolRegistry | list[Tool]): The registry or list of tools to use. If not
+                provided, the open source tool registry will be used, alongside the default tools
+                from Portia cloud if a Portia API key is set.
 
         """
-        logger_manager.configure_from_config(config)
-        self.config = config
-        self.tool_registry = (
-            InMemoryToolRegistry.from_local_tools(tools) if isinstance(tools, list) else tools
-        )
+        self.config = config if config else Config.from_default()
+        logger_manager.configure_from_config(self.config)
 
-        match config.storage_class:
+        if isinstance(tools, ToolRegistry):
+            self.tool_registry = tools
+        elif isinstance(tools, list):
+            self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
+        else:
+            self.tool_registry = DefaultToolRegistry(self.config)
+
+        match self.config.storage_class:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
-                self.storage = DiskFileStorage(storage_dir=config.must_get("storage_dir", str))
+                self.storage = DiskFileStorage(storage_dir=self.config.must_get("storage_dir", str))
             case StorageClass.CLOUD:
-                self.storage = PortiaCloudStorage(config=config)
+                self.storage = PortiaCloudStorage(config=self.config)
 
     def execute_query(
         self,
