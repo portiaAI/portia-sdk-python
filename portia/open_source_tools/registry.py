@@ -46,20 +46,31 @@ EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
 
 
 def get_default_tool_registry(config: Config) -> ToolRegistry:
-    """Get the default tool registry based on the configuration."""
+    """Get the default tool registry based on the configuration.
+
+    This includes the following tools:
+    - All open source tools that don't require API keys
+    - Search tool if you have a Tavily API key
+    - Weather tool if you have an OpenWeatherMap API key
+    - Portia cloud tools if you have a Portia cloud API key
+    """
 
     def default_tool_filter(tool: Tool) -> bool:
         """Filter to get the default set of tools offered by Portia cloud."""
         return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
 
-    tool_registry = open_source_tool_registry
-    if not os.getenv("TAVILY_API_KEY"):
-        logger.warning("TAVILY_API_KEY is not set. As a result, any plans using search will fail")
+    tool_registry = InMemoryToolRegistry.from_local_tools(
+        [
+            CalculatorTool(),
+            LLMTool(),
+            FileWriterTool(),
+            FileReaderTool(),
+        ],
+    )
+    if os.getenv("TAVILY_API_KEY"):
+        tool_registry.register_tool(SearchTool())
     if not os.getenv("OPENWEATHERMAP_API_KEY"):
-        logger.warning(
-            "OPENWEATHERMAP_API_KEY is not set. As a result, any plans using weather retrieval "
-            "will fail",
-        )
+        tool_registry.register_tool(WeatherTool())
     if config.portia_api_key:
         tool_registry += PortiaToolRegistry(config).filter_tools(default_tool_filter)
 
