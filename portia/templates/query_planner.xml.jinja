@@ -13,7 +13,7 @@
     <Example>
         <Request>
             <Tools>
-            {{example.plan_context.tool_ids}}
+            {{example.plan_context.tool_ids | safe}}
             </Tools>
             <Query>
             {{example.plan_context.query}}
@@ -29,13 +29,16 @@
 
 <Tools>{% for tool in tools %}
     <Tool name={{tool.id}}>
-        {{tool.description}}
+        {{tool.description | safe}}
+
+        Tool arguments:
+            {{tool.args | safe}}
     </Tool>{% endfor %}
 </Tools>
 
 <Request>
     <Tools>
-        {{tools}}
+        {{tools | map(attribute='id') | list}}
     </Tools>
     <Query>
         {{query}}
