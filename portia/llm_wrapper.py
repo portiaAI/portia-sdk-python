@@ -116,7 +116,6 @@ class LLMWrapper(BaseLLMWrapper):
     Attributes:
         llm_provider (LLMProvider): The LLM provider to use (e.g., OpenAI, Anthropic, MistralAI).
         model_name (str): The name of the model to use.
-        model_temperature (float): The temperature setting for the model.
         model_seed (int): The seed for the model's random generation.
 
     Methods:
@@ -138,7 +137,6 @@ class LLMWrapper(BaseLLMWrapper):
         super().__init__(config)
         self.llm_provider = config.llm_provider
         self.model_name = config.llm_model_name.value
-        self.model_temperature = config.llm_model_temperature
         self.model_seed = config.llm_model_seed
 
     def to_langchain(self) -> BaseChatModel:
@@ -156,7 +154,6 @@ class LLMWrapper(BaseLLMWrapper):
                 return ChatOpenAI(
                     name=self.model_name,
                     model=self.model_name,
-                    temperature=self.model_temperature,
                     seed=self.model_seed,
                     api_key=self.config.openai_api_key,
                     max_retries=3,
@@ -164,7 +161,6 @@ class LLMWrapper(BaseLLMWrapper):
             case LLMProvider.ANTHROPIC:
                 return ChatAnthropic(
                     model_name=self.model_name,
-                    temperature=self.model_temperature,
                     timeout=120,
                     stop=None,
                     max_retries=3,
@@ -173,7 +169,6 @@ class LLMWrapper(BaseLLMWrapper):
             case LLMProvider.MISTRALAI:
                 return ChatMistralAI(
                     model_name=self.model_name,
-                    temperature=self.model_temperature,
                     api_key=self.config.mistralai_api_key,
                     max_retries=3,
                 )
@@ -207,7 +202,6 @@ class LLMWrapper(BaseLLMWrapper):
                     response_model=response_model,
                     messages=messages,
                     model=self.model_name,
-                    temperature=self.model_temperature,
                     seed=self.model_seed,
                 )
             case LLMProvider.ANTHROPIC:
@@ -222,7 +216,6 @@ class LLMWrapper(BaseLLMWrapper):
                     response_model=response_model,
                     messages=messages,
                     max_tokens=2048,
-                    temperature=self.model_temperature,
                 )
             case LLMProvider.MISTRALAI:
                 client = instructor.from_mistral(
@@ -234,5 +227,4 @@ class LLMWrapper(BaseLLMWrapper):
                     model=self.model_name,
                     response_model=response_model,
                     messages=messages,
-                    temperature=self.model_temperature,
                 )
