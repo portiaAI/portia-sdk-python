@@ -51,7 +51,7 @@ def test_run_tool_error() -> None:
     with pytest.raises(NotImplementedError):
         registry.register_tool(AdditionTool())
 
-    tool = registry.get_tool("portia::search_tool")
+    tool = registry.get_tool("portia:tavily::search")
     tool.api_key = SecretStr("123")
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError):
