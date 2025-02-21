@@ -23,8 +23,7 @@ from tests.utils import AdditionTool, get_test_tool_context, get_test_workflow
 def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
-    tool_registry = PortiaToolRegistry(config=config)
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(config=config)
     query = "Where is the next Olympics being hosted?"
 
     workflow = runner.execute_query(query)
