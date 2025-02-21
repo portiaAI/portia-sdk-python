@@ -14,6 +14,8 @@ Classes:
 
 from __future__ import annotations
 
+import os
+import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -22,6 +24,12 @@ from pydantic import BaseModel, Field, create_model
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.logger import logger
+from portia.open_source_tools.calculator_tool import CalculatorTool
+from portia.open_source_tools.llm_tool import LLMTool
+from portia.open_source_tools.local_file_reader_tool import FileReaderTool
+from portia.open_source_tools.local_file_writer_tool import FileWriterTool
+from portia.open_source_tools.search_tool import SearchTool
+from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
@@ -166,7 +174,7 @@ class AggregatedToolRegistry(ToolRegistry):
     any of the registries in the collection.
     """
 
-    def __init__(self, registries: list[ToolRegistry]) -> None:
+    def  __init__(self, registries: list[ToolRegistry]) -> None:
         """Initialize the aggregated tool registry with a list of registries.
 
         Args:
@@ -448,3 +456,47 @@ class PortiaToolRegistry(ToolRegistry):
             self.config,
             {tool.id: tool for tool in self.get_tools() if filter_func(tool)},
         )
+
+
+EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
+    {
+        # Exclude Outlook by default as it clashes with Gmail
+        "portia:microsoft:outlook:*",
+    },
+)
+
+
+class DefaultToolRegistry(AggregatedToolRegistry):
+    """A registry providing a default set of tools.
+
+    This includes the following tools:
+    - All open source tools that don't require API keys
+    - Search tool if you have a Tavily API key
+    - Weather tool if you have an OpenWeatherMap API key
+    - Portia cloud tools if you have a Portia cloud API key
+    """
+
+    def __init__(self, config: Config) -> None:
+        """Initialize the default tool registry with the given configuration."""
+        in_memory_registry = InMemoryToolRegistry.from_local_tools(
+            [
+                CalculatorTool(),
+                LLMTool(),
+                FileWriterTool(),
+                FileReaderTool(),
+            ],
+        )
+        if os.getenv("TAVILY_API_KEY"):
+            in_memory_registry.register_tool(SearchTool())
+        if os.getenv("OPENWEATHERMAP_API_KEY"):
+            in_memory_registry.register_tool(WeatherTool())
+
+        def default_tool_filter(tool: Tool) -> bool:
+            """Filter to get the default set of tools offered by Portia cloud."""
+            return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
+
+        registries = [in_memory_registry]
+        if config.portia_api_key:
+            registries.append(PortiaToolRegistry(config).filter_tools(default_tool_filter))
+
+        super().__init__(registries)

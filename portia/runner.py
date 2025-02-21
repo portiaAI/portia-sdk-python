@@ -44,7 +44,6 @@ from portia.execution_context import (
 )
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.open_source_tools.registry import get_default_tool_registry
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.planners.one_shot_planner import OneShotPlanner
 from portia.storage import (
@@ -53,7 +52,7 @@ from portia.storage import (
     PortiaCloudStorage,
 )
 from portia.tool import ToolRunContext
-from portia.tool_registry import InMemoryToolRegistry, ToolRegistry
+from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry, ToolRegistry
 from portia.tool_wrapper import ToolCallWrapper
 from portia.workflow import ReadOnlyWorkflow, Workflow, WorkflowState, WorkflowUUID
 
@@ -92,7 +91,7 @@ class Runner:
         elif isinstance(tools, list):
             self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
         else:
-            self.tool_registry = get_default_tool_registry(self.config)
+            self.tool_registry = DefaultToolRegistry(self.config)
 
         match self.config.storage_class:
             case StorageClass.MEMORY:

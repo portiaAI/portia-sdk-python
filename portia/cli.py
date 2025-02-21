@@ -33,8 +33,8 @@ from portia.clarification import (
 from portia.config import Config, StorageClass
 from portia.execution_context import execution_context
 from portia.logger import logger
-from portia.open_source_tools.registry import get_default_tool_registry
 from portia.runner import Runner
+from portia.tool_registry import DefaultToolRegistry
 from portia.workflow import WorkflowState
 
 if TYPE_CHECKING:
@@ -167,7 +167,7 @@ def run(  # noqa: C901
     cli_config, config = _get_config(**kwargs)
 
     # Add the tool registry
-    registry = get_default_tool_registry(config)
+    registry = DefaultToolRegistry(config)
 
     # Run the query
     runner = Runner(
@@ -254,7 +254,7 @@ def list_tools(
     """List tools."""
     cli_config, config = _get_config(**kwargs)
 
-    for tool in get_default_tool_registry(config).get_tools():
+    for tool in DefaultToolRegistry(config).get_tools():
         click.echo(tool.model_dump_json(indent=4))
 
 
