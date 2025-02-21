@@ -31,8 +31,9 @@ from portia.agents.verifier_agent import VerifierAgent
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
+    ReplanClarification,
 )
-from portia.config import AgentType, Config, PlannerType, StorageClass
+from portia.config import AgentType, Config, PlannerType, ReplanningMode, StorageClass
 from portia.errors import (
     InvalidWorkflowStateError,
     PlanError,
@@ -60,6 +61,8 @@ if TYPE_CHECKING:
     from portia.agents.base_agent import BaseAgent
     from portia.planners.planner import Planner
     from portia.tool import Tool
+
+MAX_PER_STEP_REPLAN = 3
 
 
 class Runner:
@@ -287,6 +290,9 @@ class Runner:
         matched_clarification.resolved = True
         matched_clarification.response = response
 
+        if isinstance(matched_clarification, ReplanClarification):
+            workflow.plan_id = matched_clarification.new_plan_id
+
         if len(workflow.get_outstanding_clarifications()) == 0:
             workflow.state = WorkflowState.READY_TO_RESUME
 
@@ -382,7 +388,7 @@ class Runner:
 
         return workflow
 
-    def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:
+    def _execute_workflow(self, plan: Plan, workflow: Workflow) -> Workflow:  # noqa: C901
         """Execute the workflow steps, updating the workflow state as needed.
 
         Args:
@@ -419,21 +425,45 @@ class Runner:
             try:
                 step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                error_output = Output(value=str(e))
-                workflow.outputs.step_outputs[step.output] = error_output
-                workflow.state = WorkflowState.FAILED
-                workflow.outputs.final_output = error_output
-                self.storage.save_workflow(workflow)
-                logger().error(
-                    "error: {error}",
-                    error=e,
-                    extra={"plan": plan.id, "workflow": workflow.id},
-                )
-                logger().debug(
-                    f"Final workflow status: {workflow.state}",
-                    extra={"plan": plan.id, "workflow": workflow.id},
-                )
-                return workflow
+                match self.config.replanning_mode:
+                    case ReplanningMode.NONE:
+                        error_output = Output(value=str(e))
+                        workflow.outputs.step_outputs[step.output] = error_output
+                        workflow.state = WorkflowState.FAILED
+                        workflow.outputs.final_output = error_output
+                        self.storage.save_workflow(workflow)
+                        logger().error(
+                            "error: {error}",
+                            error=e,
+                            extra={"plan": plan.id, "workflow": workflow.id},
+                        )
+                        logger().debug(
+                            f"Final workflow status: {workflow.state}",
+                            extra={"plan": plan.id, "workflow": workflow.id},
+                        )
+                        return workflow
+                    case ReplanningMode.AUTOMATIC:
+                        replan = self._replan(plan, workflow, e)
+                        if replan.version > MAX_PER_STEP_REPLAN:
+                            return workflow
+                        workflow.plan_id = replan.id
+                        self.storage.save_plan(replan)
+                        self.storage.save_workflow(workflow)
+                        return self._execute_workflow(replan, workflow)
+                    case ReplanningMode.CLARIFICATION:
+                        replan = self._replan(plan, workflow, e)
+                        self.storage.save_plan(replan)
+                        workflow.state = WorkflowState.NEED_CLARIFICATION
+                        workflow.outputs.clarifications.append(
+                            ReplanClarification(
+                                workflow_id=workflow.id,
+                                user_guidance="Replan",
+                                new_plan_id=replan.id,
+                            ),
+                        )
+                        self.storage.save_workflow(workflow)
+                        return workflow
+
             else:
                 workflow.outputs.step_outputs[step.output] = step_output
                 logger().debug(
@@ -470,6 +500,23 @@ class Runner:
                 output=str(workflow.outputs.final_output.value),
             )
         return workflow
+
+    def _replan(self, original_plan: Plan, workflow: Workflow, error: Exception) -> Plan:
+        replan_prompt = [
+            f"Please replan this from step {workflow.current_step_index} leaving previous steps "
+            "unchanged.",
+            "This replan was caused by the error below and the new plan should attempt to "
+            "avoid this error happening again.",
+            f"Error from original plan: {error}",
+        ]
+        with execution_context(planner_system_context_extension=replan_prompt):
+            new_plan = self.generate_plan(
+                original_plan.plan_context.query,
+                original_plan.plan_context.tool_ids,
+                [original_plan],
+            )
+            new_plan.version = original_plan.version + 1
+            return new_plan
 
     def _get_planner(self) -> Planner:
         """Get the planner based on the configuration.

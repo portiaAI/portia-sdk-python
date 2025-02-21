@@ -19,7 +19,7 @@ from pydantic import (
 )
 
 from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
-from portia.prefixed_uuid import ClarificationUUID, WorkflowUUID
+from portia.prefixed_uuid import ClarificationUUID, PlanUUID, WorkflowUUID
 
 
 class ClarificationCategory(PortiaEnum):
@@ -36,6 +36,7 @@ class ClarificationCategory(PortiaEnum):
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
     CUSTOM = "Custom"
+    REPLAN = "Replan"
 
 
 class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
@@ -227,6 +228,18 @@ class CustomClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     data: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional data for this clarification. Can include any serializable type.",
+    )
+
+
+class ReplanClarification(Clarification):
+    """Raised when a replan occurs but replan mode == CLARIFICATION."""
+
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.REPLAN,
+        description="The category of this clarification",
+    )
+    new_plan_id: PlanUUID = Field(
+        description="The ID of the new plan",
     )
 
 
