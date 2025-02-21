@@ -1,0 +1,19 @@
+name: Run Evals for portia-sdk-python
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  call-evals:
+    uses: portiaAI/evals/.github/workflows/evals.yml@main
+    secrets:
+      EVALS_GH_TOKEN: ${{ secrets.PORTIA_GH_TOKEN }}
+      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+      LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+      OPEN_AI_KEY: ${{ secrets.OPEN_AI_KEY }}
+      PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+    with:
+      portia_sdk_branch: ${{ github.event.pull_request.head.ref }}
