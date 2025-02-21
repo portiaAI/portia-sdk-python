@@ -78,11 +78,11 @@ print(workflow.model_dump_json(indent=2))
 ```
 
 ### E2E example with Portia cloud storage
-Our cloud offering will allow you to easily store and retrieve workflows in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view workflow, clarification and tool call logs. Head over to <a href="apps.portialabs.ai" target="_blank">**apps.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
+Our cloud offering will allow you to easily store and retrieve workflows in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view workflow, clarification and tool call logs. Head over to <a href="app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
 Note that this example also requires the environment variables `OPENAI_API_KEY` (or ANTHROPIC or MISTRALAI if you're using either) and `TAVILY_API_KEY` as the [previous one](#e2e-example-with-open-source-tools).
 
 The example below introduces **some** of the config options available with Portia AI:
-- The `storage_class` is set using the `StorageClass` ENUM to 'CLOUD`. So long as your `PORTIA_API_KEY` is set, workflows and tool calls will be logged and appear automatically in your Portia dashboard at <a href="apps.portialabs.ai" target="_blank">**apps.portialabs.ai (↗)**</a>.
+- The `storage_class` is set using the `StorageClass` ENUM to 'CLOUD`. So long as your `PORTIA_API_KEY` is set, workflows and tool calls will be logged and appear automatically in your Portia dashboard at <a href="app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
 - The `default_log_level` is set using the `LogLevel` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, workflow states, tool calls and outputs at every step 😅
 - The `llm_provider`, `llm_model` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider and model. In the example below we're splurging and using GPT 4.0!
 
