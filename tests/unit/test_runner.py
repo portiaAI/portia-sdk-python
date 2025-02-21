@@ -53,7 +53,8 @@ def test_runner_local_default_config_with_api_keys() -> None:
 
 def test_runner_local_default_config_without_api_keys() -> None:
     """Test that the default config when no API keys are provided."""
-    # Unset the Tavily and weather API and check that these aren't included in the default tool registry
+    # Unset the Tavily and weather API and check that these aren't included in
+    # the default tool registry
     with mock.patch.dict(
         "os.environ",
         {

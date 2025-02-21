@@ -69,7 +69,7 @@ def get_default_tool_registry(config: Config) -> ToolRegistry:
     )
     if os.getenv("TAVILY_API_KEY"):
         tool_registry.register_tool(SearchTool())
-    if not os.getenv("OPENWEATHERMAP_API_KEY"):
+    if os.getenv("OPENWEATHERMAP_API_KEY"):
         tool_registry.register_tool(WeatherTool())
     if config.portia_api_key:
         tool_registry += PortiaToolRegistry(config).filter_tools(default_tool_filter)
