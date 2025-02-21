@@ -13,7 +13,7 @@ jobs:
       EVALS_GH_TOKEN: ${{ secrets.PORTIA_GH_TOKEN }}
       LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
       LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
-      OPEN_AI_KEY: ${{ secrets.OPEN_AI_KEY }}
+      OPEN_AI_KEY: ${{ secrets.OPENAI_API_KEY }}
       PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
     with:
       portia_sdk_branch: ${{ github.event.pull_request.head.ref }}
