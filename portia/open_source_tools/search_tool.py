@@ -30,7 +30,7 @@ class SearchTool(Tool[str]):
     id: str = "search_tool"
     name: str = "Search Tool"
     description: str = (
-        "Searches the internet to find answers to the search query provided and "
+        "Searches the internet (using Tavily) to find answers to the search query provided and "
         "returns those answers, including images, links and a natural language answer. "
         "The search tool has access to general information but can not return specific "
         "information on users or information not available on the internet"
