@@ -92,11 +92,16 @@ class TwoShotPlanner(Planner):
         if plan2.error:
             return plan1
 
+        tool_ids_used_in_plans = self._get_tools_used_in_plans([plan1, plan2])
+        print(f"Tool IDs used in plans: {tool_ids_used_in_plans}")
+        tools_used_in_plans = [t for t in tool_list if t.id in tool_ids_used_in_plans]
+
         prompt = render_template(
             "llm_plan_judge.xml.jinja",
             query=query,
             plan1=plan1.model_dump(),
             plan2=plan2.model_dump(),
+            tools=tools_used_in_plans,
         )
 
         client = wrappers.wrap_openai(OpenAI())
@@ -112,7 +117,8 @@ class TwoShotPlanner(Planner):
                         "better suited to accomplish the query and a reason for your choie. "
                         "A good plan:\n"
                         "- would achieve the task goal\n"
-                        "- has enough steps to achieve the task goal. Generally, we prefer concise plans, but it is most important that the plan achieves the task goal.\n"
+                        "- has enough steps to achieve the task goal. Generally, we prefer concise "
+                        " plans, but it is most important that the plan achieves the task goal.\n"
                         "- is faithful to the original task request and does not hallucinate "
                         "information\n"
                         "Please assess which plan is the best and return your choice in JSON "
@@ -183,6 +189,15 @@ class TwoShotPlanner(Planner):
             steps=response.steps,
             error=response.error,
         )
+
+    def _get_tools_used_in_plans(self, plans: list[StepsOrError]) -> set[str]:
+        """Get the tools used in the plans."""
+        return {
+            step.tool_id
+            for plan in plans
+            for step in plan.steps
+            if step.tool_id
+        }
 
     def _validate_tools_in_response(self, steps: list[Step], tool_list: list[Tool]) -> str | None:
         """Validate that all tools in the response steps exist in the provided tool list.
