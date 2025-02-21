@@ -15,6 +15,7 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
 from portia.templates.render import render_template
+from langsmith import wrappers
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -68,10 +69,10 @@ class TwoShotPlanner(Planner):
                 {"role": "user", "content": prompt},
             ],
         )
+        final_tools = [*response.tool_ids, LLMTool.LLM_TOOL_ID]
 
         # Filter the tool list based on the response
-        filtered_tools = [tool for tool in tool_list if tool.id in response.tool_ids]
-        print(f"Filtered tools: {response.tool_ids}")
+        filtered_tools = [tool for tool in tool_list if tool.id in final_tools]
         return filtered_tools
 
     def generate_steps_or_error(
@@ -83,8 +84,8 @@ class TwoShotPlanner(Planner):
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         likely_tools = self.get_likely_tools(query, tool_list)
-        plan1 = self.sub_generate_steps_or_error(ctx, query, likely_tools, examples)
         plan2 = self.sub_generate_steps_or_error(ctx, query, tool_list, examples)
+        plan1 = self.sub_generate_steps_or_error(ctx, query, likely_tools, examples)
 
         if plan1.error:
             return plan2
@@ -98,7 +99,7 @@ class TwoShotPlanner(Planner):
             plan2=plan2.model_dump(),
         )
 
-        client = OpenAI()
+        client = wrappers.wrap_openai(OpenAI())
 
         response = client.chat.completions.create(
             model="o3-mini",
@@ -111,9 +112,8 @@ class TwoShotPlanner(Planner):
                         "better suited to accomplish the query and a reason for your choie. "
                         "A good plan:\n"
                         "- would achieve the task goal\n"
-                        "- is concise and uses the minimal set of steps and tools required to "
-                        "achieve a task\n"
-                        "- is faithful to the orignal task request and does not hallucinate "
+                        "- has enough steps to achieve the task goal. Generally, we prefer concise plans, but it is most important that the plan achieves the task goal.\n"
+                        "- is faithful to the original task request and does not hallucinate "
                         "information\n"
                         "Please assess which plan is the best and return your choice in JSON "
                         "format with the following schema:\n"
@@ -141,7 +141,6 @@ class TwoShotPlanner(Planner):
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
-        print("using two shot planner")
         ctx = get_execution_context()
 
         likely_tools = self.get_likely_tools(query, tool_list)
