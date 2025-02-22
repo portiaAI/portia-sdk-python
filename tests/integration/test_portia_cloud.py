@@ -11,7 +11,7 @@ from portia.errors import ToolNotFoundError
 from portia.execution_context import execution_context
 from portia.runner import Runner
 from portia.storage import PortiaCloudStorage
-from portia.tool import ToolHardError
+from portia.tool import PortiaRemoteTool, Tool, ToolHardError
 from portia.tool_registry import (
     InMemoryToolRegistry,
     PortiaToolRegistry,
@@ -23,8 +23,7 @@ from tests.utils import AdditionTool, get_test_tool_context, get_test_workflow
 def test_runner_run_query_with_cloud() -> None:
     """Test running a simple query using the Runner."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
-    tool_registry = PortiaToolRegistry(config=config)
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(config=config)
     query = "Where is the next Olympics being hosted?"
 
     workflow = runner.execute_query(query)
@@ -51,7 +50,8 @@ def test_run_tool_error() -> None:
     with pytest.raises(NotImplementedError):
         registry.register_tool(AdditionTool())
 
-    tool = registry.get_tool("portia::search_tool")
+    tool = registry.get_tool("portia:tavily::search")
+    assert isinstance(tool, PortiaRemoteTool)
     tool.api_key = SecretStr("123")
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError):
@@ -76,9 +76,7 @@ def test_runner_run_query_with_cloud_and_local() -> None:
 
 def test_runner_run_query_with_oauth() -> None:
     """Test running a simple query using the Runner."""
-    config = Config.from_default()
-    tool_registry = PortiaToolRegistry(config=config)
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner()
     query = "Star the portiaai/portia-sdk-repo"
 
     with execution_context(end_user_id=str(uuid.uuid4())):
@@ -99,3 +97,28 @@ def test_portia_cloud_storage() -> None:
     storage.save_workflow(workflow)
     assert storage.get_workflow(workflow.id) == workflow
     assert isinstance(storage.get_workflows(WorkflowState.IN_PROGRESS).results, list)
+
+
+def test_default_runner_has_correct_tools() -> None:
+    """Test that the default runner has the correct tools."""
+    runner = Runner()
+    tools = runner.tool_registry.get_tools()
+    assert len(tools) > 0
+    assert any(tool.id == "portia:google:gmail:search_email" for tool in tools)
+    assert not any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)
+
+
+@pytest.mark.skip("Disable test until Microsoft tool is enabled in staging")
+def test_runner_with_microsoft_tools() -> None:
+    """Test that the default runner has the correct tools."""
+
+    # Choose to exclude gmail rather than microsoft outlook
+    def exclude_gmail_filter(tool: Tool) -> bool:
+        return not tool.id.startswith("portia::google_gmail::")
+
+    registry = PortiaToolRegistry(config=Config.from_default()).filter_tools(exclude_gmail_filter)
+    runner = Runner(tools=registry)
+    tools = runner.tool_registry.get_tools()
+    assert len(tools) > 0
+    assert any(tool.id == "portia:google:gmail:search_email" for tool in tools)
+    assert not any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)

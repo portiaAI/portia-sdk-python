@@ -33,10 +33,8 @@ from portia.clarification import (
 from portia.config import Config, StorageClass
 from portia.execution_context import execution_context
 from portia.logger import logger
-from portia.open_source_tools import example_tool_registry
-from portia.open_source_tools.llm_tool import LLMTool
 from portia.runner import Runner
-from portia.tool_registry import PortiaToolRegistry
+from portia.tool_registry import DefaultToolRegistry
 from portia.workflow import WorkflowState
 
 if TYPE_CHECKING:
@@ -169,18 +167,7 @@ def run(  # noqa: C901
     cli_config, config = _get_config(**kwargs)
 
     # Add the tool registry
-    registry = example_tool_registry
-
-    # Add the LLMTool
-    # This is a general purpose LLM tool that can be used to respond to a prompt by relying
-    # solely on LLM capabilities. It won't call other tools. Recommended for steps that don't
-    # require any external tools.
-    example_tool_registry.register_tool(
-        LLMTool(),
-    )
-
-    if config.has_api_key(PORTIA_API_KEY):
-        registry += PortiaToolRegistry(config)
+    registry = DefaultToolRegistry(config)
 
     # Run the query
     runner = Runner(
@@ -251,12 +238,7 @@ def plan(
 ) -> None:
     """Plan a query."""
     cli_config, config = _get_config(**kwargs)
-
-    registry = example_tool_registry
-    if config.has_api_key(PORTIA_API_KEY):
-        registry += PortiaToolRegistry(config)
-
-    runner = Runner(config=config, tools=registry)
+    runner = Runner(config=config)
 
     with execution_context(end_user_id=cli_config.end_user_id):
         output = runner.generate_plan(query)
@@ -272,11 +254,7 @@ def list_tools(
     """List tools."""
     cli_config, config = _get_config(**kwargs)
 
-    registry = example_tool_registry
-    if config.has_api_key(PORTIA_API_KEY):
-        registry += PortiaToolRegistry(config)
-
-    for tool in registry.get_tools():
+    for tool in DefaultToolRegistry(config).get_tools():
         click.echo(tool.model_dump_json(indent=4))
 
 

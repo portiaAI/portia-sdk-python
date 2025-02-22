@@ -14,14 +14,22 @@ Classes:
 
 from __future__ import annotations
 
+import os
+import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import httpx
 from pydantic import BaseModel, Field, create_model
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.logger import logger
+from portia.open_source_tools.calculator_tool import CalculatorTool
+from portia.open_source_tools.llm_tool import LLMTool
+from portia.open_source_tools.local_file_reader_tool import FileReaderTool
+from portia.open_source_tools.local_file_writer_tool import FileWriterTool
+from portia.open_source_tools.search_tool import SearchTool
+from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
@@ -313,17 +321,23 @@ class PortiaToolRegistry(ToolRegistry):
     This class interacts with the Portia API to retrieve and manage tools.
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(
+        self,
+        config: Config,
+        tools: dict[str, Tool] | None = None,
+    ) -> None:
         """Initialize the PortiaToolRegistry with the given configuration.
 
         Args:
             config (Config): The configuration containing the API key and endpoint.
+            tools (list[Tool] | None): A list of tools to create the registry with.
+              If not provided, all tools will be loaded from the Portia API.
 
         """
         self.api_key = config.must_get_api_key("portia_api_key")
+        self.config = config
         self.api_endpoint = config.must_get("portia_api_endpoint", str)
-        self.tools = {}
-        self._load_tools()
+        self.tools = tools or self._load_tools()
 
     def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
         """Generate a Pydantic model based on a JSON schema.
@@ -369,7 +383,7 @@ class PortiaToolRegistry(ToolRegistry):
         # Create the Pydantic model dynamically
         return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
 
-    def _load_tools(self) -> None:
+    def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
         response = httpx.get(
             url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
@@ -400,13 +414,13 @@ class PortiaToolRegistry(ToolRegistry):
                 api_endpoint=self.api_endpoint,
             )
             tools[raw_tool["tool_id"]] = tool
-        self.tools = tools
+        return tools
 
     def register_tool(self, tool: Tool) -> None:
         """Throw not implemented error as registration can't be done in this registry."""
         raise NotImplementedError("Cannot register tools in the PortiaToolRegistry")
 
-    def get_tool(self, tool_id: str) -> PortiaRemoteTool:
+    def get_tool(self, tool_id: str) -> Tool:
         """Get the tool from the tool set.
 
         Args:
@@ -432,3 +446,57 @@ class PortiaToolRegistry(ToolRegistry):
 
         """
         return list(self.tools.values())
+
+    def filter_tools(
+        self,
+        filter_func: Callable[[Tool], bool],
+    ) -> ToolRegistry:
+        """Return a new registry with the tools filtered by the filter function."""
+        return PortiaToolRegistry(
+            self.config,
+            {tool.id: tool for tool in self.get_tools() if filter_func(tool)},
+        )
+
+
+EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
+    {
+        # Exclude Outlook by default as it clashes with Gmail
+        "portia:microsoft:outlook:*",
+    },
+)
+
+
+class DefaultToolRegistry(AggregatedToolRegistry):
+    """A registry providing a default set of tools.
+
+    This includes the following tools:
+    - All open source tools that don't require API keys
+    - Search tool if you have a Tavily API key
+    - Weather tool if you have an OpenWeatherMap API key
+    - Portia cloud tools if you have a Portia cloud API key
+    """
+
+    def __init__(self, config: Config) -> None:
+        """Initialize the default tool registry with the given configuration."""
+        in_memory_registry = InMemoryToolRegistry.from_local_tools(
+            [
+                CalculatorTool(),
+                LLMTool(),
+                FileWriterTool(),
+                FileReaderTool(),
+            ],
+        )
+        if os.getenv("TAVILY_API_KEY"):
+            in_memory_registry.register_tool(SearchTool())
+        if os.getenv("OPENWEATHERMAP_API_KEY"):
+            in_memory_registry.register_tool(WeatherTool())
+
+        def default_tool_filter(tool: Tool) -> bool:
+            """Filter to get the default set of tools offered by Portia cloud."""
+            return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
+
+        registries: list[ToolRegistry] = [in_memory_registry]
+        if config.portia_api_key:
+            registries.append(PortiaToolRegistry(config).filter_tools(default_tool_filter))
+
+        super().__init__(registries)
