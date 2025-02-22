@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from portia.prefixed_uuid import PlanUUID
 
@@ -248,6 +248,7 @@ class PlanContext(BaseModel):
 
         """
         return sorted(tool_ids)
+
 
 class Plan(BaseModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
