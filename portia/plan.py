@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from portia.prefixed_uuid import PlanUUID
 
@@ -30,26 +30,31 @@ from portia.prefixed_uuid import PlanUUID
 class PlanBuilder:
     """A builder for creating plans.
 
-    This class provides an interface for constructing plans step by step.
+    This class provides an interface for constructing plans step by step. Requires a steps to be
+    added to the plan before building it and mapping inputs and outputs to the correct steps.
+
+    Example:
+    ```python
+    plan = PlanBuilder() \
+                .step("Step 1", "tool_id_1", "output_1") \
+                .step("Step 2", "tool_id_2", "output_2") \
+                .input("input_1", "value_1") \
+                .build()
+    ```
 
     """
 
     query: str
-    tool_ids: list[str]
     steps: list[Step]
 
-    def __init__(self, query: str) -> None:
+    def __init__(self, query: str | None = None) -> None:
         """Initialize the builder with the query and tool IDs.
 
         Args:
             query (str): The original query given by the user.
-            tool_ids (list[str]): A list of tool IDs available to the planner.
-            variables (list[Variable]): A list of variables available to the planner.
-            steps (list[Step]): A list of steps available to the planner.
 
         """
-        self.query = query
-        self.tool_ids = []
+        self.query = query if query is not None else ""
         self.steps = []
 
     def step(
@@ -75,8 +80,6 @@ class PlanBuilder:
             inputs = []
         if output is None:
             output = f"$output_{len(self.steps)}"
-        if tool_id is not None and tool_id not in self.tool_ids:
-            self.tool_ids.append(tool_id)
         self.steps.append(Step(task=task, output=output, inputs=inputs, tool_id=tool_id))
         return self
 
@@ -111,9 +114,9 @@ class PlanBuilder:
             Plan: The built plan.
 
         """
+        tool_ids = list({step.tool_id for step in self.steps if step.tool_id is not None})
         return Plan(
-            id=PlanUUID(),
-            plan_context=PlanContext(query=self.query, tool_ids=self.tool_ids),
+            plan_context=PlanContext(query=self.query, tool_ids=tool_ids),
             steps=self.steps,
         )
 
@@ -234,7 +237,7 @@ class PlanContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(description="The original query given by the user.")
-    tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
+    tool_ids: set[str] = Field(description="The list of tools IDs available to the planner.")
 
 
 class Plan(BaseModel):
@@ -271,6 +274,29 @@ class Plan(BaseModel):
             f"plan_context={self.plan_context!r}, "
             f"steps={self.steps!r}"
         )
+
+    @model_validator(mode="after")
+    def validate_plan(self) -> Plan:
+        """Validate the plan.
+
+        Checks that the plan has at least one step, that all step tool IDs are in the tool_ids list,
+        that all outputs are unique, and that all steps use valid outputs as inputs. Inputs must be
+        outputs of previous steps or have a value assigned to them.
+
+        Returns:
+            Plan: The validated plan.
+
+        """
+        outputs = [step.output for step in self.steps]
+        if len(outputs) != len(set(outputs)):
+            raise ValueError("Outputs must be unique")
+        for i, step in enumerate(self.steps):
+            if step.tool_id is not None and step.tool_id not in self.plan_context.tool_ids:
+                raise ValueError(f"Tool {step.tool_id} not in tool_ids")
+            for step_input in step.inputs:
+                if step_input.name not in outputs[:i] and step_input.value is None:
+                    raise ValueError(f"Input {step_input.name} not in outputs or already defined")
+        return self
 
 
 class ReadOnlyPlan(Plan):

@@ -11,22 +11,31 @@ def test_plan_builder_syntax() -> None:
             "Search for flights",
             "flight_search",
         )
+        .step(
+            "compare prices",
+            "price_comparison",
+        )
         .input(
-            "$flights",
+            "$output_0",
         )
         .build()
     )
     base_plan = Plan(
         plan_context=PlanContext(
             query="Find the best offers for a flight from London to New York",
-            tool_ids=["flight_search"],
+            tool_ids=["flight_search", "price_comparison"],
         ),
         steps=[
             Step(
                 task="Search for flights",
                 output="$output_0",
                 tool_id="flight_search",
-                inputs=[Variable(name="$flights", description="")],
+            ),
+            Step(
+                task="compare prices",
+                output="$output_1",
+                inputs=[Variable(name="$output_0", value=None, description="")],
+                tool_id="price_comparison",
             ),
         ],
     )
