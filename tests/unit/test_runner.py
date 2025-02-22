@@ -160,7 +160,7 @@ def test_runner_generate_plan_with_tools(runner: Runner) -> None:
     plan = runner.generate_plan(query, tools=["add_tool"])
 
     assert plan.plan_context.query == query
-    assert plan.plan_context.tool_ids == {"add_tool"}
+    assert plan.plan_context.tool_ids == ["add_tool"]
 
 
 def test_runner_create_and_execute_workflow(runner: Runner) -> None:

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_serializer
 
 from portia.prefixed_uuid import PlanUUID
 
@@ -237,8 +237,17 @@ class PlanContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(description="The original query given by the user.")
-    tool_ids: set[str] = Field(description="The list of tools IDs available to the planner.")
+    tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
 
+    @field_serializer("tool_ids")
+    def serialize_tool_ids(self, tool_ids: list[str]) -> list[str]:
+        """Serialize the tool_ids to a sorted list.
+
+        Returns:
+            list[str]: The tool_ids as a sorted list.
+
+        """
+        return sorted(tool_ids)
 
 class Plan(BaseModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
