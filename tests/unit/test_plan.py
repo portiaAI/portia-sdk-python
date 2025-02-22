@@ -118,10 +118,10 @@ def test_plan_inputs_must_be_outputs_or_have_value() -> None:
         Plan(
             plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
             steps=[
-            Step(
-                task="test task",
-                output="$output",
-                inputs=[Variable(name="$input1", value=None, description="")],
+                Step(
+                    task="test task",
+                    output="$output",
+                    inputs=[Variable(name="$input1", value=None, description="")],
                 ),
             ],
         )
