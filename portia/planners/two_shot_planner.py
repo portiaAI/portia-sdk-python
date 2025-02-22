@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from langsmith import wrappers
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -16,10 +18,7 @@ from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
 from portia.templates.render import render_template
 from portia.tool import Tool
-from langsmith import wrappers
 from portia.tool_filtering_exploration.fake_tool import create_fake_tools
-import os
-from pathlib import Path
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -40,7 +39,6 @@ class PlanJudgeResponse(BaseModel):
 
     plan_id: Literal["PLAN1", "PLAN2"]
     reason: str
-
 
 
 class TwoShotPlanner(Planner):
@@ -88,7 +86,7 @@ class TwoShotPlanner(Planner):
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
         package_root = Path(__file__).parent.parent
-        fake_tools_path = package_root / "tool_filtering_exploration" / "fake_tools.csv"
+        fake_tools_path = package_root / "tool_filtering_exploration" / "fake_tools_L.csv"
         extra_tools = create_fake_tools(str(fake_tools_path))
         final_tools = extra_tools + tool_list
 
@@ -199,12 +197,7 @@ class TwoShotPlanner(Planner):
 
     def _get_tools_used_in_plans(self, plans: list[StepsOrError]) -> set[str]:
         """Get the tools used in the plans."""
-        return {
-            step.tool_id
-            for plan in plans
-            for step in plan.steps
-            if step.tool_id
-        }
+        return {step.tool_id for plan in plans for step in plan.steps if step.tool_id}
 
     def _validate_tools_in_response(self, steps: list[Step], tool_list: list[Tool]) -> str | None:
         """Validate that all tools in the response steps exist in the provided tool list.

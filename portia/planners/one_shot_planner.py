@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from portia.execution_context import ExecutionContext, get_execution_context
@@ -10,6 +11,7 @@ from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planners.context import render_prompt_insert_defaults
 from portia.planners.planner import Planner, StepsOrError
+from portia.tool_filtering_exploration.fake_tool import create_fake_tools
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -35,9 +37,14 @@ class OneShotPlanner(Planner):
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         ctx = get_execution_context()
+
+        package_root = Path(__file__).parent.parent
+        fake_tools_path = package_root / "tool_filtering_exploration" / "fake_tools_L.csv"
+        extra_tools = create_fake_tools(str(fake_tools_path))
+        final_tools = extra_tools + tool_list
         prompt = render_prompt_insert_defaults(
             query,
-            tool_list,
+            final_tools,
             ctx.planner_system_context_extension,
             examples,
         )
@@ -87,13 +94,10 @@ class OneShotPlanner(Planner):
         """
         tool_ids = [tool.id for tool in tool_list]
         missing_tools = [
-            step.tool_id
-            for step in steps
-            if step.tool_id and step.tool_id not in tool_ids
+            step.tool_id for step in steps if step.tool_id and step.tool_id not in tool_ids
         ]
         return (
             f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
             if missing_tools
             else None
         )
-
