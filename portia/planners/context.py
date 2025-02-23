@@ -38,6 +38,33 @@ def render_prompt_insert_defaults(
     return template
 
 
+def render_prompt_insert_defaults_separated_tool_groups(
+    query: str,
+    likely_tools: list[Tool],
+    unlikely_tools: list[Tool],
+    system_context_extension: list[str] | None = None,
+    examples: list[Plan] | None = None,
+) -> str:
+    """Render the prompt for the query planner with defaults inserted if not provided."""
+    system_context = default_query_system_context(system_context_extension)
+
+    if examples is None:
+        examples = DEFAULT_EXAMPLE_PLANS
+
+    likely_tools_with_descriptions = get_tool_descriptions_for_tools(tool_list=likely_tools)
+    unlikely_tools_with_descriptions = get_tool_descriptions_for_tools(tool_list=unlikely_tools)
+
+    template = render_template(
+        "query_planner_three_shot.jinja",
+        query=query,
+        likely_tools=likely_tools_with_descriptions,
+        unlikely_tools=unlikely_tools_with_descriptions,
+        examples=examples,
+        system_context=system_context,
+    )
+    return template
+
+
 def default_query_system_context(
     system_context_extension: list[str] | None = None,
 ) -> list[str]:
@@ -56,8 +83,9 @@ def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str
             "name": tool.name,
             "description": tool.description,
             "usage_examples": tool.usage_examples,
-            "args_schema": tool.args_description if isinstance(tool, FakeTool) else tool.args_schema.model_json_schema(),
+            "args_schema": tool.args_description
+            if isinstance(tool, FakeTool)
+            else tool.args_schema.model_json_schema(),
         }
         for tool in tool_list
     ]
-

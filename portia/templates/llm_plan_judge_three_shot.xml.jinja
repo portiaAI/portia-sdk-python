@@ -1,0 +1,20 @@
+Here are the plans that were generated for the query shown below.
+
+Query: {{query}}
+
+Plan ID: PLAN1
+{{plan1 | safe}}
+
+
+Plan ID: PLAN2
+{{plan2 | safe}}
+
+Plan ID: PLAN3
+{{plan3 | safe}}
+
+Tools:
+{% for tool in tools %}
+{{tool.id}}
+  Description: {{tool.description}}
+
+{% endfor %}
