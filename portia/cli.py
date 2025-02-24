@@ -11,9 +11,7 @@ from __future__ import annotations
 
 import builtins
 import importlib.metadata
-import json
 import os
-import webbrowser
 from enum import Enum
 from functools import wraps
 from pathlib import Path
@@ -23,19 +21,10 @@ import click
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-from portia.clarification import (
-    ActionClarification,
-    CustomClarification,
-    InputClarification,
-    MultipleChoiceClarification,
-    ValueConfirmationClarification,
-)
 from portia.config import Config, StorageClass
 from portia.execution_context import execution_context
-from portia.logger import logger
 from portia.runner import Runner
 from portia.tool_registry import DefaultToolRegistry
-from portia.workflow import WorkflowState
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -159,7 +148,7 @@ def version() -> None:
 @click.command()
 @common_options
 @click.argument("query")
-def run(  # noqa: C901
+def run(
     query: str,
     **kwargs,  # noqa: ANN003
 ) -> None:
@@ -187,45 +176,6 @@ def run(  # noqa: C901
 
         workflow = runner.create_workflow(plan)
         workflow = runner.execute_workflow(workflow)
-
-        final_states = [WorkflowState.COMPLETE, WorkflowState.FAILED]
-        while workflow.state not in final_states:
-            for clarification in workflow.get_outstanding_clarifications():
-                if isinstance(clarification, MultipleChoiceClarification):
-                    choices = click.Choice(clarification.options)
-                    user_input = click.prompt(
-                        clarification.user_guidance + "\nPlease choose a value:\n",
-                        type=choices,
-                    )
-                    workflow = runner.resolve_clarification(clarification, user_input, workflow)
-                if isinstance(clarification, ActionClarification):
-                    webbrowser.open(str(clarification.action_url))
-                    logger().info("Please complete authentication to continue")
-                    workflow = runner.wait_for_ready(workflow)
-                if isinstance(clarification, InputClarification):
-                    user_input = click.prompt(
-                        clarification.user_guidance + "\nPlease enter a value:\n",
-                    )
-                    workflow = runner.resolve_clarification(clarification, user_input, workflow)
-                if isinstance(clarification, ValueConfirmationClarification):
-                    if click.confirm(text=clarification.user_guidance, default=False):
-                        workflow = runner.resolve_clarification(
-                            clarification,
-                            response=True,
-                            workflow=workflow,
-                        )
-                    else:
-                        workflow.state = WorkflowState.FAILED
-                        runner.storage.save_workflow(workflow)
-
-                if isinstance(clarification, CustomClarification):
-                    click.echo(clarification.user_guidance)
-                    click.echo(f"Additional data: {json.dumps(clarification.data)}")
-                    user_input = click.prompt("\nPlease enter a value:\n")
-                    workflow = runner.resolve_clarification(clarification, user_input, workflow)
-
-            runner.execute_workflow(workflow)
-
         click.echo(workflow.model_dump_json(indent=4))
 
 
