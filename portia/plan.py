@@ -165,6 +165,10 @@ class Plan(BaseModel):
         default_factory=PlanUUID,
         description="The ID of the plan.",
     )
+    version: int = Field(
+        default=1,
+        description="The version of the plan, incremented in replanning",
+    )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
 

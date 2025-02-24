@@ -189,6 +189,11 @@ def test_runner_run_query_with_hard_error(
                 value=False,
             ),
             Variable(
+                name="return_hard_error",
+                description="",
+                value=True,
+            ),
+            Variable(
                 name="return_uncaught_error",
                 description="",
                 value=False,
