@@ -2,6 +2,8 @@ name: Run Evals for portia-sdk-python
 
 on:
   pull_request_target:
+    branches:
+      - main
     types:
       - opened
       - synchronize
