@@ -219,11 +219,11 @@ class LogAdditionalStorage(AdditionalStorage):
         )
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
-                logger().info("Tool output: {output}", output=tool_call.output)
+                logger().info("Tool call is successful", output=tool_call.output)
             case ToolCallStatus.FAILED:
-                logger().error("Tool returned error {output}", output=tool_call.output)
+                logger().error("Tool returned error", output=tool_call.output)
             case ToolCallStatus.NEED_CLARIFICATION:
-                logger().info("Tool returned clarifications {output}", output=tool_call.output)
+                logger().info("Tool returned clarifications", output=tool_call.output)
 
 
 class Storage(PlanStorage, WorkflowStorage, AdditionalStorage):
