@@ -1,6 +1,7 @@
 <Instructions>
     Enumerate the steps you plan on taking to answer the query.
     If applicable, at each step indicate whether you would use a tool from those defined in <Tools>.
+    IMPORTANT: Ensure you use the tool id exactly as it is defined in <Tools> below (including whether it has a portia:: prefix or not)
     Each step should:
      - include a description, input used to complete the step, and an explicit mention of the tool used if applicable.
      - give a name to the variable for the output is from the step if it is successful.
@@ -13,7 +14,7 @@
     <Example>
         <Request>
             <Tools>
-            {{example.plan_context.tool_ids}}
+            {{example.plan_context.tool_ids | safe }}
             </Tools>
             <Query>
             {{example.plan_context.query}}
@@ -28,15 +29,12 @@
 </Examples>
 
 <Tools>{% for tool in tools %}
-    <Tool name={{tool.id}}>
+    <Tool id={{tool.id}}>
         {{tool.description}}
     </Tool>{% endfor %}
 </Tools>
 
 <Request>
-    <Tools>
-        {{tools}}
-    </Tools>
     <Query>
         {{query}}
     </Query>
