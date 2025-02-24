@@ -23,7 +23,6 @@ def test_runner_config_from_file() -> None:
     config_data = """{
 "portia_api_key": "file-key",
 "openai_api_key": "file-openai-key",
-"llm_model_temperature": 10,
 "storage_class": "MEMORY",
 "llm_provider": "OPENAI",
 "llm_model_name": "GPT_4_O_MINI",
@@ -43,7 +42,6 @@ def test_runner_config_from_file() -> None:
         assert config.must_get_raw_api_key("portia_api_key") == "file-key"
         assert config.must_get_raw_api_key("openai_api_key") == "file-openai-key"
         assert config.default_agent_type == AgentType.VERIFIER
-        assert config.llm_model_temperature == 10
 
 
 def test_from_default() -> None:
@@ -134,7 +132,6 @@ def test_getters() -> None:
             storage_class=StorageClass.MEMORY,
             llm_provider=LLMProvider.OPENAI,
             llm_model_name=LLMModel.CLAUDE_3_OPUS_LATEST,
-            llm_model_temperature=0,
             llm_model_seed=443,
             default_agent_type=AgentType.VERIFIER,
             default_planner=PlannerType.ONE_SHOT,
@@ -148,23 +145,10 @@ def test_getters() -> None:
                 llm_provider=provider,
                 openai_api_key=SecretStr(""),
                 llm_model_name=LLMModel.GPT_4_O_MINI,
-                llm_model_temperature=0,
                 llm_model_seed=443,
                 default_agent_type=AgentType.VERIFIER,
                 default_planner=PlannerType.ONE_SHOT,
             )
-
-    # negative temperature
-    with pytest.raises(ValidationError):
-        Config(
-            storage_class=StorageClass.MEMORY,
-            llm_provider=LLMProvider.OPENAI,
-            llm_model_name=LLMModel.GPT_4_O_MINI,
-            llm_model_temperature=0,
-            llm_model_seed=-443,
-            default_agent_type=AgentType.VERIFIER,
-            default_planner=PlannerType.ONE_SHOT,
-        )
     # no Portia API KEy
     with pytest.raises(InvalidConfigError):
         Config(
@@ -172,7 +156,6 @@ def test_getters() -> None:
             portia_api_key=SecretStr(""),
             llm_provider=LLMProvider.OPENAI,
             llm_model_name=LLMModel.GPT_4_O_MINI,
-            llm_model_temperature=0,
             llm_model_seed=443,
             default_agent_type=AgentType.VERIFIER,
             default_planner=PlannerType.ONE_SHOT,
