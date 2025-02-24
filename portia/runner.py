@@ -284,11 +284,25 @@ class Runner:
         if not matched_clarification:
             raise InvalidWorkflowStateError("Could not match clarification to workflow")
 
+        logger().debug(
+            "Clarification resolved for workflow",
+            extra={"workflow": workflow.id, "clarification": clarification.id},
+        )
         matched_clarification.resolved = True
         matched_clarification.response = response
 
-        if len(workflow.get_outstanding_clarifications()) == 0:
+        outstanding_clarifications = len(workflow.get_outstanding_clarifications())
+        if outstanding_clarifications == 0:
+            logger().info(
+                "All clarifications resolved. Workflow is now ready to resume",
+                extra={"workflow": workflow.id},
+            )
             workflow.state = WorkflowState.READY_TO_RESUME
+        else:
+            logger().debug(
+                f"Workflow still has {outstanding_clarifications} outstanding clarifications",
+                extra={"workflow": workflow.id},
+            )
 
         self.storage.save_workflow(workflow)
         return workflow
@@ -376,9 +390,12 @@ class Runner:
                         workflow.state = WorkflowState.READY_TO_RESUME
                         self.storage.save_workflow(workflow)
 
-            logger().debug(f"New workflow state for {workflow.id} is {workflow.state}")
+            logger().debug(
+                f"New workflow state for {workflow.id} is {workflow.state}",
+                extra={"workflow": workflow.id},
+            )
 
-        logger().info(f"Workflow {workflow.id} is ready to resume")
+        logger().info("Workflow is ready to resume", extra={"workflow": workflow.id})
 
         return workflow
 
@@ -395,7 +412,7 @@ class Runner:
         """
         workflow.state = WorkflowState.IN_PROGRESS
         self.storage.save_workflow(workflow)
-        logger().debug(
+        logger().info(
             f"Executing workflow from step {workflow.current_step_index}",
             extra={"plan": plan.id, "workflow": workflow.id},
         )
