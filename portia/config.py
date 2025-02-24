@@ -306,7 +306,9 @@ class Config(BaseModel):
 
     # Storage Options
     storage_class: StorageClass = Field(
-        default=StorageClass.MEMORY,
+        default_factory=lambda: StorageClass.CLOUD
+        if os.getenv("PORTIA_API_KEY")
+        else StorageClass.MEMORY,
         description="Where to store Plans and Workflows. By default these will be kept in memory.",
     )
 
@@ -528,8 +530,11 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         Config: The default config
 
     """
+    default_storage_class = (
+        StorageClass.CLOUD if os.getenv("PORTIA_API_KEY") else StorageClass.MEMORY
+    )
     return Config(
-        storage_class=kwargs.pop("storage_class", StorageClass.MEMORY),
+        storage_class=kwargs.pop("storage_class", default_storage_class),
         llm_provider=kwargs.pop("llm_provider", LLMProvider.OPENAI),
         llm_model_name=kwargs.pop("llm_model_name", LLMModel.GPT_4_O_MINI),
         default_planner=kwargs.pop("default_planner", PlannerType.ONE_SHOT),
