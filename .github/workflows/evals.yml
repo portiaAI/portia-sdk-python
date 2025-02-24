@@ -1,13 +1,34 @@
 name: Run Evals for portia-sdk-python
 
 on:
-  workflow_dispatch:
-  pull_request:
+  pull_request_target:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - labeled
+
+permissions:
+    contents: read
+    pull-requests: read
 
 jobs:
+  check-label:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check for safe_to_test label
+      id: check_label
+      uses: mheap/github-action-required-labels@v5
+      with:
+        mode: exactly
+        count: 1
+        labels: safe_to_test
+    env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   call-evals:
+    needs: check-label
     uses: portiaAI/evals/.github/workflows/evals.yml@main
     secrets:
       EVALS_GH_TOKEN: ${{ secrets.PORTIA_GH_TOKEN }}
