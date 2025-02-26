@@ -30,32 +30,8 @@ jobs:
     env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  call-evals:
-    needs: check-label
-    runs-on: ubuntu-latest-16core
-    steps:
-      - name: Checkout evals repo
-        uses: actions/checkout@v4
-        with:
-          path: evals
-          repository: portiaAI/evals
-          ref: main
-          token: ${{ secrets.EVALS_GH_TOKEN }}
-      - name: Call evals
-        uses: evals/.github/workflows/evals.yml
-        with:
-          portia_sdk_branch: ${{ github.event.pull_request.head.ref }}
-        env:
-          EVALS_GH_TOKEN: ${{ secrets.PORTIA_GH_TOKEN }}
-          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
-          OPEN_AI_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
-
-
-          name: Evaluate the models
-
   evals:
+    needs: check-label
     runs-on: ubuntu-latest-16core
     steps:
       - name: Checkout portia-sdk-python repo
