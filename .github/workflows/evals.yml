@@ -51,3 +51,220 @@ jobs:
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           OPEN_AI_KEY: ${{ secrets.OPENAI_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+
+
+          name: Evaluate the models
+
+  evals:
+    runs-on: ubuntu-latest-16core
+    steps:
+      - name: Checkout portia-sdk-python repo
+        uses: actions/checkout@v4
+        with:
+          path: portia-sdk-python
+          repository: portiaAI/portia-sdk-python
+          ref: ${{ github.head_ref || 'main' }}
+          token: ${{ secrets.PORTIA_GH_TOKEN }}
+
+      - name: Checkout evals repo
+        uses: actions/checkout@v4
+        with:
+          path: evals
+          repository: portiaAI/evals
+          ref: main
+          token: ${{ secrets.PORTIA_GH_TOKEN }}
+
+      - name: Checkout backend-holsten
+        uses: actions/checkout@v4
+        with:
+          repository: portiaAI/backend-holsten
+          ref: main
+          token: ${{ secrets.PORTIA_GH_TOKEN }}
+          path: backend-holsten
+
+      - name: Install Poetry
+        working-directory: ./evals
+        id: install_poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "poetry"
+
+      - name: install dependencies
+        id: install_dependencies
+        working-directory: ./evals
+        run: |
+          poetry add ../portia-sdk-python
+          poetry install --all-extras
+
+      - name: Create .env.dev file
+        run: |
+          echo "PORTIA_API_KEY=${{ secrets.PORTIA_API_KEY }}" > .env.dev
+          echo "PORTIA_API_ENDPOINT=http://0.0.0.0:8080" >> .env.dev
+          echo "POSTGRES_DB=holsten" >> .env.dev
+          echo "POSTGRES_USER=dbuser" >> .env.dev
+          echo "POSTGRES_PASSWORD=dbpassword" >> .env.dev
+          echo "DJANGO_ENV=dev" >> .env.dev
+          echo "DJANGO_SETTINGS_MODULE=core.settings.dev" >> .env.dev
+          echo "AUTH0_MTM_CLIENT_ID=${{ secrets.AUTH0_MTM_CLIENT_ID }}" >> .env.dev
+          echo "AUTH0_MTM_CLIENT_SECRET=${{ secrets.AUTH0_MTM_CLIENT_SECRET }}" >> .env.dev
+          mv .env.dev backend-holsten/.env.dev
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Run Docker Compose
+        run: docker compose -f backend-holsten/compose.yaml up web db -d
+
+      - name: Verify server is up
+        run: |
+          echo "Checking Docker container status:"
+          docker ps
+          
+          echo -e "\nChecking ports in use:"
+          netstat -tulpn || ss -tulpn
+          
+          echo -e "\nAttempting to connect to server:"
+          for i in {1..90}; do
+            if curl -f http://0.0.0.0:8080/; then
+              echo "Server is up!"
+              exit 0
+            fi
+            echo "Waiting for server to start... (attempt $i/30)"
+            sleep 2
+          done
+          echo "Server failed to start after 3 minutes"
+          docker compose -f backend-holsten/compose.yaml logs
+          exit 1
+      
+      - name: Check tool IDs
+        working-directory: ./evals
+        id: check_tool_ids
+        env:
+          PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+          OPENAI_API_KEY: ${{ secrets.OPEN_AI_KEY }}
+        run: |
+          poetry run python3 check_tool_ids.py
+
+      - name: eval query planner
+        id: eval_query_planner
+        working-directory: ./evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          OPENAI_API_KEY: ${{ secrets.OPEN_AI_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+        run: |
+          poetry run python3 cli.py query-planner update-dataset
+          EVAL_OUTPUT=$(poetry run python3 cli.py query-planner eval --model=gpt-4o-mini --threshold_file=query_planner/thresholds/thresholds.yaml)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_planner_scores=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: eval agent (verifier)
+        id: eval_agent_verifier
+        working-directory: ./evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          OPENAI_API_KEY: ${{ secrets.OPEN_AI_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+        run: |
+          poetry run python3 cli.py agent update-dataset --slice_name=verifier
+          EVAL_OUTPUT=$(poetry run python3 cli.py agent eval --agent=verifier --slice_name=verifier --model=gpt-4o-mini --threshold_file=agents/thresholds/verifier_thresholds.yaml)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "BREACHES: $BREACHES"
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: eval agent (one shot)
+        id: eval_agent_one_shot
+        working-directory: ./evals
+        env:
+            LANGCHAIN_TRACING_V2: "true"
+            LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+            LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+            LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+            OPENAI_API_KEY: ${{ secrets.OPEN_AI_KEY }}
+            MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+            PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+            PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+        run: |
+          poetry run python3 cli.py agent update-dataset --slice_name=one_shot
+          EVAL_OUTPUT=$(poetry run python3 cli.py agent eval --agent=one_shot --slice_name=one_shot --model=gpt-4o-mini --threshold_file=agents/thresholds/one_shot_thresholds.yaml)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "BREACHES: $BREACHES"
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Summary results
+        id: summary_results
+        working-directory: ./evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_STAGING_API_KEY }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_STAGING_API_ENDPOINT }}
+          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
+          QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
+        run: |
+          poetry run jupyter nbconvert --to markdown --execute github_analysis.ipynb --output notebook_output.md --no-input
+          cat notebook_output.md
+          # Removes style blocks that GitHub won't render properly
+          sed -i '/<style[^>]*>/,/<\/style>/d' notebook_output.md
+          cat notebook_output.md
+          cat notebook_output.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for evaluation failures
+        run: |
+          CONTAINS_THRESHOLD_BREACH=false
+
+          # Check if the query planner has failing scores
+          if [[ "${{ steps.eval_query_planner.outputs.has_failing_eval_planner_scores }}" == "true" ]]; then
+            echo "Query planner eval failed or has breaches."
+            echo "Breaches: ${{ steps.eval_query_planner.outputs.metric_breaches }}"
+            CONTAINS_THRESHOLD_BREACH=true
+          fi
+
+          # Check if the verifier agent has failing scores
+          if [[ "${{ steps.eval_agent_verifier.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
+            echo "Agent eval (verifier) failed or has breaches."
+            echo "Breaches: ${{ steps.eval_agent_verifier.outputs.metric_breaches }}"
+            CONTAINS_THRESHOLD_BREACH=true
+          fi
+
+          # Check if the one shot agent has failing scores
+          if [[ "${{ steps.eval_agent_one_shot.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
+            echo "Agent eval (one shot) failed or has breaches."
+            echo "Breaches: ${{ steps.eval_agent_one_shot.outputs.metric_breaches }}"
+            CONTAINS_THRESHOLD_BREACH=true
+          fi
+
+          # Exit with a non-zero status if any failures were detected
+          if [[ "$CONTAINS_THRESHOLD_BREACH" == "true" ]]; then
+            echo "One or more evaluations failed."
+            exit 1
+          fi
