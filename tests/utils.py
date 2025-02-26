@@ -194,3 +194,16 @@ class ErrorTool(Tool):
         if return_soft_error:
             raise ToolSoftError(error_str)
         raise ToolHardError(error_str)
+
+
+class NoneTool(Tool):
+    """Returns None."""
+
+    id: str = "none_tool"
+    name: str = "None Tool"
+    description: str = "returns None"
+    output_schema: tuple[str, str] = ("None", "None: nothing")
+
+    def run(self, _: ToolRunContext) -> None:
+        """Return."""
+        return
