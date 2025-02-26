@@ -30,7 +30,7 @@ PROVIDER_MODELS = [
     ),
     (
         LLMProvider.ANTHROPIC,
-        LLMModel.CLAUDE_3_OPUS_LATEST,
+        LLMModel.CLAUDE_3_OPUS,
     ),
 ]
 

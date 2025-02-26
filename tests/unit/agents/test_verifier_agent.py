@@ -27,10 +27,15 @@ from portia.agents.verifier_agent import (
 )
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentError, InvalidWorkflowStateError
-from portia.llm_wrapper import LLMWrapper
 from portia.plan import Step
 from portia.tool import Tool
-from tests.utils import AdditionTool, get_test_config, get_test_tool_context, get_test_workflow
+from tests.utils import (
+    AdditionTool,
+    get_test_config,
+    get_test_llm_wrapper,
+    get_test_tool_context,
+    get_test_workflow,
+)
 
 if TYPE_CHECKING:
     from langchain_core.prompt_values import ChatPromptValue
@@ -108,7 +113,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -145,7 +150,7 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -236,7 +241,7 @@ def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None
     )
 
     parser_model = ParserModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -291,9 +296,10 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
         name="TOOL_NAME",
         args_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
+        args_json_schema=_TestToolSchema.model_json_schema,
     )
     verifier_model = VerifierModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -304,9 +310,9 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "You are an expert reviewer" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
+    assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert mockinvoker.output_format == VerifiedToolInputs
 
 
@@ -336,9 +342,10 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
         name="TOOL_NAME",
         args_schema=TestSchema,
         description="TOOL_DESCRIPTION",
+        args_json_schema=_TestToolSchema.model_json_schema,
     )
     verifier_model = VerifierModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -387,7 +394,7 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -450,7 +457,7 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -608,7 +615,7 @@ def test_verifier_agent_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -617,7 +624,7 @@ def test_verifier_agent_edge_cases() -> None:
 
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -805,7 +812,7 @@ def test_optional_args_with_none_values() -> None:
         tool=MockTool(),
     )
     model = VerifierModel(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,
     )
@@ -825,3 +832,16 @@ def test_optional_args_with_none_values() -> None:
         ),
     )
     assert updated_tool_inputs.args[0].made_up is False
+
+def test_verifier_model_edge_cases() -> None:
+    """Tests edge cases are handled."""
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.tool = None
+    verifier_model = VerifierModel(
+        llm=get_test_llm_wrapper().to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+    with pytest.raises(InvalidWorkflowStateError):
+        verifier_model.invoke({"messages": []})

@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
-from portia.config import Config, LogLevel
+from portia.config import Config, LLMModel, LogLevel
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
+from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
@@ -78,6 +79,11 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
         default_log_level=LogLevel.INFO,
         openai_api_key=SecretStr("123"),
     )
+
+
+def get_test_llm_wrapper() -> LLMWrapper:
+    """Get a test LLM wrapper."""
+    return LLMWrapper(LLMModel.GPT_4_O, SecretStr("test123"))
 
 
 def get_execution_ctx(workflow: Workflow | None = None) -> ExecutionContext:

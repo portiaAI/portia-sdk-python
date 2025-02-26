@@ -24,7 +24,10 @@ class OneShotPlanner(Planner):
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
-        self.llm_wrapper = LLMWrapper(config)
+        self.llm_wrapper = LLMWrapper(
+            config.planning_llm_model_name,
+            config.get_llm_api_key(config.planning_llm_model_name),
+        )
 
     def generate_steps_or_error(
         self,
@@ -87,13 +90,10 @@ class OneShotPlanner(Planner):
         """
         tool_ids = [tool.id for tool in tool_list]
         missing_tools = [
-            step.tool_id
-            for step in steps
-            if step.tool_id and step.tool_id not in tool_ids
+            step.tool_id for step in steps if step.tool_id and step.tool_id not in tool_ids
         ]
         return (
             f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
             if missing_tools
             else None
         )
-
