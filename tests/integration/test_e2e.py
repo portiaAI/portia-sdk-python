@@ -14,7 +14,7 @@ from portia.plan import Plan, PlanContext, Step, Variable
 from portia.runner import Runner
 from portia.tool_registry import InMemoryToolRegistry
 from portia.workflow import WorkflowState
-from tests.utils import AdditionTool, ClarificationTool, ErrorTool
+from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarificationHandler
 
 if TYPE_CHECKING:
     from portia.tool import ToolRunContext
@@ -120,8 +120,13 @@ def test_runner_run_query_with_clarifications(
         default_agent_type=agent,
     )
 
+    test_clarification_handler = TestClarificationHandler()
     tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(
+        config=config,
+        tools=tool_registry,
+        clarification_handler=test_clarification_handler,
+    )
     clarification_step = Step(
         tool_id="clarification_tool",
         task="Use tool",
@@ -144,18 +149,12 @@ def test_runner_run_query_with_clarifications(
     runner.storage.save_plan(plan)
 
     workflow = runner.create_workflow(plan)
-    workflow = runner.execute_workflow(workflow)
-
-    assert workflow.state == WorkflowState.NEED_CLARIFICATION
-    assert workflow.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
-
-    workflow = runner.resolve_clarification(
-        workflow.get_outstanding_clarifications()[0],
-        "False",
-    )
-
     runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
+    assert test_clarification_handler.received_clarification is not None
+    assert (
+        test_clarification_handler.received_clarification.user_guidance == "Return a clarification"
+    )
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
@@ -293,8 +292,14 @@ def test_runner_run_query_with_multiple_clarifications(
                 )
             return a + b
 
+    test_clarification_handler = TestClarificationHandler()
+    test_clarification_handler.clarification_response = 456
     tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
-    runner = Runner(config=config, tools=tool_registry)
+    runner = Runner(
+        config=config,
+        tools=tool_registry,
+        clarification_handler=test_clarification_handler,
+    )
 
     step_one = Step(
         tool_id="add_tool",
@@ -342,21 +347,15 @@ def test_runner_run_query_with_multiple_clarifications(
     workflow = runner.create_workflow(plan)
     workflow = runner.execute_workflow(workflow)
 
-    assert workflow.state == WorkflowState.NEED_CLARIFICATION
-    assert workflow.get_outstanding_clarifications()[0].user_guidance == "please try again"
-
-    workflow = runner.resolve_clarification(
-        workflow.get_outstanding_clarifications()[0],
-        456,
-        workflow,
-    )
-
-    runner.execute_workflow(workflow)
     assert workflow.state == WorkflowState.COMPLETE
-    # 498 = 456 (clarification - value a - step 1) + 2 (value b - step 1) + 40 (value b - step 2)
+    # 498 = 456 (clarification for value a in step 1) + 2 (value b in step 1)
+    #  + 40 (value b in step 2)
     assert workflow.outputs.final_output is not None
     assert workflow.outputs.final_output.value == 498
     assert workflow.outputs.final_output.summary is not None
+
+    assert test_clarification_handler.received_clarification is not None
+    assert test_clarification_handler.received_clarification.user_guidance == "please try again"
 
 
 def test_runner_run_query_with_example_registry() -> None:

@@ -32,6 +32,7 @@ from portia.clarification import (
     Clarification,
     ClarificationCategory,
 )
+from portia.clarification_handler import ClarificationHandler
 from portia.config import AgentType, Config, PlannerType, StorageClass
 from portia.errors import (
     InvalidWorkflowStateError,
@@ -72,6 +73,7 @@ class Runner:
         self,
         config: Config | None = None,
         tools: ToolRegistry | list[Tool] | None = None,
+        clarification_handler: ClarificationHandler | None = None,
     ) -> None:
         """Initialize storage and tools.
 
@@ -81,10 +83,16 @@ class Runner:
             tools (ToolRegistry | list[Tool]): The registry or list of tools to use. If not
                 provided, the open source tool registry will be used, alongside the default tools
                 from Portia cloud if a Portia API key is set.
+            clarification_handler (ClarificationHandler | None): The clarification handler
+                to use when clarifications are raised. If not provided, the default
+                clarification handler will be used.
 
         """
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
+        self.clarification_handler = (
+            clarification_handler if clarification_handler else ClarificationHandler()
+        )
 
         if isinstance(tools, ToolRegistry):
             self.tool_registry = tools
@@ -213,6 +221,9 @@ class Runner:
     ) -> Workflow:
         """Run a workflow.
 
+        If any clarifications are raised during the workflow, these are handled
+        by the runner's clarification handler and the workflow continues.
+
         Args:
             workflow (Workflow | None): The workflow to execute. Defaults to None.
             workflow_id (WorkflowUUID | str | None): The ID of the workflow to execute. Defaults to
@@ -250,11 +261,29 @@ class Runner:
         # if the workflow has execution context associated, but none is set then use it
         if not is_execution_context_set():
             with execution_context(workflow.execution_context):
-                return self._execute_workflow(plan, workflow)
+                return self.execute_workflow_and_handle_clarifications(plan, workflow)
 
+        return self.execute_workflow_and_handle_clarifications(plan, workflow)
+
+    def execute_workflow_and_handle_clarifications(
+        self,
+        plan: Plan,
+        workflow: Workflow,
+    ) -> Workflow:
+        """Execute a workflow and handle any clarifications that are raised."""
         # if there is execution context set, make sure we update the workflow before running
         workflow.execution_context = get_execution_context()
-        return self._execute_workflow(plan, workflow)
+        workflow = self._execute_workflow(plan, workflow)
+
+        while workflow.state == WorkflowState.NEED_CLARIFICATION:
+            # If clarifications are needed, resolve them before resuming the workflow
+            for clarification in workflow.get_outstanding_clarifications():
+                workflow = self.clarification_handler.handle(self, workflow, clarification)
+
+            # Once clarifications are resolved, resume the workflow
+            workflow = self.execute_workflow_and_handle_clarifications(plan, workflow)
+
+        return workflow
 
     def resolve_clarification(
         self,

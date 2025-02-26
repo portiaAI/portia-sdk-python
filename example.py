@@ -4,7 +4,6 @@ from portia.config import Config, LogLevel
 from portia.execution_context import execution_context
 from portia.open_source_tools.registry import example_tool_registry
 from portia.runner import Runner
-from portia.workflow import WorkflowState
 
 runner = Runner(
     Config.from_default(default_log_level=LogLevel.DEBUG),
@@ -31,17 +30,6 @@ with execution_context(end_user_id="123", additional_data={"email_address": "hel
 
 # Fetch workflow
 workflow = runner.storage.get_workflow(workflow.id)
-# Update clarifications
-if workflow.state == WorkflowState.NEED_CLARIFICATION:
-    for c in workflow.get_outstanding_clarifications():
-        # Here you prompt the user for the response to the clarification
-        # via whatever mechanism makes sense for your use-case.
-        new_value = "Answer"
-        workflow = runner.resolve_clarification(
-            workflow=workflow,
-            clarification=c,
-            response=new_value,
-        )
 
 # Execute again with the same execution context
 with execution_context(context=workflow.execution_context):
