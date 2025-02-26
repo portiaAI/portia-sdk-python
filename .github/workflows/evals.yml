@@ -32,7 +32,7 @@ jobs:
 
   evals:
     # needs: check-label
-    runs-on: ubuntu-latest-16core
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout portia-sdk-python repo
         uses: actions/checkout@v4
