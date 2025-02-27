@@ -167,7 +167,15 @@ class ParserModel:
                 "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
-                "- Ensure arguments align with the tool's schema and intended use.\n",
+                "- Ensure arguments align with the tool's schema and intended use.\n\n"
+                "You must return the arguments in the following JSON format:\n"
+                "class ToolInputs:\n"
+                "  args: List[ToolArgument]  # List of tool arguments.\n\n"
+                "class ToolArgument:\n"
+                "  name: str  # Name of the argument requested by the tool.\n"
+                "  value: Any | None  # Value of the argument from the goal or context.\n"
+                "  valid: bool  # Whether the value is valid for the argument.\n"
+                "  explanation: str  # Explanation of the source for the value of the argument.\n\n",
             ),
         ],
     )
@@ -203,32 +211,36 @@ class ParserModel:
         if not self.agent.tool:
             raise InvalidWorkflowStateError(None)
         model = self.llm.with_structured_output(ToolInputs)
-        response = model.invoke(
-            self.arg_parser_prompt.format_messages(
-                context=self.context,
-                task=self.agent.step.task,
-                tool_name=self.agent.tool.name,
-                tool_args=self.agent.tool.args_json_schema(),
-                tool_description=self.agent.tool.description,
-                previous_errors=",".join(self.previous_errors),
-            ),
+        message = self.arg_parser_prompt.format_messages(
+            context=self.context,
+            task=self.agent.step.task,
+            tool_name=self.agent.tool.name,
+            tool_args=self.agent.tool.args_json_schema(),
+            tool_description=self.agent.tool.description,
+            previous_errors=",".join(self.previous_errors),
         )
-        response = ToolInputs.model_validate(response)
 
-        test_args = {}
         errors = []
-        for arg in response.args:
-            test_args[arg.name] = arg.value
-            if not arg.valid:
-                errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
-
-        # also test the ToolInputs that have come back
-        # actually work for the schema of the tool
-        # if not we can retry
+        tool_inputs: ToolInputs | None = None
         try:
-            self.agent.tool.args_schema.model_validate(test_args)
+            response = model.invoke(message)
+            tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
-            errors.append(str(e) + "\n")
+            errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
+        else:
+            test_args = {}
+            for arg in tool_inputs.args:
+                test_args[arg.name] = arg.value
+                if not arg.valid:
+                    errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
+
+            # also test the ToolInputs that have come back
+            # actually work for the schema of the tool
+            # if not we can retry
+            try:
+                self.agent.tool.args_schema.model_validate(test_args)
+            except ValidationError as e:
+                errors.append(str(e) + "\n")
 
         if errors:
             self.previous_errors.extend(errors)
@@ -243,7 +255,7 @@ class ParserModel:
             # Here is a Linear ticket to fix this:
             # https://linear.app/portialabs/issue/POR-456
 
-        return {"messages": [response.model_dump_json(indent=2)]}
+        return {"messages": [tool_inputs.model_dump_json(indent=2)] if tool_inputs else []}
 
 
 class VerifierModel:
