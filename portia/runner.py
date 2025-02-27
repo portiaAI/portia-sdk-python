@@ -338,6 +338,7 @@ class Runner:
             return workflow
 
         plan = self.storage.get_plan(workflow.plan_id)
+        workflow = self.storage.get_workflow(workflow.id)
         current_step_clarifications = workflow.get_clarifications_for_step()
         while workflow.state != WorkflowState.READY_TO_RESUME:
             if tries >= max_retries:
@@ -350,9 +351,6 @@ class Runner:
 
             # wait a couple of seconds as we're long polling
             time.sleep(backoff_time_seconds)
-
-            # refresh state
-            workflow = self.storage.get_workflow(workflow.id)
 
             # if its not ready we can see if the tool is ready
             if workflow.state != WorkflowState.READY_TO_RESUME:
