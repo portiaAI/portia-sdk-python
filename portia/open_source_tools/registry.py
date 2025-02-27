@@ -3,6 +3,7 @@
 import logging
 
 from portia.open_source_tools.calculator_tool import CalculatorTool
+from portia.open_source_tools.image_understanding_tool import ImageUnderstandingTool
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
@@ -27,5 +28,6 @@ open_source_tool_registry = InMemoryToolRegistry.from_local_tools(
         LLMTool(),
         FileWriterTool(),
         FileReaderTool(),
+        ImageUnderstandingTool(),
     ],
 )

@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, create_model
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.logger import logger
 from portia.open_source_tools.calculator_tool import CalculatorTool
+from portia.open_source_tools.image_understanding_tool import ImageUnderstandingTool
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
@@ -484,6 +485,7 @@ class DefaultToolRegistry(AggregatedToolRegistry):
                 LLMTool(),
                 FileWriterTool(),
                 FileReaderTool(),
+                ImageUnderstandingTool(),
             ],
         )
         if os.getenv("TAVILY_API_KEY"):
