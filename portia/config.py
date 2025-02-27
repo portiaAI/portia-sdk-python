@@ -416,7 +416,17 @@ class Config(BaseModel):
         """Validate Config is consistent."""
         # Portia API Key must be provided if using cloud storage
         if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
-            raise InvalidConfigError("portia_api_key", "Must be provided if using cloud storage")
+            raise InvalidConfigError(
+                "portia_api_key",
+                "A Portia API key must be provided if using cloud storage. Follow the steps at "
+                "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
+                "have one",
+            )
+        if self.storage_class == StorageClass.DISK and not self.storage_dir:
+            raise InvalidConfigError(
+                "storage_dir",
+                "A storage directory must be provided if using disk storage",
+            )
 
         def validate_llm_config(expected_key: str, supported_models: list[LLMModel]) -> None:
             """Validate LLM Config."""
