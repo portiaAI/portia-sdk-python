@@ -2,6 +2,7 @@
 
 import pytest
 
+from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.errors import ToolHardError
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
@@ -11,6 +12,7 @@ from tests.utils import (
     AdditionTool,
     ClarificationTool,
     ErrorTool,
+    NoneTool,
     get_test_tool_context,
     get_test_workflow,
 )
@@ -91,3 +93,13 @@ def test_tool_call_wrapper_run_records_latency(mock_tool: Tool, mock_storage: Mo
     ctx = get_test_tool_context()
     wrapper.run(ctx, 1, 2)
     assert mock_storage.records[-1].latency_seconds > 0
+
+
+def test_tool_call_wrapper_run_returns_none(mock_storage: MockStorage) -> None:
+    """Test that the ToolCallWrapper records latency correctly."""
+    (_, workflow) = get_test_workflow()
+    wrapper = ToolCallWrapper(NoneTool(), mock_storage, workflow)
+    ctx = get_test_tool_context()
+    wrapper.run(ctx)
+    assert mock_storage.records[-1].output
+    assert mock_storage.records[-1].output == Output(value=None).model_dump(mode="json")

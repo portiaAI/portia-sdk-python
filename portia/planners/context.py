@@ -49,5 +49,11 @@ def default_query_system_context(
 def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
     """Given a list of tool names, return the descriptions of the tools."""
     return [
-        {"id": tool.id, "name": tool.name, "description": tool.description} for tool in tool_list
+        {
+            "id": tool.id,
+            "name": tool.name,
+            "description": tool.description,
+            "args": tool.args_schema.model_json_schema()["properties"],
+        }
+        for tool in tool_list
     ]

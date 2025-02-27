@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
-from portia.config import Config, LogLevel
+from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
 from portia.plan import Plan, PlanContext, Step, Variable
@@ -77,6 +77,7 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
         **kwargs,
         default_log_level=LogLevel.INFO,
         openai_api_key=SecretStr("123"),
+        storage_class=StorageClass.MEMORY,
     )
 
 
@@ -194,3 +195,16 @@ class ErrorTool(Tool):
         if return_soft_error:
             raise ToolSoftError(error_str)
         raise ToolHardError(error_str)
+
+
+class NoneTool(Tool):
+    """Returns None."""
+
+    id: str = "none_tool"
+    name: str = "None Tool"
+    description: str = "returns None"
+    output_schema: tuple[str, str] = ("None", "None: nothing")
+
+    def run(self, _: ToolRunContext) -> None:
+        """Return."""
+        return

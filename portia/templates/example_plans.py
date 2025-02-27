@@ -6,7 +6,11 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
             query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
-            tool_ids=["search_tool", "send_email_tool", "other_tool"],
+            tool_ids=[
+                "search_tool",
+                "portia::google_gmail::send_email_tool",
+                "portia::provider::other_tool",
+            ],
         ),
         steps=[
             Step(
@@ -27,7 +31,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The email address to send the email to",
                     ),
                 ],
-                tool_id="send_email_tool",
+                tool_id="portia::google_gmail::send_email_tool",
                 output="$final_output",
             ),
         ],
@@ -35,7 +39,12 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
             query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
-            tool_ids=["search_tool", "send_email_tool", "other_tool", "weather_tool"],
+            tool_ids=[
+                "search_tool",
+                "portia::google_gmail::send_email_tool",
+                "portia::provider::other_tool",
+                "weather_tool",
+            ],
         ),
         steps=[
             Step(
@@ -92,7 +101,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="Comparison of the weather in the two cities",
                     ),
                 ],
-                tool_id="send_email_tool",
+                tool_id="portia::google_gmail::send_email_tool",
                 output="If the email was successfully sent",
             ),
         ],
@@ -100,7 +109,11 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
             query="Send an email to hello@portialabs.ai with the weather in London",
-            tool_ids=["weather_tool", "send_email_tool", "other_tool"],
+            tool_ids=[
+                "weather_tool",
+                "portia::google_gmail::send_email_tool",
+                "portia::provider::other_tool",
+            ],
         ),
         steps=[
             Step(
@@ -121,7 +134,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The email address",
                     ),
                 ],
-                tool_id="send_email_tool",
+                tool_id="portia::google_gmail::send_email_tool",
                 output="If the email was successfully sent",
             ),
         ],
@@ -130,16 +143,16 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         plan_context=PlanContext(
             query="Get the latest messages on the Dev channel and send a summary to nathan",
             tool_ids=[
-                "list_conversation_ids",
-                "conversation_history",
-                "list_user_ids",
-                "send_message",
+                "portia::slack::bot::list_conversation_ids",
+                "portia::slack::bot::conversation_history",
+                "portia::slack::bot::list_user_ids",
+                "portia::slack::bot::send_message",
             ],
         ),
         steps=[
             Step(
                 task="Get the id of the Dev channel",
-                tool_id="list_conversation_ids",
+                tool_id="portia::slack::bot::list_conversation_ids",
                 output="$conversation_ids",
             ),
             Step(
@@ -150,12 +163,12 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The id of the Dev channel",
                     ),
                 ],
-                tool_id="conversation_history",
+                tool_id="portia::slack::bot::conversation_history",
                 output="$conversation_history",
             ),
             Step(
                 task="get the user id of nathan",
-                tool_id="list_user_ids",
+                tool_id="portia::slack::bot::list_user_ids",
                 output="$nathan_user_id",
             ),
             Step(
@@ -170,7 +183,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The user id of nathan",
                     ),
                 ],
-                tool_id="send_message",
+                tool_id="portia::slack::bot::send_message",
                 output="If the message was successfully sent",
             ),
         ],

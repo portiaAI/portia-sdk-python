@@ -4,9 +4,10 @@
 
 # Portia SDK Python
 
-Welcome to our repository! Portia AI is an open source developer framework for stateful, authenticated agentic workflows. The core product accessible in this repository is extensible with our complimentary cloud features which are aimed at making production deployments easier and faster.
-Play around, break things and tell us how you're getting on in our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">**Code of Conduct (↗)**</a>). 
+Portia AI is an open source developer framework for stateful, authenticated agentic workflows. The core product accessible in this repository is extensible with our complimentary cloud features which are aimed at making production deployments easier and faster.
+Play around, break things and tell us how you're getting on in our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">**Code of Conduct (↗)**</a>).
 
+If you want to dive straight in with an example, check out our <a href="https://github.com/portiaAI/portia-agent-examples/tree/main/get_started_google_tools" target="_blank">**Google Tools example (↗)**</a>.
 
 ## Why Portia AI
 | Problem | Portia's answer |
@@ -43,6 +44,8 @@ portia-cli run "add 1 + 2"
 
 **All set? Now let's explore some basic usage of the product 🚀**
 
+### E2E example repo
+We have a repo that showcases some of our core concepts to get you started. It's available <a href="https://github.com/portiaAI/portia-agent-examples" target="_blank">**here (↗)**</a>. We recommend starting with the <a href="https://github.com/portiaAI/portia-agent-examples/tree/main/get_started_google_tools" target="_blank">**Google Tools example (↗)**</a> if you are brand new to Portia.
 
 ### E2E example with open source tools
 This example is meant to get you familiar with a few of our core abstractions:
@@ -63,7 +66,7 @@ from portia.open_source_tools.registry import example_tool_registry
 load_dotenv()
 
 # Instantiate a Portia runner. Load it with the default config and with the example tools.
-runner = Runner(config=default_config(), tool_registry=example_tool_registry)
+runner = Runner(config=default_config(), tools=example_tool_registry)
 
 # Generate the plan from the user query
 plan = runner.generate_plan('Which stock price grew faster in 2024, Amazon or Google?')
@@ -78,12 +81,12 @@ print(workflow.model_dump_json(indent=2))
 ```
 
 ### E2E example with Portia cloud storage
-Our cloud offering will allow you to easily store and retrieve workflows in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view workflow, clarification and tool call logs. Head over to <a href="apps.portialabs.ai" target="_blank">**apps.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
+Our cloud offering will allow you to easily store and retrieve workflows in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view workflow, clarification and tool call logs. Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
 Note that this example also requires the environment variables `OPENAI_API_KEY` (or ANTHROPIC or MISTRALAI if you're using either) and `TAVILY_API_KEY` as the [previous one](#e2e-example-with-open-source-tools).
 
 The example below introduces **some** of the config options available with Portia AI:
-- The `storage_class` is set using the `StorageClass` ENUM to 'CLOUD`. So long as your `PORTIA_API_KEY` is set, workflows and tool calls will be logged and appear automatically in your Portia dashboard at <a href="apps.portialabs.ai" target="_blank">**apps.portialabs.ai (↗)**</a>.
-- The `default_log_level` is set using the `LogLevel` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, workflow states, tool calls and outputs at every step 😅
+- The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, workflows and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
+- The `default_log_level` is set using the `LogLevel.DEBUG` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, workflow states, tool calls and outputs at every step 😅
 - The `llm_provider`, `llm_model` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider and model. In the example below we're splurging and using GPT 4.0!
 
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
@@ -108,7 +111,7 @@ my_config = Config.from_default(
 )
 
 # Instantiate a Portia runner. Load it with the config and with the open source example tool registry
-runner = Runner(config=my_config, tool_registry=example_tool_registry)
+runner = Runner(config=my_config, tools=example_tool_registry)
 
 # Execute a workflow from the user query
 workflow = runner.execute_query('Which stock price grew faster in 2024, Amazon or Google?')
@@ -125,3 +128,8 @@ print(workflow.model_dump_json(indent=2))
 
 ## Contribution guidelines
 Head on over to our <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a> for details.
+
+## Support
+We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
+
+We also particularly appreciate github stars. If you've liked what you've seen, please give us a star <a href="https://github.com/portiaAI/portia-sdk-python" target="_blank">at the top of the page</a>.
