@@ -21,7 +21,7 @@ If you want to dive straight in with an example, check out our <a href="https://
 
 ### Installation
 
-0. Ensure you have python 3.10 or higher installed. If you need to update your python version please visit their [docs](https://www.python.org/downloads/).
+0. Ensure you have python 3.11 or higher installed. If you need to update your python version please visit their [docs](https://www.python.org/downloads/).
 ```bash
 python --version
 ```
