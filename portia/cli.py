@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import click
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+from pydantic_core import PydanticUndefined
 
 from portia.clarification import (
     ActionClarification,
@@ -30,7 +31,7 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
-from portia.config import Config, StorageClass
+from portia.config import Config
 from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.runner import Runner
@@ -85,7 +86,7 @@ class CLIConfig(BaseModel):
     )
 
 
-def generate_cli_option_from_pydantic_field(
+def generate_cli_option_from_pydantic_field(  # noqa: C901
     f: Callable[..., Any],
     field: str,
     info: FieldInfo,
@@ -119,7 +120,12 @@ def generate_cli_option_from_pydantic_field(
                     [e.name for e in info.annotation],
                     case_sensitive=False,
                 )
-                field_default = info.default.name if info.default else None
+                if info.default and info.default is not PydanticUndefined:
+                    field_default = info.default.name
+                elif info.default_factory:
+                    field_default = info.default_factory().name  # type: ignore[reportCallIssue]
+                else:
+                    field_default = None
 
     field_help = info.description or f"Set the value for {option_name}"
 
@@ -297,10 +303,6 @@ def _get_config(
     if len(keys) > 1 and llm_provider is None and llm_model is None:
         message = "Multiple LLM keys found, but no default provided: Select a provider or model"
         raise click.UsageError(message)
-
-    if os.getenv("PORTIA_API_KEY"):
-        config.storage_class = StorageClass.CLOUD
-        config.portia_api_endpoint = os.getenv("PORTIA_API_ENDPOINT") or config.portia_api_endpoint
 
     if llm_provider or llm_model:
         config.llm_provider = llm_provider if llm_provider else llm_model.provider()

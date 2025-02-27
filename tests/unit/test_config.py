@@ -116,14 +116,15 @@ def test_getters() -> None:
 
     c = Config.from_default(
         openai_api_key=SecretStr("123"),
-        portia_api_key=SecretStr(""),
+        portia_api_key=SecretStr("123"),
+        anthropic_api_key=SecretStr(""),
         portia_api_endpoint="",
     )
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_key", int)
 
     with pytest.raises(InvalidConfigError):
-        c.must_get_raw_api_key("portia_api_key")
+        c.must_get_raw_api_key("anthropic_api_key")
 
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)

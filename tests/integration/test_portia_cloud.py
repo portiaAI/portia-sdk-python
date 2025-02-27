@@ -108,17 +108,16 @@ def test_default_runner_has_correct_tools() -> None:
     assert not any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)
 
 
-@pytest.mark.skip("Disable test until Microsoft tool is enabled in staging")
 def test_runner_with_microsoft_tools() -> None:
     """Test that the default runner has the correct tools."""
 
     # Choose to exclude gmail rather than microsoft outlook
     def exclude_gmail_filter(tool: Tool) -> bool:
-        return not tool.id.startswith("portia::google_gmail::")
+        return "gmail" not in tool.id
 
     registry = PortiaToolRegistry(config=Config.from_default()).filter_tools(exclude_gmail_filter)
     runner = Runner(tools=registry)
     tools = runner.tool_registry.get_tools()
     assert len(tools) > 0
-    assert any(tool.id == "portia:google:gmail:search_email" for tool in tools)
-    assert not any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)
+    assert not any(tool.id == "portia:google:gmail:search_email" for tool in tools)
+    assert any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)

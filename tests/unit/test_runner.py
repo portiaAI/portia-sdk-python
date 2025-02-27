@@ -8,7 +8,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import HttpUrl
+from pydantic import HttpUrl, SecretStr
 
 from portia.agents.base_agent import Output
 from portia.clarification import ActionClarification, InputClarification
@@ -106,8 +106,9 @@ def test_runner_run_query_disk_storage() -> None:
     """Test running a query using the Runner."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         query = "example query"
-        config = get_test_config(
+        config = Config.from_default(
             storage_class=StorageClass.DISK,
+            openai_api_key=SecretStr("123"),
             storage_dir=tmp_dir,
         )
         tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
@@ -364,6 +365,45 @@ def test_runner_wait_for_ready_tool(runner: Runner) -> None:
             assert clarification.response == "complete"
 
 
+def test_get_clarifications_and_get_workflow_called_once(runner: Runner) -> None:
+    """Test that get_clarifications_for_step is called once after get_workflow."""
+    query = "example query"
+    mock_response = StepsOrError(
+        steps=[Step(task="Example task", inputs=[], output="$output")],
+        error=None,
+    )
+    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
+
+    plan = runner.generate_plan(query)
+    workflow = runner.create_workflow(plan)
+
+    # Set the workflow state to NEED_CLARIFICATION to ensure it goes through the wait logic
+    workflow.state = WorkflowState.NEED_CLARIFICATION
+    workflow.current_step_index = 0  # Set to a valid index
+
+    # Mock the storage methods
+    with (
+        mock.patch.object(
+            runner.storage,
+            "get_workflow",
+            return_value=workflow,
+        ) as mock_get_workflow,
+        mock.patch.object(
+            Workflow,
+            "get_clarifications_for_step",
+            return_value=[],
+        ) as mock_get_clarifications,
+    ):
+        # Call wait_for_ready
+        runner.wait_for_ready(workflow)
+
+        # Assert that get_workflow was called once
+        mock_get_workflow.assert_called_once_with(workflow.id)
+
+        # Assert that get_clarifications_for_step was called once after get_workflow
+        mock_get_clarifications.assert_called_once()
+
+
 def test_runner_execute_query_with_summary(runner: Runner) -> None:
     """Test execute_query sets both final output and summary correctly."""
     query = "What activities can I do in London based on weather?"
@@ -494,6 +534,7 @@ def test_runner_wait_for_ready_max_retries(runner: Runner) -> None:
     plan, workflow = get_test_workflow()
     workflow.state = WorkflowState.NEED_CLARIFICATION
     runner.storage.save_plan(plan)
+    runner.storage.save_workflow(workflow)
     with pytest.raises(InvalidWorkflowStateError):
         runner.wait_for_ready(workflow, max_retries=0)
 

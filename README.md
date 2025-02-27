@@ -4,7 +4,7 @@
 
 # Portia SDK Python
 
-Welcome to our repository! Portia AI is an open source developer framework for stateful, authenticated agentic workflows. The core product accessible in this repository is extensible with our complimentary cloud features which are aimed at making production deployments easier and faster.
+Portia AI is an open source developer framework for stateful, authenticated agentic workflows. The core product accessible in this repository is extensible with our complimentary cloud features which are aimed at making production deployments easier and faster.
 Play around, break things and tell us how you're getting on in our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">**Code of Conduct (↗)**</a>).
 
 If you want to dive straight in with an example, check out our <a href="https://github.com/portiaAI/portia-agent-examples/tree/main/get_started_google_tools" target="_blank">**Google Tools example (↗)**</a>.
@@ -128,3 +128,8 @@ print(workflow.model_dump_json(indent=2))
 
 ## Contribution guidelines
 Head on over to our <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a> for details.
+
+## Support
+We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
+
+We also particularly appreciate github stars. If you've liked what you've seen, please give us a star <a href="https://github.com/portiaAI/portia-sdk-python" target="_blank">at the top of the page</a>.

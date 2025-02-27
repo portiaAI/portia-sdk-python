@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict
 
+from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
@@ -122,6 +123,9 @@ class ToolCallWrapper(Tool):
             if isinstance(output, Clarification):
                 record.status = ToolCallStatus.NEED_CLARIFICATION
                 record.output = output.model_dump(mode="json")
+            elif output is None:
+                record.output = Output(value=output).model_dump(mode="json")
+                record.status = ToolCallStatus.SUCCESS
             else:
                 record.output = output
                 record.status = ToolCallStatus.SUCCESS
