@@ -293,7 +293,7 @@ class Runner:
         self.storage.save_workflow(workflow)
         return workflow
 
-    def wait_for_ready(  # noqa: C901
+    def wait_for_ready(
         self,
         workflow: Workflow,
         max_retries: int = 6,
@@ -352,27 +352,25 @@ class Runner:
             # wait a couple of seconds as we're long polling
             time.sleep(backoff_time_seconds)
 
-            # if its not ready we can see if the tool is ready
-            if workflow.state != WorkflowState.READY_TO_RESUME:
-                step = plan.steps[workflow.current_step_index]
-                next_tool = self._get_tool_for_step(step, workflow)
-                if next_tool:
-                    tool_ready = next_tool.ready(
-                        ToolRunContext(
-                            execution_context=workflow.execution_context,
-                            workflow_id=workflow.id,
-                            config=self.config,
-                            clarifications=current_step_clarifications,
-                        ),
-                    )
-                    logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
-                    if tool_ready:
-                        for clarification in current_step_clarifications:
-                            if clarification.category is ClarificationCategory.ACTION:
-                                clarification.resolved = True
-                                clarification.response = "complete"
-                        workflow.state = WorkflowState.READY_TO_RESUME
-                        self.storage.save_workflow(workflow)
+            step = plan.steps[workflow.current_step_index]
+            next_tool = self._get_tool_for_step(step, workflow)
+            if next_tool:
+                tool_ready = next_tool.ready(
+                    ToolRunContext(
+                        execution_context=workflow.execution_context,
+                        workflow_id=workflow.id,
+                        config=self.config,
+                        clarifications=current_step_clarifications,
+                    ),
+                )
+                logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
+                if tool_ready:
+                    for clarification in current_step_clarifications:
+                        if clarification.category is ClarificationCategory.ACTION:
+                            clarification.resolved = True
+                            clarification.response = "complete"
+                    workflow.state = WorkflowState.READY_TO_RESUME
+                    self.storage.save_workflow(workflow)
 
             logger().debug(f"New workflow state for {workflow.id} is {workflow.state}")
 
