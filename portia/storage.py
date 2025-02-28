@@ -575,7 +575,7 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = httpx.put(
-                url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
+                url=f"{self.api_endpoint}/api/v0/plan_runs/{workflow.id}/",
                 json={
                     "current_step_index": workflow.current_step_index,
                     "state": workflow.state,
@@ -609,7 +609,7 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
+                url=f"{self.api_endpoint}/api/v0/plan_runs/{workflow_id}/",
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
@@ -657,7 +657,7 @@ class PortiaCloudStorage(Storage):
             if workflow_state:
                 query["workflow_state"] = workflow_state.value
             response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/workflows/?{urlencode(query)}",
+                url=f"{self.api_endpoint}/api/v0/plan_runs/?{urlencode(query)}",
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
