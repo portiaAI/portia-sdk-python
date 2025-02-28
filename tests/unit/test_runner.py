@@ -271,7 +271,7 @@ def test_runner_wait_for_ready(runner: Runner) -> None:
         runner.storage.save_workflow(workflow)
 
     workflow.state = WorkflowState.NEED_CLARIFICATION
-    
+
     # Ensure current_step_index is set to a valid index
     workflow.current_step_index = 0
     runner.storage.save_workflow(workflow)
