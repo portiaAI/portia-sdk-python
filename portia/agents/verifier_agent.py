@@ -175,7 +175,7 @@ class ParserModel:
                 "  name: str  # Name of the argument requested by the tool.\n"
                 "  value: Any | None  # Value of the argument from the goal or context.\n"
                 "  valid: bool  # Whether the value is valid for the argument.\n"
-                "  explanation: str  # Explanation of the source for the value of the argument.\n\n",
+                "  explanation: str  # Explanation of the source for the value of the argument.\n\n",  # noqa: E501
             ),
         ],
     )
