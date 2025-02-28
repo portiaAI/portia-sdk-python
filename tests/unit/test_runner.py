@@ -8,7 +8,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import HttpUrl
+from pydantic import HttpUrl, SecretStr
 
 from portia.agents.base_agent import Output
 from portia.clarification import ActionClarification, InputClarification
@@ -106,8 +106,9 @@ def test_runner_run_query_disk_storage() -> None:
     """Test running a query using the Runner."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         query = "example query"
-        config = get_test_config(
+        config = Config.from_default(
             storage_class=StorageClass.DISK,
+            openai_api_key=SecretStr("123"),
             storage_dir=tmp_dir,
         )
         tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
@@ -381,9 +382,18 @@ def test_get_clarifications_and_get_workflow_called_once(runner: Runner) -> None
     workflow.current_step_index = 0  # Set to a valid index
 
     # Mock the storage methods
-    with mock.patch.object(runner.storage, "get_workflow", return_value=workflow) as mock_get_workflow, \
-         mock.patch.object(Workflow, "get_clarifications_for_step", return_value=[]) as mock_get_clarifications:  # noqa: E501
-
+    with (
+        mock.patch.object(
+            runner.storage,
+            "get_workflow",
+            return_value=workflow,
+        ) as mock_get_workflow,
+        mock.patch.object(
+            Workflow,
+            "get_clarifications_for_step",
+            return_value=[],
+        ) as mock_get_clarifications,
+    ):
         # Call wait_for_ready
         runner.wait_for_ready(workflow)
 

@@ -111,6 +111,7 @@ class LLMModel(Enum):
     GPT_4_O = "gpt-4o"
     GPT_4_O_MINI = "gpt-4o-mini"
     GPT_3_5_TURBO = "gpt-3.5-turbo"
+    O_3_MINI = "o3-mini"
 
     # Anthropic
     CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
@@ -138,6 +139,7 @@ SUPPORTED_OPENAI_MODELS = [
     LLMModel.GPT_4_O,
     LLMModel.GPT_4_O_MINI,
     LLMModel.GPT_3_5_TURBO,
+    LLMModel.O_3_MINI,
 ]
 
 SUPPORTED_ANTHROPIC_MODELS = [
@@ -306,7 +308,9 @@ class Config(BaseModel):
 
     # Storage Options
     storage_class: StorageClass = Field(
-        default=StorageClass.MEMORY,
+        default_factory=lambda: StorageClass.CLOUD
+        if os.getenv("PORTIA_API_KEY")
+        else StorageClass.MEMORY,
         description="Where to store Plans and Workflows. By default these will be kept in memory.",
     )
 
@@ -528,8 +532,11 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         Config: The default config
 
     """
+    default_storage_class = (
+        StorageClass.CLOUD if os.getenv("PORTIA_API_KEY") else StorageClass.MEMORY
+    )
     return Config(
-        storage_class=kwargs.pop("storage_class", StorageClass.MEMORY),
+        storage_class=kwargs.pop("storage_class", default_storage_class),
         llm_provider=kwargs.pop("llm_provider", LLMProvider.OPENAI),
         llm_model_name=kwargs.pop("llm_model_name", LLMModel.GPT_4_O_MINI),
         default_planner=kwargs.pop("default_planner", PlannerType.ONE_SHOT),
