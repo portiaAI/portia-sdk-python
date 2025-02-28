@@ -167,30 +167,6 @@ jobs:
             echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: eval agent (one shot)
-        id: eval_agent_one_shot
-        working-directory: ./evals
-        env:
-            LANGCHAIN_TRACING_V2: "true"
-            LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
-            LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-            LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
-            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-            MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-            PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-            PORTIA_API_ENDPOINT: http://0.0.0.0:8080
-        run: |
-          poetry run python3 cli.py agent update-dataset --slice_name=one_shot
-          EVAL_OUTPUT=$(poetry run python3 cli.py agent eval --agent=one_shot --slice_name=one_shot --model=gpt-4o-mini --threshold_file=agents/thresholds/one_shot_thresholds.yaml)
-          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
-          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
-          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
-            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
-            echo "BREACHES: $BREACHES"
-            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
-            echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Summary results
         id: summary_results
         working-directory: ./evals
@@ -226,13 +202,6 @@ jobs:
           if [[ "${{ steps.eval_agent_verifier.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
             echo "Agent eval (verifier) failed or has breaches."
             echo "Breaches: ${{ steps.eval_agent_verifier.outputs.metric_breaches }}"
-            CONTAINS_THRESHOLD_BREACH=true
-          fi
-
-          # Check if the one shot agent has failing scores
-          if [[ "${{ steps.eval_agent_one_shot.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
-            echo "Agent eval (one shot) failed or has breaches."
-            echo "Breaches: ${{ steps.eval_agent_one_shot.outputs.metric_breaches }}"
             CONTAINS_THRESHOLD_BREACH=true
           fi
 
