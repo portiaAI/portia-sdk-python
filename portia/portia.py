@@ -302,7 +302,7 @@ class Portia:
             if len(clarifications) > 0:
                 # If clarifications are handled synchronously, we'll go through this immediately.
                 # If they're handled asynchronously, we'll wait for the plan run to be ready.
-                self.wait_for_ready(plan_run)
+                plan_run = self.wait_for_ready(plan_run)
 
         return plan_run
 
