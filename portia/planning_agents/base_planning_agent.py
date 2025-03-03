@@ -1,6 +1,6 @@
-"""Planner module creates plans from queries.
+"""PlanningAgents module creates plans from queries.
 
-This module contains the planner interfaces and implementations used for generating plans
+This module contains the PlanningAgent interfaces and implementations used for generating plans
 based on user queries. It supports the creation of plans using tools and example plans, and
 leverages LLMs to generate detailed step-by-step plans. It also handles errors gracefully and
 provides feedback in the form of error messages when the plan cannot be created.
@@ -25,23 +25,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Planner(ABC):
+class BasePlanningAgent(ABC):
     """Interface for planning.
 
-    This class defines the interface for planners that generate plans based on queries.
-    A planner will implement the logic to generate a plan or an error given a query,
+    This class defines the interface for PlanningAgents that generate plans based on queries.
+    A PlanningAgent will implement the logic to generate a plan or an error given a query,
     a list of tools, and optionally, some example plans.
 
     Attributes:
-        config (Config): Configuration settings for the planner.
+        config (Config): Configuration settings for the PlanningAgent.
 
     """
 
     def __init__(self, config: Config) -> None:
-        """Initialize the planner with configuration.
+        """Initialize the PlanningAgent with configuration.
 
         Args:
-            config (Config): The configuration to initialize the planner.
+            config (Config): The configuration to initialize the PlanningAgent.
 
         """
         self.config = config
@@ -63,7 +63,7 @@ class Planner(ABC):
             ctx (ExecutionContext): The context for execution.
             query (str): The user query to generate a list of steps for.
             tool_list (list[Tool]): A list of tools available for the plan.
-            examples (list[Plan] | None): Optional list of example plans to guide the planner.
+            examples (list[Plan] | None): Optional list of example plans to guide the PlanningAgent.
 
         Returns:
             StepsOrError: A StepsOrError instance containing either the generated steps or an error.

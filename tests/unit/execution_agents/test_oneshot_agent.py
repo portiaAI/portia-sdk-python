@@ -8,10 +8,10 @@ import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
-from portia.agents.base_agent import Output
-from portia.agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.errors import InvalidAgentError
-from tests.utils import AdditionTool, get_test_config, get_test_workflow
+from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
+from tests.utils import AdditionTool, get_test_config, get_test_plan_run
 
 
 def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -50,10 +50,10 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
-    (plan, workflow) = get_test_workflow()
+    (plan, plan_run) = get_test_plan_run()
     agent = OneShotAgent(
         step=plan.steps[0],
-        workflow=workflow,
+        plan_run=plan_run,
         config=get_test_config(),
         tool=AdditionTool(),
     )
@@ -65,11 +65,11 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_oneshot_agent_without_tool_raises() -> None:
     """Test oneshot agent without tool raises."""
-    (plan, workflow) = get_test_workflow()
+    (plan, plan_run) = get_test_plan_run()
     with pytest.raises(InvalidAgentError):
         OneShotAgent(
             step=plan.steps[0],
-            workflow=workflow,
+            plan_run=plan_run,
             config=get_test_config(),
             tool=None,
         ).execute_sync()

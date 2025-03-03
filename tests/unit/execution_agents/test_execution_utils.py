@@ -6,17 +6,17 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
-from portia.agents.base_agent import Output
-from portia.agents.execution_utils import (
+from portia.clarification import InputClarification
+from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
+from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
 )
-from portia.clarification import InputClarification
-from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.prefixed_uuid import WorkflowUUID
+from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import AdditionTool
 
 
@@ -92,7 +92,7 @@ def test_process_output_with_clarifications() -> None:
         InputClarification(
             argument_name="test",
             user_guidance="test",
-            workflow_id=WorkflowUUID(),
+            plan_run_id=PlanRunUUID(),
         ),
     ]
     message = HumanMessage(content="test")

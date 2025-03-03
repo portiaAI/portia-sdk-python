@@ -109,7 +109,7 @@ class ToolRegistry(ABC):
             list[Tool]: A list of tools matching the query.
 
         This method is useful to implement tool filtering whereby only a selection of tools are
-        passed to the Planner based on the query.
+        passed to the PlanningAgent based on the query.
         This method is optional to implement and will default to providing all tools.
 
         """
