@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING, Literal
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
-from portia.agents.base_agent import Output
 from portia.clarification import Clarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
+from portia.execution_agents.base_execution_agent import Output
 
 if TYPE_CHECKING:
     from portia.tool import Tool
@@ -50,7 +50,7 @@ def next_state_after_tool_call(
 ) -> Literal[AgentNode.TOOL_AGENT, AgentNode.SUMMARIZER, END]:  # type: ignore  # noqa: PGH003
     """Determine the next state after a tool call.
 
-    This function checks the state after a tool call to determine if the workflow
+    This function checks the state after a tool call to determine if the run
     should proceed to the tool agent again, to the summarizer, or end.
 
     Args:
@@ -85,7 +85,7 @@ def tool_call_or_end(
     """Determine if tool execution should continue.
 
     This function checks if the current state indicates that the tool execution
-    should continue, or if the workflow should end.
+    should continue, or if the run should end.
 
     Args:
         state (MessagesState): The current state of the messages.
@@ -111,7 +111,7 @@ def process_output(
     It raises errors if the tool encounters issues and returns the appropriate output.
 
     Args:
-        last_message (BaseMessage): The last message received in the agent's workflow.
+        last_message (BaseMessage): The last message received in the agent's plan_run.
         tool (Tool | None): The tool associated with the agent, if any.
         clarifications (list[Clarification] | None): A list of clarifications, if any.
 

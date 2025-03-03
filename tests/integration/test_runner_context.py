@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from portia.config import StorageClass, default_config
 from portia.execution_context import ExecutionContext, execution_context
 from portia.plan import Plan, PlanContext, Step
-from portia.runner import Runner
+from portia.plan_run import PlanRun, PlanRunState
+from portia.portia import Portia
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import InMemoryToolRegistry
-from portia.workflow import Workflow, WorkflowState
 
 
 class ExecutionContextTrackerTool(Tool):
@@ -30,8 +31,8 @@ class ExecutionContextTrackerTool(Tool):
         self.tool_context = ctx
 
 
-def get_test_workflow() -> tuple[Plan, Workflow]:
-    """Return test workflow."""
+def get_test_plan_run() -> tuple[Plan, PlanRun]:
+    """Return test plan_run."""
     step1 = Step(
         task="Save Context",
         inputs=[],
@@ -45,69 +46,69 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
         ),
         steps=[step1],
     )
-    return plan, Workflow(plan_id=plan.id, current_step_index=0)
+    return plan, PlanRun(plan_id=plan.id, current_step_index=0)
 
 
-def test_runner_no_execution_context_new() -> None:
-    """Test running a query using the Runner."""
+def test_portia_no_execution_context_new() -> None:
+    """Test running a query."""
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(tools=tool_registry)
-    (plan, workflow) = get_test_workflow()
-    runner.storage.save_plan(plan)
-    workflow = runner.execute_workflow(workflow)
+    portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
+    (plan, plan_run) = get_test_plan_run()
+    portia.storage.save_plan(plan)
+    plan_run = portia.resume(plan_run)
 
-    assert workflow.state == WorkflowState.COMPLETE
+    assert plan_run.state == PlanRunState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == workflow.id
+    assert tool.tool_context.plan_run_id == plan_run.id
 
 
-def test_runner_no_execution_context_existing() -> None:
-    """Test running a query using the Runner."""
+def test_portia_no_execution_context_existing() -> None:
+    """Test running a query."""
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(tools=tool_registry)
-    (plan, workflow) = get_test_workflow()
-    workflow.execution_context = ExecutionContext(end_user_id="123")
-    runner.storage.save_plan(plan)
-    workflow = runner.execute_workflow(workflow)
+    portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
+    (plan, plan_run) = get_test_plan_run()
+    plan_run.execution_context = ExecutionContext(end_user_id="123")
+    portia.storage.save_plan(plan)
+    plan_run = portia.resume(plan_run)
 
-    assert workflow.state == WorkflowState.COMPLETE
+    assert plan_run.state == PlanRunState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == workflow.id
+    assert tool.tool_context.plan_run_id == plan_run.id
     assert tool.tool_context.execution_context.end_user_id == "123"
 
 
-def test_runner_with_execution_context_new() -> None:
-    """Test running a query using the Runner."""
+def test_portia_with_execution_context_new() -> None:
+    """Test running a query."""
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(tools=tool_registry)
-    (plan, workflow) = get_test_workflow()
-    runner.storage.save_plan(plan)
+    portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
+    (plan, plan_run) = get_test_plan_run()
+    portia.storage.save_plan(plan)
 
     with execution_context(end_user_id="123"):
-        workflow = runner.execute_workflow(workflow)
+        plan_run = portia.resume(plan_run)
 
-    assert workflow.state == WorkflowState.COMPLETE
+    assert plan_run.state == PlanRunState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == workflow.id
+    assert tool.tool_context.plan_run_id == plan_run.id
     assert tool.tool_context.execution_context.end_user_id == "123"
 
 
-def test_runner_with_execution_context_existing() -> None:
-    """Test running a query using the Runner."""
+def test_portia_with_execution_context_existing() -> None:
+    """Test running a query."""
     tool = ExecutionContextTrackerTool()
     tool_registry = InMemoryToolRegistry.from_local_tools([tool])
-    runner = Runner(tools=tool_registry)
-    (plan, workflow) = get_test_workflow()
-    workflow.execution_context = ExecutionContext()
-    runner.storage.save_plan(plan)
+    portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
+    (plan, plan_run) = get_test_plan_run()
+    plan_run.execution_context = ExecutionContext()
+    portia.storage.save_plan(plan)
 
     with execution_context(end_user_id="123"):
-        workflow = runner.execute_workflow(workflow)
+        plan_run = portia.resume(plan_run)
 
-    assert workflow.state == WorkflowState.COMPLETE
+    assert plan_run.state == PlanRunState.COMPLETE
     assert tool.tool_context
-    assert tool.tool_context.workflow_id == workflow.id
+    assert tool.tool_context.plan_run_id == plan_run.id
     assert tool.tool_context.execution_context.end_user_id == "123"

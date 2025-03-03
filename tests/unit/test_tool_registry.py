@@ -80,7 +80,7 @@ def test_local_tool_registry_register_tool() -> None:
         local_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))
 
 
-def test_local_tool_registry_get_and_run() -> None:
+def test_local_tool_registry_get_and_plan_run() -> None:
     """Test getting and running tools in the InMemoryToolRegistry."""
     local_tool_registry = InMemoryToolRegistry()
     local_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))

@@ -1,4 +1,4 @@
-"""Context helpers for planners."""
+"""Context helpers for PlanningAgents."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def render_prompt_insert_defaults(
     system_context_extension: list[str] | None = None,
     examples: list[Plan] | None = None,
 ) -> str:
-    """Render the prompt for the query planner with defaults inserted if not provided."""
+    """Render the prompt for the PlanningAgent with defaults inserted if not provided."""
     system_context = default_query_system_context(system_context_extension)
 
     if examples is None:
@@ -28,7 +28,7 @@ def render_prompt_insert_defaults(
     tools_with_descriptions = get_tool_descriptions_for_tools(tool_list=tool_list)
 
     return render_template(
-        "query_planner.xml.jinja",
+        "default_planning_agent.xml.jinja",
         query=query,
         tools=tools_with_descriptions,
         examples=examples,
@@ -49,5 +49,11 @@ def default_query_system_context(
 def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
     """Given a list of tool names, return the descriptions of the tools."""
     return [
-        {"id": tool.id, "name": tool.name, "description": tool.description} for tool in tool_list
+        {
+            "id": tool.id,
+            "name": tool.name,
+            "description": tool.description,
+            "args": tool.args_schema.model_json_schema()["properties"],
+        }
+        for tool in tool_list
     ]

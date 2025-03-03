@@ -1,4 +1,4 @@
-"""Agents are responsible for executing steps of a workflow.
+"""Agents are responsible for executing steps of a PlanRun.
 
 The BaseAgent class is the base class that all agents must extend.
 """
@@ -13,47 +13,48 @@ from typing import TYPE_CHECKING, Generic
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from portia.agents.context import build_context
 from portia.common import SERIALIZABLE_TYPE_VAR
+from portia.execution_agents.context import build_context
 from portia.execution_context import get_execution_context
 
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.plan import Step
+    from portia.plan_run import PlanRun
     from portia.tool import Tool
-    from portia.workflow import Workflow
 
 
-class BaseAgent:
-    """An Agent is responsible for carrying out the task defined in the given Step.
+class BaseExecutionAgent:
+    """An ExecutionAgent is responsible for carrying out the task defined in the given Step.
 
-    This Base agent is the class all agents must extend. Critically, agents must implement the
-    execute_sync function which is responsible for actually carrying out the task as given in
-    the step. They have access to copies of the step, workflow, and config but changes to those
-    objects are forbidden.
+    This BaseExecutionAgent is the class all ExecutionAgents must extend. Critically,
+    ExecutionAgents must implement the execute_sync function which is responsible for
+    actually carrying out the task as given in the step. They have access to copies of the
+    step, plan_run and config but changes to those objects are forbidden.
 
-    Optionally, new agents may also override the get_context function, which is responsible for
-    the system context for the agent. This should be done with thought, as the details of the system
-    context are critically important for LLM performance.
+    Optionally, new execution agents may also override the get_context function, which is
+    responsible for building the system context for the agent. This should be done with
+    thought, as the details of the system context are critically important for LLM
+    performance.
     """
 
     def __init__(
         self,
         step: Step,
-        workflow: Workflow,
+        plan_run: PlanRun,
         config: Config,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the base agent with the given args.
 
-        Importantly, the models here are frozen copies of those used in the Runner.
+        Importantly, the models here are frozen copies of those used by the Portia instance.
         They are meant as read-only references, useful for execution of the task
         but cannot be edited. The agent should return output via the response
         of the execute_sync method.
 
         Args:
             step (Step): The step that defines the task to be executed.
-            workflow (Workflow): The workflow that contains the step and related data.
+            plan_run (PlanRun): The run that contains the step and related data.
             config (Config): The configuration settings for the agent.
             tool (Tool | None): An optional tool associated with the agent (default is None).
 
@@ -61,7 +62,7 @@ class BaseAgent:
         self.step = step
         self.tool = tool
         self.config = config
-        self.workflow = workflow
+        self.plan_run = plan_run
 
     @abstractmethod
     def execute_sync(self) -> Output:
@@ -76,10 +77,10 @@ class BaseAgent:
         """
 
     def get_system_context(self) -> str:
-        """Build a generic system context string from the step and workflow provided.
+        """Build a generic system context string from the step and run provided.
 
         This function retrieves the execution context and generates a system context
-        based on the step and workflow provided to the agent.
+        based on the step and run provided to the agent.
 
         Returns:
             str: A string containing the system context for the agent.
@@ -89,7 +90,7 @@ class BaseAgent:
         return build_context(
             ctx,
             self.step,
-            self.workflow,
+            self.plan_run,
         )
 
 
