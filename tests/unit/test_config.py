@@ -76,8 +76,17 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     # storage
-    c = Config.from_default(storage_class="DISK")
+    c = Config.from_default(storage_class="MEMORY")
+    assert c.storage_class == StorageClass.MEMORY
+
+    c = Config.from_default(storage_class="DISK", storage_dir="/test")
     assert c.storage_class == StorageClass.DISK
+    assert c.storage_dir == "/test"
+
+    # Need to specify storage_dir if using DISK
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(storage_class="DISK")
+
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(storage_class="OTHER")
 
