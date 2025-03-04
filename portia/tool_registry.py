@@ -161,7 +161,7 @@ class ToolRegistry(ABC):
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
                 logger().warning(
-                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.",
+                    f"Duplicate tool ID found: {tool.id!s}. Unintended behavior may occur.",
                 )
             tool_ids.add(tool.id)
 
