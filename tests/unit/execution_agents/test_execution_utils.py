@@ -193,3 +193,31 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     assert isinstance(result, Output)
     assert result.value == dict_value
     assert result.summary == provided_summary
+
+
+def test_next_state_after_tool_call_with_clarification_artifact() -> None:
+    """Test next state when tool call succeeds with clarification artifact."""
+    tool = AdditionTool()
+    tool.should_summarize = True
+
+    clarification = InputClarification(
+        argument_name="test",
+        user_guidance="test",
+        plan_run_id=PlanRunUUID(),
+    )
+
+    messages: list[ToolMessage] = [
+        ToolMessage(
+            content="Success message",
+            tool_call_id="123",
+            name="test_tool",
+            artifact=clarification,
+        ),
+    ]
+    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
+
+    result = next_state_after_tool_call(state, tool)
+
+    # Should return END even though tool.should_summarize is True
+    # because the message contains a clarification artifact
+    assert result == END

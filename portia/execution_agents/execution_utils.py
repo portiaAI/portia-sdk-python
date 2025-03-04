@@ -74,6 +74,7 @@ def next_state_after_tool_call(
         "ToolSoftError" not in last_message.content
         and tool
         and getattr(tool, "should_summarize", False)
+        and not isinstance(last_message.artifact, Clarification)
     ):
         return AgentNode.SUMMARIZER
     return END
