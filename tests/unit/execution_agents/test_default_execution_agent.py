@@ -166,6 +166,43 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     # Initial invoke call is not counted towards the MAX_RETRIES
     assert invoke_count == MAX_RETRIES + 1
 
+def test_parser_model_with_retries_invalid_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the parser model handling of invalid JSON and retries."""
+    mock_invoker = MockInvoker(response=AIMessage(content="INVALID_JSON"))
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    parser_model = ParserModel(
+        llm=LLMWrapper(get_test_config()).to_langchain(),
+        context="CONTEXT_STRING",
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+
+    # Track number of invoke calls
+    invoke_count = 0
+    original_invoke = parser_model.invoke
+
+    def counted_invoke(*args, **kwargs) -> dict[str, Any]:  # noqa: ANN002, ANN003
+        nonlocal invoke_count
+        invoke_count += 1
+        return original_invoke(*args, **kwargs)
+
+    parser_model.invoke = counted_invoke
+
+    parser_model.invoke({})  # type: ignore  # noqa: PGH003
+
+    # Initial invoke call is not counted towards the MAX_RETRIES
+    assert invoke_count == MAX_RETRIES + 1
+
 
 def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the parser model handling of invalid arguments and retries."""
