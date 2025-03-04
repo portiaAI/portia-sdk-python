@@ -56,11 +56,11 @@ class ImageUnderstandingTool(Tool[str]):
         # Define system and user messages
         context = (
             "Additional context for the Image tool to use to complete the task, provided by the "
-            "workflow run information and results of other tool calls. Use this to resolve any "
+            "plan run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
-        if ctx.execution_context.workflow_run_context:
-            context += f"\nWorkflow run context: {ctx.execution_context.workflow_run_context}"
+        if ctx.execution_context.plan_run_context:
+            context += f"\nPlan run context: {ctx.execution_context.plan_run_context}"
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
         content = (

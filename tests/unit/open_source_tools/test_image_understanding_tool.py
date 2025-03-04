@@ -43,8 +43,8 @@ def test_image_understanding_tool_run(
     mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
     mock_execution_context.execution_context = MagicMock()
     mock_execution_context.config = get_test_config()
-    mock_execution_context.workflow_id = uuid.uuid4()
-    mock_execution_context.execution_context.workflow_run_context = None
+    mock_execution_context.plan_run_id = uuid.uuid4()
+    mock_execution_context.execution_context.plan_run_context = None
     # Define task input
     schema_data = {
         "task": "What is the capital of France?",
@@ -113,7 +113,7 @@ def test_llm_tool_run_with_context(
     mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
     mock_execution_context.execution_context = MagicMock()
     mock_execution_context.config = get_test_config()
-    mock_execution_context.workflow_id = uuid.uuid4()
+    mock_execution_context.plan_run_id = uuid.uuid4()
     # Define task and context
     mock_image_understanding_tool.tool_context = "Context for task"
     schema_data = {
