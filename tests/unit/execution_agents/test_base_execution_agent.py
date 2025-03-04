@@ -9,20 +9,20 @@ from typing import Any
 from openai import BaseModel
 from pydantic import HttpUrl
 
-from portia.agents.base_agent import BaseAgent, Output
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
 from portia.execution_context import execution_context
-from portia.prefixed_uuid import WorkflowUUID
-from tests.utils import get_test_config, get_test_workflow
+from portia.prefixed_uuid import PlanRunUUID
+from tests.utils import get_test_config, get_test_plan_run
 
 
 def test_base_agent_default_context() -> None:
     """Test default context."""
-    plan, workflow = get_test_workflow()
-    agent = BaseAgent(
+    plan, plan_run = get_test_plan_run()
+    agent = BaseExecutionAgent(
         plan.steps[0],
-        workflow,
+        plan_run,
         get_test_config(),
         None,
     )
@@ -33,10 +33,10 @@ def test_base_agent_default_context() -> None:
 
 def test_base_agent_default_context_with_extensions() -> None:
     """Test default context."""
-    plan, workflow = get_test_workflow()
-    agent = BaseAgent(
+    plan, plan_run = get_test_plan_run()
+    agent = BaseExecutionAgent(
         plan.steps[0],
-        workflow,
+        plan_run,
         get_test_config(),
         None,
     )
@@ -61,7 +61,7 @@ def test_output_serialize() -> None:
     not_a_model = NotAModel(id="123")
     now = datetime.now(tz=UTC)
     clarification = ActionClarification(
-        workflow_id=WorkflowUUID(),
+        plan_run_id=PlanRunUUID(),
         user_guidance="",
         action_url=HttpUrl("https://example.com"),
     )

@@ -60,7 +60,7 @@ class FileReaderTool(Tool[str]):
         alt_file_paths = self.find_file(file_path)
         if alt_file_paths:
             return MultipleChoiceClarification(
-                workflow_id=ctx.workflow_id,
+                plan_run_id=ctx.plan_run_id,
                 argument_name="filename",
                 user_guidance=(
                     f"Found {filename} in these location(s). "

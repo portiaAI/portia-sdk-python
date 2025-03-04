@@ -33,7 +33,6 @@ from pydantic import (
     model_validator,
 )
 
-from portia.agents.base_agent import Output
 from portia.clarification import (
     ActionClarification,
     Clarification,
@@ -47,10 +46,11 @@ from portia.clarification import (
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.execution_agents.base_execution_agent import Output
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
+from portia.plan_run import PlanRunUUID
 from portia.templates.render import render_template
-from portia.workflow import WorkflowUUID
 
 """MAX_TOOL_DESCRIPTION_LENGTH is the max length tool descriptions can be to respect API limits."""
 MAX_TOOL_DESCRIPTION_LENGTH = 1024
@@ -61,16 +61,16 @@ class ToolRunContext(BaseModel):
 
     Attributes:
         execution_context(ExecutionContext): The execution context the tool is running in.
-        workflow_id(WorkflowUUID): The workflow id the tool run is part of.
+        plan_run_id(RunUUID): The run id the tool run is part of.
         config(Config): The config for the SDK as a whole.
-        clarifications(ClarificationListType): Relevant clarifications for this tool run.
+        clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
 
     """
 
     model_config = ConfigDict(extra="forbid")
 
     execution_context: ExecutionContext
-    workflow_id: WorkflowUUID
+    plan_run_id: PlanRunUUID
     config: Config
     clarifications: ClarificationListType
 
@@ -89,7 +89,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         This must be unique as collisions in a tool registry will lead to errors.
     name (str): The name of the tool. The name is informational only but useful for debugging.
     description (str): Purpose of the tool and usage.
-        This is important information for the planner module to know when and how to use this tool.
+        This is important information for the planning_agent module to know when and
+        how to use this tool.
     args_schema (type[BaseModel]): The schema defining the expected input arguments for the tool.
         We use Pydantic models to define these types.
     output_schema (tuple[str, str]): A tuple containing the type and description of the tool's
@@ -121,9 +122,9 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     )
 
     def ready(self, ctx: ToolRunContext) -> bool:  # noqa: ARG002
-        """Check whether the tool can be run.
+        """Check whether the tool can be plan_run.
 
-        This method can be implemented by subclasses to allow checking if the tool can be run.
+        This method can be implemented by subclasses to allow checking if the tool can be plan_run.
         It may run any authentication logic or other required checks before returning its status.
         If left unimplemented will always return true.
 
@@ -421,7 +422,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.ACTION:
                     return Output(
                         value=ActionClarification(
-                            workflow_id=ctx.workflow_id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
@@ -430,7 +431,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.INPUT:
                     return Output(
                         value=InputClarification(
-                            workflow_id=ctx.workflow_id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -439,7 +440,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.MULTIPLE_CHOICE:
                     return Output(
                         value=MultipleChoiceClarification(
-                            workflow_id=ctx.workflow_id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -449,7 +450,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.VALUE_CONFIRMATION:
                     return Output(
                         value=ValueConfirmationClarification(
-                            workflow_id=ctx.workflow_id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -475,7 +476,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "execution_context": {
                             "end_user_id": ctx.execution_context.end_user_id or "",
-                            "workflow_id": str(ctx.workflow_id),
+                            "plan_run_id": str(ctx.plan_run_id),
                             "additional_data": ctx.execution_context.additional_data or {},
                         },
                     },
@@ -507,7 +508,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         during the request or parsing are raised as `ToolHardError`.
 
         Args:
-            ctx (ToolRunContext): The context of the execution, including end user ID, workflow ID
+            ctx (ToolRunContext): The context of the execution, including end user ID, run ID
             and additional data.
             *args (Any): The positional arguments for the tool.
             **kwargs (Any): The keyword arguments for the tool.
@@ -529,7 +530,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.execution_context.end_user_id or "",
-                            "workflow_id": str(ctx.workflow_id),
+                            "plan_run_id": str(ctx.plan_run_id),
                             "additional_data": ctx.execution_context.additional_data or {},
                         },
                     },

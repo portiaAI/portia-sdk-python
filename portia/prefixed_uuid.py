@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field, model_serializer, model_validator
 
 PLAN_UUID_PREFIX = "plan"
-WORKFLOW_UUID_PREFIX = "wkfl"
+PLAN_RUN_UUID_PREFIX = "prun"
 CLARIFICATION_UUID_PREFIX = "clar"
 
 
@@ -101,10 +101,10 @@ class PlanUUID(PrefixedUUID):
     prefix: ClassVar[str] = PLAN_UUID_PREFIX
 
 
-class WorkflowUUID(PrefixedUUID):
-    """A UUID for a workflow."""
+class PlanRunUUID(PrefixedUUID):
+    """A UUID for a PlanRun."""
 
-    prefix: ClassVar[str] = WORKFLOW_UUID_PREFIX
+    prefix: ClassVar[str] = PLAN_RUN_UUID_PREFIX
 
 
 class ClarificationUUID(PrefixedUUID):

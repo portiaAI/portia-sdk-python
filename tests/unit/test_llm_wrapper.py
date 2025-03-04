@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from portia.llm_wrapper import BaseLLMWrapper, T
-from portia.planners.planner import StepsOrError
+from portia.planning_agents.base_planning_agent import StepsOrError
 from tests.utils import get_test_config
 
 if TYPE_CHECKING:

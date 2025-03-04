@@ -5,15 +5,15 @@ from pathlib import Path
 import pytest
 
 from portia.plan import Plan, PlanContext
+from portia.plan_run import PlanRun, PlanRunState
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
     PlanNotFoundError,
+    PlanRunNotFoundError,
+    PlanRunUUID,
     PlanUUID,
-    WorkflowNotFoundError,
-    WorkflowUUID,
 )
-from portia.workflow import Workflow, WorkflowState
 
 
 def test_in_memory_storage_save_and_get_plan() -> None:
@@ -29,18 +29,18 @@ def test_in_memory_storage_save_and_get_plan() -> None:
         storage.get_plan(PlanUUID())
 
 
-def test_in_memory_storage_save_and_get_workflow() -> None:
-    """Test saving and retrieving a Workflow in InMemoryStorage."""
+def test_in_memory_storage_save_and_get_plan_run() -> None:
+    """Test saving and retrieving PlanRun in InMemoryStorage."""
     storage = InMemoryStorage()
     plan = Plan(plan_context=PlanContext(query="query", tool_ids=[]), steps=[])
-    workflow = Workflow(plan_id=plan.id)
-    storage.save_workflow(workflow)
-    retrieved_workflow = storage.get_workflow(workflow.id)
+    plan_run = PlanRun(plan_id=plan.id)
+    storage.save_plan_run(plan_run)
+    retrieved_plan_run = storage.get_plan_run(plan_run.id)
 
-    assert retrieved_workflow.id == workflow.id
+    assert retrieved_plan_run.id == plan_run.id
 
-    with pytest.raises(WorkflowNotFoundError):
-        storage.get_workflow(WorkflowUUID())
+    with pytest.raises(PlanRunNotFoundError):
+        storage.get_plan_run(PlanRunUUID())
 
 
 def test_disk_file_storage_save_and_get_plan(tmp_path: Path) -> None:
@@ -56,37 +56,37 @@ def test_disk_file_storage_save_and_get_plan(tmp_path: Path) -> None:
         storage.get_plan(PlanUUID())
 
 
-def test_disk_file_storage_save_and_get_workflow(tmp_path: Path) -> None:
-    """Test saving and retrieving a Workflow in DiskFileStorage."""
+def test_disk_file_storage_save_and_get_plan_run(tmp_path: Path) -> None:
+    """Test saving and retrieving PlanRun in DiskFileStorage."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
     plan = Plan(
         plan_context=PlanContext(query="query", tool_ids=[]),
         steps=[],
     )
-    workflow = Workflow(plan_id=plan.id)
-    storage.save_workflow(workflow)
-    retrieved_workflow = storage.get_workflow(workflow.id)
+    plan_run = PlanRun(plan_id=plan.id)
+    storage.save_plan_run(plan_run)
+    retrieved_plan_run = storage.get_plan_run(plan_run.id)
 
-    assert retrieved_workflow.id == workflow.id
+    assert retrieved_plan_run.id == plan_run.id
 
-    with pytest.raises(WorkflowNotFoundError):
-        storage.get_workflow(WorkflowUUID())
+    with pytest.raises(PlanRunNotFoundError):
+        storage.get_plan_run(PlanRunUUID())
 
 
-def test_disk_file_storage_save_and_get_workflows(tmp_path: Path) -> None:
-    """Test saving and retrieving a Workflow in DiskFileStorage."""
+def test_disk_file_storage_save_and_get_plan_runs(tmp_path: Path) -> None:
+    """Test saving and retrieving PlanRun in DiskFileStorage."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
     plan = Plan(
         plan_context=PlanContext(query="query", tool_ids=[]),
         steps=[],
     )
-    workflow = Workflow(plan_id=plan.id, state=WorkflowState.IN_PROGRESS)
-    storage.save_workflow(workflow)
-    workflow = Workflow(plan_id=plan.id, state=WorkflowState.FAILED)
-    storage.save_workflow(workflow)
+    plan_run = PlanRun(plan_id=plan.id, state=PlanRunState.IN_PROGRESS)
+    storage.save_plan_run(plan_run)
+    plan_run = PlanRun(plan_id=plan.id, state=PlanRunState.FAILED)
+    storage.save_plan_run(plan_run)
 
-    workflows = storage.get_workflows(WorkflowState.IN_PROGRESS)
-    assert len(workflows.results) == 1
+    runs = storage.get_plan_runs(PlanRunState.IN_PROGRESS)
+    assert len(runs.results) == 1
 
 
 def test_disk_file_storage_invalid_plan_retrieval(tmp_path: Path) -> None:
@@ -99,11 +99,11 @@ def test_disk_file_storage_invalid_plan_retrieval(tmp_path: Path) -> None:
         storage.get_plan(PlanUUID())
 
 
-def test_disk_file_storage_invalid_workflow_retrieval(tmp_path: Path) -> None:
-    """Test handling of invalid Workflow data in DiskFileStorage."""
+def test_disk_file_storage_invalid_run_retrieval(tmp_path: Path) -> None:
+    """Test handling of invalid Run data in DiskFileStorage."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
-    invalid_file = tmp_path / "workflow-invalid.json"
+    invalid_file = tmp_path / "run-invalid.json"
     invalid_file.write_text('{"id": "not-a-valid-uuid"}')  # Write invalid JSON
 
-    with pytest.raises(WorkflowNotFoundError):
-        storage.get_workflow(WorkflowUUID())
+    with pytest.raises(PlanRunNotFoundError):
+        storage.get_plan_run(PlanRunUUID())

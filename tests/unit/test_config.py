@@ -1,4 +1,4 @@
-"""Tests for runner classes."""
+"""Tests for portia classes."""
 
 import tempfile
 from pathlib import Path
@@ -7,18 +7,18 @@ import pytest
 from pydantic import SecretStr, ValidationError
 
 from portia.config import (
-    AgentType,
     Config,
+    ExecutionAgentType,
     LLMModel,
     LLMProvider,
     LogLevel,
-    PlannerType,
+    PlanningAgentType,
     StorageClass,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 
-def test_runner_config_from_file() -> None:
+def test_portia_config_from_file() -> None:
     """Test loading configuration from a file."""
     config_data = """{
 "portia_api_key": "file-key",
@@ -28,8 +28,8 @@ def test_runner_config_from_file() -> None:
 "llm_provider": "OPENAI",
 "llm_model_name": "GPT_4_O_MINI",
 "llm_model_seed": 443,
-"default_agent_type": "VERIFIER",
-"default_planner": "ONE_SHOT"
+"execution_agent_type": "DEFAULT",
+"planning_agent_type": "DEFAULT"
 }"""
 
     with tempfile.NamedTemporaryFile("w", delete=True, suffix=".json") as temp_file:
@@ -42,7 +42,8 @@ def test_runner_config_from_file() -> None:
 
         assert config.must_get_raw_api_key("portia_api_key") == "file-key"
         assert config.must_get_raw_api_key("openai_api_key") == "file-openai-key"
-        assert config.default_agent_type == AgentType.VERIFIER
+        assert config.execution_agent_type == ExecutionAgentType.DEFAULT
+        assert config.planning_agent_type == PlanningAgentType.DEFAULT
         assert config.llm_model_temperature == 10
 
 
@@ -96,11 +97,11 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(llm_provider="personal", llm_model_name="other-model")
 
-    # default_agent_type
-    c = Config.from_default(default_agent_type="verifier")
-    assert c.default_agent_type == AgentType.VERIFIER
+    # execution_agent_type
+    c = Config.from_default(execution_agent_type="default")
+    assert c.execution_agent_type == ExecutionAgentType.DEFAULT
     with pytest.raises(InvalidConfigError):
-        c = Config.from_default(default_agent_type="my agent")
+        c = Config.from_default(execution_agent_type="my agent")
 
 
 def test_getters() -> None:
@@ -137,8 +138,8 @@ def test_getters() -> None:
             llm_model_name=LLMModel.CLAUDE_3_OPUS_LATEST,
             llm_model_temperature=0,
             llm_model_seed=443,
-            default_agent_type=AgentType.VERIFIER,
-            default_planner=PlannerType.ONE_SHOT,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
+            planning_agent_type=PlanningAgentType.DEFAULT,
         )
 
     # no api key for provider model
@@ -151,8 +152,8 @@ def test_getters() -> None:
                 llm_model_name=LLMModel.GPT_4_O_MINI,
                 llm_model_temperature=0,
                 llm_model_seed=443,
-                default_agent_type=AgentType.VERIFIER,
-                default_planner=PlannerType.ONE_SHOT,
+                execution_agent_type=ExecutionAgentType.DEFAULT,
+                planning_agent_type=PlanningAgentType.DEFAULT,
             )
 
     # negative temperature
@@ -163,8 +164,8 @@ def test_getters() -> None:
             llm_model_name=LLMModel.GPT_4_O_MINI,
             llm_model_temperature=0,
             llm_model_seed=-443,
-            default_agent_type=AgentType.VERIFIER,
-            default_planner=PlannerType.ONE_SHOT,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
+            planning_agent_type=PlanningAgentType.DEFAULT,
         )
     # no Portia API KEy
     with pytest.raises(InvalidConfigError):
@@ -175,8 +176,8 @@ def test_getters() -> None:
             llm_model_name=LLMModel.GPT_4_O_MINI,
             llm_model_temperature=0,
             llm_model_seed=443,
-            default_agent_type=AgentType.VERIFIER,
-            default_planner=PlannerType.ONE_SHOT,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
+            planning_agent_type=PlanningAgentType.DEFAULT,
         )
 
 
