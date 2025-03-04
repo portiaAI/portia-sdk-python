@@ -4,12 +4,12 @@ import pytest
 from pydantic import ValidationError
 
 from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step
-from tests.utils import get_test_workflow
+from tests.utils import get_test_plan_run
 
 
 def test_plan_serialization() -> None:
     """Test plan can be serialized to string."""
-    plan, _ = get_test_workflow()
+    plan, _ = get_test_plan_run()
     assert str(plan) == (
         f"PlanModel(id={plan.id!r},plan_context={plan.plan_context!r}, steps={plan.steps!r}"
     )

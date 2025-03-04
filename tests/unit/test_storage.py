@@ -10,17 +10,17 @@ import pytest
 
 from portia.errors import StorageError
 from portia.plan import Plan, PlanContext, PlanUUID
+from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
     AdditionalStorage,
     DiskFileStorage,
     InMemoryStorage,
+    PlanRunListResponse,
     PlanStorage,
     PortiaCloudStorage,
-    WorkflowListResponse,
-    WorkflowStorage,
+    RunStorage,
 )
-from portia.workflow import Workflow, WorkflowState, WorkflowUUID
-from tests.utils import get_test_config, get_test_tool_call, get_test_workflow
+from tests.utils import get_test_config, get_test_plan_run, get_test_tool_call
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def test_storage_base_classes() -> None:
     """Test PlanStorage raises."""
 
-    class MyStorage(WorkflowStorage, PlanStorage, AdditionalStorage):
+    class MyStorage(RunStorage, PlanStorage, AdditionalStorage):
         """Override to test base."""
 
         def save_plan(self, plan: Plan) -> None:
@@ -40,29 +40,29 @@ def test_storage_base_classes() -> None:
         def get_plan(self, plan_id: PlanUUID) -> Plan:
             return super().get_plan(plan_id)  # type: ignore  # noqa: PGH003
 
-        def save_workflow(self, workflow: Workflow) -> None:
-            return super().save_workflow(workflow)  # type: ignore  # noqa: PGH003
+        def save_plan_run(self, plan_run: PlanRun) -> None:
+            return super().save_plan_run(plan_run)  # type: ignore  # noqa: PGH003
 
-        def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
-            return super().get_workflow(workflow_id)  # type: ignore  # noqa: PGH003
+        def get_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+            return super().get_plan_run(plan_run_id)  # type: ignore  # noqa: PGH003
 
-        def get_workflows(
+        def get_plan_runs(
             self,
-            workflow_state: WorkflowState | None = None,
+            run_state: PlanRunState | None = None,
             page: int | None = None,
-        ) -> WorkflowListResponse:
-            return super().get_workflows(workflow_state, page)  # type: ignore  # noqa: PGH003
+        ) -> PlanRunListResponse:
+            return super().get_plan_runs(run_state, page)  # type: ignore  # noqa: PGH003
 
         def save_tool_call(self, tool_call: ToolCallRecord) -> None:
             return super().save_tool_call(tool_call)  # type: ignore  # noqa: PGH003
 
     storage = MyStorage()
     plan = Plan(plan_context=PlanContext(query="", tool_ids=[]), steps=[])
-    workflow = Workflow(
+    plan_run = PlanRun(
         plan_id=plan.id,
     )
 
-    tool_call = get_test_tool_call(workflow)
+    tool_call = get_test_tool_call(plan_run)
 
     with pytest.raises(NotImplementedError):
         storage.save_plan(plan)
@@ -71,13 +71,13 @@ def test_storage_base_classes() -> None:
         storage.get_plan(plan.id)
 
     with pytest.raises(NotImplementedError):
-        storage.save_workflow(workflow)
+        storage.save_plan_run(plan_run)
 
     with pytest.raises(NotImplementedError):
-        storage.get_workflow(workflow.id)
+        storage.get_plan_run(plan_run.id)
 
     with pytest.raises(NotImplementedError):
-        storage.get_workflows()
+        storage.get_plan_runs()
 
     with pytest.raises(NotImplementedError):
         storage.save_tool_call(tool_call)
@@ -86,26 +86,26 @@ def test_storage_base_classes() -> None:
 def test_in_memory_storage() -> None:
     """Test in memory storage."""
     storage = InMemoryStorage()
-    (plan, workflow) = get_test_workflow()
+    (plan, plan_run) = get_test_plan_run()
     storage.save_plan(plan)
     assert storage.get_plan(plan.id) == plan
-    storage.save_workflow(workflow)
-    assert storage.get_workflow(workflow.id) == workflow
-    assert storage.get_workflows().results == [workflow]
-    assert storage.get_workflows(WorkflowState.FAILED).results == []
+    storage.save_plan_run(plan_run)
+    assert storage.get_plan_run(plan_run.id) == plan_run
+    assert storage.get_plan_runs().results == [plan_run]
+    assert storage.get_plan_runs(PlanRunState.FAILED).results == []
 
 
 def test_disk_storage(tmp_path: Path) -> None:
     """Test disk storage."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
-    (plan, workflow) = get_test_workflow()
+    (plan, plan_run) = get_test_plan_run()
     storage.save_plan(plan)
     assert storage.get_plan(plan.id) == plan
-    storage.save_workflow(workflow)
-    assert storage.get_workflow(workflow.id) == workflow
-    all_workflows = storage.get_workflows()
-    assert all_workflows.results == [workflow]
-    assert storage.get_workflows(WorkflowState.FAILED).results == []
+    storage.save_plan_run(plan_run)
+    assert storage.get_plan_run(plan_run.id) == plan_run
+    all_runs = storage.get_plan_runs()
+    assert all_runs.results == [plan_run]
+    assert storage.get_plan_runs(PlanRunState.FAILED).results == []
 
 
 def test_portia_cloud_storage() -> None:
@@ -118,11 +118,11 @@ def test_portia_cloud_storage() -> None:
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
     )
-    workflow = Workflow(
-        id=WorkflowUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
+    plan_run = PlanRun(
+        id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
     )
-    tool_call = get_test_tool_call(workflow)
+    tool_call = get_test_tool_call(plan_run)
 
     # Simulate a failed response
     mock_response = MagicMock()
@@ -173,18 +173,18 @@ def test_portia_cloud_storage() -> None:
         patch("httpx.put", return_value=mock_response) as mock_put,
         patch("httpx.get", return_value=mock_response) as mock_get,
     ):
-        # Test save_workflow failure
+        # Test save_run failure
         with pytest.raises(StorageError, match="An error occurred."):
-            storage.save_workflow(workflow)
+            storage.save_plan_run(plan_run)
 
         mock_put.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
             json={
-                "current_step_index": workflow.current_step_index,
-                "state": workflow.state,
-                "execution_context": workflow.execution_context.model_dump(mode="json"),
-                "outputs": workflow.outputs.model_dump(mode="json"),
-                "plan_id": str(workflow.plan_id),
+                "current_step_index": plan_run.current_step_index,
+                "state": plan_run.state,
+                "execution_context": plan_run.execution_context.model_dump(mode="json"),
+                "outputs": plan_run.outputs.model_dump(mode="json"),
+                "plan_id": str(plan_run.plan_id),
             },
             headers={
                 "Authorization": "Api-Key test_api_key",
@@ -197,12 +197,12 @@ def test_portia_cloud_storage() -> None:
         patch("httpx.post", return_value=mock_response) as mock_post,
         patch("httpx.get", return_value=mock_response) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError, match="An error occurred."):
-            storage.get_workflow(workflow.id)
+            storage.get_plan_run(plan_run.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -214,12 +214,12 @@ def test_portia_cloud_storage() -> None:
         patch("httpx.post", return_value=mock_response) as mock_post,
         patch("httpx.get", return_value=mock_response) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError, match="An error occurred."):
-            storage.get_workflows(WorkflowState.READY_TO_RESUME)
+            storage.get_plan_runs(PlanRunState.READY_TO_RESUME)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/?workflow_state=READY_TO_RESUME",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?run_state=READY_TO_RESUME",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -231,12 +231,12 @@ def test_portia_cloud_storage() -> None:
         patch("httpx.post", return_value=mock_response) as mock_post,
         patch("httpx.get", return_value=mock_response) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError, match="An error occurred."):
-            storage.get_workflows()
+            storage.get_plan_runs()
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/?",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -248,7 +248,7 @@ def test_portia_cloud_storage() -> None:
         patch("httpx.post", return_value=mock_response) as mock_post,
         patch("httpx.get", return_value=mock_response) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.save_tool_call(tool_call)
 
@@ -259,7 +259,7 @@ def test_portia_cloud_storage() -> None:
                 "Content-Type": "application/json",
             },
             json={
-                "workflow_id": str(tool_call.workflow_id),
+                "plan_run_id": str(tool_call.plan_run_id),
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
@@ -283,12 +283,12 @@ def test_portia_cloud_storage_errors() -> None:
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
     )
-    workflow = Workflow(
-        id=WorkflowUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
+    plan_run = PlanRun(
+        id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
     )
 
-    tool_call = get_test_tool_call(workflow)
+    tool_call = get_test_tool_call(plan_run)
     with (
         patch("httpx.post", side_effect=TimeoutError()) as mock_post,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
@@ -333,18 +333,18 @@ def test_portia_cloud_storage_errors() -> None:
         patch("httpx.put", side_effect=TimeoutError()) as mock_put,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
     ):
-        # Test save_workflow failure
+        # Test save_run failure
         with pytest.raises(StorageError):
-            storage.save_workflow(workflow)
+            storage.save_plan_run(plan_run)
 
         mock_put.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
             json={
-                "current_step_index": workflow.current_step_index,
-                "state": workflow.state,
-                "execution_context": workflow.execution_context.model_dump(mode="json"),
-                "outputs": workflow.outputs.model_dump(mode="json"),
-                "plan_id": str(workflow.plan_id),
+                "current_step_index": plan_run.current_step_index,
+                "state": plan_run.state,
+                "execution_context": plan_run.execution_context.model_dump(mode="json"),
+                "outputs": plan_run.outputs.model_dump(mode="json"),
+                "plan_id": str(plan_run.plan_id),
             },
             headers={
                 "Authorization": "Api-Key test_api_key",
@@ -357,12 +357,12 @@ def test_portia_cloud_storage_errors() -> None:
         patch("httpx.post", side_effect=TimeoutError()) as mock_post,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError):
-            storage.get_workflow(workflow.id)
+            storage.get_plan_run(plan_run.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/{workflow.id}/",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -374,12 +374,12 @@ def test_portia_cloud_storage_errors() -> None:
         patch("httpx.post", side_effect=TimeoutError()) as mock_post,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError):
-            storage.get_workflows()
+            storage.get_plan_runs()
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/?",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -391,12 +391,12 @@ def test_portia_cloud_storage_errors() -> None:
         patch("httpx.post", side_effect=TimeoutError()) as mock_post,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError):
-            storage.get_workflows(workflow_state=WorkflowState.COMPLETE, page=10)
+            storage.get_plan_runs(run_state=PlanRunState.COMPLETE, page=10)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/workflows/?page=10&workflow_state=COMPLETE",
+            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?page=10&run_state=COMPLETE",
             headers={
                 "Authorization": "Api-Key test_api_key",
                 "Content-Type": "application/json",
@@ -408,7 +408,7 @@ def test_portia_cloud_storage_errors() -> None:
         patch("httpx.post", side_effect=TimeoutError()) as mock_post,
         patch("httpx.get", side_effect=TimeoutError()) as mock_get,
     ):
-        # Test get_workflow failure
+        # Test get_run failure
         with pytest.raises(StorageError):
             storage.save_tool_call(tool_call)
 
@@ -419,7 +419,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "Content-Type": "application/json",
             },
             json={
-                "workflow_id": str(tool_call.workflow_id),
+                "plan_run_id": str(tool_call.plan_run_id),
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",

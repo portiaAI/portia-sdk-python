@@ -1,4 +1,4 @@
-"""Default examples that are passed to the query planner if none are provided."""
+"""Default examples that are passed to the query planning_agent if none are provided."""
 
 from portia.plan import Plan, PlanContext, Step, Variable
 

@@ -1,4 +1,4 @@
-"""Tests for the Planner module."""
+"""Tests for the PlanningAgent module."""
 
 from __future__ import annotations
 
@@ -12,9 +12,12 @@ from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, Step, Variable
-from portia.planners.context import default_query_system_context, render_prompt_insert_defaults
-from portia.planners.one_shot_planner import OneShotPlanner
-from portia.planners.planner import Planner, StepsOrError
+from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
+from portia.planning_agents.context import (
+    default_query_system_context,
+    render_prompt_insert_defaults,
+)
+from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from tests.utils import AdditionTool, get_test_config
 
 if TYPE_CHECKING:
@@ -29,12 +32,12 @@ def mock_config() -> Config:
 
 
 @pytest.fixture
-def planner(mock_config: Config) -> OneShotPlanner:
-    """Create an instance of the Planner with mocked config."""
-    return OneShotPlanner(config=mock_config)
+def planning_agent(mock_config: Config) -> DefaultPlanningAgent:
+    """Create an instance of the PlanningAgent with mocked config."""
+    return DefaultPlanningAgent(config=mock_config)
 
 
-def test_generate_steps_or_error_success(planner: OneShotPlanner) -> None:
+def test_generate_steps_or_error_success(planning_agent: DefaultPlanningAgent) -> None:
     """Test successful plan generation with valid inputs."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
@@ -45,7 +48,7 @@ def test_generate_steps_or_error_success(planner: OneShotPlanner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_steps_or_error(
+    result = planning_agent.generate_steps_or_error(
         ctx=get_execution_context(),
         query=query,
         tool_list=[],
@@ -58,7 +61,7 @@ def test_generate_steps_or_error_success(planner: OneShotPlanner) -> None:
 def test_base_classes() -> None:
     """Test PlanStorage raises."""
 
-    class MyPlanner(Planner):
+    class MyPlanningAgent(BasePlanningAgent):
         """Override to test base."""
 
         def generate_steps_or_error(
@@ -70,13 +73,13 @@ def test_base_classes() -> None:
         ) -> StepsOrError:
             return super().generate_steps_or_error(ctx, query, tool_list, examples)  # type: ignore  # noqa: PGH003
 
-    wrapper = MyPlanner(get_test_config())
+    wrapper = MyPlanningAgent(get_test_config())
 
     with pytest.raises(NotImplementedError):
         wrapper.generate_steps_or_error(get_execution_context(), "", [], [])
 
 
-def test_generate_steps_or_error_failure(planner: OneShotPlanner) -> None:
+def test_generate_steps_or_error_failure(planning_agent: DefaultPlanningAgent) -> None:
     """Test handling of error when generating a plan fails."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
@@ -87,12 +90,16 @@ def test_generate_steps_or_error_failure(planner: OneShotPlanner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_steps_or_error(ctx=get_execution_context(), query=query, tool_list=[])
+    result = planning_agent.generate_steps_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[],
+    )
 
     assert result.error == "Unable to generate a plan"
 
 
-def test_planner_default_context_with_extensions() -> None:
+def test_planning_agent_default_context_with_extensions() -> None:
     """Test default context."""
     context = default_query_system_context(system_context_extension=["456"])
     assert "456" in context
@@ -157,7 +164,7 @@ def test_render_prompt() -> None:
     assert "extension" in system_context_content
 
 
-def test_generate_steps_or_error_invalid_tool_id(planner: OneShotPlanner) -> None:
+def test_generate_steps_or_error_invalid_tool_id(planning_agent: DefaultPlanningAgent) -> None:
     """Test handling of invalid tool ID in generated steps."""
     query = "Calculate something"
 
@@ -180,7 +187,7 @@ def test_generate_steps_or_error_invalid_tool_id(planner: OneShotPlanner) -> Non
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_steps_or_error(
+    result = planning_agent.generate_steps_or_error(
         ctx=get_execution_context(),
         query=query,
         tool_list=[AdditionTool()],
@@ -190,7 +197,7 @@ def test_generate_steps_or_error_invalid_tool_id(planner: OneShotPlanner) -> Non
     assert result.steps == mock_response.steps
 
 
-def test_generate_steps_assigns_llm_tool_id(planner: OneShotPlanner) -> None:
+def test_generate_steps_assigns_llm_tool_id(planning_agent: DefaultPlanningAgent) -> None:
     """Test that steps without tool_id get assigned to LLMTool."""
     query = "Generate a creative story"
 
@@ -214,7 +221,7 @@ def test_generate_steps_assigns_llm_tool_id(planner: OneShotPlanner) -> None:
     )
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
-    result = planner.generate_steps_or_error(
+    result = planning_agent.generate_steps_or_error(
         ctx=get_execution_context(),
         query=query,
         tool_list=[AdditionTool()],

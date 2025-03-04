@@ -1,4 +1,4 @@
-"""One shot planner is a single best effort attempt at planning based on the given query + tools."""
+"""DefaultPlanningAgent is a single best effort attempt at planning based on the given query + tools."""  # noqa: E501
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.planners.context import render_prompt_insert_defaults
-from portia.planners.planner import Planner, StepsOrError
+from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
+from portia.planning_agents.context import render_prompt_insert_defaults
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class OneShotPlanner(Planner):
-    """planner class."""
+class DefaultPlanningAgent(BasePlanningAgent):
+    """DefaultPlanningAgent class."""
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
@@ -38,7 +38,7 @@ class OneShotPlanner(Planner):
         prompt = render_prompt_insert_defaults(
             query,
             tool_list,
-            ctx.planner_system_context_extension,
+            ctx.planning_agent_system_context_extension,
             examples,
         )
         response = self.llm_wrapper.to_instructor(

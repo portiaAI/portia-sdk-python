@@ -12,7 +12,7 @@ from langchain.schema import SystemMessage
 from langchain_core.messages import BaseMessage, ToolMessage
 from langgraph.graph import MessagesState  # noqa: TC002
 
-from portia.agents.base_agent import Output
+from portia.execution_agents.base_execution_agent import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:

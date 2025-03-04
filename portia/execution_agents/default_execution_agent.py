@@ -1,4 +1,4 @@
-"""The Verifier Agent for hardest problems.
+"""The Default execution agent for hardest problems.
 
 This agent uses multiple models (verifier, parser etc) to achieve the highest accuracy
 in completing tasks.
@@ -14,17 +14,17 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from portia.agents.base_agent import BaseAgent, Output
-from portia.agents.execution_utils import (
+from portia.clarification import Clarification, InputClarification
+from portia.errors import InvalidAgentError, InvalidPlanRunStateError
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
+from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
 )
-from portia.agents.utils.step_summarizer import StepSummarizer
-from portia.clarification import Clarification, InputClarification
-from portia.errors import InvalidAgentError, InvalidWorkflowStateError
+from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import ToolRunContext
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 
     from portia.config import Config
     from portia.plan import Step
+    from portia.plan_run import PlanRun
     from portia.tool import Tool
-    from portia.workflow import Workflow
 
 
 class ToolArgument(BaseModel):
@@ -123,13 +123,13 @@ class ParserModel:
     Args:
         llm (BaseChatModel): The language model used for argument parsing.
         context (str): The context for argument generation.
-        agent (VerifierAgent): The agent using the parser model.
+        agent (DefaultExecutionAgent): The agent using the parser model.
 
     Attributes:
         arg_parser_prompt (ChatPromptTemplate): The prompt template for argument parsing.
         llm (BaseChatModel): The language model used.
         context (str): The context for argument generation.
-        agent (VerifierAgent): The agent using the parser model.
+        agent (DefaultExecutionAgent): The agent using the parser model.
         previous_errors (list[str]): A list of previous errors encountered during parsing.
         retries (int): The number of retries attempted for parsing.
 
@@ -180,13 +180,13 @@ class ParserModel:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, context: str, agent: VerifierAgent) -> None:
+    def __init__(self, llm: BaseChatModel, context: str, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
             llm (BaseChatModel): The language model used for argument parsing.
             context (str): The context for argument generation.
-            agent (VerifierAgent): The agent using the parser model.
+            agent (DefaultExecutionAgent): The agent using the parser model.
 
         """
         self.llm = llm
@@ -205,11 +205,11 @@ class ParserModel:
             dict[str, Any]: The response after invoking the model.
 
         Raises:
-            InvalidWorkflowStateError: If the agent's tool is not available.
+            InvalidRunStateError: If the agent's tool is not available.
 
         """
         if not self.agent.tool:
-            raise InvalidWorkflowStateError(None)
+            raise InvalidPlanRunStateError(None)
         model = self.llm.with_structured_output(ToolInputs)
         message = self.arg_parser_prompt.format_messages(
             context=self.context,
@@ -269,7 +269,7 @@ class VerifierModel:
         arg_verifier_prompt (ChatPromptTemplate): The prompt template used for arg verification.
         llm (BaseChatModel): The language model used to invoke the verification process.
         context (str): The context in which the tool arguments are being validated.
-        agent (VerifierAgent): The agent responsible for handling the verification process.
+        agent (DefaultExecutionAgent): The agent responsible for handling the verification process.
 
     """
 
@@ -307,13 +307,13 @@ class VerifierModel:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, context: str, agent: VerifierAgent) -> None:
+    def __init__(self, llm: BaseChatModel, context: str, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
             llm (BaseChatModel): The language model used for argument parsing.
             context (str): The context for argument generation.
-            agent (VerifierAgent): The agent using the parser model.
+            agent (DefaultExecutionAgent): The agent using the parser model.
 
         """
         self.llm = llm
@@ -330,7 +330,7 @@ class VerifierModel:
             dict[str, Any]: The response after invoking the model.
 
         Raises:
-            InvalidWorkflowStateError: If the agent's tool is not available.
+            InvalidRunStateError: If the agent's tool is not available.
 
         """
         messages = state["messages"]
@@ -416,14 +416,14 @@ class ToolCallingModel:
         llm: BaseChatModel,
         context: str,
         tools: list[StructuredTool],
-        agent: VerifierAgent,
+        agent: DefaultExecutionAgent,
     ) -> None:
         """Initialize the model.
 
         Args:
             llm (BaseChatModel): The language model used for argument parsing.
             context (str): The context for argument generation.
-            agent (VerifierAgent): The agent using the parser model.
+            agent (DefaultExecutionAgent): The agent using the parser model.
             tools (list[StructuredTool]): The tools to pass to the model.
 
         """
@@ -442,14 +442,14 @@ class ToolCallingModel:
             dict[str, Any]: The response after invoking the model.
 
         Raises:
-            InvalidWorkflowStateError: If the agent's tool is not available.
+            InvalidRunStateError: If the agent's tool is not available.
 
         """
         verified_args = self.agent.verified_args
         if not verified_args:
-            raise InvalidWorkflowStateError
+            raise InvalidPlanRunStateError
         # handle any clarifications before calling
-        if self.agent and self.agent.workflow.outputs.clarifications:
+        if self.agent and self.agent.plan_run.outputs.clarifications:
             for arg in verified_args.args:
                 matching_clarification = self.agent.get_last_resolved_clarification(arg.name)
                 if matching_clarification and arg.value != matching_clarification.response:
@@ -470,7 +470,7 @@ class ToolCallingModel:
         return {"messages": [response]}
 
 
-class VerifierAgent(BaseAgent):
+class DefaultExecutionAgent(BaseExecutionAgent):
     """Agent responsible for achieving a task by using verification.
 
     This agent does the following things:
@@ -491,7 +491,7 @@ class VerifierAgent(BaseAgent):
     def __init__(
         self,
         step: Step,
-        workflow: Workflow,
+        plan_run: PlanRun,
         config: Config,
         tool: Tool | None = None,
     ) -> None:
@@ -499,12 +499,12 @@ class VerifierAgent(BaseAgent):
 
         Args:
             step (Step): The current step in the task plan.
-            workflow (Workflow): The workflow that defines the task execution process.
+            plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
-        super().__init__(step, workflow, config, tool)
+        super().__init__(step, plan_run, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
 
@@ -533,10 +533,10 @@ class VerifierAgent(BaseAgent):
             if not matching_clarification:
                 self.new_clarifications.append(
                     InputClarification(
-                        workflow_id=self.workflow.id,
+                        plan_run_id=self.plan_run.id,
                         argument_name=arg.name,
                         user_guidance=f"Missing Argument: {arg.name}",
-                        step=self.workflow.current_step_index,
+                        step=self.plan_run.current_step_index,
                     ),
                 )
         if self.new_clarifications:
@@ -559,11 +559,11 @@ class VerifierAgent(BaseAgent):
 
         """
         matching_clarification = None
-        for clarification in self.workflow.outputs.clarifications:
+        for clarification in self.plan_run.outputs.clarifications:
             if (
                 clarification.resolved
                 and getattr(clarification, "argument_name", None) == arg_name
-                and clarification.step == self.workflow.current_step_index
+                and clarification.step == self.plan_run.current_step_index
             ):
                 matching_clarification = clarification
         return matching_clarification
@@ -578,28 +578,28 @@ class VerifierAgent(BaseAgent):
 
         """
         if not self.tool:
-            raise InvalidAgentError("Tool is required for VerifierAgent")
+            raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
         context = self.get_system_context()
         execution_context = get_execution_context()
-        execution_context.workflow_run_context = context
+        execution_context.plan_run_context = context
         llm = LLMWrapper(self.config).to_langchain()
 
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=ToolRunContext(
                     execution_context=get_execution_context(),
-                    workflow_id=self.workflow.id,
+                    plan_run_id=self.plan_run.id,
                     config=self.config,
-                    clarifications=self.workflow.get_clarifications_for_step(),
+                    clarifications=self.plan_run.get_clarifications_for_step(),
                 ),
             ),
         ]
         tool_node = ToolNode(tools)
 
-        workflow = StateGraph(MessagesState)
+        graph = StateGraph(MessagesState)
         """
         The execution graph represented here can be generated using
-        `print(app.get_graph().draw_mermaid())` on the compiled workflow (and running any agent
+        `print(app.get_graph().draw_mermaid())` on the compiled run (and running any agent
         task). The below represents the current state of the graph (use a mermaid editor
         to view e.g <https://mermaid.live/edit>)
         graph TD;
@@ -625,32 +625,32 @@ class VerifierAgent(BaseAgent):
                 classDef last fill:#bfb6fc
         """
 
-        workflow.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(llm, context, tools, self).invoke)
+        graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(llm, context, tools, self).invoke)
         if self.verified_args:
-            workflow.add_edge(START, AgentNode.TOOL_AGENT)
+            graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
-            workflow.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(llm, context, self).invoke)
-            workflow.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(llm, context, self).invoke)
-            workflow.add_edge(START, AgentNode.ARGUMENT_PARSER)
-            workflow.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
-            workflow.add_conditional_edges(
+            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(llm, context, self).invoke)
+            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(llm, context, self).invoke)
+            graph.add_edge(START, AgentNode.ARGUMENT_PARSER)
+            graph.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
+            graph.add_conditional_edges(
                 AgentNode.ARGUMENT_VERIFIER,
                 self.clarifications_or_continue,
             )
 
-        workflow.add_node(AgentNode.TOOLS, tool_node)
-        workflow.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm).invoke)
-        workflow.add_conditional_edges(
+        graph.add_node(AgentNode.TOOLS, tool_node)
+        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm).invoke)
+        graph.add_conditional_edges(
             AgentNode.TOOLS,
             lambda state: next_state_after_tool_call(state, self.tool),
         )
-        workflow.add_conditional_edges(
+        graph.add_conditional_edges(
             AgentNode.TOOL_AGENT,
             tool_call_or_end,
         )
-        workflow.add_edge(AgentNode.SUMMARIZER, END)
+        graph.add_edge(AgentNode.SUMMARIZER, END)
 
-        app = workflow.compile()
+        app = graph.compile()
         invocation_result = app.invoke({"messages": []})
         return process_output(
             invocation_result["messages"][-1],

@@ -2,42 +2,46 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, override
 
 from pydantic import BaseModel, Field, SecretStr
 
-from portia.clarification import Clarification, InputClarification
+from portia.clarification import (
+    Clarification,
+    InputClarification,
+)
+from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
 from portia.plan import Plan, PlanContext, Step, Variable
+from portia.plan_run import PlanRun, PlanRunUUID
 from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
-from portia.workflow import Workflow, WorkflowUUID
 
 if TYPE_CHECKING:
     from portia.execution_context import ExecutionContext
 
 
 def get_test_tool_context(
-    workflow_id: WorkflowUUID | None = None,
+    plan_run_id: PlanRunUUID | None = None,
     config: Config | None = None,
 ) -> ToolRunContext:
     """Return a test tool context."""
-    if not workflow_id:
-        workflow_id = WorkflowUUID()
+    if not plan_run_id:
+        plan_run_id = PlanRunUUID()
     if not config:
         config = get_test_config()
     return ToolRunContext(
         execution_context=get_execution_ctx(),
-        workflow_id=workflow_id,
+        plan_run_id=plan_run_id,
         config=config,
         clarifications=[],
     )
 
 
-def get_test_workflow() -> tuple[Plan, Workflow]:
-    """Generate a simple test workflow."""
+def get_test_plan_run() -> tuple[Plan, PlanRun]:
+    """Generate a simple test plan_run."""
     step1 = Step(
         task="Add 1 + 2",
         inputs=[
@@ -53,14 +57,14 @@ def get_test_workflow() -> tuple[Plan, Workflow]:
         ),
         steps=[step1],
     )
-    return plan, Workflow(plan_id=plan.id, current_step_index=0)
+    return plan, PlanRun(plan_id=plan.id, current_step_index=0)
 
 
-def get_test_tool_call(workflow: Workflow) -> ToolCallRecord:
+def get_test_tool_call(plan_run: PlanRun) -> ToolCallRecord:
     """Return a test tool call record."""
     return ToolCallRecord(
         tool_name="",
-        workflow_id=workflow.id,
+        plan_run_id=plan_run.id,
         step=1,
         end_user_id="1",
         additional_data={},
@@ -81,10 +85,10 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
     )
 
 
-def get_execution_ctx(workflow: Workflow | None = None) -> ExecutionContext:
-    """Return an execution context from a workflow."""
-    if workflow:
-        return workflow.execution_context
+def get_execution_ctx(plan_run: PlanRun | None = None) -> ExecutionContext:
+    """Return an execution context from a PlanRun."""
+    if plan_run:
+        return plan_run.execution_context
     return empty_context()
 
 
@@ -135,7 +139,7 @@ class ClarificationTool(Tool):
         """Add the numbers."""
         if len(ctx.clarifications) == 0:
             return InputClarification(
-                workflow_id=ctx.workflow_id,
+                plan_run_id=ctx.plan_run_id,
                 user_guidance=user_guidance,
                 argument_name="raise_clarification",
             )
@@ -208,3 +212,22 @@ class NoneTool(Tool):
     def run(self, _: ToolRunContext) -> None:
         """Return."""
         return
+
+
+class TestClarificationHandler(ClarificationHandler):  # noqa: D101
+    received_clarification: Clarification | None = None
+    clarification_response: object = "Test"
+
+    @override
+    def handle_input_clarification(
+        self,
+        clarification: InputClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],
+    ) -> None:
+        self.received_clarification = clarification
+        return on_resolution(clarification, self.clarification_response)
+
+    def reset(self) -> None:
+        """Reset the received clarification."""
+        self.received_clarification = None

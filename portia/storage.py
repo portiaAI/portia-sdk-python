@@ -1,20 +1,20 @@
-"""Storage classes for managing the saving and retrieval of plans, workflows, and tool calls.
+"""Storage classes for managing the saving and retrieval of plans, runs, and tool calls.
 
 This module defines a set of storage classes that provide different backends for saving, retrieving,
-and managing plans, workflows, and tool calls. These storage classes include both in-memory and
+and managing plans, runs, and tool calls. These storage classes include both in-memory and
 file-based storage, as well as integration with the Portia Cloud API. Each class is responsible
 for handling interactions with its respective storage medium, including validating responses
 and raising appropriate exceptions when necessary.
 
 Classes:
     - Storage (Base Class): A base class that defines common interfaces for all storage types,
-    ensuring consistent methods for saving and retrieving plans, workflows, and tool calls.
+    ensuring consistent methods for saving and retrieving plans, runs, and tool calls.
     - InMemoryStorage: An in-memory implementation of the `Storage` class for storing plans,
-    workflows, and tool calls in a temporary, volatile storage medium.
-    - FileStorage: A file-based implementation of the `Storage` class for storing plans, workflows,
+    runs, and tool calls in a temporary, volatile storage medium.
+    - FileStorage: A file-based implementation of the `Storage` class for storing plans, runs,
       and tool calls as local files in the filesystem.
     - PortiaCloudStorage: A cloud-based implementation of the `Storage` class that interacts with
-    the Portia Cloud API to save and retrieve plans, workflows, and tool call records.
+    the Portia Cloud API to save and retrieve plans, runs, and tool call records.
 
 Each storage class handles the following tasks:
     - Sending and receiving data to its respective storage medium - memory, file system, or API.
@@ -33,18 +33,18 @@ from urllib.parse import urlencode
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from portia.errors import PlanNotFoundError, StorageError, WorkflowNotFoundError
+from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanUUID, Step
-from portia.prefixed_uuid import WORKFLOW_UUID_PREFIX
-from portia.tool_call import ToolCallRecord, ToolCallStatus
-from portia.workflow import (
-    Workflow,
-    WorkflowOutputs,
-    WorkflowState,
-    WorkflowUUID,
+from portia.plan_run import (
+    PlanRun,
+    PlanRunOutputs,
+    PlanRunState,
+    PlanRunUUID,
 )
+from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX
+from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -95,80 +95,80 @@ class PlanStorage(ABC):
         raise NotImplementedError("get_plan is not implemented")
 
 
-class WorkflowListResponse(BaseModel):
-    """Response for the get_workflows operation. Can support pagination."""
+class PlanRunListResponse(BaseModel):
+    """Response for the get_plan_runs operation. Can support pagination."""
 
-    results: list[Workflow]
+    results: list[PlanRun]
     count: int
     total_pages: int
     current_page: int
 
 
-class WorkflowStorage(ABC):
-    """Abstract base class for storing and retrieving workflows.
+class RunStorage(ABC):
+    """Abstract base class for storing and retrieving runs.
 
-    Subclasses must implement the methods to save and retrieve workflows.
+    Subclasses must implement the methods to save and retrieve PlanRuns.
 
     Methods:
-        save_workflow(self, workflow: Workflow) -> None:
-            Save a workflow.
-        get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
-            Get a workflow by ID.
-        get_workflows(self, workflow_state: WorkflowState | None = None, page=int | None = None)
-            -> WorkflowListResponse:
-            Return workflows that match the given workflow_state
+        save_plan_run(self, run: Run) -> None:
+            Save a PlanRun.
+        get_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+            Get PlanRun by ID.
+        get_plan_runs(self, run_state: RunState | None = None, page=int | None = None)
+            -> PlanRunListResponse:
+            Return runs that match the given run_state
 
     """
 
     @abstractmethod
-    def save_workflow(self, workflow: Workflow) -> None:
-        """Save a workflow.
+    def save_plan_run(self, plan_run: PlanRun) -> None:
+        """Save a PlanRun.
 
         Args:
-            workflow (Workflow): The Workflow object to save.
+            plan_run (PlanRun): The Run object to save.
 
         Raises:
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("save_workflow is not implemented")
+        raise NotImplementedError("save_run is not implemented")
 
     @abstractmethod
-    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
-        """Retrieve a workflow by its ID.
+    def get_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+        """Retrieve PlanRun by its ID.
 
         Args:
-            workflow_id (WorkflowUUID): The UUID of the workflow to retrieve.
+            plan_run_id (RunUUID): The UUID of the run to retrieve.
 
         Returns:
-            Workflow: The Workflow object associated with the provided workflow_id.
+            Run: The Run object associated with the provided plan_run_id.
 
         Raises:
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("get_workflow is not implemented")
+        raise NotImplementedError("get_run is not implemented")
 
     @abstractmethod
-    def get_workflows(
+    def get_plan_runs(
         self,
-        workflow_state: WorkflowState | None = None,
+        run_state: PlanRunState | None = None,
         page: int | None = None,
-    ) -> WorkflowListResponse:
-        """List workflows by their state.
+    ) -> PlanRunListResponse:
+        """List runs by their state.
 
         Args:
-            workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            run_state (RunState | None): Optionally filter runs by their state.
             page (int | None): Optional pagination data
 
         Returns:
-            list[Workflow]: A list of Workflow objects that match the given state.
+            list[Run]: A list of Run objects that match the given state.
 
         Raises:
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("get_workflows is not implemented")
+        raise NotImplementedError("get_plan_runs is not implemented")
 
 
 class AdditionalStorage(ABC):
@@ -226,23 +226,23 @@ class LogAdditionalStorage(AdditionalStorage):
                 logger().info("Tool returned clarifications {output}", output=tool_call.output)
 
 
-class Storage(PlanStorage, WorkflowStorage, AdditionalStorage):
-    """Combined base class for Plan Workflow + Additional storages."""
+class Storage(PlanStorage, RunStorage, AdditionalStorage):
+    """Combined base class for Plan Run + Additional storages."""
 
 
-class InMemoryStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
-    """Simple storage class that keeps plans + workflows in memory.
+class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
+    """Simple storage class that keeps plans + runs in memory.
 
     Tool Calls are logged via the LogAdditionalStorage.
     """
 
     plans: dict[PlanUUID, Plan]
-    workflows: dict[WorkflowUUID, Workflow]
+    runs: dict[PlanRunUUID, PlanRun]
 
     def __init__(self) -> None:
         """Initialize Storage."""
         self.plans = {}
-        self.workflows = {}
+        self.runs = {}
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to dict.
@@ -270,55 +270,55 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
             return self.plans[plan_id]
         raise PlanNotFoundError(plan_id)
 
-    def save_workflow(self, workflow: Workflow) -> None:
-        """Add workflow to dict.
+    def save_plan_run(self, plan_run: PlanRun) -> None:
+        """Add run to dict.
 
         Args:
-            workflow (Workflow): The Workflow object to save.
+            plan_run (PlanRun): The Run object to save.
 
         """
-        self.workflows[workflow.id] = workflow
+        self.runs[plan_run.id] = plan_run
 
-    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
-        """Get workflow from dict.
+    def get_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+        """Get run from dict.
 
         Args:
-            workflow_id (WorkflowUUID): The UUID of the workflow to retrieve.
+            plan_run_id (PlanRunUUID): The UUID of the PlanRun to retrieve.
 
         Returns:
-            Workflow: The Workflow object associated with the provided workflow_id.
+            PlanRun: The PlanRun object associated with the provided plan_run_id.
 
         Raises:
-            WorkflowNotFoundError: If the workflow is not found.
+            PlanRunNotFoundError: If the PlanRun is not found.
 
         """
-        if workflow_id in self.workflows:
-            return self.workflows[workflow_id]
-        raise WorkflowNotFoundError(workflow_id)
+        if plan_run_id in self.runs:
+            return self.runs[plan_run_id]
+        raise PlanRunNotFoundError(plan_run_id)
 
-    def get_workflows(
+    def get_plan_runs(
         self,
-        workflow_state: WorkflowState | None = None,
+        run_state: PlanRunState | None = None,
         page: int | None = None,  # noqa: ARG002
-    ) -> WorkflowListResponse:
-        """Get workflow from dict.
+    ) -> PlanRunListResponse:
+        """Get run from dict.
 
         Args:
-            workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            run_state (RunState | None): Optionally filter runs by their state.
             page (int | None): Optional pagination data which is not used for in memory storage.
 
         Returns:
-            list[Workflow]: A list of Workflow objects that match the given state.
+            list[Run]: A list of Run objects that match the given state.
 
         """
-        if not workflow_state:
-            results = list(self.workflows.values())
+        if not run_state:
+            results = list(self.runs.values())
         else:
             results = [
-                workflow for workflow in self.workflows.values() if workflow.state == workflow_state
+                plan_run for plan_run in self.runs.values() if plan_run.state == run_state
             ]
 
-        return WorkflowListResponse(
+        return PlanRunListResponse(
             results=results,
             count=len(results),
             current_page=1,
@@ -326,10 +326,10 @@ class InMemoryStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
         )
 
 
-class DiskFileStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
+class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
     """Disk-based implementation of the Storage interface.
 
-    Stores serialized Plan and Workflow objects as JSON files on disk.
+    Stores serialized Plan and Run objects as JSON files on disk.
     """
 
     def __init__(self, storage_dir: str | None) -> None:
@@ -351,11 +351,11 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
         Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
 
     def _write(self, file_name: str, content: BaseModel) -> None:
-        """Write a serialized Plan or Workflow to a JSON file.
+        """Write a serialized Plan or Run to a JSON file.
 
         Args:
             file_name (str): Name of the file to write.
-            content (BaseModel): The Plan or Workflow object to serialize.
+            content (BaseModel): The Plan or Run object to serialize.
 
         """
         self._ensure_storage()  # Ensure storage directory exists
@@ -408,69 +408,69 @@ class DiskFileStorage(PlanStorage, WorkflowStorage, LogAdditionalStorage):
         except (ValidationError, FileNotFoundError) as e:
             raise PlanNotFoundError(plan_id) from e
 
-    def save_workflow(self, workflow: Workflow) -> None:
-        """Save a Workflow object to the storage.
+    def save_plan_run(self, plan_run: PlanRun) -> None:
+        """Save PlanRun object to the storage.
 
         Args:
-            workflow (Workflow): The Workflow object to save.
+            plan_run (PlanRun): The Run object to save.
 
         """
-        self._write(f"{workflow.id}.json", workflow)
+        self._write(f"{plan_run.id}.json", plan_run)
 
-    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
-        """Retrieve a Workflow object by its ID.
+    def get_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+        """Retrieve PlanRun object by its ID.
 
         Args:
-            workflow_id (WorkflowUUID): The ID of the Workflow to retrieve.
+            plan_run_id (RunUUID): The ID of the Run to retrieve.
 
         Returns:
-            Workflow: The retrieved Workflow object.
+            Run: The retrieved Run object.
 
         Raises:
-            WorkflowNotFoundError: If the Workflow is not found or validation fails.
+            RunNotFoundError: If the Run is not found or validation fails.
 
         """
         try:
-            return self._read(f"{workflow_id}.json", Workflow)
+            return self._read(f"{plan_run_id}.json", PlanRun)
         except (ValidationError, FileNotFoundError) as e:
-            raise WorkflowNotFoundError(workflow_id) from e
+            raise PlanRunNotFoundError(plan_run_id) from e
 
-    def get_workflows(
+    def get_plan_runs(
         self,
-        workflow_state: WorkflowState | None = None,
+        run_state: PlanRunState | None = None,
         page: int | None = None,  # noqa: ARG002
-    ) -> WorkflowListResponse:
-        """Find all workflows in storage that match state.
+    ) -> PlanRunListResponse:
+        """Find all plan runs in storage that match state.
 
         Args:
-            workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            run_state (RunState | None): Optionally filter runs by their state.
             page (int | None): Optional pagination data which is not used for in memory storage.
 
         Returns:
-            list[Workflow]: A list of Workflow objects that match the given state.
+            list[Run]: A list of Run objects that match the given state.
 
         """
         self._ensure_storage()
 
-        workflows = []
+        plan_runs = []
 
         directory_path = Path(self.storage_dir)
         for f in directory_path.iterdir():
-            if f.is_file() and f.name.startswith(WORKFLOW_UUID_PREFIX):
-                workflow = self._read(f.name, Workflow)
-                if not workflow_state or workflow.state == workflow_state:
-                    workflows.append(workflow)
+            if f.is_file() and f.name.startswith(PLAN_RUN_UUID_PREFIX):
+                plan_run = self._read(f.name, PlanRun)
+                if not run_state or plan_run.state == run_state:
+                    plan_runs.append(plan_run)
 
-        return WorkflowListResponse(
-            results=workflows,
-            count=len(workflows),
+        return PlanRunListResponse(
+            results=plan_runs,
+            count=len(plan_runs),
             current_page=1,
             total_pages=1,
         )
 
 
 class PortiaCloudStorage(Storage):
-    """Save plans, workflows and tool calls to portia cloud."""
+    """Save plans, runs and tool calls to portia cloud."""
 
     def __init__(self, config: Config) -> None:
         """Initialize the PortiaCloudStorage instance.
@@ -563,11 +563,11 @@ class PortiaCloudStorage(Storage):
                 steps=[Step.model_validate(step) for step in response_json["steps"]],
             )
 
-    def save_workflow(self, workflow: Workflow) -> None:
-        """Save a workflow to Portia Cloud.
+    def save_plan_run(self, plan_run: PlanRun) -> None:
+        """Save PlanRun to Portia Cloud.
 
         Args:
-            workflow (Workflow): The Workflow object to save to the cloud.
+            plan_run (PlanRun): The Run object to save to the cloud.
 
         Raises:
             StorageError: If the request to Portia Cloud fails.
@@ -575,13 +575,13 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = httpx.put(
-                url=f"{self.api_endpoint}/api/v0/workflows/{workflow.id}/",
+                url=f"{self.api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
                 json={
-                    "current_step_index": workflow.current_step_index,
-                    "state": workflow.state,
-                    "execution_context": workflow.execution_context.model_dump(mode="json"),
-                    "outputs": workflow.outputs.model_dump(mode="json"),
-                    "plan_id": str(workflow.plan_id),
+                    "current_step_index": plan_run.current_step_index,
+                    "state": plan_run.state,
+                    "execution_context": plan_run.execution_context.model_dump(mode="json"),
+                    "outputs": plan_run.outputs.model_dump(mode="json"),
+                    "plan_id": str(plan_run.plan_id),
                 },
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
@@ -594,22 +594,22 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
 
-    def get_workflow(self, workflow_id: WorkflowUUID) -> Workflow:
-        """Retrieve a workflow from Portia Cloud.
+    def get_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+        """Retrieve PlanRun from Portia Cloud.
 
         Args:
-            workflow_id (WorkflowUUID): The ID of the workflow to retrieve.
+            plan_run_id (RunUUID): The ID of the run to retrieve.
 
         Returns:
-            Workflow: The Workflow object retrieved from Portia Cloud.
+            Run: The Run object retrieved from Portia Cloud.
 
         Raises:
-            StorageError: If the request to Portia Cloud fails or the workflow does not exist.
+            StorageError: If the request to Portia Cloud fails or the run does not exist.
 
         """
         try:
             response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/workflows/{workflow_id}/",
+                url=f"{self.api_endpoint}/api/v0/plan-runs/{plan_run_id}/",
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
@@ -621,30 +621,30 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             response_json = response.json()
-            return Workflow(
-                id=WorkflowUUID.from_string(response_json["id"]),
+            return PlanRun(
+                id=PlanRunUUID.from_string(response_json["id"]),
                 plan_id=PlanUUID.from_string(response_json["plan"]["id"]),
                 current_step_index=response_json["current_step_index"],
-                state=WorkflowState(response_json["state"]),
+                state=PlanRunState(response_json["state"]),
                 execution_context=ExecutionContext.model_validate(
                     response_json["execution_context"],
                 ),
-                outputs=WorkflowOutputs.model_validate(response_json["outputs"]),
+                outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
             )
 
-    def get_workflows(
+    def get_plan_runs(
         self,
-        workflow_state: WorkflowState | None = None,
+        run_state: PlanRunState | None = None,
         page: int | None = None,
-    ) -> WorkflowListResponse:
-        """Find all workflows in storage that match state.
+    ) -> PlanRunListResponse:
+        """Find all runs in storage that match state.
 
         Args:
-            workflow_state (WorkflowState | None): Optionally filter workflows by their state.
+            run_state (RunState | None): Optionally filter runs by their state.
             page (int | None): Optional pagination data which is not used for in memory storage.
 
         Returns:
-            list[Workflow]: A list of Workflow objects retrieved from Portia Cloud.
+            list[Run]: A list of Run objects retrieved from Portia Cloud.
 
         Raises:
             StorageError: If the request to Portia Cloud fails.
@@ -654,10 +654,10 @@ class PortiaCloudStorage(Storage):
             query = {}
             if page:
                 query["page"] = page
-            if workflow_state:
-                query["workflow_state"] = workflow_state.value
+            if run_state:
+                query["run_state"] = run_state.value
             response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/workflows/?{urlencode(query)}",
+                url=f"{self.api_endpoint}/api/v0/plan-runs/?{urlencode(query)}",
                 headers={
                     "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
                     "Content-Type": "application/json",
@@ -669,19 +669,19 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             response_json = response.json()
-            return WorkflowListResponse(
+            return PlanRunListResponse(
                 results=[
-                    Workflow(
-                        id=WorkflowUUID.from_string(workflow["id"]),
-                        plan_id=PlanUUID.from_string(workflow["plan"]["id"]),
-                        current_step_index=workflow["current_step_index"],
-                        state=WorkflowState(workflow["state"]),
+                    PlanRun(
+                        id=PlanRunUUID.from_string(plan_run["id"]),
+                        plan_id=PlanUUID.from_string(plan_run["plan"]["id"]),
+                        current_step_index=plan_run["current_step_index"],
+                        state=PlanRunState(plan_run["state"]),
                         execution_context=ExecutionContext.model_validate(
-                            workflow["execution_context"],
+                            plan_run["execution_context"],
                         ),
-                        outputs=WorkflowOutputs.model_validate(workflow["outputs"]),
+                        outputs=PlanRunOutputs.model_validate(plan_run["outputs"]),
                     )
-                    for workflow in response_json["results"]
+                    for plan_run in response_json["results"]
                 ],
                 count=response_json["count"],
                 current_page=response_json["current_page"],
@@ -702,7 +702,7 @@ class PortiaCloudStorage(Storage):
             response = httpx.post(
                 url=f"{self.api_endpoint}/api/v0/tool-calls/",
                 json={
-                    "workflow_id": str(tool_call.workflow_id),
+                    "plan_run_id": str(tool_call.plan_run_id),
                     "tool_name": tool_call.tool_name,
                     "step": tool_call.step,
                     "end_user_id": tool_call.end_user_id or "",
