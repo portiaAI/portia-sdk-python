@@ -18,6 +18,7 @@ from pydantic import ConfigDict
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
 from portia.execution_agents.base_execution_agent import Output
+from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import Tool, ToolRunContext
 
@@ -99,6 +100,7 @@ class ToolCallWrapper(Tool):
 
         """
         # initialize empty call record
+
         record = ToolCallRecord(
             input=combine_args_kwargs(*args, **kwargs),
             output=None,
@@ -109,6 +111,9 @@ class ToolCallWrapper(Tool):
             end_user_id=ctx.execution_context.end_user_id,
             additional_data=ctx.execution_context.additional_data,
             status=ToolCallStatus.IN_PROGRESS,
+        )
+        logger().info(
+            f"Invoking {record.tool_name} with args: {record.input}",
         )
         start_time = datetime.now(tz=UTC)
         try:

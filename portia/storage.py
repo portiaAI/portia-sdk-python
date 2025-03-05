@@ -209,24 +209,20 @@ class LogAdditionalStorage(AdditionalStorage):
             tool_call (ToolCallRecord): The ToolCallRecord object to log.
 
         """
-        logger().info(
-            "Invoked {tool_name} with args: {tool_input}",
-            tool_name=tool_call.tool_name,
-            tool_input=tool_call.input,
-        )
         logger().debug(
-            f"Tool {tool_call.tool_name} executed in {tool_call.latency_seconds:.2f} seconds",
+            f"Tool {tool_call.tool_name!s} executed in {tool_call.latency_seconds:.2f} seconds",
         )
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
-                logger().info("Tool output: {output}", output=tool_call.output)
+                logger().debug(f"Tool call {tool_call.tool_name!s} completed",
+                output=tool_call.output)
             case ToolCallStatus.FAILED:
-                logger().error("Tool returned error {output}", output=tool_call.output)
+                logger().error("Tool returned error", output=tool_call.output)
             case ToolCallStatus.NEED_CLARIFICATION:
-                logger().info("Tool returned clarifications {output}", output=tool_call.output)
+                logger().debug("Tool returned clarifications", output=tool_call.output)
 
 
-class Storage(PlanStorage, RunStorage, AdditionalStorage):
+class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
     """Combined base class for Plan Run + Additional storages."""
 
 
@@ -722,3 +718,4 @@ class PortiaCloudStorage(Storage):
             raise StorageError(e) from e
         else:
             self.check_response(response)
+            LogAdditionalStorage.save_tool_call(self, tool_call)
