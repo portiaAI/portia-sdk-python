@@ -61,7 +61,8 @@ class InvalidConfigError(PortiaBaseError):
 
     def __init__(self, value: str, issue: str) -> None:
         """Set custom error message."""
-        super().__init__(f"Config value {value.upper()} is not valid - {issue}")
+        self.message = f"Config value {value.upper()} is not valid - {issue}"
+        super().__init__(self.message)
 
 
 class PlanError(PortiaBaseError):
