@@ -6,7 +6,7 @@ This module contains utility functions for managing agent execution flow.
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
@@ -74,9 +74,20 @@ def next_state_after_tool_call(
         "ToolSoftError" not in last_message.content
         and tool
         and getattr(tool, "should_summarize", False)
+        and isinstance(last_message, ToolMessage)
+        and not is_clarification(last_message.artifact)
     ):
         return AgentNode.SUMMARIZER
     return END
+
+
+def is_clarification(artifact: Any) -> bool:  # noqa: ANN401
+    """Check if the artifact is a clarification or list of clarifications."""
+    return isinstance(artifact, Clarification) or (
+        isinstance(artifact, list)
+        and len(artifact) > 0
+        and all(isinstance(item, Clarification) for item in artifact)
+    )
 
 
 def tool_call_or_end(

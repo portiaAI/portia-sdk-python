@@ -37,6 +37,7 @@ class SearchTool(Tool[str]):
     )
     args_schema: type[BaseModel] = SearchToolSchema
     output_schema: tuple[str, str] = ("str", "str: output of the search results")
+    should_summarize: bool = True
 
     def run(self, _: ToolRunContext, search_query: str) -> str:
         """Run the Search Tool."""
