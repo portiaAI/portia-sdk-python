@@ -660,7 +660,6 @@ class DefaultExecutionAgent(BaseExecutionAgent):
 
         app = graph.compile()
         invocation_result = app.invoke({"messages": []})
-        print(invocation_result)
         return process_output(
             invocation_result["messages"],
             self.tool,

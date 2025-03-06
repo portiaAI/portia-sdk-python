@@ -140,7 +140,6 @@ def process_output(
     """
     output_values = []
     for message in messages:
-        print(message)
         if "ToolSoftError" in message.content and tool:
             raise ToolRetryError(tool.id, str(message.content))
         if "ToolHardError" in message.content and tool:
@@ -158,7 +157,6 @@ def process_output(
                 output_values.append(message.content)
             continue
 
-    print(output_values)
     if len(output_values) == 0:
         raise InvalidAgentOutputError(str([message.content for message in messages]))
 

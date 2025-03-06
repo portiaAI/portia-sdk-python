@@ -162,12 +162,6 @@ class Plan(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-
-    syntax_version: int = Field(
-        default=1,
-        description="The syntax version of the plan",
-    )
-
     id: PlanUUID = Field(
         default_factory=PlanUUID,
         description="The ID of the plan.",
