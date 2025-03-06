@@ -96,7 +96,7 @@ jobs:
             sleep 2
           done
           echo "Server failed to start after 3 minutes"
-          docker compose -f backend-holsten/compose.yaml logs
+          docker compose -f compose.yaml logs
           exit 1
       
       - name: Check tool IDs
