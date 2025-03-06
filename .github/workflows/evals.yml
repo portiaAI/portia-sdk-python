@@ -71,7 +71,7 @@ jobs:
 
       - name: Run Docker Compose
         working-directory: ./platform
-        run: docker compose -f backend/compose.yaml up web db -d
+        run: docker compose -f compose.yaml up web db -d
 
       - name: Verify server is up
         run: |
