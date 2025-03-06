@@ -12,6 +12,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
+from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.execution_agents.base_execution_agent import Output
 
@@ -105,6 +106,8 @@ def tool_call_or_end(
         Literal[AgentNode.TOOLS, END]: The next state to transition to.
 
     """
+    print("TOOL CALL OR END")
+    print(state["messages"])
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls"):
         return AgentNode.TOOLS
@@ -112,7 +115,7 @@ def tool_call_or_end(
 
 
 def process_output(
-    last_message: BaseMessage,
+    messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
 ) -> Output:
@@ -122,7 +125,7 @@ def process_output(
     It raises errors if the tool encounters issues and returns the appropriate output.
 
     Args:
-        last_message (BaseMessage): The last message received in the agent's plan_run.
+        messages (list[BaseMessage}): The set of messages received from the agent's plan_run.
         tool (Tool | None): The tool associated with the agent, if any.
         clarifications (list[Clarification] | None): A list of clarifications, if any.
 
@@ -135,24 +138,35 @@ def process_output(
         InvalidAgentOutputError: If the output from the agent is invalid.
 
     """
-    if "ToolSoftError" in last_message.content and tool:
-        raise ToolRetryError(tool.id, str(last_message.content))
-    if "ToolHardError" in last_message.content and tool:
-        raise ToolFailedError(tool.id, str(last_message.content))
-    if clarifications and len(clarifications) > 0:
-        return Output[list[Clarification]](
-            value=clarifications,
-        )
-    if isinstance(last_message, ToolMessage):
-        if last_message.artifact and isinstance(last_message.artifact, Output):
-            tool_output = last_message.artifact
-        elif last_message.artifact:
-            tool_output = Output(value=last_message.artifact)
-        else:
-            tool_output = Output(value=last_message.content)
-        if not tool_output.summary:
-            tool_output.summary = tool_output.serialize_value(tool_output.value)
-        return tool_output
-    if isinstance(last_message, HumanMessage):
-        return Output(value=last_message.content)
-    raise InvalidAgentOutputError(str(last_message.content))
+    output_values = []
+    for message in messages:
+        print(message)
+        if "ToolSoftError" in message.content and tool:
+            raise ToolRetryError(tool.id, str(message.content))
+        if "ToolHardError" in message.content and tool:
+            raise ToolFailedError(tool.id, str(message.content))
+        if clarifications and len(clarifications) > 0:
+            return Output[list[Clarification]](
+                value=clarifications,
+            )
+        if isinstance(message, ToolMessage):
+            if message.artifact and isinstance(message.artifact, Output):
+                output_values.append(message.artifact.value)
+            elif message.artifact:
+                output_values.append(message.artifact)
+            else:
+                output_values.append(message.content)
+            continue
+
+    print(output_values)
+    if len(output_values) == 0:
+        raise InvalidAgentOutputError(str([message.content for message in messages]))
+
+    # if there's only one output return just the value
+    if len(output_values) == 1:
+        output_values = output_values[0]
+
+    output = Output(value=output_values)
+    if not output.summary:
+        output.summary = output.serialize_value(output.value)
+    return output
