@@ -106,15 +106,13 @@ def tool_call_or_end(
         Literal[AgentNode.TOOLS, END]: The next state to transition to.
 
     """
-    print("TOOL CALL OR END")
-    print(state["messages"])
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls"):
         return AgentNode.TOOLS
     return END
 
 
-def process_output(
+def process_output(  # noqa: C901
     messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
