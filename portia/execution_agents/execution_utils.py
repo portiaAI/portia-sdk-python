@@ -8,11 +8,10 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import BaseMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
-from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.execution_agents.base_execution_agent import Output
 
