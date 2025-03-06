@@ -79,6 +79,7 @@ jobs:
         run: docker compose -f compose.yaml up backend db -d
 
       - name: Verify server is up
+        working-directory: ./platform
         run: |
           echo "Checking Docker container status:"
           docker ps
