@@ -1,7 +1,6 @@
 name: Run Evals for portia-sdk-python
 
 on:
-  workflow_dispatch:
   pull_request_target:
     branches:
       - main
@@ -15,40 +14,63 @@ permissions:
     pull-requests: read
 
 jobs:
-  # check-label:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - name: Check for safe_to_test label
-  #     id: check_label
-  #     uses: mheap/github-action-required-labels@v5
-  #     with:
-  #       mode: exactly
-  #       count: 1
-  #       labels: safe_to_test
-  #   env:
-  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  check-label:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check for safe_to_test label
+      id: check_label
+      uses: mheap/github-action-required-labels@v5
+      with:
+        mode: exactly
+        count: 1
+        labels: safe_to_test
+    env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   evals:
-    # needs: check-label
-    runs-on: ubuntu-latest-16core
+    needs: check-label
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout portia-sdk-python repo
         uses: actions/checkout@v4
         with:
           path: portia-sdk-python
           repository: portiaAI/portia-sdk-python
+          ref: ${{ github.head_ref || 'main' }}
           token: ${{ secrets.PORTIA_GH_TOKEN }}
 
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/python-env-setup
+      - name: Checkout platform repo
+        uses: actions/checkout@v4
         with:
-          working-directory: ./platform/evals
+          path: platform
+          repository: portiaAI/platform
+          ref: main
           token: ${{ secrets.PORTIA_GH_TOKEN }}
 
-      - uses: ./.github/actions/setup-docker-env
+      - uses: actions/setup-python@v4
         with:
-          env-file-content: ${{ secrets.BACKEND_ENV_FILE_CONTENT }}
-          working-directory: ./platform
+          python-version: "3.12"
+      
+      - name: Install UV
+        run: pip install uv
+      
+      - name: Install dependencies
+        working-directory: ./platform/evals
+        run: |
+          uv add ../../portia-sdk-python/
+          uv sync --locked --no-dev
+
+      - name: Create .env.dev file
+        working-directory: ./platform/backend
+        run: |
+          echo "${{ env.BACKEND_ENV_FILE_CONTENT }}" > .env.dev
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Run Docker Compose
+        working-directory: ./platform
+        run: docker compose -f backend/compose.yaml up web db -d
 
       - name: Verify server is up
         run: |
@@ -68,40 +90,64 @@ jobs:
             sleep 2
           done
           echo "Server failed to start after 3 minutes"
-          docker compose -f ./backend/compose.yaml logs
+          docker compose -f backend-holsten/compose.yaml logs
           exit 1
-
+      
       - name: Check tool IDs
-        working-directory: ./evals
+        working-directory: ./platform/evals
         id: check_tool_ids
         env:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: http://0.0.0.0:8080
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          uv run python3 check_tool_ids.py
+          poetry run python3 check_tool_ids.py
 
-      - name: Evaluate Query Planner
+      - name: eval query planner
         id: eval_query_planner
-        uses: ./.github/actions/run-eval
-        with:
-          working-directory: ./platform
-          eval_type: query-planner
-          langsmith-api-key: ${{ secrets.LANGCHAIN_API_KEY }}
-          langsmith-project: ${{ secrets.LANGCHAIN_PROJECT }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          portia-api-key: ${{ secrets.PORTIA_EVAL_API_KEY }}
+        working-directory: ./platform/evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
+          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+        run: |
+          poetry run python3 cli.py query-planner update-dataset
+          EVAL_OUTPUT=$(poetry run python3 cli.py query-planner eval --model=gpt-4o-mini --threshold_file=query_planner/thresholds/thresholds.yaml)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_planner_scores=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Evaluate Agent
+      - name: eval agent (verifier)
         id: eval_agent_verifier
-        uses: ./.github/actions/run-eval
-        with:
-          working-directory: ./platform
-          eval_type: agent
-          langsmith-api-key: ${{ secrets.LANGCHAIN_API_KEY }}
-          langsmith-project: ${{ secrets.LANGCHAIN_PROJECT }}
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          portia-api-key: ${{ secrets.PORTIA_EVAL_API_KEY }}
+        working-directory: ./platform/evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
+          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+        run: |
+          poetry run python3 cli.py agent update-dataset --slice_name=verifier
+          EVAL_OUTPUT=$(poetry run python3 cli.py agent eval --agent=verifier --slice_name=verifier --model=gpt-4o-mini --threshold_file=agents/thresholds/verifier_thresholds.yaml)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "BREACHES: $BREACHES"
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Summary results
         id: summary_results
@@ -115,12 +161,12 @@ jobs:
           PORTIA_API_ENDPOINT: http://0.0.0.0:8080
           AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          OPENWEATHERMAP_API_KEY: ${{ secrets.OPENWEATHERMAP_API_KEY }}
         run: |
-          uv run jupyter nbconvert --to markdown --execute github_analysis.ipynb --output notebook_output.md --no-input
+          poetry run jupyter nbconvert --to markdown --execute github_analysis.ipynb --output notebook_output.md --no-input
+          cat notebook_output.md
           # Removes style blocks that GitHub won't render properly
           sed -i '/<style[^>]*>/,/<\/style>/d' notebook_output.md
+          cat notebook_output.md
           cat notebook_output.md >> $GITHUB_STEP_SUMMARY
 
       - name: Check for evaluation failures
