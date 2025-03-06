@@ -65,6 +65,11 @@ jobs:
         working-directory: ./platform/backend
         run: |
           echo "${{ env.BACKEND_ENV_FILE_CONTENT }}" > .env.dev
+      
+      - name: Set up environment variables from secret for frontend
+        working-directory: ./platform/frontend 
+        run: |
+          echo "${{ env.BACKEND_ENV_FILE_CONTENT }}" > .env.dev
 
       - name: Set up Docker
         uses: docker/setup-buildx-action@v2
