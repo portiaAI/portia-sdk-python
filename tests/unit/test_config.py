@@ -1,35 +1,37 @@
-"""Tests for runner classes."""
+"""Tests for portia classes."""
 
 import tempfile
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
 from portia.config import (
-    AgentType,
+    EXECUTION_MODEL_KEY,
+    PLANNING_MODEL_KEY,
     Config,
+    ExecutionAgentType,
     LLMModel,
     LLMProvider,
     LogLevel,
-    PlannerType,
+    PlanningAgentType,
     StorageClass,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 
-def test_runner_config_from_file() -> None:
+def test_portia_config_from_file() -> None:
     """Test loading configuration from a file."""
     config_data = """{
 "portia_api_key": "file-key",
-"openai_api_key": "file-openai-key",
-"llm_model_temperature": 10,
+"anthropic_api_key": "file-anthropic-key",
+"llm_provider": "ANTHROPIC",
+"models": {
+    "planning_model_name": "claude-3-5-haiku-latest"
+},
 "storage_class": "MEMORY",
-"llm_provider": "OPENAI",
-"llm_model_name": "GPT_4_O_MINI",
-"llm_model_seed": 443,
-"default_agent_type": "VERIFIER",
-"default_planner": "ONE_SHOT"
+"execution_agent_type": "DEFAULT",
+"planning_agent_type": "DEFAULT"
 }"""
 
     with tempfile.NamedTemporaryFile("w", delete=True, suffix=".json") as temp_file:
@@ -41,9 +43,11 @@ def test_runner_config_from_file() -> None:
         config = Config.from_file(config_file)
 
         assert config.must_get_raw_api_key("portia_api_key") == "file-key"
-        assert config.must_get_raw_api_key("openai_api_key") == "file-openai-key"
-        assert config.default_agent_type == AgentType.VERIFIER
-        assert config.llm_model_temperature == 10
+        assert config.must_get_raw_api_key("anthropic_api_key") == "file-anthropic-key"
+        assert config.llm_provider == LLMProvider.ANTHROPIC
+        assert config.model(PLANNING_MODEL_KEY) == LLMModel.CLAUDE_3_5_HAIKU
+        assert config.execution_agent_type == ExecutionAgentType.DEFAULT
+        assert config.planning_agent_type == PlanningAgentType.DEFAULT
 
 
 def test_from_default() -> None:
@@ -75,8 +79,17 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     # storage
-    c = Config.from_default(storage_class="DISK")
+    c = Config.from_default(storage_class="MEMORY")
+    assert c.storage_class == StorageClass.MEMORY
+
+    c = Config.from_default(storage_class="DISK", storage_dir="/test")
     assert c.storage_class == StorageClass.DISK
+    assert c.storage_dir == "/test"
+
+    # Need to specify storage_dir if using DISK
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(storage_class="DISK")
+
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(storage_class="OTHER")
 
@@ -89,18 +102,80 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(default_log_level="some level")
 
-    # LLM provider + model
-    c = Config.from_default(llm_provider="MISTRALAI", llm_model_name="mistral_large_latest")
-    assert c.llm_provider == LLMProvider.MISTRALAI
-    assert c.llm_model_name == LLMModel.MISTRAL_LARGE_LATEST
+    # execution_agent_type
+    c = Config.from_default(execution_agent_type="default")
+    assert c.execution_agent_type == ExecutionAgentType.DEFAULT
+    with pytest.raises(InvalidConfigError):
+        c = Config.from_default(execution_agent_type="my agent")
+
+
+def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test setting LLM models."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+
+    # Models can be set individually
+    c = Config.from_default(
+        planning_model_name=LLMModel.GPT_4_O,
+        execution_model_name=LLMModel.GPT_4_O_MINI,
+    )
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.GPT_4_O
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GPT_4_O_MINI
+
+    # llm_model_name sets all models
+    c = Config.from_default(llm_model_name="mistral_large_latest")
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE_LATEST
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE_LATEST
+
+    # llm_provider sets default model for all providers
+    c = Config.from_default(llm_provider="mistralai")
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE_LATEST
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE_LATEST
+
+    # With nothing specified, it chooses a model we have API keys for
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+    c = Config.from_default()
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE_LATEST
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE_LATEST
+
+    # With all API key set, correct default models are chosen
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    c = Config.from_default()
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.O_3_MINI
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GPT_4_O
+
+    # No api key for provider model
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("MISTRAL_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    for provider in [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.MISTRALAI]:
+        with pytest.raises(InvalidConfigError):
+            Config.from_default(
+                storage_class=StorageClass.MEMORY,
+                llm_provider=provider,
+                execution_agent_type=ExecutionAgentType.DEFAULT,
+                planning_agent_type=PlanningAgentType.DEFAULT,
+            )
+
+    # Wrong api key for provider model
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "")
+    with pytest.raises(InvalidConfigError):
+        Config.from_default(
+            storage_class=StorageClass.MEMORY,
+            llm_model_name=LLMModel.MISTRAL_LARGE_LATEST,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
+            planning_agent_type=PlanningAgentType.DEFAULT,
+        )
+
+    # Unrecognised providers error
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(llm_provider="personal", llm_model_name="other-model")
-
-    # default_agent_type
-    c = Config.from_default(default_agent_type="verifier")
-    assert c.default_agent_type == AgentType.VERIFIER
-    with pytest.raises(InvalidConfigError):
-        c = Config.from_default(default_agent_type="my agent")
 
 
 def test_getters() -> None:
@@ -129,62 +204,14 @@ def test_getters() -> None:
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)
 
-    # mismatch between provider and model
+    # no Portia API Key
     with pytest.raises(InvalidConfigError):
-        Config(
-            storage_class=StorageClass.MEMORY,
-            llm_provider=LLMProvider.OPENAI,
-            llm_model_name=LLMModel.CLAUDE_3_OPUS_LATEST,
-            llm_model_temperature=0,
-            llm_model_seed=443,
-            default_agent_type=AgentType.VERIFIER,
-            default_planner=PlannerType.ONE_SHOT,
-        )
-
-    # no api key for provider model
-    for provider in [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.MISTRALAI]:
-        with pytest.raises(InvalidConfigError):
-            Config(
-                storage_class=StorageClass.MEMORY,
-                llm_provider=provider,
-                openai_api_key=SecretStr(""),
-                llm_model_name=LLMModel.GPT_4_O_MINI,
-                llm_model_temperature=0,
-                llm_model_seed=443,
-                default_agent_type=AgentType.VERIFIER,
-                default_planner=PlannerType.ONE_SHOT,
-            )
-
-    # negative temperature
-    with pytest.raises(ValidationError):
-        Config(
-            storage_class=StorageClass.MEMORY,
-            llm_provider=LLMProvider.OPENAI,
-            llm_model_name=LLMModel.GPT_4_O_MINI,
-            llm_model_temperature=0,
-            llm_model_seed=-443,
-            default_agent_type=AgentType.VERIFIER,
-            default_planner=PlannerType.ONE_SHOT,
-        )
-    # no Portia API KEy
-    with pytest.raises(InvalidConfigError):
-        Config(
+        Config.from_default(
             storage_class=StorageClass.CLOUD,
             portia_api_key=SecretStr(""),
-            llm_provider=LLMProvider.OPENAI,
-            llm_model_name=LLMModel.GPT_4_O_MINI,
-            llm_model_temperature=0,
-            llm_model_seed=443,
-            default_agent_type=AgentType.VERIFIER,
-            default_planner=PlannerType.ONE_SHOT,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
+            planning_agent_type=PlanningAgentType.DEFAULT,
         )
-
-
-def test_get_default_model() -> None:
-    """Test getting default model."""
-    assert LLMProvider.OPENAI.default_model() == LLMModel.GPT_4_O_MINI
-    assert LLMProvider.ANTHROPIC.default_model() == LLMModel.CLAUDE_3_5_SONNET
-    assert LLMProvider.MISTRALAI.default_model() == LLMModel.MISTRAL_LARGE_LATEST
 
 
 @pytest.mark.parametrize("model", list(LLMModel))

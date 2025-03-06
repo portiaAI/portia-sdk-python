@@ -13,7 +13,7 @@ If you want to dive straight in with an example, check out our <a href="https://
 | Problem | Portia's answer |
 | ------- | --------------- |
 | **Planning:** Many use cases require visibility into the LLM’s reasoning, particularly for complex tasks requiring multiple steps and tools. LLMs also struggle picking the right tools as their tool set grows: a recurring limitation for production deployments | **Multi-agent plans:** Our open source, multi-shot prompter guides your LLM to produce a [`Plan`](https://docs.portialabs.ai/generate-plan) in response to a prompt, weaving the relevant tools, inputs and outputs for every step. |
-| **Execution:** Tracking an LLM’s progress mid-task is difficult, making it harder to intervene when guidance is needed. This is especially critical for enforcing company policies or correcting hallucinations (hello, missing arguments in tool calls!) | **Stateful workflows:** Portia will spin up a multi-agent [`Workflow`](https://docs.portialabs.ai/execute-workflow) to execute on generated plans and track their state throughout execution. Using our [`Clarification`](https://docs.portialabs.ai/manage-clarifications) abstraction you can define points where you want to take control of workflow execution e.g. to resolve missing information or multiple choice decisions. Portia serialises the workflow state, and you can manage its storage / retrieval yourself or use our cloud offering for simplicity. |
+| **Execution:** Tracking an LLM’s progress mid-task is difficult, making it harder to intervene when guidance is needed. This is especially critical for enforcing company policies or correcting hallucinations (hello, missing arguments in tool calls!) | **Stateful PlanRuns:** Portia will spin up a multi-agent [`PlanRun`](https://docs.portialabs.ai/execute-workflow) to execute on generated plans and track their state throughout execution. Using our [`Clarification`](https://docs.portialabs.ai/manage-clarifications) abstraction you can define points where you want to take control of run execution e.g. to resolve missing information or multiple choice decisions. Portia serialises the run state, and you can manage its storage / retrieval yourself or use our cloud offering for simplicity. |
 | **Authentication:** Existing solutions often disrupt the user experience with cumbersome authentication flows or require pre-emptive, full access to every tool—an approach that doesn’t scale for multi-agent assistants. | **Extensible, authenticated tool calling:** Bring your own tools on our extensible [`Tool`](https://docs.portialabs.ai/extend-tool-definitions) abstraction, or use our growing plug and play authenticated [tool library](https://docs.portialabs.ai/run-portia-tools), which will include a number of popular SaaS providers over time (Google, Zendesk, Hubspot, Github etc.). All Portia tools feature just-in-time authentication with token refresh, offering security without compromising on user experience. |
 
 
@@ -21,7 +21,7 @@ If you want to dive straight in with an example, check out our <a href="https://
 
 ### Installation
 
-0. Ensure you have python 3.10 or higher installed. If you need to update your python version please visit their [docs](https://www.python.org/downloads/).
+0. Ensure you have python 3.11 or higher installed. If you need to update your python version please visit their [docs](https://www.python.org/downloads/).
 ```bash
 python --version
 ```
@@ -50,8 +50,8 @@ We have a repo that showcases some of our core concepts to get you started. It's
 ### E2E example with open source tools
 This example is meant to get you familiar with a few of our core abstractions:
 - A `Plan` is the set of steps an LLM thinks it should take in order to respond to a user prompt. They are immutable, structured and human-readable.
-- A `Workflow` is a unique instantiation of a `Plan`. The purpose of a `Workflow` is to capture the state of a unique plan run at every step in an auditable way.
-- A `Runner` is the main orchestrator of plan generation. It is also capable of workflow creation, execution, pausing and resumption.
+- A `PlanRun` is a unique instantiation of a `Plan`. The purpose of a `PlanRun` is to capture the state of a unique plan run at every step in an auditable way.
+- `Portia` orchestrates plan generation and execution, including the creation, pausing and resumption of plan runs.
 
 Before running the code below, make sure you have the following keys set as environment variables in your .env file:
 - An OpenAI API key (or other LLM API key) set as `OPENAI_API_KEY=`
@@ -59,34 +59,31 @@ Before running the code below, make sure you have the following keys set as envi
 
 ```python
 from dotenv import load_dotenv
-from portia.runner import Runner
-from portia.config import default_config
-from portia.open_source_tools.registry import example_tool_registry
+from portia import Portia, default_config, example_tool_registry
 
 load_dotenv()
 
-# Instantiate a Portia runner. Load it with the default config and with the example tools.
-runner = Runner(config=default_config(), tools=example_tool_registry)
+# Instantiate a Portia client. Load it with the default config and with the example tools.
+portia = Portia(config=default_config(), tools=example_tool_registry)
 
 # Generate the plan from the user query
-plan = runner.generate_plan('Which stock price grew faster in 2024, Amazon or Google?')
+plan = portia.plan('Which stock price grew faster in 2024, Amazon or Google?')
 print(plan.model_dump_json(indent=2))
 
-# Create and execute the workflow from the generated plan
-workflow = runner.create_workflow(plan)
-workflow = runner.execute_workflow(workflow)
+# Create and execute the run from the generated plan
+plan_run = portia.run_plan(plan)
 
 # Serialise into JSON and print the output
-print(workflow.model_dump_json(indent=2))
+print(plan_run.model_dump_json(indent=2))
 ```
 
 ### E2E example with Portia cloud storage
-Our cloud offering will allow you to easily store and retrieve workflows in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view workflow, clarification and tool call logs. Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
+Our cloud offering will allow you to easily store and retrieve plans in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view plan runs, clarifications and tool call logs. Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
 Note that this example also requires the environment variables `OPENAI_API_KEY` (or ANTHROPIC or MISTRALAI if you're using either) and `TAVILY_API_KEY` as the [previous one](#e2e-example-with-open-source-tools).
 
 The example below introduces **some** of the config options available with Portia AI:
-- The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, workflows and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
-- The `default_log_level` is set using the `LogLevel.DEBUG` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, workflow states, tool calls and outputs at every step 😅
+- The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, runs and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
+- The `default_log_level` is set using the `LogLevel.DEBUG` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, run states, tool calls and outputs at every step 😅
 - The `llm_provider`, `llm_model` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider and model. In the example below we're splurging and using GPT 4.0!
 
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
@@ -94,9 +91,15 @@ Finally we also introduce the concept of a `tool_registry`, which is a flexible 
 ```python
 import os
 from dotenv import load_dotenv
-from portia.runner import Runner
-from portia.config import Config, StorageClass, LogLevel, LLMProvider, LLMModel
-from portia.open_source_tools.registry import example_tool_registry
+from portia import (
+    Portia,
+    Config,
+    StorageClass,
+    LogLevel,
+    LLMProvider,
+    LLMModel,
+    example_tool_registry,
+)
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -106,18 +109,18 @@ my_config = Config.from_default(
     storage_class=StorageClass.CLOUD,
     default_log_level=LogLevel.DEBUG,
     llm_provider=LLMProvider.OPENAI, # You can use `MISTRAL`, `ANTHROPIC` instead
-    llm_model=LLMModel.GPT_4_O, # You can use any of the available models instead
+    llm_model_name=LLMModel.GPT_4_O, # You can use any of the available models instead
     openai_api_key=OPENAI_API_KEY # Use `mistralai_api_key=MISTRALAI` or `anthropic_api_key=ANTHROPIC_API_KEY` instead
 )
 
-# Instantiate a Portia runner. Load it with the config and with the open source example tool registry
-runner = Runner(config=my_config, tools=example_tool_registry)
+# Instantiate a Portia client. Load it with the config and with the open source example tool registry
+portia = Portia(config=my_config, tools=example_tool_registry)
 
-# Execute a workflow from the user query
-workflow = runner.execute_query('Which stock price grew faster in 2024, Amazon or Google?')
+# Execute query.
+plan_run = portia.run('Which stock price grew faster in 2024, Amazon or Google?')
 
 # Serialise into JSON an print the output
-print(workflow.model_dump_json(indent=2))
+print(plan_run.model_dump_json(indent=2))
 ```
 
 ## Learn more

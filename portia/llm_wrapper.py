@@ -31,9 +31,9 @@ from langchain_openai import ChatOpenAI
 from langsmith import wrappers
 from mistralai import Mistral
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
-from portia.config import Config, LLMProvider
+from portia.config import Config, LLMModel, LLMProvider
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import (
@@ -59,14 +59,14 @@ class BaseLLMWrapper(ABC):
 
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, api_key: SecretStr) -> None:
         """Initialize the base LLM wrapper.
 
         Args:
-            config (Config): The configuration object containing settings for the LLM.
+            api_key (str): The API key for the LLM provider.
 
         """
-        self.config = config
+        self.api_key = api_key
 
     @abstractmethod
     def to_langchain(self) -> BaseChatModel:
@@ -114,9 +114,8 @@ class LLMWrapper(BaseLLMWrapper):
     LangChain-compatible model and to generate responses using the instructor tool.
 
     Attributes:
-        llm_provider (LLMProvider): The LLM provider to use (e.g., OpenAI, Anthropic, MistralAI).
-        model_name (str): The name of the model to use.
-        model_temperature (float): The temperature setting for the model.
+        model_name (LLMModel): The name of the model to use.
+        api_key (SecretStr): The API key for the LLM provider.
         model_seed (int): The seed for the model's random generation.
 
     Methods:
@@ -127,19 +126,29 @@ class LLMWrapper(BaseLLMWrapper):
 
     def __init__(
         self,
-        config: Config,
+        model_name: LLMModel,
+        api_key: SecretStr,
+        # A randomly chosen seed for the model's random generation.
+        model_seed: int = 343,
     ) -> None:
         """Initialize the wrapper.
 
         Args:
-            config (Config): The configuration object containing settings for the LLM.
+            model_name (LLMModel): The name of the LLM model to use.
+            api_key (SecretStr): The API key for authentication with the LLM provider.
+            model_seed (int, optional): Seed for model's random generation. Defaults to 343.
 
         """
-        super().__init__(config)
-        self.llm_provider = config.llm_provider
-        self.model_name = config.llm_model_name.value
-        self.model_temperature = config.llm_model_temperature
-        self.model_seed = config.llm_model_seed
+        super().__init__(api_key)
+        self.model_name = model_name
+        self.model_seed = model_seed
+
+    @classmethod
+    def for_usage(cls, usage: str, config: Config) -> LLMWrapper:
+        """Create an LLMWrapper from a LLMModel."""
+        model = config.model(usage)
+        api_key = config.get_llm_api_key(model)
+        return cls(model, api_key)
 
     def to_langchain(self) -> BaseChatModel:
         """Return a LangChain chat model based on the LLM provider.
@@ -151,30 +160,33 @@ class LLMWrapper(BaseLLMWrapper):
             BaseChatModel: A LangChain-compatible model.
 
         """
-        match self.llm_provider:
+        match self.model_name.provider():
             case LLMProvider.OPENAI:
                 return ChatOpenAI(
-                    name=self.model_name,
-                    model=self.model_name,
-                    temperature=self.model_temperature,
+                    name=self.model_name.value,
+                    model=self.model_name.value,
                     seed=self.model_seed,
-                    api_key=self.config.openai_api_key,
+                    api_key=self.api_key,
                     max_retries=3,
+                    # Unfortunately you get errors from o3 mini with Langchain unless you set
+                    # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
+                    temperature=1 if self.model_name == LLMModel.O_3_MINI else 0,
+                    # This is a workaround for o3 mini to avoid parallel tool calls.
+                    # See https://github.com/langchain-ai/langchain/issues/25357
+                    disabled_params={"parallel_tool_calls": None},
                 )
             case LLMProvider.ANTHROPIC:
                 return ChatAnthropic(
-                    model_name=self.model_name,
-                    temperature=self.model_temperature,
+                    model_name=self.model_name.value,
                     timeout=120,
                     stop=None,
                     max_retries=3,
-                    api_key=self.config.must_get_api_key("anthropic_api_key"),
+                    api_key=self.api_key,
                 )
             case LLMProvider.MISTRALAI:
                 return ChatMistralAI(
-                    model_name=self.model_name,
-                    temperature=self.model_temperature,
-                    api_key=self.config.mistralai_api_key,
+                    model_name=self.model_name.value,
+                    api_key=self.api_key,
                     max_retries=3,
                 )
 
@@ -193,12 +205,12 @@ class LLMWrapper(BaseLLMWrapper):
             T: The deserialized response from the LLM provider.
 
         """
-        match self.llm_provider:
+        match self.model_name.provider():
             case LLMProvider.OPENAI:
                 client = instructor.from_openai(
                     client=wrappers.wrap_openai(
                         OpenAI(
-                            api_key=self.config.must_get_raw_api_key("openai_api_key"),
+                            api_key=self.api_key.get_secret_value(),
                         ),
                     ),
                     mode=instructor.Mode.JSON,
@@ -206,33 +218,30 @@ class LLMWrapper(BaseLLMWrapper):
                 return client.chat.completions.create(
                     response_model=response_model,
                     messages=messages,
-                    model=self.model_name,
-                    temperature=self.model_temperature,
+                    model=self.model_name.value,
                     seed=self.model_seed,
                 )
             case LLMProvider.ANTHROPIC:
                 client = instructor.from_anthropic(
                     client=Anthropic(
-                        api_key=self.config.must_get_raw_api_key("anthropic_api_key"),
+                        api_key=self.api_key.get_secret_value(),
                     ),
                     mode=instructor.Mode.ANTHROPIC_JSON,
                 )
                 return client.chat.completions.create(
-                    model=self.model_name,
+                    model=self.model_name.value,
                     response_model=response_model,
                     messages=messages,
                     max_tokens=2048,
-                    temperature=self.model_temperature,
                 )
             case LLMProvider.MISTRALAI:
                 client = instructor.from_mistral(
                     client=Mistral(
-                        api_key=self.config.must_get_raw_api_key("mistralai_api_key"),
+                        api_key=self.api_key.get_secret_value(),
                     ),
                 )
                 return client.chat.completions.create(  # pyright: ignore[reportReturnType]
-                    model=self.model_name,
+                    model=self.model_name.value,
                     response_model=response_model,
                     messages=messages,
-                    temperature=self.model_temperature,
                 )

@@ -1,15 +1,16 @@
-"""One shot planner is a single best effort attempt at planning based on the given query + tools."""
+"""DefaultPlanningAgent is a single best effort attempt at planning based on the given query + tools."""  # noqa: E501
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
 
+from portia.config import PLANNING_MODEL_KEY
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.planners.context import render_prompt_insert_defaults
-from portia.planners.planner import Planner, StepsOrError
+from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
+from portia.planning_agents.context import render_prompt_insert_defaults
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -19,12 +20,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class OneShotPlanner(Planner):
-    """planner class."""
+class DefaultPlanningAgent(BasePlanningAgent):
+    """DefaultPlanningAgent class."""
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
-        self.llm_wrapper = LLMWrapper(config)
+        self.llm_wrapper = LLMWrapper.for_usage(PLANNING_MODEL_KEY, config)
 
     def generate_steps_or_error(
         self,
@@ -38,7 +39,7 @@ class OneShotPlanner(Planner):
         prompt = render_prompt_insert_defaults(
             query,
             tool_list,
-            ctx.planner_system_context_extension,
+            ctx.planning_agent_system_context_extension,
             examples,
         )
         response = self.llm_wrapper.to_instructor(
@@ -87,13 +88,10 @@ class OneShotPlanner(Planner):
         """
         tool_ids = [tool.id for tool in tool_list]
         missing_tools = [
-            step.tool_id
-            for step in steps
-            if step.tool_id and step.tool_id not in tool_ids
+            step.tool_id for step in steps if step.tool_id and step.tool_id not in tool_ids
         ]
         return (
             f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
             if missing_tools
             else None
         )
-

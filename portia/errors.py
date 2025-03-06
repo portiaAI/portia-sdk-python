@@ -1,22 +1,22 @@
 """Central definition of error classes.
 
 This module defines custom exception classes used throughout the application. These exceptions
-help identify specific error conditions, particularly related to configuration, planning, workflows,
+help identify specific error conditions, particularly related to configuration, planning, runs,
 tools, and storage. They provide more context and clarity than generic exceptions.
 
 Classes in this file include:
 
 - `ConfigNotFoundError`: Raised when a required configuration value is not found.
 - `InvalidConfigError`: Raised when a configuration value is invalid.
-- `PlanError`: A base class for exceptions in the query planner module.
+- `PlanError`: A base class for exceptions in the query planning_agent module.
 - `PlanNotFoundError`: Raised when a plan is not found.
-- `WorkflowNotFoundError`: Raised when a workflow is not found.
+- `PlanRunNotFoundError`: Raised when a PlanRun is not found.
 - `ToolNotFoundError`: Raised when a tool is not found.
 - `DuplicateToolError`: Raised when a tool is registered with the same name.
 - `InvalidToolDescriptionError`: Raised when a tool description is invalid.
 - `ToolRetryError`: Raised when a tool fails after retries.
 - `ToolFailedError`: Raised when a tool fails with a hard error.
-- `InvalidWorkflowStateError`: Raised when a workflow is in an invalid state.
+- `InvalidPlanRunStateError`: Raised when a plan run is in an invalid state.
 - `InvalidAgentOutputError`: Raised when the agent produces invalid output.
 - `ToolHardError`: Raised when a tool encounters an unrecoverable error.
 - `ToolSoftError`: Raised when a tool encounters an error that can be retried.
@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from portia.plan import PlanUUID
-    from portia.workflow import WorkflowUUID
+    from portia.plan_run import PlanRunUUID
 
 
 class PortiaBaseError(Exception):
@@ -65,7 +65,7 @@ class InvalidConfigError(PortiaBaseError):
 
 
 class PlanError(PortiaBaseError):
-    """Base class for exceptions in the query planner module.
+    """Base class for exceptions in the query planning_agent module.
 
     This exception indicates an error that occurred during the planning phase.
 
@@ -92,17 +92,17 @@ class PlanNotFoundError(PortiaBaseError):
         super().__init__(f"Plan with id {plan_id!s} not found.")
 
 
-class WorkflowNotFoundError(PortiaBaseError):
-    """Raised when a workflow with a specific ID is not found.
+class PlanRunNotFoundError(PortiaBaseError):
+    """Raised when a PlanRun with a specific ID is not found.
 
     Args:
-        workflow_id (UUID | str | None): The ID or name of the workflow that was not found.
+        plan_run_id (UUID | str | None): The ID or name of the PlanRun that was not found.
 
     """
 
-    def __init__(self, workflow_id: WorkflowUUID | str | None) -> None:
+    def __init__(self, plan_run_id: PlanRunUUID | str | None) -> None:
         """Set custom error message."""
-        super().__init__(f"Workflow with id {workflow_id!s} not found.")
+        super().__init__(f"Run with id {plan_run_id!s} not found.")
 
 
 class ToolNotFoundError(PortiaBaseError):
@@ -172,8 +172,8 @@ class ToolFailedError(PortiaBaseError):
         super().__init__(f"Tool {tool_id} failed: {error_string}")
 
 
-class InvalidWorkflowStateError(PortiaBaseError):
-    """Raised when a workflow is in an invalid state."""
+class InvalidPlanRunStateError(PortiaBaseError):
+    """Raised when a plan run is in an invalid state."""
 
 
 class InvalidAgentError(PortiaBaseError):

@@ -1,4 +1,4 @@
-"""tests for llm tool."""
+"""Tests for image understanding tool."""
 
 import os
 import uuid
@@ -7,7 +7,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain.schema import HumanMessage
 
-from portia.open_source_tools.llm_tool import LLMTool, LLMToolSchema
+from portia.open_source_tools.image_understanding_tool import (
+    ImageUnderstandingTool,
+    ImageUnderstandingToolSchema,
+)
 from portia.tool import ToolRunContext
 from tests.utils import get_test_config
 
@@ -19,19 +22,19 @@ def mock_execution_context() -> ToolRunContext:
 
 
 @pytest.fixture
-def mock_llm_tool() -> LLMTool:
-    """Fixture to create an instance of LLMTool."""
-    return LLMTool(id="test_tool", name="Test LLM Tool")
+def mock_image_understanding_tool() -> ImageUnderstandingTool:
+    """Fixture to create an instance of ImageUnderstandingTool."""
+    return ImageUnderstandingTool(id="test_tool", name="Test Image Understanding Tool")
 
 
-@patch("portia.open_source_tools.llm_tool.LLMWrapper")
+@patch("portia.open_source_tools.image_understanding_tool.LLMWrapper")
 @patch.dict(os.environ, {"OPENAI_API_KEY": "123"})
-def test_llm_tool_plan_run(
+def test_image_understanding_tool_run(
     mock_llm_wrapper: MagicMock,
     mock_execution_context: MagicMock,
-    mock_llm_tool: MagicMock,
+    mock_image_understanding_tool: MagicMock,
 ) -> None:
-    """Test that LLMTool runs successfully and returns a response."""
+    """Test that ImageUnderstandingTool runs successfully and returns a response."""
     # Setup mock responses
     mock_llm = MagicMock()
     mock_response = MagicMock()
@@ -43,13 +46,27 @@ def test_llm_tool_plan_run(
     mock_execution_context.plan_run_id = uuid.uuid4()
     mock_execution_context.execution_context.plan_run_context = None
     # Define task input
-    task = "What is the capital of France?"
+    schema_data = {
+        "task": "What is the capital of France?",
+        "image_url": "https://example.com/image.png",
+    }
 
     # Run the tool
-    result = mock_llm_tool.run(mock_execution_context, task)
+    result = mock_image_understanding_tool.run(mock_execution_context, **schema_data)
 
     mock_llm.invoke.assert_called_once_with(
-        [HumanMessage(content=mock_llm_tool.prompt), HumanMessage(content=task)],
+        [
+            HumanMessage(content=mock_image_understanding_tool.prompt),
+            HumanMessage(
+                content=[
+                    {"type": "text", "text": schema_data["task"]},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": schema_data["image_url"]},
+                    },
+                ],
+            ),
+        ],
     )
 
     # Assert the result is the expected response
@@ -58,32 +75,36 @@ def test_llm_tool_plan_run(
 
 def test_llm_tool_schema_valid_input() -> None:
     """Test that the LLMToolSchema correctly validates the input."""
-    schema_data = {"task": "Solve a math problem"}
-    schema = LLMToolSchema(**schema_data)
+    schema_data = {
+        "task": "Solve a math problem in this image",
+        "image_url": "https://example.com/image.png",
+    }
+    schema = ImageUnderstandingToolSchema(**schema_data)
 
-    assert schema.task == "Solve a math problem"
+    assert schema.task == "Solve a math problem in this image"
+    assert schema.image_url == "https://example.com/image.png"
 
 
 def test_llm_tool_schema_missing_task() -> None:
     """Test that LLMToolSchema raises an error if 'task' is missing."""
     with pytest.raises(ValueError):  # noqa: PT011
-        LLMToolSchema()  # type: ignore  # noqa: PGH003
+        ImageUnderstandingToolSchema()  # type: ignore  # noqa: PGH003
 
 
-def test_llm_tool_initialization(mock_llm_tool: LLMTool) -> None:
+def test_llm_tool_initialization(mock_image_understanding_tool: ImageUnderstandingTool) -> None:
     """Test that LLMTool is correctly initialized."""
-    assert mock_llm_tool.id == "test_tool"
-    assert mock_llm_tool.name == "Test LLM Tool"
+    assert mock_image_understanding_tool.id == "test_tool"
+    assert mock_image_understanding_tool.name == "Test Image Understanding Tool"
 
 
-@patch("portia.open_source_tools.llm_tool.LLMWrapper")
+@patch("portia.open_source_tools.image_understanding_tool.LLMWrapper")
 @patch.dict(os.environ, {"OPENAI_API_KEY": "123"})
 def test_llm_tool_run_with_context(
     mock_llm_wrapper: MagicMock,
     mock_execution_context: MagicMock,
-    mock_llm_tool: MagicMock,
+    mock_image_understanding_tool: MagicMock,
 ) -> None:
-    """Test that LLMTool runs successfully when a context is provided."""
+    """Test that ImageUnderstandingTool runs successfully when a context is provided."""
     # Setup mock responses
     mock_llm = MagicMock()
     mock_response = MagicMock()
@@ -94,18 +115,20 @@ def test_llm_tool_run_with_context(
     mock_execution_context.config = get_test_config()
     mock_execution_context.plan_run_id = uuid.uuid4()
     # Define task and context
-    mock_llm_tool.tool_context = "Context for task"
-    task = "What is the capital of France?"
+    mock_image_understanding_tool.tool_context = "Context for task"
+    schema_data = {
+        "task": "What is the capital of France?",
+        "image_url": "https://example.com/map.png",
+    }
 
     # Run the tool
-    result = mock_llm_tool.run(mock_execution_context, task)
+    result = mock_image_understanding_tool.run(mock_execution_context, **schema_data)
 
     # Verify that the LLMWrapper's invoke method is called
     called_with = mock_llm.invoke.call_args_list[0].args[0]
     assert len(called_with) == 2
     assert isinstance(called_with[0], HumanMessage)
     assert isinstance(called_with[1], HumanMessage)
-    assert mock_llm_tool.tool_context in called_with[1].content
-    assert task in called_with[1].content
+    assert mock_image_understanding_tool.tool_context in called_with[1].content[0]["text"]
     # Assert the result is the expected response
     assert result == "Test response content"

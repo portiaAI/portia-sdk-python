@@ -1,13 +1,13 @@
-"""Provides execution context to the planner and agents.
+"""Provides execution context to the planning and execution agents.
 
 This module defines the `ExecutionContext` class and utilities for managing execution
-contexts for planners and agents. It provides a way to pass runtime-specific information
-for each workflow execution, ensuring flexibility and context isolation, especially in
+contexts for planning and execution agents. It provides a way to pass runtime-specific information
+for each run execution, ensuring flexibility and context isolation, especially in
 multi-threaded or asynchronous applications.
 
 Key Features:
 - The `ExecutionContext` class encapsulates information such as user identification,
-  additional data, and system context extensions for planners and agents.
+  additional data, and system context extensions for planning and execution agents.
 - The `execution_context` context manager allows for context isolation, ensuring
   that each task or thread has its own independent execution context.
 - The `get_execution_context` function allows retrieval of the current execution context.
@@ -34,21 +34,22 @@ _execution_context: ContextVar[ExecutionContext | None] = ContextVar(
 
 
 class ExecutionContext(BaseModel):
-    """Execution context provides runtime information to the runner, planner, and agents.
+    """Execution context provides runtime information to the portia client and planning and execution agents.
 
     Unlike configuration settings, it is designed to be used on a per-request basis,
     allowing customization at runtime. For example, this can pass end-user-specific
-    information to planners and agents for dynamic adjustments.
+    information to planning and execution agents for dynamic adjustments.
 
     Attributes:
-        end_user_id (Optional[str]): The identifier of the user for whom the workflow is running.
+        end_user_id (Optional[str]): The identifier of the user for whom the run is running.
             Used for authentication and debugging purposes.
         additional_data (dict[str, str]): Arbitrary additional data useful for debugging.
-        planner_system_context_extension (Optional[list[str]]): Additional context for planner LLMs.
-        agent_system_context_extension (Optional[list[str]]): Additional context for agent LLMs.
-        workflow_run_context (Optional[str]): Additional context for the workflow run.
+        planning_agent_system_context_extension (Optional[list[str]]): Additional context for
+            planning_agents.
+        execution_agent_system_context_extension (Optional[list[str]]): Additional context for agent LLMs.
+        plan_run_context (Optional[str]): Additional context for the PlanRun.
 
-    """
+    """  # noqa: E501
 
     model_config = ConfigDict(extra="ignore")
 
@@ -56,11 +57,11 @@ class ExecutionContext(BaseModel):
 
     additional_data: dict[str, str] = Field(default={})
 
-    planner_system_context_extension: list[str] | None = None
+    planning_agent_system_context_extension: list[str] | None = None
 
-    agent_system_context_extension: list[str] | None = None
+    execution_agent_system_context_extension: list[str] | None = None
 
-    workflow_run_context: str | None = Field(default=None, exclude=True)
+    plan_run_context: str | None = Field(default=None, exclude=True)
 
 
 def empty_context() -> ExecutionContext:
@@ -73,9 +74,9 @@ def empty_context() -> ExecutionContext:
     return ExecutionContext(
         end_user_id=None,
         additional_data={},
-        planner_system_context_extension=None,
-        agent_system_context_extension=None,
-        workflow_run_context=None,
+        planning_agent_system_context_extension=None,
+        execution_agent_system_context_extension=None,
+        plan_run_context=None,
     )
 
 
@@ -84,10 +85,10 @@ def execution_context(
     context: ExecutionContext | None = None,
     end_user_id: str | None = None,
     additional_data: dict[str, str] | None = None,
-    planner_system_context_extension: list[str] | None = None,
+    planning_agent_system_context_extension: list[str] | None = None,
     agent_system_context_extension: list[str] | None = None,
 ) -> Generator[None, None, None]:
-    """Set the execution context for the duration of the workflow.
+    """Set the execution context for the duration of the PlanRun.
 
     This context manager ensures context isolation by using `contextvars.ContextVar`,
     meaning that the execution context set within this block will only affect
@@ -102,8 +103,8 @@ def execution_context(
             the execution for specific users. Defaults to `None`.
         additional_data (Optional[Dict[str, str]]): Arbitrary additional data to associate
             with the context. Defaults to an empty dictionary.
-        planner_system_context_extension (Optional[list[str]]): Additional context for planner
-            LLMs. This should be concise to stay within the context window.
+        planning_agent_system_context_extension (Optional[list[str]]): Additional context for
+            planning_agents. This should be concise to stay within the context window.
         agent_system_context_extension (Optional[list[str]]): Additional context for agent
             LLMs. This should also be concise.
 
@@ -128,8 +129,8 @@ def execution_context(
         context = ExecutionContext(
             end_user_id=end_user_id,
             additional_data=additional_data or {},
-            planner_system_context_extension=planner_system_context_extension,
-            agent_system_context_extension=agent_system_context_extension,
+            planning_agent_system_context_extension=planning_agent_system_context_extension,
+            execution_agent_system_context_extension=agent_system_context_extension,
         )
     token = _execution_context.set(context)
     try:

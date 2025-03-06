@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, create_model
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.logger import logger
 from portia.open_source_tools.calculator_tool import CalculatorTool
+from portia.open_source_tools.image_understanding_tool import ImageUnderstandingTool
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
@@ -109,7 +110,7 @@ class ToolRegistry(ABC):
             list[Tool]: A list of tools matching the query.
 
         This method is useful to implement tool filtering whereby only a selection of tools are
-        passed to the Planner based on the query.
+        passed to the PlanningAgent based on the query.
         This method is optional to implement and will default to providing all tools.
 
         """
@@ -160,7 +161,7 @@ class ToolRegistry(ABC):
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
                 logger().warning(
-                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.",
+                    f"Duplicate tool ID found: {tool.id!s}. Unintended behavior may occur.",
                 )
             tool_ids.add(tool.id)
 
@@ -484,6 +485,7 @@ class DefaultToolRegistry(AggregatedToolRegistry):
                 LLMTool(),
                 FileWriterTool(),
                 FileReaderTool(),
+                ImageUnderstandingTool(),
             ],
         )
         if os.getenv("TAVILY_API_KEY"):
