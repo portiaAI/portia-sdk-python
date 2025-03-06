@@ -1,6 +1,7 @@
 name: Run Evals for portia-sdk-python
 
 on:
+  workflow_dispatch:
   pull_request_target:
     branches:
       - main
