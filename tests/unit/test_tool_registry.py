@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic_core import PydanticUndefined
 import pytest
+from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.tool import Tool
@@ -258,18 +258,18 @@ def test_generate_pydantic_model_from_json_schema() -> None:
         "required": ["name", "age"],
     }
     model = generate_pydantic_model_from_json_schema("TestModel", json_schema)
-    assert model.model_fields["name"].annotation == str
+    assert model.model_fields["name"].annotation is str
     assert model.model_fields["name"].default is PydanticUndefined
     assert model.model_fields["name"].description == "The name of the user"
-    assert model.model_fields["age"].annotation == int
+    assert model.model_fields["age"].annotation is int
     assert model.model_fields["age"].default is PydanticUndefined
     assert model.model_fields["age"].description == "The age of the user"
-    assert model.model_fields["is_active"].annotation == bool
+    assert model.model_fields["is_active"].annotation is bool
     assert model.model_fields["is_active"].default is None
     assert model.model_fields["is_active"].description == "Whether the user is active"
-    assert model.model_fields["pets"].annotation == list
+    assert model.model_fields["pets"].annotation is list
     assert model.model_fields["pets"].default is None
     assert model.model_fields["pets"].description == "The pets of the user"
-    assert model.model_fields["address"].annotation == dict
+    assert model.model_fields["address"].annotation is dict
     assert model.model_fields["address"].default is None
     assert model.model_fields["address"].description == "The address of the user"

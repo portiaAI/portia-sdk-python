@@ -461,7 +461,10 @@ class DefaultToolRegistry(AggregatedToolRegistry):
         super().__init__(registries)
 
 
-def generate_pydantic_model_from_json_schema(model_name: str, json_schema: dict[str, Any]) -> type[BaseModel]:
+def generate_pydantic_model_from_json_schema(
+    model_name: str,
+    json_schema: dict[str, Any],
+) -> type[BaseModel]:
     """Generate a Pydantic model based on a JSON schema.
 
     Args:
