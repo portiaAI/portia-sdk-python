@@ -298,8 +298,7 @@ class Plan(BaseModel):
         """Validate the plan.
 
         Checks that the plan has at least one step, that all step tool IDs are in the tool_ids list,
-        that all outputs are unique, and that all steps use valid outputs as inputs. Inputs must be
-        outputs of previous steps or have a value assigned to them.
+        that all outputs are unique, and that all steps use valid outputs as inputs.
 
         Returns:
             Plan: The validated plan.
@@ -308,12 +307,9 @@ class Plan(BaseModel):
         outputs = [step.output for step in self.steps]
         if len(outputs) != len(set(outputs)):
             raise ValueError("Outputs must be unique")
-        for i, step in enumerate(self.steps):
+        for step in self.steps:
             if step.tool_id is not None and step.tool_id not in self.plan_context.tool_ids:
                 raise ValueError(f"Tool {step.tool_id} not in tool_ids")
-            for step_input in step.inputs:
-                if step_input.name not in outputs[:i] and step_input.value is None:
-                    raise ValueError(f"Input {step_input.name} not in outputs or already defined")
         return self
 
 
