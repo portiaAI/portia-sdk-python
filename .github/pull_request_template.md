@@ -21,4 +21,4 @@ Ticket Link:
 
 ## Changelog
 
-(Add a changelog entry)
+(If applicable, add a changelog entry)
