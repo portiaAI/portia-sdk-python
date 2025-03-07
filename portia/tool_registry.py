@@ -341,48 +341,7 @@ class PortiaToolRegistry(ToolRegistry):
         self.tools = tools or self._load_tools()
 
     def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
-        """Generate a Pydantic model based on a JSON schema.
-
-        Args:
-            model_name (str): The name of the Pydantic model.
-            schema (dict[str, Any]): The schema to generate the model from.
-
-        Returns:
-            type[BaseModel]: The generated Pydantic model class.
-
-        """
-        type_mapping = {
-            "string": str,
-            "integer": int,
-            "number": float,
-            "boolean": bool,
-            "array": list,
-            "object": dict,
-        }
-
-        # Extract properties and required fields
-        properties = schema.get("properties", {})
-        required = set(schema.get("required", []))
-
-        # Define fields for the model
-        fields = {
-            key: (
-                type_mapping.get(value.get("type"), Any),
-                Field(
-                    default=None,
-                    description=value.get("description", ""),
-                )
-                if key not in required
-                else Field(
-                    ...,
-                    description=value.get("description", ""),
-                ),
-            )
-            for key, value in properties.items()
-        }
-
-        # Create the Pydantic model dynamically
-        return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
+        return generate_pydantic_model_from_json_schema(model_name, schema)
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
@@ -502,3 +461,48 @@ class DefaultToolRegistry(AggregatedToolRegistry):
             registries.append(PortiaToolRegistry(config).filter_tools(default_tool_filter))
 
         super().__init__(registries)
+
+
+def generate_pydantic_model_from_json_schema(model_name: str, json_schema: dict[str, Any]) -> type[BaseModel]:
+    """Generate a Pydantic model based on a JSON schema.
+
+    Args:
+        model_name (str): The name of the Pydantic model.
+        json_schema (dict[str, Any]): The schema to generate the model from.
+
+    Returns:
+        type[BaseModel]: The generated Pydantic model class.
+
+    """
+    type_mapping = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": bool,
+        "array": list,
+        "object": dict,
+    }
+
+    # Extract properties and required fields
+    properties = json_schema.get("properties", {})
+    required = set(json_schema.get("required", []))
+
+    # Define fields for the model
+    fields = {
+        key: (
+            type_mapping.get(value.get("type"), Any),
+            Field(
+                default=None,
+                description=value.get("description", ""),
+            )
+            if key not in required
+            else Field(
+                ...,
+                description=value.get("description", ""),
+            ),
+        )
+        for key, value in properties.items()
+    }
+
+    # Create the Pydantic model dynamically
+    return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
