@@ -340,8 +340,6 @@ class PortiaToolRegistry(ToolRegistry):
         self.api_endpoint = config.must_get("portia_api_endpoint", str)
         self.tools = tools or self._load_tools()
 
-    def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
-        return generate_pydantic_model_from_json_schema(model_name, schema)
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
@@ -361,7 +359,7 @@ class PortiaToolRegistry(ToolRegistry):
                 name=raw_tool["tool_name"],
                 should_summarize=raw_tool.get("should_summarize", False),
                 description=raw_tool["description"]["overview_description"],
-                args_schema=self._generate_pydantic_model(
+                args_schema=generate_pydantic_model_from_json_schema(
                     raw_tool["tool_name"],
                     raw_tool["schema"],
                 ),
