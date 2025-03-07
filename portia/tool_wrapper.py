@@ -17,11 +17,13 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
+from portia.execution_agents.base_execution_agent import Output
+from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
-    from portia.workflow import Workflow
+    from portia.plan_run import PlanRun
 
 
 class ToolCallWrapper(Tool):
@@ -35,7 +37,7 @@ class ToolCallWrapper(Tool):
         model_config (ConfigDict): Pydantic configuration that allows arbitrary types.
         _child_tool (Tool): The child tool to be wrapped and executed.
         _storage (AdditionalStorage): Storage mechanism to save tool call records.
-        _workflow (Workflow): The workflow context for the current execution.
+        _plan_run (PlanRun): The run context for the current execution.
 
     """
 
@@ -43,15 +45,15 @@ class ToolCallWrapper(Tool):
 
     _child_tool: Tool
     _storage: AdditionalStorage
-    _workflow: Workflow
+    _plan_run: PlanRun
 
-    def __init__(self, child_tool: Tool, storage: AdditionalStorage, workflow: Workflow) -> None:
+    def __init__(self, child_tool: Tool, storage: AdditionalStorage, plan_run: PlanRun) -> None:
         """Initialize parent fields using child_tool's attributes.
 
         Args:
             child_tool (Tool): The child tool to be wrapped.
             storage (AdditionalStorage): The storage to save execution records.
-            workflow (Workflow): The current workflow for the execution.
+            plan_run (PlanRun): The PlanRun to execute.
 
         """
         super().__init__(
@@ -64,7 +66,7 @@ class ToolCallWrapper(Tool):
         )
         self._child_tool = child_tool
         self._storage = storage
-        self._workflow = workflow
+        self._plan_run = plan_run
 
     def ready(self, ctx: ToolRunContext) -> bool:
         """Check if the child tool is ready.
@@ -98,16 +100,20 @@ class ToolCallWrapper(Tool):
 
         """
         # initialize empty call record
+
         record = ToolCallRecord(
             input=combine_args_kwargs(*args, **kwargs),
             output=None,
             latency_seconds=0,
             tool_name=self._child_tool.name,
-            workflow_id=self._workflow.id,
-            step=self._workflow.current_step_index,
+            plan_run_id=self._plan_run.id,
+            step=self._plan_run.current_step_index,
             end_user_id=ctx.execution_context.end_user_id,
             additional_data=ctx.execution_context.additional_data,
             status=ToolCallStatus.IN_PROGRESS,
+        )
+        logger().info(
+            f"Invoking {record.tool_name} with args: {record.input}",
         )
         start_time = datetime.now(tz=UTC)
         try:
@@ -122,6 +128,9 @@ class ToolCallWrapper(Tool):
             if isinstance(output, Clarification):
                 record.status = ToolCallStatus.NEED_CLARIFICATION
                 record.output = output.model_dump(mode="json")
+            elif output is None:
+                record.output = Output(value=output).model_dump(mode="json")
+                record.status = ToolCallStatus.SUCCESS
             else:
                 record.output = output
                 record.status = ToolCallStatus.SUCCESS

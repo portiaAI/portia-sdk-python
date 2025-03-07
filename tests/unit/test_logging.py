@@ -2,8 +2,48 @@
 
 from unittest.mock import Mock
 
+import pytest
+
 from portia.config import LogLevel
-from portia.logger import LoggerInterface, LoggerManager, logger, logger_manager
+from portia.logger import (
+    FUNCTION_COLOR_MAP,
+    Formatter,
+    LoggerInterface,
+    LoggerManager,
+    logger,
+    logger_manager,
+)
+
+
+@pytest.mark.parametrize(
+    ("record", "expected_color"),
+    [
+        (
+            {"name": "portia.portia", "function": "_execute_plan_run"},
+            FUNCTION_COLOR_MAP["run"],
+        ),
+        (
+            {"name": "portia.storage", "function": "save_tool_call"},
+            FUNCTION_COLOR_MAP["tool"],
+        ),
+        (
+            {"name": "portia.portia", "function": "plan"},
+            FUNCTION_COLOR_MAP["plan"],
+        ),
+        (
+            {"name": "portia.portia", "function": "_raise_clarifications"},
+            FUNCTION_COLOR_MAP["clarification"],
+        ),
+        (
+            {"name": "portia.tool_wrapper", "function": "run"},
+            FUNCTION_COLOR_MAP["tool"],
+        ),
+    ],
+)
+def test_logger_formatter_get_function_color(record: dict, expected_color: str) -> None:
+    """Test the logger formatter get_function_color method."""
+    logger_formatter = Formatter()
+    assert logger_formatter._get_function_color_(record) == expected_color
 
 
 def test_logger_manager_initialization() -> None:

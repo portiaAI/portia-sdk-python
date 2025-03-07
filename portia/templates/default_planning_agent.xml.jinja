@@ -1,0 +1,51 @@
+<Instructions>
+    Enumerate the steps you plan on taking to answer the query.
+    If applicable, at each step indicate whether you would use a tool from those defined in <Tools>.
+    IMPORTANT: Ensure you use the tool id exactly as it is defined in <Tools> below (including whether it has a portia:: prefix or not)
+    Each step should:
+     - include a description, input used to complete the step, and an explicit mention of the tool used if applicable.
+     - give a name to the variable for the output is from the step if it is successful.
+    Inputs for each step can either be constants (which need to have a set value) or output variables from preceding steps.
+    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - do not return plans with no steps.
+    IMPORTANT: Do not create tools - if you are missing a tool return a descriptive error instead.
+</Instructions>
+
+<Examples>{% for example in examples %}
+    <Example>
+        <Request>
+            <Tools>
+            {{example.plan_context.tool_ids | safe }}
+            </Tools>
+            <Query>
+            {{example.plan_context.query}}
+            </Query>
+        </Request>
+        <Response>
+            [{% for step in example.steps %}
+                {{step.model_dump(exclude_none=True) | tojson}},
+            {% endfor %}]
+        </Response>
+    </Example>{% endfor %}
+</Examples>
+
+<Tools>{% for tool in tools %}
+    <Tool id={{tool.id}}>
+        {{tool.description | safe}}
+
+        Tool arguments:
+            {{tool.args | safe}}
+    </Tool>{% endfor %}
+</Tools>
+
+<Request>
+    <Tools>
+        {{tools | map(attribute='id') | list}}
+    </Tools>
+    <Query>
+        {{query}}
+    </Query>
+</Request>
+{% if system_context %}
+<SystemContext>{% for context in system_context %}
+    {{context}}{% endfor %}
+</SystemContext>{% endif %}

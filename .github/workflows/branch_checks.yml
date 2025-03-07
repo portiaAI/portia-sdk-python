@@ -3,7 +3,8 @@ name: Branch is up-to-date
 on:
   pull_request:
     branches:
-      - '*'
+      - 'main'
+      - 'production'
 
 jobs:
   check-branch:
@@ -13,7 +14,7 @@ jobs:
         with:
           fetch-depth: 0
       - run: |
-          BASE_BRANCH="origin/main"
+          BASE_BRANCH="origin/${GITHUB_BASE_REF}"
           CURRENT_BRANCH=$(git branch --show-current)
           if ! git merge-base --is-ancestor $BASE_BRANCH ${{ github.event.pull_request.head.sha }}; then
             echo "Error: The current branch is not based on $BASE_BRANCH."

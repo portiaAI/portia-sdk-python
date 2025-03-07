@@ -1,6 +1,6 @@
-"""Plan primitives used to define and execute workflows.
+"""Plan primitives used to define and execute runs.
 
-This module defines the core objects that represent the plan for executing a workflow.
+This module defines the core objects that represent the plan for executing a PlanRun.
 The `Plan` class is the main structure that holds a series of steps (`Step`) to be executed by an
 agent in response to a query. Each step can have inputs, an associated tool, and an output.
 Variables can be used within steps to reference other parts of the plan or constants.
@@ -13,7 +13,7 @@ Classes in this file include:
 - `PlanContext`: Provides context about the plan, including the original query and available tools.
 - `Plan`: Represents the entire series of steps required to execute a query.
 
-These classes facilitate the definition of workflows that can be dynamically adjusted based on the
+These classes facilitate the definition of runs that can be dynamically adjusted based on the
 tools, inputs, and outputs defined in the plan.
 
 """
@@ -154,9 +154,9 @@ class Variable(BaseModel):
 
 
 class Step(BaseModel):
-    """A step in a workflow.
+    """A step in a PlanRun.
 
-    A step represents a task in the workflow to be executed. It contains inputs (variables) and
+    A step represents a task in the run to be executed. It contains inputs (variables) and
     outputs, and may reference a tool to complete the task.
 
     Args:
@@ -226,18 +226,20 @@ class PlanContext(BaseModel):
     """Context for a plan.
 
     The plan context contains information about the original query and the tools available
-    for the planner to use when generating the plan.
+    for the planning agent to use when generating the plan.
 
     Args:
         query (str): The original query given by the user.
-        tool_ids (list[str]): A list of tool IDs available to the planner.
+        tool_ids (list[str]): A list of tool IDs available to the planning agent.
 
     """
 
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(description="The original query given by the user.")
-    tool_ids: list[str] = Field(description="The list of tools IDs available to the planner.")
+    tool_ids: list[str] = Field(
+        description="The list of tools IDs available to the planning agent.",
+    )
 
     @field_serializer("tool_ids")
     def serialize_tool_ids(self, tool_ids: list[str]) -> list[str]:
