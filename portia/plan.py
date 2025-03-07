@@ -30,8 +30,8 @@ from portia.prefixed_uuid import PlanUUID
 class PlanBuilder:
     """A builder for creating plans.
 
-    This class provides an interface for constructing plans step by step. Requires a steps to be
-    added to the plan before building it and mapping inputs and outputs to the correct steps.
+    This class provides an interface for constructing plans step by step. Requires a step to be
+    added to the plan before building it.
 
     Example:
     ```python
@@ -48,7 +48,7 @@ class PlanBuilder:
     steps: list[Step]
 
     def __init__(self, query: str | None = None) -> None:
-        """Initialize the builder with the query and tool IDs.
+        """Initialize the builder with the plan query.
 
         Args:
             query (str): The original query given by the user.
@@ -88,23 +88,29 @@ class PlanBuilder:
         name: str,
         value: Any | None = None,  # noqa: ANN401
         description: str | None = None,
+        step_index: int | None = None,
     ) -> PlanBuilder:
-        """Add an input variable to the last step in the plan.
+        """Add an input variable to the chosen step in the plan (default is the last step).
 
         Args:
             name (str): The name of the input.
             value (Any | None): The value of the input.
             description (str | None): The description of the input.
+            step_index (int | None): The index of the step to add the input to.
 
         Returns:
             PlanBuilder: The builder instance with the new input added.
 
         """
+        if step_index is None:
+            step_index = len(self.steps) - 1
         if len(self.steps) == 0:
             raise ValueError("No steps in the plan")
         if description is None:
             description = ""
-        self.steps[-1].inputs.append(Variable(name=name, value=value, description=description))
+        self.steps[step_index].inputs.append(
+            Variable(name=name, value=value, description=description),
+        )
         return self
 
     def build(self) -> Plan:
