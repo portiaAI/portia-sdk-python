@@ -135,7 +135,7 @@ def process_output(  # noqa: C901
         InvalidAgentOutputError: If the output from the agent is invalid.
 
     """
-    output_values = []
+    output_values: list[Output] = []
     for message in messages:
         if "ToolSoftError" in message.content and tool:
             raise ToolRetryError(tool.id, str(message.content))
@@ -147,11 +147,11 @@ def process_output(  # noqa: C901
             )
         if isinstance(message, ToolMessage):
             if message.artifact and isinstance(message.artifact, Output):
-                output_values.append(message.artifact.value)
-            elif message.artifact:
                 output_values.append(message.artifact)
+            elif message.artifact:
+                output_values.append(Output(value=message.artifact))
             else:
-                output_values.append(message.content)
+                output_values.append(Output(value=message.content))
             continue
 
     if len(output_values) == 0:
@@ -159,9 +159,16 @@ def process_output(  # noqa: C901
 
     # if there's only one output return just the value
     if len(output_values) == 1:
-        output_values = output_values[0]
+        output = output_values[0]
+        if output.summary is None:
+            output.summary = output.serialize_value(output.value)
+        return output
 
-    output = Output(value=output_values)
-    if not output.summary:
-        output.summary = output.serialize_value(output.value)
-    return output
+    values = []
+    summaries = []
+
+    for output in output_values:
+        values.append(output.value)
+        summaries.append(output.summary or output.serialize_value(output.value))
+
+    return Output(value=values, summary=", ".join(summaries))
