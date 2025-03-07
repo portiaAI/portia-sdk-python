@@ -97,7 +97,7 @@ def test_process_output_with_clarifications() -> None:
     ]
     message = HumanMessage(content="test")
 
-    result = process_output(message, clarifications=clarifications)  # type: ignore  # noqa: PGH003
+    result = process_output([message], clarifications=clarifications)  # type: ignore  # noqa: PGH003
 
     assert isinstance(result, Output)
     assert result.value == clarifications
@@ -111,10 +111,10 @@ def test_process_output_with_tool_errors() -> None:
     hard_error = ToolMessage(content="ToolHardError: test", tool_call_id="1", name="test")
 
     with pytest.raises(ToolRetryError):
-        process_output(soft_error, tool)
+        process_output([soft_error], tool)
 
     with pytest.raises(ToolFailedError):
-        process_output(hard_error, tool)
+        process_output([hard_error], tool)
 
 
 def test_process_output_with_invalid_message() -> None:
@@ -122,25 +122,26 @@ def test_process_output_with_invalid_message() -> None:
     invalid_message = AIMessage(content="test")
 
     with pytest.raises(InvalidAgentOutputError):
-        process_output(invalid_message)
+        process_output([invalid_message])
 
 
 def test_process_output_with_output_artifacts() -> None:
     """Test process_output with outpu artifacts."""
     message = ToolMessage(tool_call_id="1", content="", artifact=Output(value="test"))
+    message2 = ToolMessage(tool_call_id="2", content="", artifact=Output(value="bar"))
 
-    result = process_output(message, clarifications=[])
+    result = process_output([message, message2], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == "test"
-    assert result.summary == "test"
+    assert result.value == ["test", "bar"]
+    assert result.summary == "test, bar"
 
 
 def test_process_output_with_artifacts() -> None:
     """Test process_output with artifacts."""
     message = ToolMessage(tool_call_id="1", content="", artifact="test")
 
-    result = process_output(message, clarifications=[])
+    result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.value == "test"
@@ -150,17 +151,7 @@ def test_process_output_with_content() -> None:
     """Test process_output with content."""
     message = ToolMessage(tool_call_id="1", content="test")
 
-    result = process_output(message, clarifications=[])
-
-    assert isinstance(result, Output)
-    assert result.value == "test"
-
-
-def test_process_output_with_human_message() -> None:
-    """Test process_output with outpu artifacts."""
-    message = HumanMessage(tool_call_id="1", content="test")
-
-    result = process_output(message, clarifications=[])
+    result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.value == "test"
@@ -171,7 +162,7 @@ def test_process_output_summary_matches_serialized_value() -> None:
     dict_value = {"key1": "value1", "key2": "value2"}
     message = ToolMessage(tool_call_id="1", content="test", artifact=Output(value=dict_value))
 
-    result = process_output(message, clarifications=[])
+    result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.value == dict_value
@@ -188,7 +179,7 @@ def test_process_output_summary_not_updated_if_provided() -> None:
         artifact=Output(value=dict_value, summary=provided_summary),
     )
 
-    result = process_output(message, clarifications=[])
+    result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.value == dict_value

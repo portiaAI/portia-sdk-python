@@ -214,4 +214,4 @@ class OneShotAgent(BaseExecutionAgent):
         app = graph.compile()
         invocation_result = app.invoke({"messages": []})
 
-        return process_output(invocation_result["messages"][-1], self.tool)
+        return process_output(invocation_result["messages"], self.tool)
