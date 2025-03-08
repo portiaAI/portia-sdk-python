@@ -297,8 +297,8 @@ class Plan(BaseModel):
     def validate_plan(self) -> Plan:
         """Validate the plan.
 
-        Checks that the plan has at least one step, that all step tool IDs are in the tool_ids list,
-        that all outputs are unique, and that all steps use valid outputs as inputs.
+        Checks that the plan has at least one step, that all outputs are unique, and that all
+        steps use valid outputs as inputs.
 
         Returns:
             Plan: The validated plan.
@@ -307,13 +307,6 @@ class Plan(BaseModel):
         outputs = [step.output for step in self.steps]
         if len(outputs) != len(set(outputs)):
             raise ValueError("Outputs must be unique")
-        for step in self.steps:
-            if (
-                step.tool_id is not None
-                and step.tool_id not in self.plan_context.tool_ids
-                and step.tool_id != "llm_tool"  # LLM tool is always available
-            ):
-                raise ValueError(f"Tool {step.tool_id} not in tool_ids")
         return self
 
 
