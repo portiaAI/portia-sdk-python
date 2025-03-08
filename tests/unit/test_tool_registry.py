@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.tool import Tool
@@ -12,6 +13,7 @@ from portia.tool_registry import (
     AggregatedToolRegistry,
     InMemoryToolRegistry,
     ToolRegistry,
+    generate_pydantic_model_from_json_schema,
 )
 from tests.utils import AdditionTool, MockTool, get_test_tool_context
 
@@ -228,3 +230,46 @@ def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
     mock_logger.warning.assert_called_once_with(
         f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur.",
     )
+
+
+def test_generate_pydantic_model_from_json_schema() -> None:
+    """Test generating a Pydantic model from a JSON schema."""
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "The name of the user"},
+            "age": {"type": "integer", "description": "The age of the user"},
+            "is_active": {"type": "boolean", "description": "Whether the user is active"},
+            "pets": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "The pets of the user",
+            },
+            "address": {
+                "type": "object",
+                "properties": {
+                    "street": {"type": "string", "description": "The street of the user"},
+                    "city": {"type": "string", "description": "The city of the user"},
+                    "zip": {"type": "string", "description": "The zip of the user"},
+                },
+                "description": "The address of the user",
+            },
+        },
+        "required": ["name", "age"],
+    }
+    model = generate_pydantic_model_from_json_schema("TestModel", json_schema)
+    assert model.model_fields["name"].annotation is str
+    assert model.model_fields["name"].default is PydanticUndefined
+    assert model.model_fields["name"].description == "The name of the user"
+    assert model.model_fields["age"].annotation is int
+    assert model.model_fields["age"].default is PydanticUndefined
+    assert model.model_fields["age"].description == "The age of the user"
+    assert model.model_fields["is_active"].annotation is bool
+    assert model.model_fields["is_active"].default is None
+    assert model.model_fields["is_active"].description == "Whether the user is active"
+    assert model.model_fields["pets"].annotation is list
+    assert model.model_fields["pets"].default is None
+    assert model.model_fields["pets"].description == "The pets of the user"
+    assert model.model_fields["address"].annotation is dict
+    assert model.model_fields["address"].default is None
+    assert model.model_fields["address"].description == "The address of the user"
