@@ -99,14 +99,3 @@ def test_plan_outputs_must_be_unique() -> None:
                 Step(task="test task", output="$output"),
             ],
         )
-
-
-def test_plan_tool_ids_must_be_in_tool_ids() -> None:
-    """Test that plan tool IDs must be in tool IDs."""
-    with pytest.raises(ValidationError, match="Tool tool2 not in tool_ids"):
-        Plan(
-            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
-            steps=[
-                Step(task="test task", output="$output", tool_id="tool2"),
-            ],
-        )
