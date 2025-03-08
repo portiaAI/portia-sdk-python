@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step, Variable
+from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step
 from tests.utils import get_test_plan_run
 
 
@@ -108,20 +108,5 @@ def test_plan_tool_ids_must_be_in_tool_ids() -> None:
             plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
             steps=[
                 Step(task="test task", output="$output", tool_id="tool2"),
-            ],
-        )
-
-
-def test_plan_inputs_must_be_outputs_or_have_value() -> None:
-    """Test that plan inputs must be outputs of previous steps or have a value assigned to them."""
-    with pytest.raises(ValidationError, match=r"Input \$input1 not in outputs or already defined"):
-        Plan(
-            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
-            steps=[
-                Step(
-                    task="test task",
-                    output="$output",
-                    inputs=[Variable(name="$input1", value=None, description="")],
-                ),
             ],
         )

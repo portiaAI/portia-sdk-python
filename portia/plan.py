@@ -308,7 +308,11 @@ class Plan(BaseModel):
         if len(outputs) != len(set(outputs)):
             raise ValueError("Outputs must be unique")
         for step in self.steps:
-            if step.tool_id is not None and step.tool_id not in self.plan_context.tool_ids:
+            if (
+                step.tool_id is not None
+                and step.tool_id not in self.plan_context.tool_ids
+                and step.tool_id != "llm_tool"  # LLM tool is always available
+            ):
                 raise ValueError(f"Tool {step.tool_id} not in tool_ids")
         return self
 
