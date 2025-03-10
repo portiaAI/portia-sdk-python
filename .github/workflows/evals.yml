@@ -45,7 +45,6 @@ jobs:
         with:
           path: platform
           repository: portiaAI/platform
-          ref: dev-db
           token: ${{ secrets.PORTIA_GH_TOKEN }}
 
       - uses: actions/setup-python@v4
