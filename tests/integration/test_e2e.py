@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
+from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import HttpUrl
 
-from portia.clarification import Clarification, InputClarification
+from portia.clarification import ActionClarification, Clarification, InputClarification
+from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, ExecutionAgentType, LLMModel, LLMProvider, LogLevel, StorageClass
 from portia.errors import ToolSoftError
 from portia.open_source_tools.registry import example_tool_registry
@@ -26,11 +29,11 @@ PROVIDER_MODELS = [
     ),
     (
         LLMProvider.MISTRALAI,
-        LLMModel.MISTRAL_LARGE_LATEST,
+        LLMModel.MISTRAL_LARGE,
     ),
     (
         LLMProvider.ANTHROPIC,
-        LLMModel.CLAUDE_3_OPUS_LATEST,
+        LLMModel.CLAUDE_3_OPUS,
     ),
 ]
 
@@ -401,6 +404,112 @@ def test_portia_run_query_with_multiple_clarifications(
     #  + 40 (value b in step 2)
     assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.value == 498
+    assert plan_run.outputs.final_output.summary is not None
+
+    assert test_clarification_handler.received_clarification is not None
+    assert test_clarification_handler.received_clarification.user_guidance == "please try again"
+
+
+@patch("time.sleep")
+def test_portia_run_query_with_multiple_async_clarifications(
+    sleep_mock: MagicMock,
+) -> None:
+    """Test running a query with multiple clarification."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        storage_class=StorageClass.CLOUD,
+    )
+
+    resolved = False
+
+    class MyAdditionTool(AdditionTool):
+        def run(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+            nonlocal resolved
+            if not resolved:
+                return ActionClarification(
+                    plan_run_id=ctx.plan_run_id,
+                    user_guidance="please try again",
+                    action_url=HttpUrl("https://www.test.com"),
+                )
+            resolved = False
+            return a + b
+
+    class ActionClarificationHandler(ClarificationHandler):
+        def handle_action_clarification(
+            self,
+            clarification: ActionClarification,
+            on_resolution: Callable[[Clarification, object], None],
+            on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+        ) -> None:
+            self.received_clarification = clarification
+
+            # Call on_resolution and set the tool to return correctly after 2 sleeps in the
+            # wait_for_ready loop
+            def on_sleep_called(_: float) -> None:
+                nonlocal resolved
+                if sleep_mock.call_count >= 2:
+                    sleep_mock.reset_mock()
+                    on_resolution(clarification, 1)
+                    resolved = True
+
+            sleep_mock.side_effect = on_sleep_called
+
+    test_clarification_handler = ActionClarificationHandler()
+    portia = Portia(
+        config=config,
+        tools=InMemoryToolRegistry.from_local_tools([MyAdditionTool()]),
+        execution_hooks=ExecutionHooks(clarification_handler=test_clarification_handler),
+    )
+
+    step_one = Step(
+        tool_id="add_tool",
+        task="Use tool",
+        output="$step_one",
+        inputs=[
+            Variable(
+                name="a",
+                description="",
+                value=1,
+            ),
+            Variable(
+                name="b",
+                description="",
+                value=2,
+            ),
+        ],
+    )
+    step_two = Step(
+        tool_id="add_tool",
+        task="Use tool",
+        output="",
+        inputs=[
+            Variable(
+                name="a",
+                description="",
+                value=1,
+            ),
+            Variable(
+                name="b",
+                description="",
+                value="$step_one",
+            ),
+        ],
+    )
+    plan = Plan(
+        plan_context=PlanContext(
+            query="raise a clarification",
+            tool_ids=["clarification_tool"],
+        ),
+        steps=[step_one, step_two],
+    )
+    portia.storage.save_plan(plan)
+
+    plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    # 4 = 1 (value a in step 1) + 2 (value b in step 1) + 1 (value a in step 2)
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.value == 4
     assert plan_run.outputs.final_output.summary is not None
 
     assert test_clarification_handler.received_clarification is not None

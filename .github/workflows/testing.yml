@@ -12,21 +12,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  check-label:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check for safe_to_test label
-        id: check_label
-        uses: mheap/github-action-required-labels@v5
-        with:
-          mode: exactly
-          count: 1
-          labels: safe_to_test
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   testing:
-    needs: check-label
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

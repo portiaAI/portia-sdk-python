@@ -15,6 +15,7 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from portia.clarification import Clarification, InputClarification
+from portia.config import EXECUTION_MODEL_KEY
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
 from portia.execution_agents.execution_utils import (
@@ -167,7 +168,15 @@ class ParserModel:
                 "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
-                "- Ensure arguments align with the tool's schema and intended use.\n",
+                "- Ensure arguments align with the tool's schema and intended use.\n\n"
+                "You must return the arguments in the following JSON format:\n"
+                "class ToolInputs:\n"
+                "  args: List[ToolArgument]  # List of tool arguments.\n\n"
+                "class ToolArgument:\n"
+                "  name: str  # Name of the argument requested by the tool.\n"
+                "  value: Any | None  # Value of the argument from the goal or context.\n"
+                "  valid: bool  # Whether the value is valid for the argument.\n"
+                "  explanation: str  # Explanation of the source for the value of the argument.\n\n",  # noqa: E501
             ),
         ],
     )
@@ -201,34 +210,38 @@ class ParserModel:
 
         """
         if not self.agent.tool:
-            raise InvalidPlanRunStateError(None)
+            raise InvalidPlanRunStateError("Parser model has no tool")
         model = self.llm.with_structured_output(ToolInputs)
-        response = model.invoke(
-            self.arg_parser_prompt.format_messages(
-                context=self.context,
-                task=self.agent.step.task,
-                tool_name=self.agent.tool.name,
-                tool_args=self.agent.tool.args_json_schema(),
-                tool_description=self.agent.tool.description,
-                previous_errors=",".join(self.previous_errors),
-            ),
+        message = self.arg_parser_prompt.format_messages(
+            context=self.context,
+            task=self.agent.step.task,
+            tool_name=self.agent.tool.name,
+            tool_args=self.agent.tool.args_json_schema(),
+            tool_description=self.agent.tool.description,
+            previous_errors=",".join(self.previous_errors),
         )
-        response = ToolInputs.model_validate(response)
 
-        test_args = {}
         errors = []
-        for arg in response.args:
-            test_args[arg.name] = arg.value
-            if not arg.valid:
-                errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
-
-        # also test the ToolInputs that have come back
-        # actually work for the schema of the tool
-        # if not we can retry
+        tool_inputs: ToolInputs | None = None
         try:
-            self.agent.tool.args_schema.model_validate(test_args)
+            response = model.invoke(message)
+            tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
-            errors.append(str(e) + "\n")
+            errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
+        else:
+            test_args = {}
+            for arg in tool_inputs.args:
+                test_args[arg.name] = arg.value
+                if not arg.valid:
+                    errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
+
+            # also test the ToolInputs that have come back
+            # actually work for the schema of the tool
+            # if not we can retry
+            try:
+                self.agent.tool.args_schema.model_validate(test_args)
+            except ValidationError as e:
+                errors.append(str(e) + "\n")
 
         if errors:
             self.previous_errors.extend(errors)
@@ -243,7 +256,7 @@ class ParserModel:
             # Here is a Linear ticket to fix this:
             # https://linear.app/portialabs/issue/POR-456
 
-        return {"messages": [response.model_dump_json(indent=2)]}
+        return {"messages": [tool_inputs.model_dump_json(indent=2)] if tool_inputs else []}
 
 
 class VerifierModel:
@@ -272,7 +285,8 @@ class VerifierModel:
                 "\n- If an argument is marked as invalid it is likely wrong."
                 "\n- We really care if the value of an argument is not in the context, a handled "
                 "clarification or goal at all (then made_up should be TRUE), but it is ok if "
-                "it is there but in a different format (then made_up should be FALSE). "
+                "it is there but in a different format, or if it can be reasonably derived from the"
+                " information that is there (then made_up should be FALSE). "
                 "\n- Arguments where the value comes from a clarification should be marked as FALSE"
                 "\nThe output must conform to the following schema:\n\n"
                 "class VerifiedToolArgument:\n"
@@ -289,8 +303,10 @@ class VerifierModel:
                 "\n\n----------\n\n"
                 "Context for user input and past steps:"
                 "\n{context}\n"
+                "The system has a tool available named '{tool_name}'.\n"
+                "Argument schema for the tool:\n{tool_args}\n"
                 "\n\n----------\n\n"
-                "Label of the following arguments as made up or not using the goal and context provided: {arguments}\n",  # noqa: E501
+                "Label the following arguments as made up or not using the goal and context provided: {arguments}\n",  # noqa: E501
             ),
         ],
     )
@@ -321,15 +337,19 @@ class VerifierModel:
             InvalidRunStateError: If the agent's tool is not available.
 
         """
+        if not self.agent.tool:
+            raise InvalidPlanRunStateError("Verifier model has no tool")
+
         messages = state["messages"]
         tool_args = messages[-1].content
-
         model = self.llm.with_structured_output(VerifiedToolInputs)
         response = model.invoke(
             self.arg_verifier_prompt.format_messages(
                 context=self.context,
                 task=self.agent.step.task,
                 arguments=tool_args,
+                tool_name=self.agent.tool.name,
+                tool_args=self.agent.tool.args_json_schema(),
             ),
         )
         response = VerifiedToolInputs.model_validate(response)
@@ -570,7 +590,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         context = self.get_system_context()
         execution_context = get_execution_context()
         execution_context.plan_run_context = context
-        llm = LLMWrapper(self.config).to_langchain()
+        llm = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, self.config).to_langchain()
 
         tools = [
             self.tool.to_langchain_with_artifact(
@@ -641,7 +661,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         app = graph.compile()
         invocation_result = app.invoke({"messages": []})
         return process_output(
-            invocation_result["messages"][-1],
+            invocation_result["messages"],
             self.tool,
             self.new_clarifications,
         )

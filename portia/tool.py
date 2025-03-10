@@ -47,6 +47,7 @@ from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan_run import PlanRunUUID
@@ -192,11 +193,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             raise
 
         # handle clarifications cleanly
-        if isinstance(output, Clarification) or (
-            isinstance(output, list)
-            and len(output) > 0
-            and all(isinstance(item, Clarification) for item in output)
-        ):
+        if is_clarification(output):
             clarifications = output if isinstance(output, list) else [output]
             return Output[list[Clarification]](
                 value=clarifications,

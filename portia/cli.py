@@ -12,7 +12,7 @@ from __future__ import annotations
 import builtins
 import importlib.metadata
 import json
-import os
+import sys
 from enum import Enum
 from functools import wraps
 from pathlib import Path
@@ -22,9 +22,11 @@ import click
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
+from typing_extensions import get_origin
 
 from portia.clarification_handler import ClarificationHandler
 from portia.config import Config
+from portia.errors import InvalidConfigError
 from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.portia import ExecutionHooks, Portia
@@ -87,7 +89,7 @@ class CLIConfig(BaseModel):
     )
 
 
-def generate_cli_option_from_pydantic_field(  # noqa: C901
+def generate_cli_option_from_pydantic_field(  # noqa: C901, PLR0912
     f: Callable[..., Any],
     field: str,
     info: FieldInfo,
@@ -101,6 +103,7 @@ def generate_cli_option_from_pydantic_field(  # noqa: C901
 
     field_type = click.STRING
     field_default = info.default
+    callback = None
     if info.default_factory:
         field_default = info.default_factory()  # type: ignore  # noqa: PGH003
 
@@ -115,6 +118,17 @@ def generate_cli_option_from_pydantic_field(  # noqa: C901
             field_type = click.STRING
         case builtins.list:
             field_type = click.Tuple([str])
+        case _ if get_origin(info.annotation) is dict:
+
+            def dict_callback(_1: click.Context, _2: click.Parameter, value: str) -> dict:
+                if value is None:
+                    return field_default
+                try:
+                    return json.loads(value)
+                except json.JSONDecodeError as e:
+                    raise click.BadParameter(f"Invalid JSON: {value}") from e
+
+            callback = dict_callback
         case _:
             if isinstance(info.annotation, type) and issubclass(info.annotation, Enum):
                 field_type = click.Choice(
@@ -135,6 +149,7 @@ def generate_cli_option_from_pydantic_field(  # noqa: C901
         type=field_type,
         default=field_default,
         help=field_help,
+        callback=callback,
     )(f)
 
 
@@ -190,7 +205,7 @@ class CLIClarificationHandler(ClarificationHandler):
     ) -> None:
         """Handle a user input clarifications by asking the user for input from the CLI."""
         user_input = click.prompt(
-            click.style(clarification.user_guidance + "\nPlease enter a value:\n", fg=87),
+            click.style(clarification.user_guidance + "\nPlease enter a value", fg=87),
         )
         return on_resolution(clarification, user_input)
 
@@ -331,29 +346,11 @@ def _get_config(
     cli_config = CLIConfig(**kwargs)
     if cli_config.env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
-    config = Config.from_default(**kwargs)
-
-    keys = [
-        os.getenv("OPENAI_API_KEY"),
-        os.getenv("ANTHROPIC_API_KEY"),
-        os.getenv("MISTRAL_API_KEY"),
-    ]
-
-    llm_provider = config.llm_provider
-    llm_model = config.llm_model_name
-
-    keys = [k for k in keys if k is not None]
-    if len(keys) > 1 and llm_provider is None and llm_model is None:
-        message = "Multiple LLM keys found, but no default provided: Select a provider or model"
-        raise click.UsageError(message)
-
-    if llm_provider or llm_model:
-        config.llm_provider = llm_provider if llm_provider else llm_model.provider()
-        config.llm_model_name = (
-            llm_model
-            if llm_model in llm_provider.associated_models()
-            else config.llm_provider.default_model()
-        )
+    try:
+        config = Config.from_default(**kwargs)
+    except InvalidConfigError as e:
+        logger().error(e.message)
+        sys.exit(1)
 
     return (cli_config, config)
 

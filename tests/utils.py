@@ -6,14 +6,12 @@ from typing import TYPE_CHECKING, Callable, override
 
 from pydantic import BaseModel, Field, SecretStr
 
-from portia.clarification import (
-    Clarification,
-    InputClarification,
-)
+from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, LogLevel, StorageClass
+from portia.config import Config, LLMModel, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
+from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunUUID
 from portia.tool import Tool, ToolRunContext
@@ -83,6 +81,11 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
         openai_api_key=SecretStr("123"),
         storage_class=StorageClass.MEMORY,
     )
+
+
+def get_test_llm_wrapper() -> LLMWrapper:
+    """Get a test LLM wrapper."""
+    return LLMWrapper(LLMModel.GPT_4_O, SecretStr("test123"))
 
 
 def get_execution_ctx(plan_run: PlanRun | None = None) -> ExecutionContext:

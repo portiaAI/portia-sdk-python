@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from portia.config import PLANNING_MODEL_KEY
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
@@ -24,7 +25,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
-        self.llm_wrapper = LLMWrapper(config)
+        self.llm_wrapper = LLMWrapper.for_usage(PLANNING_MODEL_KEY, config)
 
     def generate_steps_or_error(
         self,
@@ -87,13 +88,10 @@ class DefaultPlanningAgent(BasePlanningAgent):
         """
         tool_ids = [tool.id for tool in tool_list]
         missing_tools = [
-            step.tool_id
-            for step in steps
-            if step.tool_id and step.tool_id not in tool_ids
+            step.tool_id for step in steps if step.tool_id and step.tool_id not in tool_ids
         ]
         return (
             f"Missing tools {', '.join(missing_tools)} from the provided tool_list"
             if missing_tools
             else None
         )
-
