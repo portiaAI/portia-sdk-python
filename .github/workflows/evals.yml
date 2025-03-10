@@ -1,5 +1,8 @@
 name: Run Evals for portia-sdk-python
 
+# Note: Any changes made here should be reflected in the evals.yml file in the platform repo
+# Actions from private repos are inaccessible from public repos
+
 on:
   workflow_dispatch:
   pull_request_target:
