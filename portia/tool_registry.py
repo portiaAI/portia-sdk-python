@@ -458,7 +458,7 @@ class MCPToolRegistry(ToolRegistry):
         mcp_client_config: McpClientConfig,
     ) -> PortiaMCPTool:
         """Conversion of a remote MCP server tool to a Portia tool."""
-        tool_name_camel = "".join(word.capitalize() for word in mcp_tool.name.split("_"))
+        tool_name_snake_case = re.sub(r"[^a-zA-Z0-9]+", "_", mcp_tool.name)
 
         description = (
             mcp_tool.description
@@ -467,11 +467,11 @@ class MCPToolRegistry(ToolRegistry):
         )
 
         return PortiaMCPTool(
-            id=mcp_tool.name,
+            id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
             name=mcp_tool.name,
             description=description,
             args_schema=generate_pydantic_model_from_json_schema(
-                f"{tool_name_camel}Schema",
+                f"{tool_name_snake_case}_schema",
                 mcp_tool.inputSchema,
             ),
             output_schema=("str", "The response from the tool formatted as a JSON string"),
