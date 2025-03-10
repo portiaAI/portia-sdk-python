@@ -240,6 +240,7 @@ def test_generate_pydantic_model_from_json_schema() -> None:
         "properties": {
             "name": {"type": "string", "description": "The name of the user"},
             "age": {"type": "integer", "description": "The age of the user"},
+            "height": {"type": "number", "description": "The height of the user"},
             "is_active": {"type": "boolean", "description": "Whether the user is active"},
             "pets": {
                 "type": "array",
@@ -266,6 +267,9 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert model.model_fields["age"].annotation is int
     assert model.model_fields["age"].default is PydanticUndefined
     assert model.model_fields["age"].description == "The age of the user"
+    assert model.model_fields["height"].annotation is float
+    assert model.model_fields["height"].default is None
+    assert model.model_fields["height"].description == "The height of the user"
     assert model.model_fields["is_active"].annotation is bool
     assert model.model_fields["is_active"].default is None
     assert model.model_fields["is_active"].description == "Whether the user is active"
