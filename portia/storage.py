@@ -215,7 +215,7 @@ class LogAdditionalStorage(AdditionalStorage):
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
                 logger().debug(
-                    f"Tool call {tool_call.tool_name!s} completed", output=tool_call.output
+                    f"Tool call {tool_call.tool_name!s} completed", output=tool_call.output,
                 )
             case ToolCallStatus.FAILED:
                 logger().error("Tool returned error", output=tool_call.output)
