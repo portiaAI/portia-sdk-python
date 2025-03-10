@@ -36,6 +36,17 @@ pandas = "^2.2.3"
 pytest-mock = "^3.14.0"
 openpyxl = "^3.1.5"
 
+[tool.poetry.extras]
+gemini = ["langchain-google-genai", "google-generativeai"]
+
+[tool.poetry.dependencies.langchain-google-genai]
+version = "2.0.10" # We need to pin this version to avoid conflicts with google-generativeai
+optional = true
+
+[tool.poetry.dependencies.google-generativeai]
+version = "^0.8.4" # This is used for the instructor
+optional = true
+
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"
 ruff = "^0.8.0"

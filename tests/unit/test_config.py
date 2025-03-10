@@ -114,7 +114,7 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
-
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     # Models can be set individually
     c = Config.from_default(
         planning_model_name=LLMModel.GPT_4_O,
@@ -133,10 +133,15 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
     assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
 
+    c = Config.from_default(llm_provider="gemini")
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.GEMINI_2_0_FLASH
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GEMINI_2_0_FLASH_LITE
+
     # With nothing specified, it chooses a model we have API keys for
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     c = Config.from_default()
     assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
     assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
@@ -144,6 +149,7 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     # With all API key set, correct default models are chosen
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     c = Config.from_default()
     assert c.model(PLANNING_MODEL_KEY) == LLMModel.O_3_MINI
     assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GPT_4_O
@@ -152,7 +158,8 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("MISTRAL_API_KEY", "")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    for provider in [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.MISTRALAI]:
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    for provider in [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.MISTRALAI, LLMProvider.GEMINI]:
         with pytest.raises(InvalidConfigError):
             Config.from_default(
                 storage_class=StorageClass.MEMORY,
@@ -165,6 +172,7 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     with pytest.raises(InvalidConfigError):
         Config.from_default(
             storage_class=StorageClass.MEMORY,

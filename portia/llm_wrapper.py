@@ -23,9 +23,11 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, TypeVar
 
+import google.generativeai as genai
 import instructor
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mistralai import ChatMistralAI
 from langchain_openai import ChatOpenAI
 from langsmith import wrappers
@@ -189,6 +191,12 @@ class LLMWrapper(BaseLLMWrapper):
                     api_key=self.api_key,
                     max_retries=3,
                 )
+            case LLMProvider.GEMINI:
+                return ChatGoogleGenerativeAI(
+                    model=self.model_name.value,
+                    api_key=self.api_key,
+                    max_retries=3,
+                )
 
     def to_instructor(
         self,
@@ -242,6 +250,18 @@ class LLMWrapper(BaseLLMWrapper):
                 )
                 return client.chat.completions.create(  # pyright: ignore[reportReturnType]
                     model=self.model_name.value,
+                    response_model=response_model,
+                    messages=messages,
+                )
+            case LLMProvider.GEMINI:
+                genai.configure(api_key=self.api_key.get_secret_value())
+                client = instructor.from_gemini(
+                    client=genai.GenerativeModel(
+                        model_name=self.model_name.value,
+                    ),
+                    mode=instructor.Mode.GEMINI_JSON,
+                )
+                return client.chat.completions.create(
                     response_model=response_model,
                     messages=messages,
                 )

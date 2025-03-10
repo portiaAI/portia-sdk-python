@@ -220,13 +220,14 @@ class ParserModel:
             tool_description=self.agent.tool.description,
             previous_errors=",".join(self.previous_errors),
         )
-
         errors = []
         tool_inputs: ToolInputs | None = None
+        response = None
         try:
             response = model.invoke(message)
             tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
+            print("Omar parser issue: ", e)
             errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
         else:
             test_args = {}
@@ -234,7 +235,6 @@ class ParserModel:
                 test_args[arg.name] = arg.value
                 if not arg.valid:
                     errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
-
             # also test the ToolInputs that have come back
             # actually work for the schema of the tool
             # if not we can retry
@@ -255,6 +255,8 @@ class ParserModel:
             #
             # Here is a Linear ticket to fix this:
             # https://linear.app/portialabs/issue/POR-456
+
+        print("self errors: ", self.previous_errors)
 
         return {"messages": [tool_inputs.model_dump_json(indent=2)] if tool_inputs else []}
 
@@ -591,7 +593,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         execution_context = get_execution_context()
         execution_context.plan_run_context = context
         llm = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, self.config).to_langchain()
-
+        print("Omar context: 1")
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=ToolRunContext(
@@ -602,6 +604,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 ),
             ),
         ]
+        print("Omar context: 2")
         tool_node = ToolNode(tools)
 
         graph = StateGraph(MessagesState)
@@ -659,7 +662,9 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
         app = graph.compile()
+        print("Omar context: 3")
         invocation_result = app.invoke({"messages": []})
+        print("Omar context: 4")
         return process_output(
             invocation_result["messages"],
             self.tool,

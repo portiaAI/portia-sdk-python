@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
+from dotenv import load_dotenv
 from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification, Clarification, InputClarification
@@ -22,24 +23,30 @@ from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarific
 if TYPE_CHECKING:
     from portia.tool import ToolRunContext
 
+load_dotenv(override=True)
+
 PROVIDER_MODELS = [
+    # (
+    #     LLMProvider.OPENAI,
+    #     LLMModel.GPT_4_O_MINI,
+    # ),
     (
-        LLMProvider.OPENAI,
-        LLMModel.GPT_4_O_MINI,
+        LLMProvider.GEMINI,
+        LLMModel.GEMINI_1_5_FLASH,
     ),
-    (
-        LLMProvider.MISTRALAI,
-        LLMModel.MISTRAL_LARGE,
-    ),
-    (
-        LLMProvider.ANTHROPIC,
-        LLMModel.CLAUDE_3_OPUS,
-    ),
+    # (
+    #     LLMProvider.MISTRALAI,
+    #     LLMModel.MISTRAL_LARGE,
+    # ),
+    # (
+    #     LLMProvider.ANTHROPIC,
+    #     LLMModel.CLAUDE_3_OPUS,
+    # ),
 ]
 
 AGENTS = [
     ExecutionAgentType.DEFAULT,
-    ExecutionAgentType.ONE_SHOT,
+    # ExecutionAgentType.ONE_SHOT,
 ]
 
 

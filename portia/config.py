@@ -55,6 +55,7 @@ class LLMProvider(Enum):
     OPENAI = "OPENAI"
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
+    GEMINI = "GEMINI"
 
     def associated_models(self) -> list[LLMModel]:
         """Get the associated models for the provider.
@@ -70,6 +71,8 @@ class LLMProvider(Enum):
                 return SUPPORTED_ANTHROPIC_MODELS
             case LLMProvider.MISTRALAI:
                 return SUPPORTED_MISTRALAI_MODELS
+            case LLMProvider.GEMINI:
+                return SUPPORTED_GEMINI_MODELS
 
     def to_api_key_name(self) -> str:
         """Get the name of the API key for the provider."""
@@ -80,6 +83,8 @@ class LLMProvider(Enum):
                 return "anthropic_api_key"
             case LLMProvider.MISTRALAI:
                 return "mistralai_api_key"
+            case LLMProvider.GEMINI:
+                return "gemini_api_key"
 
 
 class LLMModel(Enum):
@@ -115,6 +120,12 @@ class LLMModel(Enum):
     # MistralAI
     MISTRAL_LARGE = "mistral-large-latest"
 
+    # Google
+    GEMINI_2_0_FLASH = "gemini-2.0-flash-latest"
+    GEMINI_2_0_FLASH_LITE = "gemini-2.0-flash-lite-latest"
+    GEMINI_1_5_FLASH = "gemini-1.5-flash-latest"
+    GEMINI_1_5_PRO = "gemini-1.5-pro-latest"
+
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
 
@@ -126,6 +137,8 @@ class LLMModel(Enum):
             return LLMProvider.ANTHROPIC
         if self in SUPPORTED_MISTRALAI_MODELS:
             return LLMProvider.MISTRALAI
+        if self in SUPPORTED_GEMINI_MODELS:
+            return LLMProvider.GEMINI
         return LLMProvider.OPENAI
 
 
@@ -144,6 +157,13 @@ SUPPORTED_ANTHROPIC_MODELS = [
 
 SUPPORTED_MISTRALAI_MODELS = [
     LLMModel.MISTRAL_LARGE,
+]
+
+SUPPORTED_GEMINI_MODELS = [
+    LLMModel.GEMINI_2_0_FLASH,
+    LLMModel.GEMINI_2_0_FLASH_LITE,
+    LLMModel.GEMINI_1_5_FLASH,
+    LLMModel.GEMINI_1_5_PRO,
 ]
 
 
@@ -237,12 +257,14 @@ PLANNER_DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.O_3_MINI,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+    LLMProvider.GEMINI: LLMModel.GEMINI_2_0_FLASH,
 }
 
 DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.GPT_4_O,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+    LLMProvider.GEMINI: LLMModel.GEMINI_2_0_FLASH_LITE,
 }
 
 
@@ -300,6 +322,10 @@ class Config(BaseModel):
     mistralai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
         description="The API Key for Mistral AI. Must be set if llm-provider is MISTRALAI",
+    )
+    gemini_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("GEMINI_API_KEY") or ""),
+        description="The API Key for Google Gemini. Must be set if llm-provider is GEMINI",
     )
 
     llm_provider: LLMProvider = Field(
@@ -528,6 +554,8 @@ class Config(BaseModel):
                 return self.anthropic_api_key
             case LLMProvider.MISTRALAI:
                 return self.mistralai_api_key
+            case LLMProvider.GEMINI:
+                return self.gemini_api_key
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
@@ -538,6 +566,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
         return LLMProvider.ANTHROPIC
     if os.getenv("MISTRAL_API_KEY") or kwargs.get("mistralai_api_key"):
         return LLMProvider.MISTRALAI
+    if os.getenv("GEMINI_API_KEY") or kwargs.get("gemini_api_key"):
+        return LLMProvider.GEMINI
     raise InvalidConfigError(LLMProvider.OPENAI.to_api_key_name(), "No LLM API key found")
 
 
