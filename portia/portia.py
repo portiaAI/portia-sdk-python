@@ -103,6 +103,10 @@ class Portia:
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
         self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
+        if not self.config.has_api_key("portia_api_key"):
+            logger().warning(
+                "No Portia API key found, Portia cloud tools and storage will not be available.",
+            )
 
         if isinstance(tools, ToolRegistry):
             self.tool_registry = tools
