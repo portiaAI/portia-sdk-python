@@ -486,11 +486,15 @@ class Portia:
 
         """
         self._set_plan_run_state(plan_run, PlanRunState.IN_PROGRESS)
+
+        dashboard_url = self.config.must_get("portia_dashboard_url", str)
+
         logger().info(
-            f"Plan run state updated with change in state {plan_run.state!s}",
-            plan=str(plan.id),
-            plan_run=str(plan_run.id),
+            f"Plan Run State is updated to {plan_run.state!s}. "
+            f"View in your Portia AI dashboard: "
+            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}",
         )
+
         for index in range(plan_run.current_step_index, len(plan.steps)):
             step = plan.steps[index]
             plan_run.current_step_index = index

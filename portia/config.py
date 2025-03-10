@@ -279,6 +279,10 @@ class Config(BaseModel):
         default_factory=lambda: os.getenv("PORTIA_API_ENDPOINT") or "https://api.portialabs.ai",
         description="The API endpoint for the Portia Cloud API",
     )
+    portia_dashboard_url: str = Field(
+        default_factory=lambda: os.getenv("PORTIA_DASHBOARD_URL") or "https://app.portialabs.ai",
+        description="The URL for the Portia Cloud Dashboard",
+    )
     portia_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
         description="The API Key for the Portia Cloud API available from the dashboard at https://app.portialabs.ai",

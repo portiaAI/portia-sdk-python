@@ -194,6 +194,7 @@ def test_getters() -> None:
         portia_api_key=SecretStr("123"),
         anthropic_api_key=SecretStr(""),
         portia_api_endpoint="",
+        portia_dashboard_url="",
     )
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_key", int)
@@ -203,6 +204,9 @@ def test_getters() -> None:
 
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)
+
+    with pytest.raises(InvalidConfigError):
+        c.must_get("portia_dashboard_url", str)
 
     # no Portia API Key
     with pytest.raises(InvalidConfigError):
