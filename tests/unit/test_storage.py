@@ -238,13 +238,10 @@ def test_portia_cloud_storage_errors() -> None:
 
     tool_call = get_test_tool_call(plan_run)
 
-    mock_response = MagicMock()
-    mock_response.is_success = False
-    mock_response.content = b"An error occurred."
-
+    mock_exception = RuntimeError("An error occurred.")
     with (
-        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test save_plan failure
         with pytest.raises(StorageError):
@@ -260,8 +257,8 @@ def test_portia_cloud_storage_errors() -> None:
             },
         )
     with (
-        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_plan failure
         with pytest.raises(StorageError):
@@ -272,8 +269,8 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
     with (
-        patch.object(storage.client, "put", return_value=mock_response) as mock_put,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test save_run failure
         with pytest.raises(StorageError):
@@ -291,8 +288,8 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
     with (
-        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
@@ -303,8 +300,8 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
     with (
-        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
@@ -315,8 +312,8 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
     with (
-        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
@@ -327,8 +324,8 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
     with (
-        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
