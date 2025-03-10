@@ -29,7 +29,7 @@ PROVIDER_MODELS = [
     ),
     (
         LLMProvider.MISTRALAI,
-        LLMModel.MISTRAL_LARGE_LATEST,
+        LLMModel.MISTRAL_LARGE,
     ),
     (
         LLMProvider.ANTHROPIC,

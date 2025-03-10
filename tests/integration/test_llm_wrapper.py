@@ -10,7 +10,7 @@ from portia.plan import Plan
 
 MODELS = [
     LLMModel.GPT_4_O,
-    LLMModel.MISTRAL_LARGE_LATEST,
+    LLMModel.MISTRAL_LARGE,
     LLMModel.CLAUDE_3_5_SONNET,
 ]
 

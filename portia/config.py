@@ -97,7 +97,7 @@ class LLMModel(Enum):
         CLAUDE_3_5_SONNET: Claude 3.5 Sonnet model by Anthropic.
         CLAUDE_3_5_HAIKU: Claude 3.5 Haiku model by Anthropic.
         CLAUDE_3_OPUS: Claude 3.0 Opus model by Anthropic.
-        MISTRAL_LARGE_LATEST: Mistral Large Latest model by MistralAI.
+        MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
 
     """
 
@@ -113,7 +113,7 @@ class LLMModel(Enum):
     CLAUDE_3_OPUS = "claude-3-opus-latest"
 
     # MistralAI
-    MISTRAL_LARGE_LATEST = "mistral-large-latest"
+    MISTRAL_LARGE = "mistral-large-latest"
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
@@ -143,7 +143,7 @@ SUPPORTED_ANTHROPIC_MODELS = [
 ]
 
 SUPPORTED_MISTRALAI_MODELS = [
-    LLMModel.MISTRAL_LARGE_LATEST,
+    LLMModel.MISTRAL_LARGE,
 ]
 
 
@@ -236,13 +236,13 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
 PLANNER_DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.O_3_MINI,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
-    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE_LATEST,
+    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
 }
 
 DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.GPT_4_O,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
-    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE_LATEST,
+    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
 }
 
 
@@ -278,6 +278,10 @@ class Config(BaseModel):
     portia_api_endpoint: str = Field(
         default_factory=lambda: os.getenv("PORTIA_API_ENDPOINT") or "https://api.portialabs.ai",
         description="The API endpoint for the Portia Cloud API",
+    )
+    portia_dashboard_url: str = Field(
+        default_factory=lambda: os.getenv("PORTIA_DASHBOARD_URL") or "https://app.portialabs.ai",
+        description="The URL for the Portia Cloud Dashboard",
     )
     portia_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
@@ -545,7 +549,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
 
     """
     llm_model_name = kwargs.pop("llm_model_name", None)
-    models = {}
+    models = kwargs.pop("models", {})
     for model_usage in [
         PLANNING_MODEL_KEY,
         EXECUTION_MODEL_KEY,
@@ -554,7 +558,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         SUMMARISER_MODEL_KEY,
     ]:
         model_name = kwargs.pop(model_usage, llm_model_name)
-        if model_name:
+        if model_name and model_name not in models:
             models[model_usage] = parse_str_to_enum(model_name, LLMModel)
 
     llm_provider = parse_str_to_enum(

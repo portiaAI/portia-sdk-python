@@ -28,6 +28,13 @@ from loguru import logger as default_logger
 if TYPE_CHECKING:
     from portia.config import Config
 
+FUNCTION_COLOR_MAP = {
+    "tool": "fg 87",
+    "clarification": "fg 87",
+    "run": "fg 129",
+    "step": "fg 129",
+    "plan": "fg 39",
+}
 
 class LoggerInterface(Protocol):
     """General Interface for loggers.
@@ -49,6 +56,7 @@ class LoggerInterface(Protocol):
     def warning(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
     def error(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
     def critical(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
+
 
 class Formatter:
     """A class used to format log records.
@@ -90,15 +98,17 @@ class Formatter:
         if isinstance(msg, str):
             msg = re.sub(r"(?<!\{)\{(?!\{)", "{{", msg)
             msg = re.sub(r"(?<!\})\}(?!\})", "}}", msg)
-            msg = self._truncated_message(msg)
+            msg = self._truncated_message_(msg)
+
+        function_color = self._get_function_color_(record)
 
         # Create the base format string
         result = (
             f"<green>{record['time'].strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}</green> | "
             f"<level>{record['level'].name}</level> | "
-            f"<cyan>{record['name']}</cyan>:"
-            f"<cyan>{record['function']}</cyan>:"
-            f"<cyan>{record['line']}</cyan> - "
+            f"<{function_color}>{record['name']}</{function_color}>:"
+            f"<{function_color}>{record['function']}</{function_color}>:"
+            f"<{function_color}>{record['line']}</{function_color}> - "
             f"<level>{msg}</level>"
         )
 
@@ -109,7 +119,18 @@ class Formatter:
         result += "\n"
         return result
 
-    def _truncated_message(self, msg: str) -> str:
+    def _get_function_color_(self, record: Any) -> str:  # noqa: ANN401
+        """Get color based on function/module name. Default is white."""
+        return next(
+            (
+                color
+                for key, color in FUNCTION_COLOR_MAP.items()
+                if any(key in field for field in [record["function"], record["name"]])
+            ),
+            "white",
+        )
+
+    def _truncated_message_(self, msg: str) -> str:
         lines = msg.split("\n")
         if len(lines) > self.max_lines:
             # Keep first and last parts, truncate the middle
@@ -122,6 +143,7 @@ class Formatter:
             truncated_lines.extend(lines[-tail_lines:])
             msg = "\n".join(truncated_lines)
         return msg
+
 
 class LoggerManager:
     """Manages the package-level logger.
