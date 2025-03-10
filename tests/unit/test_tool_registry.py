@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
-from pydantic_core import PydanticUndefined
 import pytest
+from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
@@ -261,27 +260,28 @@ def test_generate_pydantic_model_from_json_schema() -> None:
         "required": ["name", "age"],
     }
     model = generate_pydantic_model_from_json_schema("TestModel", json_schema)
-    assert model.model_fields["name"].annotation == str
+    assert model.model_fields["name"].annotation is str
     assert model.model_fields["name"].default is PydanticUndefined
     assert model.model_fields["name"].description == "The name of the user"
-    assert model.model_fields["age"].annotation == int
+    assert model.model_fields["age"].annotation is int
     assert model.model_fields["age"].default is PydanticUndefined
     assert model.model_fields["age"].description == "The age of the user"
-    assert model.model_fields["is_active"].annotation == bool
+    assert model.model_fields["is_active"].annotation is bool
     assert model.model_fields["is_active"].default is None
     assert model.model_fields["is_active"].description == "Whether the user is active"
     assert model.model_fields["pets"].annotation == list[str]
     assert model.model_fields["pets"].default is None
     assert model.model_fields["pets"].description == "The pets of the user"
-    assert issubclass(model.model_fields["address"].annotation, BaseModel)
-    assert model.model_fields["address"].annotation.model_fields["street"].annotation == str
-    assert model.model_fields["address"].annotation.model_fields["street"].default is None
-    assert model.model_fields["address"].annotation.model_fields["street"].description == "The street of the user"
-    assert model.model_fields["address"].annotation.model_fields["city"].annotation == str
-    assert model.model_fields["address"].annotation.model_fields["city"].default is PydanticUndefined
-    assert model.model_fields["address"].annotation.model_fields["city"].description == "The city of the user"
-    assert model.model_fields["address"].annotation.model_fields["zip"].annotation == str
-    assert model.model_fields["address"].annotation.model_fields["zip"].default is PydanticUndefined
-    assert model.model_fields["address"].annotation.model_fields["zip"].description == "The zip of the user"
+    address_type = model.model_fields["address"].annotation
+    assert issubclass(address_type, BaseModel)
+    assert address_type.model_fields["street"].annotation is str
+    assert address_type.model_fields["street"].default is None
+    assert address_type.model_fields["street"].description == "The street of the user"
+    assert address_type.model_fields["city"].annotation is str
+    assert address_type.model_fields["city"].default is PydanticUndefined
+    assert address_type.model_fields["city"].description == "The city of the user"
+    assert address_type.model_fields["zip"].annotation is str
+    assert address_type.model_fields["zip"].default is PydanticUndefined
+    assert address_type.model_fields["zip"].description == "The zip of the user"
     assert model.model_fields["address"].default is None
     assert model.model_fields["address"].description == "The address of the user"

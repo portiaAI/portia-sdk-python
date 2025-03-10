@@ -461,7 +461,10 @@ class DefaultToolRegistry(AggregatedToolRegistry):
         super().__init__(registries)
 
 
-def generate_pydantic_model_from_json_schema(model_name: str, json_schema: dict[str, Any]) -> type[BaseModel]:
+def generate_pydantic_model_from_json_schema(
+    model_name: str,
+    json_schema: dict[str, Any],
+) -> type[BaseModel]:
     """Generate a Pydantic model based on a JSON schema.
 
     Args:
@@ -472,31 +475,35 @@ def generate_pydantic_model_from_json_schema(model_name: str, json_schema: dict[
         type[BaseModel]: The generated Pydantic model class.
 
     """
-    
-
     # Extract properties and required fields
     properties = json_schema.get("properties", {})
     required = set(json_schema.get("required", []))
 
     # Define fields for the model
-    fields = dict([_generate_field(key, value, key in required) for key, value in properties.items()])
+    fields = dict(
+        [_generate_field(key, value, required=key in required) for key, value in properties.items()
+    ])
 
     # Create the Pydantic model dynamically
     return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
 
 
-def _generate_field(field_name: str, field: dict[str, Any], required: bool) -> tuple[str, tuple[type, Field]]:
+def _generate_field(
+    field_name: str,
+    field: dict[str, Any],
+    *,
+    required: bool,
+) -> tuple[str, tuple[type, Field]]:
     """Generate a Pydantic field from a JSON schema field."""
-
     return (
         field_name,
         (
             _map_pydantic_type(field_name, field),
             Field(
                 default=... if required else None,
-                description=field.get("description", "")
+                description=field.get("description", ""),
             ),
-        )
+        ),
     )
 
 
