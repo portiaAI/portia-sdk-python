@@ -152,7 +152,6 @@ def process_output(  # noqa: C901
                 output_values.append(Output(value=message.artifact))
             else:
                 output_values.append(Output(value=message.content))
-            continue
 
     if len(output_values) == 0:
         raise InvalidAgentOutputError(str([message.content for message in messages]))
