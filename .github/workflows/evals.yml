@@ -60,52 +60,13 @@ jobs:
         run: |
           uv add ../../portia-sdk-python/
           uv sync --locked --no-dev
-
-      - name: Create .env.dev file
-        working-directory: ./platform/backend
-        run: |
-          echo "${{ env.BACKEND_ENV_FILE_CONTENT }}" > .env.dev
-      
-      - name: Set up environment variables from secret for frontend
-        working-directory: ./platform/frontend 
-        run: |
-          echo "${{ env.BACKEND_ENV_FILE_CONTENT }}" > .env.local
-
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2
-
-      - name: Run Docker Compose
-        working-directory: ./platform
-        run: docker compose -f compose.yaml up backend db -d
-
-      - name: Verify server is up
-        working-directory: ./platform
-        run: |
-          echo "Checking Docker container status:"
-          docker ps
-          
-          echo -e "\nChecking ports in use:"
-          netstat -tulpn || ss -tulpn
-          
-          echo -e "\nAttempting to connect to server:"
-          for i in {1..90}; do
-            if curl -f http://0.0.0.0:8080/; then
-              echo "Server is up!"
-              exit 0
-            fi
-            echo "Waiting for server to start... (attempt $i/30)"
-            sleep 2
-          done
-          echo "Server failed to start after 3 minutes"
-          docker compose -f compose.yaml logs
-          exit 1
       
       - name: Check tool IDs
         working-directory: ./platform/evals
         id: check_tool_ids
         env:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+          PORTIA_API_ENDPOINT: ${{ env.PORTIA_API_ENDPOINT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           poetry run python3 check_tool_ids.py
@@ -120,7 +81,7 @@ jobs:
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+          PORTIA_API_ENDPOINT: ${{ env.PORTIA_API_ENDPOINT }}
         run: |
           poetry run python3 cli.py query-planner update-dataset
           EVAL_OUTPUT=$(poetry run python3 cli.py query-planner eval --model=gpt-4o-mini --threshold_file=query_planner/thresholds/thresholds.yaml)
@@ -143,7 +104,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+          PORTIA_API_ENDPOINT: ${{ env.PORTIA_API_ENDPOINT }}
         run: |
           poetry run python3 cli.py agent update-dataset --slice_name=verifier
           EVAL_OUTPUT=$(poetry run python3 cli.py agent eval --agent=verifier --slice_name=verifier --model=gpt-4o-mini --threshold_file=agents/thresholds/verifier_thresholds.yaml)
@@ -165,7 +126,7 @@ jobs:
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: http://0.0.0.0:8080
+          PORTIA_API_ENDPOINT: ${{ env.PORTIA_EVAL_API_ENDPOINT }}
           AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
         run: |
