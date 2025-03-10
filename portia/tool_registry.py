@@ -493,7 +493,7 @@ def _generate_field(
     field: dict[str, Any],
     *,
     required: bool,
-) -> tuple[str, tuple[type, Field]]:
+) -> tuple[str, tuple[type | Any, Any]]:
     """Generate a Pydantic field from a JSON schema field."""
     return (
         field_name,
@@ -507,7 +507,7 @@ def _generate_field(
     )
 
 
-def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type:
+def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  # noqa: ANN401, PLR0911
     match field.get("type"):
         case "string":
             return str
@@ -518,9 +518,10 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type:
         case "boolean":
             return bool
         case "array":
-            item_type = _map_pydantic_type(field_name, field.get("items"))
+            item_type = _map_pydantic_type(field_name, field.get("items", {}))
             return list[item_type]
         case "object":
             return generate_pydantic_model_from_json_schema(f"{field_name}_model", field)
         case _:
-            raise ValueError(f"Unsupported JSON schema type: {field.get('type')}")
+            logger().warning(f"Unsupported JSON schema type: {field.get('type')}")
+            return Any
