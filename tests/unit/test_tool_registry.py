@@ -273,6 +273,7 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert model.model_fields["pets"].default is None
     assert model.model_fields["pets"].description == "The pets of the user"
     address_type = model.model_fields["address"].annotation
+    assert isinstance(address_type, type)
     assert issubclass(address_type, BaseModel)
     assert address_type.model_fields["street"].annotation is str
     assert address_type.model_fields["street"].default is None
