@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
@@ -239,6 +240,7 @@ def test_generate_pydantic_model_from_json_schema() -> None:
         "properties": {
             "name": {"type": "string", "description": "The name of the user"},
             "age": {"type": "integer", "description": "The age of the user"},
+            "height": {"type": "number", "description": "The height of the user"},
             "is_active": {"type": "boolean", "description": "Whether the user is active"},
             "pets": {
                 "type": "array",
@@ -253,6 +255,7 @@ def test_generate_pydantic_model_from_json_schema() -> None:
                     "zip": {"type": "string", "description": "The zip of the user"},
                 },
                 "description": "The address of the user",
+                "required": ["city", "zip"],
             },
         },
         "required": ["name", "age"],
@@ -264,12 +267,26 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert model.model_fields["age"].annotation is int
     assert model.model_fields["age"].default is PydanticUndefined
     assert model.model_fields["age"].description == "The age of the user"
+    assert model.model_fields["height"].annotation is float
+    assert model.model_fields["height"].default is None
+    assert model.model_fields["height"].description == "The height of the user"
     assert model.model_fields["is_active"].annotation is bool
     assert model.model_fields["is_active"].default is None
     assert model.model_fields["is_active"].description == "Whether the user is active"
-    assert model.model_fields["pets"].annotation is list
+    assert model.model_fields["pets"].annotation == list[str]
     assert model.model_fields["pets"].default is None
     assert model.model_fields["pets"].description == "The pets of the user"
-    assert model.model_fields["address"].annotation is dict
+    address_type = model.model_fields["address"].annotation
+    assert isinstance(address_type, type)
+    assert issubclass(address_type, BaseModel)
+    assert address_type.model_fields["street"].annotation is str
+    assert address_type.model_fields["street"].default is None
+    assert address_type.model_fields["street"].description == "The street of the user"
+    assert address_type.model_fields["city"].annotation is str
+    assert address_type.model_fields["city"].default is PydanticUndefined
+    assert address_type.model_fields["city"].description == "The city of the user"
+    assert address_type.model_fields["zip"].annotation is str
+    assert address_type.model_fields["zip"].default is PydanticUndefined
+    assert address_type.model_fields["zip"].description == "The zip of the user"
     assert model.model_fields["address"].default is None
     assert model.model_fields["address"].description == "The address of the user"
