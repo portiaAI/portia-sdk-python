@@ -1,6 +1,10 @@
 name: Run Evals for portia-sdk-python
 
+# Note: Any changes made here should be reflected in the evals.yml file in the platform repo
+# Actions from private repos are inaccessible from public repos
+
 on:
+  workflow_dispatch:
   pull_request_target:
     branches:
       - main
@@ -14,13 +18,133 @@ permissions:
     pull-requests: read
 
 jobs:
-  call-evals:
-    uses: portiaAI/evals/.github/workflows/evals.yml@main
-    secrets:
-      EVALS_GH_TOKEN: ${{ secrets.PORTIA_GH_TOKEN }}
-      LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-      LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
-      OPEN_AI_KEY: ${{ secrets.OPENAI_API_KEY }}
-      PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
-    with:
-      portia_sdk_branch: ${{ github.event.pull_request.head.ref }}
+  evals:
+    runs-on: ubuntu-latest-16core
+    steps:
+      - name: Checkout portia-sdk-python repo
+        uses: actions/checkout@v4
+        with:
+          path: portia-sdk-python
+          repository: portiaAI/portia-sdk-python
+          ref: ${{ github.head_ref || 'main' }}
+          token: ${{ secrets.PORTIA_GH_TOKEN }}
+
+      - name: Checkout platform repo
+        uses: actions/checkout@v4
+        with:
+          path: platform
+          repository: portiaAI/platform
+          token: ${{ secrets.PORTIA_GH_TOKEN }}
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      
+      - name: Install UV
+        run: pip install uv
+      
+      - name: Install dependencies
+        working-directory: ./platform/evals
+        run: |
+          uv add ../../portia-sdk-python/
+          uv sync --locked --no-dev
+      
+      - name: Check tool IDs
+        working-directory: ./platform/evals
+        id: check_tool_ids
+        env:
+          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          uv run check_tool_ids.py
+
+      - name: eval query planner
+        id: eval_query_planner
+        working-directory: ./platform/evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
+        run: |
+          uv run cli.py query-planner update-dataset
+          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=gpt-4o-mini --threshold_file=query_planner/thresholds/thresholds.yaml)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_planner_scores=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: eval agent (verifier)
+        id: eval_agent_verifier
+        working-directory: ./platform/evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
+        run: |
+          uv run cli.py agent update-dataset --slice_name=verifier
+          EVAL_OUTPUT=$(uv run cli.py agent eval --agent=verifier --slice_name=verifier --model=gpt-4o-mini --threshold_file=agents/thresholds/verifier_thresholds.yaml)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "BREACHES: $BREACHES"
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Summary results
+        id: summary_results
+        working-directory: ./platform/evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
+          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
+          QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
+        run: |
+          uv run jupyter nbconvert --to markdown --execute github_analysis.ipynb --output notebook_output.md --no-input
+          cat notebook_output.md
+          # Removes style blocks that GitHub won't render properly
+          sed -i '/<style[^>]*>/,/<\/style>/d' notebook_output.md
+          cat notebook_output.md
+          cat notebook_output.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for evaluation failures
+        run: |
+          CONTAINS_THRESHOLD_BREACH=false
+
+          # Check if the query planner has failing scores
+          if [[ "${{ steps.eval_query_planner.outputs.has_failing_eval_planner_scores }}" == "true" ]]; then
+            echo "Query planner eval failed or has breaches."
+            echo "Breaches: ${{ steps.eval_query_planner.outputs.metric_breaches }}"
+            CONTAINS_THRESHOLD_BREACH=true
+          fi
+
+          # Check if the verifier agent has failing scores
+          if [[ "${{ steps.eval_agent_verifier.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
+            echo "Agent eval (verifier) failed or has breaches."
+            echo "Breaches: ${{ steps.eval_agent_verifier.outputs.metric_breaches }}"
+            CONTAINS_THRESHOLD_BREACH=true
+          fi
+
+          # Exit with a non-zero status if any failures were detected
+          if [[ "$CONTAINS_THRESHOLD_BREACH" == "true" ]]; then
+            echo "One or more evaluations failed."
+            exit 1
+          fi
