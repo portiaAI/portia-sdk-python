@@ -66,7 +66,7 @@ jobs:
         id: check_tool_ids
         env:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: ${{ env.PORTIA_EVAL_API_ENDPOINT }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           uv run check_tool_ids.py
@@ -81,7 +81,7 @@ jobs:
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: ${{ env.PORTIA_EVAL_API_ENDPOINT }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
           uv run cli.py query-planner update-dataset
           EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=gpt-4o-mini --threshold_file=query_planner/thresholds/thresholds.yaml)
@@ -104,7 +104,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: ${{ env.PORTIA_EVAL_API_ENDPOINT }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
           uv run cli.py agent update-dataset --slice_name=verifier
           EVAL_OUTPUT=$(uv run cli.py agent eval --agent=verifier --slice_name=verifier --model=gpt-4o-mini --threshold_file=agents/thresholds/verifier_thresholds.yaml)
@@ -126,7 +126,7 @@ jobs:
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: ${{ env.PORTIA_EVAL_API_ENDPOINT }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
         run: |
