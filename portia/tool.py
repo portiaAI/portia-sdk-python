@@ -557,7 +557,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 return output.value
 
 
-class PortiaMCPTool(Tool[str]):
+class PortiaMcpTool(Tool[str]):
     """A Portia Tool wrapper for an MCP server-based tool."""
 
     mcp_client_config: McpClientConfig
@@ -580,4 +580,5 @@ class PortiaMCPTool(Tool[str]):
         """Call a tool using the MCP session."""
         async with get_mcp_session(self.mcp_client_config) as session:
             tool_result = await session.call_tool(name, arguments)
-            return tool_result.model_dump_json(indent=2)
+            # TODO: (Sam) Handle errors and the various content types
+            return tool_result.model_dump_json()

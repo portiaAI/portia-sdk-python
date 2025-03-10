@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Callable, override
+from unittest.mock import MagicMock
 
+from mcp import ClientSession
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
@@ -234,3 +238,14 @@ class TestClarificationHandler(ClarificationHandler):  # noqa: D101
     def reset(self) -> None:
         """Reset the received clarification."""
         self.received_clarification = None
+
+
+class MockMcpSessionWrapper:
+    """Wrapper for mocking out an MCP ClientSession for testing MCP integration."""
+
+    def __init__(self, session: MagicMock) -> None:
+        self.session = session
+
+    @asynccontextmanager
+    async def mock_mcp_session(self, config: McpClientConfig) -> AsyncIterator[ClientSession]:
+        yield self.session

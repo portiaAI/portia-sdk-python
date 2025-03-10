@@ -34,7 +34,7 @@ from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
-from portia.tool import PortiaMCPTool, PortiaRemoteTool, Tool
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -430,7 +430,7 @@ class MCPToolRegistry(ToolRegistry):
         """Initialize the MCPToolRegistry with the given configuration."""
         self.tools = {t.id: t for t in self._load_tools(mcp_client_config)}
 
-    def _load_tools(self, mcp_client_config: McpClientConfig) -> list[PortiaMCPTool]:
+    def _load_tools(self, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
         """Get a list of tools from an MCP server wrapped at Portia tools.
 
         Args:
@@ -441,7 +441,7 @@ class MCPToolRegistry(ToolRegistry):
 
         """
 
-        async def async_inner() -> list[PortiaMCPTool]:
+        async def async_inner() -> list[PortiaMcpTool]:
             async with get_mcp_session(mcp_client_config) as session:
                 logger().debug("Fetching tools from MCP server")
                 tools = await session.list_tools()
@@ -456,7 +456,7 @@ class MCPToolRegistry(ToolRegistry):
         self,
         mcp_tool: mcp.Tool,
         mcp_client_config: McpClientConfig,
-    ) -> PortiaMCPTool:
+    ) -> PortiaMcpTool:
         """Conversion of a remote MCP server tool to a Portia tool."""
         tool_name_snake_case = re.sub(r"[^a-zA-Z0-9]+", "_", mcp_tool.name)
 
@@ -466,7 +466,7 @@ class MCPToolRegistry(ToolRegistry):
             else f"{mcp_tool.name} tool from {mcp_client_config.server_name}"
         )
 
-        return PortiaMCPTool(
+        return PortiaMcpTool(
             id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
             name=mcp_tool.name,
             description=description,
