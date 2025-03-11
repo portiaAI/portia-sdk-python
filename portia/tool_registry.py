@@ -475,35 +475,53 @@ def generate_pydantic_model_from_json_schema(
         type[BaseModel]: The generated Pydantic model class.
 
     """
-    type_mapping = {
-        "string": str,
-        "integer": int,
-        "number": float,
-        "boolean": bool,
-        "array": list,
-        "object": dict,
-    }
-
     # Extract properties and required fields
     properties = json_schema.get("properties", {})
     required = set(json_schema.get("required", []))
 
     # Define fields for the model
-    fields = {
-        key: (
-            type_mapping.get(value.get("type"), Any),
-            Field(
-                default=None,
-                description=value.get("description", ""),
-            )
-            if key not in required
-            else Field(
-                ...,
-                description=value.get("description", ""),
-            ),
-        )
-        for key, value in properties.items()
-    }
+    fields = dict(
+        [_generate_field(key, value, required=key in required) for key, value in properties.items()
+    ])
 
     # Create the Pydantic model dynamically
     return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
+
+
+def _generate_field(
+    field_name: str,
+    field: dict[str, Any],
+    *,
+    required: bool,
+) -> tuple[str, tuple[type | Any, Any]]:
+    """Generate a Pydantic field from a JSON schema field."""
+    return (
+        field_name,
+        (
+            _map_pydantic_type(field_name, field),
+            Field(
+                default=... if required else None,
+                description=field.get("description", ""),
+            ),
+        ),
+    )
+
+
+def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  # noqa: ANN401, PLR0911
+    match field.get("type"):
+        case "string":
+            return str
+        case "integer":
+            return int
+        case "number":
+            return float
+        case "boolean":
+            return bool
+        case "array":
+            item_type = _map_pydantic_type(field_name, field.get("items", {}))
+            return list[item_type]
+        case "object":
+            return generate_pydantic_model_from_json_schema(f"{field_name}_model", field)
+        case _:
+            logger().warning(f"Unsupported JSON schema type: {field.get('type')}")
+            return Any

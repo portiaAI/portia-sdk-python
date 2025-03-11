@@ -145,7 +145,7 @@ class Portia:
 
         """
         plan = self.plan(query, tools, example_plans)
-        plan_run = self._create_plan_run(plan)
+        plan_run = self.create_plan_run(plan)
         return self.resume(plan_run)
 
     def plan(
@@ -217,7 +217,7 @@ class Portia:
             PlanRun: The resulting PlanRun object.
 
         """
-        plan_run = self._create_plan_run(plan)
+        plan_run = self.create_plan_run(plan)
         return self.resume(plan_run)
 
     def resume(
@@ -460,7 +460,7 @@ class Portia:
         plan_run.state = state
         self.storage.save_plan_run(plan_run)
 
-    def _create_plan_run(self, plan: Plan) -> PlanRun:
+    def create_plan_run(self, plan: Plan) -> PlanRun:
         """Create a PlanRun from a Plan.
 
         Args:
