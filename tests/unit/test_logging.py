@@ -49,8 +49,15 @@ def test_logger_sanitize_message() -> None:
     """Test the logger sanitize_message method."""
     logger_formatter = Formatter()
     assert logger_formatter._sanitize_message_("<test>") == r"\<test\>"
-    assert logger_formatter._sanitize_message_("test") == "test"
     assert logger_formatter._sanitize_message_("{test} {{test}}") == "{{test}} {{test}}"
+    assert logger_formatter._sanitize_message_('{"test": "<test>"}') == '{{"test": "\\<test\\>"}}'
+
+    # a long message gets truncated correctly
+    long_message = "test\n" * 100
+    truncated_message = logger_formatter._sanitize_message_(long_message)
+    assert len(truncated_message.split("\n"))  == logger_formatter.max_lines
+    assert truncated_message.endswith("test\n")
+    assert truncated_message.startswith("test\n")
 
 def test_logger_manager_initialization() -> None:
     """Test initialization of LoggerManager with default logger."""
