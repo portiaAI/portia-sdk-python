@@ -96,14 +96,7 @@ class Formatter:
         """
         msg = record["message"]
         if isinstance(msg, str):
-            # doubles opening curly braces in a string { -> {{
-            msg = re.sub(r"(?<!\{)\{(?!\{)", "{{", msg)
-            # doubles closing curly braces in a string } -> }}
-            msg = re.sub(r"(?<!\})\}(?!\})", "}}", msg)
-            # escapes < and > in a string
-            msg = msg.replace("<", "\\<").replace(">", "\\>")
-            msg = self._truncated_message_(msg)
-
+            msg = self._sanitize_message_(msg)
         function_color = self._get_function_color_(record)
 
         # Create the base format string
@@ -122,6 +115,18 @@ class Formatter:
 
         result += "\n"
         return result
+
+
+    def _sanitize_message_(self, msg: str) -> str:
+        """Sanitize a message to be used in a log record."""
+        # doubles opening curly braces in a string { -> {{
+        msg = re.sub(r"(?<!\{)\{(?!\{)", "{{", msg)
+        # doubles closing curly braces in a string } -> }}
+        msg = re.sub(r"(?<!\})\}(?!\})", "}}", msg)
+        # escapes < and > in a string
+        msg = msg.replace("<", r"\<").replace(">", r"\>")
+
+        return self._truncated_message_(msg)
 
     def _get_function_color_(self, record: Any) -> str:  # noqa: ANN401
         """Get color based on function/module name. Default is white."""

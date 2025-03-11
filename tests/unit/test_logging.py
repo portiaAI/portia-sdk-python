@@ -45,6 +45,12 @@ def test_logger_formatter_get_function_color(record: dict, expected_color: str) 
     logger_formatter = Formatter()
     assert logger_formatter._get_function_color_(record) == expected_color
 
+def test_logger_sanitize_message() -> None:
+    """Test the logger sanitize_message method."""
+    logger_formatter = Formatter()
+    assert logger_formatter._sanitize_message_("<test>") == r"\<test\>"
+    assert logger_formatter._sanitize_message_("test") == "test"
+    assert logger_formatter._sanitize_message_("{test} {{test}}") == "{{test}} {{test}}"
 
 def test_logger_manager_initialization() -> None:
     """Test initialization of LoggerManager with default logger."""
