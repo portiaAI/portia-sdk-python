@@ -24,6 +24,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from pydantic import SecretStr
+
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -187,8 +189,27 @@ class Portia:
             examples=example_plans,
         )
         if outcome.error:
-            logger().error(f"Error in planning - {outcome.error}")
-            raise PlanError(outcome.error)
+            if isinstance(self.tool_registry, DefaultToolRegistry) and not self.config.portia_api_key:
+                tool_registry_with_portia_cloud = DefaultToolRegistry(self.config.model_copy(update={'portia_api_key': SecretStr('prt-uKCOFX7h.GgSlQAkaRHjeFkHXqUCuxt3g1zUjRYVV')}))
+                tools = tool_registry_with_portia_cloud.match_tools(query)
+                planning_agent = self._get_planning_agent()
+                replan_outcome = planning_agent.generate_steps_or_error(
+                    ctx=get_execution_context(),
+                    query=query,
+                    tool_list=tools,
+                    examples=example_plans,
+                )
+                if not replan_outcome.error:
+                    tools_used = ', '.join([step.tool_id for step in replan_outcome.steps])
+                    logger().error(
+                        f"Error in planning - {outcome.error.rstrip('.')}.\n"
+                        f"Replanning with Portia cloud tools would successfully generate a plan using tools: {tools_used}.\n"
+                        f"Go to https://app.portialabs.ai to sign up."
+                    )
+                    raise PlanError("PORTIA_API_KEY is required to use Portia cloud tools.") from PlanError(outcome.error)
+            else:
+                logger().error(f"Error in planning - {outcome.error}")
+                raise PlanError(outcome.error)
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
