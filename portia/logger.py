@@ -96,8 +96,12 @@ class Formatter:
         """
         msg = record["message"]
         if isinstance(msg, str):
+            # doubles opening curly braces in a string { -> {{
             msg = re.sub(r"(?<!\{)\{(?!\{)", "{{", msg)
+            # doubles closing curly braces in a string } -> }}
             msg = re.sub(r"(?<!\})\}(?!\})", "}}", msg)
+            # escapes < and > in a string
+            msg = msg.replace("<", "\\<").replace(">", "\\>")
             msg = self._truncated_message_(msg)
 
         function_color = self._get_function_color_(record)
