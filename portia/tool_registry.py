@@ -420,6 +420,8 @@ EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
     {
         # Exclude Outlook by default as it clashes with Gmail
         "portia:microsoft:outlook:*",
+        # Exclude Notion by default as it requires explicit setup
+        "portia:notion:*",
     },
 )
 
