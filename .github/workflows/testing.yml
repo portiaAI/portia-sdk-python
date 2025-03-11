@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   testing:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16core
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,4 +47,4 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
         run: |
           set -o pipefail
-          poetry run pytest -n 2 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          poetry run pytest -n 8 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
