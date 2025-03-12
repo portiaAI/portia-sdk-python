@@ -24,7 +24,7 @@ jobs:
         run: |
           poetry install --all-extras
           # install license check via pip so it doesn't check itself
-          poetry run pip add licensecheck pipdeptree
+          poetry run pip install licensecheck pipdeptree
 
       - name: Check licenses
         run: |
