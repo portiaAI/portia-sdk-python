@@ -2,7 +2,7 @@ name: License Check
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -10,48 +10,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install Poetry
-      run: pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        poetry install --all-extras
-        poetry add licensecheck pipdeptree
+      - name: Install Poetry
+        run: pipx install poetry
 
-    - name: Check licenses
-      run: |
-        echo "Checking for disallowed licenses..."
-        echo "::group::License Report"
-        # Run license check and always show output
-        poetry run python -m licensecheck --zero | tee license_output.txt
-        EXIT_CODE=${PIPESTATUS[0]}
-        
-        # If there are failures, extract incompatible packages and show their reverse dependencies
-        if [ $EXIT_CODE -ne 0 ]; then
-          echo "❌ The following packages have incompatible licenses:"
-          INCOMPATIBLE=$(cat license_output.txt | grep "^│ ✖" | sed 's/│ ✖/❌/g')
-          echo "$INCOMPATIBLE"
-          
-          if [ ! -z "$INCOMPATIBLE" ]; then
-            echo -e "\n📦 Reverse dependency information:"
-            echo "$INCOMPATIBLE" | while read -r line; do
-              PKG=$(echo "$line" | awk '{print $3}')
-              echo -e "\nDependency tree for $PKG:"
-              poetry run pipdeptree --reverse --packages "$PKG"
-            done
+      - name: Install dependencies
+        run: |
+          poetry install --all-extras
+          # install license check via pip so it doesn't check itself
+          poetry run pip add licensecheck pipdeptree
+
+      - name: Check licenses
+        run: |
+          echo "Checking for disallowed licenses..."
+          echo "::group::License Report"
+          # Run license check and always show output
+          poetry run python -m licensecheck --zero | tee license_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          # If there are failures, extract incompatible packages and show their reverse dependencies
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ The following packages have incompatible licenses:"
+            INCOMPATIBLE=$(cat license_output.txt | grep "^│ ✖" | sed 's/│ ✖/❌/g')
+            echo "$INCOMPATIBLE"
+            
+            if [ ! -z "$INCOMPATIBLE" ]; then
+              echo -e "\n📦 Reverse dependency information:"
+              echo "$INCOMPATIBLE" | while read -r line; do
+                PKG=$(echo "$line" | awk '{print $3}')
+                echo -e "\nDependency tree for $PKG:"
+                poetry run pipdeptree --reverse --packages "$PKG"
+              done
+            fi
+            
+            echo "::endgroup::"
+            echo "::error::License check failed! Please ensure all dependencies use permissive licenses (MIT, Apache-2.0, BSD, ISC)."
+            exit 1
           fi
-          
+
           echo "::endgroup::"
-          echo "::error::License check failed! Please ensure all dependencies use permissive licenses (MIT, Apache-2.0, BSD, ISC)."
-          exit 1
-        fi
-        
-        echo "::endgroup::"
-        echo "✅ All dependency licenses are compliant!"
+          echo "✅ All dependency licenses are compliant!"
