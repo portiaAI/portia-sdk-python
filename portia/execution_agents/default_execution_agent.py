@@ -165,7 +165,7 @@ class ParserModel:
                 "{previous_errors}\n"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Adhere to the following guidelines:\n"
-                "- If a tool needs to be called multiple times, use the same argument with different values\n"
+                "- If a tool needs to be called many times, you can repeat the argument\n"
                 "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
