@@ -94,6 +94,12 @@ class Step(BaseModel):
         ...,
         description="The unique output id of this step i.e. $best_offers.",
     )
+    condition: str | None = Field(
+        default=None,
+        description="A human readable condition which controls if the step is run or not. "
+        "If provided the condition will be evaluated and the step skipped if false. "
+        "The step will run by default if not provided.",
+    )
 
 
 class ReadOnlyStep(Step):

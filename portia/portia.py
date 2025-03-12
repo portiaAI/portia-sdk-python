@@ -42,6 +42,11 @@ from portia.execution_context import (
     get_execution_context,
     is_execution_context_set,
 )
+from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
+from portia.introspection_agents.introspection_agent import (
+    BaseIntrospectionAgent,
+    PreStepIntrospectionOutcome,
+)
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
@@ -502,6 +507,36 @@ class Portia:
         for index in range(plan_run.current_step_index, len(plan.steps)):
             step = plan.steps[index]
             plan_run.current_step_index = index
+
+            # Run pre step introspection
+            introspection_agent = self._get_introspection_agent()
+            pre_step_outcome = introspection_agent.pre_step_introspection(
+                plan=ReadOnlyPlan.from_plan(plan),
+                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+            )
+            logger().info(
+                f"Pre Step Introspection Outcome: {pre_step_outcome.outcome}. "
+                f"Reason: {pre_step_outcome.reason}",
+            )
+            match pre_step_outcome.outcome:
+                case PreStepIntrospectionOutcome.SKIP_NEXT:
+                    plan_run.outputs.step_outputs[step.output] = Output(
+                        value="SKIPPED",
+                        summary=pre_step_outcome.reason,
+                    )
+                    self.storage.save_plan_run(plan_run)
+                    continue
+                case PreStepIntrospectionOutcome.FAIL:
+                    stop_output = Output(
+                        value="FAILED",
+                        summary=pre_step_outcome.reason,
+                    )
+                    plan_run.outputs.step_outputs[step.output] = stop_output
+                    plan_run.outputs.final_output = stop_output
+                    self._set_plan_run_state(plan_run, PlanRunState.FAILED)
+                    self.storage.save_plan_run(plan_run)
+                    return plan_run
+
             logger().info(
                 f"Executing step {index}: {step.task}",
                 plan=str(plan.id),
@@ -690,3 +725,6 @@ class Portia:
             self.config,
             tool,
         )
+
+    def _get_introspection_agent(self) -> BaseIntrospectionAgent:
+        return DefaultIntrospectionAgent(self.config)
