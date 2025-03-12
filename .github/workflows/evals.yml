@@ -14,8 +14,8 @@ on:
       - labeled
 
 permissions:
-    contents: read
-    pull-requests: read
+  contents: read
+  pull-requests: read
 
 jobs:
   evals:
@@ -39,16 +39,16 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.12"
-      
+
       - name: Install UV
         run: pip install uv
-      
+
       - name: Install dependencies
         working-directory: ./platform/evals
         run: |
           uv add ../../portia-sdk-python/
           uv sync --locked --no-dev
-      
+
       - name: Check tool IDs
         working-directory: ./platform/evals
         id: check_tool_ids
@@ -72,6 +72,9 @@ jobs:
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
           uv run cli.py query-planner update-dataset
+          ls
+          pwd
+          ls query_planner
           EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=gpt-4o-mini --threshold_file=query_planner/thresholds/thresholds.yaml)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
