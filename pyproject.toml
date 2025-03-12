@@ -35,8 +35,6 @@ python-dotenv = "^1.0.1"
 pandas = "^2.2.3"
 pytest-mock = "^3.14.0"
 openpyxl = "^3.1.5"
-licensecheck = "^2024.3"
-pipdeptree = "^2.25.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"
