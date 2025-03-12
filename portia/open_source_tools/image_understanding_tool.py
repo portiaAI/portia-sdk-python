@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+import base64
+import mimetypes
+from pathlib import Path
+from typing import Any, Self
 
 from langchain.schema import HumanMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from portia.config import IMAGE_TOOL_MODEL_KEY
 from portia.llm_wrapper import LLMWrapper
@@ -19,10 +22,23 @@ class ImageUnderstandingToolSchema(BaseModel):
         ...,
         description="The task to be completed by the Image tool.",
     )
-    image_url: str = Field(
-        ...,
+    image_url: str | None = Field(
+        default=None,
         description="Image URL for processing.",
     )
+    image_file: str | None = Field(
+        default=None,
+        description="Image file for processing.",
+    )
+
+    @model_validator(mode="after")
+    def check_image_url_or_file(self) -> Self:
+        """Check that only one of image_url or image_file is provided."""
+        has_image_url = self.image_url is not None
+        has_image_file = self.image_file is not None
+        if not has_image_url ^ has_image_file:
+            raise ValueError("One of image_url or image_file is required")
+        return self
 
 
 class ImageUnderstandingTool(Tool[str]):
@@ -69,6 +85,14 @@ class ImageUnderstandingTool(Tool[str]):
             else f"{context}\n\n{tool_schema.task}"
         )
 
+        if tool_schema.image_url:
+            image_url = tool_schema.image_url
+        elif tool_schema.image_file: # pragma: no cover
+            with Path(tool_schema.image_file).open("rb") as image_file:
+                image_data = base64.b64encode(image_file.read()).decode("utf-8")
+                mime_type = mimetypes.guess_type(tool_schema.image_file)[0]
+                image_url = f"data:{mime_type};base64,{image_data}"
+
         messages = [
             HumanMessage(content=self.prompt),
             HumanMessage(
@@ -76,7 +100,7 @@ class ImageUnderstandingTool(Tool[str]):
                     {"type": "text", "text": content},
                     {
                         "type": "image_url",
-                        "image_url": {"url": tool_schema.image_url},
+                        "image_url": {"url": image_url},
                     },
                 ],
             ),
