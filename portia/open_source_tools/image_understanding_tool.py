@@ -93,7 +93,7 @@ class ImageUnderstandingTool(Tool[str]):
                 image_data = base64.b64encode(image_file.read()).decode("utf-8")
                 mime_type = mimetypes.guess_type(tool_schema.image_file)[0]
                 image_url = f"data:{mime_type};base64,{image_data}"
-        else:
+        else: # pragma: no cover
             raise ToolHardError("No image URL or file provided")
 
         messages = [
