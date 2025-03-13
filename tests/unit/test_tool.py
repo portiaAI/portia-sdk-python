@@ -183,8 +183,7 @@ def test_remote_tool_bad_response() -> None:
     """Test remote soft errors come back to soft errors."""
     mock_client = MagicMock(spec=httpx.Client)
     mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = Exception()
-    mock_response.json.return_value = {"output": {"value": "An error occurred."}}
+    mock_response.json.return_value = {"ot": {"value": "An error occurred."}}
     mock_client.post.return_value = mock_response
 
     tool = PortiaRemoteTool(
@@ -218,12 +217,15 @@ def test_remote_tool_hard_error() -> None:
     """Test remote hard errors come back to hard errors."""
     mock_client = MagicMock(spec=httpx.Client)
     mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = Exception()
-    mock_response.json.return_value = {"output": {"value": "An error occurred."}}
+    mock_response.json.return_value = {"output": {"value": "ToolHardError: An error occurred."}}
     mock_client.post.return_value = mock_response
 
     tool = PortiaRemoteTool(
-        id="test", name="test", description="", output_schema=("", ""), client=mock_client,
+        id="test",
+        name="test",
+        description="",
+        output_schema=("", ""),
+        client=mock_client,
     )
 
     ctx = get_test_tool_context()
