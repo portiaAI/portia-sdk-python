@@ -9,7 +9,7 @@ import json
 from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Generic, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
@@ -164,3 +164,19 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             return value.decode("utf-8", errors="ignore")  # Convert bytes to string
 
         return str(value)  # Fallback for other types
+
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+        """Dump the model to a dictionary."""
+        data = super().model_dump(*args, **kwargs)
+        if isinstance(self.value, list):
+            data["value"] = []
+            for item in self.value:
+                if isinstance(item, BaseModel):
+                    data["value"].append(item.model_dump())
+                elif isinstance(item, dict):
+                    data["value"].append(item)
+                else:
+                    data["value"].append(str(item))
+        if isinstance(self.value, dict):
+            data["value"] = dict(self.value)
+        return data
