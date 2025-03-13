@@ -103,6 +103,10 @@ class Portia:
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
         self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
+        if not self.config.has_api_key("portia_api_key"):
+            logger().warning(
+                "No Portia API key found, Portia cloud tools and storage will not be available.",
+            )
 
         if isinstance(tools, ToolRegistry):
             self.tool_registry = tools
@@ -141,7 +145,7 @@ class Portia:
 
         """
         plan = self.plan(query, tools, example_plans)
-        plan_run = self._create_plan_run(plan)
+        plan_run = self.create_plan_run(plan)
         return self.resume(plan_run)
 
     def plan(
@@ -213,7 +217,7 @@ class Portia:
             PlanRun: The resulting PlanRun object.
 
         """
-        plan_run = self._create_plan_run(plan)
+        plan_run = self.create_plan_run(plan)
         return self.resume(plan_run)
 
     def resume(
@@ -456,7 +460,7 @@ class Portia:
         plan_run.state = state
         self.storage.save_plan_run(plan_run)
 
-    def _create_plan_run(self, plan: Plan) -> PlanRun:
+    def create_plan_run(self, plan: Plan) -> PlanRun:
         """Create a PlanRun from a Plan.
 
         Args:

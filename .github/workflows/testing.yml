@@ -12,22 +12,8 @@ permissions:
   pull-requests: read
 
 jobs:
-  check-label:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check for safe_to_test label
-        id: check_label
-        uses: mheap/github-action-required-labels@v5
-        with:
-          mode: exactly
-          count: 1
-          labels: safe_to_test
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   testing:
-    needs: check-label
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16core
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -61,4 +47,4 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
         run: |
           set -o pipefail
-          poetry run pytest -n 2 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          poetry run pytest -n 8 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt

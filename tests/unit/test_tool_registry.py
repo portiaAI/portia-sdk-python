@@ -2,20 +2,29 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Union
+from unittest.mock import MagicMock, patch
 
+import mcp
 import pytest
+from mcp import ClientSession
+from pydantic import BaseModel
+from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.tool import Tool
 from portia.tool_registry import (
     AggregatedToolRegistry,
     InMemoryToolRegistry,
+    McpToolRegistry,
     ToolRegistry,
+    generate_pydantic_model_from_json_schema,
 )
-from tests.utils import AdditionTool, MockTool, get_test_tool_context
+from tests.utils import AdditionTool, MockMcpSessionWrapper, MockTool, get_test_tool_context
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from pytest_mock import MockerFixture
 
     from portia.tool import Tool
@@ -228,3 +237,226 @@ def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
     mock_logger.warning.assert_called_once_with(
         f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur.",
     )
+
+
+@pytest.fixture
+def mock_get_mcp_session() -> Iterator[None]:
+    """Fixture to mock the get_mcp_session function."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.list_tools.return_value = mcp.ListToolsResult(
+        tools=[
+            mcp.Tool(
+                name="test_tool",
+                description="I am a tool",
+                inputSchema={"type": "object", "properties": {"input": {"type": "string"}}},
+            ),
+            mcp.Tool(
+                name="test_tool_2",
+                description="I am another tool",
+                inputSchema={"type": "object", "properties": {"input": {"type": "number"}}},
+            ),
+        ],
+    )
+
+    with patch(
+        "portia.tool_registry.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        yield
+
+
+@pytest.fixture
+def mcp_tool_registry(mock_get_mcp_session: None) -> McpToolRegistry:  # noqa: ARG001
+    """Fixture for a McpToolRegistry."""
+    return McpToolRegistry.from_stdio_connection(
+        server_name="mock_mcp",
+        command="test",
+        args=["test"],
+    )
+
+
+@pytest.mark.usefixtures("mock_get_mcp_session")
+def test_mcp_tool_registry_from_sse_connection() -> None:
+    """Test constructing a McpToolRegistry from an SSE connection."""
+    mcp_registry_sse = McpToolRegistry.from_sse_connection(server_name="mock_mcp", url="http://localhost:8000")
+    assert isinstance(mcp_registry_sse, McpToolRegistry)
+
+
+def test_mcp_tool_registry_get_tools(mcp_tool_registry: McpToolRegistry) -> None:
+    """Test getting tools from the MCPToolRegistry."""
+    tools = mcp_tool_registry.get_tools()
+    assert len(tools) == 2
+    assert tools[0].id == "mcp:mock_mcp:test_tool"
+    assert tools[0].name == "test_tool"
+    assert tools[0].description == "I am a tool"
+    assert issubclass(tools[0].args_schema, BaseModel)
+    assert tools[1].id == "mcp:mock_mcp:test_tool_2"
+    assert tools[1].name == "test_tool_2"
+    assert tools[1].description == "I am another tool"
+    assert issubclass(tools[1].args_schema, BaseModel)
+
+
+def test_mcp_tool_registry_get_tool(mcp_tool_registry: McpToolRegistry) -> None:
+    """Test getting a tool from the MCPToolRegistry."""
+    tool = mcp_tool_registry.get_tool("mcp:mock_mcp:test_tool")
+    assert tool.id == "mcp:mock_mcp:test_tool"
+    assert tool.name == "test_tool"
+    assert tool.description == "I am a tool"
+    assert issubclass(tool.args_schema, BaseModel)
+
+
+def test_mcp_tool_registry_get_tool_not_found(mcp_tool_registry: McpToolRegistry) -> None:
+    """Test getting a tool from the MCPToolRegistry that does not exist."""
+    with pytest.raises(ToolNotFoundError):
+        mcp_tool_registry.get_tool("mcp:mock_mcp:non_existent_tool")
+
+
+def test_mcp_tool_registry_register_tool(mcp_tool_registry: McpToolRegistry) -> None:
+    """Test MCPToolRegistry.register_tool raises NotImplementedError."""
+    with pytest.raises(NotImplementedError):
+        mcp_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))
+
+
+def test_generate_pydantic_model_from_json_schema() -> None:
+    """Test generating a Pydantic model from a JSON schema."""
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "The name of the user"},
+            "age": {"type": "integer", "description": "The age of the user"},
+            "height": {"type": "number", "description": "The height of the user", "default": 185.2},
+            "is_active": {"type": "boolean", "description": "Whether the user is active"},
+            "pets": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "The pets of the user",
+            },
+            "address": {
+                "type": "object",
+                "properties": {
+                    "street": {"type": "string", "description": "The street of the user"},
+                    "city": {"type": "string", "description": "The city of the user"},
+                    "zip": {"type": "string", "description": "The zip of the user"},
+                },
+                "description": "The address of the user",
+                "required": ["city", "zip"],
+            },
+        },
+        "required": ["name", "age"],
+    }
+    model = generate_pydantic_model_from_json_schema("TestModel", json_schema)
+    assert model.model_fields["name"].annotation is str
+    assert model.model_fields["name"].default is PydanticUndefined
+    assert model.model_fields["name"].description == "The name of the user"
+    assert model.model_fields["age"].annotation is int
+    assert model.model_fields["age"].default is PydanticUndefined
+    assert model.model_fields["age"].description == "The age of the user"
+    assert model.model_fields["height"].annotation is float
+    assert model.model_fields["height"].default == 185.2
+    assert model.model_fields["height"].description == "The height of the user"
+    assert model.model_fields["is_active"].annotation is bool
+    assert model.model_fields["is_active"].default is None
+    assert model.model_fields["is_active"].description == "Whether the user is active"
+    assert model.model_fields["pets"].annotation == list[str]
+    assert model.model_fields["pets"].default is None
+    assert model.model_fields["pets"].description == "The pets of the user"
+    address_type = model.model_fields["address"].annotation
+    assert isinstance(address_type, type)
+    assert issubclass(address_type, BaseModel)
+    assert address_type.model_fields["street"].annotation is str
+    assert address_type.model_fields["street"].default is None
+    assert address_type.model_fields["street"].description == "The street of the user"
+    assert address_type.model_fields["city"].annotation is str
+    assert address_type.model_fields["city"].default is PydanticUndefined
+    assert address_type.model_fields["city"].description == "The city of the user"
+    assert address_type.model_fields["zip"].annotation is str
+    assert address_type.model_fields["zip"].default is PydanticUndefined
+    assert address_type.model_fields["zip"].description == "The zip of the user"
+    assert model.model_fields["address"].default is None
+    assert model.model_fields["address"].description == "The address of the user"
+
+
+def test_generate_pydantic_model_from_json_schema_union_types() -> None:
+    """Test generating a Pydantic model from a JSON schema with union types."""
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "collaborators": {
+                "anyOf": [
+                    {"items": {"type": "integer"}, "type": "array"},
+                    {"type": "null"},
+                ],
+                "default": None,
+                "description": "Array of user IDs to CC on the ticket",
+                "title": "Collaborator Ids",
+            },
+            "company_number": {
+                "anyOf": [
+                    {"type": "string"},
+                    {"type": "integer"},
+                ],
+                "description": "Company number to search",
+                "title": "Company Number",
+            },
+            "additional_company_numbers": {
+                "type": "array",
+                "items": {"oneOf": [{"type": "string"}, {"type": "integer"}]},
+                "description": "Additional company numbers to search",
+                "title": "Additional Company Numbers",
+            },
+        },
+        "required": ["company_number"],
+    }
+    model = generate_pydantic_model_from_json_schema("TestUnionModel", json_schema)
+    assert model.model_fields["collaborators"].annotation == Union[list[int], None]
+    assert model.model_fields["collaborators"].default is None
+    assert (
+        model.model_fields["collaborators"].description
+        == "Array of user IDs to CC on the ticket"
+    )
+    assert model.model_fields["company_number"].annotation == Union[str, int]
+    assert model.model_fields["company_number"].default is PydanticUndefined
+    assert model.model_fields["company_number"].description == "Company number to search"
+    assert model.model_fields["additional_company_numbers"].annotation == list[Union[str, int]]
+    assert model.model_fields["additional_company_numbers"].default is None
+    assert (
+        model.model_fields["additional_company_numbers"].description
+        == "Additional company numbers to search"
+    )
+
+
+def test_generate_pydantic_model_from_json_schema_doesnt_handle_none_for_non_union_fields() -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Test that generate_pydantic_model_from_json_schema maps 'null' to Any for non-union fields.
+    """
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "null",
+                "default": None,
+                "description": "Array of user IDs to CC on the ticket",
+            },
+        },
+    }
+    model = generate_pydantic_model_from_json_schema("TestNullSchema", json_schema)
+    assert model.model_fields["name"].annotation is Any
+
+
+def test_generate_pydantic_model_from_json_schema_not_single_type_or_union_field() -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check it represents fields that are neither single type or union fields as Any type.
+    """
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "unknown": {
+                "default": None,
+                "description": "Array of user IDs to CC on the ticket",
+            },
+        },
+    }
+    model = generate_pydantic_model_from_json_schema("TestNullSchema", json_schema)
+    assert model.model_fields["unknown"].annotation is Any

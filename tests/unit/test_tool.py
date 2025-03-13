@@ -3,9 +3,11 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import mcp
 import pytest
 from httpx import Response
-from pydantic import HttpUrl, SecretStr
+from mcp import ClientSession
+from pydantic import BaseModel, HttpUrl, SecretStr
 
 from portia.clarification import (
     ActionClarification,
@@ -15,8 +17,15 @@ from portia.clarification import (
     ValueConfirmationClarification,
 )
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
-from portia.tool import PortiaRemoteTool
-from tests.utils import AdditionTool, ClarificationTool, ErrorTool, get_test_tool_context
+from portia.mcp_session import StdioMcpClientConfig
+from portia.tool import PortiaMcpTool, PortiaRemoteTool
+from tests.utils import (
+    AdditionTool,
+    ClarificationTool,
+    ErrorTool,
+    MockMcpSessionWrapper,
+    get_test_tool_context,
+)
 
 
 @pytest.fixture
@@ -583,3 +592,66 @@ def test_remote_tool_value_confirm_clarifications() -> None:
             },
             timeout=60,
         )
+
+
+def test_portia_mcp_tool_call() -> None:
+    """Test invoking a tool via MCP."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[mcp.types.TextContent(type="text", text="Hello, world!")],
+        isError=False,
+    )
+
+    class TestArgSchema(BaseModel):
+        a: int
+        b: int
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        args_schema=TestArgSchema,
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp", command="test", args=["test"],
+        ),
+    )
+    expected = (
+        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null}],'
+        '"isError":false}'
+    )
+
+    with patch(
+        "portia.tool.get_mcp_session", new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        tool_result = tool.run(get_test_tool_context(), a=1, b=2)
+        assert tool_result == expected
+
+
+def test_portia_mcp_tool_call_with_error() -> None:
+    """Test invoking a tool via MCP."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[],
+        isError=True,
+    )
+
+    class TestArgSchema(BaseModel):
+        a: int
+        b: int
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        args_schema=TestArgSchema,
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp", command="test", args=["test"],
+        ),
+    )
+
+    with patch(
+        "portia.tool.get_mcp_session", new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ), pytest.raises(ToolHardError):
+        tool.run(get_test_tool_context(), a=1, b=2)

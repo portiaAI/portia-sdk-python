@@ -272,7 +272,6 @@ class Plan(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-
     id: PlanUUID = Field(
         default_factory=PlanUUID,
         description="The ID of the plan.",

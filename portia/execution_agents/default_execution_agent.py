@@ -165,6 +165,7 @@ class ParserModel:
                 "{previous_errors}\n"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Adhere to the following guidelines:\n"
+                "- If a tool needs to be called many times, you can repeat the argument\n"
                 "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
@@ -661,7 +662,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         app = graph.compile()
         invocation_result = app.invoke({"messages": []})
         return process_output(
-            invocation_result["messages"][-1],
+            invocation_result["messages"],
             self.tool,
             self.new_clarifications,
         )
