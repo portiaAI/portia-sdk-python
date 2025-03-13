@@ -155,7 +155,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
+            url=f"/api/v0/plans/{plan.id}/",
         )
 
     with (
@@ -166,7 +166,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_plan_run(plan_run)
 
         mock_put.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
             json={
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
@@ -184,7 +184,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_plan_run(plan_run.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
         )
 
     with (
@@ -195,7 +195,7 @@ def test_portia_cloud_storage() -> None:
             storage.get_plan_runs()
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
+            url="/api/v0/plan-runs/?",
         )
 
     with (
@@ -206,7 +206,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
+            url="/api/v0/tool-calls/",
             json={
                 "plan_run_id": str(tool_call.plan_run_id),
                 "tool_name": tool_call.tool_name,
@@ -265,7 +265,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
+            url=f"/api/v0/plans/{plan.id}/",
         )
 
     with (
@@ -277,7 +277,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_plan_run(plan_run)
 
         mock_put.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
             json={
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
@@ -296,7 +296,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_plan_run(plan_run.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
         )
 
     with (
@@ -308,7 +308,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_plan_runs()
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
+            url="/api/v0/plan-runs/?",
         )
 
     with (
@@ -320,7 +320,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.get_plan_runs(run_state=PlanRunState.COMPLETE, page=10)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?page=10&run_state=COMPLETE",
+            url="/api/v0/plan-runs/?page=10&run_state=COMPLETE",
         )
 
     with (
@@ -332,7 +332,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
+            url="/api/v0/tool-calls/",
             json={
                 "plan_run_id": str(tool_call.plan_run_id),
                 "tool_name": tool_call.tool_name,
