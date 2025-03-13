@@ -540,7 +540,6 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         else:
             try:
                 output = self.parse_response(ctx, response.json())
-                print(output)
             except (ValidationError, KeyError) as e:
                 logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e
