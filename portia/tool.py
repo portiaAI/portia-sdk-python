@@ -15,6 +15,7 @@ while relying on common functionality provided by the base class.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from abc import abstractmethod
 from functools import partial
@@ -50,6 +51,7 @@ from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
+from portia.mcp_session import McpClientConfig, get_mcp_session
 from portia.plan_run import PlanRunUUID
 from portia.templates.render import render_template
 
@@ -553,3 +555,33 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 raise ToolHardError(e) from e
             else:
                 return output.value
+
+
+class PortiaMcpTool(Tool[str]):
+    """A Portia Tool wrapper for an MCP server-based tool."""
+
+    mcp_client_config: McpClientConfig
+
+    def run(self, _: ToolRunContext, **kwargs: Any) -> str:  #  noqa: ANN401
+        """Invoke the tool by dispatching to the MCP server.
+
+        Args:
+            _: The tool run context
+            **kwargs: The arguments to pass to the MCP tool invocation
+
+        Returns:
+            str: The result of the tool call
+
+        """
+        logger().debug(f"Calling tool {self.name} with arguments {kwargs}")
+        return asyncio.run(self.call_remote_mcp_tool(self.name, kwargs))
+
+    async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
+        """Call a tool using the MCP session."""
+        async with get_mcp_session(self.mcp_client_config) as session:
+            tool_result = await session.call_tool(name, arguments)
+            if tool_result.isError:
+                raise ToolHardError(
+                    f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
+                )
+            return tool_result.model_dump_json()

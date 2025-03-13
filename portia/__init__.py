@@ -57,11 +57,14 @@ from portia.execution_context import (
 
 # Logging
 from portia.logger import logger
+
+# MCP related classes
+from portia.mcp_session import SseMcpClientConfig, StdioMcpClientConfig
+
+# Open source tools
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
-
-# Open source tools
 from portia.open_source_tools.registry import (
     example_tool_registry,
     open_source_tool_registry,
@@ -81,6 +84,7 @@ from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import (
     DefaultToolRegistry,
     InMemoryToolRegistry,
+    McpToolRegistry,
     PortiaToolRegistry,
     ToolRegistry,
 )
@@ -117,6 +121,7 @@ __all__ = [
     "LLMProvider",
     "LLMTool",
     "LogLevel",
+    "McpToolRegistry",
     "MultipleChoiceClarification",
     "Plan",
     "PlanContext",
@@ -130,6 +135,8 @@ __all__ = [
     "PortiaBaseError",
     "PortiaToolRegistry",
     "SearchTool",
+    "SseMcpClientConfig",
+    "StdioMcpClientConfig",
     "Step",
     "StorageClass",
     "StorageError",
