@@ -43,7 +43,6 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
-from portia.cloud import PortiaCloudClient
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
@@ -384,7 +383,9 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     """Tool that passes run execution to Portia Cloud."""
 
-    config: Config
+    client: httpx.Client
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def parse_response(self, ctx: ToolRunContext, response: dict[str, Any]) -> Output:
         """Parse a JSON response into domain models or errors.
@@ -468,21 +469,17 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         try:
             # Send to Cloud
-            response = (
-                PortiaCloudClient()
-                .get_client(self.config)
-                .post(
-                    url=f"/api/v0/tools/{self.id}/ready/",
-                    content=json.dumps(
-                        {
-                            "execution_context": {
-                                "end_user_id": ctx.execution_context.end_user_id or "",
-                                "plan_run_id": str(ctx.plan_run_id),
-                                "additional_data": ctx.execution_context.additional_data or {},
-                            },
+            response = self.client.post(
+                url=f"/api/v0/tools/{self.id}/ready/",
+                content=json.dumps(
+                    {
+                        "execution_context": {
+                            "end_user_id": ctx.execution_context.end_user_id or "",
+                            "plan_run_id": str(ctx.plan_run_id),
+                            "additional_data": ctx.execution_context.additional_data or {},
                         },
-                    ),
-                )
+                    },
+                ),
             )
             response.raise_for_status()
         except Exception as e:  # noqa: BLE001
@@ -520,22 +517,18 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         try:
             # Send to Cloud
-            response = (
-                PortiaCloudClient()
-                .get_client(self.config)
-                .post(
-                    url=f"/api/v0/tools/{self.id}/run/",
-                    content=json.dumps(
-                        {
-                            "arguments": combine_args_kwargs(*args, **kwargs),
-                            "execution_context": {
-                                "end_user_id": ctx.execution_context.end_user_id or "",
-                                "plan_run_id": str(ctx.plan_run_id),
-                                "additional_data": ctx.execution_context.additional_data or {},
-                            },
+            response = self.client.post(
+                url=f"/api/v0/tools/{self.id}/run/",
+                content=json.dumps(
+                    {
+                        "arguments": combine_args_kwargs(*args, **kwargs),
+                        "execution_context": {
+                            "end_user_id": ctx.execution_context.end_user_id or "",
+                            "plan_run_id": str(ctx.plan_run_id),
+                            "additional_data": ctx.execution_context.additional_data or {},
                         },
-                    ),
-                )
+                    },
+                ),
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as e:

@@ -345,19 +345,14 @@ class PortiaToolRegistry(ToolRegistry):
               If not provided, all tools will be loaded from the Portia API.
 
         """
-        self.api_key = config.must_get_api_key("portia_api_key")
         self.config = config
-        self.api_endpoint = config.must_get("portia_api_endpoint", str)
+        self.client = PortiaCloudClient().get_client(config)
         self.tools = tools or self._load_tools()
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
-        response = (
-            PortiaCloudClient()
-            .get_client(self.config)
-            .get(
-                url="/api/v0/tools/descriptions/",
-            )
+        response = self.client.get(
+            url="/api/v0/tools/descriptions/",
         )
         response.raise_for_status()
         tools = {}
@@ -376,7 +371,7 @@ class PortiaToolRegistry(ToolRegistry):
                     raw_tool["description"]["output_description"],
                 ),
                 # pass API info
-                config=self.config,
+                client=self.client,
             )
             tools[raw_tool["tool_id"]] = tool
         return tools

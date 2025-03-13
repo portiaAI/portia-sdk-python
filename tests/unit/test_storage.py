@@ -138,7 +138,7 @@ def test_portia_cloud_storage() -> None:
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/",
+            url="/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
@@ -248,7 +248,7 @@ def test_portia_cloud_storage_errors() -> None:
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/",
+            url="/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
