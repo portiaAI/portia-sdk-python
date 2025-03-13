@@ -11,6 +11,7 @@ from langchain.schema import HumanMessage
 from pydantic import BaseModel, Field, model_validator
 
 from portia.config import IMAGE_TOOL_MODEL_KEY
+from portia.errors import ToolHardError
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import Tool, ToolRunContext
 
@@ -92,6 +93,8 @@ class ImageUnderstandingTool(Tool[str]):
                 image_data = base64.b64encode(image_file.read()).decode("utf-8")
                 mime_type = mimetypes.guess_type(tool_schema.image_file)[0]
                 image_url = f"data:{mime_type};base64,{image_data}"
+        else:
+            raise ToolHardError("No image URL or file provided")
 
         messages = [
             HumanMessage(content=self.prompt),
