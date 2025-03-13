@@ -7,7 +7,7 @@ import mcp
 import pytest
 from httpx import Response
 from mcp import ClientSession
-from pydantic import BaseModel, HttpUrl, SecretStr
+from pydantic import BaseModel, HttpUrl
 
 from portia.clarification import (
     ActionClarification,
@@ -24,6 +24,7 @@ from tests.utils import (
     ClarificationTool,
     ErrorTool,
     MockMcpSessionWrapper,
+    get_test_config,
     get_test_tool_context,
 )
 
@@ -126,8 +127,7 @@ def test_remote_tool_hard_error_from_server() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
         ctx = get_test_tool_context()
         with pytest.raises(ToolHardError):
@@ -169,8 +169,7 @@ def test_remote_tool_soft_error() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
 
         ctx = get_test_tool_context()
@@ -212,8 +211,7 @@ def test_remote_tool_bad_response() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
 
         ctx = get_test_tool_context()
@@ -256,8 +254,7 @@ def test_remote_tool_hard_error() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
 
         ctx = get_test_tool_context()
@@ -299,8 +296,7 @@ def test_remote_tool_ready() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
         ctx = get_test_tool_context()
         assert tool.ready(ctx)
@@ -342,8 +338,7 @@ def test_remote_tool_ready_error() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
 
         ctx = get_test_tool_context()
@@ -395,8 +390,7 @@ def test_remote_tool_action_clarifications() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
         ctx = get_test_tool_context()
         output = tool.run(ctx)
@@ -451,8 +445,7 @@ def test_remote_tool_input_clarifications() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
 
         ctx = get_test_tool_context()
@@ -508,8 +501,7 @@ def test_remote_tool_mc_clarifications() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
 
         ctx = get_test_tool_context()
@@ -565,8 +557,7 @@ def test_remote_tool_value_confirm_clarifications() -> None:
             name="test",
             description="",
             output_schema=("", ""),
-            api_key=SecretStr(""),
-            api_endpoint="https://example.com",
+            config=get_test_config(),
         )
 
         ctx = get_test_tool_context()
@@ -613,7 +604,9 @@ def test_portia_mcp_tool_call() -> None:
         output_schema=("str", "Tool output formatted as a JSON string"),
         args_schema=TestArgSchema,
         mcp_client_config=StdioMcpClientConfig(
-            server_name="mock_mcp", command="test", args=["test"],
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
         ),
     )
     expected = (
@@ -622,7 +615,8 @@ def test_portia_mcp_tool_call() -> None:
     )
 
     with patch(
-        "portia.tool.get_mcp_session", new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+        "portia.tool.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
         tool_result = tool.run(get_test_tool_context(), a=1, b=2)
         assert tool_result == expected
@@ -647,11 +641,17 @@ def test_portia_mcp_tool_call_with_error() -> None:
         output_schema=("str", "Tool output formatted as a JSON string"),
         args_schema=TestArgSchema,
         mcp_client_config=StdioMcpClientConfig(
-            server_name="mock_mcp", command="test", args=["test"],
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
         ),
     )
 
-    with patch(
-        "portia.tool.get_mcp_session", new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
-    ), pytest.raises(ToolHardError):
+    with (
+        patch(
+            "portia.tool.get_mcp_session",
+            new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+        ),
+        pytest.raises(ToolHardError),
+    ):
         tool.run(get_test_tool_context(), a=1, b=2)

@@ -28,7 +28,6 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
-    SecretStr,
     ValidationError,
     field_serializer,
     model_validator,
@@ -44,6 +43,7 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
+from portia.cloud import PortiaCloudClient
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
@@ -384,8 +384,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     """Tool that passes run execution to Portia Cloud."""
 
-    api_key: SecretStr
-    api_endpoint: str
+    config: Config
 
     def parse_response(self, ctx: ToolRunContext, response: dict[str, Any]) -> Output:
         """Parse a JSON response into domain models or errors.
@@ -469,22 +468,21 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         try:
             # Send to Cloud
-            response = httpx.post(
-                url=f"{self.api_endpoint}/api/v0/tools/{self.id}/ready/",
-                content=json.dumps(
-                    {
-                        "execution_context": {
-                            "end_user_id": ctx.execution_context.end_user_id or "",
-                            "plan_run_id": str(ctx.plan_run_id),
-                            "additional_data": ctx.execution_context.additional_data or {},
+            response = (
+                PortiaCloudClient()
+                .get_client(self.config)
+                .post(
+                    url=f"/api/v0/tools/{self.id}/ready/",
+                    content=json.dumps(
+                        {
+                            "execution_context": {
+                                "end_user_id": ctx.execution_context.end_user_id or "",
+                                "plan_run_id": str(ctx.plan_run_id),
+                                "additional_data": ctx.execution_context.additional_data or {},
+                            },
                         },
-                    },
-                ),
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=60,
+                    ),
+                )
             )
             response.raise_for_status()
         except Exception as e:  # noqa: BLE001
@@ -522,23 +520,22 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         try:
             # Send to Cloud
-            response = httpx.post(
-                url=f"{self.api_endpoint}/api/v0/tools/{self.id}/run/",
-                content=json.dumps(
-                    {
-                        "arguments": combine_args_kwargs(*args, **kwargs),
-                        "execution_context": {
-                            "end_user_id": ctx.execution_context.end_user_id or "",
-                            "plan_run_id": str(ctx.plan_run_id),
-                            "additional_data": ctx.execution_context.additional_data or {},
+            response = (
+                PortiaCloudClient()
+                .get_client(self.config)
+                .post(
+                    url=f"/api/v0/tools/{self.id}/run/",
+                    content=json.dumps(
+                        {
+                            "arguments": combine_args_kwargs(*args, **kwargs),
+                            "execution_context": {
+                                "end_user_id": ctx.execution_context.end_user_id or "",
+                                "plan_run_id": str(ctx.plan_run_id),
+                                "additional_data": ctx.execution_context.additional_data or {},
+                            },
                         },
-                    },
-                ),
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=60,
+                    ),
+                )
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
