@@ -35,6 +35,8 @@ python-dotenv = "^1.0.1"
 pandas = "^2.2.3"
 pytest-mock = "^3.14.0"
 openpyxl = "^3.1.5"
+playwright = "1.48"
+browserbase = "1.0.5"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"
