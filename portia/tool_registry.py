@@ -449,7 +449,7 @@ class McpToolRegistry(ToolRegistry):
         )
 
     @classmethod
-    def from_stdio_connection(  # noqa: PLR0913g
+    def from_stdio_connection(  # noqa: PLR0913
         cls,
         server_name: str,
         command: str,
