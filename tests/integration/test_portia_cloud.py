@@ -3,9 +3,9 @@
 import uuid
 
 import pytest
-from pydantic import SecretStr
 
 from portia.clarification import ActionClarification
+from portia.cloud import PortiaCloudClient
 from portia.config import Config, StorageClass
 from portia.errors import ToolNotFoundError
 from portia.execution_context import execution_context
@@ -52,7 +52,7 @@ def test_run_tool_error() -> None:
 
     tool = registry.get_tool("portia:tavily::search")
     assert isinstance(tool, PortiaRemoteTool)
-    tool.api_key = SecretStr("123")
+    tool.client = PortiaCloudClient().get_client(config)
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError):
         tool.run(ctx)

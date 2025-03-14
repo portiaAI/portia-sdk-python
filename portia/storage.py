@@ -30,9 +30,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import urlencode
 
-import httpx
 from pydantic import BaseModel, ValidationError
 
+from portia.cloud import PortiaCloudClient
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
@@ -47,6 +47,8 @@ from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
+    import httpx
+
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -215,7 +217,8 @@ class LogAdditionalStorage(AdditionalStorage):
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
                 logger().debug(
-                    f"Tool call {tool_call.tool_name!s} completed", output=tool_call.output,
+                    f"Tool call {tool_call.tool_name!s} completed",
+                    output=tool_call.output,
                 )
             case ToolCallStatus.FAILED:
                 logger().error("Tool returned error", output=tool_call.output)
@@ -474,17 +477,7 @@ class PortiaCloudStorage(Storage):
             config (Config): The configuration containing API details for Portia Cloud.
 
         """
-        self.api_key = config.must_get_api_key("portia_api_key")
-        self.api_endpoint = config.must_get("portia_api_endpoint", str)
-        self.client = httpx.Client(
-            base_url=self.api_endpoint,
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-            timeout=httpx.Timeout(60),
-            limits=httpx.Limits(max_connections=10),
-        )
+        self.client = PortiaCloudClient().get_client(config)
 
     def check_response(self, response: httpx.Response) -> None:
         """Validate the response from Portia API.
@@ -513,7 +506,7 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = self.client.post(
-                url=f"{self.api_endpoint}/api/v0/plans/",
+                url="/api/v0/plans/",
                 json={
                     "id": str(plan.id),
                     "query": plan.plan_context.query,
@@ -541,7 +534,7 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = self.client.get(
-                url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
+                url=f"/api/v0/plans/{plan_id}/",
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -569,7 +562,7 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = self.client.put(
-                url=f"{self.api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+                url=f"/api/v0/plan-runs/{plan_run.id}/",
                 json={
                     "current_step_index": plan_run.current_step_index,
                     "state": plan_run.state,
@@ -598,7 +591,7 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = self.client.get(
-                url=f"{self.api_endpoint}/api/v0/plan-runs/{plan_run_id}/",
+                url=f"/api/v0/plan-runs/{plan_run_id}/",
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -641,7 +634,7 @@ class PortiaCloudStorage(Storage):
             if run_state:
                 query["run_state"] = run_state.value
             response = self.client.get(
-                url=f"{self.api_endpoint}/api/v0/plan-runs/?{urlencode(query)}",
+                url=f"/api/v0/plan-runs/?{urlencode(query)}",
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -679,7 +672,7 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = self.client.post(
-                url=f"{self.api_endpoint}/api/v0/tool-calls/",
+                url="/api/v0/tool-calls/",
                 json={
                     "plan_run_id": str(tool_call.plan_run_id),
                     "tool_name": tool_call.tool_name,

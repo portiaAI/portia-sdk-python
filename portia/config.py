@@ -97,6 +97,7 @@ class LLMModel(Enum):
         CLAUDE_3_5_SONNET: Claude 3.5 Sonnet model by Anthropic.
         CLAUDE_3_5_HAIKU: Claude 3.5 Haiku model by Anthropic.
         CLAUDE_3_OPUS: Claude 3.0 Opus model by Anthropic.
+        CLAUDE_3_7_SONNET: Claude 3.7 Sonnet model by Anthropic.
         MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
 
     """
@@ -111,6 +112,7 @@ class LLMModel(Enum):
     CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
     CLAUDE_3_5_HAIKU = "claude-3-5-haiku-latest"
     CLAUDE_3_OPUS = "claude-3-opus-latest"
+    CLAUDE_3_7_SONNET = "claude-3-7-sonnet-latest"
 
     # MistralAI
     MISTRAL_LARGE = "mistral-large-latest"
@@ -139,6 +141,7 @@ SUPPORTED_OPENAI_MODELS = [
 SUPPORTED_ANTHROPIC_MODELS = [
     LLMModel.CLAUDE_3_5_HAIKU,
     LLMModel.CLAUDE_3_5_SONNET,
+    LLMModel.CLAUDE_3_7_SONNET,
     LLMModel.CLAUDE_3_OPUS,
 ]
 
