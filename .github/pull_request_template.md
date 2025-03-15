@@ -2,7 +2,7 @@
 
 Please include a summary of the change. Please also include relevant motivation and context. List any dependencies that are required for this change.
 
-Ticket Link: 
+Ticket Link (if portia): 
 
 ## Type of change
 
@@ -21,4 +21,4 @@ Ticket Link:
 
 ## Changelog
 
-(If applicable, add a changelog entry)
+(If applicable, add a changelog [entry](https://keepachangelog.com/en/))
