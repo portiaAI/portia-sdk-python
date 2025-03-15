@@ -53,7 +53,7 @@ class ToolArgument(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
-    value: Any | None = Field(
+    value: str | None = Field(
         description="Value of the argument, as provided by in the goal or context.",
     )
     valid: bool = Field(
@@ -87,7 +87,7 @@ class VerifiedToolArgument(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
-    value: Any | None = Field(
+    value: str | None = Field(
         description="Value of the argument, as provided by in the goal or context.",
     )
 
