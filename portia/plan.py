@@ -34,14 +34,12 @@ class PlanBuilder:
     added to the plan before building it.
 
     Example:
-    ```python
     plan = PlanBuilder() \
                 .step("Step 1", "tool_id_1", "output_1") \
                 .step("Step 2", "tool_id_2", "output_2") \
                 .input("input_1", "value_1") \
                 .build()
-    ```
-
+    
     """
 
     query: str
@@ -96,7 +94,8 @@ class PlanBuilder:
             name (str): The name of the input.
             value (Any | None): The value of the input.
             description (str | None): The description of the input.
-            step_index (int | None): The index of the step to add the input to.
+            step_index (int | None): The index of the step to add the input to. If not provided,
+                                    the input will be added to the last step.
 
         Returns:
             PlanBuilder: The builder instance with the new input added.
