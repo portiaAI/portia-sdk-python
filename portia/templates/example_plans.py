@@ -141,6 +141,40 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     ),
     Plan(
         plan_context=PlanContext(
+            query="Send an email to hello@portialabs.ai if the temp in London is better than 10C.",
+            tool_ids=[
+                "weather_tool",
+                "portia::google_gmail::send_email_tool",
+                "portia::provider::other_tool",
+            ],
+        ),
+        steps=[
+            Step(
+                task="What is the weather in London?",
+                tool_id="weather_tool",
+                output="$london_weather",
+            ),
+            Step(
+                task="Email $email_address politely with $london_weather",
+                inputs=[
+                    Variable(
+                        name="$london_weather",
+                        description="Weather in London",
+                    ),
+                    Variable(
+                        name="$email_address",
+                        value="hello@portialabs.ai",
+                        description="The email address",
+                    ),
+                ],
+                tool_id="portia::google_gmail::send_email_tool",
+                output="If the email was successfully sent",
+                condition="$london_weather > 10C.",
+            ),
+        ],
+    ),
+    Plan(
+        plan_context=PlanContext(
             query="Get the latest messages on the Dev channel and send a summary to nathan",
             tool_ids=[
                 "portia::slack::bot::list_conversation_ids",
