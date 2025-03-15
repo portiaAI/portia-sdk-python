@@ -21,9 +21,9 @@ import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, Literal, Union
 
-import httpx
 from pydantic import BaseModel, Field, create_model
 
+from portia.cloud import PortiaCloudClient
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.logger import logger
 from portia.mcp_session import (
@@ -345,20 +345,14 @@ class PortiaToolRegistry(ToolRegistry):
               If not provided, all tools will be loaded from the Portia API.
 
         """
-        self.api_key = config.must_get_api_key("portia_api_key")
         self.config = config
-        self.api_endpoint = config.must_get("portia_api_endpoint", str)
+        self.client = PortiaCloudClient().get_client(config)
         self.tools = tools or self._load_tools()
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
-        response = httpx.get(
-            url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+        response = self.client.get(
+            url="/api/v0/tools/descriptions/",
         )
         response.raise_for_status()
         tools = {}
@@ -377,8 +371,7 @@ class PortiaToolRegistry(ToolRegistry):
                     raw_tool["description"]["output_description"],
                 ),
                 # pass API info
-                api_key=self.api_key,
-                api_endpoint=self.api_endpoint,
+                client=self.client,
             )
             tools[raw_tool["tool_id"]] = tool
         return tools
@@ -445,16 +438,18 @@ class McpToolRegistry(ToolRegistry):
         sse_read_timeout: float = 60 * 5,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection."""
-        return cls(SseMcpClientConfig(
-            server_name=server_name,
-            url=url,
-            headers=headers,
-            timeout=timeout,
-            sse_read_timeout=sse_read_timeout,
-        ))
+        return cls(
+            SseMcpClientConfig(
+                server_name=server_name,
+                url=url,
+                headers=headers,
+                timeout=timeout,
+                sse_read_timeout=sse_read_timeout,
+            ),
+        )
 
     @classmethod
-    def from_stdio_connection(  # noqa: PLR0913g
+    def from_stdio_connection(  # noqa: PLR0913
         cls,
         server_name: str,
         command: str,
@@ -654,14 +649,14 @@ def _generate_field(
         ),
     )
 
+
 def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  # noqa: ANN401
     match field:
         case {"type": _}:
             return _map_single_pydantic_type(field_name, field)
         case {"oneOf": union_types} | {"anyOf": union_types}:
             types = [
-                _map_single_pydantic_type(field_name, t, allow_nonetype=True)
-                for t in union_types
+                _map_single_pydantic_type(field_name, t, allow_nonetype=True) for t in union_types
             ]
             return Union[*types]
         case _:
@@ -670,7 +665,10 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  #
 
 
 def _map_single_pydantic_type(  # noqa: PLR0911
-    field_name: str, field: dict[str, Any], *, allow_nonetype: bool = False,
+    field_name: str,
+    field: dict[str, Any],
+    *,
+    allow_nonetype: bool = False,
 ) -> type | Any:  # noqa: ANN401
     match field.get("type"):
         case "string":
