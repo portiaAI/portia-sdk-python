@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Callable, override
 
 from pydantic import BaseModel, Field, SecretStr
@@ -18,7 +19,13 @@ from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from unittest.mock import MagicMock
+
+    from mcp import ClientSession
+
     from portia.execution_context import ExecutionContext
+    from portia.mcp_session import McpClientConfig
 
 
 def get_test_tool_context(
@@ -234,3 +241,16 @@ class TestClarificationHandler(ClarificationHandler):  # noqa: D101
     def reset(self) -> None:
         """Reset the received clarification."""
         self.received_clarification = None
+
+
+class MockMcpSessionWrapper:
+    """Wrapper for mocking out an MCP ClientSession for testing MCP integration."""
+
+    def __init__(self, session: MagicMock) -> None:
+        """Initialize the wrapper."""
+        self.session = session
+
+    @asynccontextmanager
+    async def mock_mcp_session(self, _: McpClientConfig) -> AsyncIterator[ClientSession]:
+        """Mock method to swap out with the mcp_session context manager."""
+        yield self.session

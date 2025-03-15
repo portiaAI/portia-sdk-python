@@ -110,6 +110,7 @@ def test_disk_storage(tmp_path: Path) -> None:
 
 def test_portia_cloud_storage() -> None:
     """Test PortiaCloudStorage raises StorageError on failure responses."""
+    """Test PortiaCloudStorage raises StorageError on failure responses using the client."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
 
@@ -124,61 +125,48 @@ def test_portia_cloud_storage() -> None:
     )
     tool_call = get_test_tool_call(plan_run)
 
-    # Simulate a failed response
     mock_response = MagicMock()
     mock_response.is_success = False
     mock_response.content = b"An error occurred."
 
     with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
-        patch("httpx.get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
+        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
     ):
         # Test save_plan failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/",
+            url="/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
             },
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
         )
 
     with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
-        patch("httpx.get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
     ):
         # Test get_plan failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+            url=f"/api/v0/plans/{plan.id}/",
         )
 
     with (
-        patch("httpx.put", return_value=mock_response) as mock_put,
-        patch("httpx.get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "put", return_value=mock_response) as mock_put,
     ):
         # Test save_run failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.save_plan_run(plan_run)
 
         mock_put.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
             json={
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
@@ -186,78 +174,39 @@ def test_portia_cloud_storage() -> None:
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
             },
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
         )
 
     with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
-        patch("httpx.get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.get_plan_run(plan_run.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
         )
 
     with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
-        patch("httpx.get", return_value=mock_response) as mock_get,
-    ):
-        # Test get_run failure
-        with pytest.raises(StorageError, match="An error occurred."):
-            storage.get_plan_runs(PlanRunState.READY_TO_RESUME)
-
-        mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?run_state=READY_TO_RESUME",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
-        )
-
-    with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
-        patch("httpx.get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.get_plan_runs()
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+            url="/api/v0/plan-runs/?",
         )
 
     with (
-        patch("httpx.post", return_value=mock_response) as mock_post,
-        patch("httpx.get", return_value=mock_response) as mock_get,
+        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
     ):
-        # Test get_run failure
+        # Test save_tool_call failure
         with pytest.raises(StorageError, match="An error occurred."):
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
+            url="/api/v0/tool-calls/",
             json={
                 "plan_run_id": str(tool_call.plan_run_id),
                 "tool_name": tool_call.tool_name,
@@ -269,7 +218,6 @@ def test_portia_cloud_storage() -> None:
                 "status": tool_call.status,
                 "latency_seconds": tool_call.latency_seconds,
             },
-            timeout=10,
         )
 
 
@@ -289,56 +237,47 @@ def test_portia_cloud_storage_errors() -> None:
     )
 
     tool_call = get_test_tool_call(plan_run)
+
+    mock_exception = RuntimeError("An error occurred.")
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
-        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test save_plan failure
         with pytest.raises(StorageError):
             storage.save_plan(plan)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/",
+            url="/api/v0/plans/",
             json={
                 "id": str(plan.id),
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
             },
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
         )
-
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
-        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_plan failure
         with pytest.raises(StorageError):
             storage.get_plan(plan.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+            url=f"/api/v0/plans/{plan.id}/",
         )
 
     with (
-        patch("httpx.put", side_effect=TimeoutError()) as mock_put,
-        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+        patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test save_run failure
         with pytest.raises(StorageError):
             storage.save_plan_run(plan_run)
 
         mock_put.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
             json={
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
@@ -346,78 +285,54 @@ def test_portia_cloud_storage_errors() -> None:
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
             },
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
         )
 
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
-        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
             storage.get_plan_run(plan_run.id)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+            url=f"/api/v0/plan-runs/{plan_run.id}/",
         )
 
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
-        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
             storage.get_plan_runs()
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+            url="/api/v0/plan-runs/?",
         )
 
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
-        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
             storage.get_plan_runs(run_state=PlanRunState.COMPLETE, page=10)
 
         mock_get.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?page=10&run_state=COMPLETE",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+            url="/api/v0/plan-runs/?page=10&run_state=COMPLETE",
         )
 
     with (
-        patch("httpx.post", side_effect=TimeoutError()) as mock_post,
-        patch("httpx.get", side_effect=TimeoutError()) as mock_get,
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
         # Test get_run failure
         with pytest.raises(StorageError):
             storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
-            url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
-            headers={
-                "Authorization": "Api-Key test_api_key",
-                "Content-Type": "application/json",
-            },
+            url="/api/v0/tool-calls/",
             json={
                 "plan_run_id": str(tool_call.plan_run_id),
                 "tool_name": tool_call.tool_name,
@@ -429,5 +344,4 @@ def test_portia_cloud_storage_errors() -> None:
                 "status": tool_call.status,
                 "latency_seconds": tool_call.latency_seconds,
             },
-            timeout=10,
         )
