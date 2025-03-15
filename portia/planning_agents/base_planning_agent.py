@@ -18,8 +18,8 @@ from pydantic import ConfigDict, Field
 from portia.plan import Plan, Step  # noqa: TC001
 
 if TYPE_CHECKING:
-    from portia.config import Config
     from portia.execution_context import ExecutionContext
+    from portia.llm_wrapper import LLMWrapper
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -37,14 +37,14 @@ class BasePlanningAgent(ABC):
 
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, llm_wrapper: LLMWrapper) -> None:
         """Initialize the PlanningAgent with configuration.
 
         Args:
-            config (Config): The configuration to initialize the PlanningAgent.
+            llm_wrapper (LLMWrapper): The LLM wrapper to initialize the PlanningAgent.
 
         """
-        self.config = config
+        self.llm_wrapper = llm_wrapper
 
     @abstractmethod
     def generate_steps_or_error(

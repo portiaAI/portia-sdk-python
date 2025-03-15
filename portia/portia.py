@@ -28,7 +28,13 @@ from portia.clarification import (
     Clarification,
     ClarificationCategory,
 )
-from portia.config import Config, ExecutionAgentType, PlanningAgentType, StorageClass
+from portia.config import (
+    PLANNING_MODEL_KEY,
+    Config,
+    ExecutionAgentType,
+    PlanningAgentType,
+    StorageClass,
+)
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
@@ -42,6 +48,7 @@ from portia.execution_context import (
     get_execution_context,
     is_execution_context_set,
 )
+from portia.llm_wrapper import LLMWrapper
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
@@ -579,8 +586,13 @@ class Portia:
         match self.config.planning_agent_type:
             case PlanningAgentType.DEFAULT:
                 cls = DefaultPlanningAgent
+            case PlanningAgentType.CUSTOM:
+                custom_planning_agent = self.config.custom_planning_agent
+                if not custom_planning_agent:
+                    raise ValueError("Custom planning agent not set")
+                cls = custom_planning_agent
 
-        return cls(self.config)
+        return cls(LLMWrapper.for_usage(PLANNING_MODEL_KEY, self.config))
 
     def _get_final_output(self, plan: Plan, plan_run: PlanRun, step_output: Output) -> Output:
         """Get the final output and add summarization to it.
