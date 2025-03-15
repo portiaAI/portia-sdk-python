@@ -39,7 +39,7 @@ class PlanBuilder:
                 .step("Step 2", "tool_id_2", "output_2") \
                 .input("input_1", "value_1") \
                 .build()
-    
+
     """
 
     query: str
