@@ -87,3 +87,15 @@ def test_read_only_plan_serialization() -> None:
     assert len(deserialized.steps) == len(read_only.steps)
     assert deserialized.steps[0].task == read_only.steps[0].task
     assert deserialized.steps[0].output == read_only.steps[0].output
+
+
+def test_plan_outputs_must_be_unique() -> None:
+    """Test that plan outputs must be unique."""
+    with pytest.raises(ValidationError, match="Outputs must be unique"):
+        Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[
+                Step(task="test task", output="$output"),
+                Step(task="test task", output="$output"),
+            ],
+        )
