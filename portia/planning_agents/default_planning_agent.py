@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from langchain.schema import HumanMessage, SystemMessage
 from typing import TYPE_CHECKING
 
 from portia.config import PLANNING_MODEL_KEY
@@ -42,12 +43,9 @@ class DefaultPlanningAgent(BasePlanningAgent):
             ctx.planning_agent_system_context_extension,
             examples,
         )
-        response = self.llm_wrapper.to_instructor(
-            response_model=StepsOrError,
+        response = self.llm_wrapper.to_langchain().with_structured_output(StepsOrError).invoke(
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are an outstanding task planner who can leverage many \
+                SystemMessage("You are an outstanding task planner who can leverage many \
     tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
     steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
     that tools need to make sure the chain of calls works. If you are missing information do not \
@@ -56,9 +54,8 @@ class DefaultPlanningAgent(BasePlanningAgent):
     requires an id as an input, make sure to check if there's a corresponding tool call that\
     provides the id from natural language if possible. For example, if a tool asks for a user ID\
     check if there's a tool call that provides the user IDs before making the tool call that \
-    requires the user ID.",
-                },
-                {"role": "user", "content": prompt},
+    requires the user ID."),
+                HumanMessage(prompt),
             ],
         )
 
