@@ -44,7 +44,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
             examples,
         )
         response = self.llm_wrapper.to_langchain().with_structured_output(StepsOrError).invoke(
-            messages=[
+            [
                 SystemMessage("You are an outstanding task planner who can leverage many \
     tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
     steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
