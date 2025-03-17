@@ -46,7 +46,9 @@ class MockInvoker:
         return AIMessage(content="invoked")
 
     def with_structured_output(
-        self, output_format: type[BaseModel], method: str = "function_calling",
+        self,
+        output_format: type[BaseModel],
+        method: str = "function_calling",
     ) -> MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format

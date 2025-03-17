@@ -80,7 +80,9 @@ class MockInvoker:
         return AIMessage(content="invoked")
 
     def with_structured_output(
-        self, output_format: Any, method: str = "function_calling",  # noqa: ANN401
+        self,
+        output_format: Any,  # noqa: ANN401
+        method: str = "function_calling",
     ) -> MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
@@ -265,7 +267,11 @@ def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None
             current_response_index += 1
             return response
 
-        def with_structured_output(self, _):  # noqa: ANN001, ANN202
+        def with_structured_output(
+            self,
+            output_format: Any,
+            method: str = "function_calling",  # noqa: ANN401 ARG002
+        ) -> MockInvoker:
             return self
 
     monkeypatch.setattr(ChatOpenAI, "invoke", MockInvoker().invoke)
