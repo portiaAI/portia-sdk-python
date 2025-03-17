@@ -75,7 +75,7 @@ class MockInvoker:
             return self.response
         return AIMessage(content="invoked")
 
-    def with_structured_output(self, output_format: Any) -> MockInvoker:  # noqa: ANN401
+    def with_structured_output(self, output_format: Any, method: str = "pydantic") -> MockInvoker:  # noqa: ANN401
         """Model wrapper for structured output."""
         self.output_format = output_format
         return self

@@ -42,7 +42,7 @@ class MockInvoker:
             return self.response
         return AIMessage(content="invoked")
 
-    def with_structured_output(self, output_format: type[BaseModel]) -> MockInvoker:
+    def with_structured_output(self, output_format: type[BaseModel], method: str = "pydantic") -> MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
         return self
