@@ -1008,14 +1008,14 @@ files = [
 
 [[package]]
 name = "instructor"
-version = "1.7.2"
+version = "1.7.5"
 description = "structured outputs for llm"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "instructor-1.7.2-py3-none-any.whl", hash = "sha256:cb43d27f6d7631c31762b936b2fcb44d2a3f9d8a020430a0f4d3484604ffb95b"},
-    {file = "instructor-1.7.2.tar.gz", hash = "sha256:6c01b2b159766df24865dc81f7bf8457cbda88a3c0bbc810da3467d19b185ed2"},
+    {file = "instructor-1.7.5-py3-none-any.whl", hash = "sha256:72bfd07a5a1437510661f6b6caac067d8948e6ef71bca11df030b0328e90a2a0"},
+    {file = "instructor-1.7.5.tar.gz", hash = "sha256:ec91ca0a4c772740f3f8f0b25e9f21d395375d0b5cc754f0adb66a49f418e6df"},
 ]
 
 [package.dependencies]
@@ -1032,13 +1032,17 @@ tenacity = ">=9.0.0,<10.0.0"
 typer = ">=0.9.0,<1.0.0"
 
 [package.extras]
-anthropic = ["anthropic (==0.42.0)", "xmltodict (>=0.13,<0.15)"]
+anthropic = ["anthropic (==0.48.0)", "xmltodict (>=0.13,<0.15)"]
+bedrock = ["boto3 (>=1.34.0,<2.0.0)"]
 cerebras-cloud-sdk = ["cerebras-cloud-sdk (>=1.5.0,<2.0.0)"]
 cohere = ["cohere (>=5.1.8,<6.0.0)"]
 fireworks-ai = ["fireworks-ai (>=0.15.4,<1.0.0)"]
+google-genai = ["google-genai (>=1.5.0)", "jsonref (>=1.1.0,<2.0.0)"]
 google-generativeai = ["google-generativeai (>=0.8.2,<1.0.0)", "jsonref (>=1.1.0,<2.0.0)"]
 groq = ["groq (>=0.4.2,<0.14.0)"]
-test-docs = ["diskcache (>=5.6.3,<6.0.0)", "fastapi (>=0.109.2,<0.116.0)", "litellm (>=1.35.31,<2.0.0)", "mistralai (>=1.0.3,<2.0.0)", "pandas (>=2.2.0,<3.0.0)", "pydantic-extra-types (>=2.6.0,<3.0.0)", "redis (>=5.0.1,<6.0.0)", "tabulate (>=0.9.0,<1.0.0)"]
+mistral = ["mistralai (>=1.5.1,<2.0.0)"]
+perplexity = ["openai (>=1.52.0,<2.0.0)"]
+test-docs = ["diskcache (>=5.6.3,<6.0.0)", "fastapi (>=0.109.2,<0.116.0)", "litellm (>=1.35.31,<2.0.0)", "mistralai (>=1.5.1,<2.0.0)", "pandas (>=2.2.0,<3.0.0)", "pydantic-extra-types (>=2.6.0,<3.0.0)", "redis (>=5.0.1,<6.0.0)", "tabulate (>=0.9.0,<1.0.0)"]
 vertexai = ["google-cloud-aiplatform (>=1.53.0,<2.0.0)", "jsonref (>=1.1.0,<2.0.0)"]
 writer = ["writer-sdk (>=1.2.0,<2.0.0)"]
 
@@ -3548,4 +3552,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "92d6fc29058b517cf1bd0c7c5e6af7d680ecc0ddffafcd2af8c153604abbdad0"
+content-hash = "188baf48ad7b4bd22f743fb070c4594bda7c9e5afc275699c3bfc48981982fd3"
