@@ -141,7 +141,8 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     ),
     Plan(
         plan_context=PlanContext(
-            query="Send an email to hello@portialabs.ai if the temp in London is better than 10C.",
+            query="If the weather in London hotter than 10C, sum it with the weather in Cairo and "
+            "send the result to hello@portialabs.ai",
             tool_ids=[
                 "weather_tool",
                 "portia::google_gmail::send_email_tool",
@@ -150,16 +151,31 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         ),
         steps=[
             Step(
-                task="What is the weather in London?",
+                task="Get the weather for London",
                 tool_id="weather_tool",
                 output="$london_weather",
             ),
             Step(
-                task="Email $email_address politely with $london_weather",
+                task="Get the weather for Cairo",
+                tool_id="weather_tool",
+                output="$cairo_weather",
+                condition="$london_weather > 10C",
+            ),
+            Step(
+                task="Sum the weather in London and Cairo",
+                inputs=[
+                    Variable(name="$london_weather", description="Weather in London"),
+                    Variable(name="$cairo_weather", description="Weather in Cairo"),
+                ],
+                output="$weather_sum",
+                condition="$london_weather > 10C",
+            ),
+            Step(
+                task="Email $email_address politely with $weather_sum",
                 inputs=[
                     Variable(
-                        name="$london_weather",
-                        description="Weather in London",
+                        name="$weather_sum",
+                        description="Sum of the weather in London and Cairo",
                     ),
                     Variable(
                         name="$email_address",
@@ -169,7 +185,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                 ],
                 tool_id="portia::google_gmail::send_email_tool",
                 output="If the email was successfully sent",
-                condition="$london_weather > 10C.",
+                condition="$london_weather > 10C",
             ),
         ],
     ),

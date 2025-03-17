@@ -10,7 +10,6 @@ import pytest
 from portia.execution_agents.base_execution_agent import Output
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
-    BaseIntrospectionAgent,
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
@@ -18,7 +17,6 @@ from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState
 from portia.prefixed_uuid import PlanUUID
-from tests.utils import get_test_config
 
 if TYPE_CHECKING:
     from portia.config import Config
