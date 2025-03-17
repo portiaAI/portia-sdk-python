@@ -54,7 +54,7 @@ class ToolArgument(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
-    value: Any | None = Field(
+    value: str | None = Field(
         description="Value of the argument, as provided by in the goal or context.",
     )
     valid: bool = Field(
@@ -88,21 +88,19 @@ class VerifiedToolArgument(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
-    value: Any | None = Field(
+    value: str | None = Field(
         description="Value of the argument, as provided by in the goal or context.",
     )
 
     # We call this "made_up" and not "hallucinated" because the latter was making OpenAI's model
     # produce invalid JSON.
     made_up: bool = Field(
-        default=False,
         description="Whether the value was made up or not. "
         "Should be false if the value was provided by the user, even if in a different format."
         "User provided values can be in the context, in the goal or the result of previous steps.",
     )
 
     schema_invalid: bool = Field(
-        default=False,
         description="Whether the pydantic schema is invalid or not for this arg.",
     )
 

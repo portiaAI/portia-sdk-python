@@ -15,6 +15,9 @@ jobs:
   testing:
     timeout-minutes: 10
     runs-on: ubuntu-latest-16core
+    strategy:
+      matrix:
+        langchain_openai_version: ["0.2.1", "0.3.8"]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,6 +34,9 @@ jobs:
 
       - name: install dependencies
         run: poetry install --all-extras
+      
+      - name: For install specific langchain-openai version
+        run: poetry add langchain-openai==${{ matrix.langchain_openai_version }}
 
       - name: unit_tests + coverage
         env:
