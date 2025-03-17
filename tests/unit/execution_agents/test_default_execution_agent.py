@@ -53,6 +53,9 @@ class MockInvoker:
     called: bool
     prompt: ChatPromptValue | None
     response: AIMessage | BaseModel | None
+    output_format: Any | None
+    tools: Any | None
+    method: str | None
 
     def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
         """Init worker."""
@@ -61,6 +64,7 @@ class MockInvoker:
         self.response = response
         self.output_format = None
         self.tools = None
+        self.method = None
 
     def invoke(
         self,
@@ -75,9 +79,10 @@ class MockInvoker:
             return self.response
         return AIMessage(content="invoked")
 
-    def with_structured_output(self, output_format: Any, method: str = "pydantic") -> MockInvoker:  # noqa: ANN401
+    def with_structured_output(self, output_format: Any, method: str = "function_calling") -> MockInvoker:  # noqa: ANN401
         """Model wrapper for structured output."""
         self.output_format = output_format
+        self.method = method
         return self
 
 

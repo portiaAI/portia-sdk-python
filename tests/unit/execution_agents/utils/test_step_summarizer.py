@@ -22,6 +22,8 @@ class MockInvoker:
     called: bool
     prompt: list[BaseMessage]
     response: AIMessage | BaseModel | None
+    output_format: type[BaseModel] | None
+    method: str | None
 
     def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
         """Init worker."""
@@ -29,6 +31,7 @@ class MockInvoker:
         self.prompt = []
         self.response = response
         self.output_format = None
+        self.method = None
 
     def invoke(
         self,
@@ -42,9 +45,10 @@ class MockInvoker:
             return self.response
         return AIMessage(content="invoked")
 
-    def with_structured_output(self, output_format: type[BaseModel], method: str = "pydantic") -> MockInvoker:
+    def with_structured_output(self, output_format: type[BaseModel], method: str = "function_calling") -> MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
+        self.method = method
         return self
 
 
