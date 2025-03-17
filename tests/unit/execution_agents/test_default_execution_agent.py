@@ -79,7 +79,9 @@ class MockInvoker:
             return self.response
         return AIMessage(content="invoked")
 
-    def with_structured_output(self, output_format: Any, method: str = "function_calling") -> MockInvoker:  # noqa: ANN401
+    def with_structured_output(
+        self, output_format: Any, method: str = "function_calling",  # noqa: ANN401
+    ) -> MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
         self.method = method
