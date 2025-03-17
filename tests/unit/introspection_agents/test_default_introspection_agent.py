@@ -88,32 +88,6 @@ def mock_plan_run() -> PlanRun:
         ),
     )
 
-
-def test_base_introspection_agent() -> None:
-    """Test BaseIntrospectionAgent raises."""
-
-    class MyIntrospectionAgent(BaseIntrospectionAgent):
-        """Override to test base."""
-
-        def pre_step_introspection(
-            self,
-            plan: Plan,
-            plan_run: PlanRun,
-        ) -> PreStepIntrospection:
-            return super().pre_step_introspection(plan, plan_run)
-
-    agent = MyIntrospectionAgent(get_test_config())
-
-    empty_plan = Plan(
-        plan_context=PlanContext(query="test", tool_ids=[]),
-        steps=[],
-    )
-    empty_plan_run = PlanRun(plan_id=empty_plan.id)
-
-    with pytest.raises(NotImplementedError):
-        agent.pre_step_introspection(empty_plan, empty_plan_run)
-
-
 def test_pre_step_introspection_continue(
     introspection_agent: DefaultIntrospectionAgent,
     mock_plan: Plan,

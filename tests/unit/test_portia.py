@@ -815,11 +815,9 @@ def test_portia_run_with_introspection_stop(portia: Portia) -> None:
     )
 
     def custom_handle_introspection(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
-        plan_run = kwargs.get("plan_run")
+        plan_run: PlanRun = kwargs.get("plan_run")  # type: ignore  # noqa: PGH003
 
-        # If this is step 1, simulate a STOP outcome
         if plan_run.current_step_index == 1:
-            # Modify the plan_run to look like it stopped
             plan_run.outputs.step_outputs["$step2_result"] = Output(
                 value="STOPPED",
                 summary="Remaining steps cannot be executed",
@@ -872,7 +870,7 @@ def test_portia_run_with_introspection_fail(portia: Portia) -> None:
     )
 
     def custom_handle_introspection(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
-        plan_run = kwargs.get("plan_run")
+        plan_run: PlanRun = kwargs.get("plan_run")  # type: ignore  # noqa: PGH003
         # If this is step 1, simulate a FAIL outcome
         if plan_run.current_step_index == 1:
             # Modify the plan_run to look like it failed
@@ -986,7 +984,9 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
     # Verify plan_run was updated correctly
     assert updated_plan_run.outputs.step_outputs["$test_output"].value == "FAILED"
     assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Execution failed"
+    assert updated_plan_run.outputs.final_output is not None
     assert updated_plan_run.outputs.final_output.value == "FAILED"
+    assert updated_plan_run.outputs.final_output.summary is not None
     assert updated_plan_run.outputs.final_output.summary == "Execution failed"
     assert updated_plan_run.state == PlanRunState.FAILED
 

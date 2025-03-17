@@ -652,11 +652,12 @@ class Portia:
                     value="STOPPED",
                     summary=pre_step_outcome.reason,
                 )
-                plan_run.outputs.final_output = self._get_final_output(
-                    plan,
-                    plan_run,
-                    last_executed_step_output,
-                )
+                if last_executed_step_output:
+                    plan_run.outputs.final_output = self._get_final_output(
+                        plan,
+                        plan_run,
+                        last_executed_step_output,
+                    )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.FAIL:
