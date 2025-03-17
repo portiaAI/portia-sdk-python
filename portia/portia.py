@@ -45,6 +45,7 @@ from portia.execution_context import (
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
+    PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
 from portia.logger import logger, logger_manager
@@ -498,44 +499,32 @@ class Portia:
 
         dashboard_url = self.config.must_get("portia_dashboard_url", str)
 
+        dashboard_message = (
+            f" View in your Portia AI dashboard: "
+            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
+        ) if self.config.storage_class == StorageClass.CLOUD else ""
+
         logger().info(
-            f"Plan Run State is updated to {plan_run.state!s}. "
-            f"View in your Portia AI dashboard: "
-            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}",
+            f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
+        last_executed_step_output = None
+        introspection_agent = self._get_introspection_agent()
         for index in range(plan_run.current_step_index, len(plan.steps)):
             step = plan.steps[index]
             plan_run.current_step_index = index
 
-            # Run pre step introspection
-            introspection_agent = self._get_introspection_agent()
-            pre_step_outcome = introspection_agent.pre_step_introspection(
-                plan=ReadOnlyPlan.from_plan(plan),
-                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+            # Handle the introspection outcome
+            (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
+                introspection_agent=introspection_agent,
+                plan=plan,
+                plan_run=plan_run,
+                last_executed_step_output=last_executed_step_output,
             )
-            logger().info(
-                f"Pre Step Introspection Outcome: {pre_step_outcome.outcome}. "
-                f"Reason: {pre_step_outcome.reason}",
-            )
-            match pre_step_outcome.outcome:
-                case PreStepIntrospectionOutcome.SKIP_NEXT:
-                    plan_run.outputs.step_outputs[step.output] = Output(
-                        value="SKIPPED",
-                        summary=pre_step_outcome.reason,
-                    )
-                    self.storage.save_plan_run(plan_run)
-                    continue
-                case PreStepIntrospectionOutcome.FAIL:
-                    stop_output = Output(
-                        value="FAILED",
-                        summary=pre_step_outcome.reason,
-                    )
-                    plan_run.outputs.step_outputs[step.output] = stop_output
-                    plan_run.outputs.final_output = stop_output
-                    self._set_plan_run_state(plan_run, PlanRunState.FAILED)
-                    self.storage.save_plan_run(plan_run)
-                    return plan_run
+            if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
+                continue
+            if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
+                return plan_run
 
             logger().info(
                 f"Executing step {index}: {step.task}",
@@ -554,7 +543,7 @@ class Portia:
                 plan_run=str(plan_run.id),
             )
             try:
-                step_output = agent.execute_sync()
+                last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = Output(value=str(e))
                 plan_run.outputs.step_outputs[step.output] = error_output
@@ -573,17 +562,13 @@ class Portia:
                 )
                 return plan_run
             else:
-                plan_run.outputs.step_outputs[step.output] = step_output
+                plan_run.outputs.step_outputs[step.output] = last_executed_step_output
                 logger().info(
-                    f"Step output - {step_output.summary!s}",
+                    f"Step output - {last_executed_step_output.summary!s}",
                 )
 
-            if self._raise_clarifications(plan_run, step_output, plan):
+            if self._raise_clarifications(plan_run, last_executed_step_output, plan):
                 return plan_run
-
-            # set final output if is last step (accounting for zero index)
-            if index == len(plan.steps) - 1:
-                plan_run.outputs.final_output = self._get_final_output(plan, plan_run, step_output)
 
             # persist at the end of each step
             self.storage.save_plan_run(plan_run)
@@ -591,6 +576,12 @@ class Portia:
                 f"New PlanRun State: {plan_run.model_dump_json(indent=4)}",
             )
 
+        if last_executed_step_output:
+            plan_run.outputs.final_output = self._get_final_output(
+                plan,
+                plan_run,
+                last_executed_step_output,
+            )
         self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
         logger().debug(
             f"Final run status: {plan_run.state!s}",
@@ -602,6 +593,83 @@ class Portia:
                 f"Final output: {plan_run.outputs.final_output.value!s}",
             )
         return plan_run
+
+    def _handle_introspection_outcome(
+        self,
+        introspection_agent: BaseIntrospectionAgent,
+        plan: Plan,
+        plan_run: PlanRun,
+        last_executed_step_output: Output | None,
+    ) -> tuple[PlanRun, PreStepIntrospection]:
+        """Handle the outcome of the pre-step introspection.
+
+        Args:
+            introspection_agent (BaseIntrospectionAgent): The introspection agent to use.
+            plan (Plan): The plan being executed.
+            plan_run (PlanRun): The plan run being executed.
+            last_executed_step_output (Output | None): The output of the last step executed.
+
+        Returns:
+            tuple[PlanRun, PreStepIntrospectionOutcome]: The updated plan run and the
+                outcome of the introspection.
+
+        """
+        current_step_index = plan_run.current_step_index
+        step = plan.steps[current_step_index]
+        if not step.condition:
+            return (
+                plan_run,
+                PreStepIntrospection(
+                    outcome=PreStepIntrospectionOutcome.CONTINUE,
+                    reason="No condition to evaluate.",
+                ),
+            )
+
+        logger().info(f"Running Pre Introspection for Step #{current_step_index}.")
+
+        pre_step_outcome = introspection_agent.pre_step_introspection(
+                plan=ReadOnlyPlan.from_plan(plan),
+                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+            )
+
+        log_message = (
+            f"Pre Introspection Outcome for Step #{current_step_index}: "
+            f"{pre_step_outcome.outcome} for {step.output}. "
+            f"Reason: {pre_step_outcome.reason}",
+        )
+
+        match pre_step_outcome.outcome:
+            case PreStepIntrospectionOutcome.SKIP:
+                logger().debug(*log_message)
+                plan_run.outputs.step_outputs[step.output] = Output(
+                    value="SKIPPED",
+                    summary=pre_step_outcome.reason,
+                )
+                self.storage.save_plan_run(plan_run)
+            case PreStepIntrospectionOutcome.STOP:
+                logger().debug(*log_message)
+                plan_run.outputs.step_outputs[step.output] = Output(
+                    value="STOPPED",
+                    summary=pre_step_outcome.reason,
+                )
+                plan_run.outputs.final_output = self._get_final_output(
+                    plan,
+                    plan_run,
+                    last_executed_step_output,
+                )
+                self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
+                self.storage.save_plan_run(plan_run)
+            case PreStepIntrospectionOutcome.FAIL:
+                logger().error(*log_message)
+                failed_output = Output(
+                    value="FAILED",
+                    summary=pre_step_outcome.reason,
+                )
+                plan_run.outputs.step_outputs[step.output] = failed_output
+                plan_run.outputs.final_output = failed_output
+                self._set_plan_run_state(plan_run, PlanRunState.FAILED)
+                self.storage.save_plan_run(plan_run)
+        return (plan_run, pre_step_outcome)
 
     def _get_planning_agent(self) -> BasePlanningAgent:
         """Get the planning_agent based on the configuration.

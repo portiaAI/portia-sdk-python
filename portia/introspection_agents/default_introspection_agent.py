@@ -45,23 +45,27 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
                         "decide what action should be taken next."
                         "You should use the current_step_index field to identify the current step"
                         "in the plan, and the PlanRun state to know what has happened so far."
-                        "The actions that can be taken next are:"
-                        "- CONTINUE -> Continue execution of the next step"
-                        "- SKIP_NEXT -> skip the next step execution"
-                        "- FAIL -> stop execution entirely."
-                        "You should choose an outcome based on the following logic:"
-                        "- If the current step has a condition that is false you return SKIP_NEXT"
-                        "- If you cannot evaluate the condition because of missing data return FAIL"
-                        "- If the remainder of the workflow can not be executed because of the"
-                        "  outcome of a previous step return FAIL"
-                        "- Otherwise return CONTINUE."
-                        "Please return the outcome and reason in the given format."
+                        "The actions that can be taken next in priority order are:"
+                        " - STOP -> stop execution and return the result so far."
+                        " - SKIP -> skip the next step execution."
+                        " - FAIL -> stop execution entirely."
+                        " - CONTINUE -> Continue execution of the next step."
+                        "You should choose an outcome based on the following logic in order:\n"
+                        " - If all remaining steps can not be executed because of the"
+                        "   current conditions are not met return STOP.\n"
+                        " - If the current step has a condition that is false you return SKIP.\n"
+                        " - If you cannot evaluate the condition because some data had been skipped"
+                        "  in previous steps then return SKIP.\n"
+                        " - If you cannot evaluate the condition"
+                        " because of missing data return FAIL.\n"
+                        " - Otherwise return CONTINUE.\n"
+                        "Return the outcome and reason in the given format.\n"
                     ),
                 ),
                 HumanMessagePromptTemplate.from_template(
-                    "Please review the following plan + current step."
-                    "Current Plan: {plan}"
-                    "Current PlanRun: {plan_run}",
+                    "Review the following plan + current PlanRun."
+                    "Current Plan: {plan}\n"
+                    "Current PlanRun: {plan_run}\n",
                 ),
             ],
         )
@@ -72,7 +76,7 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """Ask the LLM whether to continue, skip or fail the plan_run."""
-        summary = (
+        outcome = (
             LLMWrapper.for_usage(INTROSPECTION_MODEL_KEY, self.config)
             .to_langchain()
             .with_structured_output(PreStepIntrospection)
@@ -84,4 +88,4 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
             )
         )
 
-        return PreStepIntrospection.model_validate(summary)
+        return PreStepIntrospection.model_validate(outcome)

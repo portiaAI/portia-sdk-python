@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 FUNCTION_COLOR_MAP = {
     "tool": "fg 87",
     "clarification": "fg 87",
+    "introspection": "fg 87",
     "run": "fg 129",
     "step": "fg 129",
     "plan": "fg 39",

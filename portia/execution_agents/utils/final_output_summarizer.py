@@ -53,8 +53,8 @@ class FinalOutputSummarizer:
         context = []
         context.append(f"Query: {plan.plan_context.query}")
         context.append("----------")
+        outputs = plan_run.outputs.step_outputs
         for step in plan.steps:
-            outputs = plan_run.outputs.step_outputs
             if step.output in outputs:
                 context.append(f"Task: {step.task}")
                 context.append(f"Output: {outputs[step.output].value}")

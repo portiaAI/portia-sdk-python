@@ -14,8 +14,9 @@ class PreStepIntrospectionOutcome(PortiaEnum):
     """The Outcome of the introspection."""
 
     CONTINUE = "CONTINUE"
-    SKIP_NEXT = "SKIP_NEXT"
+    SKIP = "SKIP"
     FAIL = "FAIL"
+    STOP = "STOP"
 
 
 class PreStepIntrospection(BaseModel):
