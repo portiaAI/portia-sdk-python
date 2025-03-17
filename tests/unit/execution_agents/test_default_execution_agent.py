@@ -269,8 +269,8 @@ def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None
 
         def with_structured_output(
             self,
-            output_format: Any,
-            method: str = "function_calling",  # noqa: ANN401 ARG002
+            output_format: Any,  # noqa: ARG002 ANN401
+            method: str = "function_calling",  # noqa: ARG002
         ) -> MockInvoker:
             return self
 
