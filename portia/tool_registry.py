@@ -660,7 +660,7 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  #
             ]
             return Union[*types]
         case _:
-            logger().warning(f"Unsupported JSON schema type: {field.get('type')}: {field}")
+            logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
             return Any
 
 
@@ -687,8 +687,8 @@ def _map_single_pydantic_type(  # noqa: PLR0911
         case "null":
             if allow_nonetype:
                 return None
-            logger().warning(f"Null type is not allowed for a non-union field: {field_name}")
+            logger().debug(f"Null type is not allowed for a non-union field: {field_name}")
             return Any
         case _:
-            logger().warning(f"Unsupported JSON schema type: {field.get('type')}: {field}")
+            logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
             return Any
