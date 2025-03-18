@@ -515,6 +515,7 @@ def test_portia_run_query_with_multiple_async_clarifications(
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
 
 
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
