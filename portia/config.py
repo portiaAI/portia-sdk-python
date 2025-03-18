@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Self, TypeVar
+from typing import NamedTuple, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -55,6 +55,7 @@ class LLMProvider(Enum):
     OPENAI = "OPENAI"
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
+    AZURE_OPENAI = "AZURE_OPENAI"
 
     def associated_models(self) -> list[LLMModel]:
         """Get the associated models for the provider.
@@ -70,6 +71,8 @@ class LLMProvider(Enum):
                 return SUPPORTED_ANTHROPIC_MODELS
             case LLMProvider.MISTRALAI:
                 return SUPPORTED_MISTRALAI_MODELS
+            case LLMProvider.AZURE_OPENAI:
+                return SUPPORTED_AZURE_OPENAI_MODELS
 
     def to_api_key_name(self) -> str:
         """Get the name of the API key for the provider."""
@@ -80,7 +83,12 @@ class LLMProvider(Enum):
                 return "anthropic_api_key"
             case LLMProvider.MISTRALAI:
                 return "mistralai_api_key"
+            case LLMProvider.AZURE_OPENAI:
+                return "azure_openai_api_key"
 
+class LLMProviderModel(NamedTuple):
+    api_name: str
+    provider: LLMProvider
 
 class LLMModel(Enum):
     """Enum for supported LLM models.
@@ -89,7 +97,7 @@ class LLMModel(Enum):
     - OpenAI
     - Anthropic
     - MistralAI
-
+    - Azure OpenAI
     Attributes:
         GPT_4_O: GPT-4 model by OpenAI.
         GPT_4_O_MINI: Mini GPT-4 model by OpenAI.
@@ -99,23 +107,28 @@ class LLMModel(Enum):
         CLAUDE_3_OPUS: Claude 3.0 Opus model by Anthropic.
         CLAUDE_3_7_SONNET: Claude 3.7 Sonnet model by Anthropic.
         MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
-
+        AZURE_GPT_4_O: OpenAI GPT-4 model hosted on Azure OpenAI.
+        AZURE_GPT_4_O_MINI: OpenAI Mini GPT-4 model hosted on Azure OpenAI.
     """
 
     # OpenAI
-    GPT_4_O = "gpt-4o"
-    GPT_4_O_MINI = "gpt-4o-mini"
-    GPT_3_5_TURBO = "gpt-3.5-turbo"
-    O_3_MINI = "o3-mini"
+    GPT_4_O = LLMProviderModel("gpt-4o", LLMProvider.OPENAI)
+    GPT_4_O_MINI =  LLMProviderModel("gpt-4o-mini", LLMProvider.OPENAI)
+    GPT_3_5_TURBO =  LLMProviderModel("gpt-3.5-turbo", LLMProvider.OPENAI)
+    O_3_MINI =  LLMProviderModel("o3-mini", LLMProvider.OPENAI)
 
     # Anthropic
-    CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
-    CLAUDE_3_5_HAIKU = "claude-3-5-haiku-latest"
-    CLAUDE_3_OPUS = "claude-3-opus-latest"
-    CLAUDE_3_7_SONNET = "claude-3-7-sonnet-latest"
+    CLAUDE_3_5_SONNET = LLMProviderModel("claude-3-5-sonnet-latest", LLMProvider.ANTHROPIC)
+    CLAUDE_3_5_HAIKU = LLMProviderModel("claude-3-5-haiku-latest", LLMProvider.ANTHROPIC)
+    CLAUDE_3_OPUS = LLMProviderModel("claude-3-opus-latest", LLMProvider.ANTHROPIC)
+    CLAUDE_3_7_SONNET = LLMProviderModel("claude-3-7-sonnet-latest", LLMProvider.ANTHROPIC)
 
     # MistralAI
-    MISTRAL_LARGE = "mistral-large-latest"
+    MISTRAL_LARGE = LLMProviderModel("mistral-large-latest", LLMProvider.MISTRALAI)
+
+    # Azure OpenAI
+    AZURE_GPT_4_O = LLMProviderModel("gpt-4o", LLMProvider.AZURE_OPENAI)
+    AZURE_GPT_4_O_MINI = LLMProviderModel("gpt-4o-mini", LLMProvider.AZURE_OPENAI)
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
@@ -124,11 +137,17 @@ class LLMModel(Enum):
             LLMProvider: The provider associated with the model.
 
         """
-        if self in SUPPORTED_ANTHROPIC_MODELS:
-            return LLMProvider.ANTHROPIC
-        if self in SUPPORTED_MISTRALAI_MODELS:
-            return LLMProvider.MISTRALAI
-        return LLMProvider.OPENAI
+        return self.value.provider
+
+    @property
+    def api_name(self) -> str:
+        """Get the API name of the model
+        
+        Returns:
+            str: The name as understood by the Provider API
+
+        """
+        return self.value.api_name
 
 
 SUPPORTED_OPENAI_MODELS = [
@@ -147,6 +166,11 @@ SUPPORTED_ANTHROPIC_MODELS = [
 
 SUPPORTED_MISTRALAI_MODELS = [
     LLMModel.MISTRAL_LARGE,
+]
+
+SUPPORTED_AZURE_OPENAI_MODELS = [
+    LLMModel.AZURE_GPT_4_O,
+    LLMModel.AZURE_GPT_4_O_MINI,
 ]
 
 
@@ -240,12 +264,14 @@ PLANNER_DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.O_3_MINI,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_O,
 }
 
 DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.GPT_4_O,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_O,
 }
 
 
@@ -263,6 +289,7 @@ class Config(BaseModel):
         openai_api_key: The API key for OpenAI.
         anthropic_api_key: The API key for Anthropic.
         mistralai_api_key: The API key for MistralAI.
+        azure_openai_api_key: The API key for Azure OpenAI.
         llm_provider: The LLM provider.
         models: A dictionary of LLM models for each usage type.
         storage_class: The storage class used (e.g., MEMORY, DISK, CLOUD).
@@ -303,6 +330,10 @@ class Config(BaseModel):
     mistralai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
         description="The API Key for Mistral AI. Must be set if llm-provider is MISTRALAI",
+    )
+    azure_openai_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("AZURE_OPENAI_API_KEY") or ""),
+        description="The API Key for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
 
     llm_provider: LLMProvider = Field(
@@ -531,6 +562,8 @@ class Config(BaseModel):
                 return self.anthropic_api_key
             case LLMProvider.MISTRALAI:
                 return self.mistralai_api_key
+            case LLMProvider.AZURE_OPENAI:
+                return self.azure_openai_api_key
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
