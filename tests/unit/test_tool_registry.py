@@ -279,7 +279,7 @@ def mcp_tool_registry(mock_get_mcp_session: None) -> McpToolRegistry:  # noqa: A
 def test_mcp_tool_registry_from_sse_connection() -> None:
     """Test constructing a McpToolRegistry from an SSE connection."""
     mcp_registry_sse = McpToolRegistry.from_sse_connection(
-        server_name="mock_mcp", url="http://localhost:8000"
+        server_name="mock_mcp", url="http://localhost:8000",
     )
     assert isinstance(mcp_registry_sse, McpToolRegistry)
 
