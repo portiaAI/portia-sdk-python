@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 PROVIDER_MODELS = [
     (
         LLMProvider.OPENAI,
-        LLMModel.GPT_4_O,
+        LLMModel.GPT_4_O_MINI,
     ),
     (
         LLMProvider.MISTRALAI,
