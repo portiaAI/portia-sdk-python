@@ -21,16 +21,17 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+import os
 from typing import TYPE_CHECKING, TypeVar
 
 import instructor
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
 from langchain_mistralai import ChatMistralAI
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
 from mistralai import Mistral
-from openai import OpenAI
+from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr
 
 from portia.config import Config, LLMModel, LLMProvider
@@ -163,8 +164,8 @@ class LLMWrapper(BaseLLMWrapper):
         match self.model_name.provider():
             case LLMProvider.OPENAI:
                 return ChatOpenAI(
-                    name=self.model_name.value,
-                    model=self.model_name.value,
+                    name=self.model_name.api_name,
+                    model=self.model_name.api_name,
                     seed=self.model_seed,
                     api_key=self.api_key,
                     max_retries=3,
@@ -177,7 +178,7 @@ class LLMWrapper(BaseLLMWrapper):
                 )
             case LLMProvider.ANTHROPIC:
                 return ChatAnthropic(
-                    model_name=self.model_name.value,
+                    model_name=self.model_name.api_name,
                     timeout=120,
                     stop=None,
                     max_retries=3,
@@ -185,7 +186,13 @@ class LLMWrapper(BaseLLMWrapper):
                 )
             case LLMProvider.MISTRALAI:
                 return ChatMistralAI(
-                    model_name=self.model_name.value,
+                    model_name=self.model_name.api_name,
+                    api_key=self.api_key,
+                    max_retries=3,
+                )
+            case LLMProvider.AZURE_OPENAI:
+                return AzureChatOpenAI(
+                    model=self.model_name.api_name,
                     api_key=self.api_key,
                     max_retries=3,
                 )
@@ -218,7 +225,7 @@ class LLMWrapper(BaseLLMWrapper):
                 return client.chat.completions.create(
                     response_model=response_model,
                     messages=messages,
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     seed=self.model_seed,
                 )
             case LLMProvider.ANTHROPIC:
@@ -229,7 +236,7 @@ class LLMWrapper(BaseLLMWrapper):
                     mode=instructor.Mode.ANTHROPIC_JSON,
                 )
                 return client.chat.completions.create(
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     response_model=response_model,
                     messages=messages,
                     max_tokens=2048,
@@ -241,7 +248,20 @@ class LLMWrapper(BaseLLMWrapper):
                     ),
                 )
                 return client.chat.completions.create(  # pyright: ignore[reportReturnType]
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     response_model=response_model,
                     messages=messages,
                 )
+            case LLMProvider.AZURE_OPENAI:
+                client = instructor.from_openai(
+                    client=AzureOpenAI(
+                        api_key=self.api_key.get_secret_value(),
+                    ),
+                )
+                return client.chat.completions.create(
+                    response_model=response_model,
+                    messages=messages,
+                    model=self.model_name.api_name,
+                    seed=self.model_seed,
+                
+)
