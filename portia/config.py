@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -23,6 +23,15 @@ from pydantic import (
 )
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
+
+if TYPE_CHECKING:
+    from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+    from portia.planning_agents.base_planning_agent import BasePlanningAgent
+else:
+    # Placeholder types for runtime
+    BaseExecutionAgent = Any
+    BasePlanningAgent = Any
+
 
 T = TypeVar("T")
 
@@ -275,7 +284,10 @@ class Config(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        populate_by_name=True,
+    )
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -313,6 +325,11 @@ class Config(BaseModel):
     models: dict[str, LLMModel] = Field(
         default={},
         description="A dictionary of configured LLM models for each usage.",
+    )
+
+    agents: dict[str, BaseExecutionAgent | BasePlanningAgent] = Field(
+        default_factory=dict,
+        description="A dictionary of configured agents for each usage.",
     )
 
     @model_validator(mode="after")
