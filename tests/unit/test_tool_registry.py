@@ -278,7 +278,9 @@ def mcp_tool_registry(mock_get_mcp_session: None) -> McpToolRegistry:  # noqa: A
 @pytest.mark.usefixtures("mock_get_mcp_session")
 def test_mcp_tool_registry_from_sse_connection() -> None:
     """Test constructing a McpToolRegistry from an SSE connection."""
-    mcp_registry_sse = McpToolRegistry.from_sse_connection(server_name="mock_mcp", url="http://localhost:8000")
+    mcp_registry_sse = McpToolRegistry.from_sse_connection(
+        server_name="mock_mcp", url="http://localhost:8000",
+    )
     assert isinstance(mcp_registry_sse, McpToolRegistry)
 
 
@@ -411,8 +413,7 @@ def test_generate_pydantic_model_from_json_schema_union_types() -> None:
     assert model.model_fields["collaborators"].annotation == Union[list[int], None]
     assert model.model_fields["collaborators"].default is None
     assert (
-        model.model_fields["collaborators"].description
-        == "Array of user IDs to CC on the ticket"
+        model.model_fields["collaborators"].description == "Array of user IDs to CC on the ticket"
     )
     assert model.model_fields["company_number"].annotation == Union[str, int]
     assert model.model_fields["company_number"].default is PydanticUndefined
@@ -438,10 +439,16 @@ def test_generate_pydantic_model_from_json_schema_doesnt_handle_none_for_non_uni
                 "default": None,
                 "description": "Array of user IDs to CC on the ticket",
             },
+            "unknown_field_type": {
+                "type": "random_type",
+                "default": None,
+                "description": "Array of user IDs to CC on the ticket",
+            },
         },
     }
     model = generate_pydantic_model_from_json_schema("TestNullSchema", json_schema)
     assert model.model_fields["name"].annotation is Any
+    assert model.model_fields["unknown_field_type"].annotation is Any
 
 
 def test_generate_pydantic_model_from_json_schema_not_single_type_or_union_field() -> None:

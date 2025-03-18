@@ -496,7 +496,7 @@ class Portia:
         logger().info(
             f"Plan Run State is updated to {plan_run.state!s}. "
             f"View in your Portia AI dashboard: "
-            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}",
+            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}&org_selection=True",
         )
 
         for index in range(plan_run.current_step_index, len(plan.steps)):
