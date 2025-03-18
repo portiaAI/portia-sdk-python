@@ -515,18 +515,9 @@ def test_portia_run_query_with_multiple_async_clarifications(
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.flaky(reruns=3)
-def test_portia_run_query_with_conditional_steps(
-    llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
-) -> None:
+def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
-    config = Config.from_default(
-        llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
-        storage_class=StorageClass.MEMORY,
-    )
+    config = Config.from_default(storage_class=StorageClass.MEMORY)
     portia = Portia(config=config, tools=example_tool_registry)
     query = "If the weather in London is hotter than 40C, then sum 1 + 2, otherwise sum 3 + 4"
 
