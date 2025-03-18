@@ -68,11 +68,11 @@ jobs:
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          uv run cli.py query-planner update-dataset
-          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=gpt-4o-mini --threshold_file=query_planner/thresholds/thresholds.yaml)
+          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=claude-3-5-sonnet-latest --threshold_file=query_planner/thresholds/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk" --slice_name main)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -90,12 +90,11 @@ jobs:
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          uv run cli.py agent update-dataset --slice_name=verifier
-          EVAL_OUTPUT=$(uv run cli.py agent eval --agent=verifier --slice_name=verifier --model=gpt-4o-mini --threshold_file=agents/thresholds/verifier_thresholds.yaml)
+          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=claude-3-5-sonnet-latest --threshold_file=agents/thresholds/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk")
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
