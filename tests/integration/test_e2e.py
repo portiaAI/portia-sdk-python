@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 PROVIDER_MODELS = [
     (
         LLMProvider.OPENAI,
-        LLMModel.GPT_4_O_MINI,
+        LLMModel.GPT_4_O,
     ),
     (
         LLMProvider.MISTRALAI,
@@ -41,7 +41,6 @@ AGENTS = [
     ExecutionAgentType.DEFAULT,
     ExecutionAgentType.ONE_SHOT,
 ]
-
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
@@ -514,6 +513,27 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
     assert test_clarification_handler.received_clarification is not None
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
+
+
+@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.flaky(reruns=3)
+def test_portia_run_query_with_conditional_steps(
+    llm_provider: LLMProvider,
+    llm_model_name: LLMModel,
+) -> None:
+    """Test running a query with conditional steps."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        storage_class=StorageClass.MEMORY,
+    )
+    portia = Portia(config=config, tools=example_tool_registry)
+    query = "If the weather in London is hotter than 40C, then sum 1 + 2, otherwise sum 3 + 4"
+
+    plan_run = portia.run(query)
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.value == 7
 
 
 def test_portia_run_query_with_example_registry() -> None:
