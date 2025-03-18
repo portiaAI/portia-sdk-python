@@ -96,8 +96,8 @@ def test_base_introspection_agent_initialization() -> None:
 
         def pre_step_introspection(
             self,
-            _plan: Plan,
-            _plan_run: PlanRun,
+            plan: Plan,  # noqa: ARG002
+            plan_run: PlanRun,  # noqa: ARG002
         ) -> PreStepIntrospection:
             """Implement required method to test the base class."""
             return PreStepIntrospection(
