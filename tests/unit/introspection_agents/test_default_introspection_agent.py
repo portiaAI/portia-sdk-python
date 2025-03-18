@@ -10,6 +10,7 @@ import pytest
 from portia.execution_agents.base_execution_agent import Output
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
+    BaseIntrospectionAgent,
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
@@ -17,6 +18,7 @@ from portia.llm_wrapper import LLMWrapper
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState
 from portia.prefixed_uuid import PlanUUID
+from tests.utils import get_test_config
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -86,6 +88,40 @@ def mock_plan_run() -> PlanRun:
         ),
     )
 
+def test_base_introspection_agent_initialization() -> None:
+    """Test BaseIntrospectionAgent initialization and default behavior."""
+    # Create a minimal implementation of BaseIntrospectionAgent for testing
+    class TestIntrospectionAgent(BaseIntrospectionAgent):
+        """Test implementation of BaseIntrospectionAgent."""
+
+        def pre_step_introspection(
+            self,
+            _plan: Plan,
+            _plan_run: PlanRun,
+        ) -> PreStepIntrospection:
+            """Implement required method to test the base class."""
+            return PreStepIntrospection(
+                outcome=PreStepIntrospectionOutcome.CONTINUE,
+                reason="Default implementation test",
+            )
+
+    config = get_test_config()
+    agent = TestIntrospectionAgent(config)
+
+    assert agent.config == config
+
+    empty_plan = Plan(
+        plan_context=PlanContext(query="test", tool_ids=[]),
+        steps=[],
+    )
+    empty_plan_run = PlanRun(plan_id=empty_plan.id)
+
+    result = agent.pre_step_introspection(empty_plan, empty_plan_run)
+
+    assert isinstance(result, PreStepIntrospection)
+    assert result.outcome == PreStepIntrospectionOutcome.CONTINUE
+    assert result.reason == "Default implementation test"
+
 def test_pre_step_introspection_continue(
     introspection_agent: DefaultIntrospectionAgent,
     mock_plan: Plan,
@@ -122,7 +158,6 @@ def test_pre_step_introspection_skip(
     mock_plan_run: PlanRun,
 ) -> None:
     """Test pre_step_introspection returns SKIP when condition is false."""
-    # Mock the LLMWrapper response to simulate a SKIP outcome
     mock_response = PreStepIntrospection(
         outcome=PreStepIntrospectionOutcome.SKIP,
         reason="Condition is false.",
@@ -152,7 +187,6 @@ def test_pre_step_introspection_fail(
     mock_plan_run: PlanRun,
 ) -> None:
     """Test pre_step_introspection returns FAIL when missing required data."""
-    # Mock the LLMWrapper response to simulate a FAIL outcome
     mock_response = PreStepIntrospection(
         outcome=PreStepIntrospectionOutcome.FAIL,
         reason="Missing required data.",
@@ -182,7 +216,6 @@ def test_pre_step_introspection_stop(
     mock_plan_run: PlanRun,
 ) -> None:
     """Test pre_step_introspection returns STOP when remaining steps cannot be executed."""
-    # Mock the LLMWrapper response to simulate a STOP outcome
     mock_response = PreStepIntrospection(
         outcome=PreStepIntrospectionOutcome.STOP,
         reason="Remaining steps cannot be executed.",
