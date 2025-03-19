@@ -5,15 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from portia.config import PLANNING_MODEL_KEY
 from portia.execution_context import ExecutionContext, get_execution_context
-from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
 from portia.planning_agents.context import render_prompt_insert_defaults
 
 if TYPE_CHECKING:
-    from portia.config import Config
     from portia.plan import Plan, Step
     from portia.tool import Tool
 
@@ -22,10 +19,6 @@ logger = logging.getLogger(__name__)
 
 class DefaultPlanningAgent(BasePlanningAgent):
     """DefaultPlanningAgent class."""
-
-    def __init__(self, config: Config) -> None:
-        """Init with the config."""
-        self.llm_wrapper = LLMWrapper.for_usage(PLANNING_MODEL_KEY, config)
 
     def generate_steps_or_error(
         self,

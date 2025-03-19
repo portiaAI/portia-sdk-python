@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Self, TypeVar
+from typing import Self, Type, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -23,6 +23,7 @@ from pydantic import (
 )
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
+from portia.planning_agents import BasePlanningAgent
 
 T = TypeVar("T")
 
@@ -172,6 +173,7 @@ class PlanningAgentType(Enum):
     """
 
     DEFAULT = "DEFAULT"
+    CUSTOM = "CUSTOM"
 
 
 class LogLevel(Enum):
@@ -275,7 +277,7 @@ class Config(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -401,7 +403,18 @@ class Config(BaseModel):
     @classmethod
     def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
         """Parse planning_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, PlanningAgentType)
+        planning_agent_type = parse_str_to_enum(value, PlanningAgentType)
+        if planning_agent_type == PlanningAgentType.CUSTOM and not cls.custom_planning_agent:
+            raise InvalidConfigError(
+                "planning_agent_type",
+                "Custom planning agent not set",
+            )
+        return planning_agent_type
+
+    custom_planning_agent: Type[BasePlanningAgent] | None = Field(
+        default=None,
+        description="A custom planning agent to use.",
+    )
 
     @model_validator(mode="after")
     def check_config(self) -> Self:
