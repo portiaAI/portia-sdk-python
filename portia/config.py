@@ -287,7 +287,11 @@ class Config(BaseModel):
         description="The URL for the Portia Cloud Dashboard",
     )
     portia_api_key: SecretStr | None = Field(
-        default_factory=lambda: SecretStr(os.environ["PORTIA_API_KEY"]) if "PORTIA_API_KEY" in os.environ else None,
+        default_factory=lambda: (
+            SecretStr(os.environ["PORTIA_API_KEY"])
+            if "PORTIA_API_KEY" in os.environ
+            else None
+        ),
         description="The API Key for the Portia Cloud API available from the dashboard at https://app.portialabs.ai",
     )
 
