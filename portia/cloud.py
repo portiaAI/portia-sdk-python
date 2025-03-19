@@ -11,14 +11,15 @@ class PortiaCloudClient:
     _client = None
 
     @classmethod
-    def get_client(cls, config: Config, allow_unauthenticated: bool = False) -> httpx.Client:
+    def get_client(cls, config: Config, *, allow_unauthenticated: bool = False) -> httpx.Client:
         """Return the client using a singleton pattern to help manage limits across the SDK."""
         if cls._client is None:
             headers = {
                 "Content-Type": "application/json",
             }
             if config.portia_api_key is not None or allow_unauthenticated is False:
-                headers["Authorization"] = f"Api-Key {config.must_get_api_key('portia_api_key').get_secret_value()}"
+                api_key = config.must_get_api_key("portia_api_key").get_secret_value()
+                headers["Authorization"] = f"Api-Key {api_key}"
             cls._client = httpx.Client(
                 base_url=config.must_get("portia_api_endpoint", str),
                 headers=headers,

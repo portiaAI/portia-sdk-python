@@ -24,8 +24,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from pydantic import SecretStr
-
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -55,7 +53,12 @@ from portia.storage import (
     PortiaCloudStorage,
 )
 from portia.tool import ToolRunContext
-from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry, PortiaToolRegistry, ToolRegistry
+from portia.tool_registry import (
+    DefaultToolRegistry,
+    InMemoryToolRegistry,
+    PortiaToolRegistry,
+    ToolRegistry,
+)
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
@@ -189,8 +192,11 @@ class Portia:
             examples=example_plans,
         )
         if outcome.error:
-            if isinstance(self.tool_registry, DefaultToolRegistry) and not self.config.portia_api_key:
-                self._log_plan_with_portia_cloud_tools(outcome.error, query, example_plans)
+            if (
+                isinstance(self.tool_registry, DefaultToolRegistry)
+                and not self.config.portia_api_key
+            ):
+                self._log_replan_with_portia_cloud_tools(outcome.error, query, example_plans)
             else:
                 logger().error(f"Error in planning - {outcome.error}")
                 raise PlanError(outcome.error)
@@ -695,17 +701,20 @@ class Portia:
             self.config,
             tool,
         )
-    
-    def _log_plan_with_portia_cloud_tools(
+
+    def _log_replan_with_portia_cloud_tools(
         self,
         original_error: str,
         query: str,
         example_plans: list[Plan] | None = None,
     ) -> None:
-        """Generates a plan using Portia cloud tools for users who's plans fail without them."""
-        try:  # This steps is optional and if it fails we don't want to exit with an error
-            tool_registry_with_portia_cloud = self.tool_registry + PortiaToolRegistry.with_default_tool_filter(self.config)
-            tools = tool_registry_with_portia_cloud.match_tools(query)
+        """Generate a plan using Portia cloud tools for users who's plans fail without them."""
+        try: # This steps is optional and if it fails we don't want to exit with an error
+            cloud_registry = (
+                self.tool_registry
+                + PortiaToolRegistry.with_default_tool_filter(self.config)
+            )
+            tools = cloud_registry.match_tools(query)
             planning_agent = self._get_planning_agent()
             replan_outcome = planning_agent.generate_steps_or_error(
                 ctx=get_execution_context(),
@@ -717,10 +726,13 @@ class Portia:
             logger().debug(f"Error generating plan with Portia cloud tools: {e}")
             return
         if not replan_outcome.error:
-            tools_used = ', '.join([step.tool_id for step in replan_outcome.steps])
+            tools_used = ", ".join([str(step.tool_id) for step in replan_outcome.steps])
             logger().error(
                 f"Error in planning - {original_error.rstrip('.')}.\n"
-                f"Replanning with Portia cloud tools would successfully generate a plan using tools: {tools_used}.\n"
-                f"Go to https://app.portialabs.ai to sign up."
+                f"Replanning with Portia cloud tools would successfully generate a plan using "
+                f"tools: {tools_used}.\n"
+                f"Go to https://app.portialabs.ai to sign up.",
             )
-            raise PlanError("PORTIA_API_KEY is required to use Portia cloud tools.") from PlanError(original_error)
+            raise PlanError(
+                "PORTIA_API_KEY is required to use Portia cloud tools.",
+            ) from PlanError(original_error)

@@ -331,6 +331,7 @@ class PortiaToolRegistry(ToolRegistry):
 
     This class interacts with the Portia API to retrieve and manage tools.
     """
+
     EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
         {
             # Exclude Outlook by default as it clashes with Gmail
@@ -356,12 +357,16 @@ class PortiaToolRegistry(ToolRegistry):
         self.tools = tools or self._load_tools()
 
     @classmethod
-    def with_default_tool_filter(cls, config: Config) -> PortiaToolRegistry:
+    def with_default_tool_filter(cls, config: Config) -> ToolRegistry:
         """Create a PortiaToolRegistry with a default tool filter."""
         def default_tool_filter(tool: Tool) -> bool:
             """Filter to get the default set of tools offered by Portia cloud."""
-            return not any(re.match(regex, tool.id) for regex in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
-        return cls(config, tools=None).filter_tools(default_tool_filter)
+            return not any(
+                re.match(regex, tool.id)
+                for regex
+                in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
+            )
+        return PortiaToolRegistry(config).filter_tools(default_tool_filter)
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
