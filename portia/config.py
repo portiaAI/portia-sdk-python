@@ -22,6 +22,7 @@ from pydantic import (
     model_validator,
 )
 
+from portia.logger import logger
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 T = TypeVar("T")
@@ -49,30 +50,15 @@ class LLMProvider(Enum):
         OPENAI: OpenAI provider.
         ANTHROPIC: Anthropic provider.
         MISTRALAI: MistralAI provider.
-
+        AZURE_OPENAI: Azure OpenAI provider.
+        AZURE_AI: Azure AI Services provider.
     """
 
     OPENAI = "OPENAI"
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
     AZURE_OPENAI = "AZURE_OPENAI"
-
-    def associated_models(self) -> list[LLMModel]:
-        """Get the associated models for the provider.
-
-        Returns:
-            list[LLMModel]: List of supported models for the provider.
-
-        """
-        match self:
-            case LLMProvider.OPENAI:
-                return SUPPORTED_OPENAI_MODELS
-            case LLMProvider.ANTHROPIC:
-                return SUPPORTED_ANTHROPIC_MODELS
-            case LLMProvider.MISTRALAI:
-                return SUPPORTED_MISTRALAI_MODELS
-            case LLMProvider.AZURE_OPENAI:
-                return SUPPORTED_AZURE_OPENAI_MODELS
+    AZURE_AI = "AZURE_AI"
 
     def to_api_key_name(self) -> str:
         """Get the name of the API key for the provider."""
@@ -85,6 +71,8 @@ class LLMProvider(Enum):
                 return "mistralai_api_key"
             case LLMProvider.AZURE_OPENAI:
                 return "azure_openai_api_key"
+            case LLMProvider.AZURE_AI:
+                return "azure_ai_api_key"
 
 class LLMProviderModel(NamedTuple):
     api_name: str
@@ -98,6 +86,8 @@ class LLMModel(Enum):
     - Anthropic
     - MistralAI
     - Azure OpenAI
+    - Azure AI Services
+
     Attributes:
         GPT_4_O: GPT-4 model by OpenAI.
         GPT_4_O_MINI: Mini GPT-4 model by OpenAI.
@@ -109,6 +99,8 @@ class LLMModel(Enum):
         MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
         AZURE_GPT_4_O: OpenAI GPT-4 model hosted on Azure OpenAI.
         AZURE_GPT_4_O_MINI: OpenAI Mini GPT-4 model hosted on Azure OpenAI.
+        AZURE_AI_DEEPSEEK_R1: Azure AI Services DeepSeek R1 model.
+        AZURE_AI_GPT_4_0_MINI: Azure AI Services Mini GPT-4 model.
     """
 
     # OpenAI
@@ -129,6 +121,11 @@ class LLMModel(Enum):
     # Azure OpenAI
     AZURE_GPT_4_O = LLMProviderModel("gpt-4o", LLMProvider.AZURE_OPENAI)
     AZURE_GPT_4_O_MINI = LLMProviderModel("gpt-4o-mini", LLMProvider.AZURE_OPENAI)
+
+    # Azure AI
+    AZURE_AI_DEEPSEEK_R1 = LLMProviderModel("DeepSeek-R1", LLMProvider.AZURE_AI)
+    AZURE_AI_DEEPSEEK_V3 = LLMProviderModel("DeepSeek-V3", LLMProvider.AZURE_AI)
+    AZURE_AI_GPT_4_0_MINI = LLMProviderModel("gpt-4o-mini", LLMProvider.AZURE_AI)
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
@@ -173,6 +170,11 @@ SUPPORTED_AZURE_OPENAI_MODELS = [
     LLMModel.AZURE_GPT_4_O_MINI,
 ]
 
+SUPPORTED_AZURE_AI_MODELS = [
+    LLMModel.AZURE_AI_DEEPSEEK_R1,
+    LLMModel.AZURE_AI_GPT_4_0_MINI,
+    LLMModel.AZURE_AI_DEEPSEEK_V3
+]
 
 class ExecutionAgentType(Enum):
     """Enum for types of agents used for executing a step.
@@ -265,6 +267,7 @@ PLANNER_DEFAULT_MODELS = {
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
     LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_O,
+    LLMProvider.AZURE_AI: LLMModel.AZURE_AI_DEEPSEEK_V3,
 }
 
 DEFAULT_MODELS = {
@@ -272,6 +275,7 @@ DEFAULT_MODELS = {
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
     LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_O,
+    LLMProvider.AZURE_AI: LLMModel.AZURE_AI_DEEPSEEK_V3,
 }
 
 
@@ -290,6 +294,8 @@ class Config(BaseModel):
         anthropic_api_key: The API key for Anthropic.
         mistralai_api_key: The API key for MistralAI.
         azure_openai_api_key: The API key for Azure OpenAI.
+        azure_ai_api_key: The API key for Azure AI.
+        azure_ai_api_endpoint: The endpoint for Azure AI.
         llm_provider: The LLM provider.
         models: A dictionary of LLM models for each usage type.
         storage_class: The storage class used (e.g., MEMORY, DISK, CLOUD).
@@ -335,6 +341,10 @@ class Config(BaseModel):
         default_factory=lambda: SecretStr(os.getenv("AZURE_OPENAI_API_KEY") or ""),
         description="The API Key for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
+    azure_ai_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("AZURE_INFERENCE_CREDENTIAL") or ""),
+        description="The API Key for Azure AI. Must be set if llm-provider is AZURE_AI",
+    )   
 
     llm_provider: LLMProvider = Field(
         default=LLMProvider.OPENAI,
@@ -555,6 +565,7 @@ class Config(BaseModel):
             SecretStr: The API key for the given LLM model.
 
         """
+        logger().info(model_name.provider())
         match model_name.provider():
             case LLMProvider.OPENAI:
                 return self.openai_api_key
@@ -564,6 +575,8 @@ class Config(BaseModel):
                 return self.mistralai_api_key
             case LLMProvider.AZURE_OPENAI:
                 return self.azure_openai_api_key
+            case LLMProvider.AZURE_AI:
+                return self.azure_ai_api_key
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003

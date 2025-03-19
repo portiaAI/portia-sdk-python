@@ -26,7 +26,9 @@ from typing import TYPE_CHECKING, TypeVar
 
 import instructor
 from anthropic import Anthropic
+from azure.core.credentials import AzureKeyCredential
 from langchain_anthropic import ChatAnthropic
+from langchain_azure_ai.chat_models import AzureAIChatCompletionsModel
 from langchain_mistralai import ChatMistralAI
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
@@ -147,6 +149,7 @@ class LLMWrapper(BaseLLMWrapper):
     @classmethod
     def for_usage(cls, usage: str, config: Config) -> LLMWrapper:
         """Create an LLMWrapper from a LLMModel."""
+        logger.info(usage)
         model = config.model(usage)
         api_key = config.get_llm_api_key(model)
         return cls(model, api_key)
@@ -195,6 +198,12 @@ class LLMWrapper(BaseLLMWrapper):
                     model=self.model_name.api_name,
                     api_key=self.api_key,
                     max_retries=3,
+                )
+            case LLMProvider.AZURE_AI:
+                return AzureAIChatCompletionsModel(
+                    model_name=self.model_name.api_name,
+                    endpoint=os.environ["AZURE_INFERENCE_ENDPOINT"],
+                    credential=AzureKeyCredential(self.api_key.get_secret_value()),
                 )
 
     def to_instructor(
@@ -263,5 +272,6 @@ class LLMWrapper(BaseLLMWrapper):
                     messages=messages,
                     model=self.model_name.api_name,
                     seed=self.model_seed,
-                
-)
+                )
+            case LLMProvider.AZURE_AI:
+                raise NotImplementedError("Azure AI is not supported with instructor yet")
