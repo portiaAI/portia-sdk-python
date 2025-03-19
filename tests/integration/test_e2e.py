@@ -519,7 +519,7 @@ def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
     portia = Portia(config=config, tools=example_tool_registry)
-    query = "If the weather in London is hotter than 40C, then sum 1 + 2, otherwise sum 3 + 4"
+    query = "If the weather in London is colder than 40C, then sum 3 + 4, otherwise sum 1 + 2"
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE

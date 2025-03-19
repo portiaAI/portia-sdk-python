@@ -301,16 +301,17 @@ class Plan(BaseModel):
     def validate_plan(self) -> Plan:
         """Validate the plan.
 
-        Checks that the plan has at least one step, that all outputs are unique, and that all
-        steps use valid outputs as inputs.
+        Checks that the plan has at least one step, that all outputs + conditions are unique.
 
         Returns:
             Plan: The validated plan.
 
         """
-        outputs = [step.output for step in self.steps]
+        if len(self.steps) == 0:
+            raise ValueError("Plan must have at least one step")
+        outputs = [step.output + (step.condition or "") for step in self.steps]
         if len(outputs) != len(set(outputs)):
-            raise ValueError("Outputs must be unique")
+            raise ValueError("Outputs + conditions must be unique")
         return self
 
 
