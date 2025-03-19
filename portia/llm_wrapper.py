@@ -223,8 +223,10 @@ class LLMWrapper(BaseLLMWrapper):
                 )
             case LLMProvider.ANTHROPIC:
                 client = instructor.from_anthropic(
-                    client=Anthropic(
-                        api_key=self.api_key.get_secret_value(),
+                    client=wrappers.wrap_anthropic(
+                        Anthropic(
+                            api_key=self.api_key.get_secret_value(),
+                        ),
                     ),
                     mode=instructor.Mode.ANTHROPIC_JSON,
                 )
