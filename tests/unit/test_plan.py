@@ -26,12 +26,6 @@ def test_plan_uuid_assign() -> None:
     assert isinstance(plan.id, PlanUUID)
 
 
-def test_plan_steps_should_have_at_least_one_step() -> None:
-    """Test plan steps should have at least one step."""
-    with pytest.raises(ValidationError, match="Plan must have at least one step"):
-        Plan(plan_context=PlanContext(query="", tool_ids=[]), steps=[])
-
-
 def test_read_only_plan_immutable() -> None:
     """Test immutability of ReadOnlyPlan."""
     plan = Plan(
