@@ -331,6 +331,12 @@ class PortiaToolRegistry(ToolRegistry):
 
     This class interacts with the Portia API to retrieve and manage tools.
     """
+    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
+        {
+            # Exclude Outlook by default as it clashes with Gmail
+            "portia:microsoft:outlook:*",
+        },
+    )
 
     def __init__(
         self,
@@ -346,8 +352,16 @@ class PortiaToolRegistry(ToolRegistry):
 
         """
         self.config = config
-        self.client = PortiaCloudClient().get_client(config)
+        self.client = PortiaCloudClient().get_client(config, allow_unauthenticated=True)
         self.tools = tools or self._load_tools()
+
+    @classmethod
+    def with_default_tool_filter(cls, config: Config) -> PortiaToolRegistry:
+        """Create a PortiaToolRegistry with a default tool filter."""
+        def default_tool_filter(tool: Tool) -> bool:
+            """Filter to get the default set of tools offered by Portia cloud."""
+            return not any(re.match(regex, tool.id) for regex in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
+        return cls(config, tools=None).filter_tools(default_tool_filter)
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
@@ -555,14 +569,6 @@ class McpToolRegistry(ToolRegistry):
         return list(self.tools.values())
 
 
-EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
-    {
-        # Exclude Outlook by default as it clashes with Gmail
-        "portia:microsoft:outlook:*",
-    },
-)
-
-
 class DefaultToolRegistry(AggregatedToolRegistry):
     """A registry providing a default set of tools.
 
@@ -589,13 +595,9 @@ class DefaultToolRegistry(AggregatedToolRegistry):
         if os.getenv("OPENWEATHERMAP_API_KEY"):
             in_memory_registry.register_tool(WeatherTool())
 
-        def default_tool_filter(tool: Tool) -> bool:
-            """Filter to get the default set of tools offered by Portia cloud."""
-            return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
-
         registries: list[ToolRegistry] = [in_memory_registry]
         if config.portia_api_key:
-            registries.append(PortiaToolRegistry(config).filter_tools(default_tool_filter))
+            registries.append(PortiaToolRegistry.with_default_tool_filter(config))
 
         super().__init__(registries)
 
