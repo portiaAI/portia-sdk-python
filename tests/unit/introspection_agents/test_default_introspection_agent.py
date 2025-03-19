@@ -135,7 +135,7 @@ def test_base_introspection_agent_abstract_method_raises_error() -> None:
             plan_run: PlanRun,
         ) -> PreStepIntrospection:
             """Call the parent's implementation which should raise NotImplementedError."""
-            return super().pre_step_introspection(plan, plan_run)
+            return super().pre_step_introspection(plan, plan_run)  # type: ignore  # noqa: PGH003
 
     config = get_test_config()
     agent = IncompleteIntrospectionAgent(config)
