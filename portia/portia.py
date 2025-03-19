@@ -590,7 +590,7 @@ class Portia:
         )
         if plan_run.outputs.final_output:
             logger().info(
-                f"Final output: {plan_run.outputs.final_output.value!s}",
+                f"Final output: {plan_run.outputs.final_output.summary!s}",
             )
         return plan_run
 

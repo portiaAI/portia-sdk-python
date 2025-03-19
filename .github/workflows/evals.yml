@@ -9,7 +9,6 @@ on:
     branches:
       - main
     types:
-      - opened
       - synchronize
       - labeled
 
@@ -17,9 +16,17 @@ permissions:
     contents: read
     pull-requests: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   evals:
-    runs-on: ubuntu-latest-16core
+    runs-on: ubuntu-latest
+    # Skip PRs unless they have the 'ready_to_eval' label
+    if: >
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'ready_to_eval')
     steps:
       - name: Checkout portia-sdk-python repo
         uses: actions/checkout@v4
@@ -72,7 +79,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=claude-3-5-sonnet-latest --threshold_file=query_planner/thresholds/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk" --slice_name main)
+          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=claude-3-5-sonnet-latest --threshold_file=query_planner/thresholds/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk" --slice_name main  --max_concurrency 32)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -94,7 +101,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=claude-3-5-sonnet-latest --threshold_file=agents/thresholds/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk")
+          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=claude-3-5-sonnet-latest --threshold_file=agents/thresholds/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then

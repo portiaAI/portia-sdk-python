@@ -172,7 +172,7 @@ class Step(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     task: str = Field(
         description="The task that needs to be completed by this step",
