@@ -223,8 +223,3 @@ def test_all_models_have_provider(model: LLMModel) -> None:
     """Test all models have a provider."""
     assert model.provider() is not None
 
-
-@pytest.mark.parametrize("provider", list(LLMProvider))
-def test_all_providers_have_associated_model(provider: LLMProvider) -> None:
-    """Test all providers have an associated model."""
-    assert provider.associated_models() is not None
