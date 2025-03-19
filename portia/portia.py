@@ -709,22 +709,18 @@ class Portia:
         example_plans: list[Plan] | None = None,
     ) -> None:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
-        try: # This steps is optional and if it fails we don't want to exit with an error
-            cloud_registry = (
-                self.tool_registry
-                + PortiaToolRegistry.with_default_tool_filter(self.config)
-            )
-            tools = cloud_registry.match_tools(query)
-            planning_agent = self._get_planning_agent()
-            replan_outcome = planning_agent.generate_steps_or_error(
-                ctx=get_execution_context(),
-                query=query,
-                tool_list=tools,
-                examples=example_plans,
-            )
-        except Exception as e:  # noqa: BLE001
-            logger().debug(f"Error generating plan with Portia cloud tools: {e}")
-            return
+        cloud_registry = (
+            self.tool_registry
+            + PortiaToolRegistry.with_default_tool_filter(self.config)
+        )
+        tools = cloud_registry.match_tools(query)
+        planning_agent = self._get_planning_agent()
+        replan_outcome = planning_agent.generate_steps_or_error(
+            ctx=get_execution_context(),
+            query=query,
+            tool_list=tools,
+            examples=example_plans,
+        )
         if not replan_outcome.error:
             tools_used = ", ".join([str(step.tool_id) for step in replan_outcome.steps])
             logger().error(
