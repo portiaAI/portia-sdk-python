@@ -10,20 +10,28 @@ Classes:
     AggregatedToolRegistry: A registry that aggregates multiple tool registries.
     InMemoryToolRegistry: A simple in-memory implementation of `ToolRegistry`.
     PortiaToolRegistry: A tool registry that interacts with the Portia API to manage tools.
+    MCPToolRegistry: A tool registry that interacts with a locally running MCP server.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Literal, Union
 
-import httpx
 from pydantic import BaseModel, Field, create_model
 
+from portia.cloud import PortiaCloudClient
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.logger import logger
+from portia.mcp_session import (
+    McpClientConfig,
+    SseMcpClientConfig,
+    StdioMcpClientConfig,
+    get_mcp_session,
+)
 from portia.open_source_tools.calculator_tool import CalculatorTool
 from portia.open_source_tools.image_understanding_tool import ImageUnderstandingTool
 from portia.open_source_tools.llm_tool import LLMTool
@@ -31,10 +39,12 @@ from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
-from portia.tool import PortiaRemoteTool, Tool
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    import mcp
 
     from portia.config import Config
 
@@ -161,7 +171,7 @@ class ToolRegistry(ABC):
         for tool in [*self_tools, *other_tools]:
             if tool.id in tool_ids:
                 logger().warning(
-                    f"Duplicate tool ID found: {tool.id}. Unintended behavior may occur.",
+                    f"Duplicate tool ID found: {tool.id!s}. Unintended behavior may occur.",
                 )
             tool_ids.add(tool.id)
 
@@ -335,64 +345,14 @@ class PortiaToolRegistry(ToolRegistry):
               If not provided, all tools will be loaded from the Portia API.
 
         """
-        self.api_key = config.must_get_api_key("portia_api_key")
         self.config = config
-        self.api_endpoint = config.must_get("portia_api_endpoint", str)
+        self.client = PortiaCloudClient().get_client(config)
         self.tools = tools or self._load_tools()
-
-    def _generate_pydantic_model(self, model_name: str, schema: dict[str, Any]) -> type[BaseModel]:
-        """Generate a Pydantic model based on a JSON schema.
-
-        Args:
-            model_name (str): The name of the Pydantic model.
-            schema (dict[str, Any]): The schema to generate the model from.
-
-        Returns:
-            type[BaseModel]: The generated Pydantic model class.
-
-        """
-        type_mapping = {
-            "string": str,
-            "integer": int,
-            "number": float,
-            "boolean": bool,
-            "array": list,
-            "object": dict,
-        }
-
-        # Extract properties and required fields
-        properties = schema.get("properties", {})
-        required = set(schema.get("required", []))
-
-        # Define fields for the model
-        fields = {
-            key: (
-                type_mapping.get(value.get("type"), Any),
-                Field(
-                    default=None,
-                    description=value.get("description", ""),
-                )
-                if key not in required
-                else Field(
-                    ...,
-                    description=value.get("description", ""),
-                ),
-            )
-            for key, value in properties.items()
-        }
-
-        # Create the Pydantic model dynamically
-        return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
-        response = httpx.get(
-            url=f"{self.api_endpoint}/api/v0/tools/descriptions/",
-            headers={
-                "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
-            },
-            timeout=10,
+        response = self.client.get(
+            url="/api/v0/tools/descriptions/",
         )
         response.raise_for_status()
         tools = {}
@@ -402,7 +362,7 @@ class PortiaToolRegistry(ToolRegistry):
                 name=raw_tool["tool_name"],
                 should_summarize=raw_tool.get("should_summarize", False),
                 description=raw_tool["description"]["overview_description"],
-                args_schema=self._generate_pydantic_model(
+                args_schema=generate_pydantic_model_from_json_schema(
                     raw_tool["tool_name"],
                     raw_tool["schema"],
                 ),
@@ -411,8 +371,7 @@ class PortiaToolRegistry(ToolRegistry):
                     raw_tool["description"]["output_description"],
                 ),
                 # pass API info
-                api_key=self.api_key,
-                api_endpoint=self.api_endpoint,
+                client=self.client,
             )
             tools[raw_tool["tool_id"]] = tool
         return tools
@@ -459,6 +418,143 @@ class PortiaToolRegistry(ToolRegistry):
         )
 
 
+class McpToolRegistry(ToolRegistry):
+    """Provides access to tools within a Model Context Protocol (MCP) server.
+
+    See https://modelcontextprotocol.io/introduction for more information on MCP.
+    """
+
+    def __init__(self, mcp_client_config: McpClientConfig) -> None:
+        """Initialize the MCPToolRegistry with the given configuration."""
+        self.tools = {t.id: t for t in self._load_tools(mcp_client_config)}
+
+    @classmethod
+    def from_sse_connection(
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 5,
+        sse_read_timeout: float = 60 * 5,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using an SSE connection."""
+        return cls(
+            SseMcpClientConfig(
+                server_name=server_name,
+                url=url,
+                headers=headers,
+                timeout=timeout,
+                sse_read_timeout=sse_read_timeout,
+            ),
+        )
+
+    @classmethod
+    def from_stdio_connection(  # noqa: PLR0913
+        cls,
+        server_name: str,
+        command: str,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        encoding: str = "utf-8",
+        encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a stdio connection."""
+        return cls(
+            StdioMcpClientConfig(
+                server_name=server_name,
+                command=command,
+                args=args if args is not None else [],
+                env=env,
+                encoding=encoding,
+                encoding_error_handler=encoding_error_handler,
+            ),
+        )
+
+    def _load_tools(self, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
+        """Get a list of tools from an MCP server wrapped at Portia tools.
+
+        Args:
+            mcp_client_config: The configuration for the MCP client
+
+        Returns:
+            A list of Portia tools
+
+        """
+
+        async def async_inner() -> list[PortiaMcpTool]:
+            async with get_mcp_session(mcp_client_config) as session:
+                logger().debug("Fetching tools from MCP server")
+                tools = await session.list_tools()
+                logger().debug(f"Got {len(tools.tools)} tools from MCP server")
+                return [
+                    self._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools
+                ]
+
+        return asyncio.run(async_inner())
+
+    def _portia_tool_from_mcp_tool(
+        self,
+        mcp_tool: mcp.Tool,
+        mcp_client_config: McpClientConfig,
+    ) -> PortiaMcpTool:
+        """Conversion of a remote MCP server tool to a Portia tool."""
+        tool_name_snake_case = re.sub(r"[^a-zA-Z0-9]+", "_", mcp_tool.name)
+
+        description = (
+            mcp_tool.description
+            if mcp_tool.description is not None
+            else f"{mcp_tool.name} tool from {mcp_client_config.server_name}"
+        )
+
+        return PortiaMcpTool(
+            id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
+            name=mcp_tool.name,
+            description=description,
+            args_schema=generate_pydantic_model_from_json_schema(
+                f"{tool_name_snake_case}_schema",
+                mcp_tool.inputSchema,
+            ),
+            output_schema=("str", "The response from the tool formatted as a JSON string"),
+            mcp_client_config=mcp_client_config,
+        )
+
+    def register_tool(self, tool: Tool) -> None:
+        """Register a new tool.
+
+        Args:
+            tool (Tool): The tool to be registered.
+
+        """
+        raise NotImplementedError("register_tool is not supported for MCPToolRegistry")
+
+    def get_tool(self, tool_id: str) -> Tool:
+        """Retrieve a tool's information.
+
+        Args:
+            tool_id (str): The ID of the tool to retrieve.
+
+        Returns:
+            Tool: The requested tool.
+
+        Raises:
+            ToolNotFoundError: If the tool with the given ID does not exist.
+
+        """
+        tool = self.tools.get(tool_id)
+        if not tool:
+            raise ToolNotFoundError(tool_id)
+        return tool
+
+    def get_tools(self) -> list[Tool]:
+        """Get all tools registered with the registry.
+
+        Returns:
+            list[Tool]: A list of all tools in the registry.
+
+        """
+        return list(self.tools.values())
+
+
 EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
     {
         # Exclude Outlook by default as it clashes with Gmail
@@ -502,3 +598,97 @@ class DefaultToolRegistry(AggregatedToolRegistry):
             registries.append(PortiaToolRegistry(config).filter_tools(default_tool_filter))
 
         super().__init__(registries)
+
+
+def generate_pydantic_model_from_json_schema(
+    model_name: str,
+    json_schema: dict[str, Any],
+) -> type[BaseModel]:
+    """Generate a Pydantic model based on a JSON schema.
+
+    Args:
+        model_name (str): The name of the Pydantic model.
+        json_schema (dict[str, Any]): The schema to generate the model from.
+
+    Returns:
+        type[BaseModel]: The generated Pydantic model class.
+
+    """
+    # Extract properties and required fields
+    properties = json_schema.get("properties", {})
+    required = set(json_schema.get("required", []))
+
+    # Define fields for the model
+    fields = dict(
+        [
+            _generate_field(key, value, required=key in required)
+            for key, value in properties.items()
+        ],
+    )
+
+    # Create the Pydantic model dynamically
+    return create_model(model_name, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
+
+
+def _generate_field(
+    field_name: str,
+    field: dict[str, Any],
+    *,
+    required: bool,
+) -> tuple[str, tuple[type | Any, Any]]:
+    """Generate a Pydantic field from a JSON schema field."""
+    default_from_schema = field.get("default")
+    return (
+        field_name,
+        (
+            _map_pydantic_type(field_name, field),
+            Field(
+                default=... if required else default_from_schema,
+                description=field.get("description", ""),
+            ),
+        ),
+    )
+
+
+def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  # noqa: ANN401
+    match field:
+        case {"type": _}:
+            return _map_single_pydantic_type(field_name, field)
+        case {"oneOf": union_types} | {"anyOf": union_types}:
+            types = [
+                _map_single_pydantic_type(field_name, t, allow_nonetype=True) for t in union_types
+            ]
+            return Union[*types]
+        case _:
+            logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
+            return Any
+
+
+def _map_single_pydantic_type(  # noqa: PLR0911
+    field_name: str,
+    field: dict[str, Any],
+    *,
+    allow_nonetype: bool = False,
+) -> type | Any:  # noqa: ANN401
+    match field.get("type"):
+        case "string":
+            return str
+        case "integer":
+            return int
+        case "number":
+            return float
+        case "boolean":
+            return bool
+        case "array":
+            item_type = _map_pydantic_type(field_name, field.get("items", {}))
+            return list[item_type]
+        case "object":
+            return generate_pydantic_model_from_json_schema(f"{field_name}_model", field)
+        case "null":
+            if allow_nonetype:
+                return None
+            logger().debug(f"Null type is not allowed for a non-union field: {field_name}")
+            return Any
+        case _:
+            logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
+            return Any

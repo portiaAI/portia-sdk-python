@@ -7,6 +7,7 @@ from typing import ClassVar
 from langchain.schema import HumanMessage
 from pydantic import BaseModel, Field
 
+from portia.config import LLM_TOOL_MODEL_KEY
 from portia.llm_wrapper import LLMWrapper
 from portia.tool import Tool, ToolRunContext
 
@@ -56,8 +57,7 @@ class LLMTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, task: str) -> str:
         """Run the LLMTool."""
-        llm_wrapper = LLMWrapper(ctx.config)
-        llm = llm_wrapper.to_langchain()
+        llm = LLMWrapper.for_usage(LLM_TOOL_MODEL_KEY, ctx.config).to_langchain()
 
         # Define system and user messages
         context = (

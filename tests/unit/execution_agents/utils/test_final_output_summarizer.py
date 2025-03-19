@@ -35,7 +35,7 @@ def test_summarizer_agent_execute_sync() -> None:
     mock_llm.invoke.return_value.content = expected_summary
 
     with mock.patch(
-        "portia.execution_agents.utils.final_output_summarizer.LLMWrapper",
+        "portia.execution_agents.utils.final_output_summarizer.LLMWrapper.for_usage",
     ) as mock_wrapper:
         mock_wrapper.return_value.to_langchain.return_value = mock_llm
 
@@ -70,7 +70,7 @@ def test_summarizer_agent_empty_plan_run() -> None:
     mock_llm.invoke.return_value.content = "Empty summary"
 
     with mock.patch(
-        "portia.execution_agents.utils.final_output_summarizer.LLMWrapper",
+        "portia.execution_agents.utils.final_output_summarizer.LLMWrapper.for_usage",
     ) as mock_wrapper:
         mock_wrapper.return_value.to_langchain.return_value = mock_llm
 
@@ -92,7 +92,7 @@ def test_summarizer_agent_handles_none_response() -> None:
     mock_llm.invoke.return_value.content = None
 
     with mock.patch(
-        "portia.execution_agents.utils.final_output_summarizer.LLMWrapper",
+        "portia.execution_agents.utils.final_output_summarizer.LLMWrapper.for_usage",
     ) as mock_wrapper:
         mock_wrapper.return_value.to_langchain.return_value = mock_llm
 

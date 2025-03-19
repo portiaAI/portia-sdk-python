@@ -29,11 +29,11 @@ PROVIDER_MODELS = [
     ),
     (
         LLMProvider.MISTRALAI,
-        LLMModel.MISTRAL_LARGE_LATEST,
+        LLMModel.MISTRAL_LARGE,
     ),
     (
         LLMProvider.ANTHROPIC,
-        LLMModel.CLAUDE_3_OPUS_LATEST,
+        LLMModel.CLAUDE_3_OPUS,
     ),
 ]
 

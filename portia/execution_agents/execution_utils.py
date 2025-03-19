@@ -6,9 +6,9 @@ This module contains utility functions for managing agent execution flow.
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import BaseMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
@@ -74,9 +74,20 @@ def next_state_after_tool_call(
         "ToolSoftError" not in last_message.content
         and tool
         and getattr(tool, "should_summarize", False)
+        and isinstance(last_message, ToolMessage)
+        and not is_clarification(last_message.artifact)
     ):
         return AgentNode.SUMMARIZER
     return END
+
+
+def is_clarification(artifact: Any) -> bool:  # noqa: ANN401
+    """Check if the artifact is a clarification or list of clarifications."""
+    return isinstance(artifact, Clarification) or (
+        isinstance(artifact, list)
+        and len(artifact) > 0
+        and all(isinstance(item, Clarification) for item in artifact)
+    )
 
 
 def tool_call_or_end(
@@ -100,8 +111,8 @@ def tool_call_or_end(
     return END
 
 
-def process_output(
-    last_message: BaseMessage,
+def process_output(  # noqa: C901
+    messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
 ) -> Output:
@@ -111,7 +122,7 @@ def process_output(
     It raises errors if the tool encounters issues and returns the appropriate output.
 
     Args:
-        last_message (BaseMessage): The last message received in the agent's plan_run.
+        messages (list[BaseMessage}): The set of messages received from the agent's plan_run.
         tool (Tool | None): The tool associated with the agent, if any.
         clarifications (list[Clarification] | None): A list of clarifications, if any.
 
@@ -124,24 +135,39 @@ def process_output(
         InvalidAgentOutputError: If the output from the agent is invalid.
 
     """
-    if "ToolSoftError" in last_message.content and tool:
-        raise ToolRetryError(tool.id, str(last_message.content))
-    if "ToolHardError" in last_message.content and tool:
-        raise ToolFailedError(tool.id, str(last_message.content))
-    if clarifications and len(clarifications) > 0:
-        return Output[list[Clarification]](
-            value=clarifications,
-        )
-    if isinstance(last_message, ToolMessage):
-        if last_message.artifact and isinstance(last_message.artifact, Output):
-            tool_output = last_message.artifact
-        elif last_message.artifact:
-            tool_output = Output(value=last_message.artifact)
-        else:
-            tool_output = Output(value=last_message.content)
-        if not tool_output.summary:
-            tool_output.summary = tool_output.serialize_value(tool_output.value)
-        return tool_output
-    if isinstance(last_message, HumanMessage):
-        return Output(value=last_message.content)
-    raise InvalidAgentOutputError(str(last_message.content))
+    output_values: list[Output] = []
+    for message in messages:
+        if "ToolSoftError" in message.content and tool:
+            raise ToolRetryError(tool.id, str(message.content))
+        if "ToolHardError" in message.content and tool:
+            raise ToolFailedError(tool.id, str(message.content))
+        if clarifications and len(clarifications) > 0:
+            return Output[list[Clarification]](
+                value=clarifications,
+            )
+        if isinstance(message, ToolMessage):
+            if message.artifact and isinstance(message.artifact, Output):
+                output_values.append(message.artifact)
+            elif message.artifact:
+                output_values.append(Output(value=message.artifact))
+            else:
+                output_values.append(Output(value=message.content))
+
+    if len(output_values) == 0:
+        raise InvalidAgentOutputError(str([message.content for message in messages]))
+
+    # if there's only one output return just the value
+    if len(output_values) == 1:
+        output = output_values[0]
+        if output.summary is None:
+            output.summary = output.serialize_value(output.value)
+        return output
+
+    values = []
+    summaries = []
+
+    for output in output_values:
+        values.append(output.value)
+        summaries.append(output.summary or output.serialize_value(output.value))
+
+    return Output(value=values, summary=", ".join(summaries))

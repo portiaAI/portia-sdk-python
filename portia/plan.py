@@ -22,9 +22,108 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from portia.prefixed_uuid import PlanUUID
+
+
+class PlanBuilder:
+    """A builder for creating plans.
+
+    This class provides an interface for constructing plans step by step. Requires a step to be
+    added to the plan before building it.
+
+    Example:
+    plan = PlanBuilder() \
+                .step("Step 1", "tool_id_1", "output_1") \
+                .step("Step 2", "tool_id_2", "output_2") \
+                .input("input_1", "value_1") \
+                .build()
+
+    """
+
+    query: str
+    steps: list[Step]
+
+    def __init__(self, query: str | None = None) -> None:
+        """Initialize the builder with the plan query.
+
+        Args:
+            query (str): The original query given by the user.
+
+        """
+        self.query = query if query is not None else ""
+        self.steps = []
+
+    def step(
+        self,
+        task: str,
+        tool_id: str | None = None,
+        output: str | None = None,
+        inputs: list[Variable] | None = None,
+    ) -> PlanBuilder:
+        """Add a step to the plan.
+
+        Args:
+            task (str): The task to be completed by the step.
+            tool_id (str | None): The ID of the tool used in this step, if applicable.
+            output (str | None): The unique output ID for the result of this step.
+            inputs (list[Variable] | None): The inputs to the step
+
+        Returns:
+            PlanBuilder: The builder instance with the new step added.
+
+        """
+        if inputs is None:
+            inputs = []
+        if output is None:
+            output = f"$output_{len(self.steps)}"
+        self.steps.append(Step(task=task, output=output, inputs=inputs, tool_id=tool_id))
+        return self
+
+    def input(
+        self,
+        name: str,
+        value: Any | None = None,  # noqa: ANN401
+        description: str | None = None,
+        step_index: int | None = None,
+    ) -> PlanBuilder:
+        """Add an input variable to the chosen step in the plan (default is the last step).
+
+        Args:
+            name (str): The name of the input.
+            value (Any | None): The value of the input.
+            description (str | None): The description of the input.
+            step_index (int | None): The index of the step to add the input to. If not provided,
+                                    the input will be added to the last step.
+
+        Returns:
+            PlanBuilder: The builder instance with the new input added.
+
+        """
+        if step_index is None:
+            step_index = len(self.steps) - 1
+        if len(self.steps) == 0:
+            raise ValueError("No steps in the plan")
+        if description is None:
+            description = ""
+        self.steps[step_index].inputs.append(
+            Variable(name=name, value=value, description=description),
+        )
+        return self
+
+    def build(self) -> Plan:
+        """Build the plan.
+
+        Returns:
+            Plan: The built plan.
+
+        """
+        tool_ids = list({step.tool_id for step in self.steps if step.tool_id is not None})
+        return Plan(
+            plan_context=PlanContext(query=self.query, tool_ids=tool_ids),
+            steps=self.steps,
+        )
 
 
 class Variable(BaseModel):
@@ -73,7 +172,7 @@ class Step(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     task: str = Field(
         description="The task that needs to be completed by this step",
@@ -147,6 +246,16 @@ class PlanContext(BaseModel):
         description="The list of tools IDs available to the planning agent.",
     )
 
+    @field_serializer("tool_ids")
+    def serialize_tool_ids(self, tool_ids: list[str]) -> list[str]:
+        """Serialize the tool_ids to a sorted list.
+
+        Returns:
+            list[str]: The tool_ids as a sorted list.
+
+        """
+        return sorted(tool_ids)
+
 
 class Plan(BaseModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
@@ -162,7 +271,6 @@ class Plan(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-
     id: PlanUUID = Field(
         default_factory=PlanUUID,
         description="The ID of the plan.",
@@ -182,6 +290,22 @@ class Plan(BaseModel):
             f"plan_context={self.plan_context!r}, "
             f"steps={self.steps!r}"
         )
+
+    @model_validator(mode="after")
+    def validate_plan(self) -> Plan:
+        """Validate the plan.
+
+        Checks that the plan has at least one step, that all outputs are unique, and that all
+        steps use valid outputs as inputs.
+
+        Returns:
+            Plan: The validated plan.
+
+        """
+        outputs = [step.output for step in self.steps]
+        if len(outputs) != len(set(outputs)):
+            raise ValueError("Outputs must be unique")
+        return self
 
 
 class ReadOnlyPlan(Plan):

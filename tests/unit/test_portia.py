@@ -182,7 +182,7 @@ def test_portia_resume(portia: Portia) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = portia.plan(query)
-    plan_run = portia._create_plan_run(plan)  # noqa: SLF001
+    plan_run = portia.create_plan_run(plan)
     plan_run = portia.resume(plan_run)
 
     assert plan_run.state == PlanRunState.COMPLETE
@@ -220,7 +220,7 @@ def test_portia_resume_edge_cases(portia: Portia) -> None:
     LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
 
     plan = portia.plan(query)
-    plan_run = portia._create_plan_run(plan)  # noqa: SLF001
+    plan_run = portia.create_plan_run(plan)
 
     # Simulate run being in progress
     plan_run.state = PlanRunState.IN_PROGRESS
@@ -632,7 +632,7 @@ def test_get_llm_tool() -> None:
 
 
 def test_portia_run_plan(portia: Portia) -> None:
-    """Test that run_plan calls _create_plan_run and resume."""
+    """Test that run_plan calls create_plan_run and resume."""
     query = "example query"
 
     mock_response = StepsOrError(
@@ -643,19 +643,19 @@ def test_portia_run_plan(portia: Portia) -> None:
 
     plan = portia.plan(query)
 
-    # Mock the _create_plan_run and resume methods
+    # Mock the create_plan_run and resume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "create_plan_run") as mockcreate_plan_run,
         mock.patch.object(portia, "resume") as mock_resume,
     ):
         mock_plan_run = MagicMock()
         mock_resumed_plan_run = MagicMock()
-        mock_create_plan_run.return_value = mock_plan_run
+        mockcreate_plan_run.return_value = mock_plan_run
         mock_resume.return_value = mock_resumed_plan_run
 
         result = portia.run_plan(plan)
 
-        mock_create_plan_run.assert_called_once_with(plan)
+        mockcreate_plan_run.assert_called_once_with(plan)
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
@@ -692,7 +692,7 @@ def test_portia_handle_clarification() -> None:
         mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
     ):
         plan = portia.plan("Raise a clarification")
-        plan_run = portia._create_plan_run(plan)  # noqa: SLF001
+        plan_run = portia.create_plan_run(plan)
 
         mock_step_agent.execute_sync.side_effect = [
             Output(

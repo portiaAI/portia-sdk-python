@@ -13,8 +13,7 @@ if TYPE_CHECKING:
 
 from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.llm_wrapper import LLMWrapper
-from tests.utils import get_test_config
+from tests.utils import get_test_llm_wrapper
 
 
 class MockInvoker:
@@ -23,6 +22,8 @@ class MockInvoker:
     called: bool
     prompt: list[BaseMessage]
     response: AIMessage | BaseModel | None
+    output_format: type[BaseModel] | None
+    method: str | None
 
     def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
         """Init worker."""
@@ -30,6 +31,7 @@ class MockInvoker:
         self.prompt = []
         self.response = response
         self.output_format = None
+        self.method = None
 
     def invoke(
         self,
@@ -43,9 +45,14 @@ class MockInvoker:
             return self.response
         return AIMessage(content="invoked")
 
-    def with_structured_output(self, output_format: type[BaseModel]) -> MockInvoker:
+    def with_structured_output(
+        self,
+        output_format: type[BaseModel],
+        method: str = "function_calling",
+    ) -> MockInvoker:
         """Model wrapper for structured output."""
         self.output_format = output_format
+        self.method = method
         return self
 
 
@@ -64,7 +71,7 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
     )
 
     summarizer_model = StepSummarizer(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
@@ -89,7 +96,7 @@ def test_summarizer_model_non_tool_message(monkeypatch: pytest.MonkeyPatch) -> N
     ai_message = AIMessage(content="AI message content")
 
     summarizer_model = StepSummarizer(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
@@ -104,7 +111,7 @@ def test_summarizer_model_no_messages(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     summarizer_model = StepSummarizer(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
+        llm=get_test_llm_wrapper().to_langchain(),
     )
     result = summarizer_model.invoke({"messages": []})
 
@@ -134,9 +141,7 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
         artifact=Output(value="Tool output value"),
     )
 
-    summarizer_model = StepSummarizer(
-        llm=LLMWrapper(get_test_config()).to_langchain(),
-    )
+    summarizer_model = StepSummarizer(llm=get_test_llm_wrapper().to_langchain())
     result = summarizer_model.invoke({"messages": [tool_message]})
 
     # Should return original message without summaries when error occurs

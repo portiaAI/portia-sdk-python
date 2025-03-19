@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain.schema import HumanMessage
+from pydantic import ValidationError
 
 from portia.open_source_tools.image_understanding_tool import (
     ImageUnderstandingTool,
@@ -29,7 +30,7 @@ def mock_image_understanding_tool() -> ImageUnderstandingTool:
 
 @patch("portia.open_source_tools.image_understanding_tool.LLMWrapper")
 @patch.dict(os.environ, {"OPENAI_API_KEY": "123"})
-def test_image_understanding_tool_run(
+def test_image_understanding_tool_run_url(
     mock_llm_wrapper: MagicMock,
     mock_execution_context: MagicMock,
     mock_image_understanding_tool: MagicMock,
@@ -40,7 +41,7 @@ def test_image_understanding_tool_run(
     mock_response = MagicMock()
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
-    mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
+    mock_llm_wrapper.for_usage.return_value.to_langchain.return_value = mock_llm
     mock_execution_context.execution_context = MagicMock()
     mock_execution_context.config = get_test_config()
     mock_execution_context.plan_run_id = uuid.uuid4()
@@ -73,7 +74,7 @@ def test_image_understanding_tool_run(
     assert result == "Test response content"
 
 
-def test_llm_tool_schema_valid_input() -> None:
+def test_image_understanding_tool_schema_valid_input() -> None:
     """Test that the LLMToolSchema correctly validates the input."""
     schema_data = {
         "task": "Solve a math problem in this image",
@@ -85,13 +86,31 @@ def test_llm_tool_schema_valid_input() -> None:
     assert schema.image_url == "https://example.com/image.png"
 
 
-def test_llm_tool_schema_missing_task() -> None:
+def test_image_understanding_tool_schema_missing_task() -> None:
     """Test that LLMToolSchema raises an error if 'task' is missing."""
-    with pytest.raises(ValueError):  # noqa: PT011
-        ImageUnderstandingToolSchema()  # type: ignore  # noqa: PGH003
+    with pytest.raises(ValidationError):
+        ImageUnderstandingToolSchema(image_url="https://example.com/image.png")  # type: ignore  # noqa: PGH003
 
 
-def test_llm_tool_initialization(mock_image_understanding_tool: ImageUnderstandingTool) -> None:
+def test_image_understanding_tool_schema_missing_image_url_and_file() -> None:
+    """Test that LLMToolSchema raises an error if 'image_url' and 'image_file' are missing."""
+    with pytest.raises(ValidationError):
+        ImageUnderstandingToolSchema(task="Solve a math problem in this image")  # type: ignore  # noqa: PGH003
+
+
+def test_image_understanding_tool_schema_both_image_url_and_file() -> None:
+    """Test that LLMToolSchema raises an error if 'image_url' and 'image_file' are provided."""
+    with pytest.raises(ValidationError):
+        ImageUnderstandingToolSchema(
+            task="Solve a math problem in this image",
+            image_url="https://example.com/image.png",
+            image_file="image.png",
+        )  # type: ignore  # noqa: PGH003
+
+
+def test_image_understanding_tool_initialization(
+    mock_image_understanding_tool: ImageUnderstandingTool,
+) -> None:
     """Test that LLMTool is correctly initialized."""
     assert mock_image_understanding_tool.id == "test_tool"
     assert mock_image_understanding_tool.name == "Test Image Understanding Tool"
@@ -99,7 +118,7 @@ def test_llm_tool_initialization(mock_image_understanding_tool: ImageUnderstandi
 
 @patch("portia.open_source_tools.image_understanding_tool.LLMWrapper")
 @patch.dict(os.environ, {"OPENAI_API_KEY": "123"})
-def test_llm_tool_run_with_context(
+def test_image_understanding_tool_run_with_context(
     mock_llm_wrapper: MagicMock,
     mock_execution_context: MagicMock,
     mock_image_understanding_tool: MagicMock,
@@ -110,7 +129,7 @@ def test_llm_tool_run_with_context(
     mock_response = MagicMock()
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
-    mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
+    mock_llm_wrapper.for_usage.return_value.to_langchain.return_value = mock_llm
     mock_execution_context.execution_context = MagicMock()
     mock_execution_context.config = get_test_config()
     mock_execution_context.plan_run_id = uuid.uuid4()

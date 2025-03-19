@@ -11,10 +11,9 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Self, TypeVar
+from typing import Self, TypeVar
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -72,20 +71,15 @@ class LLMProvider(Enum):
             case LLMProvider.MISTRALAI:
                 return SUPPORTED_MISTRALAI_MODELS
 
-    def default_model(self) -> LLMModel:
-        """Get the default model for the provider.
-
-        Returns:
-            LLMModel: The default model for the provider.
-
-        """
+    def to_api_key_name(self) -> str:
+        """Get the name of the API key for the provider."""
         match self:
             case LLMProvider.OPENAI:
-                return LLMModel.GPT_4_O_MINI
+                return "openai_api_key"
             case LLMProvider.ANTHROPIC:
-                return LLMModel.CLAUDE_3_5_SONNET
+                return "anthropic_api_key"
             case LLMProvider.MISTRALAI:
-                return LLMModel.MISTRAL_LARGE_LATEST
+                return "mistralai_api_key"
 
 
 class LLMModel(Enum):
@@ -102,8 +96,9 @@ class LLMModel(Enum):
         GPT_3_5_TURBO: GPT-3.5 Turbo model by OpenAI.
         CLAUDE_3_5_SONNET: Claude 3.5 Sonnet model by Anthropic.
         CLAUDE_3_5_HAIKU: Claude 3.5 Haiku model by Anthropic.
-        CLAUDE_3_OPUS_LATEST: Claude 3.0 Opus latest model by Anthropic.
-        MISTRAL_LARGE_LATEST: Mistral Large Latest model by MistralAI.
+        CLAUDE_3_OPUS: Claude 3.0 Opus model by Anthropic.
+        CLAUDE_3_7_SONNET: Claude 3.7 Sonnet model by Anthropic.
+        MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
 
     """
 
@@ -116,10 +111,11 @@ class LLMModel(Enum):
     # Anthropic
     CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
     CLAUDE_3_5_HAIKU = "claude-3-5-haiku-latest"
-    CLAUDE_3_OPUS_LATEST = "claude-3-opus-latest"
+    CLAUDE_3_OPUS = "claude-3-opus-latest"
+    CLAUDE_3_7_SONNET = "claude-3-7-sonnet-latest"
 
     # MistralAI
-    MISTRAL_LARGE_LATEST = "mistral-large-latest"
+    MISTRAL_LARGE = "mistral-large-latest"
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
@@ -145,11 +141,12 @@ SUPPORTED_OPENAI_MODELS = [
 SUPPORTED_ANTHROPIC_MODELS = [
     LLMModel.CLAUDE_3_5_HAIKU,
     LLMModel.CLAUDE_3_5_SONNET,
-    LLMModel.CLAUDE_3_OPUS_LATEST,
+    LLMModel.CLAUDE_3_7_SONNET,
+    LLMModel.CLAUDE_3_OPUS,
 ]
 
 SUPPORTED_MISTRALAI_MODELS = [
-    LLMModel.MISTRAL_LARGE_LATEST,
+    LLMModel.MISTRAL_LARGE,
 ]
 
 
@@ -196,25 +193,13 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
-def is_greater_than_zero(value: int) -> int:
-    """Ensure the value is greater than zero.
-
-    Args:
-        value (int): The value to validate.
-
-    Raises:
-        ValueError: If the value is less than or equal to zero.
-
-    Returns:
-        int: The validated value.
-
-    """
-    if value < 0:
-        raise ValueError(f"{value} must be greater than zero")
-    return value
-
-
-PositiveNumber = Annotated[int, AfterValidator(is_greater_than_zero)]
+PLANNING_MODEL_KEY = "planning_model_name"
+EXECUTION_MODEL_KEY = "execution_model_name"
+LLM_TOOL_MODEL_KEY = "llm_tool_model_name"
+IMAGE_TOOL_MODEL_KEY = "image_tool_model_name"
+SUMMARISER_MODEL_KEY = "summariser_model_name"
+DEFAULT_MODEL_KEY = "default_model_name"
+PLANNING_DEFAULT_MODEL_KEY = "planning_default_model_name"
 
 
 E = TypeVar("E", bound=Enum)
@@ -251,6 +236,19 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     )
 
 
+PLANNER_DEFAULT_MODELS = {
+    LLMProvider.OPENAI: LLMModel.O_3_MINI,
+    LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
+    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+}
+
+DEFAULT_MODELS = {
+    LLMProvider.OPENAI: LLMModel.GPT_4_O,
+    LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
+    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+}
+
+
 class Config(BaseModel):
     """General configuration for the SDK.
 
@@ -265,15 +263,13 @@ class Config(BaseModel):
         openai_api_key: The API key for OpenAI.
         anthropic_api_key: The API key for Anthropic.
         mistralai_api_key: The API key for MistralAI.
+        llm_provider: The LLM provider.
+        models: A dictionary of LLM models for each usage type.
         storage_class: The storage class used (e.g., MEMORY, DISK, CLOUD).
         storage_dir: The directory for storage, if applicable.
         default_log_level: The default log level (e.g., DEBUG, INFO).
         default_log_sink: The default destination for logs (e.g., sys.stdout).
         json_log_serialize: Whether to serialize logs in JSON format.
-        llm_provider: The LLM provider (e.g., OpenAI, Anthropic).
-        llm_model_name: The model to use for LLM tasks.
-        llm_model_temperature: The temperature for LLM generation.
-        llm_model_seed: The seed for LLM generation.
         planning_agent_type: The planning agent type.
         execution_agent_type: The execution agent type.
 
@@ -286,24 +282,54 @@ class Config(BaseModel):
         default_factory=lambda: os.getenv("PORTIA_API_ENDPOINT") or "https://api.portialabs.ai",
         description="The API endpoint for the Portia Cloud API",
     )
+    portia_dashboard_url: str = Field(
+        default_factory=lambda: os.getenv("PORTIA_DASHBOARD_URL") or "https://app.portialabs.ai",
+        description="The URL for the Portia Cloud Dashboard",
+    )
     portia_api_key: SecretStr | None = Field(
         default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
         description="The API Key for the Portia Cloud API available from the dashboard at https://app.portialabs.ai",
     )
 
     # LLM API Keys
-    openai_api_key: SecretStr | None = Field(
+    openai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""),
         description="The API Key for OpenAI. Must be set if llm-provider is OPENAI",
     )
-    anthropic_api_key: SecretStr | None = Field(
+    anthropic_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("ANTHROPIC_API_KEY") or ""),
         description="The API Key for Anthropic. Must be set if llm-provider is ANTHROPIC",
     )
-    mistralai_api_key: SecretStr | None = Field(
+    mistralai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
         description="The API Key for Mistral AI. Must be set if llm-provider is MISTRALAI",
     )
+
+    llm_provider: LLMProvider = Field(
+        default=LLMProvider.OPENAI,
+        description="Which LLM Provider to use.",
+    )
+
+    models: dict[str, LLMModel] = Field(
+        default={},
+        description="A dictionary of configured LLM models for each usage.",
+    )
+
+    @model_validator(mode="after")
+    def add_default_models(self) -> Self:
+        """Add default models if not provided."""
+        self.models = {
+            PLANNING_DEFAULT_MODEL_KEY: PLANNER_DEFAULT_MODELS[self.llm_provider],
+            DEFAULT_MODEL_KEY: DEFAULT_MODELS[self.llm_provider],
+            **self.models,
+        }
+        return self
+
+    def model(self, usage: str) -> LLMModel:
+        """Get the LLM model for the given usage."""
+        if usage == PLANNING_MODEL_KEY:
+            return self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
+        return self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
 
     # Storage Options
     storage_class: StorageClass = Field(
@@ -353,40 +379,6 @@ class Config(BaseModel):
         default=False,
         description="Whether to serialize logs to JSON",
     )
-
-    # LLM Options
-    llm_provider: LLMProvider = Field(
-        default=LLMProvider.OPENAI,
-        description="Which LLM Provider to use.",
-    )
-
-    @field_validator("llm_provider", mode="before")
-    @classmethod
-    def parse_llm_provider(cls, value: str | LLMProvider) -> LLMProvider:
-        """Parse llm_provider to enum if string provided."""
-        return parse_str_to_enum(value, LLMProvider)
-
-    llm_model_name: LLMModel = Field(
-        default=LLMModel.GPT_4_O_MINI,
-        description="Which LLM Model to use.",
-    )
-
-    @field_validator("llm_model_name", mode="before")
-    @classmethod
-    def parse_llm_model_name(cls, value: str | LLMModel) -> LLMModel:
-        """Parse llm_model_name to enum if string provided."""
-        return parse_str_to_enum(value, LLMModel)
-
-    llm_model_temperature: PositiveNumber = Field(
-        default=0,
-        description="The model temperature to use. A lower number leads to more repeatable results"
-        ", a higher number more creativity.",
-    )
-    llm_model_seed: PositiveNumber = Field(
-        default=443,
-        description="The model seed to use.",
-    )
-
     # Agent Options
     execution_agent_type: ExecutionAgentType = Field(
         default=ExecutionAgentType.DEFAULT,
@@ -416,29 +408,30 @@ class Config(BaseModel):
         """Validate Config is consistent."""
         # Portia API Key must be provided if using cloud storage
         if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
-            raise InvalidConfigError("portia_api_key", "Must be provided if using cloud storage")
+            raise InvalidConfigError(
+                "portia_api_key",
+                "A Portia API key must be provided if using cloud storage. Follow the steps at "
+                "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
+                "have one",
+            )
+        if self.storage_class == StorageClass.DISK and not self.storage_dir:
+            raise InvalidConfigError(
+                "storage_dir",
+                "A storage directory must be provided if using disk storage",
+            )
 
-        def validate_llm_config(expected_key: str, supported_models: list[LLMModel]) -> None:
+        def validate_llm_api_key(provider: LLMProvider) -> None:
             """Validate LLM Config."""
-            if not self.has_api_key(expected_key):
+            if not self.has_api_key(provider.to_api_key_name()):
                 raise InvalidConfigError(
-                    f"{expected_key}",
-                    f"Must be provided if using {self.llm_provider}",
-                )
-            if self.llm_model_name not in supported_models:
-                raise InvalidConfigError(
-                    "llm_model_name",
-                    "Unsupported model please use one of: "
-                    + ", ".join(model.value for model in supported_models),
+                    f"{provider.to_api_key_name()}",
+                    f"Must be provided if using {provider}",
                 )
 
-        match self.llm_provider:
-            case LLMProvider.OPENAI:
-                validate_llm_config("openai_api_key", SUPPORTED_OPENAI_MODELS)
-            case LLMProvider.ANTHROPIC:
-                validate_llm_config("anthropic_api_key", SUPPORTED_ANTHROPIC_MODELS)
-            case LLMProvider.MISTRALAI:
-                validate_llm_config("mistralai_api_key", SUPPORTED_MISTRALAI_MODELS)
+        validate_llm_api_key(self.llm_provider)
+        for model in self.models.values():
+            validate_llm_api_key(model.provider())
+
         return self
 
     @classmethod
@@ -524,6 +517,32 @@ class Config(BaseModel):
                 raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
 
+    def get_llm_api_key(self, model_name: LLMModel) -> SecretStr:
+        """Get the API key for the given LLM model.
+
+        Returns:
+            SecretStr: The API key for the given LLM model.
+
+        """
+        match model_name.provider():
+            case LLMProvider.OPENAI:
+                return self.openai_api_key
+            case LLMProvider.ANTHROPIC:
+                return self.anthropic_api_key
+            case LLMProvider.MISTRALAI:
+                return self.mistralai_api_key
+
+
+def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
+    """Get the default LLM provider from the API keys."""
+    if os.getenv("OPENAI_API_KEY") or kwargs.get("openai_api_key"):
+        return LLMProvider.OPENAI
+    if os.getenv("ANTHROPIC_API_KEY") or kwargs.get("anthropic_api_key"):
+        return LLMProvider.ANTHROPIC
+    if os.getenv("MISTRAL_API_KEY") or kwargs.get("mistralai_api_key"):
+        return LLMProvider.MISTRALAI
+    raise InvalidConfigError(LLMProvider.OPENAI.to_api_key_name(), "No LLM API key found")
+
 
 def default_config(**kwargs) -> Config:  # noqa: ANN003
     """Return default config with values that can be overridden.
@@ -532,15 +551,31 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         Config: The default config
 
     """
+    llm_model_name = kwargs.pop("llm_model_name", None)
+    models = kwargs.pop("models", {})
+    for model_usage in [
+        PLANNING_MODEL_KEY,
+        EXECUTION_MODEL_KEY,
+        LLM_TOOL_MODEL_KEY,
+        IMAGE_TOOL_MODEL_KEY,
+        SUMMARISER_MODEL_KEY,
+    ]:
+        model_name = kwargs.pop(model_usage, llm_model_name)
+        if model_name and model_name not in models:
+            models[model_usage] = parse_str_to_enum(model_name, LLMModel)
+
+    llm_provider = parse_str_to_enum(
+        kwargs.pop("llm_provider", llm_provider_default_from_api_keys(**kwargs)),
+        LLMProvider,
+    )
+
     default_storage_class = (
         StorageClass.CLOUD if os.getenv("PORTIA_API_KEY") else StorageClass.MEMORY
     )
     return Config(
+        llm_provider=llm_provider,
+        models=models,
         storage_class=kwargs.pop("storage_class", default_storage_class),
-        llm_provider=kwargs.pop("llm_provider", LLMProvider.OPENAI),
-        llm_model_name=kwargs.pop("llm_model_name", LLMModel.GPT_4_O_MINI),
-        llm_model_temperature=kwargs.pop("llm_model_temperature", 0),
-        llm_model_seed=kwargs.pop("llm_model_seed", 443),
         planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
         execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.DEFAULT),
         **kwargs,

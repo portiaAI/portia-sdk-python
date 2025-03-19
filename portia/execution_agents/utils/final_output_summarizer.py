@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from portia.config import SUMMARISER_MODEL_KEY
 from portia.llm_wrapper import LLMWrapper
 
 if TYPE_CHECKING:
@@ -71,7 +72,7 @@ class FinalOutputSummarizer:
             str | None: The generated summary or None if generation fails.
 
         """
-        llm = LLMWrapper(self.config).to_langchain()
+        llm = LLMWrapper.for_usage(SUMMARISER_MODEL_KEY, self.config).to_langchain()
         context = self._build_tasks_and_outputs_context(plan, plan_run)
         response = llm.invoke(
             self.SUMMARIZE_TASK + context,

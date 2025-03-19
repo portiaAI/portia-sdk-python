@@ -30,9 +30,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import urlencode
 
-import httpx
 from pydantic import BaseModel, ValidationError
 
+from portia.cloud import PortiaCloudClient
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
@@ -47,6 +47,8 @@ from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
+    import httpx
+
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -209,24 +211,22 @@ class LogAdditionalStorage(AdditionalStorage):
             tool_call (ToolCallRecord): The ToolCallRecord object to log.
 
         """
-        logger().info(
-            "Invoked {tool_name} with args: {tool_input}",
-            tool_name=tool_call.tool_name,
-            tool_input=tool_call.input,
-        )
         logger().debug(
-            f"Tool {tool_call.tool_name} executed in {tool_call.latency_seconds:.2f} seconds",
+            f"Tool {tool_call.tool_name!s} executed in {tool_call.latency_seconds:.2f} seconds",
         )
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
-                logger().info("Tool output: {output}", output=tool_call.output)
+                logger().debug(
+                    f"Tool call {tool_call.tool_name!s} completed",
+                    output=tool_call.output,
+                )
             case ToolCallStatus.FAILED:
-                logger().error("Tool returned error {output}", output=tool_call.output)
+                logger().error("Tool returned error", output=tool_call.output)
             case ToolCallStatus.NEED_CLARIFICATION:
-                logger().info("Tool returned clarifications {output}", output=tool_call.output)
+                logger().debug("Tool returned clarifications", output=tool_call.output)
 
 
-class Storage(PlanStorage, RunStorage, AdditionalStorage):
+class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
     """Combined base class for Plan Run + Additional storages."""
 
 
@@ -314,9 +314,7 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
         if not run_state:
             results = list(self.runs.values())
         else:
-            results = [
-                plan_run for plan_run in self.runs.values() if plan_run.state == run_state
-            ]
+            results = [plan_run for plan_run in self.runs.values() if plan_run.state == run_state]
 
         return PlanRunListResponse(
             results=results,
@@ -479,8 +477,7 @@ class PortiaCloudStorage(Storage):
             config (Config): The configuration containing API details for Portia Cloud.
 
         """
-        self.api_key = config.must_get_api_key("portia_api_key")
-        self.api_endpoint = config.must_get("portia_api_endpoint", str)
+        self.client = PortiaCloudClient().get_client(config)
 
     def check_response(self, response: httpx.Response) -> None:
         """Validate the response from Portia API.
@@ -508,19 +505,14 @@ class PortiaCloudStorage(Storage):
 
         """
         try:
-            response = httpx.post(
-                url=f"{self.api_endpoint}/api/v0/plans/",
+            response = self.client.post(
+                url="/api/v0/plans/",
                 json={
                     "id": str(plan.id),
                     "query": plan.plan_context.query,
                     "tool_ids": plan.plan_context.tool_ids,
                     "steps": [step.model_dump(mode="json") for step in plan.steps],
                 },
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -541,13 +533,8 @@ class PortiaCloudStorage(Storage):
 
         """
         try:
-            response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/plans/{plan_id}/",
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=10,
+            response = self.client.get(
+                url=f"/api/v0/plans/{plan_id}/",
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -574,8 +561,8 @@ class PortiaCloudStorage(Storage):
 
         """
         try:
-            response = httpx.put(
-                url=f"{self.api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+            response = self.client.put(
+                url=f"/api/v0/plan-runs/{plan_run.id}/",
                 json={
                     "current_step_index": plan_run.current_step_index,
                     "state": plan_run.state,
@@ -583,11 +570,6 @@ class PortiaCloudStorage(Storage):
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
                 },
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -608,13 +590,8 @@ class PortiaCloudStorage(Storage):
 
         """
         try:
-            response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/plan-runs/{plan_run_id}/",
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=10,
+            response = self.client.get(
+                url=f"/api/v0/plan-runs/{plan_run_id}/",
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -656,13 +633,8 @@ class PortiaCloudStorage(Storage):
                 query["page"] = page
             if run_state:
                 query["run_state"] = run_state.value
-            response = httpx.get(
-                url=f"{self.api_endpoint}/api/v0/plan-runs/?{urlencode(query)}",
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=10,
+            response = self.client.get(
+                url=f"/api/v0/plan-runs/?{urlencode(query)}",
             )
         except Exception as e:
             raise StorageError(e) from e
@@ -699,8 +671,8 @@ class PortiaCloudStorage(Storage):
 
         """
         try:
-            response = httpx.post(
-                url=f"{self.api_endpoint}/api/v0/tool-calls/",
+            response = self.client.post(
+                url="/api/v0/tool-calls/",
                 json={
                     "plan_run_id": str(tool_call.plan_run_id),
                     "tool_name": tool_call.tool_name,
@@ -712,13 +684,9 @@ class PortiaCloudStorage(Storage):
                     "status": tool_call.status,
                     "latency_seconds": tool_call.latency_seconds,
                 },
-                headers={
-                    "Authorization": f"Api-Key {self.api_key.get_secret_value()}",
-                    "Content-Type": "application/json",
-                },
-                timeout=10,
             )
         except Exception as e:
             raise StorageError(e) from e
         else:
             self.check_response(response)
+            LogAdditionalStorage.save_tool_call(self, tool_call)

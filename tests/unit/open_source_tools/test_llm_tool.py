@@ -37,7 +37,7 @@ def test_llm_tool_plan_run(
     mock_response = MagicMock()
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
-    mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
+    mock_llm_wrapper.for_usage.return_value.to_langchain.return_value = mock_llm
     mock_execution_context.execution_context = MagicMock()
     mock_execution_context.config = get_test_config()
     mock_execution_context.plan_run_id = uuid.uuid4()
@@ -89,7 +89,7 @@ def test_llm_tool_run_with_context(
     mock_response = MagicMock()
     mock_response.content = "Test response content"
     mock_llm.invoke.return_value = mock_response
-    mock_llm_wrapper.return_value.to_langchain.return_value = mock_llm
+    mock_llm_wrapper.for_usage.return_value.to_langchain.return_value = mock_llm
     mock_execution_context.execution_context = MagicMock()
     mock_execution_context.config = get_test_config()
     mock_execution_context.plan_run_id = uuid.uuid4()
