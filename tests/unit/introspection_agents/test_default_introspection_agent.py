@@ -122,6 +122,34 @@ def test_base_introspection_agent_initialization() -> None:
     assert result.outcome == PreStepIntrospectionOutcome.CONTINUE
     assert result.reason == "Default implementation test"
 
+
+def test_base_introspection_agent_abstract_method_raises_error() -> None:
+    """Test that non-implemented pre_step_introspection raises NotImplementedError."""
+    class IncompleteIntrospectionAgent(BaseIntrospectionAgent):
+        """Test implementation that doesn't override the abstract method."""
+
+        # Implement the method but have it call the parent's implementation
+        def pre_step_introspection(
+            self,
+            plan: Plan,
+            plan_run: PlanRun,
+        ) -> PreStepIntrospection:
+            """Call the parent's implementation which should raise NotImplementedError."""
+            return super().pre_step_introspection(plan, plan_run)
+
+    config = get_test_config()
+    agent = IncompleteIntrospectionAgent(config)
+
+    empty_plan = Plan(
+        plan_context=PlanContext(query="test", tool_ids=[]),
+        steps=[],
+    )
+    empty_plan_run = PlanRun(plan_id=empty_plan.id)
+
+    with pytest.raises(NotImplementedError, match="pre_step_introspection is not implemented"):
+        agent.pre_step_introspection(empty_plan, empty_plan_run)
+
+
 def test_pre_step_introspection_continue(
     introspection_agent: DefaultIntrospectionAgent,
     mock_plan: Plan,
