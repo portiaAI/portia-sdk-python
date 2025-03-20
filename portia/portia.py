@@ -370,7 +370,6 @@ class Portia:
         if plan_run is None:
             plan_run = self.storage.get_plan_run(clarification.plan_run_id)
         self._set_plan_run_state(plan_run, PlanRunState.FAILED)
-        self.storage.save_plan_run(plan_run)
         return plan_run
 
     def wait_for_ready(  # noqa: C901
