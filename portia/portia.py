@@ -354,6 +354,7 @@ class Portia:
         logger().debug(
             f"Clarification resolved: {matched_clarification.model_dump_json(indent=4)}",
         )
+        self.storage.save_plan_run(plan_run)
         return plan_run
 
     def error_clarification(
