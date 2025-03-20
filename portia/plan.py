@@ -61,6 +61,7 @@ class PlanBuilder:
         tool_id: str | None = None,
         output: str | None = None,
         inputs: list[Variable] | None = None,
+        condition: str | None = None,
     ) -> PlanBuilder:
         """Add a step to the plan.
 
@@ -69,6 +70,8 @@ class PlanBuilder:
             tool_id (str | None): The ID of the tool used in this step, if applicable.
             output (str | None): The unique output ID for the result of this step.
             inputs (list[Variable] | None): The inputs to the step
+            condition (str | None): A human readable condition which controls if the step should run
+              or not.
 
         Returns:
             PlanBuilder: The builder instance with the new step added.
@@ -78,7 +81,15 @@ class PlanBuilder:
             inputs = []
         if output is None:
             output = f"$output_{len(self.steps)}"
-        self.steps.append(Step(task=task, output=output, inputs=inputs, tool_id=tool_id))
+        self.steps.append(
+            Step(
+                task=task,
+                output=output,
+                inputs=inputs,
+                tool_id=tool_id,
+                condition=condition,
+            ),
+        )
         return self
 
     def input(

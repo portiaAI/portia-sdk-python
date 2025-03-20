@@ -10,15 +10,16 @@ def test_plan_builder_syntax() -> None:
     plan_builder = (
         PlanBuilder("Find the best offers for a flight from London to New York")
         .step(
-            "Search for flights",
-            "flight_search",
+            task="Search for flights",
+            tool_id="flight_search",
         )
         .step(
-            "compare prices",
-            "price_comparison",
+            task="compare prices",
+            tool_id="price_comparison",
+            condition="$flight_search has more than 30 results",
         )
         .input(
-            "$output_0",
+            name="$output_0",
         )
         .build()
     )
@@ -38,6 +39,7 @@ def test_plan_builder_syntax() -> None:
                 output="$output_1",
                 inputs=[Variable(name="$output_0", value=None, description="")],
                 tool_id="price_comparison",
+                condition="$flight_search has more than 30 results",
             ),
         ],
     )
