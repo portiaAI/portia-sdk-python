@@ -8,11 +8,13 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel, SecretStr
 
-from portia.config import EXECUTION_MODEL_KEY, LLMProvider, default_config
+from portia.config import EXECUTION_MODEL_KEY, Config, LLMProvider
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper, T
 from portia.planning_agents.base_planning_agent import StepsOrError
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from langchain_core.language_models.chat_models import BaseChatModel
     from openai.types.chat import ChatCompletionMessageParam
 
@@ -45,24 +47,33 @@ def test_base_classes() -> None:
         wrapper.to_langchain()
 
 
+@pytest.fixture
+def mock_import_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Mock the import check."""
+    monkeypatch.setenv("MISTRAL_API_KEY", "test123")
+    with patch("portia.llm_wrapper.is_library_installed", return_value=False):
+        yield
+
+
+class DummyModel(BaseModel):
+    """Dummy model for testing."""
+
+    name: str
+
+
+@pytest.mark.usefixtures("mock_import_check")
 @pytest.mark.parametrize("provider", [LLMProvider.MISTRALAI])
 def test_error_if_extension_not_installed(
     provider: LLMProvider,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that an error is raised if the extension is not installed."""
-    monkeypatch.setenv("MISTRAL_API_KEY", "test123")
-    lib_check_patch = patch("portia.llm_wrapper.is_library_installed", return_value=False)
+    llm_wrapper = LLMWrapper.for_usage(
+        EXECUTION_MODEL_KEY,
+        Config.from_default(llm_provider=provider),
+    )
 
-    llm_wrapper = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, default_config(llm_provider=provider))
-
-    with lib_check_patch, pytest.raises(ImportError):
+    with pytest.raises(ImportError):
         llm_wrapper.to_langchain()
 
-    class DummyModel(BaseModel):
-        """Dummy model for testing."""
-
-        name: str
-
-    with lib_check_patch, pytest.raises(ImportError):
+    with pytest.raises(ImportError):
         llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
