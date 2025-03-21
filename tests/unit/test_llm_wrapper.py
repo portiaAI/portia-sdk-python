@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel, SecretStr
 
-from portia.config import EXECUTION_MODEL_KEY, Config, LLMModel, LLMProvider
+from portia.config import EXECUTION_MODEL_KEY, Config, LLMProvider
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper, T
 from portia.planning_agents.base_planning_agent import StepsOrError
 
