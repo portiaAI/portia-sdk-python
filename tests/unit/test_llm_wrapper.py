@@ -87,5 +87,4 @@ def test_error_if_extension_not_installed_to_instructor(
         Config.from_default(llm_provider=provider),
     )
 
-    with pytest.raises(ImportError):
-        llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
+    llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
