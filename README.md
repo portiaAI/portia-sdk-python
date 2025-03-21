@@ -30,6 +30,11 @@ python --version
 ```bash
 pip install portia-sdk-python 
 ```
+
+>[!NOTE]
+> OpenAI and Anthropic dependencies are included by default. We also provide the following extras:<br/>
+> * Mistral: `portia-sdk-python[mistral]`
+
 2. Ensure you have an API key set up
 ```bash
 export OPENAI_API_KEY='your-api-key-here'
