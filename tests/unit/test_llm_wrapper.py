@@ -13,7 +13,6 @@ from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper, T
 from portia.planning_agents.base_planning_agent import StepsOrError
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
 
     from langchain_core.language_models.chat_models import BaseChatModel
     from openai.types.chat import ChatCompletionMessageParam
@@ -59,7 +58,6 @@ def test_error_if_extension_not_installed_to_langchain(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that an error is raised in to_langchain if the extension is not installed."""
-
     monkeypatch.setenv("MISTRAL_API_KEY", "test123")
     with patch("importlib.util.find_spec", return_value=None):
         llm_wrapper = LLMWrapper.for_usage(
@@ -77,7 +75,6 @@ def test_error_if_extension_not_installed_to_instructor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that an error is raised in to_instructor if the extension is not installed."""
-
     monkeypatch.setenv("MISTRAL_API_KEY", "test123")
     with patch("importlib.util.find_spec", return_value=None):
         llm_wrapper = LLMWrapper.for_usage(
