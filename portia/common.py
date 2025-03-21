@@ -7,6 +7,7 @@ use in the Portia framework.
 
 from __future__ import annotations
 
+import importlib.util
 from enum import Enum
 from typing import Any, TypeVar
 
@@ -52,3 +53,9 @@ def combine_args_kwargs(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
     """
     args_dict = {f"{i}": arg for i, arg in enumerate(args)}
     return {**args_dict, **kwargs}
+
+
+def is_library_installed(library_name: str) -> bool:
+    """Check if a library is installed without importing it."""
+    spec = importlib.util.find_spec(library_name)
+    return spec is not None

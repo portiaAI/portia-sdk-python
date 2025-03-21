@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 
-from portia.llm_wrapper import BaseLLMWrapper, T
+from portia.config import EXECUTION_MODEL_KEY, LLMProvider, default_config
+from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper, T
 from portia.planning_agents.base_planning_agent import StepsOrError
 
 if TYPE_CHECKING:
@@ -41,3 +43,26 @@ def test_base_classes() -> None:
 
     with pytest.raises(NotImplementedError):
         wrapper.to_langchain()
+
+
+@pytest.mark.parametrize("provider", [LLMProvider.MISTRALAI])
+def test_error_if_extension_not_installed(
+    provider: LLMProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that an error is raised if the extension is not installed."""
+    monkeypatch.setenv("MISTRAL_API_KEY", "test123")
+    lib_check_patch = patch("portia.llm_wrapper.is_library_installed", return_value=False)
+
+    llm_wrapper = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, default_config(llm_provider=provider))
+
+    with lib_check_patch, pytest.raises(ImportError):
+        llm_wrapper.to_langchain()
+
+    class DummyModel(BaseModel):
+        """Dummy model for testing."""
+
+        name: str
+
+    with lib_check_patch, pytest.raises(ImportError):
+        llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
