@@ -9,7 +9,7 @@ and value confirmations.
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Generic, Self, Union
+from typing import Any, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -19,7 +19,7 @@ from pydantic import (
     model_validator,
 )
 
-from portia.common import Serializable, PortiaEnum
+from portia.common import PortiaEnum, Serializable
 from portia.prefixed_uuid import ClarificationUUID, PlanRunUUID
 
 
