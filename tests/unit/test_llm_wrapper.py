@@ -51,7 +51,7 @@ def test_base_classes() -> None:
 def mock_import_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Mock the import check."""
     monkeypatch.setenv("MISTRAL_API_KEY", "test123")
-    with patch("portia.llm_wrapper.is_library_installed", return_value=False):
+    with patch("importlib.util.find_spec", return_value=None):
         yield
 
 

@@ -31,8 +31,7 @@ from langsmith import wrappers
 from openai import OpenAI
 from pydantic import BaseModel, SecretStr
 
-from portia.common import is_library_installed
-from portia.config import Config, LLMModel, LLMProvider
+from portia.config import Config, LLMModel, LLMProvider, validate_extras_dependencies
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import (
@@ -183,11 +182,7 @@ class LLMWrapper(BaseLLMWrapper):
                     api_key=self.api_key,
                 )
             case LLMProvider.MISTRALAI:
-                if not is_library_installed("langchain_mistralai"):
-                    raise ImportError(
-                        "mistralai extension is not installed. Please install "
-                        "portia-sdk-python[mistral] to use MistralAI models.",
-                    )
+                validate_extras_dependencies("mistral")
                 from langchain_mistralai import ChatMistralAI
 
                 return ChatMistralAI(
@@ -243,11 +238,7 @@ class LLMWrapper(BaseLLMWrapper):
                     max_tokens=2048,
                 )
             case LLMProvider.MISTRALAI:
-                if not is_library_installed("mistralai"):
-                    raise ImportError(
-                        "mistralai extension is not installed. Please install "
-                        "portia-sdk-python[mistral] to use MistralAI models.",
-                    )
+                validate_extras_dependencies("mistral")
                 from mistralai import Mistral
 
                 client = instructor.from_mistral(
