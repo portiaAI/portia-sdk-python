@@ -63,7 +63,7 @@ class DummyModel(BaseModel):
 
 @pytest.mark.usefixtures("mock_import_check")
 @pytest.mark.parametrize("provider", [LLMProvider.MISTRALAI])
-def test_error_if_extension_not_installed(
+def test_error_if_extension_not_installed_to_langchain(
     provider: LLMProvider,
 ) -> None:
     """Test that an error is raised if the extension is not installed."""
@@ -74,6 +74,18 @@ def test_error_if_extension_not_installed(
 
     with pytest.raises(ImportError):
         llm_wrapper.to_langchain()
+
+
+@pytest.mark.usefixtures("mock_import_check")
+@pytest.mark.parametrize("provider", [LLMProvider.MISTRALAI])
+def test_error_if_extension_not_installed_to_instructor(
+    provider: LLMProvider,
+) -> None:
+    """Test that an error is raised if the extension is not installed."""
+    llm_wrapper = LLMWrapper.for_usage(
+        EXECUTION_MODEL_KEY,
+        Config.from_default(llm_provider=provider),
+    )
 
     with pytest.raises(ImportError):
         llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
