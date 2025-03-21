@@ -1128,7 +1128,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
     mock_introspection = MagicMock()
     def mock_introspection_outcome(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
         plan_run = kwargs.get("plan_run")
-        if plan_run.current_step_index in (2, 3):  # Skip both step3 and step4
+        if plan_run.current_step_index in (2, 3): # pyright: ignore[reportOptionalMemberAccess] # Skip both step3 and step4
             return PreStepIntrospection(
                 outcome=PreStepIntrospectionOutcome.SKIP,
                 reason="Condition is false",

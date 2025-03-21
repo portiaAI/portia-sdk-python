@@ -145,7 +145,6 @@ def test_build_tasks_and_outputs_context() -> None:
     )
 
 
-
 def test_build_tasks_and_outputs_context_empty() -> None:
     """Test that the tasks and outputs context handles empty steps and outputs."""
     (plan, plan_run) = get_test_plan_run()
@@ -203,12 +202,11 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
     )
 
 
-def test_build_tasks_and_outputs_context_with_special_outcomes() -> None:
-    """Test that the context builder correctly uses summary for special outcomes."""
+def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
+    """Test that the context builder correctly uses summary for conditional outcomes."""
     (plan, plan_run) = get_test_plan_run()
 
-    # Set up test data with special outcomes
-    plan.plan_context.query = "Test query with special outcomes"
+    plan.plan_context.query = "Test query with conditional outcomes"
     plan.steps = [
         Step(
             task="Regular task",
@@ -228,7 +226,6 @@ def test_build_tasks_and_outputs_context_with_special_outcomes() -> None:
         ),
     ]
 
-    # Provide outputs with special values and summaries
     plan_run.outputs.step_outputs = {
         "$regular_output": Output(value="Regular result", summary="Not used"),
         "$failed_output": Output(
@@ -251,9 +248,8 @@ def test_build_tasks_and_outputs_context_with_special_outcomes() -> None:
         plan_run=plan_run,
     )
 
-    # Verify that regular values are used directly, but summaries are used for special outcomes
     assert context == (
-        "Query: Test query with special outcomes\n"
+        "Query: Test query with conditional outcomes\n"
         "----------\n"
         "Task: Regular task\n"
         "Output: Regular result\n"

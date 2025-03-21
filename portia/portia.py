@@ -509,11 +509,6 @@ class Portia:
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
-        # If there are no steps, return the plan run as complete
-        if not plan.steps:
-            self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
-            return plan_run
-
         last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
         introspection_agent = self._get_introspection_agent()
         for index in range(plan_run.current_step_index, len(plan.steps)):
