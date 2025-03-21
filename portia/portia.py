@@ -509,7 +509,12 @@ class Portia:
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
-        last_executed_step_output = None
+        # If there are no steps, return the plan run as complete
+        if not plan.steps:
+            self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
+            return plan_run
+
+        last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
         introspection_agent = self._get_introspection_agent()
         for index in range(plan_run.current_step_index, len(plan.steps)):
             step = plan.steps[index]
@@ -595,6 +600,29 @@ class Portia:
             )
         return plan_run
 
+    def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
+        """Get the output of the last executed step.
+
+        Args:
+            plan (Plan): The plan containing steps.
+            plan_run (PlanRun): The plan run to get the output from.
+
+        Returns:
+            Output | None: The output of the last executed step.
+
+        """
+        return next(
+            (
+                plan_run.outputs.step_outputs[step.output]
+                for i in range(plan_run.current_step_index, -1, -1)
+                if i < len(plan.steps)
+                and (step := plan.steps[i]).output in plan_run.outputs.step_outputs
+                and (step_output := plan_run.outputs.step_outputs[step.output])
+                and step_output.value != PreStepIntrospectionOutcome.SKIP
+            ),
+            None,
+        )
+
     def _handle_introspection_outcome(
         self,
         introspection_agent: BaseIntrospectionAgent,
@@ -639,18 +667,21 @@ class Portia:
             f"Reason: {pre_step_outcome.reason}",
         )
 
+        if pre_step_outcome.outcome != PreStepIntrospectionOutcome.FAIL:
+            logger().debug(*log_message)
+        else:
+            logger().error(*log_message)
+
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
-                logger().debug(*log_message)
                 plan_run.outputs.step_outputs[step.output] = Output(
-                    value="SKIPPED",
+                    value=PreStepIntrospectionOutcome.SKIP,
                     summary=pre_step_outcome.reason,
                 )
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.STOP:
-                logger().debug(*log_message)
                 plan_run.outputs.step_outputs[step.output] = Output(
-                    value="STOPPED",
+                    value=PreStepIntrospectionOutcome.STOP,
                     summary=pre_step_outcome.reason,
                 )
                 if last_executed_step_output:
@@ -662,9 +693,8 @@ class Portia:
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.FAIL:
-                logger().error(*log_message)
                 failed_output = Output(
-                    value="FAILED",
+                    value=PreStepIntrospectionOutcome.FAIL,
                     summary=pre_step_outcome.reason,
                 )
                 plan_run.outputs.step_outputs[step.output] = failed_output

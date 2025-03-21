@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from portia.config import SUMMARISER_MODEL_KEY
+from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
 from portia.llm_wrapper import LLMWrapper
 
 if TYPE_CHECKING:
@@ -56,8 +57,17 @@ class FinalOutputSummarizer:
         outputs = plan_run.outputs.step_outputs
         for step in plan.steps:
             if step.output in outputs:
+                output_value = (
+                    outputs[step.output].summary
+                    if outputs[step.output].value in (
+                        PreStepIntrospectionOutcome.SKIP,
+                        PreStepIntrospectionOutcome.STOP,
+                        PreStepIntrospectionOutcome.FAIL,
+                    )
+                    else outputs[step.output].value
+                )
                 context.append(f"Task: {step.task}")
-                context.append(f"Output: {outputs[step.output].value}")
+                context.append(f"Output: {output_value}")
                 context.append("----------")
         return "\n".join(context)
 

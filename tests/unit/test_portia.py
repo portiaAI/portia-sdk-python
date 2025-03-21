@@ -788,7 +788,10 @@ def test_portia_run_with_introspection_skip(portia: Portia) -> None:
         # Verify result
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step1_result" in plan_run.outputs.step_outputs
-        assert plan_run.outputs.step_outputs["$step1_result"].value == "SKIPPED"
+        assert (
+            plan_run.outputs.step_outputs["$step1_result"].value
+            == PreStepIntrospectionOutcome.SKIP
+        )
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert plan_run.outputs.step_outputs["$step2_result"].value == "Step 2 result"
         assert plan_run.outputs.final_output is not None
@@ -819,7 +822,7 @@ def test_portia_run_with_introspection_stop(portia: Portia) -> None:
 
         if plan_run.current_step_index == 1:
             plan_run.outputs.step_outputs["$step2_result"] = Output(
-                value="STOPPED",
+                value=PreStepIntrospectionOutcome.STOP,
                 summary="Remaining steps cannot be executed",
             )
             plan_run.outputs.final_output = Output(
@@ -846,7 +849,10 @@ def test_portia_run_with_introspection_stop(portia: Portia) -> None:
         # Verify result based on our simulated outcomes
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step2_result" in plan_run.outputs.step_outputs
-        assert plan_run.outputs.step_outputs["$step2_result"].value == "STOPPED"
+        assert (
+            plan_run.outputs.step_outputs["$step2_result"].value
+            == PreStepIntrospectionOutcome.STOP
+        )
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.summary == "Execution stopped early"
 
@@ -874,7 +880,10 @@ def test_portia_run_with_introspection_fail(portia: Portia) -> None:
         # If this is step 1, simulate a FAIL outcome
         if plan_run.current_step_index == 1:
             # Modify the plan_run to look like it failed
-            failed_output = Output(value="FAILED", summary="Missing required data")
+            failed_output = Output(
+                value=PreStepIntrospectionOutcome.FAIL,
+                summary="Missing required data",
+            )
             plan_run.outputs.step_outputs["$step2_result"] = failed_output
             plan_run.outputs.final_output = failed_output
             plan_run.state = PlanRunState.FAILED
@@ -897,9 +906,12 @@ def test_portia_run_with_introspection_fail(portia: Portia) -> None:
         # Verify the expected outcome
         assert plan_run.state == PlanRunState.FAILED
         assert "$step2_result" in plan_run.outputs.step_outputs
-        assert plan_run.outputs.step_outputs["$step2_result"].value == "FAILED"
+        assert (
+            plan_run.outputs.step_outputs["$step2_result"].value
+            == PreStepIntrospectionOutcome.FAIL
+        )
         assert plan_run.outputs.final_output is not None
-        assert plan_run.outputs.final_output.value == "FAILED"
+        assert plan_run.outputs.final_output.value == PreStepIntrospectionOutcome.FAIL
         assert plan_run.outputs.final_output.summary == "Missing required data"
 
 
@@ -941,7 +953,10 @@ def test_handle_introspection_outcome_stop(portia: Portia) -> None:
         assert outcome.reason == "Stopping execution"
 
         # Verify plan_run was updated correctly
-        assert updated_plan_run.outputs.step_outputs["$test_output"].value == "STOPPED"
+        assert (
+            updated_plan_run.outputs.step_outputs["$test_output"].value
+            == PreStepIntrospectionOutcome.STOP
+        )
         assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Stopping execution"
         assert updated_plan_run.outputs.final_output == mock_final_output
         assert updated_plan_run.state == PlanRunState.COMPLETE
@@ -982,10 +997,13 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
     assert outcome.reason == "Execution failed"
 
     # Verify plan_run was updated correctly
-    assert updated_plan_run.outputs.step_outputs["$test_output"].value == "FAILED"
+    assert (
+        updated_plan_run.outputs.step_outputs["$test_output"].value
+        == PreStepIntrospectionOutcome.FAIL
+    )
     assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Execution failed"
     assert updated_plan_run.outputs.final_output is not None
-    assert updated_plan_run.outputs.final_output.value == "FAILED"
+    assert updated_plan_run.outputs.final_output.value == PreStepIntrospectionOutcome.FAIL
     assert updated_plan_run.outputs.final_output.summary is not None
     assert updated_plan_run.outputs.final_output.summary == "Execution failed"
     assert updated_plan_run.state == PlanRunState.FAILED
@@ -1026,7 +1044,10 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     assert outcome.reason == "Skipping step"
 
     # Verify plan_run was updated correctly
-    assert updated_plan_run.outputs.step_outputs["$test_output"].value == "SKIPPED"
+    assert (
+        updated_plan_run.outputs.step_outputs["$test_output"].value
+        == PreStepIntrospectionOutcome.SKIP
+    )
     assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Skipping step"
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS  # State should remain IN_PROGRESS
 
@@ -1068,3 +1089,87 @@ def test_handle_introspection_outcome_no_condition(portia: Portia) -> None:
     assert "$test_output" not in updated_plan_run.outputs.step_outputs
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS
 
+
+def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
+    """Test resuming a plan run with skipped steps and verifying final output.
+
+    This test verifies:
+    1. Resuming from a middle index works correctly
+    2. Steps marked as SKIPPED are properly skipped during execution
+    3. The final output is correctly computed from the last non-SKIPPED step
+    """
+    # Create a plan with multiple steps
+    step1 = Step(task="Step 1", inputs=[], output="$step1_result")
+    step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="true")
+    step3 = Step(task="Step 3", inputs=[], output="$step3_result", condition="false")
+    step4 = Step(task="Step 4", inputs=[], output="$step4_result", condition="false")
+    plan = Plan(
+        plan_context=PlanContext(query="Test query with skips", tool_ids=[]),
+        steps=[step1, step2, step3, step4],
+    )
+
+    # Create a plan run that's partially completed (step1 is done)
+    plan_run = PlanRun(
+        plan_id=plan.id,
+        current_step_index=1,  # Resume from step 2
+        state=PlanRunState.IN_PROGRESS,
+        outputs=PlanRunOutputs(
+            step_outputs={
+                "$step1_result": Output(value="Step 1 result", summary="Summary of step 1"),
+            },
+        ),
+    )
+
+    # Mock the storage to return our plan
+    portia.storage.save_plan(plan)
+    portia.storage.save_plan_run(plan_run)
+
+    # Mock introspection agent to SKIP steps 3 and 4
+    mock_introspection = MagicMock()
+    def mock_introspection_outcome(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
+        plan_run = kwargs.get("plan_run")
+        if plan_run.current_step_index in (2, 3):  # Skip both step3 and step4
+            return PreStepIntrospection(
+                outcome=PreStepIntrospectionOutcome.SKIP,
+                reason="Condition is false",
+            )
+        return PreStepIntrospection(
+            outcome=PreStepIntrospectionOutcome.CONTINUE,
+            reason="Continue execution",
+        )
+    mock_introspection.pre_step_introspection.side_effect = mock_introspection_outcome
+
+    # Mock step agent to return expected output for step 2 only (steps 3 and 4 will be skipped)
+    mock_step_agent = MagicMock()
+    mock_step_agent.execute_sync.return_value = Output(
+        value="Step 2 result",
+        summary="Summary of step 2",
+    )
+
+    # Mock the final output summarizer
+    expected_summary = "Combined summary of steps 1 and 2"
+    mock_summarizer = MagicMock()
+    mock_summarizer.create_summary.return_value = expected_summary
+
+    with mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection), \
+         mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent), \
+         mock.patch("portia.portia.FinalOutputSummarizer", return_value=mock_summarizer):
+
+        result_plan_run = portia.resume(plan_run)
+
+        assert result_plan_run.state == PlanRunState.COMPLETE
+
+        assert result_plan_run.outputs.step_outputs["$step1_result"].value == "Step 1 result"
+        assert result_plan_run.outputs.step_outputs["$step2_result"].value == "Step 2 result"
+        assert (
+            result_plan_run.outputs.step_outputs["$step3_result"].value
+            == PreStepIntrospectionOutcome.SKIP
+        )
+        assert (
+            result_plan_run.outputs.step_outputs["$step4_result"].value
+            == PreStepIntrospectionOutcome.SKIP
+        )
+        assert result_plan_run.outputs.final_output is not None
+        assert result_plan_run.outputs.final_output.value == "Step 2 result"
+        assert result_plan_run.outputs.final_output.summary == expected_summary
+        assert result_plan_run.current_step_index == 3
