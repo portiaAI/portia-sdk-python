@@ -33,6 +33,7 @@ from portia.tool import ToolRunContext
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
     from langchain_core.language_models.chat_models import BaseChatModel
+    from langchain_core.messages import BaseMessage
 
     from portia.config import Config
     from portia.plan import Step
@@ -212,8 +213,8 @@ class ParserModel:
         """
         if not self.agent.tool:
             raise InvalidPlanRunStateError("Parser model has no tool")
-        model = self.llm.with_structured_output(ToolInputs, method="function_calling")
-        message = self.arg_parser_prompt.format_messages(
+
+        formatted_messages = self.arg_parser_prompt.format_messages(
             context=self.context,
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
@@ -225,7 +226,7 @@ class ParserModel:
         errors = []
         tool_inputs: ToolInputs | None = None
         try:
-            response = model.invoke(message)
+            response = invoke_structured_output(self.llm, ToolInputs, formatted_messages)
             tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
             errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
@@ -343,16 +344,14 @@ class VerifierModel:
 
         messages = state["messages"]
         tool_args = messages[-1].content
-        model = self.llm.with_structured_output(VerifiedToolInputs, method="function_calling")
-        response = model.invoke(
-            self.arg_verifier_prompt.format_messages(
-                context=self.context,
-                task=self.agent.step.task,
-                arguments=tool_args,
-                tool_name=self.agent.tool.name,
-                tool_args=self.agent.tool.args_json_schema(),
-            ),
+        formatted_messages = self.arg_verifier_prompt.format_messages(
+            context=self.context,
+            task=self.agent.step.task,
+            arguments=tool_args,
+            tool_name=self.agent.tool.name,
+            tool_args=self.agent.tool.args_json_schema(),
         )
+        response = invoke_structured_output(self.llm, VerifiedToolInputs, formatted_messages)
         response = VerifiedToolInputs.model_validate(response)
 
         # Validate the arguments against the tool's schema
@@ -666,3 +665,39 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             self.tool,
             self.new_clarifications,
         )
+
+
+def invoke_structured_output(
+    model: BaseChatModel,
+    response_model: type[BaseModel],
+    messages: list[BaseMessage],
+) -> dict[Any, Any] | BaseModel:
+    """Invoke a model with structured output.
+
+    Args:
+        model (BaseChatModel): The LangChain model to invoke.
+        response_model (type[T]): The Pydantic model to use as schema for structured output.
+        messages (list[BaseMessage]): The message input to the model.
+
+    Returns:
+        T: The deserialized Pydantic model from the LLM provider.
+
+    """
+    # We match on class name because not all these types are guaranteed to be installed
+    match model.__class__.__name__:
+        case "ChatOpenAI":
+            return model.with_structured_output(
+                response_model,
+                method="function_calling",
+            ).invoke(messages)
+        case "ChatAnthropic":
+            return model.with_structured_output(
+                response_model,
+            ).invoke(messages)
+        case "ChatMistralAI":
+            return model.with_structured_output(
+                response_model,
+                method="function_calling",
+            ).invoke(messages)
+        case _:
+            raise ValueError(f"Unsupported model type: {model.__class__.__name__}")
