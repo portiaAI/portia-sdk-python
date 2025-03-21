@@ -75,4 +75,5 @@ def test_error_if_extension_not_installed(
     with pytest.raises(ImportError):
         llm_wrapper.to_langchain()
 
-    llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
+    with pytest.raises(ImportError):
+        llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
