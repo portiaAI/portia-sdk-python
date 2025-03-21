@@ -662,10 +662,10 @@ class Portia:
             f"Reason: {pre_step_outcome.reason}",
         )
 
-        if pre_step_outcome.outcome != PreStepIntrospectionOutcome.FAIL:
-            logger().debug(*log_message)
-        else:
+        if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
             logger().error(*log_message)
+        else:
+            logger().debug(*log_message)
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
