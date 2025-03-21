@@ -584,9 +584,10 @@ files = [
 name = "eval-type-backport"
 version = "0.2.2"
 description = "Like `typing._eval_type`, but lets older Python versions use newer typing features."
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
     {file = "eval_type_backport-0.2.2-py3-none-any.whl", hash = "sha256:cb6ad7c393517f476f96d456d0412ea80f0a8cf96f6892834cd9340149111b0a"},
     {file = "eval_type_backport-0.2.2.tar.gz", hash = "sha256:f0576b4cf01ebb5bd358d02314d31846af5e07678387486e2c798af0e7d849c1"},
@@ -621,6 +622,7 @@ files = [
     {file = "filelock-3.18.0-py3-none-any.whl", hash = "sha256:c401f4f8377c4464e6db25fff06205fd89bdd83b65eb0488ed1b160f780e21de"},
     {file = "filelock-3.18.0.tar.gz", hash = "sha256:adbc88eabb99d2fec8c9c1b229b171f18afa655400173ddc653d5d01501fb9f2"},
 ]
+markers = {main = "extra == \"mistral\""}
 
 [package.extras]
 docs = ["furo (>=2024.8.6)", "sphinx (>=8.1.3)", "sphinx-autodoc-typehints (>=3)"]
@@ -733,9 +735,10 @@ files = [
 name = "fsspec"
 version = "2025.3.0"
 description = "File-system specification"
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
     {file = "fsspec-2025.3.0-py3-none-any.whl", hash = "sha256:efb87af3efa9103f94ca91a7f8cb7a4df91af9f74fc106c9c7ea0efd7277c1b3"},
     {file = "fsspec-2025.3.0.tar.gz", hash = "sha256:a935fd1ea872591f2b5148907d103488fc523295e6c64b835cfad8c3eca44972"},
@@ -933,9 +936,10 @@ files = [
 name = "huggingface-hub"
 version = "0.29.3"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
-optional = false
+optional = true
 python-versions = ">=3.8.0"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
     {file = "huggingface_hub-0.29.3-py3-none-any.whl", hash = "sha256:0b25710932ac649c08cdbefa6c6ccb8e88eef82927cacdb048efb726429453aa"},
     {file = "huggingface_hub-0.29.3.tar.gz", hash = "sha256:64519a25716e0ba382ba2d3fb3ca082e7c7eb4a2fc634d200e8380006e0760e5"},
@@ -1169,9 +1173,10 @@ jsonpointer = ">=1.9"
 name = "jsonpath-python"
 version = "1.0.6"
 description = "A more powerful JSONPath implementation in modern python"
-optional = false
+optional = true
 python-versions = ">=3.6"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
     {file = "jsonpath-python-1.0.6.tar.gz", hash = "sha256:dd5be4a72d8a2995c3f583cf82bf3cd1a9544cfdabf2d22595b67aff07349666"},
     {file = "jsonpath_python-1.0.6-py3-none-any.whl", hash = "sha256:1e3b78df579f5efc23565293612decee04214609208a2335884b3ee3f786b575"},
@@ -1247,14 +1252,14 @@ pydantic = ">=2.7.4,<3.0.0"
 
 [[package]]
 name = "langchain-core"
-version = "0.3.45"
+version = "0.3.47"
 description = "Building applications with LLMs through composability"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "langchain_core-0.3.45-py3-none-any.whl", hash = "sha256:fe560d644c102c3f5dcfb44eb5295e26d22deab259fdd084f6b1b55a0350b77c"},
-    {file = "langchain_core-0.3.45.tar.gz", hash = "sha256:a39b8446495d1ea97311aa726478c0a13ef1d77cb7644350bad6d9d3c0141a0c"},
+    {file = "langchain_core-0.3.47-py3-none-any.whl", hash = "sha256:ef7c78202e6fd9df79fe8128c828d08a95d3878cf4aec282580baf358a3f2ec5"},
+    {file = "langchain_core-0.3.47.tar.gz", hash = "sha256:975a3daabf8e8d583749b3c553cc412d0527d935dfe820317431b475fa0c585a"},
 ]
 
 [package.dependencies]
@@ -1271,20 +1276,21 @@ typing-extensions = ">=4.7"
 
 [[package]]
 name = "langchain-mistralai"
-version = "0.2.8"
+version = "0.2.9"
 description = "An integration package connecting Mistral and LangChain"
-optional = false
+optional = true
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
-    {file = "langchain_mistralai-0.2.8-py3-none-any.whl", hash = "sha256:2d081b1a22d4588508c737492c62713ece14646d02168ebe06ca1060866a9318"},
-    {file = "langchain_mistralai-0.2.8.tar.gz", hash = "sha256:fbeee35d559999fb28fd831683602706b6ba49a4ee5235d4e292dce01f40a700"},
+    {file = "langchain_mistralai-0.2.9-py3-none-any.whl", hash = "sha256:106a65f1771dc41c2c9a00a305f1d03fcbe16f0d4f640b6c634f35780b711aaf"},
+    {file = "langchain_mistralai-0.2.9.tar.gz", hash = "sha256:ad88a4ded5d53fef781309485da6c6bdf217fadb9dfb41f5c9ad0ea2835d2b74"},
 ]
 
 [package.dependencies]
 httpx = ">=0.25.2,<1"
 httpx-sse = ">=0.3.1,<1"
-langchain-core = ">=0.3.45,<1.0.0"
+langchain-core = ">=0.3.47,<1.0.0"
 pydantic = ">=2,<3"
 tokenizers = ">=0.15.1,<1"
 
@@ -1554,14 +1560,15 @@ files = [
 
 [[package]]
 name = "mistralai"
-version = "1.5.1"
+version = "1.5.2"
 description = "Python Client SDK for the Mistral AI API."
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
-    {file = "mistralai-1.5.1-py3-none-any.whl", hash = "sha256:881f8a1b9a7966d15bd1eb4ed05df09483c261f826c1b9d153ceeca605dc79ac"},
-    {file = "mistralai-1.5.1.tar.gz", hash = "sha256:ce4b8c7aa587521c46dbc45d42e27575f6197c0229f47242e5b331875104707b"},
+    {file = "mistralai-1.5.2-py3-none-any.whl", hash = "sha256:5b1112acebbcad1afd7732ce0bd60614975b64999801c555c54768ac41f506ae"},
+    {file = "mistralai-1.5.2.tar.gz", hash = "sha256:f39e6e51e8939aac2602e4badcb18712cbee2df33d86100c559333e609b92d17"},
 ]
 
 [package.dependencies]
@@ -1755,9 +1762,10 @@ files = [
 name = "mypy-extensions"
 version = "1.0.0"
 description = "Type system extensions for programs checked with the mypy type checker."
-optional = false
+optional = true
 python-versions = ">=3.5"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
     {file = "mypy_extensions-1.0.0-py3-none-any.whl", hash = "sha256:4392f6c0eb8a5668a69e23d168ffa70f0be9ccfd32b5cc2d26a34ae5b844552d"},
     {file = "mypy_extensions-1.0.0.tar.gz", hash = "sha256:75dbf8955dc00442a438fc4d0666508a9a97b6bd41aa2f0ffe9d2f2725af0782"},
@@ -3121,9 +3129,10 @@ blobfile = ["blobfile (>=2)"]
 name = "tokenizers"
 version = "0.21.1"
 description = ""
-optional = false
+optional = true
 python-versions = ">=3.9"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
     {file = "tokenizers-0.21.1-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e78e413e9e668ad790a29456e677d9d3aa50a9ad311a40905d6861ba7692cf41"},
     {file = "tokenizers-0.21.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:cd51cd0a91ecc801633829fcd1fda9cf8682ed3477c6243b9a095539de4aecf3"},
@@ -3206,9 +3215,10 @@ files = [
 name = "typing-inspect"
 version = "0.9.0"
 description = "Runtime inspection utilities for typing module."
-optional = false
+optional = true
 python-versions = "*"
 groups = ["main"]
+markers = "extra == \"mistral\""
 files = [
     {file = "typing_inspect-0.9.0-py3-none-any.whl", hash = "sha256:9ee6fc59062311ef8547596ab6b955e1b8aa46242d854bfc78f4f6b0eff35f9f"},
     {file = "typing_inspect-0.9.0.tar.gz", hash = "sha256:b23fc42ff6f6ef6954e4852c1fb512cdd18dbea03134f91f856a95ccc9461f78"},
@@ -3529,7 +3539,10 @@ cffi = {version = ">=1.11", markers = "platform_python_implementation == \"PyPy\
 [package.extras]
 cffi = ["cffi (>=1.11)"]
 
+[extras]
+mistral = ["langchain-mistralai", "mistralai"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "73975d770aafaec50d1aeb940ad2a62578383a6a4e3cfcef096a678f003fa6c9"
+content-hash = "959326842b6aee8894d86e6595dc54e847189d9b10719639f6bef98d04c634cc"
