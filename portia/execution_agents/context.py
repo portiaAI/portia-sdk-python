@@ -90,9 +90,9 @@ def generate_input_context(
             "indirectly help you.",
         )
         for output_key in unused_output_keys:
-            # We truncate the output value to 1000 characters to avoid overwhelming the
+            # We truncate the output value to 10000 characters to avoid overwhelming the
             # LLM with too much information.
-            output_val = (str(previous_outputs[output_key].value) or "")[:1000]
+            output_val = (str(previous_outputs[output_key].value) or "")[:10000]
             input_context.extend(
                 [
                     f"output_name: {output_key}",

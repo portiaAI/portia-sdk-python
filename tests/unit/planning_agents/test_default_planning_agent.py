@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
@@ -46,13 +47,16 @@ def test_generate_steps_or_error_success(planning_agent: DefaultPlanningAgent) -
         steps=[],
         error=None,
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
-
-    result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
-        query=query,
-        tool_list=[],
-    )
+    with mock.patch.object(
+        LLMWrapper,
+        "to_instructor",
+        new=MagicMock(return_value=mock_response),
+    ):
+        result = planning_agent.generate_steps_or_error(
+            ctx=get_execution_context(),
+            query=query,
+            tool_list=[],
+        )
 
     assert result.steps == []
     assert result.error is None
@@ -88,13 +92,16 @@ def test_generate_steps_or_error_failure(planning_agent: DefaultPlanningAgent) -
         steps=[],
         error="Unable to generate a plan",
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
-
-    result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
-        query=query,
-        tool_list=[],
-    )
+    with mock.patch.object(
+        LLMWrapper,
+        "to_instructor",
+        new=MagicMock(return_value=mock_response),
+    ):
+        result = planning_agent.generate_steps_or_error(
+            ctx=get_execution_context(),
+            query=query,
+            tool_list=[],
+        )
 
     assert result.error == "Unable to generate a plan"
 
@@ -185,13 +192,16 @@ def test_generate_steps_or_error_invalid_tool_id(planning_agent: DefaultPlanning
         ],
         error=None,
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
-
-    result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
-        query=query,
-        tool_list=[AdditionTool()],
-    )
+    with mock.patch.object(
+        LLMWrapper,
+        "to_instructor",
+        new=MagicMock(return_value=mock_response),
+    ):
+        result = planning_agent.generate_steps_or_error(
+            ctx=get_execution_context(),
+            query=query,
+            tool_list=[AdditionTool()],
+        )
 
     assert result.error == "Missing tools no_tool_1, no_tool_2 from the provided tool_list"
     assert result.steps == mock_response.steps
@@ -219,13 +229,16 @@ def test_generate_steps_assigns_llm_tool_id(planning_agent: DefaultPlanningAgent
         ],
         error=None,
     )
-    LLMWrapper.to_instructor = MagicMock(return_value=mock_response)
-
-    result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
-        query=query,
-        tool_list=[AdditionTool()],
-    )
+    with mock.patch.object(
+        LLMWrapper,
+        "to_instructor",
+        new=MagicMock(return_value=mock_response),
+    ):
+        result = planning_agent.generate_steps_or_error(
+            ctx=get_execution_context(),
+            query=query,
+            tool_list=[AdditionTool()],
+        )
 
     assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)
     assert len(result.steps) == 2
