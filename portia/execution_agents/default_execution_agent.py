@@ -676,6 +676,9 @@ def invoke_structured_output(
 ) -> dict[Any, Any] | BaseModel:
     """Invoke a model with structured output.
 
+    This function allows us to dispatch to the structured output method that works with
+    the LLM provider.
+
     Args:
         model (BaseChatModel): The LangChain model to invoke.
         response_model (type[T]): The Pydantic model to use as schema for structured output.
@@ -687,16 +690,7 @@ def invoke_structured_output(
     """
     # We match on class name because not all these types are guaranteed to be installed
     match model.__class__.__name__:
-        case "ChatOpenAI":
-            return model.with_structured_output(
-                response_model,
-                method="function_calling",
-            ).invoke(messages)
-        case "ChatAnthropic":
-            return model.with_structured_output(
-                response_model,
-            ).invoke(messages)
-        case "ChatMistralAI":
+        case "ChatOpenAI" | "ChatAnthropic" | "ChatMistralAI":
             return model.with_structured_output(
                 response_model,
                 method="function_calling",

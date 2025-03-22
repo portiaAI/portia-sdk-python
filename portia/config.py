@@ -116,6 +116,7 @@ class LLMModel(Enum):
         GEMINI_2_0_FLASH: Gemini 2.0 Flash model by Google Generative AI.
         GEMINI_2_0_FLASH_LITE: Gemini 2.0 Flash Lite model by Google Generative AI.
         GEMINI_1_5_FLASH: Gemini 1.5 Flash model by Google Generative AI.
+
     """
 
     # OpenAI
