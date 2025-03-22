@@ -73,6 +73,7 @@ class LLMProvider(Enum):
         ANTHROPIC: Anthropic provider.
         MISTRALAI: MistralAI provider.
         GOOGLE_GENERATIVE_AI: Google Generative AI provider.
+
     """
 
     OPENAI = "OPENAI"
@@ -112,6 +113,7 @@ class LLMModel(Enum):
         CLAUDE_3_7_SONNET: Claude 3.7 Sonnet model by Anthropic.
         MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
         GEMINI_2_0_FLASH: Gemini 2.0 Flash model by Google Generative AI.
+
     """
 
     # OpenAI
@@ -329,7 +331,8 @@ class Config(BaseModel):
     )
     google_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("GOOGLE_API_KEY") or ""),
-        description="The API Key for Google Generative AI. Must be set if llm-provider is GOOGLE_GENERATIVE_AI",
+        description="The API Key for Google Generative AI. Must be set if llm-provider is "
+        "GOOGLE_GENERATIVE_AI",
     )
 
     llm_provider: LLMProvider = Field(

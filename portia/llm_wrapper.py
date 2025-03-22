@@ -25,9 +25,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 import instructor
 from anthropic import Anthropic
-import google.generativeai as genai
 from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langsmith import wrappers
 from openai import OpenAI
@@ -193,9 +191,12 @@ class LLMWrapper(BaseLLMWrapper):
                     max_retries=3,
                 )
             case LLMProvider.GOOGLE_GENERATIVE_AI:
+                validate_extras_dependencies("google")
+                from langchain_google_genai import ChatGoogleGenerativeAI
+
                 return ChatGoogleGenerativeAI(
                     model=self.model_name.value,
-                    google_api_key=self.api_key,
+                    api_key=self.api_key,
                     max_retries=3,
                 )
 
@@ -260,14 +261,17 @@ class LLMWrapper(BaseLLMWrapper):
                     messages=messages,
                 )
             case LLMProvider.GOOGLE_GENERATIVE_AI:
-                genai.configure(api_key=self.api_key.get_secret_value())
+                validate_extras_dependencies("google")
+                import google.generativeai as genai
+
+                genai.configure(api_key=self.api_key.get_secret_value()) # pyright: ignore[reportPrivateImportUsage]
                 client = instructor.from_gemini(
-                    client=genai.GenerativeModel(
+                    client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
                         model_name=self.model_name.value,
                     ),
                     mode=instructor.Mode.GEMINI_JSON,
                 )
-                return client.messages.create(
+                return client.messages.create(  # pyright: ignore[reportReturnType]
                     messages=messages,
                     response_model=response_model,
                 )

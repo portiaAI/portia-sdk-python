@@ -6,8 +6,9 @@ in completing tasks.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
+import instructor
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
@@ -15,7 +16,7 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from portia.clarification import Clarification, InputClarification
-from portia.config import EXECUTION_MODEL_KEY
+from portia.config import EXECUTION_MODEL_KEY, validate_extras_dependencies
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
 from portia.execution_agents.execution_utils import (
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from langchain.tools import StructuredTool
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import BaseMessage
+    from openai.types.chat import ChatCompletionMessageParam
 
     from portia.config import Config
     from portia.plan import Step
@@ -699,5 +701,51 @@ def invoke_structured_output(
                 response_model,
                 method="function_calling",
             ).invoke(messages)
+        case "ChatGoogleGenerativeAI":
+            validate_extras_dependencies("google")
+            import google.generativeai as genai
+            from langchain_google_genai import ChatGoogleGenerativeAI
+
+            google_model = cast(ChatGoogleGenerativeAI, model)
+            api_key = (
+                google_model.google_api_key.get_secret_value()
+                if google_model.google_api_key
+                else None
+            )
+            genai.configure(api_key=api_key)  # pyright: ignore[reportPrivateImportUsage]
+            client = instructor.from_gemini(
+                client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
+                    model_name=google_model.model,
+                ),
+                mode=instructor.Mode.GEMINI_JSON,
+            )
+            return client.messages.create(  # pyright: ignore[reportReturnType]
+                messages=_map_message_types_for_instructor(messages),
+                response_model=response_model,
+            )
         case _:
             raise ValueError(f"Unsupported model type: {model.__class__.__name__}")
+
+def _map_message_types_for_instructor(
+    messages: list[BaseMessage],
+) -> list[ChatCompletionMessageParam]:
+    """Map the message types to the correct format for the LLM provider.
+
+    Args:
+        messages (list[BaseMessage]): Input Langchain messages
+
+    Returns:
+        list[dict]: The mapped messages.
+
+    """
+    def _map_message(message: BaseMessage) -> ChatCompletionMessageParam:
+        match message.type:
+            case "human":
+                return {"role": "user", "content": message.text()}
+            case "system":
+                return {"role": "system", "content": message.text()}
+            case _:
+                raise ValueError(f"Unsupported message type: {message.type}")
+
+    return [_map_message(message) for message in messages]
+

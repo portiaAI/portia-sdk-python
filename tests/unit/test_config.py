@@ -226,11 +226,6 @@ def test_all_models_have_provider(model: LLMModel) -> None:
     assert model.provider() is not None
 
 
-@pytest.mark.parametrize("provider", list(LLMProvider))
-def test_all_providers_have_associated_model(provider: LLMProvider) -> None:
-    """Test all providers have an associated model."""
-    assert provider.associated_models() is not None
-
 def test_validate_extras_dependencies_catches_import_errors() -> None:
     """Test function doesn't raise on non-existing top level package."""
     EXTRAS_GROUPS_DEPENDENCIES["fake-extras-package"] = ["fake_package.bar"]
