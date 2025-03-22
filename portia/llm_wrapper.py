@@ -25,7 +25,9 @@ from typing import TYPE_CHECKING, TypeVar
 
 import instructor
 from anthropic import Anthropic
+import google.generativeai as genai
 from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langsmith import wrappers
 from openai import OpenAI
@@ -190,6 +192,12 @@ class LLMWrapper(BaseLLMWrapper):
                     api_key=self.api_key,
                     max_retries=3,
                 )
+            case LLMProvider.GOOGLE_GENERATIVE_AI:
+                return ChatGoogleGenerativeAI(
+                    model=self.model_name.value,
+                    google_api_key=self.api_key,
+                    max_retries=3,
+                )
 
     def to_instructor(
         self,
@@ -250,4 +258,16 @@ class LLMWrapper(BaseLLMWrapper):
                     model=self.model_name.value,
                     response_model=response_model,
                     messages=messages,
+                )
+            case LLMProvider.GOOGLE_GENERATIVE_AI:
+                genai.configure(api_key=self.api_key.get_secret_value())
+                client = instructor.from_gemini(
+                    client=genai.GenerativeModel(
+                        model_name=self.model_name.value,
+                    ),
+                    mode=instructor.Mode.GEMINI_JSON,
+                )
+                return client.messages.create(
+                    messages=messages,
+                    response_model=response_model,
                 )

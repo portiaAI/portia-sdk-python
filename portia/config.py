@@ -72,27 +72,13 @@ class LLMProvider(Enum):
         OPENAI: OpenAI provider.
         ANTHROPIC: Anthropic provider.
         MISTRALAI: MistralAI provider.
-
+        GOOGLE_GENERATIVE_AI: Google Generative AI provider.
     """
 
     OPENAI = "OPENAI"
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
-
-    def associated_models(self) -> list[LLMModel]:
-        """Get the associated models for the provider.
-
-        Returns:
-            list[LLMModel]: List of supported models for the provider.
-
-        """
-        match self:
-            case LLMProvider.OPENAI:
-                return SUPPORTED_OPENAI_MODELS
-            case LLMProvider.ANTHROPIC:
-                return SUPPORTED_ANTHROPIC_MODELS
-            case LLMProvider.MISTRALAI:
-                return SUPPORTED_MISTRALAI_MODELS
+    GOOGLE_GENERATIVE_AI = "GOOGLE_GENERATIVE_AI"
 
     def to_api_key_name(self) -> str:
         """Get the name of the API key for the provider."""
@@ -103,6 +89,8 @@ class LLMProvider(Enum):
                 return "anthropic_api_key"
             case LLMProvider.MISTRALAI:
                 return "mistralai_api_key"
+            case LLMProvider.GOOGLE_GENERATIVE_AI:
+                return "google_api_key"
 
 
 class LLMModel(Enum):
@@ -112,6 +100,7 @@ class LLMModel(Enum):
     - OpenAI
     - Anthropic
     - MistralAI
+    - Google Generative AI
 
     Attributes:
         GPT_4_O: GPT-4 model by OpenAI.
@@ -122,7 +111,7 @@ class LLMModel(Enum):
         CLAUDE_3_OPUS: Claude 3.0 Opus model by Anthropic.
         CLAUDE_3_7_SONNET: Claude 3.7 Sonnet model by Anthropic.
         MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
-
+        GEMINI_2_0_FLASH: Gemini 2.0 Flash model by Google Generative AI.
     """
 
     # OpenAI
@@ -140,6 +129,9 @@ class LLMModel(Enum):
     # MistralAI
     MISTRAL_LARGE = "mistral-large-latest"
 
+    # Google Generative AI
+    GEMINI_2_0_FLASH = "gemini-2.0-flash"
+
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
 
@@ -151,6 +143,8 @@ class LLMModel(Enum):
             return LLMProvider.ANTHROPIC
         if self in SUPPORTED_MISTRALAI_MODELS:
             return LLMProvider.MISTRALAI
+        if self in SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS:
+            return LLMProvider.GOOGLE_GENERATIVE_AI
         return LLMProvider.OPENAI
 
 
@@ -172,6 +166,9 @@ SUPPORTED_MISTRALAI_MODELS = [
     LLMModel.MISTRAL_LARGE,
 ]
 
+SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = [
+    LLMModel.GEMINI_2_0_FLASH,
+]
 
 class ExecutionAgentType(Enum):
     """Enum for types of agents used for executing a step.
@@ -264,12 +261,14 @@ PLANNER_DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.O_3_MINI,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+    LLMProvider.GOOGLE_GENERATIVE_AI: LLMModel.GEMINI_2_0_FLASH,
 }
 
 DEFAULT_MODELS = {
     LLMProvider.OPENAI: LLMModel.GPT_4_O,
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
+    LLMProvider.GOOGLE_GENERATIVE_AI: LLMModel.GEMINI_2_0_FLASH,
 }
 
 
@@ -327,6 +326,10 @@ class Config(BaseModel):
     mistralai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
         description="The API Key for Mistral AI. Must be set if llm-provider is MISTRALAI",
+    )
+    google_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("GOOGLE_API_KEY") or ""),
+        description="The API Key for Google Generative AI. Must be set if llm-provider is GOOGLE_GENERATIVE_AI",
     )
 
     llm_provider: LLMProvider = Field(
@@ -555,6 +558,8 @@ class Config(BaseModel):
                 return self.anthropic_api_key
             case LLMProvider.MISTRALAI:
                 return self.mistralai_api_key
+            case LLMProvider.GOOGLE_GENERATIVE_AI:
+                return self.google_api_key
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
@@ -565,6 +570,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
         return LLMProvider.ANTHROPIC
     if os.getenv("MISTRAL_API_KEY") or kwargs.get("mistralai_api_key"):
         return LLMProvider.MISTRALAI
+    if os.getenv("GOOGLE_API_KEY") or kwargs.get("google_api_key"):
+        return LLMProvider.GOOGLE_GENERATIVE_AI
     raise InvalidConfigError(LLMProvider.OPENAI.to_api_key_name(), "No LLM API key found")
 
 

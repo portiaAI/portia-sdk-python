@@ -81,7 +81,7 @@ class Formatter:
             max_lines (int): The maximum number of lines the logger can handle, default is 30.
 
         """
-        self.max_lines = 30
+        self.max_lines = 100
 
     def format(self, record: Any) -> str:  # noqa: ANN401
         """Format a log record into a string with specific formatting.
