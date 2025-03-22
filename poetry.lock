@@ -3624,9 +3624,9 @@ cffi = {version = ">=1.11", markers = "platform_python_implementation == \"PyPy\
 cffi = ["cffi (>=1.11)"]
 
 [extras]
-tools-browser = ["browser-use", "playwright"]
+tools-browser-local = ["browser-use", "playwright"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<4.0"
-content-hash = "beb22d1d119f5dfe356ff9fc43187c375cd175e5618f16965164f66e9e959b31"
+content-hash = "b2ad73357a9240a85b16d892df39834764cdeed157000a12b405effb4aad125a"
