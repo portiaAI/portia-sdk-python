@@ -114,7 +114,8 @@ class LLMModel(Enum):
         CLAUDE_3_7_SONNET: Claude 3.7 Sonnet model by Anthropic.
         MISTRAL_LARGE: Mistral Large Latest model by MistralAI.
         GEMINI_2_0_FLASH: Gemini 2.0 Flash model by Google Generative AI.
-
+        GEMINI_2_0_FLASH_LITE: Gemini 2.0 Flash Lite model by Google Generative AI.
+        GEMINI_1_5_FLASH: Gemini 1.5 Flash model by Google Generative AI.
     """
 
     # OpenAI
@@ -134,6 +135,8 @@ class LLMModel(Enum):
 
     # Google Generative AI
     GEMINI_2_0_FLASH = "gemini-2.0-flash"
+    GEMINI_2_0_FLASH_LITE = "gemini-2.0-flash-lite"
+    GEMINI_1_5_FLASH = "gemini-1.5-flash"
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
@@ -171,6 +174,8 @@ SUPPORTED_MISTRALAI_MODELS = [
 
 SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = [
     LLMModel.GEMINI_2_0_FLASH,
+    LLMModel.GEMINI_2_0_FLASH_LITE,
+    LLMModel.GEMINI_1_5_FLASH,
 ]
 
 class ExecutionAgentType(Enum):
