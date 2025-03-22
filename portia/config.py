@@ -45,6 +45,7 @@ class StorageClass(Enum):
 
 EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
+    "google": ["google.generativeai", "langchain_google_genai"],
 }
 
 def validate_extras_dependencies(extra_group: str) -> None:
