@@ -698,9 +698,10 @@ def invoke_structured_output(
         case "ChatGoogleGenerativeAI":
             validate_extras_dependencies("google")
             import google.generativeai as genai
-            from langchain_google_genai import ChatGoogleGenerativeAI
+            if TYPE_CHECKING:
+                from langchain_google_genai import ChatGoogleGenerativeAI
 
-            google_model = cast(ChatGoogleGenerativeAI, model)
+            google_model = cast("ChatGoogleGenerativeAI", model)
             api_key = (
                 google_model.google_api_key.get_secret_value()
                 if google_model.google_api_key
