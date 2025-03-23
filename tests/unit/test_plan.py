@@ -21,7 +21,7 @@ def test_plan_uuid_assign() -> None:
     """Test plan assign correct UUIDs."""
     plan = Plan(
         plan_context=PlanContext(query="", tool_ids=[]),
-        steps=[],
+        steps=[Step(task="test task", output="$output")],
     )
     assert isinstance(plan.id, PlanUUID)
 
@@ -91,7 +91,7 @@ def test_read_only_plan_serialization() -> None:
 
 def test_plan_outputs_must_be_unique() -> None:
     """Test that plan outputs must be unique."""
-    with pytest.raises(ValidationError, match="Outputs must be unique"):
+    with pytest.raises(ValidationError, match="Outputs \\+ conditions must be unique"):
         Plan(
             plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
             steps=[
@@ -99,3 +99,22 @@ def test_plan_outputs_must_be_unique() -> None:
                 Step(task="test task", output="$output"),
             ],
         )
+
+def test_plan_outputs_and_conditions_must_be_unique() -> None:
+    """Test that plan outputs and conditions must be unique."""
+    with pytest.raises(ValidationError, match="Outputs \\+ conditions must be unique"):
+        Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[
+                Step(task="test task", output="$output", condition="x > 10"),
+                Step(task="test task", output="$output", condition="x > 10"),
+            ],
+        )
+    # should not fail if conditions are different
+    Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[
+            Step(task="test task", output="$output", condition="x > 10"),
+            Step(task="test task", output="$output", condition="x < 10"),
+        ],
+    )

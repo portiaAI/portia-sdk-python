@@ -26,14 +26,12 @@ from typing import TYPE_CHECKING, TypeVar
 import instructor
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
-from langchain_mistralai import ChatMistralAI
 from langchain_openai import ChatOpenAI
 from langsmith import wrappers
-from mistralai import Mistral
 from openai import OpenAI
 from pydantic import BaseModel, SecretStr
 
-from portia.config import Config, LLMModel, LLMProvider
+from portia.config import Config, LLMModel, LLMProvider, validate_extras_dependencies
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import (
@@ -184,6 +182,9 @@ class LLMWrapper(BaseLLMWrapper):
                     api_key=self.api_key,
                 )
             case LLMProvider.MISTRALAI:
+                validate_extras_dependencies("mistral")
+                from langchain_mistralai import ChatMistralAI
+
                 return ChatMistralAI(
                     model_name=self.model_name.value,
                     api_key=self.api_key,
@@ -223,8 +224,10 @@ class LLMWrapper(BaseLLMWrapper):
                 )
             case LLMProvider.ANTHROPIC:
                 client = instructor.from_anthropic(
-                    client=Anthropic(
-                        api_key=self.api_key.get_secret_value(),
+                    client=wrappers.wrap_anthropic(
+                        Anthropic(
+                            api_key=self.api_key.get_secret_value(),
+                        ),
                     ),
                     mode=instructor.Mode.ANTHROPIC_JSON,
                 )
@@ -235,6 +238,9 @@ class LLMWrapper(BaseLLMWrapper):
                     max_tokens=2048,
                 )
             case LLMProvider.MISTRALAI:
+                validate_extras_dependencies("mistral")
+                from mistralai import Mistral
+
                 client = instructor.from_mistral(
                     client=Mistral(
                         api_key=self.api_key.get_secret_value(),

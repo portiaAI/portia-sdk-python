@@ -1,0 +1,21 @@
+name: Ready to eval Labeller
+
+on:
+  pull_request:
+    types: [review_requested]
+
+jobs:
+  add-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add 'ready_to_eval' label
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.EVALS_LABELLER_GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['ready_to_eval']
+            })

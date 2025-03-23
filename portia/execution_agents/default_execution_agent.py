@@ -212,7 +212,7 @@ class ParserModel:
         """
         if not self.agent.tool:
             raise InvalidPlanRunStateError("Parser model has no tool")
-        model = self.llm.with_structured_output(ToolInputs)
+        model = self.llm.with_structured_output(ToolInputs, method="function_calling")
         message = self.arg_parser_prompt.format_messages(
             context=self.context,
             task=self.agent.step.task,
@@ -343,7 +343,7 @@ class VerifierModel:
 
         messages = state["messages"]
         tool_args = messages[-1].content
-        model = self.llm.with_structured_output(VerifiedToolInputs)
+        model = self.llm.with_structured_output(VerifiedToolInputs, method="function_calling")
         response = model.invoke(
             self.arg_verifier_prompt.format_messages(
                 context=self.context,

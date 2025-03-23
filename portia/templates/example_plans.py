@@ -141,6 +141,56 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     ),
     Plan(
         plan_context=PlanContext(
+            query="If the weather in London hotter than 10C, sum it with the weather in Cairo and "
+            "send the result to hello@portialabs.ai",
+            tool_ids=[
+                "weather_tool",
+                "portia::google_gmail::send_email_tool",
+                "portia::provider::other_tool",
+            ],
+        ),
+        steps=[
+            Step(
+                task="Get the weather for London",
+                tool_id="weather_tool",
+                output="$london_weather",
+            ),
+            Step(
+                task="Get the weather for Cairo",
+                tool_id="weather_tool",
+                output="$cairo_weather",
+                condition="$london_weather > 10C",
+            ),
+            Step(
+                task="Sum the weather in London and Cairo",
+                inputs=[
+                    Variable(name="$london_weather", description="Weather in London"),
+                    Variable(name="$cairo_weather", description="Weather in Cairo"),
+                ],
+                output="$weather_sum",
+                condition="$london_weather > 10C",
+            ),
+            Step(
+                task="Email $email_address politely with $weather_sum",
+                inputs=[
+                    Variable(
+                        name="$weather_sum",
+                        description="Sum of the weather in London and Cairo",
+                    ),
+                    Variable(
+                        name="$email_address",
+                        value="hello@portialabs.ai",
+                        description="The email address",
+                    ),
+                ],
+                tool_id="portia::google_gmail::send_email_tool",
+                output="If the email was successfully sent",
+                condition="$london_weather > 10C",
+            ),
+        ],
+    ),
+    Plan(
+        plan_context=PlanContext(
             query="Get the latest messages on the Dev channel and send a summary to nathan",
             tool_ids=[
                 "portia::slack::bot::list_conversation_ids",
