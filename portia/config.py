@@ -126,8 +126,24 @@ class LLMModel(Enum):
 
     """
 
+    @classmethod
+    def _missing_(cls, value: object) -> LLMModel:
+        """Get the LLM model from the model name."""
+        if isinstance(value, str):
+            for member in cls:
+                if member.value == value:
+                    return member
+                if "/" in value:
+                    provider, model_name = value.split("/")
+                    if (
+                        member.provider().value.lower() == provider.lower()
+                        and member.value == model_name
+                    ):
+                        return member
+        raise ValueError(f"Invalid LLM model: {value}")
+
     class Model(NamedTuple):
-        """Provider and model name."""
+        """Provider and model name tuple."""
 
         provider: LLMProvider
         model_name: str
