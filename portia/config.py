@@ -170,6 +170,7 @@ class ExecutionAgentType(Enum):
 
     ONE_SHOT = "ONE_SHOT"
     DEFAULT = "DEFAULT"
+    CUSTOM = "CUSTOM"
 
 
 class PlanningAgentType(Enum):
@@ -181,6 +182,7 @@ class PlanningAgentType(Enum):
     """
 
     DEFAULT = "DEFAULT"
+    CUSTOM = "CUSTOM"
 
 
 class LogLevel(Enum):
@@ -418,7 +420,23 @@ class Config(BaseModel):
     @classmethod
     def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
         """Parse planning_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, PlanningAgentType)
+        planning_agent_type = parse_str_to_enum(value, PlanningAgentType)
+        if planning_agent_type == PlanningAgentType.CUSTOM and not cls.custom_planning_agent:
+            raise InvalidConfigError(
+                "planning_agent_type",
+                "Custom planning agent not set",
+            )
+        return planning_agent_type
+
+    custom_planning_agent: type[BasePlanningAgent] | None = Field(
+        default=None,
+        description="A custom planning agent to use.",
+    )
+
+    custom_execution_agent: type[BaseExecutionAgent] | None = Field(
+        default=None,
+        description="A custom execution agent to use.",
+    )
 
     @model_validator(mode="after")
     def check_config(self) -> Self:
