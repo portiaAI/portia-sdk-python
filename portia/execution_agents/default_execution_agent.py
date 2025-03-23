@@ -690,7 +690,7 @@ def invoke_structured_output(
     """
     # We match on class name because not all these types are guaranteed to be installed
     match model.__class__.__name__:
-        case "ChatOpenAI" | "ChatAnthropic" | "ChatMistralAI":
+        case "ChatOpenAI" | "ChatAnthropic" | "ChatMistralAI" | "AzureChatOpenAI":
             return model.with_structured_output(
                 response_model,
                 method="function_calling",
