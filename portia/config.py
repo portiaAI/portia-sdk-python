@@ -56,11 +56,13 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
 }
 
+
 def validate_extras_dependencies(extra_group: str) -> None:
     """Validate that the dependencies for an extras group are installed.
 
     Provide a helpful error message if not all dependencies are installed.
     """
+
     def package_installed(package: str) -> bool:
         try:
             return importlib.util.find_spec(package) is not None
@@ -353,11 +355,6 @@ class Config(BaseModel):
         description="A dictionary of configured LLM models for each usage.",
     )
 
-    agents: dict[str, BaseExecutionAgent | BasePlanningAgent] = Field(
-        default_factory=dict,
-        description="A dictionary of configured agents for each usage.",
-    )
-
     @model_validator(mode="after")
     def add_default_models(self) -> Self:
         """Add default models if not provided."""
@@ -432,7 +429,13 @@ class Config(BaseModel):
     @classmethod
     def parse_execution_agent_type(cls, value: str | ExecutionAgentType) -> ExecutionAgentType:
         """Parse execution_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, ExecutionAgentType)
+        execution_agent_type = parse_str_to_enum(value, ExecutionAgentType)
+        if execution_agent_type == ExecutionAgentType.CUSTOM and not cls.custom_execution_agent:
+            raise InvalidConfigError(
+                "execution_agent_type",
+                "Custom execution agent not set",
+            )
+        return execution_agent_type
 
     # PlanningAgent Options
     planning_agent_type: PlanningAgentType = Field(
