@@ -178,7 +178,7 @@ class LLMModel(Enum):
             LLMProvider: The provider associated with the model.
 
         """
-        return self.value.provider
+        return super().value.provider
 
 
 SUPPORTED_OPENAI_MODELS = [
@@ -617,6 +617,18 @@ class Config(BaseModel):
                 return self.google_api_key
             case LLMProvider.AZURE_OPENAI:
                 return self.azure_openai_api_key
+
+    def get_llm_api_endpoint(self, model_name: LLMModel) -> str | None:
+        """Get the API endpoint for the given LLM model.
+
+        Returns:
+            str | None: The API endpoint for the given LLM model.
+
+        """
+        match model_name.provider():
+            case LLMProvider.AZURE_OPENAI:
+                return self.azure_openai_endpoint
+        return None
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003

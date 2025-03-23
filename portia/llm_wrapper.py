@@ -26,9 +26,9 @@ from typing import TYPE_CHECKING, TypeVar
 import instructor
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
-from openai import OpenAI
+from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr
 
 from portia.config import Config, LLMModel, LLMProvider, validate_extras_dependencies
@@ -115,6 +115,8 @@ class LLMWrapper(BaseLLMWrapper):
         model_name (LLMModel): The name of the model to use.
         api_key (SecretStr): The API key for the LLM provider.
         model_seed (int): The seed for the model's random generation.
+        api_endpoint (str | None): The API endpoint for the LLM provider, used for self-hosted
+        models.
 
     Methods:
         to_langchain: Converts the LLM provider's model to a LangChain-compatible model.
@@ -128,6 +130,7 @@ class LLMWrapper(BaseLLMWrapper):
         api_key: SecretStr,
         # A randomly chosen seed for the model's random generation.
         model_seed: int = 343,
+        api_endpoint: str | None = None,
     ) -> None:
         """Initialize the wrapper.
 
@@ -135,18 +138,21 @@ class LLMWrapper(BaseLLMWrapper):
             model_name (LLMModel): The name of the LLM model to use.
             api_key (SecretStr): The API key for authentication with the LLM provider.
             model_seed (int, optional): Seed for model's random generation. Defaults to 343.
+            api_endpoint (str | None, optional): The API endpoint for the LLM provider
 
         """
         super().__init__(api_key)
         self.model_name = model_name
         self.model_seed = model_seed
+        self.api_endpoint = api_endpoint
 
     @classmethod
     def for_usage(cls, usage: str, config: Config) -> LLMWrapper:
         """Create an LLMWrapper from a LLMModel."""
         model = config.model(usage)
         api_key = config.get_llm_api_key(model)
-        return cls(model, api_key)
+        api_endpoint = config.get_llm_api_endpoint(model)
+        return cls(model, api_key, api_endpoint=api_endpoint)
 
     def to_langchain(self) -> BaseChatModel:
         """Return a LangChain chat model based on the LLM provider.
@@ -171,6 +177,17 @@ class LLMWrapper(BaseLLMWrapper):
                     temperature=1 if self.model_name == LLMModel.O_3_MINI else 0,
                     # This is a workaround for o3 mini to avoid parallel tool calls.
                     # See https://github.com/langchain-ai/langchain/issues/25357
+                    disabled_params={"parallel_tool_calls": None},
+                )
+            case LLMProvider.AZURE_OPENAI:
+                # Copied settings from OpenAI as the clients and models are the same.
+                return AzureChatOpenAI(
+                    name=self.model_name.value,
+                    model=self.model_name.value,
+                    seed=self.model_seed,
+                    api_key=self.api_key,
+                    max_retries=3,
+                    temperature=1 if self.model_name == LLMModel.O_3_MINI else 0,
                     disabled_params={"parallel_tool_calls": None},
                 )
             case LLMProvider.ANTHROPIC:
@@ -222,6 +239,22 @@ class LLMWrapper(BaseLLMWrapper):
                         OpenAI(
                             api_key=self.api_key.get_secret_value(),
                         ),
+                    ),
+                    mode=instructor.Mode.JSON,
+                )
+                return client.chat.completions.create(
+                    response_model=response_model,
+                    messages=messages,
+                    model=self.model_name.value,
+                    seed=self.model_seed,
+                )
+            case LLMProvider.AZURE_OPENAI:
+                if self.api_endpoint is None:
+                    raise ValueError("API endpoint is required for Azure OpenAI")
+                client = instructor.from_openai(  # pyright: ignore[reportCallIssue]
+                    client=AzureOpenAI(  # pyright: ignore[reportArgumentType]
+                        api_key=self.api_key.get_secret_value(),
+                        azure_endpoint=self.api_endpoint,
                     ),
                     mode=instructor.Mode.JSON,
                 )
