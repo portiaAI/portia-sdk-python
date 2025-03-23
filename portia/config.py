@@ -12,7 +12,7 @@ import importlib.util
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Self, TypeVar
+from typing import NamedTuple, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -74,6 +74,7 @@ class LLMProvider(Enum):
         ANTHROPIC: Anthropic provider.
         MISTRALAI: MistralAI provider.
         GOOGLE_GENERATIVE_AI: Google Generative AI provider.
+        AZURE_OPENAI: Azure OpenAI provider.
 
     """
 
@@ -81,6 +82,7 @@ class LLMProvider(Enum):
     ANTHROPIC = "ANTHROPIC"
     MISTRALAI = "MISTRALAI"
     GOOGLE_GENERATIVE_AI = "GOOGLE_GENERATIVE_AI"
+    AZURE_OPENAI = "AZURE_OPENAI"
 
     def to_api_key_name(self) -> str:
         """Get the name of the API key for the provider."""
@@ -93,6 +95,8 @@ class LLMProvider(Enum):
                 return "mistralai_api_key"
             case LLMProvider.GOOGLE_GENERATIVE_AI:
                 return "google_api_key"
+            case LLMProvider.AZURE_OPENAI:
+                return "azure_openai_api_key"
 
 
 class LLMModel(Enum):
@@ -116,28 +120,56 @@ class LLMModel(Enum):
         GEMINI_2_0_FLASH: Gemini 2.0 Flash model by Google Generative AI.
         GEMINI_2_0_FLASH_LITE: Gemini 2.0 Flash Lite model by Google Generative AI.
         GEMINI_1_5_FLASH: Gemini 1.5 Flash model by Google Generative AI.
+        AZURE_GPT_4_0: GPT-4 model by Azure OpenAI.
+        AZURE_GPT_4_MINI: Mini GPT-4 model by Azure OpenAI.
+        AZURE_O_3_MINI: O3 Mini model by Azure OpenAI.
 
     """
 
+    class Model(NamedTuple):
+        """Provider and model name."""
+
+        provider: LLMProvider
+        model_name: str
+
     # OpenAI
-    GPT_4_O = "gpt-4o"
-    GPT_4_O_MINI = "gpt-4o-mini"
-    GPT_3_5_TURBO = "gpt-3.5-turbo"
-    O_3_MINI = "o3-mini"
+    GPT_4_O = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o")
+    GPT_4_O_MINI = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
+    GPT_3_5_TURBO = Model(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
+    O_3_MINI = Model(provider=LLMProvider.OPENAI, model_name="o3-mini")
 
     # Anthropic
-    CLAUDE_3_5_SONNET = "claude-3-5-sonnet-latest"
-    CLAUDE_3_5_HAIKU = "claude-3-5-haiku-latest"
-    CLAUDE_3_OPUS = "claude-3-opus-latest"
-    CLAUDE_3_7_SONNET = "claude-3-7-sonnet-latest"
+    CLAUDE_3_5_SONNET = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-sonnet-latest")
+    CLAUDE_3_5_HAIKU = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-haiku-latest")
+    CLAUDE_3_OPUS = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-opus-latest")
+    CLAUDE_3_7_SONNET = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-7-sonnet-latest")
 
     # MistralAI
-    MISTRAL_LARGE = "mistral-large-latest"
+    MISTRAL_LARGE = Model(provider=LLMProvider.MISTRALAI, model_name="mistral-large-latest")
 
     # Google Generative AI
-    GEMINI_2_0_FLASH = "gemini-2.0-flash"
-    GEMINI_2_0_FLASH_LITE = "gemini-2.0-flash-lite"
-    GEMINI_1_5_FLASH = "gemini-1.5-flash"
+    GEMINI_2_0_FLASH = Model(
+        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        model_name="gemini-2.0-flash",
+    )
+    GEMINI_2_0_FLASH_LITE = Model(
+        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        model_name="gemini-2.0-flash-lite",
+    )
+    GEMINI_1_5_FLASH = Model(
+        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        model_name="gemini-1.5-flash",
+    )
+
+    # Azure OpenAI
+    AZURE_GPT_4_0 = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
+    AZURE_GPT_4_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
+    AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
+
+    @property
+    def value(self) -> str:
+        """Override the default value to return the model name."""
+        return super().value.model_name
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
@@ -146,13 +178,7 @@ class LLMModel(Enum):
             LLMProvider: The provider associated with the model.
 
         """
-        if self in SUPPORTED_ANTHROPIC_MODELS:
-            return LLMProvider.ANTHROPIC
-        if self in SUPPORTED_MISTRALAI_MODELS:
-            return LLMProvider.MISTRALAI
-        if self in SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS:
-            return LLMProvider.GOOGLE_GENERATIVE_AI
-        return LLMProvider.OPENAI
+        return self.value.provider
 
 
 SUPPORTED_OPENAI_MODELS = [
@@ -177,6 +203,12 @@ SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = [
     LLMModel.GEMINI_2_0_FLASH,
     LLMModel.GEMINI_2_0_FLASH_LITE,
     LLMModel.GEMINI_1_5_FLASH,
+]
+
+SUPPORTED_AZURE_OPENAI_MODELS = [
+    LLMModel.AZURE_GPT_4_0,
+    LLMModel.AZURE_GPT_4_MINI,
+    LLMModel.AZURE_O_3_MINI,
 ]
 
 class ExecutionAgentType(Enum):
@@ -271,6 +303,7 @@ PLANNER_DEFAULT_MODELS = {
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
     LLMProvider.GOOGLE_GENERATIVE_AI: LLMModel.GEMINI_2_0_FLASH,
+    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_O_3_MINI,
 }
 
 DEFAULT_MODELS = {
@@ -278,6 +311,7 @@ DEFAULT_MODELS = {
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
     LLMProvider.GOOGLE_GENERATIVE_AI: LLMModel.GEMINI_2_0_FLASH,
+    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_0,
 }
 
 
@@ -295,6 +329,9 @@ class Config(BaseModel):
         openai_api_key: The API key for OpenAI.
         anthropic_api_key: The API key for Anthropic.
         mistralai_api_key: The API key for MistralAI.
+        google_api_key: The API key for Google Generative AI.
+        azure_openai_api_key: The API key for Azure OpenAI.
+        azure_openai_endpoint: The endpoint for Azure OpenAI.
         llm_provider: The LLM provider.
         models: A dictionary of LLM models for each usage type.
         storage_class: The storage class used (e.g., MEMORY, DISK, CLOUD).
@@ -340,6 +377,14 @@ class Config(BaseModel):
         default_factory=lambda: SecretStr(os.getenv("GOOGLE_API_KEY") or ""),
         description="The API Key for Google Generative AI. Must be set if llm-provider is "
         "GOOGLE_GENERATIVE_AI",
+    )
+    azure_openai_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("AZURE_OPENAI_API_KEY") or ""),
+        description="The API Key for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
+    )
+    azure_openai_endpoint: str = Field(
+        default_factory=lambda: os.getenv("AZURE_OPENAI_ENDPOINT") or "",
+        description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
 
     llm_provider: LLMProvider = Field(
@@ -570,6 +615,8 @@ class Config(BaseModel):
                 return self.mistralai_api_key
             case LLMProvider.GOOGLE_GENERATIVE_AI:
                 return self.google_api_key
+            case LLMProvider.AZURE_OPENAI:
+                return self.azure_openai_api_key
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
@@ -582,6 +629,11 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
         return LLMProvider.MISTRALAI
     if os.getenv("GOOGLE_API_KEY") or kwargs.get("google_api_key"):
         return LLMProvider.GOOGLE_GENERATIVE_AI
+    if (
+        (os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT"))
+        or (kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint"))
+    ):
+        return LLMProvider.AZURE_OPENAI
     raise InvalidConfigError(LLMProvider.OPENAI.to_api_key_name(), "No LLM API key found")
 
 
