@@ -42,7 +42,6 @@ AGENTS = [
     ExecutionAgentType.ONE_SHOT,
 ]
 
-
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 def test_portia_run_query(
@@ -514,6 +513,18 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
     assert test_clarification_handler.received_clarification is not None
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
+
+
+def test_portia_run_query_with_conditional_steps() -> None:
+    """Test running a query with conditional steps."""
+    config = Config.from_default(storage_class=StorageClass.MEMORY)
+    portia = Portia(config=config, tools=example_tool_registry)
+    query = "If the sum of 5 and 6 is greater than 10, then sum 3 + 4, otherwise sum 1 + 2"
+
+    plan_run = portia.run(query)
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.value == 7
 
 
 def test_portia_run_query_with_example_registry() -> None:

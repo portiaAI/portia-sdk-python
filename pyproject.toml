@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.1.7-alpha"
+version = "0.1.8-alpha"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
@@ -24,9 +24,9 @@ instructor = "^1.7.7"
 anthropic = ">=0.41.0"
 langchain-anthropic = "^0.3.0"
 langchain-core = "^0.3.25"
-langchain-mistralai = "^0.2.3"
+langchain-mistralai = {version = "^0.2.3", optional = true}
 langchain-openai = "^0.3"
-mistralai = "^1.2.5"
+mistralai = {version = "^1.2.5", optional = true}
 langchain = "^0.3.17"
 langgraph = "^0.2.59"
 click = "^8.1.7"
@@ -48,6 +48,9 @@ pyright = "^1.1.382"
 pytest-httpx = "^0.33.0"
 pytest-xdist = {extras = ["psutil"], version = "^3.6.1"}
 pytest-asyncio = "^0.25.3"
+
+[tool.poetry.extras]
+mistral = ["langchain-mistralai", "mistralai"]
 
 [tool.ruff]
 line-length=100

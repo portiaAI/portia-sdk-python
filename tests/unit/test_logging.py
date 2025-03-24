@@ -23,6 +23,10 @@ from portia.logger import (
             FUNCTION_COLOR_MAP["run"],
         ),
         (
+            {"name": "portia.portia", "function": "_handle_introspection_outcome"},
+            FUNCTION_COLOR_MAP["introspection"],
+        ),
+        (
             {"name": "portia.storage", "function": "save_tool_call"},
             FUNCTION_COLOR_MAP["tool"],
         ),

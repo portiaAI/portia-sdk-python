@@ -8,6 +8,7 @@ config files and default settings.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 from enum import Enum
 from pathlib import Path
@@ -40,6 +41,28 @@ class StorageClass(Enum):
     MEMORY = "MEMORY"
     DISK = "DISK"
     CLOUD = "CLOUD"
+
+
+EXTRAS_GROUPS_DEPENDENCIES = {
+    "mistral": ["mistralai", "langchain_mistralai"],
+}
+
+def validate_extras_dependencies(extra_group: str) -> None:
+    """Validate that the dependencies for an extras group are installed.
+
+    Provide a helpful error message if not all dependencies are installed.
+    """
+    def package_installed(package: str) -> bool:
+        try:
+            return importlib.util.find_spec(package) is not None
+        except ImportError:
+            pass
+        return False
+
+    if not all(package_installed(p) for p in EXTRAS_GROUPS_DEPENDENCIES[extra_group]):
+        raise ImportError(
+            f"Please install portia-sdk-python[{extra_group}] to use this functionality.",
+        )
 
 
 class LLMProvider(Enum):
@@ -195,6 +218,7 @@ class LogLevel(Enum):
 
 PLANNING_MODEL_KEY = "planning_model_name"
 EXECUTION_MODEL_KEY = "execution_model_name"
+INTROSPECTION_MODEL_KEY = "introspection_model_name"
 LLM_TOOL_MODEL_KEY = "llm_tool_model_name"
 IMAGE_TOOL_MODEL_KEY = "image_tool_model_name"
 SUMMARISER_MODEL_KEY = "summariser_model_name"
@@ -559,6 +583,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     models = kwargs.pop("models", {})
     for model_usage in [
         PLANNING_MODEL_KEY,
+        INTROSPECTION_MODEL_KEY,
         EXECUTION_MODEL_KEY,
         LLM_TOOL_MODEL_KEY,
         IMAGE_TOOL_MODEL_KEY,

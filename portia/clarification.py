@@ -9,7 +9,7 @@ and value confirmations.
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Generic, Self, Union
+from typing import Any, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -19,7 +19,7 @@ from pydantic import (
     model_validator,
 )
 
-from portia.common import SERIALIZABLE_TYPE_VAR, PortiaEnum
+from portia.common import PortiaEnum, Serializable
 from portia.prefixed_uuid import ClarificationUUID, PlanRunUUID
 
 
@@ -38,7 +38,7 @@ class ClarificationCategory(PortiaEnum):
     CUSTOM = "Custom"
 
 
-class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR], ABC):
+class Clarification(BaseModel, ABC):
     """Base Model for Clarifications.
 
     A Clarification represents a question or action that requires user input to resolve. For example
@@ -65,7 +65,7 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR], ABC):
     category: ClarificationCategory = Field(
         description="The category of this clarification",
     )
-    response: SERIALIZABLE_TYPE_VAR | None = Field(
+    response: Serializable | None = Field(
         default=None,
         description="The response from the user to this clarification.",
     )
@@ -79,7 +79,7 @@ class Clarification(BaseModel, Generic[SERIALIZABLE_TYPE_VAR], ABC):
     )
 
 
-class ActionClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+class ActionClarification(Clarification):
     """Action-based clarification.
 
     Represents a clarification that involves an action, such as clicking a link. The response is set
@@ -111,7 +111,7 @@ class ActionClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
         return str(action_url)
 
 
-class InputClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+class InputClarification(Clarification):
     """Input-based clarification.
 
     Represents a clarification where the user needs to provide a value for a specific argument.
@@ -131,7 +131,7 @@ class InputClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     )
 
 
-class MultipleChoiceClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+class MultipleChoiceClarification(Clarification):
     """Multiple choice-based clarification.
 
     Represents a clarification where the user needs to select an option for a specific argument.
@@ -139,7 +139,7 @@ class MultipleChoiceClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
 
     Attributes:
         category (ClarificationCategory): The category for this clarification 'Multiple Choice'.
-        options (list[SERIALIZABLE_TYPE_VAR]): The available options for the user to choose from.
+        options (list[Serializable]): The available options for the user to choose from.
 
     Methods:
         validate_response: Ensures that the user's response is one of the available options.
@@ -153,7 +153,7 @@ class MultipleChoiceClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
         default=ClarificationCategory.MULTIPLE_CHOICE,
         description="The category of this clarification",
     )
-    options: list[SERIALIZABLE_TYPE_VAR]
+    options: list[Serializable]
 
     @model_validator(mode="after")
     def validate_response(self) -> Self:
@@ -174,7 +174,7 @@ class MultipleChoiceClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
         return self
 
 
-class ValueConfirmationClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+class ValueConfirmationClarification(Clarification):
     """Value confirmation clarification.
 
     Represents a clarification where the user is presented with a value and must confirm or deny it.
@@ -195,7 +195,7 @@ class ValueConfirmationClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
     )
 
 
-class CustomClarification(Clarification[SERIALIZABLE_TYPE_VAR]):
+class CustomClarification(Clarification):
     """Custom clarifications.
 
     Allows the user to extend clarifications with arbitrary data.

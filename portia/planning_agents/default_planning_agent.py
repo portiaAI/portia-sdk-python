@@ -56,7 +56,9 @@ class DefaultPlanningAgent(BasePlanningAgent):
     requires an id as an input, make sure to check if there's a corresponding tool call that\
     provides the id from natural language if possible. For example, if a tool asks for a user ID\
     check if there's a tool call that provides the user IDs before making the tool call that \
-    requires the user ID.",
+    requires the user ID. If a step is conditional, make sure the condition is written in the \
+    condition field for that step. The condition field should be an expression that can be \
+    evaluated using another agent. Do not use the condition if it is not needed.",
                 },
                 {"role": "user", "content": prompt},
             ],
