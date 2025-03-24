@@ -28,7 +28,13 @@ from portia.clarification import (
     Clarification,
     ClarificationCategory,
 )
-from portia.config import CONDITIONAL_FEATURE_FLAG, Config, ExecutionAgentType, PlanningAgentType, StorageClass
+from portia.config import (
+    CONDITIONAL_FEATURE_FLAG,
+    Config,
+    ExecutionAgentType,
+    PlanningAgentType,
+    StorageClass,
+)
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,

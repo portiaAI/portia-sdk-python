@@ -15,7 +15,7 @@ from portia.clarification import (
     InputClarification,
     ValueConfirmationClarification,
 )
-from portia.config import CONDITIONAL_FEATURE_FLAG, Config, StorageClass
+from portia.config import Config, StorageClass
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.base_execution_agent import Output
 from portia.introspection_agents.introspection_agent import (
@@ -794,7 +794,7 @@ def test_portia_error_clarification_with_plan_run(portia: Portia) -> None:
     assert plan_run.state == PlanRunState.FAILED
 
 
-def test_portia_do_not_run_conditional_steps_by_default() -> None:
+def test_portia_does_not_run_conditional_steps_by_default() -> None:
     """Test that conditional steps are not run if the feature flag is not set."""
         # Setup mock plan and response
     portia = Portia(config=Config.from_default(
