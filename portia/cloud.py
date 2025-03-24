@@ -19,7 +19,13 @@ class PortiaCloudClient:
 
     @classmethod
     def new_client(cls, config: Config, *, allow_unauthenticated: bool = False) -> httpx.Client:
-        """Create a new httpx client."""
+        """Create a new httpx client.
+
+        Args:
+            config (Config): The Portia Configuration instance, containing the API key and endpoint.
+            allow_unauthenticated (bool): Whether to allow creation of an unauthenticated client.
+
+        """
         headers = {
                 "Content-Type": "application/json",
         }
