@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import SecretStr
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, MessagesState
+from pydantic import SecretStr
 
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
