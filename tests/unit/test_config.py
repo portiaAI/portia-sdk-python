@@ -301,6 +301,21 @@ def test_config_get_llm_api_endpoint() -> None:
     assert c.get_llm_api_endpoint(model_name=LLMModel.GPT_4_O) is None
 
 
+PROVIDER_ENV_VARS = [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "MISTRAL_API_KEY",
+    "GOOGLE_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+]
+
+def clear_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear env vars for the Provider APIs."""
+    for env_var in PROVIDER_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
+
+
 @pytest.mark.parametrize(("env_vars", "provider"), [
     ({"OPENAI_API_KEY": "test-openai-api-key"}, LLMProvider.OPENAI),
     ({"ANTHROPIC_API_KEY": "test-anthropic-api-key"}, LLMProvider.ANTHROPIC),
@@ -317,6 +332,7 @@ def test_config_get_llm_api_endpoint() -> None:
 def test_llm_provider_default_from_api_keys_env_vars(
     env_vars: dict[str, str], provider: LLMProvider, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test LLM provider default from API keys env vars."""
+    clear_env_vars(monkeypatch)
     for env_var_name, env_var_value in env_vars.items():
         monkeypatch.setenv(env_var_name, env_var_value)
 
@@ -338,7 +354,8 @@ def test_llm_provider_default_from_api_keys_env_vars(
     ),
 ])
 def test_llm_provider_default_from_api_keys_config_kwargs(
-    config_kwargs: dict[str, str], provider: LLMProvider) -> None:
+    config_kwargs: dict[str, str], provider: LLMProvider, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test LLM provider default from API keys config kwargs."""
+    clear_env_vars(monkeypatch)
     c = Config.from_default(**config_kwargs)
     assert c.llm_provider == provider
