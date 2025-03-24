@@ -35,7 +35,7 @@ pip install portia-sdk-python
 > OpenAI and Anthropic dependencies are included by default. We also provide the following extras:<br/>
 > * **MistralAI**: `portia-sdk-python[mistral]`
 > * **Google Generative AI**: `portia-sdk-python[google]`
-> <br/>
+> 
 > Alternatively you can add all dependencies with `portia-sdk-python[all]`
 
 2. Ensure you have an API key set up
