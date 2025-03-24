@@ -81,3 +81,23 @@ def test_error_if_extension_not_installed_to_langchain(
 
     with pytest.raises(ImportError):
         llm_wrapper.to_instructor(response_model=DummyModel, messages=[])
+
+
+def test_construct_azure_openai_llm_wrapper() -> None:
+    """Test construct azure openai llm wrapper.
+
+    This test wouldn't be strictly necessary if we had e2e tests for Azure OpenAI
+    but we don't (MS portal access problems).
+    """
+    llm_wrapper = LLMWrapper.for_usage(
+        EXECUTION_MODEL_KEY,
+        Config.from_default(
+            llm_provider=LLMProvider.AZURE_OPENAI,
+            azure_openai_endpoint="https://test-azure-openai-endpoint",
+            azure_openai_api_key="test-azure-openai-api-key",
+        ),
+    )
+    assert llm_wrapper is not None
+    assert llm_wrapper.model_name.provider() == LLMProvider.AZURE_OPENAI
+    assert llm_wrapper.api_key == SecretStr("test-azure-openai-api-key")
+    assert llm_wrapper.api_endpoint == "https://test-azure-openai-endpoint"
