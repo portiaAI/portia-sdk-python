@@ -841,7 +841,7 @@ class Portia:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
         cloud_registry = (
             self.tool_registry
-            + PortiaToolRegistry.with_default_tool_filter(self.config)
+            + PortiaToolRegistry.with_unauthenticated_client(self.config)
         )
         tools = cloud_registry.match_tools(query)
         planning_agent = self._get_planning_agent()

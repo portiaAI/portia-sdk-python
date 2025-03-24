@@ -353,7 +353,7 @@ class PortiaToolRegistry(ToolRegistry):
 
         """
         self.config = config
-        self.client = PortiaCloudClient().get_client(config, allow_unauthenticated=True)
+        self.client = PortiaCloudClient().get_client(config)
         self.tools = tools or self._load_tools()
 
     @classmethod
@@ -367,6 +367,14 @@ class PortiaToolRegistry(ToolRegistry):
                 in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
             )
         return PortiaToolRegistry(config).filter_tools(default_tool_filter)
+
+    @classmethod
+    def with_unauthenticated_client(cls, config: Config) -> ToolRegistry:
+        """Create a PortiaToolRegistry with an unauthenticated client."""
+        registry = PortiaToolRegistry.with_default_tool_filter(config)
+        if isinstance(registry, PortiaToolRegistry):
+            registry.client = PortiaCloudClient.new_client(config, allow_unauthenticated=True)
+        return registry
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
