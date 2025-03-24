@@ -167,8 +167,8 @@ class LLMWrapper(BaseLLMWrapper):
         match self.model_name.provider():
             case LLMProvider.OPENAI:
                 return ChatOpenAI(
-                    name=self.model_name.value,
-                    model=self.model_name.value,
+                    name=self.model_name.api_name,
+                    model=self.model_name.api_name,
                     seed=self.model_seed,
                     api_key=self.api_key,
                     max_retries=3,
@@ -182,8 +182,8 @@ class LLMWrapper(BaseLLMWrapper):
             case LLMProvider.AZURE_OPENAI:
                 # Copied settings from OpenAI as the clients and models are the same.
                 return AzureChatOpenAI(
-                    name=self.model_name.value,
-                    model=self.model_name.value,
+                    name=self.model_name.api_name,
+                    model=self.model_name.api_name,
                     azure_endpoint=self.api_endpoint,
                     api_version="2025-01-01-preview",
                     seed=self.model_seed,
@@ -194,7 +194,7 @@ class LLMWrapper(BaseLLMWrapper):
                 )
             case LLMProvider.ANTHROPIC:
                 return ChatAnthropic(
-                    model_name=self.model_name.value,
+                    model_name=self.model_name.api_name,
                     timeout=120,
                     stop=None,
                     max_retries=3,
@@ -205,7 +205,7 @@ class LLMWrapper(BaseLLMWrapper):
                 from langchain_mistralai import ChatMistralAI
 
                 return ChatMistralAI(
-                    model_name=self.model_name.value,
+                    model_name=self.model_name.api_name,
                     api_key=self.api_key,
                     max_retries=3,
                 )
@@ -214,7 +214,7 @@ class LLMWrapper(BaseLLMWrapper):
                 from langchain_google_genai import ChatGoogleGenerativeAI
 
                 return ChatGoogleGenerativeAI(
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     api_key=self.api_key,
                     max_retries=3,
                 )
@@ -247,7 +247,7 @@ class LLMWrapper(BaseLLMWrapper):
                 return client.chat.completions.create(
                     response_model=response_model,
                     messages=messages,
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     seed=self.model_seed,
                 )
             case LLMProvider.AZURE_OPENAI:
@@ -264,7 +264,7 @@ class LLMWrapper(BaseLLMWrapper):
                 return client.chat.completions.create(
                     response_model=response_model,
                     messages=messages,
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     seed=self.model_seed,
                 )
             case LLMProvider.ANTHROPIC:
@@ -277,7 +277,7 @@ class LLMWrapper(BaseLLMWrapper):
                     mode=instructor.Mode.ANTHROPIC_JSON,
                 )
                 return client.chat.completions.create(
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     response_model=response_model,
                     messages=messages,
                     max_tokens=2048,
@@ -292,7 +292,7 @@ class LLMWrapper(BaseLLMWrapper):
                     ),
                 )
                 return client.chat.completions.create(  # pyright: ignore[reportReturnType]
-                    model=self.model_name.value,
+                    model=self.model_name.api_name,
                     response_model=response_model,
                     messages=messages,
                 )
@@ -303,7 +303,7 @@ class LLMWrapper(BaseLLMWrapper):
                 genai.configure(api_key=self.api_key.get_secret_value()) # pyright: ignore[reportPrivateImportUsage]
                 client = instructor.from_gemini(
                     client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
-                        model_name=self.model_name.value,
+                        model_name=self.model_name.api_name,
                     ),
                     mode=instructor.Mode.GEMINI_JSON,
                 )

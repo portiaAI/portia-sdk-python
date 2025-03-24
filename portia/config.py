@@ -131,13 +131,13 @@ class LLMModel(Enum):
         """Get the LLM model from the model name."""
         if isinstance(value, str):
             for member in cls:
-                if member.value == value:
+                if member.api_name == value:
                     return member
                 if "/" in value:
                     provider, model_name = value.split("/")
                     if (
                         member.provider().value.lower() == provider.lower()
-                        and member.value == model_name
+                        and member.api_name == model_name
                     ):
                         return member
         raise ValueError(f"Invalid LLM model: {value}")
@@ -183,9 +183,9 @@ class LLMModel(Enum):
     AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
 
     @property
-    def value(self) -> str:
+    def api_name(self) -> str:
         """Override the default value to return the model name."""
-        return super().value.model_name
+        return self.value.model_name
 
     def provider(self) -> LLMProvider:
         """Get the associated provider for the model.
@@ -194,7 +194,7 @@ class LLMModel(Enum):
             LLMProvider: The provider associated with the model.
 
         """
-        return super().value.provider
+        return self.value.provider
 
 
 SUPPORTED_OPENAI_MODELS = [

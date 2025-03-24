@@ -35,6 +35,6 @@ def test_wrapper_methods(model_name: LLMModel) -> None:
 
     if isinstance(model, (ChatMistralAI, ChatAnthropic)):
         # MistralAI and Anthropic get_name() method doesn't give the model name unfortunately
-        assert model.model == model_name.value
+        assert model.model == model_name.api_name
     else:
-        assert model.get_name() == model_name.value
+        assert model.get_name() == model_name.api_name
