@@ -82,6 +82,25 @@ class BrowserTool(Tool[str]):
     args_schema: type[BaseModel] = BrowserToolSchema
     output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
 
+    @staticmethod
+    def _get_chrome_instance_path() -> str:
+        """Get the path to the Chrome instance based on the operating system or env variable."""
+        chrome_path_from_env = os.environ.get("PORTIA_BROWSER_LOCAL_CHROME_EXEC")
+        if chrome_path_from_env:
+            return chrome_path_from_env
+
+        match sys.platform:
+            case "darwin":  # macOS
+                return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            case "win32":  # Windows
+                return r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+            case "linux":  # Linux
+                return "/usr/bin/google-chrome"
+            case _:
+                raise RuntimeError(f"Unsupported platform: {sys.platform}")
+
+    chrome_path: str = Field(default_factory=_get_chrome_instance_path)
+
     def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
         llm = LLMWrapper.for_usage(LLM_TOOL_MODEL_KEY, ctx.config).to_langchain()
@@ -109,11 +128,7 @@ class BrowserTool(Tool[str]):
                 ),
             )
             result = await auth_agent.run()
-            auth_final_result = result.final_result()
-
-            if not isinstance(auth_final_result, str):
-                raise ToolHardError("Expected string result from browser agent")
-            auth_result = BrowserAuthOutput.model_validate(json.loads(auth_final_result))
+            auth_result = BrowserAuthOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
             if auth_result.human_login_required:
                 if auth_result.user_login_guidance is None or auth_result.login_url is None:
                     raise ToolHardError(
@@ -135,11 +150,7 @@ class BrowserTool(Tool[str]):
                 ),
             )
             result = await task_agent.run()
-            task_final_result = result.final_result()
-
-            if not isinstance(task_final_result, str):
-                raise ToolHardError("Expected string result from browser agent")
-            task_result = BrowserTaskOutput.model_validate(json.loads(task_final_result))
+            task_result = BrowserTaskOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
             if task_result.human_login_required:
                 if task_result.user_login_guidance is None or task_result.login_url is None:
                     raise ToolHardError(
@@ -163,22 +174,6 @@ class BrowserTool(Tool[str]):
         """Get the browser instance to be used by the tool."""
         return Browser(
             config=BrowserConfig(
-                chrome_instance_path=self._get_chrome_instance_path(),
+                chrome_instance_path=self.chrome_path,
             ),
         )
-
-    def _get_chrome_instance_path(self) -> str:
-        """Get the path to the Chrome instance based on the operating system or env variable."""
-        chrome_path_from_env = os.environ.get("PORTIA_BROWSER_LOCAL_CHROME_EXEC")
-        if chrome_path_from_env:
-            return chrome_path_from_env
-
-        match sys.platform:
-            case "darwin":  # macOS
-                return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            case "win32":  # Windows
-                return r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-            case "linux":  # Linux
-                return "/usr/bin/google-chrome"
-            case _:
-                raise RuntimeError(f"Unsupported platform: {sys.platform}")
