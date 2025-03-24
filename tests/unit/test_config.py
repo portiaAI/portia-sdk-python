@@ -290,6 +290,7 @@ def test_config_get_llm_api_endpoint() -> None:
     c = Config.from_default(
         llm_provider=LLMProvider.AZURE_OPENAI,
         azure_openai_endpoint="test-azure-openai-endpoint",
+        azure_openai_api_key="test-azure-openai-api-key",g
     )
     assert c.get_llm_api_endpoint(model_name=LLMModel.AZURE_GPT_4_O) == "test-azure-openai-endpoint"
 
