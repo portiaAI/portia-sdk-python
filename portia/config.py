@@ -225,6 +225,8 @@ SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 PLANNING_DEFAULT_MODEL_KEY = "planning_default_model_name"
 
+CONDITIONAL_FEATURE_FLAG = "conditional_feature_flag"
+
 
 E = TypeVar("E", bound=Enum)
 
@@ -311,7 +313,11 @@ class Config(BaseModel):
         description="The URL for the Portia Cloud Dashboard",
     )
     portia_api_key: SecretStr | None = Field(
-        default_factory=lambda: SecretStr(os.getenv("PORTIA_API_KEY") or ""),
+        default_factory=lambda: (
+            SecretStr(os.environ["PORTIA_API_KEY"])
+            if "PORTIA_API_KEY" in os.environ
+            else None
+        ),
         description="The API Key for the Portia Cloud API available from the dashboard at https://app.portialabs.ai",
     )
 
@@ -338,6 +344,20 @@ class Config(BaseModel):
         default={},
         description="A dictionary of configured LLM models for each usage.",
     )
+
+    feature_flags: dict[str, bool] = Field(
+        default={},
+        description="A dictionary of feature flags for the SDK.",
+    )
+
+    @model_validator(mode="after")
+    def parse_feature_flags(self) -> Self:
+        """Add feature flags if not provided."""
+        self.feature_flags = {
+            CONDITIONAL_FEATURE_FLAG: False,
+            **self.feature_flags,
+        }
+        return self
 
     @model_validator(mode="after")
     def add_default_models(self) -> Self:
@@ -600,6 +620,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     return Config(
         llm_provider=llm_provider,
         models=models,
+        feature_flags=kwargs.pop("feature_flags", {}),
         storage_class=kwargs.pop("storage_class", default_storage_class),
         planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
         execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.DEFAULT),
