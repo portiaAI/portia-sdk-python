@@ -99,6 +99,19 @@ class LLMProvider(Enum):
                 return "azure_openai_api_key"
 
 
+class Model(NamedTuple):
+    """Provider and model name tuple.
+
+    Attributes:
+        provider: The provider of the model.
+        model_name: The name of the model in the provider's API.
+
+    """
+
+    provider: LLMProvider
+    model_name: str
+
+
 class LLMModel(Enum):
     """Enum for supported LLM models.
 
@@ -107,6 +120,7 @@ class LLMModel(Enum):
     - Anthropic
     - MistralAI
     - Google Generative AI
+    - Azure OpenAI
 
     Attributes:
         GPT_4_O: GPT-4 model by OpenAI.
@@ -123,6 +137,13 @@ class LLMModel(Enum):
         AZURE_GPT_4_0: GPT-4 model by Azure OpenAI.
         AZURE_GPT_4_MINI: Mini GPT-4 model by Azure OpenAI.
         AZURE_O_3_MINI: O3 Mini model by Azure OpenAI.
+
+    Can be instantiated from a string with the following format:
+        - provider/model_name  [e.g. LLMModel("openai/gpt-4o")]
+        - model_name           [e.g. LLMModel("gpt-4o")]
+
+    In the cases where the model name is not unique across providers, the earlier values in the enum
+    definition will take precedence.
 
     """
 
@@ -141,12 +162,6 @@ class LLMModel(Enum):
                     ):
                         return member
         raise ValueError(f"Invalid LLM model: {value}")
-
-    class Model(NamedTuple):
-        """Provider and model name tuple."""
-
-        provider: LLMProvider
-        model_name: str
 
     # OpenAI
     GPT_4_O = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o")
@@ -640,6 +655,9 @@ class Config(BaseModel):
 
     def get_llm_api_endpoint(self, model_name: LLMModel) -> str | None:
         """Get the API endpoint for the given LLM model.
+
+        In most cases the endpoint is not required for the LLM provider API.
+        The common exception is a self-hosted solution like Azure OpenAI.
 
         Returns:
             str | None: The API endpoint for the given LLM model.

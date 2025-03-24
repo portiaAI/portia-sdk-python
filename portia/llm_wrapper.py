@@ -115,8 +115,8 @@ class LLMWrapper(BaseLLMWrapper):
         model_name (LLMModel): The name of the model to use.
         api_key (SecretStr): The API key for the LLM provider.
         model_seed (int): The seed for the model's random generation.
-        api_endpoint (str | None): The API endpoint for the LLM provider, used for self-hosted
-        models.
+        api_endpoint (str | None): The API endpoint for the LLM provider (Optional, many API's don't
+                                   require it).
 
     Methods:
         to_langchain: Converts the LLM provider's model to a LangChain-compatible model.
