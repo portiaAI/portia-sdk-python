@@ -794,6 +794,51 @@ def test_portia_error_clarification_with_plan_run(portia: Portia) -> None:
     assert plan_run.state == PlanRunState.FAILED
 
 
+def test_portia_does_not_run_introspection_by_default() -> None:
+    """Test that introspection is not run if the feature flag is not set."""
+    # Setup mock plan and response
+    portia = Portia(config=Config.from_default(
+        openai_api_key=SecretStr("123"),
+        storage_class=StorageClass.MEMORY,
+    ))
+    step1 = Step(task="Step 1", inputs=[], output="$step1_result")
+    step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="some_condition")
+    mock_response = StepsOrError(steps=[step1, step2], error=None)
+
+    # Mock introspection agent to return SKIP for first step
+    mock_introspection = MagicMock()
+    mock_introspection.pre_step_introspection.return_value = PreStepIntrospection(
+        outcome=PreStepIntrospectionOutcome.SKIP,
+        reason="Condition not met",
+    )
+
+    mock_step_agent = MagicMock()
+    mock_step_agent.execute_sync.side_effect = [
+        Output(value="Step 1 result"),
+        Output(value="Step 2 result"),
+    ]
+
+    with (
+        mock.patch.object(
+            LLMWrapper,
+            "to_instructor",
+            new=MagicMock(return_value=mock_response),
+        ),
+        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
+    ):
+        plan_run = portia.run("Test query with conditional step")
+
+        # Verify result
+        assert plan_run.state == PlanRunState.COMPLETE
+        assert "$step1_result" in plan_run.outputs.step_outputs
+        assert plan_run.outputs.step_outputs["$step1_result"].value == "Step 1 result"
+        assert "$step2_result" in plan_run.outputs.step_outputs
+        assert plan_run.outputs.step_outputs["$step2_result"].value == "Step 2 result"
+        assert plan_run.outputs.final_output is not None
+        assert plan_run.outputs.final_output.value == "Step 2 result"
+        assert mock_introspection.pre_step_introspection.call_count == 0
+
 def test_portia_run_with_introspection_skip(portia: Portia) -> None:
     """Test run with introspection agent returning SKIP outcome."""
     # Setup mock plan and response

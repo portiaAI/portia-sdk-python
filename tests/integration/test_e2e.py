@@ -10,7 +10,15 @@ from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, ExecutionAgentType, LLMModel, LLMProvider, LogLevel, StorageClass
+from portia.config import (
+    CONDITIONAL_FEATURE_FLAG,
+    Config,
+    ExecutionAgentType,
+    LLMModel,
+    LLMProvider,
+    LogLevel,
+    StorageClass,
+)
 from portia.errors import PlanError, ToolSoftError
 from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import Plan, PlanContext, Step, Variable
@@ -521,7 +529,9 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
 def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
-    config = Config.from_default(storage_class=StorageClass.MEMORY)
+    config = Config.from_default(storage_class=StorageClass.MEMORY, feature_flags={
+        CONDITIONAL_FEATURE_FLAG: True,
+    })
     portia = Portia(config=config, tools=example_tool_registry)
     query = "If the sum of 5 and 6 is greater than 10, then sum 3 + 4, otherwise sum 1 + 2"
 

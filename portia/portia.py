@@ -28,7 +28,13 @@ from portia.clarification import (
     Clarification,
     ClarificationCategory,
 )
-from portia.config import Config, ExecutionAgentType, PlanningAgentType, StorageClass
+from portia.config import (
+    CONDITIONAL_FEATURE_FLAG,
+    Config,
+    ExecutionAgentType,
+    PlanningAgentType,
+    StorageClass,
+)
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
@@ -526,17 +532,18 @@ class Portia:
             step = plan.steps[index]
             plan_run.current_step_index = index
 
-            # Handle the introspection outcome
-            (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
-                introspection_agent=introspection_agent,
-                plan=plan,
-                plan_run=plan_run,
-                last_executed_step_output=last_executed_step_output,
-            )
-            if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
-                continue
-            if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
-                return plan_run
+            if self.config.feature_flags.get(CONDITIONAL_FEATURE_FLAG):
+                # Handle the introspection outcome
+                (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
+                    introspection_agent=introspection_agent,
+                    plan=plan,
+                    plan_run=plan_run,
+                    last_executed_step_output=last_executed_step_output,
+                )
+                if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
+                    continue
+                if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
+                    return plan_run
 
             logger().info(
                 f"Executing step {index}: {step.task}",
