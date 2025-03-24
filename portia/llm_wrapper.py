@@ -184,6 +184,8 @@ class LLMWrapper(BaseLLMWrapper):
                 return AzureChatOpenAI(
                     name=self.model_name.value,
                     model=self.model_name.value,
+                    azure_endpoint=self.api_endpoint,
+                    api_version="2025-01-01-preview",
                     seed=self.model_seed,
                     api_key=self.api_key,
                     max_retries=3,
@@ -255,6 +257,7 @@ class LLMWrapper(BaseLLMWrapper):
                     client=AzureOpenAI(  # pyright: ignore[reportArgumentType]
                         api_key=self.api_key.get_secret_value(),
                         azure_endpoint=self.api_endpoint,
+                        api_version="2025-01-01-preview",
                     ),
                     mode=instructor.Mode.JSON,
                 )

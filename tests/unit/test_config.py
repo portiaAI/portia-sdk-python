@@ -154,7 +154,15 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("MISTRAL_API_KEY", "")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    for provider in [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.MISTRALAI]:
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "")
+    for provider in [
+        LLMProvider.OPENAI,
+        LLMProvider.ANTHROPIC,
+        LLMProvider.MISTRALAI,
+        LLMProvider.GOOGLE_GENERATIVE_AI,
+        LLMProvider.AZURE_OPENAI,
+    ]:
         with pytest.raises(InvalidConfigError):
             Config.from_default(
                 storage_class=StorageClass.MEMORY,
@@ -232,3 +240,17 @@ def test_validate_extras_dependencies_catches_import_errors() -> None:
     with pytest.raises(ImportError) as e:
         validate_extras_dependencies("fake-extras-package")
     assert "portia-sdk-python[fake-extras-package]" in str(e.value)
+
+
+@pytest.mark.parametrize(("model_name", "expected"), [
+    ("gpt-4o", LLMModel.GPT_4_O),
+    ("openai/gpt-4o", LLMModel.GPT_4_O),
+    ("azure_openai/gpt-4o", LLMModel.AZURE_GPT_4_0),
+    ("claude-3-5-haiku-latest", LLMModel.CLAUDE_3_5_HAIKU),
+    ("mistral-large-latest", LLMModel.MISTRAL_LARGE),
+    ("gemini-2.0-flash", LLMModel.GEMINI_2_0_FLASH),
+])
+def test_llm_model_instantiate_from_string(model_name: str, expected: LLMModel) -> None:
+    """Test LLM model from string."""
+    model = LLMModel(model_name)
+    assert model == expected
