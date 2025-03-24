@@ -245,7 +245,7 @@ def test_validate_extras_dependencies_catches_import_errors() -> None:
 @pytest.mark.parametrize(("model_name", "expected"), [
     ("gpt-4o", LLMModel.GPT_4_O),
     ("openai/gpt-4o", LLMModel.GPT_4_O),
-    ("azure_openai/gpt-4o", LLMModel.AZURE_GPT_4_0),
+    ("azure_openai/gpt-4o", LLMModel.AZURE_GPT_4_O),
     ("claude-3-5-haiku-latest", LLMModel.CLAUDE_3_5_HAIKU),
     ("mistral-large-latest", LLMModel.MISTRAL_LARGE),
     ("gemini-2.0-flash", LLMModel.GEMINI_2_0_FLASH),

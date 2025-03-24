@@ -178,8 +178,8 @@ class LLMModel(Enum):
     )
 
     # Azure OpenAI
-    AZURE_GPT_4_0 = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
-    AZURE_GPT_4_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
+    AZURE_GPT_4_O = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
+    AZURE_GPT_4_O_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
     AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
 
     @property
@@ -222,8 +222,8 @@ SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = [
 ]
 
 SUPPORTED_AZURE_OPENAI_MODELS = [
-    LLMModel.AZURE_GPT_4_0,
-    LLMModel.AZURE_GPT_4_MINI,
+    LLMModel.AZURE_GPT_4_O,
+    LLMModel.AZURE_GPT_4_O_MINI,
     LLMModel.AZURE_O_3_MINI,
 ]
 
@@ -327,7 +327,7 @@ DEFAULT_MODELS = {
     LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
     LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
     LLMProvider.GOOGLE_GENERATIVE_AI: LLMModel.GEMINI_2_0_FLASH,
-    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_0,
+    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_O,
 }
 
 
