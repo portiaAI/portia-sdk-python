@@ -36,6 +36,7 @@ from portia.config import (
     StorageClass,
 )
 from portia.errors import (
+    InvalidConfigError,
     InvalidPlanRunStateError,
     PlanError,
 )
@@ -518,9 +519,13 @@ class Portia:
         dashboard_url = self.config.must_get("portia_dashboard_url", str)
 
         dashboard_message = (
-            f" View in your Portia AI dashboard: "
-            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
-        ) if self.config.storage_class == StorageClass.CLOUD else ""
+            (
+                f" View in your Portia AI dashboard: "
+                f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
+            )
+            if self.config.storage_class == StorageClass.CLOUD
+            else ""
+        )
 
         logger().info(
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
@@ -670,9 +675,9 @@ class Portia:
         logger().info(f"Running Pre Introspection for Step #{current_step_index}.")
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
-                plan=ReadOnlyPlan.from_plan(plan),
-                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
-            )
+            plan=ReadOnlyPlan.from_plan(plan),
+            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+        )
 
         log_message = (
             f"Pre Introspection Outcome for Step #{current_step_index}: "
@@ -727,6 +732,14 @@ class Portia:
         match self.config.planning_agent_type:
             case PlanningAgentType.DEFAULT:
                 cls = DefaultPlanningAgent
+            case PlanningAgentType.CUSTOM:
+                custom_planning_agent = self.config.custom_planning_agent
+                if not custom_planning_agent:
+                    raise InvalidConfigError(
+                        "planning_agent_type",
+                        "Custom planning agent not set",
+                    )
+                cls = custom_planning_agent
 
         return cls(self.config)
 
@@ -832,6 +845,14 @@ class Portia:
                 cls = OneShotAgent
             case ExecutionAgentType.DEFAULT:
                 cls = DefaultExecutionAgent
+            case ExecutionAgentType.CUSTOM:
+                custom_execution_agent = self.config.custom_execution_agent
+                if not custom_execution_agent:
+                    raise InvalidConfigError(
+                        "execution_agent_type",
+                        "Custom execution agent not set",
+                    )
+                cls = custom_execution_agent
         return cls(
             step,
             plan_run,

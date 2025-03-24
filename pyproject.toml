@@ -58,6 +58,7 @@ line-length=100
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+  "COM812",  # Disables checks for detecting missing trailing commas as it conflicts with ISC001 (implicit string concatenation).
   "D203",    # Disables checks for having a blank line before a class docstring. We instead have no-blank-line-before-class (D211) enabled.
   "D213",    # Disables checks for multi-line docstrings not starting on the first line. We instead have multi-line-summary-first-line (D212) enabled.
   "EM101",   # Disables checks for missing exception message arguments. We prefer single-line exception statements for simplicity and terseness.

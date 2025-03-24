@@ -12,7 +12,7 @@ import importlib.util
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -24,6 +24,15 @@ from pydantic import (
 )
 
 from portia.errors import ConfigNotFoundError, InvalidConfigError
+
+if TYPE_CHECKING:
+    from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+    from portia.planning_agents.base_planning_agent import BasePlanningAgent
+else:
+    # Placeholder types for runtime
+    BaseExecutionAgent = Any
+    BasePlanningAgent = Any
+
 
 T = TypeVar("T")
 
@@ -47,11 +56,13 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
 }
 
+
 def validate_extras_dependencies(extra_group: str) -> None:
     """Validate that the dependencies for an extras group are installed.
 
     Provide a helpful error message if not all dependencies are installed.
     """
+
     def package_installed(package: str) -> bool:
         try:
             return importlib.util.find_spec(package) is not None
@@ -184,6 +195,7 @@ class ExecutionAgentType(Enum):
 
     ONE_SHOT = "ONE_SHOT"
     DEFAULT = "DEFAULT"
+    CUSTOM = "CUSTOM"
 
 
 class PlanningAgentType(Enum):
@@ -195,6 +207,7 @@ class PlanningAgentType(Enum):
     """
 
     DEFAULT = "DEFAULT"
+    CUSTOM = "CUSTOM"
 
 
 class LogLevel(Enum):
@@ -301,7 +314,10 @@ class Config(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        populate_by_name=True,
+    )
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -433,7 +449,13 @@ class Config(BaseModel):
     @classmethod
     def parse_execution_agent_type(cls, value: str | ExecutionAgentType) -> ExecutionAgentType:
         """Parse execution_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, ExecutionAgentType)
+        execution_agent_type = parse_str_to_enum(value, ExecutionAgentType)
+        if execution_agent_type == ExecutionAgentType.CUSTOM and not cls.custom_execution_agent:
+            raise InvalidConfigError(
+                "execution_agent_type",
+                "Custom execution agent not set",
+            )
+        return execution_agent_type
 
     # PlanningAgent Options
     planning_agent_type: PlanningAgentType = Field(
@@ -445,7 +467,23 @@ class Config(BaseModel):
     @classmethod
     def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
         """Parse planning_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, PlanningAgentType)
+        planning_agent_type = parse_str_to_enum(value, PlanningAgentType)
+        if planning_agent_type == PlanningAgentType.CUSTOM and not cls.custom_planning_agent:
+            raise InvalidConfigError(
+                "planning_agent_type",
+                "Custom planning agent not set",
+            )
+        return planning_agent_type
+
+    custom_planning_agent: type[BasePlanningAgent] | None = Field(
+        default=None,
+        description="A custom planning agent to use.",
+    )
+
+    custom_execution_agent: type[BaseExecutionAgent] | None = Field(
+        default=None,
+        description="A custom execution agent to use.",
+    )
 
     @model_validator(mode="after")
     def check_config(self) -> Self:
