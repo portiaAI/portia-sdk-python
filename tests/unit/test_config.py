@@ -294,5 +294,8 @@ def test_config_get_llm_api_endpoint() -> None:
     )
     assert c.get_llm_api_endpoint(model_name=LLMModel.AZURE_GPT_4_O) == "test-azure-openai-endpoint"
 
-    c = Config.from_default(llm_provider=LLMProvider.OPENAI)
+    c = Config.from_default(
+        llm_provider=LLMProvider.OPENAI,
+        openai_api_key=SecretStr("test-openai-api-key"),
+    )
     assert c.get_llm_api_endpoint(model_name=LLMModel.GPT_4_O) is None
