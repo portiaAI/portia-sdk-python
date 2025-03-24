@@ -82,7 +82,7 @@ class BrowserTool(Tool[str]):
     args_schema: type[BaseModel] = BrowserToolSchema
     output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
 
-    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification[str]:
+    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
         llm = LLMWrapper.for_usage(LLM_TOOL_MODEL_KEY, ctx.config).to_langchain()
 
@@ -92,7 +92,7 @@ class BrowserTool(Tool[str]):
                 "end_user_id. end_user_id will be ignored.",
             )
 
-        async def run_browser_tasks() -> str | ActionClarification[str]:
+        async def run_browser_tasks() -> str | ActionClarification:
             # First auth check
             auth_agent = Agent(
                 task=(
@@ -119,7 +119,7 @@ class BrowserTool(Tool[str]):
                     raise ToolHardError(
                         "Expected user guidance and login URL if human login is required",
                     )
-                return ActionClarification[str](
+                return ActionClarification(
                     user_guidance=auth_result.user_login_guidance,
                     action_url=HttpUrl(auth_result.login_url),
                     plan_run_id=ctx.plan_run_id,
@@ -145,7 +145,7 @@ class BrowserTool(Tool[str]):
                     raise ToolHardError(
                         "Expected user guidance and login URL if human login is required",
                     )
-                return ActionClarification[str](
+                return ActionClarification(
                     user_guidance=task_result.user_login_guidance,
                     action_url=HttpUrl(task_result.login_url),
                     plan_run_id=ctx.plan_run_id,
