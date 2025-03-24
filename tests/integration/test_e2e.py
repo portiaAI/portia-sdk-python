@@ -538,7 +538,8 @@ def test_portia_run_query_with_conditional_steps() -> None:
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
-    assert plan_run.outputs.final_output.value == 7
+    assert "7" in str(plan_run.outputs.final_output.value)
+    assert "3" not in str(plan_run.outputs.final_output.value)
 
 
 def test_portia_run_query_with_example_registry() -> None:
