@@ -51,6 +51,7 @@ def test_base_classes() -> None:
 def mock_import_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Mock the import check."""
     monkeypatch.setenv("MISTRAL_API_KEY", "test123")
+    monkeypatch.setenv("GOOGLE_API_KEY", "test123")
     with patch("importlib.util.find_spec", return_value=None):
         yield
 
@@ -62,7 +63,10 @@ class DummyModel(BaseModel):
 
 
 @pytest.mark.usefixtures("mock_import_check")
-@pytest.mark.parametrize("provider", [LLMProvider.MISTRALAI])
+@pytest.mark.parametrize("provider", [
+    LLMProvider.MISTRALAI,
+    LLMProvider.GOOGLE_GENERATIVE_AI,
+])
 def test_error_if_extension_not_installed_to_langchain(
     provider: LLMProvider,
 ) -> None:
