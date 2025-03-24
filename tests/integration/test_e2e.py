@@ -10,8 +10,16 @@ from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
-from portia.config import CONDITIONAL_FEATURE_FLAG, Config, ExecutionAgentType, LLMModel, LLMProvider, LogLevel, StorageClass
-from portia.errors import ToolSoftError
+from portia.config import (
+    CONDITIONAL_FEATURE_FLAG,
+    Config,
+    ExecutionAgentType,
+    LLMModel,
+    LLMProvider,
+    LogLevel,
+    StorageClass,
+)
+from portia.errors import PlanError, ToolSoftError
 from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRunState
@@ -538,3 +546,15 @@ def test_portia_run_query_with_example_registry() -> None:
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
+
+
+def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
+    """Test that running a query requiring cloud tools fails but points user to sign up."""
+    config = Config.from_default(portia_api_key=None, storage_class=StorageClass.MEMORY)
+
+    portia = Portia(config=config)
+    query = "Send an email to John Doe"
+
+    with pytest.raises(PlanError) as e:
+        portia.plan(query)
+    assert "PORTIA_API_KEY is required to use Portia cloud tools." in str(e.value)

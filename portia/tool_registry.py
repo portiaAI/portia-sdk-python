@@ -44,6 +44,7 @@ from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    import httpx
     import mcp
 
     from portia.config import Config
@@ -332,10 +333,18 @@ class PortiaToolRegistry(ToolRegistry):
     This class interacts with the Portia API to retrieve and manage tools.
     """
 
+    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
+        {
+            # Exclude Outlook by default as it clashes with Gmail
+            "portia:microsoft:outlook:*",
+        },
+    )
+
     def __init__(
         self,
         config: Config,
         tools: dict[str, Tool] | None = None,
+        client: httpx.Client | None = None,
     ) -> None:
         """Initialize the PortiaToolRegistry with the given configuration.
 
@@ -343,11 +352,41 @@ class PortiaToolRegistry(ToolRegistry):
             config (Config): The configuration containing the API key and endpoint.
             tools (list[Tool] | None): A list of tools to create the registry with.
               If not provided, all tools will be loaded from the Portia API.
+            client (httpx.Client | None): An optional httpx client to use. If not provided, a new
+              client will be created.
 
         """
         self.config = config
-        self.client = PortiaCloudClient().get_client(config)
+        self.client = client or PortiaCloudClient().get_client(config)
         self.tools = tools or self._load_tools()
+
+    @classmethod
+    def with_default_tool_filter(cls, config: Config) -> ToolRegistry:
+        """Create a PortiaToolRegistry with a default tool filter."""
+        return PortiaToolRegistry(config).filter_tools(cls.default_tool_filter)
+
+    @classmethod
+    def default_tool_filter(cls, tool: Tool) -> bool:
+        """Filter to get the default set of tools offered by Portia cloud."""
+        return not any(
+            re.match(regex, tool.id)
+            for regex
+            in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
+        )
+
+    @classmethod
+    def with_unauthenticated_client(
+        cls,
+        config: Config,
+        *,
+        with_default_tool_filter: bool = True,
+    ) -> ToolRegistry:
+        """Create a PortiaToolRegistry with an unauthenticated client."""
+        client = PortiaCloudClient.new_client(config, allow_unauthenticated=True)
+        registry = cls(config, client=client)
+        if with_default_tool_filter:
+            registry = registry.filter_tools(cls.default_tool_filter)
+        return registry
 
     def _load_tools(self) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
@@ -414,7 +453,8 @@ class PortiaToolRegistry(ToolRegistry):
         """Return a new registry with the tools filtered by the filter function."""
         return PortiaToolRegistry(
             self.config,
-            {tool.id: tool for tool in self.get_tools() if filter_func(tool)},
+            client=self.client,
+            tools={tool.id: tool for tool in self.get_tools() if filter_func(tool)},
         )
 
 
@@ -555,14 +595,6 @@ class McpToolRegistry(ToolRegistry):
         return list(self.tools.values())
 
 
-EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
-    {
-        # Exclude Outlook by default as it clashes with Gmail
-        "portia:microsoft:outlook:*",
-    },
-)
-
-
 class DefaultToolRegistry(AggregatedToolRegistry):
     """A registry providing a default set of tools.
 
@@ -589,13 +621,9 @@ class DefaultToolRegistry(AggregatedToolRegistry):
         if os.getenv("OPENWEATHERMAP_API_KEY"):
             in_memory_registry.register_tool(WeatherTool())
 
-        def default_tool_filter(tool: Tool) -> bool:
-            """Filter to get the default set of tools offered by Portia cloud."""
-            return not any(re.match(regex, tool.id) for regex in EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
-
         registries: list[ToolRegistry] = [in_memory_registry]
         if config.portia_api_key:
-            registries.append(PortiaToolRegistry(config).filter_tools(default_tool_filter))
+            registries.append(PortiaToolRegistry.with_default_tool_filter(config))
 
         super().__init__(registries)
 
