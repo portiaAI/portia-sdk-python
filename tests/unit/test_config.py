@@ -246,6 +246,16 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
     c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
     assert c.llm_provider == LLMProvider.AZURE_OPENAI
 
+    # Also works with passing parameters to constructor
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "")
+    c = Config.from_default(
+        llm_provider=LLMProvider.AZURE_OPENAI,
+        azure_openai_endpoint="test-azure-openai-endpoint",
+        azure_openai_api_key="test-azure-openai-api-key",
+    )
+    assert c.llm_provider == LLMProvider.AZURE_OPENAI
+
 
 @pytest.mark.parametrize("model", list(LLMModel))
 def test_all_models_have_provider(model: LLMModel) -> None:
@@ -273,3 +283,15 @@ def test_llm_model_instantiate_from_string(model_name: str, expected: LLMModel) 
     """Test LLM model from string."""
     model = LLMModel(model_name)
     assert model == expected
+
+
+def test_config_get_llm_api_endpoint() -> None:
+    """Test config get llm api endpoint."""
+    c = Config.from_default(
+        llm_provider=LLMProvider.AZURE_OPENAI,
+        azure_openai_endpoint="test-azure-openai-endpoint",
+    )
+    assert c.get_llm_api_endpoint(model_name=LLMModel.AZURE_GPT_4_O) == "test-azure-openai-endpoint"
+
+    c = Config.from_default(llm_provider=LLMProvider.OPENAI)
+    assert c.get_llm_api_endpoint(model_name=LLMModel.GPT_4_O) is None
