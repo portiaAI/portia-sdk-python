@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel, SecretStr
 
-from portia.config import EXECUTION_MODEL_KEY, Config, LLMProvider
+from portia.config import EXECUTION_MODEL_KEY, Config, LLMModel, LLMProvider
 from portia.llm_wrapper import BaseLLMWrapper, LLMWrapper, T
 from portia.planning_agents.base_planning_agent import StepsOrError
 
@@ -109,3 +109,14 @@ def test_construct_azure_openai_llm_wrapper() -> None:
             response_model=DummyModel,
             messages=[{"role": "system", "content": "test"}],
         ) is not None
+
+    llm_wrapper_no_endpoint = LLMWrapper(
+        model_name=LLMModel.AZURE_GPT_4_O,
+        api_key=SecretStr("test-azure-openai-api-key"),
+        api_endpoint=None,
+    )
+    with (
+        mock.patch("instructor.patch", autospec=True),
+        pytest.raises(ValueError, match="endpoint is required"),
+    ):
+        llm_wrapper_no_endpoint.to_instructor(response_model=DummyModel, messages=[])
