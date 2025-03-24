@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest import mock
 from unittest.mock import patch
 
 import pytest
@@ -101,3 +102,10 @@ def test_construct_azure_openai_llm_wrapper() -> None:
     assert llm_wrapper.model_name.provider() == LLMProvider.AZURE_OPENAI
     assert llm_wrapper.api_key == SecretStr("test-azure-openai-api-key")
     assert llm_wrapper.api_endpoint == "https://test-azure-openai-endpoint"
+
+    assert llm_wrapper.to_langchain() is not None
+    with mock.patch("instructor.patch", autospec=True):
+        assert llm_wrapper.to_instructor(
+            response_model=DummyModel,
+            messages=[{"role": "system", "content": "test"}],
+        ) is not None
