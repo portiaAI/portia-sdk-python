@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pydantic import SecretStr
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
@@ -270,7 +271,7 @@ def test_invoke_structured_output_fails_unsupported_model() -> None:
 
     with pytest.raises(ValueError, match="Unsupported model type"):
         invoke_structured_output(
-            FakeModel(model="test", api_key="test"),
+            FakeModel(model="test", api_key=SecretStr("test")),
             Output,
             [HumanMessage(content="Make a pie")],
         )
