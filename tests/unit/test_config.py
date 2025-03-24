@@ -228,6 +228,25 @@ def test_getters() -> None:
         )
 
 
+def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Azure OpenAI requires endpoint."""
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("MISTRAL_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-azure-openai-key")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
+
+    # Without endpoint set, it errors
+    with pytest.raises(InvalidConfigError):
+        Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+
+    # With endpoint set, it works
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
+    c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+    assert c.llm_provider == LLMProvider.AZURE_OPENAI
+
+
 @pytest.mark.parametrize("model", list(LLMModel))
 def test_all_models_have_provider(model: LLMModel) -> None:
     """Test all models have a provider."""

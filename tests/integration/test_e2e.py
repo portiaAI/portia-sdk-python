@@ -35,6 +35,10 @@ PROVIDER_MODELS = [
         LLMProvider.ANTHROPIC,
         LLMModel.CLAUDE_3_OPUS,
     ),
+    (
+        LLMProvider.GOOGLE_GENERATIVE_AI,
+        LLMModel.GEMINI_2_0_FLASH,
+    ),
 ]
 
 AGENTS = [
