@@ -121,7 +121,7 @@ type = "python"
 
 [[tool.pydoc-markdown.processors]]
 type = "filter"
-expression = "not 'test' in name and not 'cli' in name and not 'prefixed_uuid' in name and not 'common' in name and not 'templates' in name and default()"
+expression = "not 'test' in name and not 'cli' in name and not 'prefixed_uuid' in name and not 'common' in name and not 'templates' in name and not '_unstable' in name and default()"
 skip_empty_modules = true
 
 [[tool.pydoc-markdown.processors]]
