@@ -501,9 +501,13 @@ class Portia:
         dashboard_url = self.config.must_get("portia_dashboard_url", str)
 
         dashboard_message = (
-            f" View in your Portia AI dashboard: "
-            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
-        ) if self.config.storage_class == StorageClass.CLOUD else ""
+            (
+                f" View in your Portia AI dashboard: "
+                f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
+            )
+            if self.config.storage_class == StorageClass.CLOUD
+            else ""
+        )
 
         logger().info(
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
@@ -547,7 +551,7 @@ class Portia:
                 last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = Output(value=str(e))
-                plan_run.outputs.step_outputs[step.output] = error_output
+                self._save_output(error_output, step.output, plan_run)
                 plan_run.outputs.final_output = error_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
                 logger().error(
@@ -563,7 +567,7 @@ class Portia:
                 )
                 return plan_run
             else:
-                plan_run.outputs.step_outputs[step.output] = last_executed_step_output
+                self._save_output(last_executed_step_output, step.output, plan_run)
                 logger().info(
                     f"Step output - {last_executed_step_output.summary!s}",
                 )
@@ -629,9 +633,9 @@ class Portia:
         logger().info(f"Running Pre Introspection for Step #{current_step_index}.")
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
-                plan=ReadOnlyPlan.from_plan(plan),
-                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
-            )
+            plan=ReadOnlyPlan.from_plan(plan),
+            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+        )
 
         log_message = (
             f"Pre Introspection Outcome for Step #{current_step_index}: "
@@ -642,17 +646,19 @@ class Portia:
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
                 logger().debug(*log_message)
-                plan_run.outputs.step_outputs[step.output] = Output(
+                output = Output(
                     value="SKIPPED",
                     summary=pre_step_outcome.reason,
                 )
+                self._save_output(output, step.output, plan_run)
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.STOP:
                 logger().debug(*log_message)
-                plan_run.outputs.step_outputs[step.output] = Output(
+                output = Output(
                     value="STOPPED",
                     summary=pre_step_outcome.reason,
                 )
+                self._save_output(output, step.output, plan_run)
                 if last_executed_step_output:
                     plan_run.outputs.final_output = self._get_final_output(
                         plan,
@@ -667,7 +673,7 @@ class Portia:
                     value="FAILED",
                     summary=pre_step_outcome.reason,
                 )
-                plan_run.outputs.step_outputs[step.output] = failed_output
+                self._save_output(failed_output, step.output, plan_run)
                 plan_run.outputs.final_output = failed_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
                 self.storage.save_plan_run(plan_run)
@@ -798,3 +804,7 @@ class Portia:
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config)
+
+    def _save_output(self, output: Output, output_name: str, plan_run: PlanRun) -> None:
+        plan_run.outputs.step_outputs[output_name] = output
+        self.storage.save_plan_run_output(output_name, output, plan_run.id)

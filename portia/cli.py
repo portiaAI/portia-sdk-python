@@ -31,6 +31,8 @@ from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.portia import ExecutionHooks, Portia
 from portia.tool_registry import DefaultToolRegistry
+from portia.config import CONDITIONAL_FEATURE_FLAG
+
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -347,7 +349,12 @@ def _get_config(
     if cli_config.env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
     try:
-        config = Config.from_default(**kwargs)
+        config = Config.from_default(
+            feature_flags={
+                CONDITIONAL_FEATURE_FLAG: True,
+            },
+            **kwargs,
+        )
     except InvalidConfigError as e:
         logger().error(e.message)
         sys.exit(1)

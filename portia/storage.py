@@ -34,6 +34,7 @@ from pydantic import BaseModel, ValidationError
 
 from portia.cloud import PortiaCloudClient
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
+from portia.execution_agents.base_execution_agent import Output
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanUUID, Step
@@ -466,6 +467,17 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
             total_pages=1,
         )
 
+    def save_plan_run_output(self, output_name: str, output: Output, plan_run: PlanRun) -> None:
+        """Save Output from a plan run to the storage.
+
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run (PlanRun): The current plan run
+
+        """
+        self._write(f"{plan_run.id}-{output_name}.json", output)
+
 
 class PortiaCloudStorage(Storage):
     """Save plans, runs and tool calls to portia cloud."""
@@ -606,6 +618,7 @@ class PortiaCloudStorage(Storage):
                 execution_context=ExecutionContext.model_validate(
                     response_json["execution_context"],
                 ),
+                # TODO: NEED TO SORT
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
             )
 
@@ -690,3 +703,57 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             LogAdditionalStorage.save_tool_call(self, tool_call)
+
+    def save_plan_run_output(self, output_name: str, output: Output, , plan_run_id: PlanRunUUID) -> None:
+        """Save Output from a plan run to Portia Cloud.
+
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRun): The if of the current plan run
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.put(
+                url=f"/api/v0/plan-runs/{plan_run_id}/outputs/{output_name}/",
+                json={
+                    "name": output_name,
+                    "value": output.value,
+                    "summary": output.summary,
+                },
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
+    def get_plan_run_output(self, output_name: str, , plan_run_id: PlanRunUUID):
+        """Retrieve an Output from Portia Cloud.
+
+        Args:
+            plan_run_id (RunUUID): The ID of the run to retrieve.
+
+        Returns:
+            Run: The Run object retrieved from Portia Cloud.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails or the run does not exist.
+
+        """
+        try:
+            response = self.client.get(
+                url=f"/api/v0/plan-runs/{plan_run_id}/outputs/{output_name}/",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Output(
+                value=response_json["value"],
+                summary=response_json["summary"],
+            )
+
