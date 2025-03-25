@@ -6,5 +6,5 @@ test_harness.py
 htmlcov
 docs
 .venv
-.env
+*.env
 .vscode
