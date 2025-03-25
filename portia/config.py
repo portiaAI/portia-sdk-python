@@ -134,8 +134,8 @@ class LLMModel(Enum):
         GEMINI_2_0_FLASH: Gemini 2.0 Flash model by Google Generative AI.
         GEMINI_2_0_FLASH_LITE: Gemini 2.0 Flash Lite model by Google Generative AI.
         GEMINI_1_5_FLASH: Gemini 1.5 Flash model by Google Generative AI.
-        AZURE_GPT_4_0: GPT-4 model by Azure OpenAI.
-        AZURE_GPT_4_MINI: Mini GPT-4 model by Azure OpenAI.
+        AZURE_GPT_4_O: GPT-4 model by Azure OpenAI.
+        AZURE_GPT_4_O_MINI: Mini GPT-4 model by Azure OpenAI.
         AZURE_O_3_MINI: O3 Mini model by Azure OpenAI.
 
     Can be instantiated from a string with the following format:
