@@ -28,7 +28,13 @@ from portia.clarification import (
     Clarification,
     ClarificationCategory,
 )
-from portia.config import Config, ExecutionAgentType, PlanningAgentType, StorageClass
+from portia.config import (
+    CONDITIONAL_FEATURE_FLAG,
+    Config,
+    ExecutionAgentType,
+    PlanningAgentType,
+    StorageClass,
+)
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
@@ -59,7 +65,12 @@ from portia.storage import (
     PortiaCloudStorage,
 )
 from portia.tool import ToolRunContext
-from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry, ToolRegistry
+from portia.tool_registry import (
+    DefaultToolRegistry,
+    InMemoryToolRegistry,
+    PortiaToolRegistry,
+    ToolRegistry,
+)
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
@@ -193,8 +204,14 @@ class Portia:
             examples=example_plans,
         )
         if outcome.error:
-            logger().error(f"Error in planning - {outcome.error}")
-            raise PlanError(outcome.error)
+            if (
+                isinstance(self.tool_registry, DefaultToolRegistry)
+                and not self.config.portia_api_key
+            ):
+                self._log_replan_with_portia_cloud_tools(outcome.error, query, example_plans)
+            else:
+                logger().error(f"Error in planning - {outcome.error}")
+                raise PlanError(outcome.error)
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
@@ -513,23 +530,24 @@ class Portia:
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
-        last_executed_step_output = None
+        last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
         introspection_agent = self._get_introspection_agent()
         for index in range(plan_run.current_step_index, len(plan.steps)):
             step = plan.steps[index]
             plan_run.current_step_index = index
 
-            # Handle the introspection outcome
-            (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
-                introspection_agent=introspection_agent,
-                plan=plan,
-                plan_run=plan_run,
-                last_executed_step_output=last_executed_step_output,
-            )
-            if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
-                continue
-            if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
-                return plan_run
+            if self.config.feature_flags.get(CONDITIONAL_FEATURE_FLAG):
+                # Handle the introspection outcome
+                (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
+                    introspection_agent=introspection_agent,
+                    plan=plan,
+                    plan_run=plan_run,
+                    last_executed_step_output=last_executed_step_output,
+                )
+                if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
+                    continue
+                if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
+                    return plan_run
 
             logger().info(
                 f"Executing step {index}: {step.task}",
@@ -599,6 +617,29 @@ class Portia:
             )
         return plan_run
 
+    def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
+        """Get the output of the last executed step.
+
+        Args:
+            plan (Plan): The plan containing steps.
+            plan_run (PlanRun): The plan run to get the output from.
+
+        Returns:
+            Output | None: The output of the last executed step.
+
+        """
+        return next(
+            (
+                plan_run.outputs.step_outputs[step.output]
+                for i in range(plan_run.current_step_index, -1, -1)
+                if i < len(plan.steps)
+                and (step := plan.steps[i]).output in plan_run.outputs.step_outputs
+                and (step_output := plan_run.outputs.step_outputs[step.output])
+                and step_output.value != PreStepIntrospectionOutcome.SKIP
+            ),
+            None,
+        )
+
     def _handle_introspection_outcome(
         self,
         introspection_agent: BaseIntrospectionAgent,
@@ -643,21 +684,26 @@ class Portia:
             f"Reason: {pre_step_outcome.reason}",
         )
 
+        if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
+            logger().error(*log_message)
+        else:
+            logger().debug(*log_message)
+
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
-                logger().debug(*log_message)
                 output = Output(
-                    value="SKIPPED",
+                    value=PreStepIntrospectionOutcome.SKIP,
                     summary=pre_step_outcome.reason,
                 )
+                plan_run.outputs.step_outputs[step.output] = output
                 self._save_output(output, step.output, plan_run)
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.STOP:
-                logger().debug(*log_message)
                 output = Output(
-                    value="STOPPED",
+                    value=PreStepIntrospectionOutcome.STOP,
                     summary=pre_step_outcome.reason,
                 )
+                plan_run.outputs.step_outputs[step.output] = output
                 self._save_output(output, step.output, plan_run)
                 if last_executed_step_output:
                     plan_run.outputs.final_output = self._get_final_output(
@@ -668,9 +714,8 @@ class Portia:
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.FAIL:
-                logger().error(*log_message)
                 failed_output = Output(
-                    value="FAILED",
+                    value=PreStepIntrospectionOutcome.FAIL,
                     summary=pre_step_outcome.reason,
                 )
                 self._save_output(failed_output, step.output, plan_run)
@@ -801,6 +846,36 @@ class Portia:
             self.config,
             tool,
         )
+
+    def _log_replan_with_portia_cloud_tools(
+        self,
+        original_error: str,
+        query: str,
+        example_plans: list[Plan] | None = None,
+    ) -> None:
+        """Generate a plan using Portia cloud tools for users who's plans fail without them."""
+        cloud_registry = self.tool_registry + PortiaToolRegistry.with_unauthenticated_client(
+            self.config
+        )
+        tools = cloud_registry.match_tools(query)
+        planning_agent = self._get_planning_agent()
+        replan_outcome = planning_agent.generate_steps_or_error(
+            ctx=get_execution_context(),
+            query=query,
+            tool_list=tools,
+            examples=example_plans,
+        )
+        if not replan_outcome.error:
+            tools_used = ", ".join([str(step.tool_id) for step in replan_outcome.steps])
+            logger().error(
+                f"Error in planning - {original_error.rstrip('.')}.\n"
+                f"Replanning with Portia cloud tools would successfully generate a plan using "
+                f"tools: {tools_used}.\n"
+                f"Go to https://app.portialabs.ai to sign up.",
+            )
+            raise PlanError(
+                "PORTIA_API_KEY is required to use Portia cloud tools.",
+            ) from PlanError(original_error)
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config)

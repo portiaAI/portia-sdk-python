@@ -4,6 +4,7 @@ from unittest import mock
 
 from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
+from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
 from portia.plan import Step
 from tests.utils import get_test_config, get_test_plan_run
 
@@ -197,5 +198,69 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
         "----------\n"
         "Task: Get weather in London\n"
         "Output: Sunny and warm\n"
+        "----------"
+    )
+
+
+def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
+    """Test that the context builder correctly uses summary for conditional outcomes."""
+    (plan, plan_run) = get_test_plan_run()
+
+    plan.plan_context.query = "Test query with conditional outcomes"
+    plan.steps = [
+        Step(
+            task="Regular task",
+            output="$regular_output",
+        ),
+        Step(
+            task="Failed task",
+            output="$failed_output",
+        ),
+        Step(
+            task="Skipped task",
+            output="$skipped_output",
+        ),
+        Step(
+            task="Stopped task",
+            output="$stopped_output",
+        ),
+    ]
+
+    plan_run.outputs.step_outputs = {
+        "$regular_output": Output(value="Regular result", summary="Not used"),
+        "$failed_output": Output(
+            value=PreStepIntrospectionOutcome.FAIL,
+            summary="This task failed due to an error",
+        ),
+        "$skipped_output": Output(
+            value=PreStepIntrospectionOutcome.SKIP,
+            summary="This task was skipped as it was unnecessary",
+        ),
+        "$stopped_output": Output(
+            value=PreStepIntrospectionOutcome.STOP,
+            summary="The plan execution was stopped early",
+        ),
+    }
+
+    summarizer = FinalOutputSummarizer(config=get_test_config())
+    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+        plan=plan,
+        plan_run=plan_run,
+    )
+
+    assert context == (
+        "Query: Test query with conditional outcomes\n"
+        "----------\n"
+        "Task: Regular task\n"
+        "Output: Regular result\n"
+        "----------\n"
+        "Task: Failed task\n"
+        "Output: This task failed due to an error\n"
+        "----------\n"
+        "Task: Skipped task\n"
+        "Output: This task was skipped as it was unnecessary\n"
+        "----------\n"
+        "Task: Stopped task\n"
+        "Output: The plan execution was stopped early\n"
         "----------"
     )

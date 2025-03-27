@@ -21,6 +21,7 @@ from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Out
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
+    invoke_structured_output,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
@@ -212,8 +213,8 @@ class ParserModel:
         """
         if not self.agent.tool:
             raise InvalidPlanRunStateError("Parser model has no tool")
-        model = self.llm.with_structured_output(ToolInputs, method="function_calling")
-        message = self.arg_parser_prompt.format_messages(
+
+        formatted_messages = self.arg_parser_prompt.format_messages(
             context=self.context,
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
@@ -225,7 +226,7 @@ class ParserModel:
         errors = []
         tool_inputs: ToolInputs | None = None
         try:
-            response = model.invoke(message)
+            response = invoke_structured_output(self.llm, ToolInputs, formatted_messages)
             tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
             errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
@@ -343,16 +344,14 @@ class VerifierModel:
 
         messages = state["messages"]
         tool_args = messages[-1].content
-        model = self.llm.with_structured_output(VerifiedToolInputs, method="function_calling")
-        response = model.invoke(
-            self.arg_verifier_prompt.format_messages(
-                context=self.context,
-                task=self.agent.step.task,
-                arguments=tool_args,
-                tool_name=self.agent.tool.name,
-                tool_args=self.agent.tool.args_json_schema(),
-            ),
+        formatted_messages = self.arg_verifier_prompt.format_messages(
+            context=self.context,
+            task=self.agent.step.task,
+            arguments=tool_args,
+            tool_name=self.agent.tool.name,
+            tool_args=self.agent.tool.args_json_schema(),
         )
+        response = invoke_structured_output(self.llm, VerifiedToolInputs, formatted_messages)
         response = VerifiedToolInputs.model_validate(response)
 
         # Validate the arguments against the tool's schema

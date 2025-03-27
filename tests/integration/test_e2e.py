@@ -10,8 +10,16 @@ from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, ExecutionAgentType, LLMModel, LLMProvider, LogLevel, StorageClass
-from portia.errors import ToolSoftError
+from portia.config import (
+    CONDITIONAL_FEATURE_FLAG,
+    Config,
+    ExecutionAgentType,
+    LLMModel,
+    LLMProvider,
+    LogLevel,
+    StorageClass,
+)
+from portia.errors import PlanError, ToolSoftError
 from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRunState
@@ -34,6 +42,10 @@ PROVIDER_MODELS = [
     (
         LLMProvider.ANTHROPIC,
         LLMModel.CLAUDE_3_OPUS,
+    ),
+    (
+        LLMProvider.GOOGLE_GENERATIVE_AI,
+        LLMModel.GEMINI_2_0_FLASH,
     ),
 ]
 
@@ -517,14 +529,17 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
 def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
-    config = Config.from_default(storage_class=StorageClass.MEMORY)
+    config = Config.from_default(storage_class=StorageClass.MEMORY, feature_flags={
+        CONDITIONAL_FEATURE_FLAG: True,
+    })
     portia = Portia(config=config, tools=example_tool_registry)
     query = "If the sum of 5 and 6 is greater than 10, then sum 3 + 4, otherwise sum 1 + 2"
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
-    assert plan_run.outputs.final_output.value == 7
+    assert "7" in str(plan_run.outputs.final_output.value)
+    assert "3" not in str(plan_run.outputs.final_output.value)
 
 
 def test_portia_run_query_with_example_registry() -> None:
@@ -536,3 +551,15 @@ def test_portia_run_query_with_example_registry() -> None:
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
+
+
+def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
+    """Test that running a query requiring cloud tools fails but points user to sign up."""
+    config = Config.from_default(portia_api_key=None, storage_class=StorageClass.MEMORY)
+
+    portia = Portia(config=config)
+    query = "Send an email to John Doe"
+
+    with pytest.raises(PlanError) as e:
+        portia.plan(query)
+    assert "PORTIA_API_KEY is required to use Portia cloud tools." in str(e.value)

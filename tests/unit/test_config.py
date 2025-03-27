@@ -8,6 +8,7 @@ from pydantic import SecretStr
 
 from portia.config import (
     EXECUTION_MODEL_KEY,
+    EXTRAS_GROUPS_DEPENDENCIES,
     PLANNING_MODEL_KEY,
     Config,
     ExecutionAgentType,
@@ -16,6 +17,7 @@ from portia.config import (
     LogLevel,
     PlanningAgentType,
     StorageClass,
+    validate_extras_dependencies,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
@@ -152,7 +154,15 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("MISTRAL_API_KEY", "")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    for provider in [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.MISTRALAI]:
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "")
+    for provider in [
+        LLMProvider.OPENAI,
+        LLMProvider.ANTHROPIC,
+        LLMProvider.MISTRALAI,
+        LLMProvider.GOOGLE_GENERATIVE_AI,
+        LLMProvider.AZURE_OPENAI,
+    ]:
         with pytest.raises(InvalidConfigError):
             Config.from_default(
                 storage_class=StorageClass.MEMORY,
@@ -218,13 +228,134 @@ def test_getters() -> None:
         )
 
 
+def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Azure OpenAI requires endpoint."""
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("MISTRAL_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-azure-openai-key")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
+
+    # Without endpoint set, it errors
+    with pytest.raises(InvalidConfigError):
+        Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+
+    # With endpoint set, it works
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
+    c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+    assert c.llm_provider == LLMProvider.AZURE_OPENAI
+
+    # Also works with passing parameters to constructor
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "")
+    c = Config.from_default(
+        llm_provider=LLMProvider.AZURE_OPENAI,
+        azure_openai_endpoint="test-azure-openai-endpoint",
+        azure_openai_api_key="test-azure-openai-api-key",
+    )
+    assert c.llm_provider == LLMProvider.AZURE_OPENAI
+
+
 @pytest.mark.parametrize("model", list(LLMModel))
 def test_all_models_have_provider(model: LLMModel) -> None:
     """Test all models have a provider."""
     assert model.provider() is not None
 
 
-@pytest.mark.parametrize("provider", list(LLMProvider))
-def test_all_providers_have_associated_model(provider: LLMProvider) -> None:
-    """Test all providers have an associated model."""
-    assert provider.associated_models() is not None
+def test_validate_extras_dependencies_catches_import_errors() -> None:
+    """Test function doesn't raise on non-existing top level package."""
+    EXTRAS_GROUPS_DEPENDENCIES["fake-extras-package"] = ["fake_package.bar"]
+    with pytest.raises(ImportError) as e:
+        validate_extras_dependencies("fake-extras-package")
+    assert "portia-sdk-python[fake-extras-package]" in str(e.value)
+
+
+@pytest.mark.parametrize(("model_name", "expected"), [
+    ("gpt-4o", LLMModel.GPT_4_O),
+    ("openai/gpt-4o", LLMModel.GPT_4_O),
+    ("azure_openai/gpt-4o", LLMModel.AZURE_GPT_4_O),
+    ("claude-3-5-haiku-latest", LLMModel.CLAUDE_3_5_HAIKU),
+    ("mistral-large-latest", LLMModel.MISTRAL_LARGE),
+    ("gemini-2.0-flash", LLMModel.GEMINI_2_0_FLASH),
+])
+def test_llm_model_instantiate_from_string(model_name: str, expected: LLMModel) -> None:
+    """Test LLM model from string."""
+    model = LLMModel(model_name)
+    assert model == expected
+
+
+def test_config_get_llm_api_endpoint() -> None:
+    """Test config get llm api endpoint."""
+    c = Config.from_default(
+        llm_provider=LLMProvider.AZURE_OPENAI,
+        azure_openai_endpoint="test-azure-openai-endpoint",
+        azure_openai_api_key="test-azure-openai-api-key",
+    )
+    assert c.get_llm_api_endpoint(model_name=LLMModel.AZURE_GPT_4_O) == "test-azure-openai-endpoint"
+
+    c = Config.from_default(
+        llm_provider=LLMProvider.OPENAI,
+        openai_api_key=SecretStr("test-openai-api-key"),
+    )
+    assert c.get_llm_api_endpoint(model_name=LLMModel.GPT_4_O) is None
+
+
+PROVIDER_ENV_VARS = [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "MISTRAL_API_KEY",
+    "GOOGLE_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+]
+
+def clear_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear env vars for the Provider APIs."""
+    for env_var in PROVIDER_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
+
+
+@pytest.mark.parametrize(("env_vars", "provider"), [
+    ({"OPENAI_API_KEY": "test-openai-api-key"}, LLMProvider.OPENAI),
+    ({"ANTHROPIC_API_KEY": "test-anthropic-api-key"}, LLMProvider.ANTHROPIC),
+    ({"MISTRAL_API_KEY": "test-mistral-api-key"}, LLMProvider.MISTRALAI),
+    ({"GOOGLE_API_KEY": "test-google-api-key"}, LLMProvider.GOOGLE_GENERATIVE_AI),
+    (
+        {
+            "AZURE_OPENAI_API_KEY": "test-azure-openai-api-key",
+            "AZURE_OPENAI_ENDPOINT": "test-azure-openai-endpoint",
+        },
+        LLMProvider.AZURE_OPENAI,
+    ),
+])
+def test_llm_provider_default_from_api_keys_env_vars(
+    env_vars: dict[str, str], provider: LLMProvider, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test LLM provider default from API keys env vars."""
+    clear_env_vars(monkeypatch)
+    for env_var_name, env_var_value in env_vars.items():
+        monkeypatch.setenv(env_var_name, env_var_value)
+
+    c = Config.from_default()
+    assert c.llm_provider == provider
+
+
+@pytest.mark.parametrize(("config_kwargs", "provider"), [
+    ({"openai_api_key": "test-openai-api-key"}, LLMProvider.OPENAI),
+    ({"anthropic_api_key": "test-anthropic-api-key"}, LLMProvider.ANTHROPIC),
+    ({"mistralai_api_key": "test-mistral-api-key"}, LLMProvider.MISTRALAI),
+    ({"google_api_key": "test-google-api-key"}, LLMProvider.GOOGLE_GENERATIVE_AI),
+    (
+        {
+            "azure_openai_api_key": "test-azure-openai-api-key",
+            "azure_openai_endpoint": "test-azure-openai-endpoint",
+        },
+        LLMProvider.AZURE_OPENAI,
+    ),
+])
+def test_llm_provider_default_from_api_keys_config_kwargs(
+    config_kwargs: dict[str, str], provider: LLMProvider, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test LLM provider default from API keys config kwargs."""
+    clear_env_vars(monkeypatch)
+    c = Config.from_default(**config_kwargs)
+    assert c.llm_provider == provider
