@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import click
 from dotenv import load_dotenv
+from langchain_community.tools.file_management.copy import CopyFileTool
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
 from typing_extensions import get_origin
@@ -29,8 +30,9 @@ from portia.config import Config
 from portia.errors import InvalidConfigError
 from portia.execution_context import execution_context
 from portia.logger import logger
+from portia.open_source_tools.calculator_tool import to_portia
 from portia.portia import ExecutionHooks, Portia
-from portia.tool_registry import DefaultToolRegistry
+from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry
 
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
@@ -270,7 +272,8 @@ def run(
     cli_config, config = _get_config(**kwargs)
 
     # Add the tool registry
-    registry = DefaultToolRegistry(config)
+    p = to_portia(CopyFileTool)
+    registry = DefaultToolRegistry(config) + InMemoryToolRegistry.from_local_tools([p])
 
     # Run the query
     portia = Portia(

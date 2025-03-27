@@ -1,12 +1,62 @@
 """Simple Calculator Implementation."""
 
 import re
+from tempfile import TemporaryDirectory
+from typing import Any, Optional, Type
 
+from langchain_community.agent_toolkits import FileManagementToolkit
+from langchain_community.tools.file_management.copy import CopyFileTool, FileCopyInput
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError
 from portia.tool import Tool, ToolRunContext
 
+working_directory = TemporaryDirectory()
+toolkit = FileManagementToolkit(
+    root_dir=str(working_directory.name),
+)  # If you don't provide a root_dir, operations will default to the current working directory
+toolkit.get_tools()
+
+
+class PortiaCopyFileTool(Tool[str]):
+    """Copy a file to a new location."""
+
+    id: str = "copy_file_tool"
+    name: str = "Copy File Tool"
+    description: str = "Copy a file to a new location."
+    args_schema: type[BaseModel] = FileCopyInput
+    output_schema: tuple[str, str] = ("str", "A string dump of the computed result")
+    langchain_tool: CopyFileTool = Field(default_factory=CopyFileTool)
+
+    def run(self, _: ToolRunContext, **other_args: str) -> str:
+        """Run the tool."""
+        return self.langchain_tool.run(other_args)
+
+
+def to_portia(langchain_tool: BaseTool, tool_id: Optional[str] = None) -> Tool:
+    name = getattr(langchain_tool, "name", "Unnamed Tool")
+    description = getattr(langchain_tool, "description", "No description provided.")
+    args_schema = getattr(langchain_tool, "args_schema", None)
+
+    if tool_id is None:
+        tool_id = name.lower().replace(" ", "_")
+
+    class LangChainToolWrapper(Tool[str]):
+        id: str = tool_id
+        name: str = name
+        description: str = description
+        args_schema: Type[BaseModel] = args_schema
+        output_schema: tuple[str, str] = ("str", "A string dump of the computed result")
+
+        def run(self, _: ToolRunContext, **kwargs: Any) -> str:
+            """Run the wrapped LangChain tool."""
+            return langchain_tool.run(**kwargs)
+
+    # Create an instance of the wrapper class
+    return LangChainToolWrapper()
+
+tool = to_portia(CopyFileTool)
 
 class CalculatorToolSchema(BaseModel):
     """Input for the CalculatorTool."""
