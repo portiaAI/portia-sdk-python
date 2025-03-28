@@ -8,7 +8,6 @@ from pydantic import SecretStr
 
 from portia.config import (
     EXECUTION_MODEL_KEY,
-    EXTRAS_GROUPS_DEPENDENCIES,
     PLANNING_MODEL_KEY,
     Config,
     ExecutionAgentType,
@@ -17,7 +16,6 @@ from portia.config import (
     LogLevel,
     PlanningAgentType,
     StorageClass,
-    validate_extras_dependencies,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
@@ -261,14 +259,6 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
 def test_all_models_have_provider(model: LLMModel) -> None:
     """Test all models have a provider."""
     assert model.provider() is not None
-
-
-def test_validate_extras_dependencies_catches_import_errors() -> None:
-    """Test function doesn't raise on non-existing top level package."""
-    EXTRAS_GROUPS_DEPENDENCIES["fake-extras-package"] = ["fake_package.bar"]
-    with pytest.raises(ImportError) as e:
-        validate_extras_dependencies("fake-extras-package")
-    assert "portia-sdk-python[fake-extras-package]" in str(e.value)
 
 
 @pytest.mark.parametrize(("model_name", "expected"), [

@@ -31,7 +31,8 @@ from langsmith import wrappers
 from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr
 
-from portia.config import Config, LLMModel, LLMProvider, validate_extras_dependencies
+from portia.common import validate_extras_dependencies
+from portia.config import Config, LLMModel, LLMProvider
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import (

@@ -64,7 +64,7 @@ class ImageUnderstandingTool(Tool[str]):
         """
     tool_context: str = ""
 
-    def run(self, ctx: ToolRunContext, **kwargs: Any) -> str:  # noqa: ANN401
+    def run(self, ctx: ToolRunContext, **kwargs: Any) -> str:
         """Run the ImageTool."""
         image_processor = LLMWrapper.for_usage(IMAGE_TOOL_MODEL_KEY, ctx.config).to_langchain()
 

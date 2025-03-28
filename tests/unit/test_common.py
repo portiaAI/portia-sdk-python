@@ -1,12 +1,18 @@
 """Tests for common classes."""
 
 import json
+from unittest import mock
 from uuid import UUID
 
 import pytest
 from pydantic import BaseModel, Field
 
-from portia.common import PortiaEnum, combine_args_kwargs
+from portia.common import (
+    EXTRAS_GROUPS_DEPENDENCIES,
+    PortiaEnum,
+    combine_args_kwargs,
+    validate_extras_dependencies,
+)
 from portia.prefixed_uuid import PrefixedUUID
 
 
@@ -123,3 +129,11 @@ class TestPrefixedUUID:
         """Test PrefixedUUID hash."""
         uuid = PrefixedUUID()
         assert hash(uuid) == hash(uuid.uuid)
+
+
+def test_validate_extras_dependencies_catches_import_errors() -> None:
+    """Test function doesn't raise on non-existing top level package."""
+    with mock.patch.dict(EXTRAS_GROUPS_DEPENDENCIES, {"fake-extras-package": ["fake_package.bar"]}):
+        with pytest.raises(ImportError) as e:
+            validate_extras_dependencies("fake-extras-package")
+        assert "portia-sdk-python[fake-extras-package]" in str(e.value)
