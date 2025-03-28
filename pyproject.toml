@@ -111,6 +111,7 @@ addopts = [
 omit = [
     "*/tests/*", # Don't cover test files themselves
     "example.py", # Don't cover example
+    "*/_unstable/**",  # Don't check _unstable files
 ]
 
 [tool.coverage.report]
