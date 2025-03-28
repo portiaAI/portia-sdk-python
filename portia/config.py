@@ -8,7 +8,6 @@ config files and default settings.
 
 from __future__ import annotations
 
-import importlib.util
 import os
 from enum import Enum
 from pathlib import Path
@@ -41,29 +40,6 @@ class StorageClass(Enum):
     MEMORY = "MEMORY"
     DISK = "DISK"
     CLOUD = "CLOUD"
-
-
-EXTRAS_GROUPS_DEPENDENCIES = {
-    "mistral": ["mistralai", "langchain_mistralai"],
-    "google": ["google.generativeai", "langchain_google_genai"],
-}
-
-def validate_extras_dependencies(extra_group: str) -> None:
-    """Validate that the dependencies for an extras group are installed.
-
-    Provide a helpful error message if not all dependencies are installed.
-    """
-    def package_installed(package: str) -> bool:
-        try:
-            return importlib.util.find_spec(package) is not None
-        except ImportError:
-            pass
-        return False
-
-    if not all(package_installed(p) for p in EXTRAS_GROUPS_DEPENDENCIES[extra_group]):
-        raise ImportError(
-            f"Please install portia-sdk-python[{extra_group}] to use this functionality.",
-        )
 
 
 class LLMProvider(Enum):

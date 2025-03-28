@@ -36,7 +36,7 @@ class MockInvoker:
     def invoke(
         self,
         prompt: list[BaseMessage],
-        **_: Any,  # noqa: ANN401
+        **_: Any,
     ) -> AIMessage | BaseModel:
         """Mock run for invoking the chain."""
         self.called = True
@@ -125,7 +125,7 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
     class TestError(Exception):
         """Test error."""
 
-    def mock_invoke(**_: Any) -> AIMessage | BaseModel:  # noqa: ANN401
+    def mock_invoke(**_: Any) -> AIMessage | BaseModel:
         """Mock invoke that raises an error."""
         raise TestError("Test error")
 
