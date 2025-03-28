@@ -143,8 +143,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def run(
         self,
         ctx: ToolRunContext,
-        *args: Any,  # noqa: ANN401
-        **kwargs: Any,  # noqa: ANN401
+        *args: Any,
+        **kwargs: Any,
     ) -> SERIALIZABLE_TYPE_VAR | Clarification:
         """Run the tool.
 
@@ -164,8 +164,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def _run(
         self,
         ctx: ToolRunContext,
-        *args: Any,  # noqa: ANN401
-        **kwargs: Any,  # noqa: ANN401
+        *args: Any,
+        **kwargs: Any,
     ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
         """Invoke the Tool.run function and handle converting the result into an Output object.
 
@@ -204,8 +204,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def _run_with_artifacts(
         self,
         ctx: ToolRunContext,
-        *args: Any,  # noqa: ANN401
-        **kwargs: Any,  # noqa: ANN401
+        *args: Any,
+        **kwargs: Any,
     ) -> tuple[str, Output[SERIALIZABLE_TYPE_VAR]]:
         """Invoke the Tool.run function and handle converting to an Output object.
 
@@ -492,8 +492,8 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     def run(
         self,
         ctx: ToolRunContext,
-        *args: Any,  # noqa: ANN401
-        **kwargs: Any,  #  noqa: ANN401
+        *args: Any,
+        **kwargs: Any,
     ) -> SERIALIZABLE_TYPE_VAR | None | Clarification:
         """Invoke the run endpoint and handle the response.
 
@@ -552,7 +552,7 @@ class PortiaMcpTool(Tool[str]):
 
     mcp_client_config: McpClientConfig
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> str:  #  noqa: ANN401
+    def run(self, _: ToolRunContext, **kwargs: Any) -> str:
         """Invoke the tool by dispatching to the MCP server.
 
         Args:

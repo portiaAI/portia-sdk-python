@@ -11,7 +11,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 
-def render_template(file_name: str, **kwargs: Any) -> str:  # noqa: ANN401
+def render_template(file_name: str, **kwargs: Any) -> str:
     """Render a Jinja template from the file system into a string.
 
     This function loads a template file from the `portia.templates` package,

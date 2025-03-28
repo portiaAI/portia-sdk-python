@@ -12,10 +12,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from openai import BaseModel
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from portia.plan import Plan, Step  # noqa: TC001
+from portia.plan import Plan, Step
 
 if TYPE_CHECKING:
     from portia.config import Config

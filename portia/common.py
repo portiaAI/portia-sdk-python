@@ -7,6 +7,7 @@ use in the Portia framework.
 
 from __future__ import annotations
 
+import importlib.util
 from enum import Enum
 from typing import Any, TypeVar
 
@@ -52,3 +53,38 @@ def combine_args_kwargs(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
     """
     args_dict = {f"{i}": arg for i, arg in enumerate(args)}
     return {**args_dict, **kwargs}
+
+
+EXTRAS_GROUPS_DEPENDENCIES = {
+    "mistral": ["mistralai", "langchain_mistralai"],
+    "google": ["google.generativeai", "langchain_google_genai"],
+}
+
+
+def validate_extras_dependencies(extra_group: str, *, raise_error: bool = True) -> bool:
+    """Validate that the dependencies for an extras group are installed.
+
+    Returns True if all dependencies are installed, False otherwise.
+
+    Args:
+        extra_group (str): The extras group to validate, e.g. "mistral" or "google".
+        raise_error (bool): Whether to raise an ImportError if the dependencies are not installed.
+
+    Returns:
+        bool: True if all dependencies are installed, False otherwise.
+
+    """
+    def are_packages_installed(packages: list[str]) -> bool:
+        """Check if a list of packages are installed."""
+        try:
+            return all(importlib.util.find_spec(package) is not None for package in packages)
+        except ImportError:
+            return False
+
+    if not are_packages_installed(EXTRAS_GROUPS_DEPENDENCIES[extra_group]):
+        if raise_error:
+            raise ImportError(
+                f"Please install portia-sdk-python[{extra_group}] to use this functionality.",
+            )
+        return False
+    return True

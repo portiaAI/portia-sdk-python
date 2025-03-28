@@ -13,7 +13,7 @@ from langchain_core.messages import BaseMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
-from portia.config import validate_extras_dependencies
+from portia.common import validate_extras_dependencies
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.execution_agents.base_execution_agent import Output
 
