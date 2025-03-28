@@ -1,10 +1,13 @@
 """Unit tests for the Message class in portia._unstable.model."""
 
-import pytest
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from pydantic import ValidationError
+from unittest.mock import MagicMock
 
-from portia._unstable.model import Message
+import pytest
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel, ValidationError
+
+from portia._unstable.model import LangChainModel, Message
 
 
 @pytest.mark.parametrize(
@@ -85,3 +88,24 @@ def test_message_validation() -> None:
     # Missing required fields
     with pytest.raises(ValidationError, match="Field required"):
         Message()  # type: ignore[call-arg]
+
+
+class StructuredOutputTestModel(BaseModel):
+    """Test model for structured output."""
+
+    test_field: str
+
+
+def test_langchain_model_structured_output_returns_dict() -> None:
+    """Test that LangchainModel.structured_output returns a dict."""
+    base_chat_model = MagicMock(spec=BaseChatModel)
+    structured_output = MagicMock()
+    base_chat_model.with_structured_output.return_value = structured_output
+    structured_output.invoke.return_value = {"test_field": "Response from model"}
+    model = LangChainModel(client=base_chat_model)
+    result = model.get_structured_response(
+        messages=[Message(role="user", content="Hello")],
+        schema=StructuredOutputTestModel,
+    )
+    assert isinstance(result, StructuredOutputTestModel)
+    assert result.test_field == "Response from model"
