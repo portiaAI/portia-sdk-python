@@ -65,9 +65,8 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
                     ),
                 ),
                 HumanMessagePromptTemplate.from_template(
-                    f"Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')} and today is "
-                    f"{datetime.now(UTC).strftime('%A')}. "
-                    "Review the following plan + current PlanRun."
+                    "Today's date is {current_date} and today is {current_day_of_week}.\n"
+                    "Review the following plan + current PlanRun.\n"
                     "Current Plan: {plan}\n"
                     "Current PlanRun: {plan_run}\n",
                 ),
@@ -86,6 +85,8 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
             .with_structured_output(PreStepIntrospection)
             .invoke(
                 self.prompt.format_messages(
+                    current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
+                    current_day_of_week=datetime.now(UTC).strftime("%A"),
                     plan_run=plan_run.model_dump_json(),
                     plan=plan.model_dump_json(),
                 ),
