@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 from typing import Any
+from unittest import mock
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
@@ -31,7 +31,7 @@ from portia.plan import Step
 from portia.tool import Tool
 from tests.utils import (
     AdditionTool,
-    MockInvoker,
+    get_mock_base_chat_model,
     get_test_config,
     get_test_llm_wrapper,
     get_test_plan_run,
@@ -62,7 +62,7 @@ def test_parser_model() -> None:
             ),
         ],
     )
-    mock_invoker = MockInvoker(response=tool_inputs)
+    mock_model = get_mock_base_chat_model(response=tool_inputs)
 
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
@@ -74,14 +74,14 @@ def test_parser_model() -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=get_test_llm_wrapper(mock_model).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     parser_model.invoke({})  # type: ignore  # noqa: PGH003
 
-    assert mock_invoker.called
-    messages = mock_invoker.prompt
+    assert mock_model.invoke.called
+    messages = mock_model.invoke.call_args[0][0]
     assert messages
     assert "You are a highly capable assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
@@ -89,17 +89,16 @@ def test_parser_model() -> None:
     assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert mock_invoker.output_format == ToolInputs
+    assert mock_model.with_structured_output.called
+    assert mock_model.with_structured_output.call_args[0][0] == ToolInputs
 
 
-def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parser_model_with_retries() -> None:
     """Test the parser model with retries."""
     tool_inputs = ToolInputs(
         args=[],
     )
-    mock_invoker = MockInvoker(response=tool_inputs)
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+    mock_invoker = get_mock_base_chat_model(response=tool_inputs)
 
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
@@ -111,33 +110,22 @@ def test_parser_model_with_retries(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(mock_invoker).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
-    # Track number of invoke calls
-    invoke_count = 0
-    original_invoke = parser_model.invoke
+    with mock.patch.object(parser_model, "invoke", side_effect=parser_model.invoke) as mock_invoke:
+        parser_model.invoke({})  # type: ignore  # noqa: PGH003
 
-    def counted_invoke(*args, **kwargs) -> dict[str, Any]:  # noqa: ANN002, ANN003
-        nonlocal invoke_count
-        invoke_count += 1
-        return original_invoke(*args, **kwargs)
-
-    parser_model.invoke = counted_invoke
-
-    parser_model.invoke({})  # type: ignore  # noqa: PGH003
-
-    # Initial invoke call is not counted towards the MAX_RETRIES
-    assert invoke_count == MAX_RETRIES + 1
+    assert mock_invoke.call_count == MAX_RETRIES + 1
 
 
-def test_parser_model_with_retries_invalid_json(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parser_model_with_retries_invalid_structured_response() -> None:
     """Test the parser model handling of invalid JSON and retries."""
-    mock_invoker = MockInvoker(response=AIMessage(content="INVALID_JSON"))
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+    mock_model = get_mock_base_chat_model(
+        response="NOT_A_PYDANTIC_MODEL_INSTANCE",
+    )
 
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
@@ -149,29 +137,18 @@ def test_parser_model_with_retries_invalid_json(monkeypatch: pytest.MonkeyPatch)
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(mock_model).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
-    # Track number of invoke calls
-    invoke_count = 0
-    original_invoke = parser_model.invoke
+    with mock.patch.object(parser_model, "invoke", side_effect=parser_model.invoke) as mock_invoke:
+        parser_model.invoke({"messages": []})  # type: ignore  # noqa: PGH003
 
-    def counted_invoke(*args, **kwargs) -> dict[str, Any]:  # noqa: ANN002, ANN003
-        nonlocal invoke_count
-        invoke_count += 1
-        return original_invoke(*args, **kwargs)
-
-    parser_model.invoke = counted_invoke
-
-    parser_model.invoke({})  # type: ignore  # noqa: PGH003
-
-    # Initial invoke call is not counted towards the MAX_RETRIES
-    assert invoke_count == MAX_RETRIES + 1
+    assert mock_invoke.call_count == MAX_RETRIES + 1
 
 
-def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parser_model_with_invalid_args() -> None:
     """Test the parser model handling of invalid arguments and retries."""
     # First response contains one valid and one invalid argument
     invalid_tool_inputs = ToolInputs(
@@ -212,22 +189,14 @@ def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None
     responses = [invalid_tool_inputs, valid_tool_inputs]
     current_response_index = 0
 
-    class MockInvoker:
-        def invoke(self, *_, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG002
-            nonlocal current_response_index
-            response = responses[current_response_index]
-            current_response_index += 1
-            return response
+    def mock_invoke(*_, **__):  # noqa: ANN002, ANN003, ANN202
+        nonlocal current_response_index
+        response = responses[current_response_index]
+        current_response_index += 1
+        return response
 
-        def with_structured_output(
-            self,
-            output_format: Any,  # noqa: ARG002 ANN401
-            method: str = "function_calling",  # noqa: ARG002
-        ) -> MockInvoker:
-            return self
-
-    monkeypatch.setattr(ChatOpenAI, "invoke", MockInvoker().invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", MockInvoker().with_structured_output)
+    mock_model = get_mock_base_chat_model(response=None)
+    mock_model.invoke.side_effect = mock_invoke
 
     class TestSchema(BaseModel):
         content: str
@@ -244,7 +213,7 @@ def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None
     )
 
     parser_model = ParserModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(mock_model).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -273,7 +242,7 @@ def test_parser_model_with_invalid_args(monkeypatch: pytest.MonkeyPatch) -> None
     assert number_arg.value == 43
 
 
-def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_verifier_model() -> None:
     """Test the verifier model."""
     tool_inputs = ToolInputs(
         args=[
@@ -286,11 +255,10 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
         ],
     )
     verified_tool_inputs = VerifiedToolInputs(
-        args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
-    )
-    mockinvoker = MockInvoker(response=verified_tool_inputs)
-    monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mockinvoker.with_structured_output)
+        args=[
+            VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
+        )
+    mock_model = get_mock_base_chat_model(response=verified_tool_inputs)
 
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
@@ -302,24 +270,25 @@ def test_verifier_model(monkeypatch: pytest.MonkeyPatch) -> None:
         args_json_schema=_TestToolSchema.model_json_schema,
     )
     verifier_model = VerifierModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(mock_model).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     verifier_model.invoke({"messages": [AIMessage(content=tool_inputs.model_dump_json(indent=2))]})
 
-    assert mockinvoker.called
-    messages = mockinvoker.prompt
+    assert mock_model.invoke.called
+    messages = mock_model.invoke.call_args[0][0]
     assert "You are an expert reviewer" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert mockinvoker.output_format == VerifiedToolInputs
+    assert mock_model.with_structured_output.called
+    assert mock_model.with_structured_output.call_args[0][0] == VerifiedToolInputs
 
 
-def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_verifier_model_schema_validation() -> None:
     """Test the verifier model schema validation."""
 
     class TestSchema(BaseModel):
@@ -334,9 +303,7 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
             VerifiedToolArgument(name="optional_field", value=None, schema_invalid=False),
         ],
     )
-    mockinvoker = MockInvoker(response=verified_tool_inputs)
-    monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mockinvoker.with_structured_output)
+    mock_model = get_mock_base_chat_model(response=verified_tool_inputs)
 
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
@@ -348,7 +315,7 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
         args_json_schema=_TestToolSchema.model_json_schema,
     )
     verifier_model = VerifierModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(mock_model).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -374,15 +341,15 @@ def test_verifier_model_schema_validation(monkeypatch: pytest.MonkeyPatch) -> No
     ), "optional_field should not be marked as missing when validation fails"
 
 
-def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tool_calling_model_no_hallucinations() -> None:
     """Test the tool calling model."""
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
     )
-    mockinvoker = MockInvoker(
+    mock_model = get_mock_base_chat_model(
         response=SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),  # type: ignore  # noqa: PGH003
     )
-    monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
+
     (_, plan_run) = get_test_plan_run()
     agent = SimpleNamespace(
         verified_args=verified_tool_inputs,
@@ -397,15 +364,15 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        llm=get_test_llm_wrapper(mock_model).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
 
-    assert mockinvoker.called
-    messages = mockinvoker.prompt
+    assert mock_model.invoke.called
+    messages = mock_model.invoke.call_args[0][0]
     assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
@@ -414,15 +381,14 @@ def test_tool_calling_model_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
 
 
-def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tool_calling_model_with_hallucinations() -> None:
     """Test the tool calling model."""
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=True)],
     )
-    mockinvoker = MockInvoker(
+    mock_model = get_mock_base_chat_model(
         response=SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),  # type: ignore  # noqa: PGH003
     )
-    monkeypatch.setattr(ChatOpenAI, "invoke", mockinvoker.invoke)
 
     (_, plan_run) = get_test_plan_run()
 
@@ -460,16 +426,15 @@ def test_tool_calling_model_with_hallucinations(monkeypatch: pytest.MonkeyPatch)
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        llm=get_test_llm_wrapper(mock_model).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
 
-    assert mockinvoker.called
-    messages = mockinvoker.prompt
-    assert messages
+    assert mock_model.invoke.called
+    messages = mock_model.invoke.call_args[0][0]
     assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
@@ -618,7 +583,7 @@ def test_default_execution_agent_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(get_mock_base_chat_model()).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -627,7 +592,7 @@ def test_default_execution_agent_edge_cases() -> None:
 
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        llm=get_test_llm_wrapper(get_mock_base_chat_model()).to_langchain(),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -815,7 +780,7 @@ def test_optional_args_with_none_values() -> None:
         tool=MockTool(),
     )
     model = VerifierModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(get_mock_base_chat_model()).model,
         context="CONTEXT_STRING",
         agent=agent,
     )
@@ -842,7 +807,7 @@ def test_verifier_model_edge_cases() -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     verifier_model = VerifierModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        model=get_test_llm_wrapper(get_mock_base_chat_model()).model,
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
