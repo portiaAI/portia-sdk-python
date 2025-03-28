@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, override
+from typing import TYPE_CHECKING, Any, Callable, override
 from unittest.mock import MagicMock
-from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.prompt_values import ChatPromptValue
-from langchain_core.runnables.config import RunnableConfig
-from pydantic import BaseModel, Field, SecretStr
+
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.outputs import ChatResult
-from langchain_core.tools import BaseTool
+from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
@@ -26,7 +22,10 @@ from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Sequence
+
+    from langchain_core.messages import BaseMessage
+    from langchain_core.tools import BaseTool
     from mcp import ClientSession
 
     from portia.execution_context import ExecutionContext
@@ -95,7 +94,7 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
     )
 
 
-def get_test_llm_wrapper(mock_client: MockInvoker | BaseChatModel) -> LLMWrapper:
+def get_test_llm_wrapper(mock_client: BaseChatModel) -> LLMWrapper:
     """Get a test LLM wrapper."""
     return LLMWrapper(model=LangChainModel(client=mock_client))
 
@@ -262,21 +261,21 @@ class MockMcpSessionWrapper:
 
 
 def get_mock_base_chat_model(
-    response: Any = None,
-) -> BaseChatModel:
+    response: Any = None,  # noqa: ANN401
+) -> MagicMock:
     """Get a mock base chat model."""
     model = MagicMock(spec=BaseChatModel)
 
-    def invoke(self, *args, **kwargs) -> BaseMessage:
+    def invoke(*_: Any, **__: Any) -> BaseMessage:
         """Mock invoke."""
         assert response is not None
         return response
 
-    def with_structured_output(schema: BaseModel, *args, **kwargs) -> BaseChatModel:
+    def with_structured_output(_: BaseModel, *__: Any, **___: Any) -> BaseChatModel:
         """Mock with structured output."""
         return model
 
-    def bind_tools(tools: Sequence[BaseTool], *args, **kwargs) -> BaseChatModel:
+    def bind_tools(_: Sequence[BaseTool], *__: Any, **___: Any) -> BaseChatModel:
         """Mock bind tools."""
         return model
 
@@ -284,80 +283,3 @@ def get_mock_base_chat_model(
     model.with_structured_output.side_effect = with_structured_output
     model.bind_tools.side_effect = bind_tools
     return model
-
-
-class MockInvoker:
-    """Mock invoker."""
-
-    called: bool
-    prompt: ChatPromptValue | None
-    response: AIMessage | BaseMessage | None
-    output_format: Any | None
-    tools: Any | None
-    method: str | None
-
-    def __init__(self, response: AIMessage | BaseMessage | None = None) -> None:
-        """Init worker."""
-        super().__init__()
-        self.called = False
-        self.prompt = None
-        self.response = response
-        self.output_format = None
-        self.tools = None
-        self.method = None
-
-    @override
-    def invoke(
-        self,
-        input: ChatPromptValue,  # type: ignore
-        config: RunnableConfig | None = None,
-        **kwargs: Any,
-    ) -> BaseMessage:
-        """Mock run for invoking the chain."""
-        self.called = True
-        self.prompt = input
-        if self.response:
-            return self.response
-        return AIMessage(content="invoked")
-
-    @override
-    def with_structured_output(
-        self,
-        schema: Any,  # noqa: ANN401
-        method: str = "function_calling",
-        include_raw: bool = False,
-        **kwargs: Any,
-    ) -> MockInvoker:
-        """Model wrapper for structured output."""
-        self.output_format = schema
-        self.method = method
-        return self
-
-    @override
-    def bind_tools(
-        self,
-        tools: Sequence[Dict[str, Any] | type | Callable[..., Any] | BaseTool],
-        tool_choice: str | dict | None = None,
-        **kwargs: Any,
-    ) -> MockInvoker:
-        """Mock method to bind tools to the model."""
-        self.tools = tools
-        return self
-
-    @property
-    def _llm_type(self) -> str:
-        """Return type of llm."""
-        return "mock_invoker"
-
-    @override
-    def _generate(
-        self,
-        messages: list[BaseMessage],
-        stop: list[str] | None = None,
-        run_manager: Any | None = None,  # noqa: ANN401
-        **kwargs: Any,
-    ) -> ChatResult:
-        """Generate chat result."""
-        if self.response:
-            return ChatResult(generations=[{"message": self.response, "text": self.response.content}])
-        return ChatResult(generations=[{"message": AIMessage(content="generated"), "text": "generated"}])

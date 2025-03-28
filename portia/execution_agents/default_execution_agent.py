@@ -187,7 +187,7 @@ class ParserModel:
         """Initialize the model.
 
         Args:
-            mode (Model): The language model used for argument parsing.
+            model (Model): The language model used for argument parsing.
             context (str): The context for argument generation.
             agent (DefaultExecutionAgent): The agent using the parser model.
 

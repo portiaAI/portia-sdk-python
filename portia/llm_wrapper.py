@@ -21,13 +21,12 @@ from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
-from portia.config import Config
 from portia.model import LangChainModel, Message, Model
 
 if TYPE_CHECKING:
-    from langchain_core.language_models.chat_models import (
-        BaseChatModel,
-    )
+    from langchain_core.language_models.chat_models import BaseChatModel
+
+    from portia.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +60,7 @@ class LLMWrapper:
         """Initialize the wrapper.
 
         Args:
-            model_name (LLMModel): The name of the LLM model to use.
-            api_key (SecretStr): The API key for authentication with the LLM provider.
-            model_seed (int, optional): Seed for model's random generation. Defaults to 343.
-            api_endpoint (str | None, optional): The API endpoint for the LLM provider
+            model (Model): The language model to use.
 
         """
         self.model = model
