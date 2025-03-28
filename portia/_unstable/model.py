@@ -46,7 +46,7 @@ class Message(BaseModel):
             )
         if isinstance(message, AIMessage):
             return cls.model_validate(
-                {"role": "ai", "content": message.content},
+                {"role": "assistant", "content": message.content},
             )
         if isinstance(message, SystemMessage):
             return cls.model_validate(
