@@ -11,7 +11,8 @@ from langchain_openai import ChatOpenAI
 from openai import OpenAI
 from pydantic import BaseModel, SecretStr
 
-from portia._unstable.model import (
+from portia.config import Config
+from portia.model import (
     AnthropicModel,
     AzureOpenAIModel,
     GoogleGenerativeAIModel,
@@ -20,7 +21,6 @@ from portia._unstable.model import (
     Model,
     OpenAIModel,
 )
-from portia.config import Config
 from portia.planning_agents.base_planning_agent import StepsOrError
 
 if TYPE_CHECKING:

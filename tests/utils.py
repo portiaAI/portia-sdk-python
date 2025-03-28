@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Callable, override
+from typing import TYPE_CHECKING, Any, Callable, override
 
+from langchain_core.messages import AIMessage
+from langchain_core.prompt_values import ChatPromptValue
+from langchain_core.runnables.config import RunnableConfig
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, LLMModel, LogLevel, StorageClass
+from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
 from portia.llm_wrapper import LLMWrapper
+from portia.model import LangChainModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunUUID
 from portia.tool import Tool, ToolRunContext
@@ -90,9 +94,9 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
     )
 
 
-def get_test_llm_wrapper() -> LLMWrapper:
+def get_test_llm_wrapper(mock_invoker: MockInvoker) -> LLMWrapper:
     """Get a test LLM wrapper."""
-    return LLMWrapper(LLMModel.GPT_4_O, SecretStr("test123"))
+    return LLMWrapper(model=LangChainModel(client=mock_invoker))
 
 
 def get_execution_ctx(plan_run: PlanRun | None = None) -> ExecutionContext:
@@ -254,3 +258,46 @@ class MockMcpSessionWrapper:
     async def mock_mcp_session(self, _: McpClientConfig) -> AsyncIterator[ClientSession]:
         """Mock method to swap out with the mcp_session context manager."""
         yield self.session
+
+
+class MockInvoker:
+    """Mock invoker."""
+
+    called: bool
+    prompt: ChatPromptValue | None
+    response: AIMessage | BaseModel | None
+    output_format: Any | None
+    tools: Any | None
+    method: str | None
+
+    def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
+        """Init worker."""
+        self.called = False
+        self.prompt = None
+        self.response = response
+        self.output_format = None
+        self.tools = None
+        self.method = None
+
+    def invoke(
+        self,
+        prompt: ChatPromptValue,
+        _: RunnableConfig | None = None,
+        **kwargs: Any,  # noqa: ARG002
+    ) -> AIMessage | BaseModel:
+        """Mock run for invoking the chain."""
+        self.called = True
+        self.prompt = prompt
+        if self.response:
+            return self.response
+        return AIMessage(content="invoked")
+
+    def with_structured_output(
+        self,
+        output_format: Any,  # noqa: ANN401
+        method: str = "function_calling",
+    ) -> MockInvoker:
+        """Model wrapper for structured output."""
+        self.output_format = output_format
+        self.method = method
+        return self

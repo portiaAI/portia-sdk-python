@@ -16,7 +16,6 @@ from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr
 
 from portia.common import validate_extras_dependencies
-from portia.planning_agents.base_planning_agent import StepsOrError
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -119,6 +118,10 @@ class LangChainModel(Model):
         """
         self._client = client
 
+    def to_langchain(self) -> BaseChatModel:
+        """Get the LangChain client."""
+        return self._client
+
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
         langchain_messages = [msg.to_langchain() for msg in messages]
@@ -217,7 +220,7 @@ class OpenAIModel(LangChainModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema == StepsOrError:
+        if schema.__name__ == "StepsOrError":
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
             messages, schema, method="function_calling", **kwargs,
@@ -315,7 +318,7 @@ class AzureOpenAIModel(LangChainModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema == StepsOrError:
+        if schema.__name__ == "StepsOrError":
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
             messages, schema, method="function_calling", **kwargs,
@@ -389,7 +392,7 @@ class AnthropicModel(LangChainModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema == StepsOrError:
+        if schema.__name__ == "StepsOrError":
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(messages, schema, **kwargs)
 
@@ -461,7 +464,7 @@ if validate_extras_dependencies("mistral", raise_error=False):
                 BaseModelT: The structured response from the model.
 
             """
-            if schema == StepsOrError:
+            if schema.__name__ == "StepsOrError":
                 return self.get_structured_response_instructor(messages, schema)
             return super().get_structured_response(
                 messages, schema, method="function_calling", **kwargs,

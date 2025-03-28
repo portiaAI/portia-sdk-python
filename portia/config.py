@@ -22,7 +22,9 @@ from pydantic import (
     model_validator,
 )
 
+from portia.common import validate_extras_dependencies
 from portia.errors import ConfigNotFoundError, InvalidConfigError
+from portia.model import AnthropicModel, AzureOpenAIModel, Model, OpenAIModel
 
 T = TypeVar("T")
 
@@ -75,7 +77,7 @@ class LLMProvider(Enum):
                 return "azure_openai_api_key"
 
 
-class Model(NamedTuple):
+class ProviderModel(NamedTuple):
     """Provider and model name tuple.
 
     Attributes:
@@ -140,38 +142,38 @@ class LLMModel(Enum):
         raise ValueError(f"Invalid LLM model: {value}")
 
     # OpenAI
-    GPT_4_O = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o")
-    GPT_4_O_MINI = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
-    GPT_3_5_TURBO = Model(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
-    O_3_MINI = Model(provider=LLMProvider.OPENAI, model_name="o3-mini")
+    GPT_4_O = ProviderModel(provider=LLMProvider.OPENAI, model_name="gpt-4o")
+    GPT_4_O_MINI = ProviderModel(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
+    GPT_3_5_TURBO = ProviderModel(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
+    O_3_MINI = ProviderModel(provider=LLMProvider.OPENAI, model_name="o3-mini")
 
     # Anthropic
-    CLAUDE_3_5_SONNET = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-sonnet-latest")
-    CLAUDE_3_5_HAIKU = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-haiku-latest")
-    CLAUDE_3_OPUS = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-opus-latest")
-    CLAUDE_3_7_SONNET = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-7-sonnet-latest")
+    CLAUDE_3_5_SONNET = ProviderModel(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-sonnet-latest")
+    CLAUDE_3_5_HAIKU = ProviderModel(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-haiku-latest")
+    CLAUDE_3_OPUS = ProviderModel(provider=LLMProvider.ANTHROPIC, model_name="claude-3-opus-latest")
+    CLAUDE_3_7_SONNET = ProviderModel(provider=LLMProvider.ANTHROPIC, model_name="claude-3-7-sonnet-latest")
 
     # MistralAI
-    MISTRAL_LARGE = Model(provider=LLMProvider.MISTRALAI, model_name="mistral-large-latest")
+    MISTRAL_LARGE = ProviderModel(provider=LLMProvider.MISTRALAI, model_name="mistral-large-latest")
 
     # Google Generative AI
-    GEMINI_2_0_FLASH = Model(
+    GEMINI_2_0_FLASH = ProviderModel(
         provider=LLMProvider.GOOGLE_GENERATIVE_AI,
         model_name="gemini-2.0-flash",
     )
-    GEMINI_2_0_FLASH_LITE = Model(
+    GEMINI_2_0_FLASH_LITE = ProviderModel(
         provider=LLMProvider.GOOGLE_GENERATIVE_AI,
         model_name="gemini-2.0-flash-lite",
     )
-    GEMINI_1_5_FLASH = Model(
+    GEMINI_1_5_FLASH = ProviderModel(
         provider=LLMProvider.GOOGLE_GENERATIVE_AI,
         model_name="gemini-1.5-flash",
     )
 
     # Azure OpenAI
-    AZURE_GPT_4_O = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
-    AZURE_GPT_4_O_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
-    AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
+    AZURE_GPT_4_O = ProviderModel(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
+    AZURE_GPT_4_O_MINI = ProviderModel(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
+    AZURE_O_3_MINI = ProviderModel(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
 
     @property
     def api_name(self) -> str:
@@ -352,7 +354,7 @@ class Config(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -404,7 +406,7 @@ class Config(BaseModel):
         description="Which LLM Provider to use.",
     )
 
-    models: dict[str, LLMModel] = Field(
+    models: dict[str, LLMModel | Model] = Field(
         default={},
         description="A dictionary of configured LLM models for each usage.",
     )
@@ -434,11 +436,51 @@ class Config(BaseModel):
         }
         return self
 
-    def model(self, usage: str) -> LLMModel:
+    def model(self, usage: str) -> Model:
         """Get the LLM model for the given usage."""
         if usage == PLANNING_MODEL_KEY:
-            return self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
-        return self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
+            llm_model = self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
+        else:
+            llm_model = self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
+        if isinstance(llm_model, LLMModel):
+            return self._construct_model(llm_model)
+        return llm_model
+
+    def _construct_model(self, llm_model: LLMModel) -> Model:
+        """Construct a Model instance from an LLMModel."""
+        match llm_model.provider():
+            case LLMProvider.OPENAI:
+                return OpenAIModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.openai_api_key,
+                )
+            case LLMProvider.ANTHROPIC:
+                return AnthropicModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.anthropic_api_key,
+                )
+            case LLMProvider.MISTRALAI:
+                validate_extras_dependencies("mistralai")
+                from portia.model import MistralAIModel
+                return MistralAIModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.mistralai_api_key,
+                )
+            case LLMProvider.GOOGLE_GENERATIVE_AI:
+                validate_extras_dependencies("google-generativeai")
+                from portia.model import GoogleGenerativeAIModel
+                return GoogleGenerativeAIModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.google_api_key,
+                )
+            case LLMProvider.AZURE_OPENAI:
+                return AzureOpenAIModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.azure_openai_api_key,
+                    azure_endpoint=self.azure_openai_endpoint,
+                )
+            case _:
+                raise ValueError(f"Unsupported provider: {llm_model.provider()}")
 
     # Storage Options
     storage_class: StorageClass = Field(
@@ -539,8 +581,8 @@ class Config(BaseModel):
 
         validate_llm_api_key(self.llm_provider)
         for model in self.models.values():
-            validate_llm_api_key(model.provider())
-
+            if isinstance(model, LLMModel):
+                validate_llm_api_key(model.provider())
         return self
 
     @classmethod

@@ -1,4 +1,4 @@
-"""Unit tests for the Message class in portia._unstable.model."""
+"""Unit tests for the Message class in portia.model."""
 
 from unittest.mock import MagicMock
 
@@ -7,7 +7,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, ValidationError
 
-from portia._unstable.model import LangChainModel, Message
+from portia.model import LangChainModel, Message
 
 
 @pytest.mark.parametrize(

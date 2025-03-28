@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from portia.config import PLANNING_MODEL_KEY
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.llm_wrapper import LLMWrapper
+from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
 from portia.planning_agents.context import render_prompt_insert_defaults
@@ -45,9 +46,9 @@ class DefaultPlanningAgent(BasePlanningAgent):
         response = self.llm_wrapper.to_instructor(
             response_model=StepsOrError,
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are an outstanding task planner who can leverage many \
+                Message(
+                    role="system",
+                    content="You are an outstanding task planner who can leverage many \
     tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
     steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
     that tools need to make sure the chain of calls works. If you are missing information do not \
@@ -60,8 +61,8 @@ class DefaultPlanningAgent(BasePlanningAgent):
     1. Task field: Write only the task description without conditions. \
     2. Condition field: Write the condition in concise natural language. \
     Do not use the condition field for non-conditional steps.",
-                },
-                {"role": "user", "content": prompt},
+                ),
+                Message(role="user", content=prompt),
             ],
         )
 

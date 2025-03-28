@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -31,63 +31,17 @@ from portia.plan import Step
 from portia.tool import Tool
 from tests.utils import (
     AdditionTool,
+    MockInvoker,
     get_test_config,
     get_test_llm_wrapper,
     get_test_plan_run,
     get_test_tool_context,
 )
 
-if TYPE_CHECKING:
-    from langchain_core.prompt_values import ChatPromptValue
-    from langchain_core.runnables.config import RunnableConfig
-
 
 @pytest.fixture(scope="session", autouse=True)
 def _setup() -> None:
     logging.basicConfig(level=logging.INFO)
-
-
-class MockInvoker:
-    """Mock invoker."""
-
-    called: bool
-    prompt: ChatPromptValue | None
-    response: AIMessage | BaseModel | None
-    output_format: Any | None
-    tools: Any | None
-    method: str | None
-
-    def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
-        """Init worker."""
-        self.called = False
-        self.prompt = None
-        self.response = response
-        self.output_format = None
-        self.tools = None
-        self.method = None
-
-    def invoke(
-        self,
-        prompt: ChatPromptValue,
-        _: RunnableConfig | None = None,
-        **kwargs: Any,  # noqa: ARG002
-    ) -> AIMessage | BaseModel:
-        """Mock run for invoking the chain."""
-        self.called = True
-        self.prompt = prompt
-        if self.response:
-            return self.response
-        return AIMessage(content="invoked")
-
-    def with_structured_output(
-        self,
-        output_format: Any,  # noqa: ANN401
-        method: str = "function_calling",
-    ) -> MockInvoker:
-        """Model wrapper for structured output."""
-        self.output_format = output_format
-        self.method = method
-        return self
 
 
 class _TestToolSchema(BaseModel):
@@ -96,7 +50,7 @@ class _TestToolSchema(BaseModel):
     content: str = Field(..., description="INPUT_DESCRIPTION")
 
 
-def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parser_model() -> None:
     """Test the parser model."""
     tool_inputs = ToolInputs(
         args=[
@@ -109,8 +63,6 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
         ],
     )
     mock_invoker = MockInvoker(response=tool_inputs)
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
@@ -122,7 +74,7 @@ def test_parser_model(monkeypatch: pytest.MonkeyPatch) -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        llm=get_test_llm_wrapper().to_langchain(),
+        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
