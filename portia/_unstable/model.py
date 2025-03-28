@@ -87,7 +87,7 @@ class Model(ABC):
             Message: The response from the model.
 
         """
-        ...
+
 
     @abstractmethod
     def get_structured_response(
@@ -148,18 +148,6 @@ class LangChainModel(Model):
         if isinstance(response, schema):
             return response
         return schema.model_validate(response)
-
-    def _map_message_to_instructor(self, message: Message) -> ChatCompletionMessageParam:
-        """Type-safe mapping of Message to ChatCompletionMessageParam."""
-        match message:
-            case Message(role="user", content=content):
-                return {"role": "user", "content": content}
-            case Message(role="assistant", content=content):
-                return {"role": "assistant", "content": content}
-            case Message(role="system", content=content):
-                return {"role": "system", "content": content}
-            case _:
-                raise ValueError(f"Unsupported message role: {message.role}")
 
 
 def map_message_to_instructor(message: Message) -> ChatCompletionMessageParam:
