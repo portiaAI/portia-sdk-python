@@ -186,7 +186,7 @@ def map_message_to_instructor(message: Message) -> ChatCompletionMessageParam:
 class OpenAIModel(LangChainModel):
     """OpenAI model implementation."""
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         model_name: str,
@@ -194,7 +194,6 @@ class OpenAIModel(LangChainModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
-        disabled_params: dict[str, None] | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with OpenAI client.
@@ -204,13 +203,18 @@ class OpenAIModel(LangChainModel):
             api_key: API key for OpenAI
             seed: Random seed for model generation
             max_retries: Maximum number of retries
-            temperature: Temperature parameter (defaults to 1 for O_3_MINI, 0 otherwise)
-            disabled_params: Parameters to disable in the client
+            temperature: Temperature parameter
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
 
         """
-        if disabled_params is None:
-            disabled_params = {"parallel_tool_calls": None}
+        if "disabled_params" not in kwargs:
+            # This is a workaround for o3 mini to avoid parallel tool calls.
+            # See https://github.com/langchain-ai/langchain/issues/25357
+            kwargs["disabled_params"] = {"parallel_tool_calls": None}
+
+        # Unfortunately you get errors from o3 mini with Langchain unless you set
+        # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
+        temperature = 1 if "o3-mini" in model_name.lower() else temperature
 
         client = ChatOpenAI(
             name=model_name,
@@ -219,7 +223,6 @@ class OpenAIModel(LangChainModel):
             api_key=api_key,
             max_retries=max_retries,
             temperature=temperature,
-            disabled_params=disabled_params,
             **kwargs,
         )
         super().__init__(client)
@@ -282,7 +285,6 @@ class AzureOpenAIModel(LangChainModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
-        disabled_params: dict[str, None] | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with Azure OpenAI client.
@@ -295,12 +297,17 @@ class AzureOpenAIModel(LangChainModel):
             api_key: API key for Azure OpenAI
             max_retries: Maximum number of retries
             temperature: Temperature parameter (defaults to 1 for O_3_MINI, 0 otherwise)
-            disabled_params: Parameters to disable in the client
             **kwargs: Additional keyword arguments to pass to AzureChatOpenAI
 
         """
-        if disabled_params is None:
-            disabled_params = {"parallel_tool_calls": None}
+        if "disabled_params" not in kwargs:
+            # This is a workaround for o3 mini to avoid parallel tool calls.
+            # See https://github.com/langchain-ai/langchain/issues/25357
+            kwargs["disabled_params"] = {"parallel_tool_calls": None}
+
+        # Unfortunately you get errors from o3 mini with Langchain unless you set
+        # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
+        temperature = 1 if "o3-mini" in model_name.lower() else temperature
 
         client = AzureChatOpenAI(
             name=model_name,
@@ -311,7 +318,6 @@ class AzureOpenAIModel(LangChainModel):
             api_key=api_key,
             max_retries=max_retries,
             temperature=temperature,
-            disabled_params=disabled_params,
             **kwargs,
         )
         super().__init__(client)
