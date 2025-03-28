@@ -4,6 +4,8 @@ This agent looks at the state of a plan run between steps
 and makes decisions about whether execution should continue.
 """
 
+from datetime import UTC, datetime
+
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 
@@ -43,15 +45,16 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
                         "You are a highly skilled reviewer who reviews in flight plan execution."
                         "Your job is to examine the state of a plan execution (PlanRun) and "
                         "decide what action should be taken next."
-                        "You should use the current_step_index field to identify the current step"
+                        "You should use the current_step_index field to identify the current step "
                         "in the plan, and the PlanRun state to know what has happened so far."
-                        "The actions that can be taken next are:"
-                        " - STOP -> stop execution and return the result so far."
-                        " - SKIP -> skip the next step execution."
-                        " - FAIL -> stop execution entirely."
-                        " - CONTINUE -> Continue execution of the next step."
+                        "The actions that can be taken are:"
+                        " - COMPLETE -> complete execution and return the result so far."
+                        " - SKIP -> skip the current step execution."
+                        " - FAIL -> stop and fail execution entirely."
+                        " - CONTINUE -> Continue execution for the current step."
                         "You should choose an outcome based on the following logic in order:\n"
-                        " - If the overarching goal of the plan has already been met return STOP.\n"
+                        " - If the overarching goal of the plan "
+                        "has already been met return COMPLETE.\n"
                         " - If the current step has a condition that is false you return SKIP.\n"
                         " - If you cannot evaluate the condition"
                         " because it's impossible to evaluate return FAIL.\n"
@@ -62,6 +65,8 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
                     ),
                 ),
                 HumanMessagePromptTemplate.from_template(
+                    f"Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')} and today is "
+                    f"{datetime.now(UTC).strftime('%A')}. "
                     "Review the following plan + current PlanRun."
                     "Current Plan: {plan}\n"
                     "Current PlanRun: {plan_run}\n",
