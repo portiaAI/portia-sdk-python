@@ -1,0 +1,90 @@
+name: Create Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type (alpha/release)'
+        required: true
+        type: choice
+        options:
+          - alpha
+          - release
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: 'patch'
+
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(poetry version -s)
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Bump version
+        id: bump_version
+        run: |
+          # Remove potential alpha suffix from current version
+          BASE_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | sed 's/-alpha//')
+          
+          # Bump version according to input
+          case "${{ inputs.bump_type }}" in
+            patch)
+              NEW_VERSION=$(echo $BASE_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+              ;;
+            minor)
+              NEW_VERSION=$(echo $BASE_VERSION | awk -F. '{$(NF-1) = $(NF-1) + 1; $NF = 0;} 1' | sed 's/ /./g')
+              ;;
+            major)
+              NEW_VERSION=$(echo $BASE_VERSION | awk -F. '{$1 = $1 + 1; $(NF-1) = 0; $NF = 0;} 1' | sed 's/ /./g')
+              ;;
+          esac
+          
+          # Add alpha suffix if requested
+          if [ "${{ inputs.release_type }}" = "alpha" ]; then
+            NEW_VERSION="${NEW_VERSION}-alpha"
+          fi
+          
+          # Update poetry version
+          poetry version $NEW_VERSION
+          
+          # Set output for next steps
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create release branch
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git checkout -b release/v${{ steps.bump_version.outputs.new_version }}
+          git add pyproject.toml
+          git commit -m "Bump version to v${{ steps.bump_version.outputs.new_version }}"
+          git push origin release/v${{ steps.bump_version.outputs.new_version }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "Release v${{ steps.bump_version.outputs.new_version }}"
+          body: "Automated PR for version bump to v${{ steps.bump_version.outputs.new_version }}"
+          branch: "release/v${{ steps.bump_version.outputs.new_version }}"
+          base: "main"
+          labels: "release" 
