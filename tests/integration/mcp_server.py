@@ -1,4 +1,5 @@
 """Mock MCP server for testing."""
+
 from __future__ import annotations
 
 import sys
@@ -24,6 +25,7 @@ def add_one(input_number: float) -> str:
 
     """
     return str(input_number + 1)
+
 
 if __name__ == "__main__":
     logger.info("Starting MCP server with args: %s", sys.argv)

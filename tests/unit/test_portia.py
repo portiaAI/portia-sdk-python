@@ -804,7 +804,7 @@ def test_portia_does_not_run_introspection_by_default() -> None:
         config=Config.from_default(
             openai_api_key=SecretStr("123"),
             storage_class=StorageClass.MEMORY,
-        )
+        ),
     )
     step1 = Step(task="Step 1", inputs=[], output="$step1_result")
     step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="some_condition")

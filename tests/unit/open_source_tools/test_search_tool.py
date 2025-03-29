@@ -39,6 +39,7 @@ def test_search_tool_successful_response() -> None:
             result = tool.run(ctx, "What is the capital of France?")
             assert result == ["result1", "result2", "result3"]
 
+
 def test_search_tool_fewer_results_than_max() -> None:
     """Test that SearchTool successfully processes a valid response."""
     tool = SearchTool()
@@ -59,6 +60,7 @@ def test_search_tool_fewer_results_than_max() -> None:
 
             result = tool.run(ctx, "What is the capital of France?")
             assert result == ["result1", "result2"]
+
 
 def test_search_tool_no_answer_in_response() -> None:
     """Test that SearchTool raises ToolSoftError if no answer is found in the response."""

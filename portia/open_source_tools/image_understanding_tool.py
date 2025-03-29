@@ -88,12 +88,12 @@ class ImageUnderstandingTool(Tool[str]):
 
         if tool_schema.image_url:
             image_url = tool_schema.image_url
-        elif tool_schema.image_file: # pragma: no cover
+        elif tool_schema.image_file:  # pragma: no cover
             with Path(tool_schema.image_file).open("rb") as image_file:
                 image_data = base64.b64encode(image_file.read()).decode("utf-8")
                 mime_type = mimetypes.guess_type(tool_schema.image_file)[0]
                 image_url = f"data:{mime_type};base64,{image_data}"
-        else: # pragma: no cover
+        else:  # pragma: no cover
             raise ToolHardError("No image URL or file provided")
 
         messages = [

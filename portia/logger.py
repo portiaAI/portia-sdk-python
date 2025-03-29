@@ -37,6 +37,7 @@ FUNCTION_COLOR_MAP = {
     "plan": "fg 39",
 }
 
+
 class LoggerInterface(Protocol):
     """General Interface for loggers.
 
@@ -116,7 +117,6 @@ class Formatter:
 
         result += "\n"
         return result
-
 
     def _sanitize_message_(self, msg: str) -> str:
         """Sanitize a message to be used in a log record."""

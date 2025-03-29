@@ -59,7 +59,8 @@ class FinalOutputSummarizer:
             if step.output in outputs:
                 output_value = (
                     outputs[step.output].summary
-                    if outputs[step.output].value in (
+                    if outputs[step.output].value
+                    in (
                         PreStepIntrospectionOutcome.SKIP,
                         PreStepIntrospectionOutcome.STOP,
                         PreStepIntrospectionOutcome.FAIL,
