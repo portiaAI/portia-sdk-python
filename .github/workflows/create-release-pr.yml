@@ -11,7 +11,7 @@ on:
           - alpha
           - release
       bump_type:
-        description: 'Version bump type'
+        description: 'Version bump type (v{major}.{minor}.{patch})'
         required: true
         type: choice
         options:
@@ -70,8 +70,8 @@ jobs:
 
       - name: Create release branch and update version
         run: |
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git checkout -b release/v${{ steps.bump_version.outputs.new_version }}
           
           # Update version in release branch
