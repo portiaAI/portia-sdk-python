@@ -71,7 +71,7 @@ jobs:
       - name: Create release branch and update version
         run: |
           git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -b release/v${{ steps.bump_version.outputs.new_version }}
           
           # Update version in release branch
