@@ -88,8 +88,10 @@ def mock_plan_run() -> PlanRun:
         ),
     )
 
+
 def test_base_introspection_agent_initialization() -> None:
     """Test BaseIntrospectionAgent initialization and default behavior."""
+
     # Create a minimal implementation of BaseIntrospectionAgent for testing
     class TestIntrospectionAgent(BaseIntrospectionAgent):
         """Test implementation of BaseIntrospectionAgent."""
@@ -125,6 +127,7 @@ def test_base_introspection_agent_initialization() -> None:
 
 def test_base_introspection_agent_abstract_method_raises_error() -> None:
     """Test that non-implemented pre_step_introspection raises NotImplementedError."""
+
     class IncompleteIntrospectionAgent(BaseIntrospectionAgent):
         """Test implementation that doesn't override the abstract method."""
 
@@ -163,7 +166,9 @@ def test_pre_step_introspection_continue(
     )
 
     with patch.object(
-        LLMWrapper, "to_langchain", return_value=MagicMock(
+        LLMWrapper,
+        "to_langchain",
+        return_value=MagicMock(
             with_structured_output=MagicMock(
                 return_value=MagicMock(
                     invoke=MagicMock(return_value=mock_response),
@@ -192,7 +197,9 @@ def test_pre_step_introspection_skip(
     )
 
     with patch.object(
-        LLMWrapper, "to_langchain", return_value=MagicMock(
+        LLMWrapper,
+        "to_langchain",
+        return_value=MagicMock(
             with_structured_output=MagicMock(
                 return_value=MagicMock(
                     invoke=MagicMock(return_value=mock_response),
@@ -221,7 +228,9 @@ def test_pre_step_introspection_fail(
     )
 
     with patch.object(
-        LLMWrapper, "to_langchain", return_value=MagicMock(
+        LLMWrapper,
+        "to_langchain",
+        return_value=MagicMock(
             with_structured_output=MagicMock(
                 return_value=MagicMock(
                     invoke=MagicMock(return_value=mock_response),
@@ -250,7 +259,9 @@ def test_pre_step_introspection_stop(
     )
 
     with patch.object(
-        LLMWrapper, "to_langchain", return_value=MagicMock(
+        LLMWrapper,
+        "to_langchain",
+        return_value=MagicMock(
             with_structured_output=MagicMock(
                 return_value=MagicMock(
                     invoke=MagicMock(return_value=mock_response),
@@ -283,8 +294,12 @@ def test_pre_step_introspection_passes_correct_data(
         )
     )
 
-    with patch.object(LLMWrapper, "for_usage", return_value=llm_mock), patch(
-        "langchain.prompts.ChatPromptTemplate.format_messages", return_value=mock_messages,
+    with (
+        patch.object(LLMWrapper, "for_usage", return_value=llm_mock),
+        patch(
+            "langchain.prompts.ChatPromptTemplate.format_messages",
+            return_value=mock_messages,
+        ),
     ):
         result = introspection_agent.pre_step_introspection(
             plan=mock_plan,
@@ -314,21 +329,26 @@ def test_pre_step_introspection_model_validate(
         "reason": "All conditions are met.",
     }
 
-    with patch.object(
-        LLMWrapper, "to_langchain", return_value=MagicMock(
-            with_structured_output=MagicMock(
-                return_value=MagicMock(
-                    invoke=MagicMock(return_value=raw_response),
+    with (
+        patch.object(
+            LLMWrapper,
+            "to_langchain",
+            return_value=MagicMock(
+                with_structured_output=MagicMock(
+                    return_value=MagicMock(
+                        invoke=MagicMock(return_value=raw_response),
+                    ),
                 ),
             ),
         ),
-    ), patch(
-        "portia.introspection_agents.introspection_agent.PreStepIntrospection.model_validate",
-        return_value=PreStepIntrospection(
-            outcome=PreStepIntrospectionOutcome.CONTINUE,
-            reason="All conditions are met.",
-        ),
-    ) as model_validate_mock:
+        patch(
+            "portia.introspection_agents.introspection_agent.PreStepIntrospection.model_validate",
+            return_value=PreStepIntrospection(
+                outcome=PreStepIntrospectionOutcome.CONTINUE,
+                reason="All conditions are met.",
+            ),
+        ) as model_validate_mock,
+    ):
         result = introspection_agent.pre_step_introspection(
             plan=mock_plan,
             plan_run=mock_plan_run,

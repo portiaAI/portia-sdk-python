@@ -100,6 +100,7 @@ def test_plan_outputs_must_be_unique() -> None:
             ],
         )
 
+
 def test_plan_outputs_and_conditions_must_be_unique() -> None:
     """Test that plan outputs and conditions must be unique."""
     with pytest.raises(ValidationError, match="Outputs \\+ conditions must be unique"):

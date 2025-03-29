@@ -12,6 +12,7 @@ from portia.tool import Tool, ToolRunContext
 
 MAX_RESULTS = 3
 
+
 class SearchToolSchema(BaseModel):
     """Input for SearchTool."""
 

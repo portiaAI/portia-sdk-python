@@ -368,11 +368,7 @@ class PortiaToolRegistry(ToolRegistry):
     @classmethod
     def default_tool_filter(cls, tool: Tool) -> bool:
         """Filter to get the default set of tools offered by Portia cloud."""
-        return not any(
-            re.match(regex, tool.id)
-            for regex
-            in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
-        )
+        return not any(re.match(regex, tool.id) for regex in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
 
     @classmethod
     def with_unauthenticated_client(
