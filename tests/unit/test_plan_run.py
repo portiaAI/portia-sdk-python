@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 from portia.plan import PlanUUID, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, ReadOnlyPlanRun
 from portia.prefixed_uuid import PlanRunUUID

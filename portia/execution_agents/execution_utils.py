@@ -13,9 +13,9 @@ from langchain_core.messages import BaseMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
-from portia.config import validate_extras_dependencies
+from portia.config import Config, validate_extras_dependencies
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -51,6 +51,7 @@ MAX_RETRIES = 4
 
 
 def next_state_after_tool_call(
+    config: Config,
     state: MessagesState,
     tool: Tool | None = None,
 ) -> Literal[AgentNode.TOOL_AGENT, AgentNode.SUMMARIZER, END]:  # type: ignore  # noqa: PGH003
@@ -79,7 +80,12 @@ def next_state_after_tool_call(
     if (
         "ToolSoftError" not in last_message.content
         and tool
-        and getattr(tool, "should_summarize", False)
+        and (
+            getattr(tool, "should_summarize", False)
+            # If the value is larger than the threshold value, always summarise them as they are
+            # too big to store the full value locally
+            or config.exceeds_output_threshold(last_message.content)
+        )
         and isinstance(last_message, ToolMessage)
         and not is_clarification(last_message.artifact)
     ):
@@ -191,6 +197,7 @@ def map_message_types_for_instructor(
         list[dict]: The mapped messages.
 
     """
+
     def _map_message(message: BaseMessage) -> ChatCompletionMessageParam:
         match message.type:
             case "human":
@@ -232,6 +239,7 @@ def invoke_structured_output(
         case "ChatGoogleGenerativeAI":
             validate_extras_dependencies("google")
             import google.generativeai as genai
+
             if TYPE_CHECKING:
                 from langchain_google_genai import ChatGoogleGenerativeAI
 

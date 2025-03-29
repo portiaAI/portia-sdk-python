@@ -48,11 +48,13 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "google": ["google.generativeai", "langchain_google_genai"],
 }
 
+
 def validate_extras_dependencies(extra_group: str) -> None:
     """Validate that the dependencies for an extras group are installed.
 
     Provide a helpful error message if not all dependencies are installed.
     """
+
     def package_installed(package: str) -> bool:
         try:
             return importlib.util.find_spec(package) is not None
@@ -242,6 +244,7 @@ SUPPORTED_AZURE_OPENAI_MODELS = [
     LLMModel.AZURE_O_3_MINI,
 ]
 
+
 class ExecutionAgentType(Enum):
     """Enum for types of agents used for executing a step.
 
@@ -295,6 +298,7 @@ DEFAULT_MODEL_KEY = "default_model_name"
 PLANNING_DEFAULT_MODEL_KEY = "planning_default_model_name"
 
 CONDITIONAL_FEATURE_FLAG = "conditional_feature_flag"
+AGENT_MEMORY_FEATURE_FLAG = "agent_memory_feature_flag"
 
 
 E = TypeVar("E", bound=Enum)
@@ -390,9 +394,7 @@ class Config(BaseModel):
     )
     portia_api_key: SecretStr | None = Field(
         default_factory=lambda: (
-            SecretStr(os.environ["PORTIA_API_KEY"])
-            if "PORTIA_API_KEY" in os.environ
-            else None
+            SecretStr(os.environ["PORTIA_API_KEY"]) if "PORTIA_API_KEY" in os.environ else None
         ),
         description="The API Key for the Portia Cloud API available from the dashboard at https://app.portialabs.ai",
     )
@@ -444,6 +446,7 @@ class Config(BaseModel):
         """Add feature flags if not provided."""
         self.feature_flags = {
             CONDITIONAL_FEATURE_FLAG: False,
+            AGENT_MEMORY_FEATURE_FLAG: False,
             **self.feature_flags,
         }
         return self
@@ -535,6 +538,18 @@ class Config(BaseModel):
     def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
         """Parse planning_agent_type to enum if string provided."""
         return parse_str_to_enum(value, PlanningAgentType)
+
+    large_output_threshold_value: int = Field(
+        default=10_000,
+        description="The threshold number of characters before we start treating an output as a"
+        "large output and write it to agent memory rather than storing it locally",
+    )
+
+    def exceeds_output_threshold(self, value: str | list[str | dict]) -> bool:
+        """Determine whether the provided output value exceeds the large output threshold."""
+        if self.feature_flags.get(AGENT_MEMORY_FEATURE_FLAG):
+            return False
+        return str(value) > self.large_output_threshold_value
 
     @model_validator(mode="after")
     def check_config(self) -> Self:
@@ -695,9 +710,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
         return LLMProvider.MISTRALAI
     if os.getenv("GOOGLE_API_KEY") or kwargs.get("google_api_key"):
         return LLMProvider.GOOGLE_GENERATIVE_AI
-    if (
-        (os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT"))
-        or (kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint"))
+    if (os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT")) or (
+        kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
     ):
         return LLMProvider.AZURE_OPENAI
     raise InvalidConfigError(LLMProvider.OPENAI.to_api_key_name(), "No LLM API key found")

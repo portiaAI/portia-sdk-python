@@ -29,6 +29,7 @@ from portia.clarification import (
     ClarificationCategory,
 )
 from portia.config import (
+    AGENT_MEMORY_FEATURE_FLAG,
     CONDITIONAL_FEATURE_FLAG,
     Config,
     ExecutionAgentType,
@@ -39,9 +40,9 @@ from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
 )
-from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.execution_agents.output import Output
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.execution_context import (
     execution_context,
@@ -695,7 +696,6 @@ class Portia:
                     value=PreStepIntrospectionOutcome.SKIP,
                     summary=pre_step_outcome.reason,
                 )
-                plan_run.outputs.step_outputs[step.output] = output
                 self._save_output(output, step.output, plan_run)
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.STOP:
@@ -703,7 +703,6 @@ class Portia:
                     value=PreStepIntrospectionOutcome.STOP,
                     summary=pre_step_outcome.reason,
                 )
-                plan_run.outputs.step_outputs[step.output] = output
                 self._save_output(output, step.output, plan_run)
                 if last_executed_step_output:
                     plan_run.outputs.final_output = self._get_final_output(
@@ -855,7 +854,7 @@ class Portia:
     ) -> None:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
         cloud_registry = self.tool_registry + PortiaToolRegistry.with_unauthenticated_client(
-            self.config
+            self.config,
         )
         tools = cloud_registry.match_tools(query)
         planning_agent = self._get_planning_agent()
@@ -881,5 +880,14 @@ class Portia:
         return DefaultIntrospectionAgent(self.config)
 
     def _save_output(self, output: Output, output_name: str, plan_run: PlanRun) -> None:
+        if len(
+            str(output.value),
+        ) > self.config.large_output_threshold_value and self.config.feature_flags.get(
+            AGENT_MEMORY_FEATURE_FLAG,
+        ):
+            self.storage.save_plan_run_output(output_name, output, plan_run.id)
+            # As the value has been put into agent memory, set the output value to None.
+            # If we need the value, we'll fetch it from agent memory.
+            output.value = None
+
         plan_run.outputs.step_outputs[output_name] = output
-        self.storage.save_plan_run_output(output_name, output, plan_run.id)

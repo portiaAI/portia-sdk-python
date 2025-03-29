@@ -17,7 +17,7 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import Tool, ToolRunContext

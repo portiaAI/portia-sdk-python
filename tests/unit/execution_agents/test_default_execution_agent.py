@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
-from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.default_execution_agent import (
     MAX_RETRIES,
     DefaultExecutionAgent,
@@ -27,6 +26,7 @@ from portia.execution_agents.default_execution_agent import (
     VerifiedToolInputs,
     VerifierModel,
 )
+from portia.execution_agents.output import Output
 from portia.plan import Step
 from portia.tool import Tool
 from tests.utils import (

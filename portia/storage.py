@@ -26,6 +26,7 @@ Each storage class handles the following tasks:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import urlencode
@@ -34,7 +35,7 @@ from pydantic import BaseModel, ValidationError
 
 from portia.cloud import PortiaCloudClient
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import FileMemoryValue, Output, RemoteMemoryValue
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanUUID, Step
@@ -231,7 +232,48 @@ class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
     """Combined base class for Plan Run + Additional storages."""
 
 
-class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
+class AgentMemoryStorage(ABC):
+    """Abstract base class for storing items in agent memory."""
+
+    @abstractmethod
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> None:
+        """Save an output from a plan run to agent memory.
+
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("save_plan_run_output is not implemented")
+
+    @abstractmethod
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+        """Retrieve an Output from the storage.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            Output: The retrieved Output object
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("get_plan_run_output is not implemented")
+
+
+class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemoryStorage):
     """Simple storage class that keeps plans + runs in memory.
 
     Tool Calls are logged via the LogAdditionalStorage.
@@ -239,11 +281,13 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
 
     plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
+    outputs: defaultdict[PlanRunUUID, dict[str, Output]]
 
     def __init__(self) -> None:
         """Initialize Storage."""
         self.plans = {}
         self.runs = {}
+        self.outputs = defaultdict(dict)
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to dict.
@@ -324,8 +368,40 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
             total_pages=1,
         )
 
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> None:
+        """Save Output from a plan run to memory.
 
-class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        """
+        self.outputs[plan_run_id][output_name] = output
+
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+        """Retrieve an Output from memory.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            Output: The retrieved Output object
+
+        Raises:
+            KeyError: If the output is not found
+
+        """
+        return self.outputs[plan_run_id][output_name]
+
+
+class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemoryStorage):
     """Disk-based implementation of the Storage interface.
 
     Stores serialized Plan and Run objects as JSON files on disk.
@@ -348,6 +424,23 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
 
         """
         Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
+
+    def _ensure_output_dir(self, plan_run_id: PlanRunUUID) -> Path:
+        """Ensure that the output directory for a plan run exists.
+
+        Args:
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            Path: The path to the output directory
+
+        Raises:
+            FileNotFoundError: If the directory cannot be created.
+
+        """
+        output_dir = Path(self.storage_dir, str(plan_run_id))
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
 
     def _write(self, file_name: str, content: BaseModel) -> None:
         """Write a serialized Plan or Run to a JSON file.
@@ -467,19 +560,50 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
             total_pages=1,
         )
 
-    def save_plan_run_output(self, output_name: str, output: Output, plan_run: PlanRun) -> None:
-        """Save Output from a plan run to the storage.
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> None:
+        """Save Output from a plan run to agent memory on disk.
 
         Args:
             output_name (str): The name of the output within the plan
             output (Output): The Output object to save
-            plan_run (PlanRun): The current plan run
+            plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        self._write(f"{plan_run.id}-{output_name}.json", output)
+        output_dir = self._ensure_output_dir(plan_run_id)
+        with (output_dir / f"{output_name}.json").open("w") as file:
+            file.write(output.model_dump_json(indent=4))
+
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+        """Retrieve an Output from agent memory on disk.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            Output: The retrieved Output object
+
+        Raises:
+            FileNotFoundError: If the output file is not found
+            ValidationError: If the deserialization fails
+
+        """
+        output_file = Path(self.storage_dir, str(plan_run_id), f"{output_name}.json")
+        with output_file.open("r") as file:
+            output = Output.model_validate_json(file.read())
+            return Output(
+                name=output["name"],
+                summary=output["summary"],
+                value=FileMemoryValue(path=output_file),
+            )
 
 
-class PortiaCloudStorage(Storage):
+class PortiaCloudStorage(Storage, AgentMemoryStorage):
     """Save plans, runs and tool calls to portia cloud."""
 
     def __init__(self, config: Config) -> None:
@@ -618,7 +742,6 @@ class PortiaCloudStorage(Storage):
                 execution_context=ExecutionContext.model_validate(
                     response_json["execution_context"],
                 ),
-                # TODO: NEED TO SORT
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
             )
 
@@ -704,7 +827,12 @@ class PortiaCloudStorage(Storage):
             self.check_response(response)
             LogAdditionalStorage.save_tool_call(self, tool_call)
 
-    def save_plan_run_output(self, output_name: str, output: Output, , plan_run_id: PlanRunUUID) -> None:
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> None:
         """Save Output from a plan run to Portia Cloud.
 
         Args:
@@ -718,10 +846,9 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = self.client.put(
-                url=f"/api/v0/plan-runs/{plan_run_id}/outputs/{output_name}/",
+                url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
                 json={
-                    "name": output_name,
-                    "value": output.value,
+                    "value": output.value.encode("utf-8"),
                     "summary": output.summary,
                 },
             )
@@ -730,10 +857,11 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
 
-    def get_plan_run_output(self, output_name: str, , plan_run_id: PlanRunUUID):
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from Portia Cloud.
 
         Args:
+            output_name: The name of the output to get from memory
             plan_run_id (RunUUID): The ID of the run to retrieve.
 
         Returns:
@@ -745,15 +873,15 @@ class PortiaCloudStorage(Storage):
         """
         try:
             response = self.client.get(
-                url=f"/api/v0/plan-runs/{plan_run_id}/outputs/{output_name}/",
+                url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
             )
+
         except Exception as e:
             raise StorageError(e) from e
         else:
             self.check_response(response)
-            response_json = response.json()
             return Output(
-                value=response_json["value"],
-                summary=response_json["summary"],
+                name=response["name"],
+                summary=response["summary"],
+                value=RemoteMemoryValue(url=response["url"]),
             )
-

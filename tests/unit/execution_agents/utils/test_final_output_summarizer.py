@@ -2,7 +2,7 @@
 
 from unittest import mock
 
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
 from portia.plan import Step

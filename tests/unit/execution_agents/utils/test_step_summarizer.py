@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     import pytest
     from pydantic import BaseModel
 
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from tests.utils import get_test_llm_wrapper
 

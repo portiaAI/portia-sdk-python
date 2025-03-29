@@ -17,7 +17,7 @@ from portia.clarification import (
 )
 from portia.config import Config, StorageClass
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
@@ -163,11 +163,14 @@ def test_portia_generate_plan_error(portia: Portia) -> None:
     query = "example query"
 
     mock_response = StepsOrError(steps=[], error="could not plan")
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ), pytest.raises(PlanError):
+    with (
+        mock.patch.object(
+            LLMWrapper,
+            "to_instructor",
+            new=MagicMock(return_value=mock_response),
+        ),
+        pytest.raises(PlanError),
+    ):
         portia.plan(query)
 
 
@@ -797,10 +800,12 @@ def test_portia_error_clarification_with_plan_run(portia: Portia) -> None:
 def test_portia_does_not_run_introspection_by_default() -> None:
     """Test that introspection is not run if the feature flag is not set."""
     # Setup mock plan and response
-    portia = Portia(config=Config.from_default(
-        openai_api_key=SecretStr("123"),
-        storage_class=StorageClass.MEMORY,
-    ))
+    portia = Portia(
+        config=Config.from_default(
+            openai_api_key=SecretStr("123"),
+            storage_class=StorageClass.MEMORY,
+        )
+    )
     step1 = Step(task="Step 1", inputs=[], output="$step1_result")
     step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="some_condition")
     mock_response = StepsOrError(steps=[step1, step2], error=None)
@@ -839,6 +844,7 @@ def test_portia_does_not_run_introspection_by_default() -> None:
         assert plan_run.outputs.final_output.value == "Step 2 result"
         assert mock_introspection.pre_step_introspection.call_count == 0
 
+
 def test_portia_run_with_introspection_skip(portia: Portia) -> None:
     """Test run with introspection agent returning SKIP outcome."""
     # Setup mock plan and response
@@ -872,8 +878,7 @@ def test_portia_run_with_introspection_skip(portia: Portia) -> None:
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step1_result" in plan_run.outputs.step_outputs
         assert (
-            plan_run.outputs.step_outputs["$step1_result"].value
-            == PreStepIntrospectionOutcome.SKIP
+            plan_run.outputs.step_outputs["$step1_result"].value == PreStepIntrospectionOutcome.SKIP
         )
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert plan_run.outputs.step_outputs["$step2_result"].value == "Step 2 result"
@@ -917,10 +922,13 @@ def test_portia_run_with_introspection_stop(portia: Portia) -> None:
             return (plan_run, mock_introspection_stop)
 
         # Otherwise continue normally
-        return (plan_run, PreStepIntrospection(
-            outcome=PreStepIntrospectionOutcome.CONTINUE,
-            reason="Condition met",
-        ))
+        return (
+            plan_run,
+            PreStepIntrospection(
+                outcome=PreStepIntrospectionOutcome.CONTINUE,
+                reason="Condition met",
+            ),
+        )
 
     with (
         mock.patch.object(portia, "_handle_introspection_outcome", custom_handle_introspection),
@@ -931,7 +939,6 @@ def test_portia_run_with_introspection_stop(portia: Portia) -> None:
             new=MagicMock(return_value=mock_response),
         ),
     ):
-
         # Run the test
         plan_run = portia.run("Test query with stopped execution")
 
@@ -939,8 +946,7 @@ def test_portia_run_with_introspection_stop(portia: Portia) -> None:
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert (
-            plan_run.outputs.step_outputs["$step2_result"].value
-            == PreStepIntrospectionOutcome.STOP
+            plan_run.outputs.step_outputs["$step2_result"].value == PreStepIntrospectionOutcome.STOP
         )
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.summary == "Execution stopped early"
@@ -980,10 +986,13 @@ def test_portia_run_with_introspection_fail(portia: Portia) -> None:
             return (plan_run, mock_introspection_fail)
 
         # Otherwise continue normally
-        return (plan_run, PreStepIntrospection(
-            outcome=PreStepIntrospectionOutcome.CONTINUE,
-            reason="Condition met",
-        ))
+        return (
+            plan_run,
+            PreStepIntrospection(
+                outcome=PreStepIntrospectionOutcome.CONTINUE,
+                reason="Condition met",
+            ),
+        )
 
     with (
         mock.patch.object(portia, "_handle_introspection_outcome", custom_handle_introspection),
@@ -994,7 +1003,6 @@ def test_portia_run_with_introspection_fail(portia: Portia) -> None:
             new=MagicMock(return_value=mock_response),
         ),
     ):
-
         # Run the test
         plan_run = portia.run("Test query with failed execution")
 
@@ -1002,8 +1010,7 @@ def test_portia_run_with_introspection_fail(portia: Portia) -> None:
         assert plan_run.state == PlanRunState.FAILED
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert (
-            plan_run.outputs.step_outputs["$step2_result"].value
-            == PreStepIntrospectionOutcome.FAIL
+            plan_run.outputs.step_outputs["$step2_result"].value == PreStepIntrospectionOutcome.FAIL
         )
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.value == PreStepIntrospectionOutcome.FAIL
@@ -1221,9 +1228,10 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
 
     # Mock introspection agent to SKIP steps 3 and 4
     mock_introspection = MagicMock()
+
     def mock_introspection_outcome(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
         plan_run = kwargs.get("plan_run")
-        if plan_run.current_step_index in (2, 3): # pyright: ignore[reportOptionalMemberAccess] # Skip both step3 and step4
+        if plan_run.current_step_index in (2, 3):  # pyright: ignore[reportOptionalMemberAccess] # Skip both step3 and step4
             return PreStepIntrospection(
                 outcome=PreStepIntrospectionOutcome.SKIP,
                 reason="Condition is false",
@@ -1232,6 +1240,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
             outcome=PreStepIntrospectionOutcome.CONTINUE,
             reason="Continue execution",
         )
+
     mock_introspection.pre_step_introspection.side_effect = mock_introspection_outcome
 
     # Mock step agent to return expected output for step 2 only (steps 3 and 4 will be skipped)
@@ -1246,10 +1255,11 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
     mock_summarizer = MagicMock()
     mock_summarizer.create_summary.return_value = expected_summary
 
-    with mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection), \
-         mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent), \
-         mock.patch("portia.portia.FinalOutputSummarizer", return_value=mock_summarizer):
-
+    with (
+        mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
+        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch("portia.portia.FinalOutputSummarizer", return_value=mock_summarizer),
+    ):
         result_plan_run = portia.resume(plan_run)
 
         assert result_plan_run.state == PlanRunState.COMPLETE

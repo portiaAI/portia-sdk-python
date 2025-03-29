@@ -10,7 +10,6 @@ from pydantic import SecretStr
 
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
@@ -20,6 +19,7 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
+from portia.execution_agents.output import Output
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import AdditionTool
 
@@ -265,9 +265,9 @@ def test_map_message_types_for_instructor() -> None:
 
 def test_invoke_structured_output_fails_unsupported_model() -> None:
     """Test invoke_structured_output fails with unsupported model."""
+
     class FakeModel(ChatOpenAI):
         """A fake OpenAI model subclass."""
-
 
     with pytest.raises(ValueError, match="Unsupported model type"):
         invoke_structured_output(

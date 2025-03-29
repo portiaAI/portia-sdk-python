@@ -46,8 +46,8 @@ from portia.clarification import (
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
-from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.execution_utils import is_clarification
+from portia.execution_agents.output import Output
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session

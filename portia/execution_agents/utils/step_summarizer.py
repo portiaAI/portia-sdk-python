@@ -7,12 +7,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from jinja2 import Template
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 from langchain_core.messages import BaseMessage, ToolMessage
-from langgraph.graph import MessagesState  # noqa: TC002
+from langgraph.graph import MessagesState
 
-from portia.execution_agents.base_execution_agent import Output
+from portia.config import Config
+from portia.execution_agents.output import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
@@ -48,7 +50,7 @@ class StepSummarizer:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, summary_max_length: int = 500) -> None:
+    def __init__(self, config: Config, llm: BaseChatModel, summary_max_length: int = 500) -> None:
         """Initialize the model.
 
         Args:
@@ -56,6 +58,7 @@ class StepSummarizer:
             summary_max_length (int): The maximum length of the summary. Default is 500 characters.
 
         """
+        self.config = config
         self.llm = llm
         self.summary_max_length = summary_max_length
 
@@ -86,6 +89,11 @@ class StepSummarizer:
 
         logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
         tool_output = last_message.content
+        if self.config.exceeds_output_threshold(tool_output):
+            tool_output = f"This is a large value (full length: {len(str(tool_output))}"
+            "characters) - it is too long to provide the full value, but the first 10k characters "
+            f"are: {self._truncate(tool_output, self.config.large_output_threshold_value)}"
+
         try:
             summary: BaseMessage = self.llm.invoke(
                 self.summarizer_prompt.format_messages(
@@ -98,3 +106,8 @@ class StepSummarizer:
             logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
 
         return {"messages": [last_message]}
+
+    def _truncate(self, content: str | dict | list[str | dict], max_len_chars: int):
+        """Truncate a value so it is no longer than max_len_chars."""
+        content_str = Template("{{ content }}").render(content=str(content))
+        return content_str[:max_len_chars]
