@@ -1,6 +1,8 @@
+"""Unit tests for the LLMWrapper."""
 from unittest.mock import MagicMock
 
 import pytest
+
 from portia.config import DEFAULT_MODEL_KEY, Config
 from portia.llm_wrapper import LLMWrapper
 from portia.model import LangChainModel, Model

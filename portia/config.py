@@ -3,14 +3,13 @@
 This module defines the configuration classes and enumerations used in the SDK,
 including settings for storage, API keys, LLM providers, logging, and agent options.
 It also provides validation for configuration values and loading mechanisms for
-config files and default settings.
+default settings.
 """
 
 from __future__ import annotations
 
 import os
 from enum import Enum
-from pathlib import Path
 from typing import NamedTuple, Self, TypeVar
 
 from pydantic import (
@@ -608,17 +607,6 @@ class Config(BaseModel):
             if isinstance(model, LLMModel):
                 validate_llm_api_key(model.provider())
         return self
-
-    @classmethod
-    def from_file(cls, file_path: Path) -> Config:
-        """Load configuration from a JSON file.
-
-        Returns:
-            Config: The default config
-
-        """
-        with Path.open(file_path) as f:
-            return cls.model_validate_json(f.read())
 
     @classmethod
     def from_default(cls, **kwargs) -> Config:  # noqa: ANN003

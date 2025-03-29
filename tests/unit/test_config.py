@@ -1,7 +1,5 @@
 """Tests for portia classes."""
 
-import tempfile
-from pathlib import Path
 
 import pytest
 from pydantic import SecretStr
@@ -18,36 +16,6 @@ from portia.config import (
     StorageClass,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
-
-
-def test_portia_config_from_file() -> None:
-    """Test loading configuration from a file."""
-    config_data = """{
-"portia_api_key": "file-key",
-"anthropic_api_key": "file-anthropic-key",
-"llm_provider": "ANTHROPIC",
-"models": {
-    "planning_model_name": "claude-3-5-haiku-latest"
-},
-"storage_class": "MEMORY",
-"execution_agent_type": "DEFAULT",
-"planning_agent_type": "DEFAULT"
-}"""
-
-    with tempfile.NamedTemporaryFile("w", delete=True, suffix=".json") as temp_file:
-        temp_file.write(config_data)
-        temp_file.flush()
-
-        config_file = Path(temp_file.name)
-
-        config = Config.from_file(config_file)
-
-        assert config.must_get_raw_api_key("portia_api_key") == "file-key"
-        assert config.must_get_raw_api_key("anthropic_api_key") == "file-anthropic-key"
-        assert config.llm_provider == LLMProvider.ANTHROPIC
-        assert config.model(PLANNING_MODEL_KEY) == LLMModel.CLAUDE_3_5_HAIKU
-        assert config.execution_agent_type == ExecutionAgentType.DEFAULT
-        assert config.planning_agent_type == PlanningAgentType.DEFAULT
 
 
 def test_from_default() -> None:
