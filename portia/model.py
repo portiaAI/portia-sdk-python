@@ -179,6 +179,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
     """OpenAI model implementation."""
 
     provider_name: str = "openai"
+
     def __init__(
         self,
         *,
@@ -245,7 +246,10 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ == "StepsOrError":
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
-            messages, schema, method="function_calling", **kwargs,
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
         )
 
     def get_structured_response_instructor(
@@ -344,7 +348,10 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ == "StepsOrError":
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
-            messages, schema, method="function_calling", **kwargs,
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
         )
 
     def get_structured_response_instructor(
@@ -366,6 +373,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     """Anthropic model implementation."""
 
     provider_name: str = "anthropic"
+
     def __init__(
         self,
         *,
@@ -491,7 +499,10 @@ if validate_extras_dependencies("mistral", raise_error=False):
             if schema.__name__ == "StepsOrError":
                 return self.get_structured_response_instructor(messages, schema)
             return super().get_structured_response(
-                messages, schema, method="function_calling", **kwargs,
+                messages,
+                schema,
+                method="function_calling",
+                **kwargs,
             )
 
         def get_structured_response_instructor(

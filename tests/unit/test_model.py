@@ -35,6 +35,7 @@ def test_message_from_langchain(
 
 def test_message_from_langchain_unsupported_type() -> None:
     """Test that converting from unsupported LangChain message type raises ValueError."""
+
     class UnsupportedMessage:
         content = "test"
 

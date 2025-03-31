@@ -88,7 +88,6 @@ class Model(ABC):
 
         """
 
-
     @abstractmethod
     def get_structured_response(
         self,
@@ -220,7 +219,10 @@ class OpenAIModel(LangChainModel):
         if schema == StepsOrError:
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
-            messages, schema, method="function_calling", **kwargs,
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
         )
 
     def get_structured_response_instructor(
@@ -318,7 +320,10 @@ class AzureOpenAIModel(LangChainModel):
         if schema == StepsOrError:
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
-            messages, schema, method="function_calling", **kwargs,
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
         )
 
     def get_structured_response_instructor(
@@ -464,7 +469,10 @@ if validate_extras_dependencies("mistral", raise_error=False):
             if schema == StepsOrError:
                 return self.get_structured_response_instructor(messages, schema)
             return super().get_structured_response(
-                messages, schema, method="function_calling", **kwargs,
+                messages,
+                schema,
+                method="function_calling",
+                **kwargs,
             )
 
         def get_structured_response_instructor(

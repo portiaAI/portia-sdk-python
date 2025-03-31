@@ -74,6 +74,7 @@ def validate_extras_dependencies(extra_group: str, *, raise_error: bool = True) 
         bool: True if all dependencies are installed, False otherwise.
 
     """
+
     def are_packages_installed(packages: list[str]) -> bool:
         """Check if a list of packages are installed."""
         try:

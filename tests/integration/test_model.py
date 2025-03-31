@@ -53,6 +53,7 @@ def patch_azure_model() -> Iterator[None]:
 
     When we have Azure access we can remove this patch.
     """
+
     class AzureOpenAIWrapper(OpenAI):
         """Mock the AzureOpenAI client."""
 
@@ -63,19 +64,23 @@ def patch_azure_model() -> Iterator[None]:
             new_kwargs["api_key"] = CONFIG.openai_api_key.get_secret_value()
             super().__init__(*args, **new_kwargs)
 
-    with mock.patch.object(
-        AZURE_MODEL,
-        "_client",
-        ChatOpenAI(model="gpt-4o-mini", api_key=CONFIG.openai_api_key),
-    ), mock.patch.object(
-        AZURE_MODEL,
-        "_instructor_client",
-        instructor.from_openai(
-            OpenAI(api_key=CONFIG.openai_api_key.get_secret_value()),
-            mode=instructor.Mode.JSON,
+    with (
+        mock.patch.object(
+            AZURE_MODEL,
+            "_client",
+            ChatOpenAI(model="gpt-4o-mini", api_key=CONFIG.openai_api_key),
+        ),
+        mock.patch.object(
+            AZURE_MODEL,
+            "_instructor_client",
+            instructor.from_openai(
+                OpenAI(api_key=CONFIG.openai_api_key.get_secret_value()),
+                mode=instructor.Mode.JSON,
+            ),
         ),
     ):
         yield
+
 
 @pytest.fixture
 def messages() -> list[Message]:
