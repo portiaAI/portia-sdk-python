@@ -197,7 +197,6 @@ class Portia:
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
         outcome = planning_agent.generate_steps_or_error(
-            ctx=get_execution_context(),
             query=query,
             tool_list=tools,
             examples=example_plans,
@@ -864,7 +863,6 @@ class Portia:
         tools = cloud_registry.match_tools(query)
         planning_agent = self._get_planning_agent()
         replan_outcome = planning_agent.generate_steps_or_error(
-            ctx=get_execution_context(),
             query=query,
             tool_list=tools,
             examples=example_plans,
