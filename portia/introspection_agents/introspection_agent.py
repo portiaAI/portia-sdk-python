@@ -16,7 +16,7 @@ class PreStepIntrospectionOutcome(PortiaEnum):
     CONTINUE = "CONTINUE"
     SKIP = "SKIP"
     FAIL = "FAIL"
-    STOP = "STOP"
+    COMPLETE = "COMPLETE"
 
 
 class PreStepIntrospection(BaseModel):

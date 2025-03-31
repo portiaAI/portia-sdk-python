@@ -254,7 +254,7 @@ def test_pre_step_introspection_stop(
 ) -> None:
     """Test pre_step_introspection returns STOP when remaining steps cannot be executed."""
     mock_response = PreStepIntrospection(
-        outcome=PreStepIntrospectionOutcome.STOP,
+        outcome=PreStepIntrospectionOutcome.COMPLETE,
         reason="Remaining steps cannot be executed.",
     )
 
@@ -274,7 +274,7 @@ def test_pre_step_introspection_stop(
             plan_run=mock_plan_run,
         )
 
-        assert result.outcome == PreStepIntrospectionOutcome.STOP
+        assert result.outcome == PreStepIntrospectionOutcome.COMPLETE
         assert result.reason == "Remaining steps cannot be executed."
 
 

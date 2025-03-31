@@ -30,7 +30,6 @@ from portia.clarification import (
 )
 from portia.config import (
     AGENT_MEMORY_FEATURE_FLAG,
-    CONDITIONAL_FEATURE_FLAG,
     Config,
     ExecutionAgentType,
     PlanningAgentType,
@@ -537,18 +536,18 @@ class Portia:
             step = plan.steps[index]
             plan_run.current_step_index = index
 
-            if self.config.feature_flags.get(CONDITIONAL_FEATURE_FLAG):
-                # Handle the introspection outcome
-                (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
-                    introspection_agent=introspection_agent,
-                    plan=plan,
-                    plan_run=plan_run,
-                    last_executed_step_output=last_executed_step_output,
-                )
-                if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
-                    continue
-                if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
-                    return plan_run
+            # Handle the introspection outcome
+            (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
+                introspection_agent=introspection_agent,
+                plan=plan,
+                plan_run=plan_run,
+                last_executed_step_output=last_executed_step_output,
+            )
+            if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
+                continue
+            if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
+                self._log_final_output(plan_run, plan)
+                return plan_run
 
             logger().info(
                 f"Executing step {index}: {step.task}",
@@ -607,6 +606,10 @@ class Portia:
                 last_executed_step_output,
             )
         self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
+        self._log_final_output(plan_run, plan)
+        return plan_run
+
+    def _log_final_output(self, plan_run: PlanRun, plan: Plan) -> None:
         logger().debug(
             f"Final run status: {plan_run.state!s}",
             plan=str(plan.id),
@@ -616,7 +619,6 @@ class Portia:
             logger().info(
                 f"Final output: {plan_run.outputs.final_output.summary!s}",
             )
-        return plan_run
 
     def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
         """Get the output of the last executed step.
@@ -672,7 +674,10 @@ class Portia:
                 ),
             )
 
-        logger().info(f"Running Pre Introspection for Step #{current_step_index}.")
+        logger().info(
+            f"Running Pre Introspection for Step #{current_step_index}, "
+            f"evaluating condition: #{step.condition}",
+        )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
             plan=ReadOnlyPlan.from_plan(plan),
@@ -700,7 +705,7 @@ class Portia:
                 self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.STOP:
                 output = Output(
-                    value=PreStepIntrospectionOutcome.STOP,
+                    value=PreStepIntrospectionOutcome.COMPLETE,
                     summary=pre_step_outcome.reason,
                 )
                 self._save_output(output, step.output, plan_run)

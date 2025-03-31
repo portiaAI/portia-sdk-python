@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
-from portia.config import CONDITIONAL_FEATURE_FLAG, Config, LLMModel, LogLevel, StorageClass
+from portia.config import Config, LLMModel, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
 from portia.llm_wrapper import LLMWrapper
@@ -87,9 +87,6 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
         default_log_level=LogLevel.INFO,
         openai_api_key=SecretStr("123"),
         storage_class=StorageClass.MEMORY,
-        feature_flags={
-            CONDITIONAL_FEATURE_FLAG: True,
-        },
     )
 
 

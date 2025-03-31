@@ -297,9 +297,7 @@ SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 PLANNING_DEFAULT_MODEL_KEY = "planning_default_model_name"
 
-CONDITIONAL_FEATURE_FLAG = "conditional_feature_flag"
 AGENT_MEMORY_FEATURE_FLAG = "agent_memory_feature_flag"
-
 
 E = TypeVar("E", bound=Enum)
 
@@ -445,7 +443,8 @@ class Config(BaseModel):
     def parse_feature_flags(self) -> Self:
         """Add feature flags if not provided."""
         self.feature_flags = {
-            CONDITIONAL_FEATURE_FLAG: False,
+            # Fill here with any default feature flags.
+            # e.g. CONDITIONAL_FLAG: True,
             AGENT_MEMORY_FEATURE_FLAG: False,
             **self.feature_flags,
         }

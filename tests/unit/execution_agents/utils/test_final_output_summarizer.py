@@ -221,8 +221,8 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
             output="$skipped_output",
         ),
         Step(
-            task="Stopped task",
-            output="$stopped_output",
+            task="Complete task",
+            output="$complete_output",
         ),
     ]
 
@@ -236,9 +236,9 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
             value=PreStepIntrospectionOutcome.SKIP,
             summary="This task was skipped as it was unnecessary",
         ),
-        "$stopped_output": Output(
-            value=PreStepIntrospectionOutcome.STOP,
-            summary="The plan execution was stopped early",
+        "$complete_output": Output(
+            value=PreStepIntrospectionOutcome.COMPLETE,
+            summary="The plan execution was completed early",
         ),
     }
 
@@ -260,7 +260,7 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
         "Task: Skipped task\n"
         "Output: This task was skipped as it was unnecessary\n"
         "----------\n"
-        "Task: Stopped task\n"
-        "Output: The plan execution was stopped early\n"
+        "Task: Complete task\n"
+        "Output: The plan execution was completed early\n"
         "----------"
     )
