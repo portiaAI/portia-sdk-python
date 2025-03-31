@@ -507,8 +507,6 @@ class Config(BaseModel):
                     api_key=self.azure_openai_api_key,
                     azure_endpoint=self.azure_openai_endpoint,
                 )
-            case _:
-                raise ValueError(f"Unsupported provider: {llm_model.provider()}")
 
     # Storage Options
     storage_class: StorageClass = Field(
@@ -684,40 +682,6 @@ class Config(BaseModel):
             case SecretStr() if value.get_secret_value() == "":
                 raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
-
-    def get_llm_api_key(self, model_name: LLMModel) -> SecretStr:
-        """Get the API key for the given LLM model.
-
-        Returns:
-            SecretStr: The API key for the given LLM model.
-
-        """
-        match model_name.provider():
-            case LLMProvider.OPENAI:
-                return self.openai_api_key
-            case LLMProvider.ANTHROPIC:
-                return self.anthropic_api_key
-            case LLMProvider.MISTRALAI:
-                return self.mistralai_api_key
-            case LLMProvider.GOOGLE_GENERATIVE_AI:
-                return self.google_api_key
-            case LLMProvider.AZURE_OPENAI:
-                return self.azure_openai_api_key
-
-    def get_llm_api_endpoint(self, model_name: LLMModel) -> str | None:
-        """Get the API endpoint for the given LLM model.
-
-        In most cases the endpoint is not required for the LLM provider API.
-        The common exception is a self-hosted solution like Azure OpenAI.
-
-        Returns:
-            str | None: The API endpoint for the given LLM model.
-
-        """
-        match model_name.provider():
-            case LLMProvider.AZURE_OPENAI:
-                return self.azure_openai_endpoint
-        return None
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
