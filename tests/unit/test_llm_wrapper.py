@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import SecretStr
 
-from portia.config import DEFAULT_MODEL_KEY, PLANNING_DEFAULT_MODEL_KEY, Config
+from portia.config import DEFAULT_MODEL_KEY, Config
 from portia.llm_wrapper import LLMWrapper
 from portia.model import GenerativeModel, LangChainGenerativeModel
 from tests.utils import MockToolSchema, get_mock_base_chat_model
@@ -19,8 +19,7 @@ def test_llm_wrapper() -> None:
     )
 
     config = Config(
-        models={
-            PLANNING_DEFAULT_MODEL_KEY: model,
+        custom_models={
             DEFAULT_MODEL_KEY: model,
         },
         openai_api_key=SecretStr("123"),

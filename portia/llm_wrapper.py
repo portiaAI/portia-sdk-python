@@ -68,7 +68,7 @@ class LLMWrapper:
     @classmethod
     def for_usage(cls, usage: str, config: Config) -> LLMWrapper:
         """Create an LLMWrapper from a LLMModel."""
-        model = config.model(usage)
+        model = config.resolve_model(usage)
         return cls(model)
 
     def to_langchain(self) -> BaseChatModel:

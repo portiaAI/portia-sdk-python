@@ -432,9 +432,14 @@ class Config(BaseModel):
         description="Which LLM Provider to use.",
     )
 
-    models: dict[str, LLMModel | GenerativeModel] = Field(
-        default={},
+    models: dict[str, LLMModel] = Field(
+        default_factory=dict,
         description="A dictionary of configured LLM models for each usage.",
+    )
+
+    custom_models: dict[str, GenerativeModel] = Field(
+        default_factory=dict,
+        description="A dictionary of custom GenerativeModel instances for each usage.",
     )
 
     feature_flags: dict[str, bool] = Field(
@@ -462,15 +467,18 @@ class Config(BaseModel):
         }
         return self
 
-    def model(self, usage: str) -> GenerativeModel:
+    def model(self, usage: str) -> LLMModel:
         """Get the LLM model for the given usage."""
         if usage == PLANNING_MODEL_KEY:
-            llm_model = self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
-        else:
-            llm_model = self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
-        if isinstance(llm_model, LLMModel):
-            return self._construct_model(llm_model)
-        return llm_model
+            return self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
+        return self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
+
+    def resolve_model(self, usage: str) -> GenerativeModel:
+        """Resolve a model from the config."""
+        if usage in self.custom_models:
+            return self.custom_models[usage]
+        model = self.model(usage)
+        return self._construct_model(model)
 
     def _construct_model(self, llm_model: LLMModel) -> GenerativeModel:
         """Construct a Model instance from an LLMModel."""

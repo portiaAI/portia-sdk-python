@@ -1,5 +1,7 @@
 """Tests for portia classes."""
 
+from unittest.mock import MagicMock
+
 import pytest
 from pydantic import SecretStr
 
@@ -16,9 +18,7 @@ from portia.config import (
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
-    AzureOpenAIGenerativeModel,
-    MistralAIGenerativeModel,
-    OpenAIGenerativeModel,
+    LangChainGenerativeModel,
 )
 
 
@@ -81,7 +81,7 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
         c = Config.from_default(execution_agent_type="my agent")
 
 
-def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: PLR0915
+def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setting LLM models."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
@@ -92,53 +92,33 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: PLR0915
         planning_model_name=LLMModel.GPT_4_O,
         execution_model_name=LLMModel.GPT_4_O_MINI,
     )
-    planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, OpenAIGenerativeModel)
-    assert planning_model.model_name == "gpt-4o"
-    execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, OpenAIGenerativeModel)
-    assert execution_model.model_name == "gpt-4o-mini"
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.GPT_4_O
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GPT_4_O_MINI
 
     # llm_model_name sets all models
     c = Config.from_default(llm_model_name="mistral_large")
-    planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, MistralAIGenerativeModel)
-    assert planning_model.model_name == "mistral-large-latest"
-    execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, MistralAIGenerativeModel)
-    assert execution_model.model_name == "mistral-large-latest"
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
 
     # llm_provider sets default model for all providers
     c = Config.from_default(llm_provider="mistralai")
-    planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, MistralAIGenerativeModel)
-    assert planning_model.model_name == "mistral-large-latest"
-    execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, MistralAIGenerativeModel)
-    assert execution_model.model_name == "mistral-large-latest"
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
 
     # With nothing specified, it chooses a model we have API keys for
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     c = Config.from_default()
-    planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, MistralAIGenerativeModel)
-    assert planning_model.model_name == "mistral-large-latest"
-    execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, MistralAIGenerativeModel)
-    assert execution_model.model_name == "mistral-large-latest"
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
 
     # With all API key set, correct default models are chosen
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     c = Config.from_default()
-    planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, OpenAIGenerativeModel)
-    assert planning_model.model_name == "o3-mini"
-    execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, OpenAIGenerativeModel)
-    assert execution_model.model_name == "gpt-4o"
+    assert c.model(PLANNING_MODEL_KEY) == LLMModel.O_3_MINI
+    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GPT_4_O
 
     # No api key for provider model
     monkeypatch.setenv("OPENAI_API_KEY", "")
@@ -176,6 +156,22 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: PLR0915
     # Unrecognised providers error
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(llm_provider="personal", llm_model_name="other-model")
+
+
+def test_custom_models() -> None:
+    """Test custom models."""
+    c = Config.from_default(
+        custom_models={
+            PLANNING_MODEL_KEY: LangChainGenerativeModel(
+                client=MagicMock(),
+                model_name="gpt-4o",
+            ),
+        },
+        openai_api_key=SecretStr("test-openai-key"),
+    )
+    resolved_model = c.resolve_model(PLANNING_MODEL_KEY)
+    assert isinstance(resolved_model, LangChainGenerativeModel)
+    assert resolved_model.model_name == "gpt-4o"
 
 
 def test_getters() -> None:
@@ -235,7 +231,7 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
     c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
     assert c.llm_provider == LLMProvider.AZURE_OPENAI
-    assert isinstance(c.model(PLANNING_MODEL_KEY), AzureOpenAIGenerativeModel)
+    assert c.model(PLANNING_MODEL_KEY).provider() == LLMProvider.AZURE_OPENAI
 
     # Also works with passing parameters to constructor
     monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
