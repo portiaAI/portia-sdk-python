@@ -11,6 +11,7 @@ Classes:
     StdioMcpClientConfig: Configuration for an MCP client that connects via stdio.
     McpClientConfig: The configuration to connect to an MCP server.
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
