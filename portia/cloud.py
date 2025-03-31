@@ -27,7 +27,7 @@ class PortiaCloudClient:
 
         """
         headers = {
-                "Content-Type": "application/json",
+            "Content-Type": "application/json",
         }
         if config.portia_api_key or allow_unauthenticated is False:
             api_key = config.must_get_api_key("portia_api_key").get_secret_value()

@@ -301,7 +301,7 @@ class LLMWrapper(BaseLLMWrapper):
                 validate_extras_dependencies("google")
                 import google.generativeai as genai
 
-                genai.configure(api_key=self.api_key.get_secret_value()) # pyright: ignore[reportPrivateImportUsage]
+                genai.configure(api_key=self.api_key.get_secret_value())  # pyright: ignore[reportPrivateImportUsage]
                 client = instructor.from_gemini(
                     client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
                         model_name=self.model_name.api_name,

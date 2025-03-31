@@ -265,9 +265,9 @@ def test_map_message_types_for_instructor() -> None:
 
 def test_invoke_structured_output_fails_unsupported_model() -> None:
     """Test invoke_structured_output fails with unsupported model."""
+
     class FakeModel(ChatOpenAI):
         """A fake OpenAI model subclass."""
-
 
     with pytest.raises(ValueError, match="Unsupported model type"):
         invoke_structured_output(

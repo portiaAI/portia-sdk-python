@@ -191,6 +191,7 @@ def map_message_types_for_instructor(
         list[dict]: The mapped messages.
 
     """
+
     def _map_message(message: BaseMessage) -> ChatCompletionMessageParam:
         match message.type:
             case "human":
@@ -232,6 +233,7 @@ def invoke_structured_output(
         case "ChatGoogleGenerativeAI":
             validate_extras_dependencies("google")
             import google.generativeai as genai
+
             if TYPE_CHECKING:
                 from langchain_google_genai import ChatGoogleGenerativeAI
 

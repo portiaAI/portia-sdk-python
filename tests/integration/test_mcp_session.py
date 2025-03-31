@@ -13,6 +13,7 @@ from portia.mcp_session import SseMcpClientConfig, StdioMcpClientConfig, get_mcp
 
 SERVER_FILE_PATH = Path(__file__).parent / "mcp_server.py"
 
+
 def is_port_in_use(port: int) -> bool:
     """Check if a port is in use."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

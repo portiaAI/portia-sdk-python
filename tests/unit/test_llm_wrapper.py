@@ -64,10 +64,13 @@ class DummyModel(BaseModel):
 
 
 @pytest.mark.usefixtures("mock_import_check")
-@pytest.mark.parametrize("provider", [
-    LLMProvider.MISTRALAI,
-    LLMProvider.GOOGLE_GENERATIVE_AI,
-])
+@pytest.mark.parametrize(
+    "provider",
+    [
+        LLMProvider.MISTRALAI,
+        LLMProvider.GOOGLE_GENERATIVE_AI,
+    ],
+)
 def test_error_if_extension_not_installed_to_langchain(
     provider: LLMProvider,
 ) -> None:
@@ -105,10 +108,13 @@ def test_construct_azure_openai_llm_wrapper() -> None:
 
     assert llm_wrapper.to_langchain() is not None
     with mock.patch("instructor.patch", autospec=True):
-        assert llm_wrapper.to_instructor(
-            response_model=DummyModel,
-            messages=[{"role": "system", "content": "test"}],
-        ) is not None
+        assert (
+            llm_wrapper.to_instructor(
+                response_model=DummyModel,
+                messages=[{"role": "system", "content": "test"}],
+            )
+            is not None
+        )
 
     llm_wrapper_no_endpoint = LLMWrapper(
         model_name=LLMModel.AZURE_GPT_4_O,
