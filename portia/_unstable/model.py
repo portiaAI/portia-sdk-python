@@ -193,7 +193,10 @@ class OpenAIModel(LangChainModel):
             **kwargs,
         )
         super().__init__(client)
-        self._api_key = api_key
+        self._instructor_client = instructor.from_openai(
+            client=OpenAI(api_key=api_key.get_secret_value()),
+            mode=instructor.Mode.JSON,
+        )
         self._model_name = model_name
         self._seed = seed
 
@@ -226,12 +229,8 @@ class OpenAIModel(LangChainModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
-        instructor_client = instructor.from_openai(
-            client=OpenAI(api_key=self._api_key.get_secret_value()),
-            mode=instructor.Mode.JSON,
-        )
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        return instructor_client.chat.completions.create(
+        return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
             model=self._model_name,
@@ -288,10 +287,15 @@ class AzureOpenAIModel(LangChainModel):
             **kwargs,
         )
         super().__init__(client)
-        self._api_key = api_key
+        self._instructor_client = instructor.from_openai(
+            client=AzureOpenAI(
+                api_key=api_key.get_secret_value(),
+                azure_endpoint=azure_endpoint,
+                api_version=api_version,
+            ),
+            mode=instructor.Mode.JSON,
+        )
         self._model_name = model_name
-        self._azure_endpoint = azure_endpoint
-        self._api_version = api_version
         self._seed = seed
 
     def get_structured_response(
@@ -323,16 +327,8 @@ class AzureOpenAIModel(LangChainModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
-        instructor_client = instructor.from_openai(
-            client=AzureOpenAI(
-                api_key=self._api_key.get_secret_value(),
-                azure_endpoint=self._azure_endpoint,
-                api_version=self._api_version,
-            ),
-            mode=instructor.Mode.JSON,
-        )
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        return instructor_client.chat.completions.create(
+        return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
             model=self._model_name,
@@ -370,7 +366,10 @@ class AnthropicModel(LangChainModel):
             **kwargs,
         )
         super().__init__(client)
-        self._api_key = api_key
+        self._instructor_client = instructor.from_anthropic(
+            client=Anthropic(api_key=api_key.get_secret_value()),
+            mode=instructor.Mode.ANTHROPIC_JSON,
+        )
         self._model_name = model_name
 
     def get_structured_response(
@@ -400,12 +399,8 @@ class AnthropicModel(LangChainModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
-        instructor_client = instructor.from_anthropic(
-            client=Anthropic(api_key=self._api_key.get_secret_value()),
-            mode=instructor.Mode.ANTHROPIC_JSON,
-        )
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        return instructor_client.chat.completions.create(
+        return self._instructor_client.chat.completions.create(
             model=self._model_name,
             response_model=schema,
             messages=instructor_messages,
@@ -443,7 +438,10 @@ if validate_extras_dependencies("mistral", raise_error=False):
                 **kwargs,
             )
             super().__init__(client)
-            self._api_key = api_key
+            self._instructor_client = instructor.from_mistral(
+                client=Mistral(api_key=api_key.get_secret_value()),
+                use_async=False,
+            )
             self._model_name = model_name
 
         def get_structured_response(
@@ -475,12 +473,8 @@ if validate_extras_dependencies("mistral", raise_error=False):
             schema: type[BaseModelT],
         ) -> BaseModelT:
             """Get structured response using instructor."""
-            instructor_client = instructor.from_mistral(
-                client=Mistral(api_key=self._api_key.get_secret_value()),
-                use_async=False,
-            )
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-            return instructor_client.chat.completions.create(
+            return self._instructor_client.chat.completions.create(
                 model=self._model_name,
                 response_model=schema,
                 messages=instructor_messages,
@@ -510,15 +504,22 @@ if validate_extras_dependencies("google", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
+            # Configure genai with the api key
+            genai.configure(api_key=api_key.get_secret_value())  # pyright: ignore[reportPrivateImportUsage]
+
             client = ChatGoogleGenerativeAI(
                 model=model_name,
                 api_key=api_key,
                 max_retries=max_retries,
                 **kwargs,
             )
-            self._api_key = api_key
-            self._model_name = model_name
             super().__init__(client)
+            self._instructor_client = instructor.from_gemini(
+                client=genai.GenerativeModel(model_name=model_name),  # pyright: ignore[reportPrivateImportUsage]
+                mode=instructor.Mode.GEMINI_JSON,
+                use_async=False,
+            )
+            self._model_name = model_name
 
         def get_structured_response(
             self,
@@ -543,20 +544,8 @@ if validate_extras_dependencies("google", raise_error=False):
                 BaseModelT: The structured response from the model.
 
             """
-            # Configure genai with the api key
-            genai.configure(api_key=self._api_key.get_secret_value())  # pyright: ignore[reportPrivateImportUsage]
-
-            # Create instructor client
-            instructor_client = instructor.from_gemini(
-                client=genai.GenerativeModel(model_name=self._model_name),  # pyright: ignore[reportPrivateImportUsage]
-                mode=instructor.Mode.GEMINI_JSON,
-                use_async=False,
-            )
-
-            # Convert messages to format expected by instructor
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-
-            return instructor_client.messages.create(
+            return self._instructor_client.messages.create(
                 messages=instructor_messages,
                 response_model=schema,
             )
