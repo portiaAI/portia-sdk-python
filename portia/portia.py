@@ -517,9 +517,13 @@ class Portia:
         dashboard_url = self.config.must_get("portia_dashboard_url", str)
 
         dashboard_message = (
-            f" View in your Portia AI dashboard: "
-            f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
-        ) if self.config.storage_class == StorageClass.CLOUD else ""
+            (
+                f" View in your Portia AI dashboard: "
+                f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
+            )
+            if self.config.storage_class == StorageClass.CLOUD
+            else ""
+        )
 
         logger().info(
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
@@ -669,13 +673,15 @@ class Portia:
                 ),
             )
 
-        logger().info(f"Running Pre Introspection for Step #{current_step_index}, "
-                      f"evaluating condition: #{step.condition}")
+        logger().info(
+            f"Running Pre Introspection for Step #{current_step_index}, "
+            f"evaluating condition: #{step.condition}"
+        )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
-                plan=ReadOnlyPlan.from_plan(plan),
-                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
-            )
+            plan=ReadOnlyPlan.from_plan(plan),
+            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+        )
 
         log_message = (
             f"Pre Introspection Outcome for Step #{current_step_index}: "
@@ -849,9 +855,8 @@ class Portia:
         example_plans: list[Plan] | None = None,
     ) -> None:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
-        cloud_registry = (
-            self.tool_registry
-            + PortiaToolRegistry.with_unauthenticated_client(self.config)
+        cloud_registry = self.tool_registry + PortiaToolRegistry.with_unauthenticated_client(
+            self.config
         )
         tools = cloud_registry.match_tools(query)
         planning_agent = self._get_planning_agent()

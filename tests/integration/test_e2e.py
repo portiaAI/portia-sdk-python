@@ -53,6 +53,7 @@ AGENTS = [
     ExecutionAgentType.ONE_SHOT,
 ]
 
+
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 def test_portia_run_query(
