@@ -12,7 +12,6 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
-from portia.execution_context import execution_context
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import get_test_config, get_test_plan_run
 
@@ -29,21 +28,6 @@ def test_base_agent_default_context() -> None:
     context = agent.get_system_context()
     assert context is not None
     assert "value: 1" in context
-
-
-def test_base_agent_default_context_with_extensions() -> None:
-    """Test default context."""
-    plan, plan_run = get_test_plan_run()
-    agent = BaseExecutionAgent(
-        plan.steps[0],
-        plan_run,
-        get_test_config(),
-        None,
-    )
-    with execution_context(agent_system_context_extension=["456"]):
-        context = agent.get_system_context()
-    assert context is not None
-    assert "456" in context
 
 
 def test_output_serialize() -> None:

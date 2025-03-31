@@ -75,8 +75,6 @@ class ImageUnderstandingTool(Tool[str]):
             "plan run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
-        if ctx.execution_context.plan_run_context:
-            context += f"\nPlan run context: {ctx.execution_context.plan_run_context}"
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
         content = (
