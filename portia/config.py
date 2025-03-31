@@ -81,7 +81,7 @@ class LLMProvider(Enum):
                 return "azure_openai_api_key"
 
 
-class ProviderModel(NamedTuple):
+class Model(NamedTuple):
     """Provider and model name tuple.
 
     Attributes:
@@ -146,59 +146,59 @@ class LLMModel(Enum):
         raise ValueError(f"Invalid LLM model: {value}")
 
     # OpenAI
-    GPT_4_O = ProviderModel(provider=LLMProvider.OPENAI, model_name="gpt-4o")
-    GPT_4_O_MINI = ProviderModel(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
-    GPT_3_5_TURBO = ProviderModel(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
-    O_3_MINI = ProviderModel(provider=LLMProvider.OPENAI, model_name="o3-mini")
+    GPT_4_O = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o")
+    GPT_4_O_MINI = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
+    GPT_3_5_TURBO = Model(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
+    O_3_MINI = Model(provider=LLMProvider.OPENAI, model_name="o3-mini")
 
     # Anthropic
-    CLAUDE_3_5_SONNET = ProviderModel(
+    CLAUDE_3_5_SONNET = Model(
         provider=LLMProvider.ANTHROPIC,
         model_name="claude-3-5-sonnet-latest",
     )
-    CLAUDE_3_5_HAIKU = ProviderModel(
+    CLAUDE_3_5_HAIKU = Model(
         provider=LLMProvider.ANTHROPIC,
         model_name="claude-3-5-haiku-latest",
     )
-    CLAUDE_3_OPUS = ProviderModel(
+    CLAUDE_3_OPUS = Model(
         provider=LLMProvider.ANTHROPIC,
         model_name="claude-3-opus-latest",
     )
-    CLAUDE_3_7_SONNET = ProviderModel(
+    CLAUDE_3_7_SONNET = Model(
         provider=LLMProvider.ANTHROPIC,
         model_name="claude-3-7-sonnet-latest",
     )
 
     # MistralAI
-    MISTRAL_LARGE = ProviderModel(
+    MISTRAL_LARGE = Model(
         provider=LLMProvider.MISTRALAI,
         model_name="mistral-large-latest",
     )
 
     # Google Generative AI
-    GEMINI_2_0_FLASH = ProviderModel(
+    GEMINI_2_0_FLASH = Model(
         provider=LLMProvider.GOOGLE_GENERATIVE_AI,
         model_name="gemini-2.0-flash",
     )
-    GEMINI_2_0_FLASH_LITE = ProviderModel(
+    GEMINI_2_0_FLASH_LITE = Model(
         provider=LLMProvider.GOOGLE_GENERATIVE_AI,
         model_name="gemini-2.0-flash-lite",
     )
-    GEMINI_1_5_FLASH = ProviderModel(
+    GEMINI_1_5_FLASH = Model(
         provider=LLMProvider.GOOGLE_GENERATIVE_AI,
         model_name="gemini-1.5-flash",
     )
 
     # Azure OpenAI
-    AZURE_GPT_4_O = ProviderModel(
+    AZURE_GPT_4_O = Model(
         provider=LLMProvider.AZURE_OPENAI,
         model_name="gpt-4o",
     )
-    AZURE_GPT_4_O_MINI = ProviderModel(
+    AZURE_GPT_4_O_MINI = Model(
         provider=LLMProvider.AZURE_OPENAI,
         model_name="gpt-4o-mini",
     )
-    AZURE_O_3_MINI = ProviderModel(
+    AZURE_O_3_MINI = Model(
         provider=LLMProvider.AZURE_OPENAI,
         model_name="o3-mini",
     )
