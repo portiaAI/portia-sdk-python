@@ -70,7 +70,7 @@ class MockInvoker:
         self,
         prompt: ChatPromptValue,
         _: RunnableConfig | None = None,
-        **kwargs: Any,  # noqa: ANN401, ARG002
+        **kwargs: Any,  # noqa: ARG002
     ) -> AIMessage | BaseModel:
         """Mock run for invoking the chain."""
         self.called = True

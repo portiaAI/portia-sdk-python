@@ -1,0 +1,72 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-alpha'
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Extract version from tag
+        id: get_tag_version
+        run: |
+          # Remove 'v' prefix from tag
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get version from pyproject.toml
+        id: get_project_version
+        run: |
+          PROJECT_VERSION=$(poetry version -s)
+          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Verify versions match
+        id: verify_versions
+        run: |
+          if [ "${{ steps.get_tag_version.outputs.tag_version }}" != "${{ steps.get_project_version.outputs.project_version }}" ]; then
+            echo "Tag version (${{ steps.get_tag_version.outputs.tag_version }}) does not match project version (${{ steps.get_project_version.outputs.project_version }})"
+            exit 1
+          fi
+
+      - name: Build and publish to PyPI
+        id: pypi_publish
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.POETRY_PYPI_TOKEN_PYPI }}
+          poetry build
+          poetry publish --no-interaction
+        
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: '${{ vars.SLACK_DEV_CHANNEL }}'
+          slack-message: "✅ Successfully published SDK version ${{ steps.get_tag_version.outputs.tag_version }} to PyPI! 🎉"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: '${{ vars.SLACK_RUN_CHANNEL }}'
+          slack-message: "❌ Failed to publish version ${{ steps.get_tag_version.outputs.tag_version }} to PyPI.\nSee: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

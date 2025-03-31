@@ -1,12 +1,18 @@
 """Tests for common classes."""
 
 import json
+from unittest import mock
 from uuid import UUID
 
 import pytest
 from pydantic import BaseModel, Field
 
-from portia.common import PortiaEnum, combine_args_kwargs
+from portia.common import (
+    EXTRAS_GROUPS_DEPENDENCIES,
+    PortiaEnum,
+    combine_args_kwargs,
+    validate_extras_dependencies,
+)
 from portia.prefixed_uuid import PrefixedUUID
 
 
@@ -123,3 +129,24 @@ class TestPrefixedUUID:
         """Test PrefixedUUID hash."""
         uuid = PrefixedUUID()
         assert hash(uuid) == hash(uuid.uuid)
+
+
+def test_validate_extras_dependencies() -> None:
+    """Test function raises correct error when non-existing top level package is installed."""
+    with mock.patch.dict(EXTRAS_GROUPS_DEPENDENCIES, {"fake-extras-package": ["fake_package.bar"]}):
+        with pytest.raises(ImportError) as e:
+            validate_extras_dependencies("fake-extras-package")
+        assert "portia-sdk-python[fake-extras-package]" in str(e.value)
+
+
+def test_validate_extras_dependencies_raise_error_false() -> None:
+    """Test function doesn't raise an error when raise_error is False."""
+    with mock.patch.dict(EXTRAS_GROUPS_DEPENDENCIES, {"test": ["foobarbaz"]}):
+        extras_installed = validate_extras_dependencies("test", raise_error=False)
+        assert extras_installed is False
+
+
+def test_validate_extras_dependencies_success() -> None:
+    """Test function succeeds when package is installed."""
+    with mock.patch.dict(EXTRAS_GROUPS_DEPENDENCIES, {"test": ["pytest"]}):
+        validate_extras_dependencies("test")
