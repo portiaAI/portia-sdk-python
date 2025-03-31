@@ -152,28 +152,13 @@ class LLMModel(Enum):
     O_3_MINI = Model(provider=LLMProvider.OPENAI, model_name="o3-mini")
 
     # Anthropic
-    CLAUDE_3_5_SONNET = Model(
-        provider=LLMProvider.ANTHROPIC,
-        model_name="claude-3-5-sonnet-latest",
-    )
-    CLAUDE_3_5_HAIKU = Model(
-        provider=LLMProvider.ANTHROPIC,
-        model_name="claude-3-5-haiku-latest",
-    )
-    CLAUDE_3_OPUS = Model(
-        provider=LLMProvider.ANTHROPIC,
-        model_name="claude-3-opus-latest",
-    )
-    CLAUDE_3_7_SONNET = Model(
-        provider=LLMProvider.ANTHROPIC,
-        model_name="claude-3-7-sonnet-latest",
-    )
+    CLAUDE_3_5_SONNET = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-sonnet-latest")
+    CLAUDE_3_5_HAIKU = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-haiku-latest")
+    CLAUDE_3_OPUS = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-opus-latest")
+    CLAUDE_3_7_SONNET = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-7-sonnet-latest")
 
     # MistralAI
-    MISTRAL_LARGE = Model(
-        provider=LLMProvider.MISTRALAI,
-        model_name="mistral-large-latest",
-    )
+    MISTRAL_LARGE = Model(provider=LLMProvider.MISTRALAI, model_name="mistral-large-latest")
 
     # Google Generative AI
     GEMINI_2_0_FLASH = Model(
@@ -190,18 +175,9 @@ class LLMModel(Enum):
     )
 
     # Azure OpenAI
-    AZURE_GPT_4_O = Model(
-        provider=LLMProvider.AZURE_OPENAI,
-        model_name="gpt-4o",
-    )
-    AZURE_GPT_4_O_MINI = Model(
-        provider=LLMProvider.AZURE_OPENAI,
-        model_name="gpt-4o-mini",
-    )
-    AZURE_O_3_MINI = Model(
-        provider=LLMProvider.AZURE_OPENAI,
-        model_name="o3-mini",
-    )
+    AZURE_GPT_4_O = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
+    AZURE_GPT_4_O_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
+    AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
 
     @property
     def api_name(self) -> str:
