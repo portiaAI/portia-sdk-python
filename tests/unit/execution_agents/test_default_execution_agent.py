@@ -255,9 +255,8 @@ def test_verifier_model() -> None:
         ],
     )
     verified_tool_inputs = VerifiedToolInputs(
-        args=[
-            VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
-        )
+        args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
+    )
     mock_model = get_mock_base_chat_model(response=verified_tool_inputs)
 
     agent = SimpleNamespace()

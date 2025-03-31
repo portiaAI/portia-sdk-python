@@ -49,6 +49,7 @@ def test_logger_formatter_get_function_color(record: dict, expected_color: str) 
     logger_formatter = Formatter()
     assert logger_formatter._get_function_color_(record) == expected_color
 
+
 def test_logger_sanitize_message() -> None:
     """Test the logger sanitize_message method."""
     logger_formatter = Formatter()
@@ -59,9 +60,10 @@ def test_logger_sanitize_message() -> None:
     # a long message gets truncated correctly
     long_message = "test\n" * 100
     truncated_message = logger_formatter._sanitize_message_(long_message)
-    assert len(truncated_message.split("\n"))  == logger_formatter.max_lines
+    assert len(truncated_message.split("\n")) == logger_formatter.max_lines
     assert truncated_message.endswith("test\n")
     assert truncated_message.startswith("test\n")
+
 
 def test_logger_manager_initialization() -> None:
     """Test initialization of LoggerManager with default logger."""

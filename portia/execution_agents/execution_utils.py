@@ -16,7 +16,6 @@ from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryErr
 from portia.execution_agents.base_execution_agent import Output
 
 if TYPE_CHECKING:
-
     from portia.tool import Tool
 
 

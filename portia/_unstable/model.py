@@ -16,6 +16,7 @@ from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr
 
 from portia.common import validate_extras_dependencies
+from portia.planning_agents.base_planning_agent import StepsOrError
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -72,19 +73,8 @@ class Message(BaseModel):
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
 
 
-class GenerativeModel(ABC):
-    """Base class for all generative model clients."""
-
-    provider_name: str
-
-    def __init__(self, model_name: str) -> None:
-        """Initialize the model.
-
-        Args:
-            model_name: The name of the model.
-
-        """
-        self.model_name = model_name
+class Model(ABC):
+    """Base class for all Model clients."""
 
     @abstractmethod
     def get_response(self, messages: list[Message]) -> Message:
@@ -115,34 +105,18 @@ class GenerativeModel(ABC):
 
         """
 
-    def __str__(self) -> str:
-        """Get the string representation of the model."""
-        return f"{self.provider_name}/{self.model_name}"
 
-    def __repr__(self) -> str:
-        """Get the string representation of the model."""
-        return f'{self.__class__.__name__}("{self.provider_name}/{self.model_name}")'
-
-
-class LangChainGenerativeModel(GenerativeModel):
+class LangChainModel(Model):
     """Base class for LangChain-based models."""
 
-    provider_name: str
-
-    def __init__(self, client: BaseChatModel, model_name: str) -> None:
+    def __init__(self, client: BaseChatModel) -> None:
         """Initialize with LangChain client.
 
         Args:
             client: LangChain chat model instance
-            model_name: The name of the model
 
         """
-        super().__init__(model_name)
         self._client = client
-
-    def to_langchain(self) -> BaseChatModel:
-        """Get the LangChain client."""
-        return self._client
 
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
@@ -175,10 +149,8 @@ class LangChainGenerativeModel(GenerativeModel):
         return schema.model_validate(response)
 
 
-class OpenAIGenerativeModel(LangChainGenerativeModel):
+class OpenAIModel(LangChainModel):
     """OpenAI model implementation."""
-
-    provider_name: str = "openai"
 
     def __init__(
         self,
@@ -219,11 +191,12 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             temperature=temperature,
             **kwargs,
         )
-        super().__init__(client, model_name)
+        super().__init__(client)
         self._instructor_client = instructor.from_openai(
             client=OpenAI(api_key=api_key.get_secret_value()),
             mode=instructor.Mode.JSON,
         )
+        self._model_name = model_name
         self._seed = seed
 
     def get_structured_response(
@@ -243,7 +216,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
+        if schema == StepsOrError:
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
             messages,
@@ -262,15 +235,13 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
-            model=self.model_name,
+            model=self._model_name,
             seed=self._seed,
         )
 
 
-class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
+class AzureOpenAIModel(LangChainModel):
     """Azure OpenAI model implementation."""
-
-    provider_name: str = "azure-openai"
 
     def __init__(  # noqa: PLR0913
         self,
@@ -317,7 +288,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             temperature=temperature,
             **kwargs,
         )
-        super().__init__(client, model_name)
+        super().__init__(client)
         self._instructor_client = instructor.from_openai(
             client=AzureOpenAI(
                 api_key=api_key.get_secret_value(),
@@ -326,6 +297,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             ),
             mode=instructor.Mode.JSON,
         )
+        self._model_name = model_name
         self._seed = seed
 
     def get_structured_response(
@@ -345,7 +317,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
+        if schema == StepsOrError:
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(
             messages,
@@ -364,15 +336,13 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
-            model=self.model_name,
+            model=self._model_name,
             seed=self._seed,
         )
 
 
-class AnthropicGenerativeModel(LangChainGenerativeModel):
+class AnthropicModel(LangChainModel):
     """Anthropic model implementation."""
-
-    provider_name: str = "anthropic"
 
     def __init__(
         self,
@@ -400,11 +370,12 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             **kwargs,
         )
-        super().__init__(client, model_name)
+        super().__init__(client)
         self._instructor_client = instructor.from_anthropic(
             client=Anthropic(api_key=api_key.get_secret_value()),
             mode=instructor.Mode.ANTHROPIC_JSON,
         )
+        self._model_name = model_name
 
     def get_structured_response(
         self,
@@ -423,7 +394,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
+        if schema == StepsOrError:
             return self.get_structured_response_instructor(messages, schema)
         return super().get_structured_response(messages, schema, **kwargs)
 
@@ -435,7 +406,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._instructor_client.chat.completions.create(
-            model=self.model_name,
+            model=self._model_name,
             response_model=schema,
             messages=instructor_messages,
             max_tokens=2048,
@@ -445,10 +416,8 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
 if validate_extras_dependencies("mistral", raise_error=False):
     from mistralai import Mistral
 
-    class MistralAIGenerativeModel(LangChainGenerativeModel):
+    class MistralAIModel(LangChainModel):
         """MistralAI model implementation."""
-
-        provider_name: str = "mistralai"
 
         def __init__(
             self,
@@ -473,11 +442,12 @@ if validate_extras_dependencies("mistral", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
-            super().__init__(client, model_name)
+            super().__init__(client)
             self._instructor_client = instructor.from_mistral(
                 client=Mistral(api_key=api_key.get_secret_value()),
                 use_async=False,
             )
+            self._model_name = model_name
 
         def get_structured_response(
             self,
@@ -496,7 +466,7 @@ if validate_extras_dependencies("mistral", raise_error=False):
                 BaseModelT: The structured response from the model.
 
             """
-            if schema.__name__ == "StepsOrError":
+            if schema == StepsOrError:
                 return self.get_structured_response_instructor(messages, schema)
             return super().get_structured_response(
                 messages,
@@ -513,7 +483,7 @@ if validate_extras_dependencies("mistral", raise_error=False):
             """Get structured response using instructor."""
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return self._instructor_client.chat.completions.create(
-                model=self.model_name,
+                model=self._model_name,
                 response_model=schema,
                 messages=instructor_messages,
             )
@@ -522,10 +492,8 @@ if validate_extras_dependencies("mistral", raise_error=False):
 if validate_extras_dependencies("google", raise_error=False):
     import google.generativeai as genai
 
-    class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
+    class GoogleGenerativeAIModel(LangChainModel):
         """Google Generative AI (Gemini)model implementation."""
-
-        provider_name: str = "google-generative-ai"
 
         def __init__(
             self,
@@ -553,12 +521,13 @@ if validate_extras_dependencies("google", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
-            super().__init__(client, model_name)
+            super().__init__(client)
             self._instructor_client = instructor.from_gemini(
                 client=genai.GenerativeModel(model_name=model_name),  # pyright: ignore[reportPrivateImportUsage]
                 mode=instructor.Mode.GEMINI_JSON,
                 use_async=False,
             )
+            self._model_name = model_name
 
         def get_structured_response(
             self,

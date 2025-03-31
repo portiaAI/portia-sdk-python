@@ -1,4 +1,5 @@
 """Unit tests for the LLMWrapper."""
+
 from unittest.mock import MagicMock
 
 import pytest
