@@ -337,7 +337,9 @@ def clear_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     ],
 )
 def test_llm_provider_default_from_api_keys_env_vars(
-    env_vars: dict[str, str], provider: LLMProvider, monkeypatch: pytest.MonkeyPatch
+    env_vars: dict[str, str],
+    provider: LLMProvider,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test LLM provider default from API keys env vars."""
     clear_env_vars(monkeypatch)
@@ -365,7 +367,9 @@ def test_llm_provider_default_from_api_keys_env_vars(
     ],
 )
 def test_llm_provider_default_from_api_keys_config_kwargs(
-    config_kwargs: dict[str, str], provider: LLMProvider, monkeypatch: pytest.MonkeyPatch
+    config_kwargs: dict[str, str],
+    provider: LLMProvider,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test LLM provider default from API keys config kwargs."""
     clear_env_vars(monkeypatch)
