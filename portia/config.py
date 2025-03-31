@@ -626,19 +626,6 @@ class Config(BaseModel):
         """
         return self.must_get(name, SecretStr)
 
-    def must_get_raw_api_key(self, name: str) -> str:
-        """Retrieve the raw API key for the configured provider.
-
-        Raises:
-            ConfigNotFoundError: If no API key is found for the provider.
-
-        Returns:
-            str: The raw API key.
-
-        """
-        key = self.must_get_api_key(name)
-        return key.get_secret_value()
-
     def must_get(self, name: str, expected_type: type[T]) -> T:
         """Retrieve any value from the config, ensuring its of the correct type.
 

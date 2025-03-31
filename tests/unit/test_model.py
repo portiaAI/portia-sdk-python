@@ -1,5 +1,6 @@
 """Unit tests for the Message class in portia.model."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -7,7 +8,12 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, ValidationError
 
-from portia.model import LangChainGenerativeModel, Message, map_message_to_instructor
+from portia.model import (
+    GenerativeModel,
+    LangChainGenerativeModel,
+    Message,
+    map_message_to_instructor,
+)
 
 
 @pytest.mark.parametrize(
@@ -94,6 +100,13 @@ def test_map_message_to_instructor(message: Message, expected_instructor_message
     assert map_message_to_instructor(message) == expected_instructor_message
 
 
+def test_map_message_to_instructor_unsupported_role() -> None:
+    """Test mapping a Message to an Instructor message with an unsupported role."""
+    message = SimpleNamespace(role="invalid", content="Hello")
+    with pytest.raises(ValueError, match="Unsupported message role"):
+        map_message_to_instructor(message)  # type: ignore[arg-type]
+
+
 def test_message_validation() -> None:
     """Test basic Message model validation."""
     # Valid message
@@ -108,6 +121,35 @@ def test_message_validation() -> None:
     # Missing required fields
     with pytest.raises(ValidationError, match="Field required"):
         Message()  # type: ignore[call-arg]
+
+
+class DummyGenerativeModel(GenerativeModel):
+    """Dummy generative model."""
+
+    provider_name: str = "portia"
+
+    def __init__(self, model_name: str) -> None:
+        """Initialize the model."""
+        super().__init__(model_name)
+
+    def get_response(self, messages: list[Message]) -> Message:  # noqa: ARG002
+        """Get a response from the model."""
+        return Message(role="assistant", content="Hello")
+
+    def get_structured_response(
+        self,
+        messages: list[Message],  # noqa: ARG002
+        schema: type[BaseModel],
+    ) -> BaseModel:
+        """Get a structured response from the model."""
+        return schema()
+
+
+def test_model_to_string() -> None:
+    """Test that the model to string method works."""
+    model = DummyGenerativeModel(model_name="test")
+    assert str(model) == "portia/test"
+    assert repr(model) == 'DummyGenerativeModel("portia/test")'
 
 
 class StructuredOutputTestModel(BaseModel):

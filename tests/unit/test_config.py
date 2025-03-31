@@ -18,6 +18,7 @@ from portia.config import (
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
+    AzureOpenAIGenerativeModel,
     LangChainGenerativeModel,
 )
 
@@ -158,6 +159,16 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
         c = Config.from_default(llm_provider="personal", llm_model_name="other-model")
 
 
+def test_resolve_model_azure() -> None:
+    """Test resolve model for Azure OpenAI."""
+    c = Config.from_default(
+        llm_provider=LLMProvider.AZURE_OPENAI,
+        azure_openai_endpoint="http://test-azure-openai-endpoint",
+        azure_openai_api_key="test-azure-openai-api-key",
+    )
+    assert isinstance(c.resolve_model(PLANNING_MODEL_KEY), AzureOpenAIGenerativeModel)
+
+
 def test_custom_models() -> None:
     """Test custom models."""
     c = Config.from_default(
@@ -194,9 +205,6 @@ def test_getters() -> None:
     )
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_key", int)
-
-    with pytest.raises(InvalidConfigError):
-        c.must_get_raw_api_key("anthropic_api_key")
 
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)
@@ -265,6 +273,12 @@ def test_llm_model_instantiate_from_string(model_name: str, expected: LLMModel) 
     """Test LLM model from string."""
     model = LLMModel(model_name)
     assert model == expected
+
+
+def test_llm_model_instantiate_from_string_missing() -> None:
+    """Test LLM model from string missing."""
+    with pytest.raises(ValueError, match="Invalid LLM model"):
+        LLMModel("not-a-model")
 
 
 PROVIDER_ENV_VARS = [
