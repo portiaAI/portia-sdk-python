@@ -150,27 +150,6 @@ class LangChainModel(Model):
         return schema.model_validate(response)
 
 
-def map_message_to_instructor(message: Message) -> ChatCompletionMessageParam:
-    """Map a Message to ChatCompletionMessageParam.
-
-    Args:
-        message (Message): The message to map.
-
-    Returns:
-        ChatCompletionMessageParam: Message in the format expected by instructor.
-
-    """
-    match message:
-        case Message(role="user", content=content):
-            return {"role": "user", "content": content}
-        case Message(role="assistant", content=content):
-            return {"role": "assistant", "content": content}
-        case Message(role="system", content=content):
-            return {"role": "system", "content": content}
-        case _:
-            raise ValueError(f"Unsupported message role: {message.role}")
-
-
 class OpenAIModel(LangChainModel):
     """OpenAI model implementation."""
 
@@ -581,3 +560,24 @@ if validate_extras_dependencies("google", raise_error=False):
                 messages=instructor_messages,
                 response_model=schema,
             )
+
+
+def map_message_to_instructor(message: Message) -> ChatCompletionMessageParam:
+    """Map a Message to ChatCompletionMessageParam.
+
+    Args:
+        message (Message): The message to map.
+
+    Returns:
+        ChatCompletionMessageParam: Message in the format expected by instructor.
+
+    """
+    match message:
+        case Message(role="user", content=content):
+            return {"role": "user", "content": content}
+        case Message(role="assistant", content=content):
+            return {"role": "assistant", "content": content}
+        case Message(role="system", content=content):
+            return {"role": "system", "content": content}
+        case _:
+            raise ValueError(f"Unsupported message role: {message.role}")
