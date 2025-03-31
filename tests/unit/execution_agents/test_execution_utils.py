@@ -9,6 +9,7 @@ from langgraph.graph import END, MessagesState
 from pydantic import SecretStr
 
 from portia.clarification import InputClarification
+from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
@@ -21,7 +22,7 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.output import Output
 from portia.prefixed_uuid import PlanRunUUID
-from tests.utils import AdditionTool
+from tests.utils import AdditionTool, get_test_config
 
 
 def test_next_state_after_tool_call_no_error() -> None:
@@ -35,7 +36,7 @@ def test_next_state_after_tool_call_no_error() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state)
+    result = next_state_after_tool_call(get_test_config(), state)
 
     assert result == END
 
@@ -54,8 +55,29 @@ def test_next_state_after_tool_call_with_summarize() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state, tool)
+    result = next_state_after_tool_call(get_test_config(), state, tool)
 
+    assert result == AgentNode.SUMMARIZER
+
+
+def test_next_state_after_tool_call_with_large_output() -> None:
+    """Test next state when tool call succeeds and should summarize."""
+    tool = AdditionTool()
+    messages: list[ToolMessage] = [
+        ToolMessage(
+            content="Test" * 1000,
+            tool_call_id="123",
+            name="test_tool",
+        ),
+    ]
+    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
+
+    config = get_test_config(
+        # Set a small threshold value so all outputs are stored in agent memory
+        feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
+        large_output_threshold_value=10,
+    )
+    result = next_state_after_tool_call(config, state, tool)
     assert result == AgentNode.SUMMARIZER
 
 
@@ -72,7 +94,7 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
         ]
         state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-        result = next_state_after_tool_call(state)
+        result = next_state_after_tool_call(get_test_config(), state)
 
         expected_state = END if i == MAX_RETRIES else AgentNode.TOOL_AGENT
         assert result == expected_state, f"Failed at retry {i}"
@@ -211,7 +233,7 @@ def test_next_state_after_tool_call_with_clarification_artifact() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state, tool)
+    result = next_state_after_tool_call(get_test_config(), state, tool)
 
     # Should return END even though tool.should_summarize is True
     # because the message contains a clarification artifact
@@ -246,7 +268,7 @@ def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state, tool)
+    result = next_state_after_tool_call(get_test_config(), state, tool)
 
     # Should return END even though tool.should_summarize is True
     # because the message contains a list of clarifications as artifact

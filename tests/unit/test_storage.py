@@ -9,7 +9,12 @@ from uuid import UUID
 import pytest
 
 from portia.errors import StorageError
-from portia.execution_agents.output import FileMemoryValue, Output, RemoteMemoryValue
+from portia.execution_agents.output import (
+    FileMemoryValue,
+    LocalMemoryValue,
+    Output,
+    RemoteMemoryValue,
+)
 from portia.plan import Plan, PlanContext, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
@@ -111,7 +116,6 @@ def test_disk_storage(tmp_path: Path) -> None:
 
 def test_portia_cloud_storage() -> None:
     """Test PortiaCloudStorage raises StorageError on failure responses."""
-    """Test PortiaCloudStorage raises StorageError on failure responses using the client."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
 
@@ -356,12 +360,16 @@ def test_in_memory_storage_outputs() -> None:
     output_name = "test_output"
 
     # Test saving output
-    storage.save_plan_run_output(output_name, output, plan_run.id)
+    stored_output = storage.save_plan_run_output(output_name, output, plan_run.id)
+    assert stored_output.summary == output.summary
+    assert stored_output.value == LocalMemoryValue(value=output.value)
 
     # Test retrieving output
     retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
-    assert retrieved_output.value == output.value
+    assert retrieved_output.value == LocalMemoryValue(value=output.value)
     assert retrieved_output.summary == output.summary
+    assert retrieved_output.value_for_prompt() == output.summary
+    assert retrieved_output.full_value() == output.value
 
     # Test retrieving non-existent output
     with pytest.raises(KeyError):
@@ -376,13 +384,17 @@ def test_disk_file_storage_outputs(tmp_path: Path) -> None:
     output_name = "test_output"
 
     # Test saving output
-    storage.save_plan_run_output(output_name, output, plan_run.id)
+    stored_output = storage.save_plan_run_output(output_name, output, plan_run.id)
+    assert stored_output.summary == output.summary
+    assert isinstance(stored_output.value, FileMemoryValue)
+    assert stored_output.value.path == str(tmp_path / str(plan_run.id) / f"{output_name}.json")
 
     # Test retrieving output
     retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
     assert retrieved_output.summary == output.summary
     assert isinstance(retrieved_output.value, FileMemoryValue)
-    assert retrieved_output.value.path == tmp_path / str(plan_run.id) / f"{output_name}.json"
+    assert retrieved_output.value.path == str(tmp_path / str(plan_run.id) / f"{output_name}.json")
+    assert retrieved_output.value_for_prompt() == output.summary
     assert retrieved_output.full_value() == output.value
 
     # Test retrieving non-existent output
@@ -413,7 +425,7 @@ def test_portia_cloud_storage_outputs() -> None:
         patch.object(storage.client, "get", return_value=mock_response) as mock_get,
     ):
         # Test saving output
-        storage.save_plan_run_output(output_name, output, plan_run.id)
+        stored_output = storage.save_plan_run_output(output_name, output, plan_run.id)
         mock_put.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/{output_name}/",
             json={
@@ -421,11 +433,14 @@ def test_portia_cloud_storage_outputs() -> None:
                 "summary": output.summary,
             },
         )
+        assert stored_output.value == RemoteMemoryValue(url="https://example.com/output")
+        assert stored_output.summary == output.summary
 
         # Test retrieving output
         retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
-        assert retrieved_output.value == RemoteMemoryValue(url="https://example.com/output")
+        assert stored_output.value == RemoteMemoryValue(url="https://example.com/output")
         assert retrieved_output.summary == output.summary
+        assert stored_output.value_for_prompt() == output.summary
         mock_get.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/{output_name}/",
         )
@@ -434,7 +449,10 @@ def test_portia_cloud_storage_outputs() -> None:
     mock_http_response = MagicMock()
     mock_http_response.status_code = 200
     mock_http_response.text = "test-value"
-    with patch("requests.get", return_value=mock_http_response) as mock_http_get:
+    with (
+        patch("httpx.Client.get", return_value=mock_http_response) as mock_http_get,
+        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+    ):
         retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
         assert retrieved_output.full_value() == "test-value"
         mock_http_get.assert_called_once_with("https://example.com/output")

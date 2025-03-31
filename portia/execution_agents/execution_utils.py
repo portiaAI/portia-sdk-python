@@ -62,6 +62,7 @@ def next_state_after_tool_call(
     should proceed to the tool agent again, to the summarizer, or end.
 
     Args:
+        config (Config): The configuration for the run.
         state (MessagesState): The current state of the messages.
         tool (Tool | None): The tool involved in the call, if any.
 

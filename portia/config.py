@@ -271,6 +271,8 @@ SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 PLANNING_DEFAULT_MODEL_KEY = "planning_default_model_name"
 
+FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
+
 
 E = TypeVar("E", bound=Enum)
 
@@ -418,7 +420,7 @@ class Config(BaseModel):
         self.feature_flags = {
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
-            AGENT_MEMORY_FEATURE_FLAG: False,
+            FEATURE_FLAG_AGENT_MEMORY_ENABLED: False,
             **self.feature_flags,
         }
         return self
@@ -519,9 +521,9 @@ class Config(BaseModel):
 
     def exceeds_output_threshold(self, value: str | list[str | dict]) -> bool:
         """Determine whether the provided output value exceeds the large output threshold."""
-        if self.feature_flags.get(AGENT_MEMORY_FEATURE_FLAG):
+        if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
             return False
-        return str(value) > self.large_output_threshold_value
+        return len(str(value)) > self.large_output_threshold_value
 
     @model_validator(mode="after")
     def check_config(self) -> Self:

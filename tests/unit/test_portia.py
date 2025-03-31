@@ -15,7 +15,7 @@ from portia.clarification import (
     InputClarification,
     ValueConfirmationClarification,
 )
-from portia.config import AGENT_MEMORY_FEATURE_FLAG, Config, StorageClass
+from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED, Config, StorageClass
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.output import Output
 from portia.introspection_agents.introspection_agent import (
@@ -53,7 +53,7 @@ def portia_with_agent_memory() -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
         # Set a small threshold value so all outputs are stored in agent memory
-        feature_flags={AGENT_MEMORY_FEATURE_FLAG: True},
+        feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
         large_output_threshold_value=10,
     )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
@@ -599,7 +599,9 @@ def test_portia_run_query_with_memory(portia_with_agent_memory: Portia) -> None:
             return_value=mock_summarizer_agent,
         ),
         mock.patch.object(
-            portia_with_agent_memory, "_get_agent_for_step", return_value=mock_step_agent
+            portia_with_agent_memory,
+            "_get_agent_for_step",
+            return_value=mock_step_agent,
         ),
     ):
         plan_run = portia_with_agent_memory.run(query)

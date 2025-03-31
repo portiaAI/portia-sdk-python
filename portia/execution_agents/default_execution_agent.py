@@ -18,7 +18,6 @@ from portia.clarification import Clarification, InputClarification
 from portia.config import EXECUTION_MODEL_KEY
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-from portia.execution_agents.output import Output
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
@@ -27,6 +26,7 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
+from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
@@ -651,7 +651,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm, self.config).invoke)
         graph.add_conditional_edges(
             AgentNode.TOOLS,
-            lambda state: next_state_after_tool_call(state, self.tool),
+            lambda state: next_state_after_tool_call(self.config, state, self.tool),
         )
         graph.add_conditional_edges(
             AgentNode.TOOL_AGENT,

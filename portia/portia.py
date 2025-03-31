@@ -29,7 +29,6 @@ from portia.clarification import (
     ClarificationCategory,
 )
 from portia.config import (
-    AGENT_MEMORY_FEATURE_FLAG,
     Config,
     ExecutionAgentType,
     PlanningAgentType,
@@ -885,14 +884,7 @@ class Portia:
         return DefaultIntrospectionAgent(self.config)
 
     def _save_output(self, output: Output, output_name: str, plan_run: PlanRun) -> None:
-        if len(
-            str(output.value),
-        ) > self.config.large_output_threshold_value and self.config.feature_flags.get(
-            AGENT_MEMORY_FEATURE_FLAG,
-        ):
-            self.storage.save_plan_run_output(output_name, output, plan_run.id)
-            # As the value has been put into agent memory, set the output value to None.
-            # If we need the value, we'll fetch it from agent memory.
-            output.value = None
+        if self.config.exceeds_output_threshold(output.value):
+            output = self.storage.save_plan_run_output(output_name, output, plan_run.id)
 
         plan_run.outputs.step_outputs[output_name] = output

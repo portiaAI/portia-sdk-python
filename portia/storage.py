@@ -35,7 +35,12 @@ from pydantic import BaseModel, ValidationError
 
 from portia.cloud import PortiaCloudClient
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
-from portia.execution_agents.output import FileMemoryValue, Output, RemoteMemoryValue
+from portia.execution_agents.output import (
+    FileMemoryValue,
+    LocalMemoryValue,
+    Output,
+    RemoteMemoryValue,
+)
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanUUID, Step
@@ -241,13 +246,16 @@ class AgentMemoryStorage(ABC):
         output_name: str,
         output: Output,
         plan_run_id: PlanRunUUID,
-    ) -> None:
+    ) -> Output:
         """Save an output from a plan run to agent memory.
 
         Args:
             output_name (str): The name of the output within the plan
             output (Output): The Output object to save
             plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        Returns:
+            Output: The Output object with stored value
 
         Raises:
             NotImplementedError: If the method is not implemented.
@@ -382,7 +390,12 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
+        output = Output(
+            summary=output.summary,
+            value=LocalMemoryValue(value=output.value),
+        )
         self.outputs[plan_run_id][output_name] = output
+        return output
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from memory.
@@ -575,8 +588,13 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
 
         """
         output_dir = self._ensure_output_dir(plan_run_id)
-        with (output_dir / f"{output_name}.json").open("w") as file:
+        filename = output_dir / f"{output_name}.json"
+        with (filename).open("w") as file:
             file.write(output.model_dump_json(indent=4))
+        return Output(
+            summary=output.summary,
+            value=FileMemoryValue(path=str(filename)),
+        )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from agent memory on disk.
@@ -594,12 +612,12 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
 
         """
         output_file = Path(self.storage_dir, str(plan_run_id), f"{output_name}.json")
+
         with output_file.open("r") as file:
-            output = Output.model_validate_json(file.read())
+            stored_output = Output.model_validate_json(file.read())
             return Output(
-                name=output["name"],
-                summary=output["summary"],
-                value=FileMemoryValue(path=output_file),
+                summary=stored_output.summary,
+                value=FileMemoryValue(path=str(output_file)),
             )
 
 
@@ -832,7 +850,7 @@ class PortiaCloudStorage(Storage, AgentMemoryStorage):
         output_name: str,
         output: Output,
         plan_run_id: PlanRunUUID,
-    ) -> None:
+    ) -> Output:
         """Save Output from a plan run to Portia Cloud.
 
         Args:
@@ -856,6 +874,11 @@ class PortiaCloudStorage(Storage, AgentMemoryStorage):
             raise StorageError(e) from e
         else:
             self.check_response(response)
+            response_json = response.json()
+            return Output(
+                summary=response_json["summary"],
+                value=RemoteMemoryValue(url=response_json["url"]),
+            )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from Portia Cloud.
@@ -880,8 +903,8 @@ class PortiaCloudStorage(Storage, AgentMemoryStorage):
             raise StorageError(e) from e
         else:
             self.check_response(response)
+            response_json = response.json()
             return Output(
-                name=response["name"],
-                summary=response["summary"],
-                value=RemoteMemoryValue(url=response["url"]),
+                summary=response_json["summary"],
+                value=RemoteMemoryValue(url=response_json["url"]),
             )

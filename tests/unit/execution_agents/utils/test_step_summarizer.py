@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     import pytest
     from pydantic import BaseModel
 
-from portia.config import AGENT_MEMORY_FEATURE_FLAG
+from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
 from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from tests.utils import get_test_config, get_test_llm_wrapper
@@ -143,7 +143,7 @@ def test_summarizer_model_large_output(monkeypatch: pytest.MonkeyPatch) -> None:
         config=get_test_config(
             large_output_threshold_value=100,
             feature_flags={
-                AGENT_MEMORY_FEATURE_FLAG: False,
+                FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             },
         ),
     )

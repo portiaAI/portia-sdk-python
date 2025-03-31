@@ -9,16 +9,23 @@ import json
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
+from typing import Generic
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from portia.common import Serializable
+from portia.common import SERIALIZABLE_TYPE_VAR, Serializable
 from portia.errors import StorageError
 
 
 class RemoteMemoryValue(BaseModel):
-    """Used for large outputs that are stored remotely in agent memory."""
+    """Used for large outputs that are stored remotely in agent memory.
+
+    Note that this URL is usually a signed URL into agent memory, so it will expire.
+    You should ensure you fetch the output value shortly before using it to ensure
+    that expiry isn't an issue.
+
+    """
 
     url: str
 
@@ -29,7 +36,16 @@ class FileMemoryValue(BaseModel):
     path: str
 
 
-class Output(BaseModel):
+class LocalMemoryValue(BaseModel):
+    """Used for large outputs that are stored in local agent memory."""
+
+    value: Serializable
+
+
+AgentMemoryValue = RemoteMemoryValue | FileMemoryValue | LocalMemoryValue
+
+
+class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output of a tool with a wrapper for data, summaries, and LLM interpretation.
 
     This class contains a generic value `T` bound to `Serializable`.
@@ -43,7 +59,7 @@ class Output(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    raw_value: RemoteMemoryValue | FileMemoryValue | Serializable | None = Field(
+    value: AgentMemoryValue | list[AgentMemoryValue] | Serializable | None = Field(
         default=None,
         description="The output of the tool",
         alias="value",  # This ensures the field is serialized as "value" in JSON
@@ -53,29 +69,22 @@ class Output(BaseModel):
         description="Textual summary of the output of the tool. Not all tools generate summaries.",
     )
 
-    @property
-    def value(self) -> Serializable | None:
-        """Get the output value.
+    def value_for_prompt(self) -> Serializable | None:
+        """Get the value in a format suitable for an LLM prompt.
 
-        If we have the value locally, it will be returned. If the value is stored remotely in agent
-        memory this will be a summary of the value (i.e. the full value won't be fetched).
+        If the output is not so large that it can't be stored locally, it will be returned. If the
+        value is stored remotely in agent memory, this will be a summary of the value (i.e. the full
+        value won't be fetched).
 
         Returns:
             Serializable | None: The value of the output.
 
         """
-        match self.raw_value:
-            case value if isinstance(value, RemoteMemoryValue):
-                return self.summary
-            case value if isinstance(value, FileMemoryValue):
+        match self.value:
+            case value if isinstance(value, (RemoteMemoryValue, FileMemoryValue, LocalMemoryValue)):
                 return self.summary
             case _:
-                return self.raw_value
-
-    @value.setter
-    def value(self, value: RemoteMemoryValue | FileMemoryValue | Serializable | None) -> None:
-        """Set the output value."""
-        self.raw_value = value
+                return self.value
 
     def _fetch_remote_value(self, storage: RemoteMemoryValue) -> str:
         """Fetch a value from remote agent memory.
@@ -112,9 +121,11 @@ class Output(BaseModel):
 
         """
         try:
-            return Path(storage.path).read_text()
+            stored_output = Output.model_validate_json(Path(storage.path).read_text())
         except Exception as e:
             raise StorageError(f"Failed to read file value: {e}") from e
+        else:
+            return stored_output.value
 
     def full_value(self) -> Serializable | None:
         """Get the full value, fetching from remote storage or file if necessary.
@@ -123,16 +134,21 @@ class Output(BaseModel):
             Serializable | None: The full value of the output, fetched from storage if needed.
 
         """
-        match self.raw_value:
+        match self.value:
             case value if isinstance(value, RemoteMemoryValue):
                 return self._fetch_remote_value(value)
             case value if isinstance(value, FileMemoryValue):
                 return self._read_file_value(value)
+            case value if isinstance(value, LocalMemoryValue):
+                return value.value
+            case value if isinstance(value, list) and all(
+                isinstance(item, AgentMemoryValue) for item in value
+            ):
+                return [self.full_value(item) for item in value]
             case _:
-                return self.raw_value
+                return self.value
 
-    # @@@ TODO - SORT THIS (PLUS ANY TESTING)
-    @field_serializer("raw_value")
+    @field_serializer("value")
     def serialize_value(self, value: Serializable | None) -> str:  # noqa: C901, PLR0911
         """Serialize the value to a string.
 
@@ -176,7 +192,7 @@ class Output(BaseModel):
         if isinstance(value, Enum):
             return str(value.value)  # Convert Enums to their values
 
-        if isinstance(value, BaseModel):
+        if isinstance(value, (BaseModel, FileMemoryValue, RemoteMemoryValue)):
             return value.model_dump_json()  # Use Pydantic's built-in serialization for models
 
         if isinstance(value, bytes):

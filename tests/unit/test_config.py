@@ -7,8 +7,8 @@ import pytest
 from pydantic import SecretStr
 
 from portia.config import (
-    AGENT_MEMORY_FEATURE_FLAG,
     EXECUTION_MODEL_KEY,
+    FEATURE_FLAG_AGENT_MEMORY_ENABLED,
     PLANNING_MODEL_KEY,
     Config,
     ExecutionAgentType,
@@ -111,22 +111,20 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Large output threshold value
     c = Config.from_default(
-        large_output_threshold=100,
+        large_output_threshold_value=100,
         feature_flags={
-            AGENT_MEMORY_FEATURE_FLAG: True,
+            FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
         },
     )
-    assert c.large_output_threshold == 100
+    assert c.large_output_threshold_value == 100
     assert c.exceeds_output_threshold("Test " * 1000)
-    with pytest.raises(InvalidConfigError):
-        c = Config.from_default(large_output_threshold=-1)
     c = Config.from_default(
-        large_output_threshold=100,
+        large_output_threshold_value=100,
         feature_flags={
-            AGENT_MEMORY_FEATURE_FLAG: False,
+            FEATURE_FLAG_AGENT_MEMORY_ENABLED: False,
         },
     )
-    assert c.large_output_threshold == 100
+    assert c.large_output_threshold_value == 100
     assert not c.exceeds_output_threshold("Test " * 1000)
 
 

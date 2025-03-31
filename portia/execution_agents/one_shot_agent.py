@@ -208,7 +208,7 @@ class OneShotAgent(BaseExecutionAgent):
         )
         graph.add_conditional_edges(
             AgentNode.TOOLS,
-            lambda state: next_state_after_tool_call(state, self.tool),
+            lambda state: next_state_after_tool_call(self.config, state, self.tool),
         )
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
