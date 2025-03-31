@@ -483,14 +483,14 @@ class Config(BaseModel):
                     api_key=self.anthropic_api_key,
                 )
             case LLMProvider.MISTRALAI:
-                validate_extras_dependencies("mistralai")
+                validate_extras_dependencies("mistral")
                 from portia.model import MistralAIModel
                 return MistralAIModel(
                     model_name=llm_model.api_name,
                     api_key=self.mistralai_api_key,
                 )
             case LLMProvider.GOOGLE_GENERATIVE_AI:
-                validate_extras_dependencies("google-generativeai")
+                validate_extras_dependencies("google")
                 from portia.model import GoogleGenerativeAIModel
                 return GoogleGenerativeAIModel(
                     model_name=llm_model.api_name,
