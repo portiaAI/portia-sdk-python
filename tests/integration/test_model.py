@@ -13,13 +13,13 @@ from pydantic import BaseModel, SecretStr
 
 from portia.config import Config
 from portia.model import (
-    AnthropicModel,
-    AzureOpenAIModel,
-    GoogleGenerativeAIModel,
+    AnthropicGenerativeModel,
+    AzureOpenAIGenerativeModel,
+    GenerativeModel,
+    GoogleGenAiGenerativeModel,
     Message,
-    MistralAIModel,
-    Model,
-    OpenAIModel,
+    MistralAIGenerativeModel,
+    OpenAIGenerativeModel,
 )
 from portia.planning_agents.base_planning_agent import StepsOrError
 
@@ -34,12 +34,15 @@ class Response(BaseModel):
 
 
 CONFIG = Config.from_default()
-MODELS: list[Model] = [
-    OpenAIModel(model_name="gpt-4o-mini", api_key=CONFIG.openai_api_key),
-    AnthropicModel(model_name="claude-3-5-sonnet-latest", api_key=CONFIG.anthropic_api_key),
-    MistralAIModel(model_name="mistral-small-latest", api_key=CONFIG.mistralai_api_key),
-    GoogleGenerativeAIModel(model_name="gemini-2.0-flash", api_key=CONFIG.google_api_key),
-    AZURE_MODEL := AzureOpenAIModel(
+MODELS: list[GenerativeModel] = [
+    OpenAIGenerativeModel(model_name="gpt-4o-mini", api_key=CONFIG.openai_api_key),
+    AnthropicGenerativeModel(
+        model_name="claude-3-5-sonnet-latest",
+        api_key=CONFIG.anthropic_api_key,
+    ),
+    MistralAIGenerativeModel(model_name="mistral-small-latest", api_key=CONFIG.mistralai_api_key),
+    GoogleGenAiGenerativeModel(model_name="gemini-2.0-flash", api_key=CONFIG.google_api_key),
+    AZURE_MODEL := AzureOpenAIGenerativeModel(
         model_name="gpt-4o-mini",
         api_key=SecretStr("dummy"),
         azure_endpoint="https://dummy.openai.azure.com",
@@ -92,7 +95,7 @@ def messages() -> list[Message]:
 
 
 @pytest.mark.parametrize("model", MODELS)
-def test_get_response(model: Model, messages: list[Message]) -> None:
+def test_get_response(model: GenerativeModel, messages: list[Message]) -> None:
     """Test get_response for each model type."""
     response = model.get_response(messages)
     assert isinstance(response, Message)
@@ -101,7 +104,7 @@ def test_get_response(model: Model, messages: list[Message]) -> None:
 
 
 @pytest.mark.parametrize("model", MODELS)
-def test_get_structured_response(model: Model, messages: list[Message]) -> None:
+def test_get_structured_response(model: GenerativeModel, messages: list[Message]) -> None:
     """Test get_structured_response for each model type."""
     response = model.get_structured_response(messages, Response)
     assert isinstance(response, Response)
@@ -109,7 +112,10 @@ def test_get_structured_response(model: Model, messages: list[Message]) -> None:
 
 
 @pytest.mark.parametrize("model", MODELS)
-def test_get_structured_response_steps_or_error(model: Model, messages: list[Message]) -> None:
+def test_get_structured_response_steps_or_error(
+    model: GenerativeModel,
+    messages: list[Message],
+) -> None:
     """Test get_structured_response with StepsOrError for each model type."""
     response = model.get_structured_response(messages, StepsOrError)
     assert isinstance(response, StepsOrError)

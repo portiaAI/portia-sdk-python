@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
-from portia.model import LangChainModel, Message, Model
+from portia.model import GenerativeModel, LangChainGenerativeModel, Message
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -55,7 +55,7 @@ class LLMWrapper:
 
     def __init__(
         self,
-        model: Model,
+        model: GenerativeModel,
     ) -> None:
         """Initialize the wrapper.
 
@@ -81,7 +81,7 @@ class LLMWrapper:
             BaseChatModel: A LangChain-compatible model.
 
         """
-        if isinstance(self.model, LangChainModel):
+        if isinstance(self.model, LangChainGenerativeModel):
             return self.model.to_langchain()
         raise ValueError(
             f"LangChain is not supported for this model type {self.model.__class__.__name__}",

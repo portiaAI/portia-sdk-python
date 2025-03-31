@@ -7,7 +7,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, ValidationError
 
-from portia.model import LangChainModel, Message
+from portia.model import LangChainGenerativeModel, Message
 
 
 @pytest.mark.parametrize(
@@ -103,7 +103,7 @@ def test_langchain_model_structured_output_returns_dict() -> None:
     structured_output = MagicMock()
     base_chat_model.with_structured_output.return_value = structured_output
     structured_output.invoke.return_value = {"test_field": "Response from model"}
-    model = LangChainModel(client=base_chat_model)
+    model = LangChainGenerativeModel(client=base_chat_model, model_name="test")
     result = model.get_structured_response(
         messages=[Message(role="user", content="Hello")],
         schema=StructuredOutputTestModel,

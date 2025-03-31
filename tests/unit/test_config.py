@@ -16,8 +16,8 @@ from portia.config import (
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
-    MistralAIModel,
-    OpenAIModel,
+    MistralAIGenerativeModel,
+    OpenAIGenerativeModel,
 )
 
 
@@ -92,28 +92,28 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: PLR0915
         execution_model_name=LLMModel.GPT_4_O_MINI,
     )
     planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, OpenAIModel)
+    assert isinstance(planning_model, OpenAIGenerativeModel)
     assert planning_model.model_name == "gpt-4o"
     execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, OpenAIModel)
+    assert isinstance(execution_model, OpenAIGenerativeModel)
     assert execution_model.model_name == "gpt-4o-mini"
 
     # llm_model_name sets all models
     c = Config.from_default(llm_model_name="mistral_large")
     planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, MistralAIModel)
+    assert isinstance(planning_model, MistralAIGenerativeModel)
     assert planning_model.model_name == "mistral-large-latest"
     execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, MistralAIModel)
+    assert isinstance(execution_model, MistralAIGenerativeModel)
     assert execution_model.model_name == "mistral-large-latest"
 
     # llm_provider sets default model for all providers
     c = Config.from_default(llm_provider="mistralai")
     planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, MistralAIModel)
+    assert isinstance(planning_model, MistralAIGenerativeModel)
     assert planning_model.model_name == "mistral-large-latest"
     execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, MistralAIModel)
+    assert isinstance(execution_model, MistralAIGenerativeModel)
     assert execution_model.model_name == "mistral-large-latest"
 
     # With nothing specified, it chooses a model we have API keys for
@@ -122,10 +122,10 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: PLR0915
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     c = Config.from_default()
     planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, MistralAIModel)
+    assert isinstance(planning_model, MistralAIGenerativeModel)
     assert planning_model.model_name == "mistral-large-latest"
     execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, MistralAIModel)
+    assert isinstance(execution_model, MistralAIGenerativeModel)
     assert execution_model.model_name == "mistral-large-latest"
 
     # With all API key set, correct default models are chosen
@@ -133,10 +133,10 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: PLR0915
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     c = Config.from_default()
     planning_model = c.model(PLANNING_MODEL_KEY)
-    assert isinstance(planning_model, OpenAIModel)
+    assert isinstance(planning_model, OpenAIGenerativeModel)
     assert planning_model.model_name == "o3-mini"
     execution_model = c.model(EXECUTION_MODEL_KEY)
-    assert isinstance(execution_model, OpenAIModel)
+    assert isinstance(execution_model, OpenAIGenerativeModel)
     assert execution_model.model_name == "gpt-4o"
 
     # No api key for provider model

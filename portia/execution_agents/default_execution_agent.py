@@ -28,7 +28,7 @@ from portia.execution_agents.execution_utils import (
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
-from portia.model import Message, Model
+from portia.model import GenerativeModel, Message
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -183,7 +183,7 @@ class ParserModel:
         ],
     )
 
-    def __init__(self, model: Model, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
@@ -316,7 +316,7 @@ class VerifierModel:
         ],
     )
 
-    def __init__(self, model: Model, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:

@@ -23,7 +23,12 @@ from pydantic import (
 
 from portia.common import validate_extras_dependencies
 from portia.errors import ConfigNotFoundError, InvalidConfigError
-from portia.model import AnthropicModel, AzureOpenAIModel, Model, OpenAIModel
+from portia.model import (
+    AnthropicGenerativeModel,
+    AzureOpenAIGenerativeModel,
+    GenerativeModel,
+    OpenAIGenerativeModel,
+)
 
 T = TypeVar("T")
 
@@ -427,7 +432,7 @@ class Config(BaseModel):
         description="Which LLM Provider to use.",
     )
 
-    models: dict[str, LLMModel | Model] = Field(
+    models: dict[str, LLMModel | GenerativeModel] = Field(
         default={},
         description="A dictionary of configured LLM models for each usage.",
     )
@@ -457,7 +462,7 @@ class Config(BaseModel):
         }
         return self
 
-    def model(self, usage: str) -> Model:
+    def model(self, usage: str) -> GenerativeModel:
         """Get the LLM model for the given usage."""
         if usage == PLANNING_MODEL_KEY:
             llm_model = self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
@@ -467,37 +472,37 @@ class Config(BaseModel):
             return self._construct_model(llm_model)
         return llm_model
 
-    def _construct_model(self, llm_model: LLMModel) -> Model:
+    def _construct_model(self, llm_model: LLMModel) -> GenerativeModel:
         """Construct a Model instance from an LLMModel."""
         match llm_model.provider():
             case LLMProvider.OPENAI:
-                return OpenAIModel(
+                return OpenAIGenerativeModel(
                     model_name=llm_model.api_name,
                     api_key=self.openai_api_key,
                 )
             case LLMProvider.ANTHROPIC:
-                return AnthropicModel(
+                return AnthropicGenerativeModel(
                     model_name=llm_model.api_name,
                     api_key=self.anthropic_api_key,
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistral")
-                from portia.model import MistralAIModel
+                from portia.model import MistralAIGenerativeModel
 
-                return MistralAIModel(
+                return MistralAIGenerativeModel(
                     model_name=llm_model.api_name,
                     api_key=self.mistralai_api_key,
                 )
             case LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
-                from portia.model import GoogleGenerativeAIModel
+                from portia.model import GoogleGenAiGenerativeModel
 
-                return GoogleGenerativeAIModel(
+                return GoogleGenAiGenerativeModel(
                     model_name=llm_model.api_name,
                     api_key=self.google_api_key,
                 )
             case LLMProvider.AZURE_OPENAI:
-                return AzureOpenAIModel(
+                return AzureOpenAIGenerativeModel(
                     model_name=llm_model.api_name,
                     api_key=self.azure_openai_api_key,
                     azure_endpoint=self.azure_openai_endpoint,

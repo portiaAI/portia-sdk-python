@@ -15,7 +15,7 @@ from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
 from portia.llm_wrapper import LLMWrapper
-from portia.model import LangChainModel
+from portia.model import LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunUUID
 from portia.tool import Tool, ToolRunContext
@@ -96,7 +96,9 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
 
 def get_test_llm_wrapper(mock_client: BaseChatModel) -> LLMWrapper:
     """Get a test LLM wrapper."""
-    return LLMWrapper(model=LangChainModel(client=mock_client))
+    return LLMWrapper(
+        model=LangChainGenerativeModel(client=mock_client, model_name="test"),
+    )
 
 
 def get_execution_ctx(plan_run: PlanRun | None = None) -> ExecutionContext:
