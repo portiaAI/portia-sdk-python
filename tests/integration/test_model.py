@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
+import instructor
 import pytest
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
@@ -41,7 +42,7 @@ MODELS: list[Model] = [
     AZURE_MODEL := AzureOpenAIModel(
         model_name="gpt-4o-mini",
         api_key=SecretStr("dummy"),
-        azure_endpoint="dummy",
+        azure_endpoint="https://dummy.openai.azure.com",
     ),
 ]
 
@@ -66,7 +67,14 @@ def patch_azure_model() -> Iterator[None]:
         AZURE_MODEL,
         "_client",
         ChatOpenAI(model="gpt-4o-mini", api_key=CONFIG.openai_api_key),
-    ), mock.patch("portia._unstable.model.AzureOpenAI", new=AzureOpenAIWrapper):
+    ), mock.patch.object(
+        AZURE_MODEL,
+        "_instructor_client",
+        instructor.from_openai(
+            OpenAI(api_key=CONFIG.openai_api_key.get_secret_value()),
+            mode=instructor.Mode.JSON,
+        ),
+    ):
         yield
 
 @pytest.fixture
