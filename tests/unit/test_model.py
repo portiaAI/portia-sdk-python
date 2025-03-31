@@ -7,7 +7,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, ValidationError
 
-from portia.model import LangChainGenerativeModel, Message
+from portia.model import LangChainGenerativeModel, Message, map_message_to_instructor
 
 
 @pytest.mark.parametrize(
@@ -73,6 +73,25 @@ def test_message_to_langchain_unsupported_role() -> None:
     message.role = "invalid"  # type: ignore[assignment]
     with pytest.raises(ValueError, match="Unsupported role"):
         message.to_langchain()
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_instructor_message"),
+    [
+        (Message(role="user", content="Hello"), {"role": "user", "content": "Hello"}),
+        (
+            Message(role="assistant", content="Hi there"),
+            {"role": "assistant", "content": "Hi there"},
+        ),
+        (
+            Message(role="system", content="You are a helpful assistant"),
+            {"role": "system", "content": "You are a helpful assistant"},
+        ),
+    ],
+)
+def test_map_message_to_instructor(message: Message, expected_instructor_message: dict) -> None:
+    """Test mapping a Message to an Instructor message."""
+    assert map_message_to_instructor(message) == expected_instructor_message
 
 
 def test_message_validation() -> None:
