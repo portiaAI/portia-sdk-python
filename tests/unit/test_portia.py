@@ -15,7 +15,7 @@ from portia.clarification import (
     InputClarification,
     ValueConfirmationClarification,
 )
-from portia.config import Config, StorageClass
+from portia.config import AGENT_MEMORY_FEATURE_FLAG, Config, StorageClass
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.output import Output
 from portia.introspection_agents.introspection_agent import (
@@ -44,6 +44,18 @@ from tests.utils import (
 def portia() -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config()
+    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+    return Portia(config=config, tools=tool_registry)
+
+
+@pytest.fixture
+def portia_with_agent_memory() -> Portia:
+    """Fixture to create a Portia instance for testing."""
+    config = get_test_config(
+        # Set a small threshold value so all outputs are stored in agent memory
+        feature_flags={AGENT_MEMORY_FEATURE_FLAG: True},
+        large_output_threshold_value=10,
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
 
@@ -543,6 +555,74 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         assert isinstance(call_args["plan_run"], ReadOnlyPlanRun)
         assert call_args["plan"].id == plan.id
         assert call_args["plan_run"].id == plan_run.id
+
+
+def test_portia_run_query_with_memory(portia_with_agent_memory: Portia) -> None:
+    """Test run_query sets both final output and summary correctly."""
+    query = "What activities can I do in London based on weather?"
+
+    # Mock planning_agent response
+    weather_step = Step(
+        task="Get weather in London",
+        tool_id="add_tool",
+        output="$weather",
+    )
+    activities_step = Step(
+        task="Suggest activities based on weather",
+        tool_id="add_tool",
+        output="$activities",
+    )
+    mock_plan = StepsOrError(
+        steps=[weather_step, activities_step],
+        error=None,
+    )
+
+    # Mock agent responses
+    weather_output = Output(value="Sunny and warm")
+    activities_output = Output(value="Visit Hyde Park and have a picnic")
+    expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
+
+    mock_step_agent = mock.MagicMock()
+    mock_step_agent.execute_sync.side_effect = [weather_output, activities_output]
+
+    mock_summarizer_agent = mock.MagicMock()
+    mock_summarizer_agent.create_summary.side_effect = [expected_summary]
+
+    with (
+        mock.patch.object(
+            LLMWrapper,
+            "to_instructor",
+            new=MagicMock(return_value=mock_plan),
+        ),
+        mock.patch(
+            "portia.portia.FinalOutputSummarizer",
+            return_value=mock_summarizer_agent,
+        ),
+        mock.patch.object(
+            portia_with_agent_memory, "_get_agent_for_step", return_value=mock_step_agent
+        ),
+    ):
+        plan_run = portia_with_agent_memory.run(query)
+
+        # Verify run completed successfully
+        assert plan_run.state == PlanRunState.COMPLETE
+
+        # Verify step outputs were stored correctly
+        assert plan_run.outputs.step_outputs["$weather"] == weather_output
+        assert (
+            portia_with_agent_memory.storage.get_plan_run_output("$weather", plan_run.id)
+            == weather_output
+        )
+        assert plan_run.outputs.step_outputs["$activities"] == activities_output
+        assert (
+            portia_with_agent_memory.storage.get_plan_run_output("$activities", plan_run.id)
+            == activities_output
+        )
+
+        # Verify final output and summary
+        assert plan_run.outputs.final_output is not None
+        assert plan_run.outputs.final_output.value == activities_output.value
+        assert plan_run.outputs.final_output.summary == expected_summary
 
 
 def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:

@@ -11,9 +11,10 @@ if TYPE_CHECKING:
     import pytest
     from pydantic import BaseModel
 
+from portia.config import AGENT_MEMORY_FEATURE_FLAG
 from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from tests.utils import get_test_llm_wrapper
+from tests.utils import get_test_config, get_test_llm_wrapper
 
 
 class MockInvoker:
@@ -72,6 +73,7 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
 
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper().to_langchain(),
+        config=get_test_config(),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
@@ -97,6 +99,7 @@ def test_summarizer_model_non_tool_message(monkeypatch: pytest.MonkeyPatch) -> N
 
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper().to_langchain(),
+        config=get_test_config(),
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
@@ -112,11 +115,52 @@ def test_summarizer_model_no_messages(monkeypatch: pytest.MonkeyPatch) -> None:
 
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper().to_langchain(),
+        config=get_test_config(),
     )
     result = summarizer_model.invoke({"messages": []})
 
     assert not mock_invoker.called
     assert result["messages"] == [None]
+
+
+def test_summarizer_model_large_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the summarizer model with large output."""
+    summary = AIMessage(content="Short summary")
+    mock_invoker = MockInvoker(response=summary)
+    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
+    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+
+    tool_message = ToolMessage(
+        content="Test " * 1000,
+        tool_call_id="123",
+        name="test_tool",
+        artifact=Output(value="Test " * 1000),
+    )
+
+    summarizer_model = StepSummarizer(
+        llm=get_test_llm_wrapper().to_langchain(),
+        # Set a low threshold so the above output is considered large
+        config=get_test_config(
+            large_output_threshold_value=100,
+            feature_flags={
+                AGENT_MEMORY_FEATURE_FLAG: False,
+            },
+        ),
+    )
+    result = summarizer_model.invoke({"messages": [tool_message]})
+
+    assert mock_invoker.called
+    messages: list[BaseMessage] = mock_invoker.prompt
+    assert messages
+    assert "You are a highly skilled summarizer" in messages[0].content
+    assert "This is a large value" in messages[1].content
+    # Check that the content has been truntaced
+    assert messages[1].content.count("Test") < 1000
+
+    # Check that summaries were added to the artifact
+    output_message = result["messages"][0]
+    assert isinstance(output_message, ToolMessage)
+    assert output_message.artifact.summary == "Short summary"
 
 
 def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -141,7 +185,10 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
         artifact=Output(value="Tool output value"),
     )
 
-    summarizer_model = StepSummarizer(llm=get_test_llm_wrapper().to_langchain())
+    summarizer_model = StepSummarizer(
+        llm=get_test_llm_wrapper().to_langchain(),
+        config=get_test_config(),
+    )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
     # Should return original message without summaries when error occurs

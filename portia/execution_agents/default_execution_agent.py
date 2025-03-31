@@ -17,7 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from portia.clarification import Clarification, InputClarification
 from portia.config import EXECUTION_MODEL_KEY
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
-from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.output import Output
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
@@ -647,7 +648,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             )
 
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm).invoke)
+        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm, self.config).invoke)
         graph.add_conditional_edges(
             AgentNode.TOOLS,
             lambda state: next_state_after_tool_call(state, self.tool),

@@ -11,7 +11,8 @@ from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
-from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.output import Output
 from portia.execution_context import execution_context
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import get_test_config, get_test_plan_run

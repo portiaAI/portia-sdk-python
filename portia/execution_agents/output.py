@@ -43,9 +43,10 @@ class Output(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    _value: RemoteMemoryValue | FileMemoryValue | Serializable | None = Field(
+    raw_value: RemoteMemoryValue | FileMemoryValue | Serializable | None = Field(
         default=None,
         description="The output of the tool",
+        alias="value",  # This ensures the field is serialized as "value" in JSON
     )
     summary: str | None = Field(
         default=None,
@@ -63,18 +64,18 @@ class Output(BaseModel):
             Serializable | None: The value of the output.
 
         """
-        match self._value:
+        match self.raw_value:
             case value if isinstance(value, RemoteMemoryValue):
                 return self.summary
             case value if isinstance(value, FileMemoryValue):
                 return self.summary
             case _:
-                return self._value
+                return self.raw_value
 
     @value.setter
     def value(self, value: RemoteMemoryValue | FileMemoryValue | Serializable | None) -> None:
         """Set the output value."""
-        self._value = value
+        self.raw_value = value
 
     def _fetch_remote_value(self, storage: RemoteMemoryValue) -> str:
         """Fetch a value from remote agent memory.
@@ -122,15 +123,16 @@ class Output(BaseModel):
             Serializable | None: The full value of the output, fetched from storage if needed.
 
         """
-        match self.value:
+        match self.raw_value:
             case value if isinstance(value, RemoteMemoryValue):
                 return self._fetch_remote_value(value)
             case value if isinstance(value, FileMemoryValue):
                 return self._read_file_value(value)
             case _:
-                return self.value
+                return self.raw_value
 
-    @field_serializer("value")
+    # @@@ TODO - SORT THIS (PLUS ANY TESTING)
+    @field_serializer("raw_value")
     def serialize_value(self, value: Serializable | None) -> str:  # noqa: C901, PLR0911
         """Serialize the value to a string.
 

@@ -17,13 +17,14 @@ from langgraph.prebuilt import ToolNode
 
 from portia.config import EXECUTION_MODEL_KEY
 from portia.errors import InvalidAgentError
-from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.execution_utils import (
     AgentNode,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
 )
+from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
