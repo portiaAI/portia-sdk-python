@@ -99,6 +99,7 @@ portia = ["templates/**/*.jinja"]
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore:Failing to pass a value to the 'type_params' parameter of 'typing.ForwardRef._evaluate':DeprecationWarning",  # this comes from LangChain
+    "ignore::DeprecationWarning:langchain_core.load.serializable",  # Pydantic via LangChain
 ]
 addopts = [
   "--cov",
