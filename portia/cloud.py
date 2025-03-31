@@ -18,7 +18,13 @@ class PortiaCloudClient:
         return cls._client
 
     @classmethod
-    def new_client(cls, config: Config, *, allow_unauthenticated: bool = False) -> httpx.Client:
+    def new_client(
+        cls,
+        config: Config,
+        *,
+        allow_unauthenticated: bool = False,
+        json_headers: bool = True,
+    ) -> httpx.Client:
         """Create a new httpx client.
 
         Args:
@@ -26,9 +32,11 @@ class PortiaCloudClient:
             allow_unauthenticated (bool): Whether to allow creation of an unauthenticated client.
 
         """
-        headers = {
-            "Content-Type": "application/json",
-        }
+        headers = {}
+        if json_headers:
+            headers = {
+                "Content-Type": "application/json",
+            }
         if config.portia_api_key or allow_unauthenticated is False:
             api_key = config.must_get_api_key("portia_api_key").get_secret_value()
             headers["Authorization"] = f"Api-Key {api_key}"

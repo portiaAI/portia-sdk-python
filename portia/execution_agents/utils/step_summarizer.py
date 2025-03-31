@@ -90,9 +90,11 @@ class StepSummarizer:
         logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
         tool_output = last_message.content
         if self.config.exceeds_output_threshold(tool_output):
-            tool_output = f"This is a large value (full length: {len(str(tool_output))}"
-            "characters) - it is too long to provide the full value, but the first 10k characters "
-            f"are: {self._truncate(tool_output, self.config.large_output_threshold_value)}"
+            tool_output = (
+                f"This is a large value (full length: {len(str(tool_output))} characters) - it is "
+                "too long to provide the full value, but it starts with:"
+                f"{self._truncate(tool_output, self.config.large_output_threshold_value)}"
+            )
 
         try:
             summary: BaseMessage = self.llm.invoke(

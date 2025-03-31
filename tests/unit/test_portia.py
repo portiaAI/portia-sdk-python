@@ -1,5 +1,6 @@
 """Tests for portia classes."""
 
+import json
 import tempfile
 import threading
 import time
@@ -150,9 +151,20 @@ def test_portia_run_query_disk_storage() -> None:
         # Use Path to check for the files
         plan_files = list(Path(tmp_dir).glob("plan-*.json"))
         run_files = list(Path(tmp_dir).glob("prun-*.json"))
+        output_files = list(Path(tmp_dir).glob("output-*.json"))
 
         assert len(plan_files) == 1
         assert len(run_files) == 1
+        assert len(output_files) == 1
+
+        # Verify the output file contains the expected data
+        output_file = output_files[0]
+        with Path(output_file).open("r") as f:
+            output_data = json.load(f)
+            assert "value" in output_data
+            assert "summary" in output_data
+            assert output_data["value"] is not None
+            assert output_data["summary"] is not None
 
 
 def test_portia_generate_plan(portia: Portia) -> None:

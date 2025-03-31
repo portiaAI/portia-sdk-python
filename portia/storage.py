@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 from urllib.parse import urlencode
@@ -221,16 +222,20 @@ class LogAdditionalStorage(AdditionalStorage):
         logger().debug(
             f"Tool {tool_call.tool_name!s} executed in {tool_call.latency_seconds:.2f} seconds",
         )
+        # Limit log to just first 1000 characters
+        output = tool_call.output
+        if len(tool_call.output) > 1000:
+            output = tool_call.output[:1000] + "...[truncated - only first 1000 characters shown]"
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
                 logger().debug(
                     f"Tool call {tool_call.tool_name!s} completed",
-                    output=tool_call.output,
+                    output=output,
                 )
             case ToolCallStatus.FAILED:
-                logger().error("Tool returned error", output=tool_call.output)
+                logger().error("Tool returned error", output=output)
             case ToolCallStatus.NEED_CLARIFICATION:
-                logger().debug("Tool returned clarifications", output=tool_call.output)
+                logger().debug("Tool returned clarifications", output=output)
 
 
 class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
@@ -632,6 +637,7 @@ class PortiaCloudStorage(Storage, AgentMemoryStorage):
 
         """
         self.client = PortiaCloudClient().get_client(config)
+        self.form_client = PortiaCloudClient().new_client(config, json_headers=False)
 
     def check_response(self, response: httpx.Response) -> None:
         """Validate the response from Portia API.
@@ -863,10 +869,15 @@ class PortiaCloudStorage(Storage, AgentMemoryStorage):
 
         """
         try:
-            response = self.client.put(
+            response = self.form_client.put(
                 url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
-                json={
-                    "value": output.value.encode("utf-8"),
+                files={
+                    "value": (
+                        "output",
+                        BytesIO(output.serialize_value(output.value).encode("utf-8")),
+                    ),
+                },
+                data={
                     "summary": output.summary,
                 },
             )
