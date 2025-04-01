@@ -91,6 +91,7 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
     for name, output in outputs.items():
         assert name in context
         if output.value:
+            assert isinstance(output.value, str)
             assert output.value in context
 
 
@@ -220,6 +221,7 @@ def test_context_inputs_outputs_clarifications(
     for name, output in outputs.items():
         assert name in context
         if output.value:
+            assert isinstance(output.value, str)
             assert output.value in context
     assert "email cc list" in context
     assert "bob@bla.com" in context

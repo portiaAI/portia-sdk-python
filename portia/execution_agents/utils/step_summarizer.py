@@ -11,9 +11,8 @@ from jinja2 import Template
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 from langchain_core.messages import BaseMessage, ToolMessage
-from langgraph.graph import MessagesState
+from langgraph.graph import MessagesState  # noqa: TC002
 
-from portia.config import Config
 from portia.execution_agents.output import Output
 from portia.logger import logger
 from portia.planning_agents.context import get_tool_descriptions_for_tools
@@ -21,6 +20,7 @@ from portia.planning_agents.context import get_tool_descriptions_for_tools
 if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
 
+    from portia.config import Config
     from portia.plan import Step
     from portia.tool import Tool
 

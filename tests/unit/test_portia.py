@@ -17,7 +17,7 @@ from portia.clarification import (
 )
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED, Config, StorageClass
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import AgentMemoryStorageDetails, Output
 from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
@@ -610,12 +610,24 @@ def test_portia_run_query_with_memory(portia_with_agent_memory: Portia) -> None:
         assert plan_run.state == PlanRunState.COMPLETE
 
         # Verify step outputs were stored correctly
-        assert plan_run.outputs.step_outputs["$weather"] == weather_output
+        assert plan_run.outputs.step_outputs["$weather"] == Output(
+            value=AgentMemoryStorageDetails(
+                name="$weather",
+                plan_run_id=plan_run.id,
+            ),
+            summary=weather_output.summary,
+        )
         assert (
             portia_with_agent_memory.storage.get_plan_run_output("$weather", plan_run.id)
             == weather_output
         )
-        assert plan_run.outputs.step_outputs["$activities"] == activities_output
+        assert plan_run.outputs.step_outputs["$activities"] == Output(
+            value=AgentMemoryStorageDetails(
+                name="$activities",
+                plan_run_id=plan_run.id,
+            ),
+            summary=activities_output.summary,
+        )
         assert (
             portia_with_agent_memory.storage.get_plan_run_output("$activities", plan_run.id)
             == activities_output

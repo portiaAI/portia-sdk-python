@@ -54,11 +54,11 @@ from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
-    import httpx
-
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
+
+MAX_OUTPUT_LOG_LENGTH = 1000
 
 
 class PlanStorage(ABC):
@@ -223,8 +223,11 @@ class LogAdditionalStorage(AdditionalStorage):
         )
         # Limit log to just first 1000 characters
         output = tool_call.output
-        if len(tool_call.output) > 1000:
-            output = tool_call.output[:1000] + "...[truncated - only first 1000 characters shown]"
+        if len(tool_call.output) > MAX_OUTPUT_LOG_LENGTH:
+            output = (
+                tool_call.output[:MAX_OUTPUT_LOG_LENGTH]
+                + "...[truncated - only first 1000 characters shown]"
+            )
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
                 logger().debug(
@@ -406,7 +409,7 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
         output_name: str,
         output: Output,
         plan_run_id: PlanRunUUID,
-    ) -> None:
+    ) -> Output:
         """Save Output from a plan run to memory.
 
         Args:
@@ -587,7 +590,7 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
         output_name: str,
         output: Output,
         plan_run_id: PlanRunUUID,
-    ) -> None:
+    ) -> Output:
         """Save Output from a plan run to agent memory on disk.
 
         Args:

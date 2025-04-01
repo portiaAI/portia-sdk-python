@@ -71,11 +71,11 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             Serializable | None: The full value of the output, fetched from storage if needed.
 
         """
-        return (
-            agent_memory.get_plan_run_output(self.value.name, self.value.plan_run_id)
-            if self._stored_in_agent_memory()
-            else self.value
-        )
+        if self.value is None:
+            return None
+        if self._stored_in_agent_memory():
+            return agent_memory.get_plan_run_output(self.value.name, self.value.plan_run_id)
+        return self.value
 
     def _stored_in_agent_memory(self) -> bool:
         """Whether the output is stored in agent memory."""

@@ -12,11 +12,11 @@ from langchain_core.messages import BaseMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
-from portia.config import Config
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.execution_agents.output import Output
 
 if TYPE_CHECKING:
+    from portia.config import Config
     from portia.tool import Tool
 
 

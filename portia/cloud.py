@@ -30,6 +30,7 @@ class PortiaCloudClient:
         Args:
             config (Config): The Portia Configuration instance, containing the API key and endpoint.
             allow_unauthenticated (bool): Whether to allow creation of an unauthenticated client.
+            json_headers (bool): Whether to add json headers to the request.
 
         """
         headers = {}
