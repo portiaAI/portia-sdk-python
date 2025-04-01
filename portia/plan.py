@@ -202,6 +202,15 @@ class Variable(BaseModel):
         description="A description of the variable.",
     )
 
+    def pretty_print(self) -> str:
+        """Return the pretty print representation of the variable.
+
+        Returns:
+            str: A pretty print representation of the variable's name, value, and description.
+
+        """
+        return f"{self.name}: {self.value} ({self.description})"
+
 
 class Step(BaseModel):
     """A step in a PlanRun.
@@ -254,7 +263,24 @@ class Step(BaseModel):
         """
         message = (
             f"- {self.task}\n"
-            f"  Inputs: {', '.join([f'{input.name}: {input.value}' for input in self.inputs])}\n"
+            f"  Inputs: {', '.join([in_variable.pretty_print() for in_variable in self.inputs])}\n"
+            f"  Tool ID: {self.tool_id}\n"
+            f"  Output: {self.output}\n"
+        )
+        if self.condition:
+            message += f"  Condition: {self.condition}\n"
+        return message
+
+    def pretty_print(self) -> str:
+        """Return the pretty print representation of the step.
+
+        Returns:
+            str: A pretty print representation of the step's task, inputs, tool_id, and output.
+
+        """
+        message = (
+            f"- {self.task}\n"
+            f"  Inputs: {', '.join([in_variable.pretty_print() for in_variable in self.inputs])}\n"
             f"  Tool ID: {self.tool_id}\n"
             f"  Output: {self.output}\n"
         )
@@ -353,6 +379,19 @@ class Plan(BaseModel):
             str: A string representation of the plan's ID, context, and steps.
 
         """
+        return (
+            f"PlanModel(id={self.id!r},"
+            f"plan_context={self.plan_context!r}, "
+            f"steps={self.steps!r}"
+        )
+
+    def pretty_print(self) -> str:
+        """Return the pretty print representation of the plan.
+
+        Returns:
+            str: A pretty print representation of the plan's ID, context, and steps.
+
+        """
         portia_tools = [tool for tool in self.plan_context.tool_ids if tool.startswith("portia:")]
         other_tools = [
             tool for tool in self.plan_context.tool_ids if not tool.startswith("portia:")
@@ -361,7 +400,7 @@ class Plan(BaseModel):
         return (
             f"Task: {self.plan_context.query}\n"
             f"Tools Available Summary: {tools_summary}\n"
-            f"Steps:\n" + "\n".join([str(step) for step in self.steps])
+            f"Steps:\n" + "\n".join([step.pretty_print() for step in self.steps])
         )
 
     @model_validator(mode="after")

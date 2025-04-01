@@ -119,3 +119,13 @@ def test_plan_outputs_and_conditions_must_be_unique() -> None:
             Step(task="test task", output="$output", condition="x < 10"),
         ],
     )
+
+
+def test_pretty_print() -> None:
+    """Test pretty print."""
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="test task", output="$output")],
+    )
+    output = plan.pretty_print()
+    assert isinstance(output, str)

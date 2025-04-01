@@ -285,7 +285,7 @@ def run(
         plan = portia.plan(query)
 
         if cli_config.confirm:
-            click.echo(plan)
+            click.echo(plan.pretty_print())
             if not click.confirm("Do you want to execute the plan?"):
                 return
 
