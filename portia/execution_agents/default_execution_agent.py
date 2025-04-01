@@ -6,10 +6,11 @@ in completing tasks.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Literal
 
-from jinja2 import Template
-from langchain_core.messages import SystemMessage
+from jinja2 import Environment, Template, meta
+from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -41,6 +42,16 @@ if TYPE_CHECKING:
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.tool import Tool
+
+logger = logging.getLogger(__name__)
+
+
+class MemoryExtractionModelOutput(BaseModel):
+    """Represents the output of the memory extraction model."""
+
+    inputs: list[str] = Field(
+        description="List of input names whose full values we should template in.",
+    )
 
 
 class ToolArgument(BaseModel):
@@ -75,6 +86,10 @@ class ToolInputs(BaseModel):
     """
 
     args: list[ToolArgument] = Field(description="Arguments for the tool.")
+    contains_templated_argument: bool = Field(
+        default=False,
+        description="Whether the args contain any large values that need to be templated in.",
+    )
 
 
 class VerifiedToolArgument(BaseModel):
@@ -119,6 +134,10 @@ class VerifiedToolInputs(BaseModel):
     """
 
     args: list[VerifiedToolArgument] = Field(description="Arguments for the tool.")
+    contains_templated_argument: bool = Field(
+        default=False,
+        description="Whether the args contain any large values that need to be templated in.",
+    )
 
 
 class MemoryExtractionModel:
@@ -127,17 +146,31 @@ class MemoryExtractionModel:
     memory_model_prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(
-                content="TODO",
+                content="You are an excellent analyst and are great at working out what information is required to complete a task.",
             ),
             HumanMessagePromptTemplate.from_template(
-                "TODO",
+                "Your task is to work out what additional information we need to complete a task. "
+                "The task we are trying to complete is: {task}. "
+                "To achieve this, we are using the following tool: {tool_name} with description: {tool_description}. "
+                "The args schema for this tool is: {tool_args}. "
+                "As inputs for the task, we have: {inputs}. "
+                "At least one of these inputs is large and so only a summary has been provided. "
+                "You need to determine whether this is enough information for us to complete the task, "
+                "or whether we need to pull in the full value for any of these large inputs in order to call the tool with the correct args. "
+                "If we don't pull in the full value, we can pass the full value to the tool (using templating). "
+                "However, if we need to do any processing (extraction / conversion / etc) of the value before passing it to the tool, "
+                "we'll need to pull in the full value."
+                "You should return a list of the outputs we should retrieve the full value for as a list in JSON format."
+                "The output must conform to the following schema:"
+                "class MemoryExtractionModelOutput:\n"
+                "  inputs: List[str]  # List of input names that need to be pulled in the full value.",
             ),
         ],
     )
 
     def __init__(
         self,
-        llm: BaseChatModel,
+        model: GenerativeModel,
         context: str,
         tools: list[StructuredTool],
         agent: DefaultExecutionAgent,
@@ -145,18 +178,18 @@ class MemoryExtractionModel:
         """Initialize the memory model.
 
         Args:
-            llm (BaseChatModel): The language model used for memory extraction.
+            model (Model): The language model used for memory extraction.
             context (str): The context for memory extraction.
             agent (DefaultExecutionAgent): The agent using the memory extraction model.
             tools (list[StructuredTool]): The tools to pass to the model.
 
         """
-        self.llm = llm
+        self.model = model
         self.context = context
         self.agent = agent
         self.tools = tools
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, _: MessagesState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         Args:
@@ -170,22 +203,23 @@ class MemoryExtractionModel:
 
         """
         formatted_messages = self.memory_model_prompt.format_messages(
-            # @@@ TODO
-            # context=self.context,
-            # task=self.agent.step.task,
-            # tool_name=self.agent.tool.name,
-            # tool_args=self.agent.tool.args_json_schema(),
-            # tool_description=self.agent.tool.description,
-            # previous_errors=",".join(self.previous_errors),
+            task=self.agent.step.task,
+            tool_name=self.agent.tool.name,
+            tool_description=self.agent.tool.description,
+            tool_args=self.agent.tool.args_json_schema(),
+            inputs=self.agent.step.inputs,
         )
 
-        # @@@ ADD CLASS
         try:
-            response = invoke_structured_output(self.llm, ToolInputs, formatted_messages)
-            tool_inputs = ToolInputs.model_validate(response)
+            response = self.model.get_structured_response(
+                messages=[Message.from_langchain(m) for m in formatted_messages],
+                schema=MemoryExtractionModelOutput,
+            )
+            extraction_response = MemoryExtractionModelOutput.model_validate(response)
         except ValidationError as e:
-            # @@@ JUST PULL NOTHING IN
+            logger.error(f"Error validating memory extraction model output: {e}")
 
+        # @@@ SORT PULLING IN
         return {"messages": [tool_inputs.model_dump_json(indent=2)] if tool_inputs else []}
 
 
@@ -222,6 +256,7 @@ class ParserModel:
                     "If you wish to use one of these values, you can provide the name in curly braces and "
                     "the value will be templated in. For example: if you wish to use an output called 'large_output_value',"
                     "you can enter {{large_value_name}} and the value will be templated in before the tool is called."
+                    "If you do this, please ensure that you set the contains_templated_argument field to True."
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
@@ -247,7 +282,8 @@ class ParserModel:
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
                 "class ToolInputs:\n"
-                "  args: List[ToolArgument]  # List of tool arguments.\n\n"
+                "  args: List[ToolArgument]  # List of tool arguments.\n"
+                "  contains_templated_argument: bool  # (Default: False) Whether the args contain any large values that need to be templated in.\n\n"
                 "class ToolArgument:\n"
                 "  name: str  # Name of the argument requested by the tool.\n"
                 "  value: Any | None  # Value of the argument from the goal or context.\n"
@@ -313,13 +349,15 @@ class ParserModel:
                 test_args[arg.name] = arg.value
                 if not arg.valid:
                     errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
-                # @@@ CHECK TEMPLATING
 
             # also test the ToolInputs that have come back
             # actually work for the schema of the tool
             # if not we can retry
             try:
-                self.agent.tool.args_schema.model_validate(test_args)
+                # If the tool has templated arguments, we can't validate them here
+                # because the templated values won't be available.
+                if not tool_inputs.contains_templated_argument:
+                    self.agent.tool.args_schema.model_validate(test_args)
             except ValidationError as e:
                 errors.append(str(e) + "\n")
 
@@ -375,7 +413,8 @@ class VerifierModel:
                 "USE EXACTLY the type of the argument provided in the list of arguments provided.\n"
                 "  made_up: bool  # if the value is made_up based on the given rules.\n\n"
                 "class VerifiedToolInputs:\n"
-                "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
+                "  args: List[VerifiedToolArgument]  # List of tool arguments.\n"
+                "  contains_templated_argument: bool  # Whether the args contain any large values that need to be templated in.\n\n"
                 "Please ensure the output matches the VerifiedToolInputs schema.",
             ),
             HumanMessagePromptTemplate.from_template(
@@ -498,7 +537,7 @@ class ToolCallingModel:
                 "If any values are too large to be provided in full, a summary of them has been provided."
                 "If you wish to use one of these values, you can provide the name in curly braces and "
                 "the value will be templated in. For example: if you wish to use an output called 'large_output_value',"
-                "you can enter {{large_value_name}} and the value will be templated in before the tool is called.\n"
+                "you can enter {{large_value_name}} and the value will be templated in before the tool is called."
                 "Make sure you don't repeat past errors: {past_errors}\n",
             ),
         ],
@@ -561,10 +600,33 @@ class ToolCallingModel:
             ),
         )
 
-        template_args = {arg.name: arg.value for arg in verified_args.args}
-        result = Template(response).render(args=template_args)
+        result = response
+        if verified_args.contains_templated_argument:
+            result = self._template_in_required_outputs(response)
 
         return {"messages": [result]}
+
+    def _template_in_required_outputs(self, response: BaseMessage) -> list[Clarification]:
+        """Template any required outputs into the tool call.
+
+        Args:
+            response (BaseMessage): The response to template in the required outputs.
+
+        Returns:
+            list[Clarification]: The list of clarifications that were created.
+
+        """
+        parsed_response = Environment().parse(response.content)
+        required_args = meta.find_undeclared_variables(parsed_response)
+        template_args = {}
+        for arg in required_args:
+            output = self.agent.plan_run.outputs.step_outputs[arg]
+            if output:
+                template_args[arg] = output.full_value()
+
+        templated_content = Template(response.content).render(args=template_args)
+        response.content = templated_content
+        return response
 
 
 class DefaultExecutionAgent(BaseExecutionAgent):
@@ -728,8 +790,8 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
-            graph.add_edge(START, AgentNode.MEMORY_AGENT)
-            graph.add_edge(AgentNode.MEMORY_AGENT, AgentNode.ARGUMENT_PARSER)
+            graph.add_edge(START, AgentNode.MEMORY_EXTRACTION)
+            graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.ARGUMENT_PARSER)
             graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, context, self).invoke)
             graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, context, self).invoke)
             graph.add_edge(START, AgentNode.ARGUMENT_PARSER)

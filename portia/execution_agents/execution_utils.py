@@ -27,7 +27,7 @@ class AgentNode(str, Enum):
     during the agent execution process.
 
     Attributes:
-        MEMORY_AGENT (str): A node representing the memory agent.
+        MEMORY_EXTRACTION (str): A node representing the memory extraction step.
         TOOL_AGENT (str): A node representing the tool agent.
         SUMMARIZER (str): A node representing the summarizer.
         TOOLS (str): A node representing the tools.
@@ -36,7 +36,7 @@ class AgentNode(str, Enum):
 
     """
 
-    MEMORY_AGENT = "memory_agent"
+    MEMORY_EXTRACTION = "memory_extraction"
     TOOL_AGENT = "tool_agent"
     SUMMARIZER = "summarizer"
     TOOLS = "tools"
