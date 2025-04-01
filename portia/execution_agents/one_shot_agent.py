@@ -24,7 +24,6 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
@@ -36,6 +35,7 @@ if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
 
     from portia.config import Config
+    from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.tool import Tool
@@ -198,7 +198,10 @@ class OneShotAgent(BaseExecutionAgent):
             OneShotToolCallingModel(llm, context, tools, self).invoke,
         )
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(self.config, llm).invoke)
+        graph.add_node(
+            AgentNode.SUMMARIZER,
+            StepSummarizer(self.config, llm, self.tool, self.step).invoke,
+        )
         graph.add_edge(START, AgentNode.TOOL_AGENT)
 
         # Use execution manager for state transitions

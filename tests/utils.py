@@ -3,25 +3,29 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Callable, override
+from typing import TYPE_CHECKING, Any, Callable, override
+from unittest.mock import MagicMock
 
+from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel, Field, SecretStr
 
 from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, LLMModel, LogLevel, StorageClass
+from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
 from portia.llm_wrapper import LLMWrapper
+from portia.model import LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunUUID
 from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-    from unittest.mock import MagicMock
+    from collections.abc import AsyncIterator, Sequence
 
+    from langchain_core.messages import BaseMessage
+    from langchain_core.tools import BaseTool
     from mcp import ClientSession
 
     from portia.execution_context import ExecutionContext
@@ -90,9 +94,11 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
     )
 
 
-def get_test_llm_wrapper() -> LLMWrapper:
+def get_test_llm_wrapper(mock_client: BaseChatModel) -> LLMWrapper:
     """Get a test LLM wrapper."""
-    return LLMWrapper(LLMModel.GPT_4_O, SecretStr("test123"))
+    return LLMWrapper(
+        model=LangChainGenerativeModel(client=mock_client, model_name="test"),
+    )
 
 
 def get_execution_ctx(plan_run: PlanRun | None = None) -> ExecutionContext:
@@ -254,3 +260,28 @@ class MockMcpSessionWrapper:
     async def mock_mcp_session(self, _: McpClientConfig) -> AsyncIterator[ClientSession]:
         """Mock method to swap out with the mcp_session context manager."""
         yield self.session
+
+
+def get_mock_base_chat_model(
+    response: Any = None,  # noqa: ANN401
+) -> MagicMock:
+    """Get a mock base chat model."""
+    model = MagicMock(spec=BaseChatModel)
+
+    def invoke(*_: Any, **__: Any) -> BaseMessage:
+        """Mock invoke."""
+        assert response is not None
+        return response
+
+    def with_structured_output(_: BaseModel, *__: Any, **___: Any) -> BaseChatModel:
+        """Mock with structured output."""
+        return model
+
+    def bind_tools(_: Sequence[BaseTool], *__: Any, **___: Any) -> BaseChatModel:
+        """Mock bind tools."""
+        return model
+
+    model.invoke.side_effect = invoke
+    model.with_structured_output.side_effect = with_structured_output
+    model.bind_tools.side_effect = bind_tools
+    return model

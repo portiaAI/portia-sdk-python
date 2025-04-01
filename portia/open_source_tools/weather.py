@@ -43,6 +43,4 @@ class WeatherTool(Tool[str]):
         if "main" not in data:
             raise ToolSoftError(f"No main data found for city: {city}")
         temp = data["main"]["temp"]
-        return (
-            f"The current weather in {city} is {weather} with a temperature of {temp}°C." * 100000
-        )
+        return f"The current weather in {city} is {weather} with a temperature of {temp}°C."

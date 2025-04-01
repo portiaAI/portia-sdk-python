@@ -17,7 +17,6 @@ from enum import Enum
 from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
-from uuid import UUID
 
 import click
 from dotenv import load_dotenv
@@ -26,12 +25,11 @@ from pydantic_core import PydanticUndefined
 from typing_extensions import get_origin
 
 from portia.clarification_handler import ClarificationHandler
-from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED, Config
+from portia.config import Config
 from portia.errors import InvalidConfigError
 from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.portia import ExecutionHooks, Portia
-from portia.prefixed_uuid import PlanUUID
 from portia.tool_registry import DefaultToolRegistry
 
 if TYPE_CHECKING:
@@ -284,10 +282,7 @@ def run(
     )
 
     with execution_context(end_user_id=cli_config.end_user_id):
-        plan = portia.storage.get_plan(
-            PlanUUID(uuid=UUID("969ba169-278e-4780-ac2e-bbf101121552")),
-        )
-        # plan = portia.plan(query)
+        plan = portia.plan(query)
 
         if cli_config.confirm:
             click.echo(plan.model_dump_json(indent=4))
@@ -352,16 +347,7 @@ def _get_config(
     if cli_config.env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
     try:
-        kwargs.pop("large_output_threshold_value")
-        kwargs.pop("feature_flags")
-        kwargs.pop("storage_class")
-        kwargs.pop("portia_api_endpoint")
-        config = Config.from_default(
-            feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
-            large_output_threshold_value=10000,
-            portia_api_endpoint="http://localhost:8080",
-            **kwargs,
-        )
+        config = Config.from_default(**kwargs)
     except InvalidConfigError as e:
         logger().error(e.message)
         sys.exit(1)

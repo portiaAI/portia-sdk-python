@@ -702,7 +702,7 @@ class Portia:
                 )
                 self._save_output(output, step.output, plan_run)
                 self.storage.save_plan_run(plan_run)
-            case PreStepIntrospectionOutcome.STOP:
+            case PreStepIntrospectionOutcome.COMPLETE:
                 output = Output(
                     value=PreStepIntrospectionOutcome.COMPLETE,
                     summary=pre_step_outcome.reason,
@@ -884,7 +884,7 @@ class Portia:
         return DefaultIntrospectionAgent(self.config)
 
     def _save_output(self, output: Output, output_name: str, plan_run: PlanRun) -> None:
-        if self.config.exceeds_output_threshold(output.value):
+        if self.config.exceeds_output_threshold(output.serialize_value(output.value)):
             output = self.storage.save_plan_run_output(output_name, output, plan_run.id)
 
         plan_run.outputs.step_outputs[output_name] = output

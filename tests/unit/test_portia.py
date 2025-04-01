@@ -1,6 +1,5 @@
 """Tests for portia classes."""
 
-import json
 import tempfile
 import threading
 import time
@@ -18,7 +17,7 @@ from portia.clarification import (
 )
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED, Config, StorageClass
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import AgentMemoryStorageDetails, Output
 from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
@@ -151,20 +150,9 @@ def test_portia_run_query_disk_storage() -> None:
         # Use Path to check for the files
         plan_files = list(Path(tmp_dir).glob("plan-*.json"))
         run_files = list(Path(tmp_dir).glob("prun-*.json"))
-        output_files = list(Path(tmp_dir).glob("output-*.json"))
 
         assert len(plan_files) == 1
         assert len(run_files) == 1
-        assert len(output_files) == 1
-
-        # Verify the output file contains the expected data
-        output_file = output_files[0]
-        with Path(output_file).open("r") as f:
-            output_data = json.load(f)
-            assert "value" in output_data
-            assert "summary" in output_data
-            assert output_data["value"] is not None
-            assert output_data["summary"] is not None
 
 
 def test_portia_generate_plan(portia: Portia) -> None:
@@ -622,12 +610,24 @@ def test_portia_run_query_with_memory(portia_with_agent_memory: Portia) -> None:
         assert plan_run.state == PlanRunState.COMPLETE
 
         # Verify step outputs were stored correctly
-        assert plan_run.outputs.step_outputs["$weather"] == weather_output
+        assert plan_run.outputs.step_outputs["$weather"] == Output(
+            value=AgentMemoryStorageDetails(
+                name="$weather",
+                plan_run_id=plan_run.id,
+            ),
+            summary=weather_output.summary,
+        )
         assert (
             portia_with_agent_memory.storage.get_plan_run_output("$weather", plan_run.id)
             == weather_output
         )
-        assert plan_run.outputs.step_outputs["$activities"] == activities_output
+        assert plan_run.outputs.step_outputs["$activities"] == Output(
+            value=AgentMemoryStorageDetails(
+                name="$activities",
+                plan_run_id=plan_run.id,
+            ),
+            summary=activities_output.summary,
+        )
         assert (
             portia_with_agent_memory.storage.get_plan_run_output("$activities", plan_run.id)
             == activities_output
