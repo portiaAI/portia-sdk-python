@@ -14,6 +14,7 @@ from langgraph.graph import MessagesState  # noqa: TC002
 
 from portia.execution_agents.base_execution_agent import Output
 from portia.logger import logger
+from portia.plan import Step
 from portia.planning_agents.context import get_tool_descriptions_for_tools
 
 if TYPE_CHECKING:
@@ -39,13 +40,14 @@ class StepSummarizer:
             SystemMessage(
                 content=(
                     "You are a highly skilled summarizer. Your task is to create a textual summary"
-                    "of the provided output make sure to follow the guidelines provided.\n"
+                    "of the provided tool output, make sure to follow the guidelines provided.\n"
                     "- Focus on the key information and maintain accuracy.\n"
                     "- Make sure to not exceed the max limit of {max_length} characters.\n"
                     "- Don't produce an overly long summary if it doesn't make sense.\n"
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
+                "Here is original task:\n{task_description}\n"
                 "Here is the description of the tool that produced "
                 "the output:\n{tool_description}\n"
                 "Please summarize the following output:\n{tool_output}\n",
@@ -53,7 +55,13 @@ class StepSummarizer:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, tool: Tool, summary_max_length: int = 500) -> None:
+    def __init__(
+        self,
+        llm: BaseChatModel,
+        tool: Tool,
+        step: Step,
+        summary_max_length: int = 500,
+    ) -> None:
         """Initialize the model.
 
         Args:
@@ -65,6 +73,7 @@ class StepSummarizer:
         self.llm = llm
         self.summary_max_length = summary_max_length
         self.tool = tool
+        self.step = step
 
     def invoke(self, state: MessagesState) -> dict[str, Any]:
         """Invoke the model with the given message state.
@@ -99,6 +108,7 @@ class StepSummarizer:
                     tool_output=tool_output,
                     max_length=self.summary_max_length,
                     tool_description=get_tool_descriptions_for_tools([self.tool]),
+                    task_description=self.step.task,
                 ),
             )
             last_message.artifact.summary = summary.content  # type: ignore[attr-defined]

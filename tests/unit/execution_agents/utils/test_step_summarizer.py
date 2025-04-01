@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
+from portia.plan import Step
+
 if TYPE_CHECKING:
     import pytest
     from pydantic import BaseModel
@@ -74,6 +76,7 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper().to_langchain(),
         tool=tool,
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
@@ -100,6 +103,7 @@ def test_summarizer_model_non_tool_message(monkeypatch: pytest.MonkeyPatch) -> N
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper().to_langchain(),
         tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
@@ -116,6 +120,7 @@ def test_summarizer_model_no_messages(monkeypatch: pytest.MonkeyPatch) -> None:
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper().to_langchain(),
         tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": []})
 
@@ -148,6 +153,7 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper().to_langchain(),
         tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
