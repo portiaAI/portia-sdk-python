@@ -86,7 +86,7 @@ runtime-evaluated-base-classes = [
   "pydantic.BaseModel", # Tells ruff that BaseModel instances need to be evaluated at runtime.
 ]
 
-[tool.ruff.flake8-annotations]
+[tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true  # Allows **kwargs: Any in type signatures.
 
 [build-system]
