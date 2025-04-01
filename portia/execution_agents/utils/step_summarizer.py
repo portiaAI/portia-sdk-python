@@ -32,6 +32,7 @@ class StepSummarizer:
         summarizer_prompt (ChatPromptTemplate): The prompt template used to generate the summary.
         llm (BaseChatModel): The language model used for summarization.
         summary_max_length (int): The maximum length of the summary.
+        step (Step): The step that produced the output.
 
     """
 
