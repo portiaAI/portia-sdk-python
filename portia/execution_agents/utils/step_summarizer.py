@@ -14,12 +14,12 @@ from langgraph.graph import MessagesState  # noqa: TC002
 
 from portia.execution_agents.base_execution_agent import Output
 from portia.logger import logger
-from portia.plan import Step
 from portia.planning_agents.context import get_tool_descriptions_for_tools
 
 if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
 
+    from portia.plan import Step
     from portia.tool import Tool
 
 
@@ -68,6 +68,7 @@ class StepSummarizer:
         Args:
             llm (BaseChatModel): The language model used for summarization.
             tool (Tool): The tool used for summarization.
+            step (Step): The step that produced the output.
             summary_max_length (int): The maximum length of the summary. Default is 500 characters.
 
         """
