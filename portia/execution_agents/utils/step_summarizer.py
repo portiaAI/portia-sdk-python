@@ -14,6 +14,8 @@ from langgraph.graph import MessagesState  # noqa: TC002
 
 from portia.execution_agents.base_execution_agent import Output
 from portia.logger import logger
+from portia.planning_agents.context import get_tool_descriptions_for_tools
+from portia.tool import Tool
 
 if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
@@ -43,21 +45,25 @@ class StepSummarizer:
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
+                "Here is the description of the tool that produced "
+                "the output:\n{tool_description}\n"
                 "Please summarize the following output:\n{tool_output}\n",
             ),
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, summary_max_length: int = 500) -> None:
+    def __init__(self, llm: BaseChatModel, tool: Tool, summary_max_length: int = 500) -> None:
         """Initialize the model.
 
         Args:
             llm (BaseChatModel): The language model used for summarization.
+            tool (Tool): The tool used for summarization.
             summary_max_length (int): The maximum length of the summary. Default is 500 characters.
 
         """
         self.llm = llm
         self.summary_max_length = summary_max_length
+        self.tool = tool
 
     def invoke(self, state: MessagesState) -> dict[str, Any]:
         """Invoke the model with the given message state.
@@ -91,6 +97,7 @@ class StepSummarizer:
                 self.summarizer_prompt.format_messages(
                     tool_output=tool_output,
                     max_length=self.summary_max_length,
+                    tool_description=get_tool_descriptions_for_tools([self.tool]),
                 ),
             )
             last_message.artifact.summary = summary.content  # type: ignore[attr-defined]
