@@ -5,7 +5,7 @@ import threading
 import time
 from pathlib import Path
 from unittest import mock
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import HttpUrl, SecretStr
@@ -15,14 +15,14 @@ from portia.clarification import (
     InputClarification,
     ValueConfirmationClarification,
 )
-from portia.config import Config, StorageClass
+from portia.config import DEFAULT_MODEL_KEY, PLANNING_MODEL_KEY, Config, StorageClass
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.base_execution_agent import Output
 from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.llm_wrapper import LLMWrapper
+from portia.model import LangChainGenerativeModel
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
@@ -41,9 +41,26 @@ from tests.utils import (
 
 
 @pytest.fixture
-def portia() -> Portia:
+def planning_model() -> MagicMock:
+    """Fixture to create a mock planning model."""
+    return MagicMock(spec=LangChainGenerativeModel)
+
+
+@pytest.fixture
+def default_model() -> MagicMock:
+    """Fixture to create a mock default model."""
+    return MagicMock(spec=LangChainGenerativeModel)
+
+
+@pytest.fixture
+def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
-    config = get_test_config()
+    config = get_test_config(
+        custom_models={
+            PLANNING_MODEL_KEY: planning_model,
+            DEFAULT_MODEL_KEY: default_model,
+        },
+    )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
 
@@ -85,36 +102,42 @@ def test_portia_local_default_config_without_api_keys() -> None:
         )
 
 
-def test_portia_run_query(portia: Portia) -> None:
+def test_portia_run_query(portia: Portia, planning_model: MagicMock) -> None:
     """Test running a query."""
     query = "example query"
 
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[],
         error=None,
     )
-    with patch.object(LLMWrapper, "to_instructor", new=MagicMock(return_value=mock_response)):
-        plan_run = portia.run(query)
+
+    plan_run = portia.run(query)
 
     assert plan_run.state == PlanRunState.COMPLETE
 
 
-def test_portia_run_query_tool_list() -> None:
+def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
     """Test running a query."""
     query = "example query"
-    portia = Portia(config=get_test_config(), tools=[AdditionTool(), ClarificationTool()])
+    portia = Portia(
+        config=get_test_config(
+            custom_models={
+                PLANNING_MODEL_KEY: planning_model,
+            },
+        ),
+        tools=[AdditionTool(), ClarificationTool()],
+    )
 
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[],
         error=None,
     )
-    with patch.object(LLMWrapper, "to_instructor", new=MagicMock(return_value=mock_response)):
-        plan_run = portia.run(query)
+    plan_run = portia.run(query)
 
     assert plan_run.state == PlanRunState.COMPLETE
 
 
-def test_portia_run_query_disk_storage() -> None:
+def test_portia_run_query_disk_storage(planning_model: MagicMock) -> None:
     """Test running a query."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         query = "example query"
@@ -122,17 +145,15 @@ def test_portia_run_query_disk_storage() -> None:
             storage_class=StorageClass.DISK,
             openai_api_key=SecretStr("123"),
             storage_dir=tmp_dir,
+            custom_models={
+                PLANNING_MODEL_KEY: planning_model,
+            },
         )
         tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
         portia = Portia(config=config, tools=tool_registry)
 
-        mock_response = StepsOrError(steps=[], error=None)
-        with mock.patch.object(
-            LLMWrapper,
-            "to_instructor",
-            new=MagicMock(return_value=mock_response),
-        ):
-            plan_run = portia.run(query)
+        planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+        plan_run = portia.run(query)
 
         assert plan_run.state == PlanRunState.COMPLETE
         # Use Path to check for the files
@@ -143,64 +164,45 @@ def test_portia_run_query_disk_storage() -> None:
         assert len(run_files) == 1
 
 
-def test_portia_generate_plan(portia: Portia) -> None:
+def test_portia_generate_plan(portia: Portia, planning_model: MagicMock) -> None:
     """Test planning a query."""
     query = "example query"
 
-    mock_response = StepsOrError(steps=[], error=None)
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan = portia.plan(query)
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan = portia.plan(query)
 
     assert plan.plan_context.query == query
 
 
-def test_portia_generate_plan_error(portia: Portia) -> None:
+def test_portia_generate_plan_error(portia: Portia, planning_model: MagicMock) -> None:
     """Test planning a query that returns an error."""
     query = "example query"
 
-    mock_response = StepsOrError(steps=[], error="could not plan")
-    with (
-        mock.patch.object(
-            LLMWrapper,
-            "to_instructor",
-            new=MagicMock(return_value=mock_response),
-        ),
-        pytest.raises(PlanError),
-    ):
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[],
+        error="could not plan",
+    )
+    with pytest.raises(PlanError):
         portia.plan(query)
 
 
-def test_portia_generate_plan_with_tools(portia: Portia) -> None:
+def test_portia_generate_plan_with_tools(portia: Portia, planning_model: MagicMock) -> None:
     """Test planning a query."""
     query = "example query"
 
-    mock_response = StepsOrError(steps=[], error=None)
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan = portia.plan(query, tools=["add_tool"])
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan = portia.plan(query, tools=["add_tool"])
 
     assert plan.plan_context.query == query
     assert plan.plan_context.tool_ids == ["add_tool"]
 
 
-def test_portia_resume(portia: Portia) -> None:
+def test_portia_resume(portia: Portia, planning_model: MagicMock) -> None:
     """Test running a plan."""
     query = "example query"
 
-    mock_response = StepsOrError(steps=[], error=None)
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan = portia.plan(query)
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan = portia.plan(query)
     plan_run = portia.create_plan_run(plan)
     plan_run = portia.resume(plan_run)
 
@@ -208,13 +210,12 @@ def test_portia_resume(portia: Portia) -> None:
     assert plan_run.plan_id == plan.id
 
 
-def test_portia_resume_after_interruption(portia: Portia) -> None:
+def test_portia_resume_after_interruption(portia: Portia, planning_model: MagicMock) -> None:
     """Test resuming PlanRun after interruption."""
     query = "example query"
 
-    mock_response = StepsOrError(steps=[], error=None)
-    with patch.object(LLMWrapper, "to_instructor", new=MagicMock(return_value=mock_response)):
-        plan_run = portia.run(query)
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan_run = portia.run(query)
 
     # Simulate run being in progress
     plan_run.state = PlanRunState.IN_PROGRESS
@@ -225,22 +226,17 @@ def test_portia_resume_after_interruption(portia: Portia) -> None:
     assert plan_run.current_step_index == 1
 
 
-def test_portia_resume_edge_cases(portia: Portia) -> None:
+def test_portia_resume_edge_cases(portia: Portia, planning_model: MagicMock) -> None:
     """Test edge cases for execute."""
     with pytest.raises(ValueError):  # noqa: PT011
         portia.resume()
 
     query = "example query"
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[],
         error=None,
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan = portia.plan(query)
+    plan = portia.plan(query)
     plan_run = portia.create_plan_run(plan)
 
     # Simulate run being in progress
@@ -255,13 +251,12 @@ def test_portia_resume_edge_cases(portia: Portia) -> None:
         portia.resume(plan_run_id=PlanRunUUID())
 
 
-def test_portia_run_invalid_state(portia: Portia) -> None:
+def test_portia_run_invalid_state(portia: Portia, planning_model: MagicMock) -> None:
     """Test resuming PlanRun with an invalid state."""
     query = "example query"
 
-    mock_response = StepsOrError(steps=[], error=None)
-    with patch.object(LLMWrapper, "to_instructor", new=MagicMock(return_value=mock_response)):
-        plan_run = portia.run(query)
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan_run = portia.run(query)
 
     # Set invalid state
     plan_run.state = PlanRunState.COMPLETE
@@ -270,16 +265,15 @@ def test_portia_run_invalid_state(portia: Portia) -> None:
         portia.resume(plan_run)
 
 
-def test_portia_wait_for_ready(portia: Portia) -> None:
+def test_portia_wait_for_ready(portia: Portia, planning_model: MagicMock) -> None:
     """Test wait for ready."""
     query = "example query"
 
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[Step(task="Example task", inputs=[], output="$output")],
         error=None,
     )
-    with patch.object(LLMWrapper, "to_instructor", new=MagicMock(return_value=mock_response)):
-        plan_run = portia.run(query)
+    plan_run = portia.run(query)
 
     plan_run.state = PlanRunState.FAILED
     with pytest.raises(InvalidPlanRunStateError):
@@ -396,19 +390,17 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
             assert clarification.response == "complete"
 
 
-def test_get_clarifications_and_get_run_called_once(portia: Portia) -> None:
+def test_get_clarifications_and_get_run_called_once(
+    portia: Portia,
+    planning_model: MagicMock,
+) -> None:
     """Test that get_clarifications_for_step is called once after get_plan_run."""
     query = "example query"
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[Step(task="Example task", inputs=[], output="$output")],
         error=None,
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan_run = portia.run(query)
+    plan_run = portia.run(query)
 
     # Set the run state to NEED_CLARIFICATION to ensure it goes through the wait logic
     plan_run.state = PlanRunState.NEED_CLARIFICATION
@@ -437,7 +429,7 @@ def test_get_clarifications_and_get_run_called_once(portia: Portia) -> None:
         mock_get_clarifications.assert_called_once()
 
 
-def test_portia_run_query_with_summary(portia: Portia) -> None:
+def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock) -> None:
     """Test run_query sets both final output and summary correctly."""
     query = "What activities can I do in London based on weather?"
 
@@ -452,7 +444,7 @@ def test_portia_run_query_with_summary(portia: Portia) -> None:
         tool_id="add_tool",
         output="$activities",
     )
-    mock_plan = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[weather_step, activities_step],
         error=None,
     )
@@ -469,11 +461,6 @@ def test_portia_run_query_with_summary(portia: Portia) -> None:
     mock_summarizer_agent.create_summary.side_effect = [expected_summary]
 
     with (
-        mock.patch.object(
-            LLMWrapper,
-            "to_instructor",
-            new=MagicMock(return_value=mock_plan),
-        ),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -657,20 +644,15 @@ def test_get_llm_tool() -> None:
     assert isinstance(tool._child_tool, LLMTool)  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
 
 
-def test_portia_run_plan(portia: Portia) -> None:
+def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
     """Test that run_plan calls create_plan_run and resume."""
     query = "example query"
 
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[],
         error=None,
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan = portia.plan(query)
+    plan = portia.plan(query)
 
     # Mock the create_plan_run and resume methods
     with (
@@ -691,15 +673,15 @@ def test_portia_run_plan(portia: Portia) -> None:
         assert result == mock_resumed_plan_run
 
 
-def test_portia_handle_clarification() -> None:
+def test_portia_handle_clarification(planning_model: MagicMock) -> None:
     """Test that portia can handle a clarification."""
     clarification_handler = TestClarificationHandler()
     portia = Portia(
-        config=get_test_config(),
+        config=get_test_config(custom_models={PLANNING_MODEL_KEY: planning_model}),
         tools=[ClarificationTool()],
         execution_hooks=ExecutionHooks(clarification_handler=clarification_handler),
     )
-    mock_plan = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[
             Step(
                 task="Raise a clarification",
@@ -713,11 +695,6 @@ def test_portia_handle_clarification() -> None:
     mock_summarizer_agent = mock.MagicMock()
     mock_summarizer_agent.create_summary.side_effect = "I caught the clarification"
     with (
-        mock.patch.object(
-            LLMWrapper,
-            "to_instructor",
-            new=MagicMock(return_value=mock_plan),
-        ),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -748,18 +725,13 @@ def test_portia_handle_clarification() -> None:
         )
 
 
-def test_portia_error_clarification(portia: Portia) -> None:
+def test_portia_error_clarification(portia: Portia, planning_model: MagicMock) -> None:
     """Test that portia can handle an error clarification."""
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[],
         error=None,
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan_run = portia.run("test query")
+    plan_run = portia.run("test query")
 
     portia.error_clarification(
         ValueConfirmationClarification(
@@ -772,18 +744,16 @@ def test_portia_error_clarification(portia: Portia) -> None:
     assert plan_run.state == PlanRunState.FAILED
 
 
-def test_portia_error_clarification_with_plan_run(portia: Portia) -> None:
+def test_portia_error_clarification_with_plan_run(
+    portia: Portia,
+    planning_model: MagicMock,
+) -> None:
     """Test that portia can handle an error clarification."""
-    mock_response = StepsOrError(
+    planning_model.get_structured_response.return_value = StepsOrError(
         steps=[],
         error=None,
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        plan_run = portia.run("test query")
+    plan_run = portia.run("test query")
 
     portia.error_clarification(
         ValueConfirmationClarification(
@@ -797,12 +767,15 @@ def test_portia_error_clarification_with_plan_run(portia: Portia) -> None:
     assert plan_run.state == PlanRunState.FAILED
 
 
-def test_portia_run_with_introspection_skip(portia: Portia) -> None:
+def test_portia_run_with_introspection_skip(portia: Portia, planning_model: MagicMock) -> None:
     """Test run with introspection agent returning SKIP outcome."""
     # Setup mock plan and response
     step1 = Step(task="Step 1", inputs=[], output="$step1_result", condition="some_condition")
     step2 = Step(task="Step 2", inputs=[], output="$step2_result")
-    mock_response = StepsOrError(steps=[step1, step2], error=None)
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[step1, step2],
+        error=None,
+    )
 
     # Mock introspection agent to return SKIP for first step
     mock_introspection = MagicMock()
@@ -816,11 +789,6 @@ def test_portia_run_with_introspection_skip(portia: Portia) -> None:
     mock_step_agent.execute_sync.return_value = Output(value="Step 2 result")
 
     with (
-        mock.patch.object(
-            LLMWrapper,
-            "to_instructor",
-            new=MagicMock(return_value=mock_response),
-        ),
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
         mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
     ):
@@ -838,13 +806,16 @@ def test_portia_run_with_introspection_skip(portia: Portia) -> None:
         assert plan_run.outputs.final_output.value == "Step 2 result"
 
 
-def test_portia_run_with_introspection_complete(portia: Portia) -> None:
+def test_portia_run_with_introspection_complete(portia: Portia, planning_model: MagicMock) -> None:
     """Test run with introspection agent returning COMPLETE outcome."""
     # Setup mock plan and response
     step1 = Step(task="Step 1", inputs=[], output="$step1_result")
     step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="some_condition")
     step3 = Step(task="Step 3", inputs=[], output="$step3_result")
-    mock_response = StepsOrError(steps=[step1, step2, step3], error=None)
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[step1, step2, step3],
+        error=None,
+    )
 
     # Mock step agent for first step
     mock_step_agent = MagicMock()
@@ -884,11 +855,6 @@ def test_portia_run_with_introspection_complete(portia: Portia) -> None:
     with (
         mock.patch.object(portia, "_handle_introspection_outcome", custom_handle_introspection),
         mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
-        mock.patch.object(
-            LLMWrapper,
-            "to_instructor",
-            new=MagicMock(return_value=mock_response),
-        ),
     ):
         # Run the test
         plan_run = portia.run("Test query with early completed execution")
@@ -904,12 +870,15 @@ def test_portia_run_with_introspection_complete(portia: Portia) -> None:
         assert plan_run.outputs.final_output.summary == "Execution completed early"
 
 
-def test_portia_run_with_introspection_fail(portia: Portia) -> None:
+def test_portia_run_with_introspection_fail(portia: Portia, planning_model: MagicMock) -> None:
     """Test run with introspection agent returning FAIL outcome."""
     # Setup mock plan and response
     step1 = Step(task="Step 1", inputs=[], output="$step1_result")
     step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="some_condition")
-    mock_response = StepsOrError(steps=[step1, step2], error=None)
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[step1, step2],
+        error=None,
+    )
 
     # Mock step agent for first step
     mock_step_agent = MagicMock()
@@ -949,11 +918,6 @@ def test_portia_run_with_introspection_fail(portia: Portia) -> None:
     with (
         mock.patch.object(portia, "_handle_introspection_outcome", custom_handle_introspection),
         mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
-        mock.patch.object(
-            LLMWrapper,
-            "to_instructor",
-            new=MagicMock(return_value=mock_response),
-        ),
     ):
         # Run the test
         plan_run = portia.run("Test query with failed execution")

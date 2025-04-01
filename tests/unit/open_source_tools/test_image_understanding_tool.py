@@ -1,8 +1,6 @@
 """Tests for image understanding tool."""
 
-import os
-import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from langchain.schema import HumanMessage
@@ -13,13 +11,6 @@ from portia.open_source_tools.image_understanding_tool import (
     ImageUnderstandingToolSchema,
 )
 from portia.tool import ToolRunContext
-from tests.utils import get_test_config
-
-
-@pytest.fixture
-def mock_execution_context() -> ToolRunContext:
-    """Fixture to mock ExecutionContext."""
-    return MagicMock(spec=ToolRunContext)
 
 
 @pytest.fixture
@@ -28,24 +19,17 @@ def mock_image_understanding_tool() -> ImageUnderstandingTool:
     return ImageUnderstandingTool(id="test_tool", name="Test Image Understanding Tool")
 
 
-@patch("portia.open_source_tools.image_understanding_tool.LLMWrapper")
-@patch.dict(os.environ, {"OPENAI_API_KEY": "123"})
 def test_image_understanding_tool_run_url(
-    mock_llm_wrapper: MagicMock,
-    mock_execution_context: MagicMock,
-    mock_image_understanding_tool: MagicMock,
+    mock_tool_run_context: ToolRunContext,
+    mock_image_understanding_tool: ImageUnderstandingTool,
+    mock_model: MagicMock,
 ) -> None:
     """Test that ImageUnderstandingTool runs successfully and returns a response."""
     # Setup mock responses
-    mock_llm = MagicMock()
     mock_response = MagicMock()
     mock_response.content = "Test response content"
-    mock_llm.invoke.return_value = mock_response
-    mock_llm_wrapper.for_usage.return_value.to_langchain.return_value = mock_llm
-    mock_execution_context.execution_context = MagicMock()
-    mock_execution_context.config = get_test_config()
-    mock_execution_context.plan_run_id = uuid.uuid4()
-    mock_execution_context.execution_context.plan_run_context = None
+    mock_model.to_langchain.return_value.invoke.return_value = mock_response
+
     # Define task input
     schema_data = {
         "task": "What is the capital of France?",
@@ -53,9 +37,9 @@ def test_image_understanding_tool_run_url(
     }
 
     # Run the tool
-    result = mock_image_understanding_tool.run(mock_execution_context, **schema_data)
+    result = mock_image_understanding_tool.run(mock_tool_run_context, **schema_data)
 
-    mock_llm.invoke.assert_called_once_with(
+    mock_model.to_langchain.return_value.invoke.assert_called_once_with(
         [
             HumanMessage(content=mock_image_understanding_tool.prompt),
             HumanMessage(
@@ -116,23 +100,16 @@ def test_image_understanding_tool_initialization(
     assert mock_image_understanding_tool.name == "Test Image Understanding Tool"
 
 
-@patch("portia.open_source_tools.image_understanding_tool.LLMWrapper")
-@patch.dict(os.environ, {"OPENAI_API_KEY": "123"})
 def test_image_understanding_tool_run_with_context(
-    mock_llm_wrapper: MagicMock,
-    mock_execution_context: MagicMock,
-    mock_image_understanding_tool: MagicMock,
+    mock_model: MagicMock,
+    mock_tool_run_context: ToolRunContext,
+    mock_image_understanding_tool: ImageUnderstandingTool,
 ) -> None:
     """Test that ImageUnderstandingTool runs successfully when a context is provided."""
     # Setup mock responses
-    mock_llm = MagicMock()
     mock_response = MagicMock()
     mock_response.content = "Test response content"
-    mock_llm.invoke.return_value = mock_response
-    mock_llm_wrapper.for_usage.return_value.to_langchain.return_value = mock_llm
-    mock_execution_context.execution_context = MagicMock()
-    mock_execution_context.config = get_test_config()
-    mock_execution_context.plan_run_id = uuid.uuid4()
+    mock_model.to_langchain.return_value.invoke.return_value = mock_response
     # Define task and context
     mock_image_understanding_tool.tool_context = "Context for task"
     schema_data = {
@@ -141,10 +118,10 @@ def test_image_understanding_tool_run_with_context(
     }
 
     # Run the tool
-    result = mock_image_understanding_tool.run(mock_execution_context, **schema_data)
+    result = mock_image_understanding_tool.run(mock_tool_run_context, **schema_data)
 
-    # Verify that the LLMWrapper's invoke method is called
-    called_with = mock_llm.invoke.call_args_list[0].args[0]
+    # Verify that the Models's to_langchain().invoke method is called
+    called_with = mock_model.to_langchain.return_value.invoke.call_args_list[0].args[0]
     assert len(called_with) == 2
     assert isinstance(called_with[0], HumanMessage)
     assert isinstance(called_with[1], HumanMessage)

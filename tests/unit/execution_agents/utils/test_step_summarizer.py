@@ -2,25 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 from portia.plan import Step
 
-if TYPE_CHECKING:
-    from pydantic import BaseModel
-
 from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from tests.utils import AdditionTool, get_mock_base_chat_model, get_test_llm_wrapper
+from portia.model import Message
+from tests.utils import AdditionTool, get_mock_langchain_generative_model
 
 
 def test_summarizer_model_normal_output() -> None:
     """Test the summarizer model with valid tool message."""
     summary = AIMessage(content="Short summary")
     tool = AdditionTool()
-    mock_invoker = get_mock_base_chat_model(response=summary)
+    mock_model = get_mock_langchain_generative_model(response=summary)
     tool_message = ToolMessage(
         content="Tool output content",
         tool_call_id="123",
@@ -29,14 +25,15 @@ def test_summarizer_model_normal_output() -> None:
     )
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=tool,
         step=Step(task="Test task", output="$output"),
     )
+    base_chat_model = mock_model.to_langchain()
     result = summarizer_model.invoke({"messages": [tool_message]})
 
-    assert mock_invoker.invoke.called
-    messages: list[BaseMessage] = mock_invoker.invoke.call_args[0][0]
+    assert base_chat_model.invoke.called
+    messages: list[Message] = base_chat_model.invoke.call_args[0][0]
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "Tool output content" in messages[1].content
@@ -49,32 +46,32 @@ def test_summarizer_model_normal_output() -> None:
 
 def test_summarizer_model_non_tool_message() -> None:
     """Test the summarizer model with non-tool message should not invoke the LLM."""
-    mock_invoker = get_mock_base_chat_model()
-    ai_message = AIMessage(content="AI message content")
+    mock_model = get_mock_langchain_generative_model()
+    ai_message = Message(role="assistant", content="AI message content")
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
-    assert not mock_invoker.invoke.called
+    assert not mock_model.to_langchain().invoke.called
     assert result["messages"][0] == ai_message
 
 
 def test_summarizer_model_no_messages() -> None:
     """Test the summarizer model with empty message list should not invoke the LLM."""
-    mock_invoker = get_mock_base_chat_model()
+    mock_model = get_mock_langchain_generative_model()
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": []})
 
-    assert not mock_invoker.invoke.called
+    assert not mock_model.to_langchain().invoke.called
     assert result["messages"] == [None]
 
 
@@ -84,12 +81,8 @@ def test_summarizer_model_error_handling() -> None:
     class TestError(Exception):
         """Test error."""
 
-    def mock_invoke(**_: Any) -> AIMessage | BaseModel:
-        """Mock invoke that raises an error."""
-        raise TestError("Test error")
-
-    mock_invoker = get_mock_base_chat_model()
-    mock_invoker.invoke = mock_invoke  # type: ignore  # noqa: PGH003
+    mock_model = get_mock_langchain_generative_model()
+    mock_model.to_langchain().invoke.side_effect = TestError("Test error")  # type: ignore[reportFunctionMemberAccess]
 
     tool_message = ToolMessage(
         content="Tool output content",
@@ -99,7 +92,7 @@ def test_summarizer_model_error_handling() -> None:
     )
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
