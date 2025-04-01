@@ -26,14 +26,13 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
-from portia.model import LangChainGenerativeModel
-from portia.plan_run import PlanRun
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
     from portia.config import Config
+    from portia.model import LangChainGenerativeModel
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.tool import Tool
@@ -176,12 +175,7 @@ class OneShotAgent(BaseExecutionAgent):
             raise InvalidAgentError("No tool available")
 
         context = self.get_system_context()
-        model = self.config.resolve_model(EXECUTION_MODEL_KEY)
-        if not isinstance(model, LangChainGenerativeModel):
-            raise InvalidAgentError(
-                f"OneShotAgent must be initialized with a LangChainGenerativeModel, "
-                f"{type(model)} is not supported",
-            )
+        model = self.config.resolve_langchain_model(EXECUTION_MODEL_KEY)
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=ToolRunContext(

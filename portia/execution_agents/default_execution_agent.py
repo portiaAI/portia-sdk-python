@@ -594,11 +594,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         context = self.get_system_context()
         execution_context = get_execution_context()
         execution_context.plan_run_context = context
-        model = self.config.resolve_model(EXECUTION_MODEL_KEY)
-        if not isinstance(model, LangChainGenerativeModel):
-            raise InvalidAgentError(
-                "LangChainGenerativeModel is required for DefaultExecutionAgent",
-            )
+        model = self.config.resolve_langchain_model(EXECUTION_MODEL_KEY)
 
         tools = [
             self.tool.to_langchain_with_artifact(
