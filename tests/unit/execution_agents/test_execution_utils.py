@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
-from pydantic import SecretStr
 
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
@@ -14,8 +12,6 @@ from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
-    invoke_structured_output,
-    map_message_types_for_instructor,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
@@ -251,27 +247,3 @@ def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
     # Should return END even though tool.should_summarize is True
     # because the message contains a list of clarifications as artifact
     assert result == END
-
-
-def test_map_message_types_for_instructor() -> None:
-    """Test map_message_types_for_instructor."""
-    messages = [SystemMessage(content="test"), HumanMessage(content="hello")]
-    result = map_message_types_for_instructor(messages)
-    assert result == [{"role": "system", "content": "test"}, {"role": "user", "content": "hello"}]
-
-    with pytest.raises(ValueError, match="Unsupported message type"):
-        map_message_types_for_instructor([AIMessage(content="test")])
-
-
-def test_invoke_structured_output_fails_unsupported_model() -> None:
-    """Test invoke_structured_output fails with unsupported model."""
-
-    class FakeModel(ChatOpenAI):
-        """A fake OpenAI model subclass."""
-
-    with pytest.raises(ValueError, match="Unsupported model type"):
-        invoke_structured_output(
-            FakeModel(model="test", api_key=SecretStr("test")),
-            Output,
-            [HumanMessage(content="Make a pie")],
-        )
