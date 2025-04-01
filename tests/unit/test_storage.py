@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
 import pytest
 
 from portia.errors import StorageError
-from portia.execution_agents.output import (
-    FileMemoryValue,
-    LocalMemoryValue,
-    Output,
-    RemoteMemoryValue,
-)
+from portia.execution_agents.output import AgentMemoryStorageDetails, Output
 from portia.plan import Plan, PlanContext, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
@@ -362,14 +357,14 @@ def test_in_memory_storage_outputs() -> None:
     # Test saving output
     stored_output = storage.save_plan_run_output(output_name, output, plan_run.id)
     assert stored_output.summary == output.summary
-    assert stored_output.value == LocalMemoryValue(value=output.value)
+    assert isinstance(stored_output.value, AgentMemoryStorageDetails)
+    assert stored_output.value.name == output_name
+    assert stored_output.value.plan_run_id == plan_run.id
 
     # Test retrieving output
     retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
-    assert retrieved_output.value == LocalMemoryValue(value=output.value)
+    assert retrieved_output.value == output.value
     assert retrieved_output.summary == output.summary
-    assert retrieved_output.value_for_prompt() == output.summary
-    assert retrieved_output.full_value() == output.value
 
     # Test retrieving non-existent output
     with pytest.raises(KeyError):
@@ -386,16 +381,14 @@ def test_disk_file_storage_outputs(tmp_path: Path) -> None:
     # Test saving output
     stored_output = storage.save_plan_run_output(output_name, output, plan_run.id)
     assert stored_output.summary == output.summary
-    assert isinstance(stored_output.value, FileMemoryValue)
-    assert stored_output.value.path == str(tmp_path / str(plan_run.id) / f"{output_name}.json")
+    assert isinstance(stored_output.value, AgentMemoryStorageDetails)
+    assert stored_output.value.name == output_name
+    assert stored_output.value.plan_run_id == plan_run.id
 
     # Test retrieving output
     retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
     assert retrieved_output.summary == output.summary
-    assert isinstance(retrieved_output.value, FileMemoryValue)
-    assert retrieved_output.value.path == str(tmp_path / str(plan_run.id) / f"{output_name}.json")
-    assert retrieved_output.value_for_prompt() == output.summary
-    assert retrieved_output.full_value() == output.value
+    assert retrieved_output.value == output.value
 
     # Test retrieving non-existent output
     with pytest.raises(FileNotFoundError):
@@ -420,41 +413,41 @@ def test_portia_cloud_storage_outputs() -> None:
         },
     )
 
+    mock_http_response = MagicMock()
+    mock_http_response.status_code = 200
+    mock_http_response.text = output.value
+
     with (
-        patch.object(storage.client, "put", return_value=mock_response) as mock_put,
+        patch.object(storage.form_client, "put", return_value=mock_response) as mock_put,
         patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+        patch("httpx.Client.get", return_value=mock_http_response) as mock_http_get,
     ):
         # Test saving output
         stored_output = storage.save_plan_run_output(output_name, output, plan_run.id)
         mock_put.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/{output_name}/",
-            json={
-                "value": output.value.encode("utf-8"),
+            files={
+                "value": (
+                    "output",
+                    ANY,
+                ),
+            },
+            data={
                 "summary": output.summary,
             },
         )
-        assert stored_output.value == RemoteMemoryValue(url="https://example.com/output")
+        assert isinstance(stored_output.value, AgentMemoryStorageDetails)
+        assert stored_output.value.name == output_name
+        assert stored_output.value.plan_run_id == plan_run.id
         assert stored_output.summary == output.summary
 
         # Test retrieving output
         retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
-        assert stored_output.value == RemoteMemoryValue(url="https://example.com/output")
         assert retrieved_output.summary == output.summary
-        assert stored_output.value_for_prompt() == output.summary
+        assert retrieved_output.value == output.value
         mock_get.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/{output_name}/",
         )
-
-    # Test retrieving full value from remote URL
-    mock_http_response = MagicMock()
-    mock_http_response.status_code = 200
-    mock_http_response.text = "test-value"
-    with (
-        patch("httpx.Client.get", return_value=mock_http_response) as mock_http_get,
-        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
-    ):
-        retrieved_output = storage.get_plan_run_output(output_name, plan_run.id)
-        assert retrieved_output.full_value() == "test-value"
         mock_http_get.assert_called_once_with("https://example.com/output")
 
     # Test error handling
@@ -462,7 +455,7 @@ def test_portia_cloud_storage_outputs() -> None:
     mock_error_response.is_success = False
     mock_error_response.content = b"An error occurred."
 
-    with patch.object(storage.client, "put", return_value=mock_error_response) as mock_put:
+    with patch.object(storage.form_client, "put", return_value=mock_error_response) as mock_put:
         with pytest.raises(StorageError, match="An error occurred."):
             storage.save_plan_run_output(output_name, output, plan_run.id)
         mock_put.assert_called_once()

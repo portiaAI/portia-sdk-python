@@ -8,41 +8,22 @@ from __future__ import annotations
 import json
 from datetime import date, datetime
 from enum import Enum
-from pathlib import Path
-from typing import Generic
+from typing import TYPE_CHECKING, Generic
 
-import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from portia.common import SERIALIZABLE_TYPE_VAR, Serializable
-from portia.errors import StorageError
+from portia.prefixed_uuid import PlanRunUUID
+
+if TYPE_CHECKING:
+    from portia.storage import AgentMemory
 
 
-class RemoteMemoryValue(BaseModel):
-    """Used for large outputs that are stored remotely in agent memory.
+class AgentMemoryStorageDetails(BaseModel):
+    """Details about the storage of an output in agent memory."""
 
-    Note that this URL is usually a signed URL into agent memory, so it will expire.
-    You should ensure you fetch the output value shortly before using it to ensure
-    that expiry isn't an issue.
-
-    """
-
-    url: str
-
-
-class FileMemoryValue(BaseModel):
-    """Used for large outputs that are stored in agent memory in a local file."""
-
-    path: str
-
-
-class LocalMemoryValue(BaseModel):
-    """Used for large outputs that are stored in local agent memory."""
-
-    value: Serializable
-
-
-AgentMemoryValue = RemoteMemoryValue | FileMemoryValue | LocalMemoryValue
+    name: str
+    plan_run_id: PlanRunUUID
 
 
 class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
@@ -59,9 +40,10 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     model_config = ConfigDict(extra="forbid")
 
-    value: AgentMemoryValue | list[AgentMemoryValue] | Serializable | None = Field(
+    value: AgentMemoryStorageDetails | Serializable | None = Field(
         default=None,
-        description="The output of the tool",
+        description="The output of the tool. If the value is stored in agent memory, "
+        "this will contain the storage details so it can be retrieved.",
         alias="value",  # This ensures the field is serialized as "value" in JSON
     )
     summary: str | None = Field(
@@ -80,73 +62,24 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             Serializable | None: The value of the output.
 
         """
-        match self.value:
-            case value if isinstance(value, (RemoteMemoryValue, FileMemoryValue, LocalMemoryValue)):
-                return self.summary
-            case _:
-                return self.value
+        return self.summary if self._stored_in_agent_memory() else self.value
 
-    def _fetch_remote_value(self, storage: RemoteMemoryValue) -> str:
-        """Fetch a value from remote agent memory.
-
-        Args:
-            storage (RemoteStorage): The remote storage configuration.
-
-        Returns:
-            str: The fetched value.
-
-        Raises:
-            StorageError: If the fetch fails.
-
-        """
-        try:
-            with httpx.Client() as client:
-                response = client.get(storage.url)
-                response.raise_for_status()
-                return response.text
-        except Exception as e:
-            raise StorageError(f"Failed to fetch remote value: {e}") from e
-
-    def _read_file_value(self, storage: FileMemoryValue) -> str:
-        """Read a value from file storage.
-
-        Args:
-            storage (FileStorage): The file storage configuration.
-
-        Returns:
-            str: The file contents.
-
-        Raises:
-            StorageError: If the file read fails.
-
-        """
-        try:
-            stored_output = Output.model_validate_json(Path(storage.path).read_text())
-        except Exception as e:
-            raise StorageError(f"Failed to read file value: {e}") from e
-        else:
-            return stored_output.value
-
-    def full_value(self) -> Serializable | None:
+    def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
         """Get the full value, fetching from remote storage or file if necessary.
 
         Returns:
             Serializable | None: The full value of the output, fetched from storage if needed.
 
         """
-        match self.value:
-            case value if isinstance(value, RemoteMemoryValue):
-                return self._fetch_remote_value(value)
-            case value if isinstance(value, FileMemoryValue):
-                return self._read_file_value(value)
-            case value if isinstance(value, LocalMemoryValue):
-                return value.value
-            case value if isinstance(value, list) and all(
-                isinstance(item, AgentMemoryValue) for item in value
-            ):
-                return [self.full_value(item) for item in value]
-            case _:
-                return self.value
+        return (
+            agent_memory.get_plan_run_output(self.value.name, self.value.plan_run_id)
+            if self._stored_in_agent_memory()
+            else self.value
+        )
+
+    def _stored_in_agent_memory(self) -> bool:
+        """Whether the output is stored in agent memory."""
+        return isinstance(self.value, AgentMemoryStorageDetails)
 
     @field_serializer("value")
     def serialize_value(self, value: Serializable | None) -> str:  # noqa: C901, PLR0911
@@ -192,7 +125,7 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         if isinstance(value, Enum):
             return str(value.value)  # Convert Enums to their values
 
-        if isinstance(value, (BaseModel, FileMemoryValue, RemoteMemoryValue)):
+        if isinstance(value, (BaseModel)):
             return value.model_dump_json()  # Use Pydantic's built-in serialization for models
 
         if isinstance(value, bytes):
