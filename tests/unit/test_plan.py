@@ -130,6 +130,7 @@ def test_pretty_print() -> None:
                 task="test task",
                 output="$output",
                 inputs=[Variable(name="$input", value="10", description="test input")],
+                condition="x > 10",
             ),
         ],
     )
