@@ -198,7 +198,9 @@ class OneShotAgent(BaseExecutionAgent):
             OneShotToolCallingModel(llm, context, tools, self).invoke,
         )
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(self.config, llm).invoke)
+        graph.add_node(
+            AgentNode.SUMMARIZER, StepSummarizer(self.config, llm, self.tool, self.step).invoke
+        )
         graph.add_edge(START, AgentNode.TOOL_AGENT)
 
         # Use execution manager for state transitions

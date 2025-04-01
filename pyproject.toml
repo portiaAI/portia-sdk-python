@@ -86,7 +86,7 @@ runtime-evaluated-base-classes = [
   "pydantic.BaseModel", # Tells ruff that BaseModel instances need to be evaluated at runtime.
 ]
 
-[tool.ruff.flake8-annotations]
+[tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true  # Allows **kwargs: Any in type signatures.
 
 [build-system]
@@ -99,6 +99,7 @@ portia = ["templates/**/*.jinja"]
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore:Failing to pass a value to the 'type_params' parameter of 'typing.ForwardRef._evaluate':DeprecationWarning",  # this comes from LangChain
+    "ignore::DeprecationWarning:langchain_core.load.serializable",  # Pydantic via LangChain
 ]
 addopts = [
   "--cov",

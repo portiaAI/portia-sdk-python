@@ -9,8 +9,6 @@ import instructor
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_mistralai import ChatMistralAI
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr
@@ -443,6 +441,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
 
 
 if validate_extras_dependencies("mistral", raise_error=False):
+    from langchain_mistralai import ChatMistralAI
     from mistralai import Mistral
 
     class MistralAIGenerativeModel(LangChainGenerativeModel):
@@ -521,6 +520,7 @@ if validate_extras_dependencies("mistral", raise_error=False):
 
 if validate_extras_dependencies("google", raise_error=False):
     import google.generativeai as genai
+    from langchain_google_genai import ChatGoogleGenerativeAI
 
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""

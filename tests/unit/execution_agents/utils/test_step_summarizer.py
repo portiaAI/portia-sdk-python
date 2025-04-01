@@ -5,80 +5,45 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
-from langchain_openai import ChatOpenAI
+
+from portia.plan import Step
 
 if TYPE_CHECKING:
-    import pytest
     from pydantic import BaseModel
 
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
 from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from tests.utils import get_test_config, get_test_llm_wrapper
+from tests.utils import (
+    AdditionTool,
+    get_mock_base_chat_model,
+    get_test_config,
+    get_test_llm_wrapper,
+)
 
 
-class MockInvoker:
-    """Mock invoker."""
-
-    called: bool
-    prompt: list[BaseMessage]
-    response: AIMessage | BaseModel | None
-    output_format: type[BaseModel] | None
-    method: str | None
-
-    def __init__(self, response: AIMessage | BaseModel | None = None) -> None:
-        """Init worker."""
-        self.called = False
-        self.prompt = []
-        self.response = response
-        self.output_format = None
-        self.method = None
-
-    def invoke(
-        self,
-        prompt: list[BaseMessage],
-        **_: Any,
-    ) -> AIMessage | BaseModel:
-        """Mock run for invoking the chain."""
-        self.called = True
-        self.prompt = prompt
-        if self.response:
-            return self.response
-        return AIMessage(content="invoked")
-
-    def with_structured_output(
-        self,
-        output_format: type[BaseModel],
-        method: str = "function_calling",
-    ) -> MockInvoker:
-        """Model wrapper for structured output."""
-        self.output_format = output_format
-        self.method = method
-        return self
-
-
-def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_summarizer_model_normal_output() -> None:
     """Test the summarizer model with valid tool message."""
     summary = AIMessage(content="Short summary")
-    mock_invoker = MockInvoker(response=summary)
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
-
+    tool = AdditionTool()
+    mock_invoker = get_mock_base_chat_model(response=summary)
     tool_message = ToolMessage(
         content="Tool output content",
         tool_call_id="123",
-        name="test_tool",
+        name=tool.name,
         artifact=Output(value="Tool output value"),
     )
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper().to_langchain(),
         config=get_test_config(),
+        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=tool,
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
-    assert mock_invoker.called
-    messages: list[BaseMessage] = mock_invoker.prompt
+    assert mock_invoker.invoke.called
+    messages: list[BaseMessage] = mock_invoker.invoke.call_args[0][0]
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "Tool output content" in messages[1].content
@@ -89,46 +54,43 @@ def test_summarizer_model_normal_output(monkeypatch: pytest.MonkeyPatch) -> None
     assert output_message.artifact.summary == "Short summary"
 
 
-def test_summarizer_model_non_tool_message(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_summarizer_model_non_tool_message() -> None:
     """Test the summarizer model with non-tool message should not invoke the LLM."""
-    mock_invoker = MockInvoker()
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
-
+    mock_invoker = get_mock_base_chat_model()
     ai_message = AIMessage(content="AI message content")
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper().to_langchain(),
         config=get_test_config(),
+        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
-    assert not mock_invoker.called
+    assert not mock_invoker.invoke.called
     assert result["messages"][0] == ai_message
 
 
-def test_summarizer_model_no_messages(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_summarizer_model_no_messages() -> None:
     """Test the summarizer model with empty message list should not invoke the LLM."""
-    mock_invoker = MockInvoker()
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+    mock_invoker = get_mock_base_chat_model()
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper().to_langchain(),
         config=get_test_config(),
+        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": []})
 
-    assert not mock_invoker.called
+    assert not mock_invoker.invoke.called
     assert result["messages"] == [None]
 
 
-def test_summarizer_model_large_output(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_summarizer_model_large_output() -> None:
     """Test the summarizer model with large output."""
     summary = AIMessage(content="Short summary")
-    mock_invoker = MockInvoker(response=summary)
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
+    mock_invoker = get_mock_base_chat_model(response=summary)
 
     tool_message = ToolMessage(
         content="Test " * 1000,
@@ -138,7 +100,6 @@ def test_summarizer_model_large_output(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper().to_langchain(),
         # Set a low threshold so the above output is considered large
         config=get_test_config(
             large_output_threshold_value=100,
@@ -146,15 +107,18 @@ def test_summarizer_model_large_output(monkeypatch: pytest.MonkeyPatch) -> None:
                 FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             },
         ),
+        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
-    assert mock_invoker.called
-    messages: list[BaseMessage] = mock_invoker.prompt
+    assert mock_invoker.invoke.called
+    messages: list[BaseMessage] = mock_invoker.invoke.call_args[0][0]
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "This is a large value" in messages[1].content
-    # Check that the content has been truntaced
+    # Check that the content has been truncated
     assert messages[1].content.count("Test") < 1000
 
     # Check that summaries were added to the artifact
@@ -163,7 +127,7 @@ def test_summarizer_model_large_output(monkeypatch: pytest.MonkeyPatch) -> None:
     assert output_message.artifact.summary == "Short summary"
 
 
-def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_summarizer_model_error_handling() -> None:
     """Test the summarizer model error handling."""
 
     class TestError(Exception):
@@ -173,10 +137,8 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
         """Mock invoke that raises an error."""
         raise TestError("Test error")
 
-    mock_invoker = MockInvoker()
+    mock_invoker = get_mock_base_chat_model()
     mock_invoker.invoke = mock_invoke  # type: ignore  # noqa: PGH003
-    monkeypatch.setattr(ChatOpenAI, "invoke", mock_invoker.invoke)
-    monkeypatch.setattr(ChatOpenAI, "with_structured_output", mock_invoker.with_structured_output)
 
     tool_message = ToolMessage(
         content="Tool output content",
@@ -186,8 +148,10 @@ def test_summarizer_model_error_handling(monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
     summarizer_model = StepSummarizer(
-        llm=get_test_llm_wrapper().to_langchain(),
         config=get_test_config(),
+        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 

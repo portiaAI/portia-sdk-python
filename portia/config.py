@@ -3,14 +3,13 @@
 This module defines the configuration classes and enumerations used in the SDK,
 including settings for storage, API keys, LLM providers, logging, and agent options.
 It also provides validation for configuration values and loading mechanisms for
-config files and default settings.
+default settings.
 """
 
 from __future__ import annotations
 
 import os
 from enum import Enum
-from pathlib import Path
 from typing import NamedTuple, Self, TypeVar
 
 from pydantic import (
@@ -22,7 +21,14 @@ from pydantic import (
     model_validator,
 )
 
+from portia.common import validate_extras_dependencies
 from portia.errors import ConfigNotFoundError, InvalidConfigError
+from portia.model import (
+    AnthropicGenerativeModel,
+    AzureOpenAIGenerativeModel,
+    GenerativeModel,
+    OpenAIGenerativeModel,
+)
 
 T = TypeVar("T")
 
@@ -354,7 +360,7 @@ class Config(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -405,8 +411,13 @@ class Config(BaseModel):
     )
 
     models: dict[str, LLMModel] = Field(
-        default={},
+        default_factory=dict,
         description="A dictionary of configured LLM models for each usage.",
+    )
+
+    custom_models: dict[str, GenerativeModel] = Field(
+        default_factory=dict,
+        description="A dictionary of custom GenerativeModel instances for each usage.",
     )
 
     feature_flags: dict[str, bool] = Field(
@@ -440,6 +451,49 @@ class Config(BaseModel):
         if usage == PLANNING_MODEL_KEY:
             return self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
         return self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
+
+    def resolve_model(self, usage: str) -> GenerativeModel:
+        """Resolve a model from the config."""
+        if usage in self.custom_models:
+            return self.custom_models[usage]
+        model = self.model(usage)
+        return self._construct_model(model)
+
+    def _construct_model(self, llm_model: LLMModel) -> GenerativeModel:
+        """Construct a Model instance from an LLMModel."""
+        match llm_model.provider():
+            case LLMProvider.OPENAI:
+                return OpenAIGenerativeModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.openai_api_key,
+                )
+            case LLMProvider.ANTHROPIC:
+                return AnthropicGenerativeModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.anthropic_api_key,
+                )
+            case LLMProvider.MISTRALAI:
+                validate_extras_dependencies("mistral")
+                from portia.model import MistralAIGenerativeModel
+
+                return MistralAIGenerativeModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.mistralai_api_key,
+                )
+            case LLMProvider.GOOGLE_GENERATIVE_AI:
+                validate_extras_dependencies("google")
+                from portia.model import GoogleGenAiGenerativeModel
+
+                return GoogleGenAiGenerativeModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.google_api_key,
+                )
+            case LLMProvider.AZURE_OPENAI:
+                return AzureOpenAIGenerativeModel(
+                    model_name=llm_model.api_name,
+                    api_key=self.azure_openai_api_key,
+                    azure_endpoint=self.azure_openai_endpoint,
+                )
 
     # Storage Options
     storage_class: StorageClass = Field(
@@ -552,20 +606,9 @@ class Config(BaseModel):
 
         validate_llm_api_key(self.llm_provider)
         for model in self.models.values():
-            validate_llm_api_key(model.provider())
-
+            if isinstance(model, LLMModel):
+                validate_llm_api_key(model.provider())
         return self
-
-    @classmethod
-    def from_file(cls, file_path: Path) -> Config:
-        """Load configuration from a JSON file.
-
-        Returns:
-            Config: The default config
-
-        """
-        with Path.open(file_path) as f:
-            return cls.model_validate_json(f.read())
 
     @classmethod
     def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
@@ -598,19 +641,6 @@ class Config(BaseModel):
         """
         return self.must_get(name, SecretStr)
 
-    def must_get_raw_api_key(self, name: str) -> str:
-        """Retrieve the raw API key for the configured provider.
-
-        Raises:
-            ConfigNotFoundError: If no API key is found for the provider.
-
-        Returns:
-            str: The raw API key.
-
-        """
-        key = self.must_get_api_key(name)
-        return key.get_secret_value()
-
     def must_get(self, name: str, expected_type: type[T]) -> T:
         """Retrieve any value from the config, ensuring its of the correct type.
 
@@ -638,40 +668,6 @@ class Config(BaseModel):
             case SecretStr() if value.get_secret_value() == "":
                 raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
-
-    def get_llm_api_key(self, model_name: LLMModel) -> SecretStr:
-        """Get the API key for the given LLM model.
-
-        Returns:
-            SecretStr: The API key for the given LLM model.
-
-        """
-        match model_name.provider():
-            case LLMProvider.OPENAI:
-                return self.openai_api_key
-            case LLMProvider.ANTHROPIC:
-                return self.anthropic_api_key
-            case LLMProvider.MISTRALAI:
-                return self.mistralai_api_key
-            case LLMProvider.GOOGLE_GENERATIVE_AI:
-                return self.google_api_key
-            case LLMProvider.AZURE_OPENAI:
-                return self.azure_openai_api_key
-
-    def get_llm_api_endpoint(self, model_name: LLMModel) -> str | None:
-        """Get the API endpoint for the given LLM model.
-
-        In most cases the endpoint is not required for the LLM provider API.
-        The common exception is a self-hosted solution like Azure OpenAI.
-
-        Returns:
-            str | None: The API endpoint for the given LLM model.
-
-        """
-        match model_name.provider():
-            case LLMProvider.AZURE_OPENAI:
-                return self.azure_openai_endpoint
-        return None
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003

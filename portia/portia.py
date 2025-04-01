@@ -702,7 +702,7 @@ class Portia:
                 )
                 self._save_output(output, step.output, plan_run)
                 self.storage.save_plan_run(plan_run)
-            case PreStepIntrospectionOutcome.STOP:
+            case PreStepIntrospectionOutcome.COMPLETE:
                 output = Output(
                     value=PreStepIntrospectionOutcome.COMPLETE,
                     summary=pre_step_outcome.reason,
