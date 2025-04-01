@@ -6,7 +6,6 @@ from langchain_core.messages import AIMessage, ToolMessage
 
 from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.model import Message
 from portia.plan import Step
 from tests.utils import AdditionTool, get_mock_langchain_generative_model
 
@@ -31,8 +30,8 @@ def test_summarizer_model_normal_output() -> None:
     base_chat_model = mock_model.to_langchain()
     result = summarizer_model.invoke({"messages": [tool_message]})
 
-    assert base_chat_model.invoke.called
-    messages: list[Message] = base_chat_model.invoke.call_args[0][0]
+    assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
+    messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "Tool output content" in messages[1].content
@@ -46,7 +45,7 @@ def test_summarizer_model_normal_output() -> None:
 def test_summarizer_model_non_tool_message() -> None:
     """Test the summarizer model with non-tool message should not invoke the LLM."""
     mock_model = get_mock_langchain_generative_model()
-    ai_message = Message(role="assistant", content="AI message content")
+    ai_message = AIMessage(content="AI message content")
 
     summarizer_model = StepSummarizer(
         model=mock_model,
@@ -55,7 +54,7 @@ def test_summarizer_model_non_tool_message() -> None:
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
-    assert not mock_model.to_langchain().invoke.called
+    assert not mock_model.to_langchain().invoke.called  # type: ignore[reportFunctionMemberAccess]
     assert result["messages"][0] == ai_message
 
 
@@ -70,7 +69,7 @@ def test_summarizer_model_no_messages() -> None:
     )
     result = summarizer_model.invoke({"messages": []})
 
-    assert not mock_model.to_langchain().invoke.called
+    assert not mock_model.to_langchain().invoke.called  # type: ignore[reportFunctionMemberAccess]
     assert result["messages"] == [None]
 
 

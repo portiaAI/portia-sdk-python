@@ -86,6 +86,6 @@ class FinalOutputSummarizer:
         model = self.config.resolve_model(SUMMARISER_MODEL_KEY)
         context = self._build_tasks_and_outputs_context(plan, plan_run)
         response = model.get_response(
-            Message(content=self.SUMMARIZE_TASK + context, role="user"),
+            [Message(content=self.SUMMARIZE_TASK + context, role="user")],
         )
         return str(response.content) if response.content else None

@@ -41,7 +41,7 @@ def test_generate_steps_or_error_success(mock_config: Config) -> None:
             error=None,
         ),
     )
-    mock_config.resolve_model.return_value = mock_model
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
 
     result = planning_agent.generate_steps_or_error(
@@ -86,7 +86,7 @@ def test_generate_steps_or_error_failure(mock_config: Config) -> None:
             error="Unable to generate a plan",
         ),
     )
-    mock_config.resolve_model.return_value = mock_model
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
         ctx=get_execution_context(),
@@ -186,7 +186,7 @@ def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
     mock_model = get_mock_langchain_generative_model(
         response=mock_response,
     )
-    mock_config.resolve_model.return_value = mock_model
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
         ctx=get_execution_context(),
@@ -223,7 +223,7 @@ def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
     mock_model = get_mock_langchain_generative_model(
         response=mock_response,
     )
-    mock_config.resolve_model.return_value = mock_model
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
         ctx=get_execution_context(),
