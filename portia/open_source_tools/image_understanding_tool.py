@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from portia.config import IMAGE_TOOL_MODEL_KEY
 from portia.errors import ToolHardError
-from portia.model import LangChainGenerativeModel
 from portia.tool import Tool, ToolRunContext
 
 
@@ -66,12 +65,7 @@ class ImageUnderstandingTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, **kwargs: Any) -> str:
         """Run the ImageTool."""
-        model = ctx.config.resolve_model(IMAGE_TOOL_MODEL_KEY)
-        if not isinstance(model, LangChainGenerativeModel):
-            raise ToolHardError(
-                f"{self.__class__.__name__} requires a LangChainGenerativeModel, "
-                f"got: {model.__class__.__name__}",
-            )
+        model = ctx.config.resolve_langchain_model(IMAGE_TOOL_MODEL_KEY)
 
         tool_schema = ImageUnderstandingToolSchema(**kwargs)
 
