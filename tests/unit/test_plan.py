@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step
+from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step, Variable
 from tests.utils import get_test_plan_run
 
 
@@ -125,7 +125,13 @@ def test_pretty_print() -> None:
     """Test pretty print."""
     plan = Plan(
         plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
-        steps=[Step(task="test task", output="$output")],
+        steps=[
+            Step(
+                task="test task",
+                output="$output",
+                inputs=[Variable(name="$input", value="10", description="test input")],
+            ),
+        ],
     )
     output = plan.pretty_print()
     assert isinstance(output, str)

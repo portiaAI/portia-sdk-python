@@ -254,23 +254,6 @@ class Step(BaseModel):
         "The step will run by default if not provided.",
     )
 
-    def __str__(self) -> str:
-        """Return the string representation of the step.
-
-        Returns:
-            str: A string representation of the step's task, inputs, tool_id, and output.
-
-        """
-        message = (
-            f"- {self.task}\n"
-            f"  Inputs: {', '.join([in_variable.pretty_print() for in_variable in self.inputs])}\n"
-            f"  Tool ID: {self.tool_id}\n"
-            f"  Output: {self.output}\n"
-        )
-        if self.condition:
-            message += f"  Condition: {self.condition}\n"
-        return message
-
     def pretty_print(self) -> str:
         """Return the pretty print representation of the step.
 
