@@ -15,10 +15,11 @@ from langgraph.graph import MessagesState  # noqa: TC002
 from portia.execution_agents.base_execution_agent import Output
 from portia.logger import logger
 from portia.planning_agents.context import get_tool_descriptions_for_tools
-from portia.tool import Tool
 
 if TYPE_CHECKING:
     from langchain.chat_models.base import BaseChatModel
+
+    from portia.tool import Tool
 
 
 class StepSummarizer:
