@@ -39,6 +39,7 @@ def test_image_understanding_tool_run_url(
     # Run the tool
     result = mock_image_understanding_tool.run(mock_tool_run_context, **schema_data)
 
+    assert mock_model.to_langchain.called
     mock_model.to_langchain.return_value.invoke.assert_called_once_with(
         [
             HumanMessage(content=mock_image_understanding_tool.prompt),
