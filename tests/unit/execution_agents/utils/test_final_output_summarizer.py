@@ -74,7 +74,7 @@ def test_summarizer_agent_execute_sync(
     )
     expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + expected_context
     mock_summarizer_model.get_response.assert_called_once_with(
-        Message(content=expected_prompt, role="user"),
+        [Message(content=expected_prompt, role="user")],
     )
 
 
@@ -101,7 +101,7 @@ def test_summarizer_agent_empty_plan_run(
     assert output == "Empty summary"
     expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + ("Query: Empty query\n----------")
     mock_summarizer_model.get_response.assert_called_once_with(
-        Message(content=expected_prompt, role="user"),
+        [Message(content=expected_prompt, role="user")],
     )
 
 
