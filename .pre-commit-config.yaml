@@ -9,7 +9,13 @@ repos:
         args: ["--fix"]
     # Run the formatter.
       - id: ruff-format
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.398
+
+-   repo: local
     hooks:
-    - id: pyright
+      - id: pyright
+        name: Pyright
+        entry: poetry run pyright
+        language: system
+        pass_filenames: false
+        verbose: true  # Show output only on failure
+
