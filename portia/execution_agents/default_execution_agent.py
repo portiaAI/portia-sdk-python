@@ -21,7 +21,6 @@ from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Out
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
-    invoke_structured_output,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
@@ -29,6 +28,7 @@ from portia.execution_agents.execution_utils import (
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
+from portia.model import GenerativeModel, Message
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -123,13 +123,13 @@ class ParserModel:
     """Model to parse the arguments for a tool.
 
     Args:
-        llm (BaseChatModel): The language model used for argument parsing.
+        model (Model): The language model used for argument parsing.
         context (str): The context for argument generation.
         agent (DefaultExecutionAgent): The agent using the parser model.
 
     Attributes:
         arg_parser_prompt (ChatPromptTemplate): The prompt template for argument parsing.
-        llm (BaseChatModel): The language model used.
+        model (Model): The language model used.
         context (str): The context for argument generation.
         agent (DefaultExecutionAgent): The agent using the parser model.
         previous_errors (list[str]): A list of previous errors encountered during parsing.
@@ -183,16 +183,16 @@ class ParserModel:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
-            llm (BaseChatModel): The language model used for argument parsing.
+            model (Model): The language model used for argument parsing.
             context (str): The context for argument generation.
             agent (DefaultExecutionAgent): The agent using the parser model.
 
         """
-        self.llm = llm
+        self.model = model
         self.context = context
         self.agent = agent
         self.previous_errors: list[str] = []
@@ -226,7 +226,10 @@ class ParserModel:
         errors = []
         tool_inputs: ToolInputs | None = None
         try:
-            response = invoke_structured_output(self.llm, ToolInputs, formatted_messages)
+            response = self.model.get_structured_response(
+                messages=[Message.from_langchain(m) for m in formatted_messages],
+                schema=ToolInputs,
+            )
             tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
             errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
@@ -270,7 +273,7 @@ class VerifierModel:
 
     Attributes:
         arg_verifier_prompt (ChatPromptTemplate): The prompt template used for arg verification.
-        llm (BaseChatModel): The language model used to invoke the verification process.
+        model (Model): The model used to invoke the verification process.
         context (str): The context in which the tool arguments are being validated.
         agent (DefaultExecutionAgent): The agent responsible for handling the verification process.
 
@@ -313,16 +316,16 @@ class VerifierModel:
         ],
     )
 
-    def __init__(self, llm: BaseChatModel, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
-            llm (BaseChatModel): The language model used for argument parsing.
+            model (Model): The model used for argument verification.
             context (str): The context for argument generation.
-            agent (DefaultExecutionAgent): The agent using the parser model.
+            agent (DefaultExecutionAgent): The agent using the verifier model.
 
         """
-        self.llm = llm
+        self.model = model
         self.context = context
         self.agent = agent
 
@@ -351,7 +354,10 @@ class VerifierModel:
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
         )
-        response = invoke_structured_output(self.llm, VerifiedToolInputs, formatted_messages)
+        response = self.model.get_structured_response(
+            messages=[Message.from_langchain(m) for m in formatted_messages],
+            schema=VerifiedToolInputs,
+        )
         response = VerifiedToolInputs.model_validate(response)
 
         # Validate the arguments against the tool's schema
@@ -590,7 +596,9 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         context = self.get_system_context()
         execution_context = get_execution_context()
         execution_context.plan_run_context = context
-        llm = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, self.config).to_langchain()
+        llm_wrapper = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, self.config)
+        llm = llm_wrapper.to_langchain()
+        model = llm_wrapper.model
 
         tools = [
             self.tool.to_langchain_with_artifact(
@@ -637,8 +645,8 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
-            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(llm, context, self).invoke)
-            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(llm, context, self).invoke)
+            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, context, self).invoke)
+            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, context, self).invoke)
             graph.add_edge(START, AgentNode.ARGUMENT_PARSER)
             graph.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
             graph.add_conditional_edges(
@@ -647,7 +655,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             )
 
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm).invoke)
+        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm, self.tool, self.step).invoke)
         graph.add_conditional_edges(
             AgentNode.TOOLS,
             lambda state: next_state_after_tool_call(state, self.tool),

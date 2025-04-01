@@ -1,5 +1,6 @@
-"""Unit tests for the Message class in portia._unstable.model."""
+"""Unit tests for the Message class in portia.model."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -7,7 +8,12 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, ValidationError
 
-from portia._unstable.model import LangChainModel, Message
+from portia.model import (
+    GenerativeModel,
+    LangChainGenerativeModel,
+    Message,
+    map_message_to_instructor,
+)
 
 
 @pytest.mark.parametrize(
@@ -75,6 +81,32 @@ def test_message_to_langchain_unsupported_role() -> None:
         message.to_langchain()
 
 
+@pytest.mark.parametrize(
+    ("message", "expected_instructor_message"),
+    [
+        (Message(role="user", content="Hello"), {"role": "user", "content": "Hello"}),
+        (
+            Message(role="assistant", content="Hi there"),
+            {"role": "assistant", "content": "Hi there"},
+        ),
+        (
+            Message(role="system", content="You are a helpful assistant"),
+            {"role": "system", "content": "You are a helpful assistant"},
+        ),
+    ],
+)
+def test_map_message_to_instructor(message: Message, expected_instructor_message: dict) -> None:
+    """Test mapping a Message to an Instructor message."""
+    assert map_message_to_instructor(message) == expected_instructor_message
+
+
+def test_map_message_to_instructor_unsupported_role() -> None:
+    """Test mapping a Message to an Instructor message with an unsupported role."""
+    message = SimpleNamespace(role="invalid", content="Hello")
+    with pytest.raises(ValueError, match="Unsupported message role"):
+        map_message_to_instructor(message)  # type: ignore[arg-type]
+
+
 def test_message_validation() -> None:
     """Test basic Message model validation."""
     # Valid message
@@ -91,6 +123,35 @@ def test_message_validation() -> None:
         Message()  # type: ignore[call-arg]
 
 
+class DummyGenerativeModel(GenerativeModel):
+    """Dummy generative model."""
+
+    provider_name: str = "portia"
+
+    def __init__(self, model_name: str) -> None:
+        """Initialize the model."""
+        super().__init__(model_name)
+
+    def get_response(self, messages: list[Message]) -> Message:  # noqa: ARG002
+        """Get a response from the model."""
+        return Message(role="assistant", content="Hello")
+
+    def get_structured_response(
+        self,
+        messages: list[Message],  # noqa: ARG002
+        schema: type[BaseModel],
+    ) -> BaseModel:
+        """Get a structured response from the model."""
+        return schema()
+
+
+def test_model_to_string() -> None:
+    """Test that the model to string method works."""
+    model = DummyGenerativeModel(model_name="test")
+    assert str(model) == "portia/test"
+    assert repr(model) == 'DummyGenerativeModel("portia/test")'
+
+
 class StructuredOutputTestModel(BaseModel):
     """Test model for structured output."""
 
@@ -103,7 +164,7 @@ def test_langchain_model_structured_output_returns_dict() -> None:
     structured_output = MagicMock()
     base_chat_model.with_structured_output.return_value = structured_output
     structured_output.invoke.return_value = {"test_field": "Response from model"}
-    model = LangChainModel(client=base_chat_model)
+    model = LangChainGenerativeModel(client=base_chat_model, model_name="test")
     result = model.get_structured_response(
         messages=[Message(role="user", content="Hello")],
         schema=StructuredOutputTestModel,

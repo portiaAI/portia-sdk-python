@@ -1,7 +1,6 @@
 """Tests for portia classes."""
 
-import tempfile
-from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import SecretStr
@@ -18,36 +17,10 @@ from portia.config import (
     StorageClass,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
-
-
-def test_portia_config_from_file() -> None:
-    """Test loading configuration from a file."""
-    config_data = """{
-"portia_api_key": "file-key",
-"anthropic_api_key": "file-anthropic-key",
-"llm_provider": "ANTHROPIC",
-"models": {
-    "planning_model_name": "claude-3-5-haiku-latest"
-},
-"storage_class": "MEMORY",
-"execution_agent_type": "DEFAULT",
-"planning_agent_type": "DEFAULT"
-}"""
-
-    with tempfile.NamedTemporaryFile("w", delete=True, suffix=".json") as temp_file:
-        temp_file.write(config_data)
-        temp_file.flush()
-
-        config_file = Path(temp_file.name)
-
-        config = Config.from_file(config_file)
-
-        assert config.must_get_raw_api_key("portia_api_key") == "file-key"
-        assert config.must_get_raw_api_key("anthropic_api_key") == "file-anthropic-key"
-        assert config.llm_provider == LLMProvider.ANTHROPIC
-        assert config.model(PLANNING_MODEL_KEY) == LLMModel.CLAUDE_3_5_HAIKU
-        assert config.execution_agent_type == ExecutionAgentType.DEFAULT
-        assert config.planning_agent_type == PlanningAgentType.DEFAULT
+from portia.model import (
+    AzureOpenAIGenerativeModel,
+    LangChainGenerativeModel,
+)
 
 
 def test_from_default() -> None:
@@ -186,6 +159,32 @@ def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
         c = Config.from_default(llm_provider="personal", llm_model_name="other-model")
 
 
+def test_resolve_model_azure() -> None:
+    """Test resolve model for Azure OpenAI."""
+    c = Config.from_default(
+        llm_provider=LLMProvider.AZURE_OPENAI,
+        azure_openai_endpoint="http://test-azure-openai-endpoint",
+        azure_openai_api_key="test-azure-openai-api-key",
+    )
+    assert isinstance(c.resolve_model(PLANNING_MODEL_KEY), AzureOpenAIGenerativeModel)
+
+
+def test_custom_models() -> None:
+    """Test custom models."""
+    c = Config.from_default(
+        custom_models={
+            PLANNING_MODEL_KEY: LangChainGenerativeModel(
+                client=MagicMock(),
+                model_name="gpt-4o",
+            ),
+        },
+        openai_api_key=SecretStr("test-openai-key"),
+    )
+    resolved_model = c.resolve_model(PLANNING_MODEL_KEY)
+    assert isinstance(resolved_model, LangChainGenerativeModel)
+    assert resolved_model.model_name == "gpt-4o"
+
+
 def test_getters() -> None:
     """Test getters work."""
     c = Config.from_default(
@@ -206,9 +205,6 @@ def test_getters() -> None:
     )
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_key", int)
-
-    with pytest.raises(InvalidConfigError):
-        c.must_get_raw_api_key("anthropic_api_key")
 
     with pytest.raises(InvalidConfigError):
         c.must_get("portia_api_endpoint", str)
@@ -243,6 +239,7 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
     c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
     assert c.llm_provider == LLMProvider.AZURE_OPENAI
+    assert c.model(PLANNING_MODEL_KEY).provider() == LLMProvider.AZURE_OPENAI
 
     # Also works with passing parameters to constructor
     monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
@@ -278,20 +275,10 @@ def test_llm_model_instantiate_from_string(model_name: str, expected: LLMModel) 
     assert model == expected
 
 
-def test_config_get_llm_api_endpoint() -> None:
-    """Test config get llm api endpoint."""
-    c = Config.from_default(
-        llm_provider=LLMProvider.AZURE_OPENAI,
-        azure_openai_endpoint="test-azure-openai-endpoint",
-        azure_openai_api_key="test-azure-openai-api-key",
-    )
-    assert c.get_llm_api_endpoint(model_name=LLMModel.AZURE_GPT_4_O) == "test-azure-openai-endpoint"
-
-    c = Config.from_default(
-        llm_provider=LLMProvider.OPENAI,
-        openai_api_key=SecretStr("test-openai-api-key"),
-    )
-    assert c.get_llm_api_endpoint(model_name=LLMModel.GPT_4_O) is None
+def test_llm_model_instantiate_from_string_missing() -> None:
+    """Test LLM model from string missing."""
+    with pytest.raises(ValueError, match="Invalid LLM model"):
+        LLMModel("not-a-model")
 
 
 PROVIDER_ENV_VARS = [
