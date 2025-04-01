@@ -6,27 +6,32 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 
+from portia.plan import Step
+
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
 from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from tests.utils import get_mock_base_chat_model, get_test_llm_wrapper
+from tests.utils import AdditionTool, get_mock_base_chat_model, get_test_llm_wrapper
 
 
 def test_summarizer_model_normal_output() -> None:
     """Test the summarizer model with valid tool message."""
     summary = AIMessage(content="Short summary")
+    tool = AdditionTool()
     mock_invoker = get_mock_base_chat_model(response=summary)
     tool_message = ToolMessage(
         content="Tool output content",
         tool_call_id="123",
-        name="test_tool",
+        name=tool.name,
         artifact=Output(value="Tool output value"),
     )
 
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=tool,
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
@@ -49,6 +54,8 @@ def test_summarizer_model_non_tool_message() -> None:
 
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
@@ -62,6 +69,8 @@ def test_summarizer_model_no_messages() -> None:
 
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": []})
 
@@ -91,6 +100,8 @@ def test_summarizer_model_error_handling() -> None:
 
     summarizer_model = StepSummarizer(
         llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        tool=AdditionTool(),
+        step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 

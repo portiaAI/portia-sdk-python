@@ -655,7 +655,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             )
 
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm).invoke)
+        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm, self.tool, self.step).invoke)
         graph.add_conditional_edges(
             AgentNode.TOOLS,
             lambda state: next_state_after_tool_call(state, self.tool),
