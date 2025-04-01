@@ -262,6 +262,7 @@ class Step(BaseModel):
             message += f"  Condition: {self.condition}\n"
         return message
 
+
 class ReadOnlyStep(Step):
     """A read-only copy of a step, passed to agents for reference.
 
@@ -353,13 +354,14 @@ class Plan(BaseModel):
 
         """
         portia_tools = [tool for tool in self.plan_context.tool_ids if tool.startswith("portia:")]
-        other_tools = [tool for tool in self.plan_context.tool_ids if not tool.startswith("portia:")]
+        other_tools = [
+            tool for tool in self.plan_context.tool_ids if not tool.startswith("portia:")
+        ]
         tools_summary = f"{len(portia_tools)} portia tools, {len(other_tools)} other tools"
         return (
             f"Task: {self.plan_context.query}\n"
             f"Tools Available Summary: {tools_summary}\n"
-            f"Steps:\n"
-            + "\n".join([str(step) for step in self.steps])
+            f"Steps:\n" + "\n".join([str(step) for step in self.steps])
         )
 
     @model_validator(mode="after")
