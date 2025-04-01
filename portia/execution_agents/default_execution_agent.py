@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
+from jinja2 import Template
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
@@ -120,6 +121,74 @@ class VerifiedToolInputs(BaseModel):
     args: list[VerifiedToolArgument] = Field(description="Arguments for the tool.")
 
 
+class MemoryExtractionModel:
+    """Model to extract required entries from agent memory."""
+
+    memory_model_prompt = ChatPromptTemplate.from_messages(
+        [
+            SystemMessage(
+                content="TODO",
+            ),
+            HumanMessagePromptTemplate.from_template(
+                "TODO",
+            ),
+        ],
+    )
+
+    def __init__(
+        self,
+        llm: BaseChatModel,
+        context: str,
+        tools: list[StructuredTool],
+        agent: DefaultExecutionAgent,
+    ) -> None:
+        """Initialize the memory model.
+
+        Args:
+            llm (BaseChatModel): The language model used for memory extraction.
+            context (str): The context for memory extraction.
+            agent (DefaultExecutionAgent): The agent using the memory extraction model.
+            tools (list[StructuredTool]): The tools to pass to the model.
+
+        """
+        self.llm = llm
+        self.context = context
+        self.agent = agent
+        self.tools = tools
+
+    def invoke(self, state: MessagesState) -> dict[str, Any]:
+        """Invoke the model with the given message state.
+
+        Args:
+            state (MessagesState): The current state of the conversation.
+
+        Returns:
+            dict[str, Any]: The response after invoking the model.
+
+        Raises:
+            InvalidRunStateError: If the agent's tool is not available.
+
+        """
+        formatted_messages = self.memory_model_prompt.format_messages(
+            # @@@ TODO
+            # context=self.context,
+            # task=self.agent.step.task,
+            # tool_name=self.agent.tool.name,
+            # tool_args=self.agent.tool.args_json_schema(),
+            # tool_description=self.agent.tool.description,
+            # previous_errors=",".join(self.previous_errors),
+        )
+
+        # @@@ ADD CLASS
+        try:
+            response = invoke_structured_output(self.llm, ToolInputs, formatted_messages)
+            tool_inputs = ToolInputs.model_validate(response)
+        except ValidationError as e:
+            # @@@ JUST PULL NOTHING IN
+
+        return {"messages": [tool_inputs.model_dump_json(indent=2)] if tool_inputs else []}
+
+
 class ParserModel:
     """Model to parse the arguments for a tool.
 
@@ -149,6 +218,10 @@ class ParserModel:
                     "Your responses must clearly explain the source of each argument "
                     "(e.g., context, past messages, clarifications). "
                     "Avoid assumptions or fabricated information."
+                    "If any values are too large to be provided in full, a summary of them has been provided."
+                    "If you wish to use one of these values, you can provide the name in curly braces and "
+                    "the value will be templated in. For example: if you wish to use an output called 'large_output_value',"
+                    "you can enter {{large_value_name}} and the value will be templated in before the tool is called."
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
@@ -237,6 +310,7 @@ class ParserModel:
                 test_args[arg.name] = arg.value
                 if not arg.valid:
                     errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
+                # @@@ CHECK TEMPLATING
 
             # also test the ToolInputs that have come back
             # actually work for the schema of the tool
@@ -413,9 +487,13 @@ class ToolCallingModel:
             ),
             HumanMessagePromptTemplate.from_template(
                 "context:\n{verified_args}\n"
-                "Make sure you don't repeat past errors: {past_errors}\n"
                 "Use the provided tool with the arguments in the context, as "
                 "long as they are valid.\n",
+                "If any values are too large to be provided in full, a summary of them has been provided."
+                "If you wish to use one of these values, you can provide the name in curly braces and "
+                "the value will be templated in. For example: if you wish to use an output called 'large_output_value',"
+                "you can enter {{large_value_name}} and the value will be templated in before the tool is called.\n"
+                "Make sure you don't repeat past errors: {past_errors}\n",
             ),
         ],
     )
@@ -476,7 +554,11 @@ class ToolCallingModel:
                 past_errors=past_errors,
             ),
         )
-        return {"messages": [response]}
+
+        template_args = {arg.name: arg.value for arg in verified_args.args}
+        result = Template(response).render(args=template_args)
+
+        return {"messages": [result]}
 
 
 class DefaultExecutionAgent(BaseExecutionAgent):
@@ -638,9 +720,11 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
+            graph.add_node(AgentNode.MEMORY_AGENT, MemoryExtractionModel(llm, context, self).invoke)
             graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(llm, context, self).invoke)
             graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(llm, context, self).invoke)
-            graph.add_edge(START, AgentNode.ARGUMENT_PARSER)
+            graph.add_edge(START, AgentNode.MEMORY_AGENT)
+            graph.add_edge(AgentNode.MEMORY_AGENT, AgentNode.ARGUMENT_PARSER)
             graph.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
             graph.add_conditional_edges(
                 AgentNode.ARGUMENT_VERIFIER,

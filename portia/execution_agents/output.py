@@ -82,7 +82,9 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         match self.value:
             case value if isinstance(value, (RemoteMemoryValue, FileMemoryValue, LocalMemoryValue)):
-                return self.summary
+                return (
+                    "This value is too large to provide in full, but a summary is: " + self.summary
+                )
             case _:
                 return self.value
 
