@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, ToolMessage
 
-from portia.plan import Step
-
 from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.model import Message
+from portia.plan import Step
 from tests.utils import AdditionTool, get_mock_langchain_generative_model
 
 

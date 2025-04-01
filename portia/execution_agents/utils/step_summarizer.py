@@ -19,10 +19,8 @@ from portia.planning_agents.context import get_tool_descriptions_for_tools
 
 if TYPE_CHECKING:
     from portia.model import GenerativeModel
-
     from portia.plan import Step
     from portia.tool import Tool
-
 
 
 class StepSummarizer:
