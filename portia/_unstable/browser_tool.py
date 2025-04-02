@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field, HttpUrl
 from portia.clarification import ActionClarification
 from portia.config import LLM_TOOL_MODEL_KEY
 from portia.errors import ToolHardError
-from portia.model import LangChainGenerativeModel
 from portia.tool import Tool, ToolRunContext
 
 logger = logging.getLogger(__name__)
@@ -103,12 +102,7 @@ class BrowserTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
-        model = ctx.config.resolve_model(LLM_TOOL_MODEL_KEY)
-        if not isinstance(model, LangChainGenerativeModel):
-            raise ToolHardError(
-                f"{self.__class__.__name__} only supports LangChainGenerativeModel models, "
-                f"got {model.__class__.__name__}.",
-            )
+        model = ctx.config.resolve_langchain_model(LLM_TOOL_MODEL_KEY)
         llm = model.to_langchain()
 
         if ctx.execution_context.end_user_id:
