@@ -166,7 +166,7 @@ def generate_context_from_execution_context(context: ExecutionContext) -> list[s
         list[str]: A list of strings representing the execution context.
 
     """
-    if not context.end_user_id and not context.additional_data:
+    if not context.end_user_id:
         return []
 
     execution_context = ["Metadata: This section contains general context about this execution."]
@@ -176,13 +176,7 @@ def generate_context_from_execution_context(context: ExecutionContext) -> list[s
                 f"end_user_id: {context.end_user_id}",
             ],
         )
-    for key, value in context.additional_data.items():
-        execution_context.extend(
-            [
-                f"context_key_name: {key} context_key_value: {value}",
-                "----------",
-            ],
-        )
+
     return execution_context
 
 

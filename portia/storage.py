@@ -678,7 +678,6 @@ class PortiaCloudStorage(Storage):
                     "tool_name": tool_call.tool_name,
                     "step": tool_call.step,
                     "end_user_id": tool_call.end_user_id or "",
-                    "additional_data": tool_call.additional_data,
                     "input": tool_call.input,
                     "output": tool_call.output,
                     "status": tool_call.status,

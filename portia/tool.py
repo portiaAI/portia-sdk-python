@@ -476,7 +476,6 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "execution_context": {
                             "end_user_id": ctx.execution_context.end_user_id or "",
                             "plan_run_id": str(ctx.plan_run_id),
-                            "additional_data": ctx.execution_context.additional_data or {},
                         },
                     },
                 ),
@@ -525,7 +524,6 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "execution_context": {
                             "end_user_id": ctx.execution_context.end_user_id or "",
                             "plan_run_id": str(ctx.plan_run_id),
-                            "additional_data": ctx.execution_context.additional_data or {},
                         },
                     },
                 ),

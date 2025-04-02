@@ -20,7 +20,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -42,15 +42,12 @@ class ExecutionContext(BaseModel):
     Attributes:
         end_user_id (Optional[str]): The identifier of the user for whom the run is running.
             Used for authentication and debugging purposes.
-        additional_data (dict[str, str]): Arbitrary additional data useful for debugging.
 
     """  # noqa: E501
 
     model_config = ConfigDict(extra="ignore")
 
     end_user_id: str | None = None
-
-    additional_data: dict[str, str] = Field(default={})
 
 
 def empty_context() -> ExecutionContext:
@@ -62,7 +59,6 @@ def empty_context() -> ExecutionContext:
     """
     return ExecutionContext(
         end_user_id=None,
-        additional_data={},
     )
 
 
@@ -70,7 +66,6 @@ def empty_context() -> ExecutionContext:
 def execution_context(
     context: ExecutionContext | None = None,
     end_user_id: str | None = None,
-    additional_data: dict[str, str] | None = None,
 ) -> Generator[None, None, None]:
     """Set the execution context for the duration of the PlanRun.
 
@@ -85,8 +80,6 @@ def execution_context(
             If not provided, a new `ExecutionContext` is created using the provided parameters.
         end_user_id (Optional[str]): An identifier for the end user, used to customize
             the execution for specific users. Defaults to `None`.
-        additional_data (Optional[Dict[str, str]]): Arbitrary additional data to associate
-            with the context. Defaults to an empty dictionary.
 
     Yields:
         None: The block of code within the context manager executes with the specified context.
@@ -99,7 +92,7 @@ def execution_context(
 
     Example:
     ```python
-        with execution_context(end_user_id="user123", additional_data={"key": "value"}):
+        with execution_context(end_user_id="user123"):
             # Code here runs with the specified execution context
         # Outside the block, the execution context is cleared for the current task.
     ```
@@ -108,7 +101,6 @@ def execution_context(
     if context is None:
         context = ExecutionContext(
             end_user_id=end_user_id,
-            additional_data=additional_data or {},
         )
     token = _execution_context.set(context)
     try:

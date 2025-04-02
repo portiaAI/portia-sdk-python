@@ -75,7 +75,6 @@ def get_test_tool_call(plan_run: PlanRun) -> ToolCallRecord:
         plan_run_id=plan_run.id,
         step=1,
         end_user_id="1",
-        additional_data={},
         output={},
         input={},
         latency_seconds=10,

@@ -52,12 +52,11 @@ def test_context_execution_context() -> None:
     """Test that the context is set up correctly."""
     (plan, plan_run) = get_test_plan_run()
     context = build_context(
-        ExecutionContext(additional_data={"user_id": "123"}),
+        ExecutionContext(end_user_id="123"),
         plan.steps[0],
         plan_run,
     )
     assert "System Context:" in context
-    assert "user_id" in context
     assert "123" in context
 
 
@@ -124,7 +123,6 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     context = build_context(
         ExecutionContext(
             end_user_id="123",
-            additional_data={"email": "hello@world.com"},
         ),
         plan.steps[0],
         plan_run,
@@ -159,7 +157,6 @@ input_value: bob@bla.com
 ----------
 Metadata: This section contains general context about this execution.
 end_user_id: 123
-context_key_name: email context_key_value: hello@world.com
 ----------
 System Context:
 Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""

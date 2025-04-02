@@ -44,7 +44,6 @@ class ToolCallRecord(BaseModel):
             belongs.
         step (int): The step number of the tool call in the PlanRun.
         end_user_id (str | None): The ID of the end user, if applicable. Can be None.
-        additional_data (dict[str, str]): Additional data from the execution context.
         status (ToolCallStatus): The current status of the tool call (e.g., IN_PROGRESS, SUCCESS).
         input (Any): The input data passed to the tool call.
         output (Any): The output data returned from the tool call.
@@ -59,7 +58,6 @@ class ToolCallRecord(BaseModel):
     step: int
     # execution context is tracked here so we get a snapshot if its updated
     end_user_id: str | None
-    additional_data: dict[str, str]
     # details of the tool call are below
     status: ToolCallStatus
     input: Any

@@ -22,13 +22,13 @@ plan_run = portia.run(
 )
 
 # We can also provide additional execution context to the process
-with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
+with execution_context(end_user_id="123"):
     plan_run = portia.run(
         "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
     )
 
 # When we hit a clarification we can ask our end user for clarification then resume the process
-with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
+with execution_context(end_user_id="123"):
     # Deliberate typo in the second place name to hit the clarification
     plan_run = portia.run(
         "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
