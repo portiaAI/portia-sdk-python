@@ -60,7 +60,7 @@ class PlanBuilder:
         task: str,
         tool_id: str | None = None,
         output: str | None = None,
-        inputs: list[Constant] | None = None,
+        inputs: list[Variable] | None = None,
         condition: str | None = None,
     ) -> PlanBuilder:
         """Add a step to the plan.
@@ -171,37 +171,19 @@ class PlanBuilder:
         return step_index
 
 
-class Constant(BaseModel):
-    """A constant value to pass to a step
-    Args:
-        name (str): The name of the constant.
-        value (str | None): The value of the constant, which may be set by other preceding steps if not
-                     defined.
-
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    value: Any = Field(
-        default=None,
-        description="If the value is not set, it will be defined by other preceding steps.",
-    )
-    description: str = Field(
-        description="A description of the variable.",
-    )
-
-
-class OutputReference(BaseModel):
+class Variable(BaseModel):
     """A reference to an output of a step.
 
     Args:
-        output_id (str): The ID of the output to reference, e.g. $best_offers.
+        name (str): The name of the output to reference, e.g. $best_offers.
         description (str): A description of the output.
 
     """
 
-    output_id: str = Field(
-        description="The ID of the output to reference, e.g. $best_offers.",
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(
+        description="The name of the output to reference, e.g. $best_offers.",
     )
     description: str = Field(
         description="A description of the output.",
@@ -216,23 +198,18 @@ class Step(BaseModel):
 
     Args:
         task (str): The task that needs to be completed by this step.
-        constants (list[Constant]): The input to the step, as a constant extracted from the user's query.
-        references (list[OutputReference]): The input to the step, as a reference to an output of a previous step.
+        inputs (list[OutputReference]): The input to the step, as a reference to an output of a previous step.
         tool_id (str | None): The ID of the tool used in this step, if applicable.
         output (str): The unique output ID for the result of this step.
 
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     task: str = Field(
         description="The task that needs to be completed by this step",
     )
-    constants: list[Constant] = Field(
-        default=[],
-        description=("The input to the step, as a constant extracted from the user's query."),
-    )
-    references: list[OutputReference] = Field(
+    inputs: list[Variable] = Field(
         default=[],
         description=("The input to the step, as a reference to an output of a previous step."),
     )
