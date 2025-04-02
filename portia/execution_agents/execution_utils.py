@@ -175,7 +175,7 @@ def process_output(  # noqa: C901
     summaries = []
 
     for output in output_values:
-        values.append(output.value)
+        values.append(output.get_value())
         summaries.append(output.summary or output.serialize_value())
 
     return LocalOutput(value=values, summary=", ".join(summaries))

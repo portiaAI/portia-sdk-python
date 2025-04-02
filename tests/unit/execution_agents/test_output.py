@@ -72,7 +72,7 @@ def test_output_serialize(input_value: Any, expected: Any) -> None:  # noqa: ANN
 def test_local_output() -> None:
     """Test value is held locally."""
     output = LocalOutput(value="test value")
-    assert output.value == "test value"
+    assert output.get_value() == "test value"
 
     mock_agent_memory = MagicMock(spec=AgentMemory)
     assert output.full_value(mock_agent_memory) == "test value"
@@ -81,8 +81,13 @@ def test_local_output() -> None:
 
 def test_agent_memory_output() -> None:
     """Test value is stored in agent memory."""
-    output = AgentMemoryOutput(output_name="test_value", plan_run_id=PlanRunUUID())
-    assert output.value == "test summary"
+    output = AgentMemoryOutput(
+        output_name="test_value",
+        plan_run_id=PlanRunUUID(),
+        summary="test summary",
+    )
+    assert output.get_value() == "test summary"
+    assert output.summary == "test summary"
 
     mock_agent_memory = MagicMock()
     mock_agent_memory.get_plan_run_output.return_value = "retrieved value"

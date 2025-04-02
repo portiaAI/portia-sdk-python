@@ -60,7 +60,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
-    assert output.value == "Sent email with id: 0"
+    assert output.get_value() == "Sent email with id: 0"
 
 
 def test_oneshot_agent_without_tool_raises() -> None:

@@ -12,6 +12,7 @@ import os
 from enum import Enum
 from typing import NamedTuple, Self, TypeVar
 
+import tiktoken
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -567,9 +568,9 @@ class Config(BaseModel):
         """Parse planning_agent_type to enum if string provided."""
         return parse_str_to_enum(value, PlanningAgentType)
 
-    large_output_threshold_value: int = Field(
-        default=10_000,
-        description="The threshold number of characters before we start treating an output as a"
+    large_output_threshold_tokens: int = Field(
+        default=1_000,
+        description="The threshold number of tokens before we start treating an output as a"
         "large output and write it to agent memory rather than storing it locally",
     )
 
@@ -577,7 +578,10 @@ class Config(BaseModel):
         """Determine whether the provided output value exceeds the large output threshold."""
         if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
             return False
-        return len(str(value)) > self.large_output_threshold_value
+        # It doesn't really matter which model we use here, so choose gpt2 for speed.
+        # More details at https://chatgpt.com/share/67ee4931-a794-8007-9859-13aca611dba9
+        encoding = tiktoken.get_encoding("gpt2").encoude(str(value))
+        return len(encoding) > self.large_output_threshold_tokens
 
     @model_validator(mode="after")
     def check_config(self) -> Self:

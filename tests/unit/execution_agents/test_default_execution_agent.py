@@ -516,7 +516,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
-    assert output.value == "Sent email with id: 0"
+    assert output.get_value() == "Sent email with id: 0"
 
 
 def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -573,7 +573,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
-    assert output.value == "Sent email with id: 0"
+    assert output.get_value() == "Sent email with id: 0"
 
 
 def test_default_execution_agent_edge_cases() -> None:

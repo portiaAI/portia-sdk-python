@@ -125,6 +125,7 @@ def test_run_serialization() -> None:
         f"state={plan_run.state}, current_step_index={plan_run.current_step_index}, "
         f"final_output={'set' if plan_run.outputs.final_output else 'unset'})"
     )
+
     # check we can also serialize to JSON
     json_str = plan_run.model_dump_json()
     # parse back to run

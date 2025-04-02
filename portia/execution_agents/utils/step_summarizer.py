@@ -113,7 +113,7 @@ class StepSummarizer:
             tool_output = (
                 f"This is a large value (full length: {len(str(tool_output))} characters) - it is "
                 "too long to provide the full value, but it starts with:"
-                f"{self._truncate(tool_output, self.config.large_output_threshold_value)}"
+                f"{self._truncate(tool_output, self.config.large_output_threshold_tokens)}"
             )
 
         try:
