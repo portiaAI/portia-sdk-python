@@ -76,7 +76,7 @@ def generate_input_context(
             input_context.extend(
                 [
                     f"input_name: {var.name}",
-                    f"input_value: {previous_outputs[var.name].value_for_prompt()}",
+                    f"input_value: {previous_outputs[var.name].value}",
                     f"input_description: {var.description}",
                     "----------",
                 ],
@@ -92,7 +92,7 @@ def generate_input_context(
         for output_key in unused_output_keys:
             # We truncate the output value to 10000 characters to avoid overwhelming the
             # LLM with too much information.
-            output_val = (str(previous_outputs[output_key].value_for_prompt()) or "")[:10000]
+            output_val = (str(previous_outputs[output_key].value) or "")[:10000]
             input_context.extend(
                 [
                     f"output_name: {output_key}",

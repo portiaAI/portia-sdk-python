@@ -7,36 +7,45 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 from openai import BaseModel
 from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
-from portia.execution_agents.output import AgentMemoryStorageDetails, Output
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.prefixed_uuid import PlanRunUUID
+from portia.storage import AgentMemory
 
 
-def test_output_serialize() -> None:
-    """Test output serialize."""
+class MyModel(BaseModel):
+    """Test BaseModel."""
 
-    class MyModel(BaseModel):
-        id: str
+    id: str
 
-    class NotAModel:
-        id: str
 
-        def __init__(self, id: str) -> None:  # noqa: A002
-            self.id = id
+class NotAModel:
+    """Test class that's not a BaseModel."""
 
-    not_a_model = NotAModel(id="123")
-    now = datetime.now(tz=UTC)
-    clarification = ActionClarification(
-        plan_run_id=PlanRunUUID(),
-        user_guidance="",
-        action_url=HttpUrl("https://example.com"),
-    )
+    id: str
 
-    tcs: list[tuple[Any, Any]] = [
+    def __init__(self, id: str) -> None:  # noqa: A002
+        """Init an instance."""
+        self.id = id
+
+
+not_a_model = NotAModel(id="123")
+now = datetime.now(tz=UTC)
+clarification = ActionClarification(
+    plan_run_id=PlanRunUUID(),
+    user_guidance="",
+    action_url=HttpUrl("https://example.com"),
+)
+
+
+@pytest.mark.parametrize(
+    ("input_value", "expected"),
+    [
         ("Hello World!", "Hello World!"),
         (None, ""),
         ({"hello": "world"}, json.dumps({"hello": "world"})),
@@ -52,31 +61,28 @@ def test_output_serialize() -> None:
         (now, now.isoformat()),
         (not_a_model, str(not_a_model)),
         ([clarification], json.dumps([clarification.model_dump(mode="json")])),
-    ]
-
-    for tc in tcs:
-        output = Output(value=tc[0]).serialize_value(tc[0])
-        assert output == tc[1]
+    ],
+)
+def test_output_serialize(input_value: Any, expected: Any) -> None:  # noqa: ANN401
+    """Test output serialize."""
+    output = LocalOutput(value=input_value).serialize_value()
+    assert output == expected
 
 
 def test_local_output() -> None:
     """Test value is held locally."""
-    output = Output(value="test value")
-    assert output.value_for_prompt() == "test value"
+    output = LocalOutput(value="test value")
+    assert output.value == "test value"
 
-    mock_agent_memory = MagicMock()
+    mock_agent_memory = MagicMock(spec=AgentMemory)
     assert output.full_value(mock_agent_memory) == "test value"
     mock_agent_memory.get_plan_run_output.assert_not_called()
 
 
 def test_agent_memory_output() -> None:
     """Test value is stored in agent memory."""
-    storage_details = AgentMemoryStorageDetails(
-        name="test_value",
-        plan_run_id=PlanRunUUID(),
-    )
-    output = Output(value=storage_details, summary="test summary")
-    assert output.value_for_prompt() == "test summary"
+    output = AgentMemoryOutput(output_name="test_value", plan_run_id=PlanRunUUID())
+    assert output.value == "test summary"
 
     mock_agent_memory = MagicMock()
     mock_agent_memory.get_plan_run_output.return_value = "retrieved value"
@@ -84,6 +90,6 @@ def test_agent_memory_output() -> None:
     result = output.full_value(mock_agent_memory)
     assert result == "retrieved value"
     mock_agent_memory.get_plan_run_output.assert_called_once_with(
-        storage_details.name,
-        storage_details.plan_run_id,
+        output.output_name,
+        output.plan_run_id,
     )

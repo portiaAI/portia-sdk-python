@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from tests.utils import (
     AdditionTool,
@@ -31,7 +31,7 @@ def test_summarizer_model_normal_output() -> None:
         content="Tool output content",
         tool_call_id="123",
         name=tool.name,
-        artifact=Output(value="Tool output value"),
+        artifact=LocalOutput(value="Tool output value"),
     )
 
     summarizer_model = StepSummarizer(
@@ -96,7 +96,7 @@ def test_summarizer_model_large_output() -> None:
         content="Test " * 1000,
         tool_call_id="123",
         name="test_tool",
-        artifact=Output(value="Test " * 1000),
+        artifact=LocalOutput(value="Test " * 1000),
     )
 
     summarizer_model = StepSummarizer(
@@ -144,7 +144,7 @@ def test_summarizer_model_error_handling() -> None:
         content="Tool output content",
         tool_call_id="123",
         name="test_tool",
-        artifact=Output(value="Tool output value"),
+        artifact=LocalOutput(value="Tool output value"),
     )
 
     summarizer_model = StepSummarizer(

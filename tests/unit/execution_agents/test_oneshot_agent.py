@@ -10,7 +10,7 @@ from langgraph.prebuilt import ToolNode
 
 from portia.errors import InvalidAgentError
 from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput, Output
 from tests.utils import AdditionTool, get_test_config, get_test_plan_run
 
 
@@ -43,7 +43,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         return {
             "messages": ToolMessage(
                 content="Sent email",
-                artifact=Output(value="Sent email with id: 0"),
+                artifact=LocalOutput(value="Sent email with id: 0"),
                 tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
             ),
         }

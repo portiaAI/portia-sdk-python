@@ -17,7 +17,7 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput
 from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import Tool, ToolRunContext
@@ -129,7 +129,7 @@ class ToolCallWrapper(Tool):
                 record.status = ToolCallStatus.NEED_CLARIFICATION
                 record.output = output.model_dump(mode="json")
             elif output is None:
-                record.output = Output(value=output).model_dump(mode="json")
+                record.output = LocalOutput(value=output).model_dump(mode="json")
                 record.status = ToolCallStatus.SUCCESS
             else:
                 record.output = output

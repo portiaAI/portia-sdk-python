@@ -6,6 +6,7 @@ These are stored and can be used as inputs to future steps
 from __future__ import annotations
 
 import json
+from abc import ABC, abstractmethod
 from datetime import date, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Generic
@@ -19,17 +20,8 @@ if TYPE_CHECKING:
     from portia.storage import AgentMemory
 
 
-class AgentMemoryStorageDetails(BaseModel):
-    """Details about the storage of an output in agent memory."""
-
-    name: str
-    plan_run_id: PlanRunUUID
-
-
-class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class Output(ABC, BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output of a tool with a wrapper for data, summaries, and LLM interpretation.
-
-    This class contains a generic value `T` bound to `Serializable`.
 
     Attributes:
         value (SERIALIZABLE_TYPE_VAR | None): The output of the tool.
@@ -40,49 +32,57 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     model_config = ConfigDict(extra="forbid")
 
-    value: AgentMemoryStorageDetails | Serializable | None = Field(
-        default=None,
-        description="The output of the tool. If the value is stored in agent memory, "
-        "this will contain the storage details so it can be retrieved.",
-        alias="value",  # This ensures the field is serialized as "value" in JSON
-    )
+    # @@@ MOVE THIS TO SUBCLASSES + CHANGE TO METHOD
     summary: str | None = Field(
         default=None,
         description="Textual summary of the output of the tool. Not all tools generate summaries.",
     )
 
-    def value_for_prompt(self) -> Serializable | None:
-        """Get the value in a format suitable for an LLM prompt.
+    @property
+    def value(self) -> Serializable | None:
+        """Get the value of the output.
 
-        If the output is not so large that it can't be stored locally, it will be returned. If the
-        value is stored remotely in agent memory, this will be a summary of the value (i.e. the full
-        value won't be fetched).
-
-        Returns:
-            Serializable | None: The value of the output.
-
+        This will return the output in a format that is suitable for an LLM prompt. If the output
+        value is so large that it isn't appropriate to include in an LLM prompt, a summary
+        will be returned and you'll need to use full_value() to get the full value.
         """
-        return self.summary if self._stored_in_agent_memory() else self.value
+        raise NotImplementedError("value is not implemented")
 
+    @abstractmethod
+    def serialize_value(self) -> str:
+        """Serialize the value to a string."""
+        raise NotImplementedError("serialize_value is not implemented")
+
+    @abstractmethod
     def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
-        """Get the full value, fetching from remote storage or file if necessary.
+        """Get the full value, fetching from remote storage or file if necessary."""
+        raise NotImplementedError("full_value is not implemented")
 
-        Returns:
-            Serializable | None: The full value of the output, fetched from storage if needed.
 
-        """
-        if self.value is None:
-            return None
-        if self._stored_in_agent_memory():
-            return agent_memory.get_plan_run_output(self.value.name, self.value.plan_run_id)
-        return self.value
+class LocalOutput(Output, Generic[SERIALIZABLE_TYPE_VAR]):
+    """Output that is stored locally."""
 
-    def _stored_in_agent_memory(self) -> bool:
-        """Whether the output is stored in agent memory."""
-        return isinstance(self.value, AgentMemoryStorageDetails)
+    raw_value: Serializable | None = Field(
+        default=None,
+        description="The output of the tool.",
+        alias="value",
+    )
+
+    @property
+    def value(self) -> Serializable | None:
+        """Get the value of the output."""
+        return self.raw_value
+
+    def serialize_value(self) -> str:
+        """Serialize the value to a string."""
+        return self.serialize_value_field(self.raw_value)
+
+    def full_value(self, agent_memory: AgentMemory) -> Serializable | None:  # noqa: ARG002
+        """Return the full value."""
+        return self.raw_value
 
     @field_serializer("value")
-    def serialize_value(self, value: Serializable | None) -> str:  # noqa: C901, PLR0911
+    def serialize_value_field(self, value: Serializable | None) -> str:  # noqa: C901, PLR0911
         """Serialize the value to a string.
 
         Args:
@@ -132,3 +132,24 @@ class Output(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             return value.decode("utf-8", errors="ignore")  # Convert bytes to string
 
         return str(value)  # Fallback for other types
+
+
+class AgentMemoryOutput(Output):
+    """Output that is stored in agent memory."""
+
+    output_name: str
+    plan_run_id: PlanRunUUID
+
+    @property
+    def value(self) -> Serializable | None:
+        """Return the summary of the output as the value is too large to be retained locally."""
+        return self.summary
+
+    def serialize_value(self) -> str:
+        """Serialize the value to a string."""
+        # @@@ UNDO OR
+        return self.summary or ""
+
+    def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
+        """Get the full value, fetching from remote storage or file if necessary."""
+        return agent_memory.get_plan_run_output(self.output_name, self.plan_run_id)

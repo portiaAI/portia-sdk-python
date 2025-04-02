@@ -29,7 +29,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 from urllib.parse import urlencode
 
 import httpx
@@ -38,7 +38,8 @@ from pydantic import BaseModel, ValidationError
 from portia.cloud import PortiaCloudClient
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
 from portia.execution_agents.output import (
-    AgentMemoryStorageDetails,
+    AgentMemoryOutput,
+    LocalOutput,
     Output,
 )
 from portia.execution_context import ExecutionContext
@@ -244,7 +245,7 @@ class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
     """Combined base class for Plan Run + Additional storages."""
 
 
-class AgentMemory(ABC):
+class AgentMemory(Protocol):
     """Abstract base class for storing items in agent memory."""
 
     @abstractmethod
@@ -286,27 +287,6 @@ class AgentMemory(ABC):
 
         """
         raise NotImplementedError("get_plan_run_output is not implemented")
-
-    def _convert_to_stored_output(
-        self,
-        output: Output,
-        output_name: str,
-        plan_run_id: PlanRunUUID,
-    ) -> Output:
-        """Convert a received output to a stored output.
-
-        Args:
-            output (Output): The output to convert.
-            output_name (str): The name of the output.
-            plan_run_id (PlanRunUUID): The ID of the plan run.
-
-        """
-        converted_output = output.model_copy()
-        converted_output.value = AgentMemoryStorageDetails(
-            name=output_name,
-            plan_run_id=plan_run_id,
-        )
-        return converted_output
 
 
 class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
@@ -419,7 +399,11 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
 
         """
         self.outputs[plan_run_id][output_name] = output
-        return self._convert_to_stored_output(output, output_name, plan_run_id)
+        return AgentMemoryOutput(
+            output_name=output_name,
+            plan_run_id=plan_run_id,
+            summary=output.summary,
+        )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from memory.
@@ -601,7 +585,11 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
         """
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
-        return self._convert_to_stored_output(output, output_name, plan_run_id)
+        return AgentMemoryOutput(
+            output_name=output_name,
+            plan_run_id=plan_run_id,
+            summary=output.summary,
+        )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from agent memory on disk.
@@ -870,7 +858,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 files={
                     "value": (
                         "output",
-                        BytesIO(output.serialize_value(output.value).encode("utf-8")),
+                        BytesIO(output.serialize_value().encode("utf-8")),
                     ),
                 },
                 data={
@@ -881,7 +869,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
             raise StorageError(e) from e
         else:
             self.check_response(response)
-            return self._convert_to_stored_output(output, output_name, plan_run_id)
+            return AgentMemoryOutput(
+                output_name=output_name,
+                plan_run_id=plan_run_id,
+                summary=output.summary,
+            )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from Portia Cloud.
@@ -912,7 +904,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
             with httpx.Client() as client:
                 value_response = client.get(value_url)
                 value_response.raise_for_status()
-            return Output(
+            return LocalOutput(
                 summary=summary,
                 value=value_response.text,
             )

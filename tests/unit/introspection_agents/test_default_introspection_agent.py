@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
@@ -82,7 +82,7 @@ def mock_plan_run() -> PlanRun:
         state=PlanRunState.IN_PROGRESS,
         outputs=PlanRunOutputs(
             step_outputs={
-                "$result1": Output(value="Task 1 result", summary="Task 1 summary"),
+                "$result1": LocalOutput(value="Task 1 result", summary="Task 1 summary"),
             },
             final_output=None,
         ),

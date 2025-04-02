@@ -47,7 +47,7 @@ from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.execution_utils import is_clarification
-from portia.execution_agents.output import AgentMemoryStorageDetails, Output
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput, Output
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
@@ -196,10 +196,10 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         # handle clarifications cleanly
         if is_clarification(output):
             clarifications = output if isinstance(output, list) else [output]
-            return Output[list[Clarification]](
+            return LocalOutput[list[Clarification]](
                 value=clarifications,
             )
-        return Output[SERIALIZABLE_TYPE_VAR](value=output)  # type: ignore  # noqa: PGH003
+        return LocalOutput[SERIALIZABLE_TYPE_VAR](value=output)  # type: ignore  # noqa: PGH003
 
     def _run_with_artifacts(
         self,
@@ -419,7 +419,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             clarification = output.value[0]
             match clarification["category"]:
                 case ClarificationCategory.ACTION:
-                    return Output(
+                    return LocalOutput(
                         value=ActionClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -428,7 +428,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.INPUT:
-                    return Output(
+                    return LocalOutput(
                         value=InputClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -437,7 +437,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.MULTIPLE_CHOICE:
-                    return Output(
+                    return LocalOutput(
                         value=MultipleChoiceClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -447,7 +447,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.VALUE_CONFIRMATION:
-                    return Output(
+                    return LocalOutput(
                         value=ValueConfirmationClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -540,7 +540,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         else:
             try:
                 output = self.parse_response(ctx, response.json())
-                if isinstance(output.value, AgentMemoryStorageDetails):
+                if isinstance(output, AgentMemoryOutput):
                     raise ToolHardError(
                         "Remote tool saved output directly to agent memory. This is not supported.",
                     )
