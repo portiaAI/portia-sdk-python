@@ -128,6 +128,8 @@ class LLMModel(Enum):
         GPT_4_O: GPT-4 model by OpenAI.
         GPT_4_O_MINI: Mini GPT-4 model by OpenAI.
         GPT_3_5_TURBO: GPT-3.5 Turbo model by OpenAI.
+        O_1: O1 model by OpenAI.
+        O_3_MINI: O3 Mini model by OpenAI.
         CLAUDE_3_5_SONNET: Claude 3.5 Sonnet model by Anthropic.
         CLAUDE_3_5_HAIKU: Claude 3.5 Haiku model by Anthropic.
         CLAUDE_3_OPUS: Claude 3.0 Opus model by Anthropic.
@@ -170,6 +172,7 @@ class LLMModel(Enum):
     GPT_4_O_MINI = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
     GPT_3_5_TURBO = Model(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
     O_3_MINI = Model(provider=LLMProvider.OPENAI, model_name="o3-mini")
+    O_1 = Model(provider=LLMProvider.OPENAI, model_name="o1")
 
     # Anthropic
     CLAUDE_3_5_SONNET = Model(provider=LLMProvider.ANTHROPIC, model_name="claude-3-5-sonnet-latest")
@@ -219,6 +222,7 @@ SUPPORTED_OPENAI_MODELS = [
     LLMModel.GPT_4_O_MINI,
     LLMModel.GPT_3_5_TURBO,
     LLMModel.O_3_MINI,
+    LLMModel.O_1,
 ]
 
 SUPPORTED_ANTHROPIC_MODELS = [
