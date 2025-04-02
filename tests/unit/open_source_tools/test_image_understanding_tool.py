@@ -113,7 +113,6 @@ def test_image_understanding_tool_run_with_context(
     mock_model.to_langchain.return_value.invoke.return_value = mock_response
     # Define task and context
     mock_image_understanding_tool.tool_context = "Context for task"
-    exec_context = mock_tool_run_context.execution_context
     schema_data = {
         "task": "What is the capital of France?",
         "image_url": "https://example.com/map.png",
