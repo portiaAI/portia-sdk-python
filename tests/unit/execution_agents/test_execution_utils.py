@@ -122,7 +122,7 @@ def test_process_output_with_clarifications() -> None:
     result = process_output([message], clarifications=clarifications)  # type: ignore  # noqa: PGH003
 
     assert isinstance(result, Output)
-    assert result.value == clarifications
+    assert result.get_value() == clarifications
 
 
 def test_process_output_with_tool_errors() -> None:
@@ -155,7 +155,7 @@ def test_process_output_with_output_artifacts() -> None:
     result = process_output([message, message2], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == ["test", "bar"]
+    assert result.get_value() == ["test", "bar"]
     assert result.summary == "test, bar"
 
 
@@ -166,7 +166,7 @@ def test_process_output_with_artifacts() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == "test"
+    assert result.get_value() == "test"
 
 
 def test_process_output_with_content() -> None:
@@ -176,7 +176,7 @@ def test_process_output_with_content() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == "test"
+    assert result.get_value() == "test"
 
 
 def test_process_output_summary_matches_serialized_value() -> None:
@@ -187,7 +187,7 @@ def test_process_output_summary_matches_serialized_value() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == dict_value
+    assert result.get_value() == dict_value
     assert result.summary == result.serialize_value()
 
 
@@ -204,7 +204,7 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == dict_value
+    assert result.get_value() == dict_value
     assert result.summary == provided_summary
 
 

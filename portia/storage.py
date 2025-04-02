@@ -398,11 +398,15 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
+        if output.summary is None:
+            logger().warning(
+                f"Storing Output {output} with no summary",
+            )
         self.outputs[plan_run_id][output_name] = output
         return AgentMemoryOutput(
             output_name=output_name,
             plan_run_id=plan_run_id,
-            summary=output.summary,
+            summary=output.summary or "",
         )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
@@ -583,12 +587,21 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
+        if not isinstance(output, LocalOutput):
+            logger().warning(
+                f"Attempting to store Output {output} which is not held locally - skipping...",
+            )
+            return output
+        if output.summary is None:
+            logger().warning(
+                f"Storing Output {output} with no summary",
+            )
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
         return AgentMemoryOutput(
             output_name=output_name,
             plan_run_id=plan_run_id,
-            summary=output.summary,
+            summary=output.summary or "",
         )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
@@ -607,7 +620,7 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
 
         """
         file_name = f"{plan_run_id}/{output_name}.json"
-        return self._read(file_name, Output)
+        return self._read(file_name, LocalOutput)
 
 
 class PortiaCloudStorage(Storage, AgentMemory):
@@ -869,10 +882,14 @@ class PortiaCloudStorage(Storage, AgentMemory):
             raise StorageError(e) from e
         else:
             self.check_response(response)
+            if output.summary is None:
+                logger().warning(
+                    f"Storing Output {output} with no summary",
+                )
             return AgentMemoryOutput(
                 output_name=output_name,
                 plan_run_id=plan_run_id,
-                summary=output.summary,
+                summary=output.summary or "",
             )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:

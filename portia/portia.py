@@ -637,7 +637,7 @@ class Portia:
                 if i < len(plan.steps)
                 and (step := plan.steps[i]).output in plan_run.outputs.step_outputs
                 and (step_output := plan_run.outputs.step_outputs[step.output])
-                and step_output.value != PreStepIntrospectionOutcome.SKIP
+                and step_output.get_value() != PreStepIntrospectionOutcome.SKIP
             ),
             None,
         )
@@ -701,7 +701,6 @@ class Portia:
                     summary=pre_step_outcome.reason,
                 )
                 self._save_output(output, step.output, plan_run)
-                self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.COMPLETE:
                 output = LocalOutput(
                     value=PreStepIntrospectionOutcome.COMPLETE,
@@ -715,7 +714,6 @@ class Portia:
                         last_executed_step_output,
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
-                self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.FAIL:
                 failed_output = LocalOutput(
                     value=PreStepIntrospectionOutcome.FAIL,
@@ -724,7 +722,6 @@ class Portia:
                 self._save_output(failed_output, step.output, plan_run)
                 plan_run.outputs.final_output = failed_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
-                self.storage.save_plan_run(plan_run)
         return (plan_run, pre_step_outcome)
 
     def _get_planning_agent(self) -> BasePlanningAgent:
@@ -751,7 +748,7 @@ class Portia:
 
         """
         final_output = LocalOutput(
-            value=step_output.value,
+            value=step_output.get_value(),
             summary=None,
         )
 
@@ -780,15 +777,14 @@ class Portia:
             bool: True if clarification is needed and run execution should stop.
 
         """
-        if isinstance(step_output.value, Clarification) or (
-            isinstance(step_output.value, list)
-            and len(step_output.value) > 0
-            and all(isinstance(item, Clarification) for item in step_output.value)
+        output_value = step_output.get_value()
+        if isinstance(output_value, Clarification) or (
+            isinstance(output_value, list)
+            and len(output_value) > 0
+            and all(isinstance(item, Clarification) for item in output_value)
         ):
             new_clarifications = (
-                [step_output.value]
-                if isinstance(step_output.value, Clarification)
-                else step_output.value
+                [output_value] if isinstance(output_value, Clarification) else output_value
             )
             for clarification in new_clarifications:
                 clarification.step = plan_run.current_step_index
@@ -884,9 +880,11 @@ class Portia:
         return DefaultIntrospectionAgent(self.config)
 
     def _save_output(self, output: Output, output_name: str, plan_run: PlanRun) -> None:
+        """Save an output to agent memory if it is large enough."""
         if self.config.exceeds_output_threshold(
             output.serialize_value(),
         ):
             output = self.storage.save_plan_run_output(output_name, output, plan_run.id)
 
         plan_run.outputs.step_outputs[output_name] = output
+        self.storage.save_plan_run(plan_run)
