@@ -1,6 +1,6 @@
 """Default examples that are passed to the query planning_agent if none are provided."""
 
-from portia.plan import OutputReference, Plan, PlanContext, Step, Constant
+from portia.plan import Constant, OutputReference, Plan, PlanContext, Step
 
 DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(

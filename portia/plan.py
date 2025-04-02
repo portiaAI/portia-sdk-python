@@ -197,6 +197,7 @@ class OutputReference(BaseModel):
     Args:
         output_id (str): The ID of the output to reference, e.g. $best_offers.
         description (str): A description of the output.
+
     """
 
     output_id: str = Field(
@@ -229,15 +230,11 @@ class Step(BaseModel):
     )
     constants: list[Constant] = Field(
         default=[],
-        description=(
-            "The input to the step, as a constant extracted from the user's query."
-        ),
+        description=("The input to the step, as a constant extracted from the user's query."),
     )
     references: list[OutputReference] = Field(
         default=[],
-        description=(
-            "The input to the step, as a reference to an output of a previous step."
-        ),
+        description=("The input to the step, as a reference to an output of a previous step."),
     )
     tool_id: str | None = Field(
         default=None,
