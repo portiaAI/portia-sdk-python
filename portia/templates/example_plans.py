@@ -1,6 +1,6 @@
 """Default examples that are passed to the query planning_agent if none are provided."""
 
-from portia.plan import Plan, PlanContext, Step, Variable
+from portia.plan import OutputReference, Plan, PlanContext, Step, Constant
 
 DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
@@ -20,13 +20,14 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Email $email politely with $ai_search_results",
-                inputs=[
-                    Variable(
-                        name="$ai_search_results",
+                references=[
+                    OutputReference(
+                        output_id="$ai_search_results",
                         description="summary of AI news",
                     ),
-                    Variable(
-                        name="$email",
+                ],
+                constants=[
+                    Constant(
                         value="hello@portialabs.ai",
                         description="The email address to send the email to",
                     ),
@@ -59,9 +60,9 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="What is the weather in the city in the input?",
-                inputs=[
-                    Variable(
-                        name="$southern_hemisphere_city",
+                references=[
+                    OutputReference(
+                        output_id="$southern_hemisphere_city",
                         description="City in the southern hemisphere",
                     ),
                 ],
@@ -70,9 +71,9 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="What is the weather in the city in the input?",
-                inputs=[
-                    Variable(
-                        name="$northern_hemisphere_city",
+                references=[
+                    OutputReference(
+                        output_id="$northern_hemisphere_city",
                         description="City in the norther hemisphere",
                     ),
                 ],
@@ -81,13 +82,13 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Compare the weather of the 2 cities ($southern_hemisphere_city_weather and $northern_hemisphere_city_weather) and write a comparison summarizing the similarities and differences",  # noqa: E501
-                inputs=[
-                    Variable(
-                        name="$southern_hemisphere_city_weather",
+                references=[
+                    OutputReference(
+                        output_id="$southern_hemisphere_city_weather",
                         description="Weather of a city in the southern hemisphere",
                     ),
-                    Variable(
-                        name="$northern_hemisphere_city_weather",
+                    OutputReference(
+                        output_id="$northern_hemisphere_city_weather",
                         description="Weather of a city in the northern hemisphere",
                     ),
                 ],
@@ -95,10 +96,16 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Email hello@portialabs.ai with a $weather_comparison",
-                inputs=[
-                    Variable(
-                        name="$weather_comparison",
+                references=[
+                    OutputReference(
+                        output_id="$weather_comparison",
                         description="Comparison of the weather in the two cities",
+                    ),
+                ],
+                constants=[
+                    Constant(
+                        value="hello@portialabs.ai",
+                        description="The email address to send the email to",
                     ),
                 ],
                 tool_id="portia::google_gmail::send_email_tool",
@@ -119,19 +126,26 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             Step(
                 task="What is the weather in London?",
                 tool_id="weather_tool",
+                constants=[
+                    Constant(
+                        value="London",
+                        description="The city from the user's query",
+                    ),
+                ],
                 output="$london_weather",
             ),
             Step(
                 task="Email $email_address politely with $london_weather",
-                inputs=[
-                    Variable(
-                        name="$london_weather",
+                references=[
+                    OutputReference(
+                        output_id="$london_weather",
                         description="Weather in London",
                     ),
-                    Variable(
-                        name="$email_address",
+                ],
+                constants=[
+                    Constant(
                         value="hello@portialabs.ai",
-                        description="The email address",
+                        description="The email address from the user's query",
                     ),
                 ],
                 tool_id="portia::google_gmail::send_email_tool",
@@ -153,34 +167,53 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             Step(
                 task="Get the weather for London",
                 tool_id="weather_tool",
+                constants=[
+                    Constant(
+                        value="London",
+                        description="The first city from the user's query",
+                    ),
+                ],
                 output="$london_weather",
             ),
             Step(
                 task="Get the weather for Cairo",
                 tool_id="weather_tool",
+                constants=[
+                    Constant(
+                        value="Cairo",
+                        description="The second city from the user's query",
+                    ),
+                ],
                 output="$cairo_weather",
                 condition="if $london_weather is hotter than 10C",
             ),
             Step(
                 task="Sum the weather in London and Cairo",
-                inputs=[
-                    Variable(name="$london_weather", description="Weather in London"),
-                    Variable(name="$cairo_weather", description="Weather in Cairo"),
+                references=[
+                    OutputReference(
+                        output_id="$london_weather",
+                        description="Weather in London",
+                    ),
+                    OutputReference(
+                        output_id="$cairo_weather",
+                        description="Weather in Cairo",
+                    ),
                 ],
                 output="$weather_sum",
                 condition="if $london_weather is hotter than 10C",
             ),
             Step(
                 task="Email $email_address politely with $weather_sum",
-                inputs=[
-                    Variable(
-                        name="$weather_sum",
+                references=[
+                    OutputReference(
+                        output_id="$weather_sum",
                         description="Sum of the weather in London and Cairo",
                     ),
-                    Variable(
-                        name="$email_address",
+                ],
+                constants=[
+                    Constant(
                         value="hello@portialabs.ai",
-                        description="The email address",
+                        description="The email address from the user's query",
                     ),
                 ],
                 tool_id="portia::google_gmail::send_email_tool",
@@ -207,9 +240,9 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             ),
             Step(
                 task="Get the latest messages on the Dev channel",
-                inputs=[
-                    Variable(
-                        name="$conversation_ids",
+                references=[
+                    OutputReference(
+                        output_id="$conversation_ids",
                         description="The id of the Dev channel",
                     ),
                 ],
@@ -219,17 +252,23 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             Step(
                 task="get the user id of nathan",
                 tool_id="portia::slack::bot::list_user_ids",
+                constants=[
+                    Constant(
+                        value="nathan",
+                        description="The name of the user to get the id of",
+                    ),
+                ],
                 output="$nathan_user_id",
             ),
             Step(
                 task="send a summary of the conversation to nathan",
-                inputs=[
-                    Variable(
-                        name="$conversation_history",
+                references=[
+                    OutputReference(
+                        output_id="$conversation_history",
                         description="The conversation history",
                     ),
-                    Variable(
-                        name="$nathan_user_id",
+                    OutputReference(
+                        output_id="$nathan_user_id",
                         description="The user id of nathan",
                     ),
                 ],

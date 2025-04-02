@@ -60,7 +60,7 @@ class PlanBuilder:
         task: str,
         tool_id: str | None = None,
         output: str | None = None,
-        inputs: list[Variable] | None = None,
+        inputs: list[Constant] | None = None,
         condition: str | None = None,
     ) -> PlanBuilder:
         """Add a step to the plan.
@@ -116,7 +116,7 @@ class PlanBuilder:
         if description is None:
             description = ""
         self.steps[step_index].inputs.append(
-            Variable(name=name, value=value, description=description),
+            Constant(name=name, value=value, description=description),
         )
         return self
 
@@ -171,29 +171,17 @@ class PlanBuilder:
         return step_index
 
 
-class Variable(BaseModel):
-    """A variable in the plan.
-
-    A variable is a way of referencing other parts of the plan, usually either another step's output
-    or a constant input variable.
-
+class Constant(BaseModel):
+    """A constant value to pass to a step
     Args:
-        name (str): The name of the variable starting with '$'. The variable should be the output
-                    of another step, or be a constant.
-        value (Any): The value of the variable, which may be set by other preceding steps if not
+        name (str): The name of the constant.
+        value (str | None): The value of the constant, which may be set by other preceding steps if not
                      defined.
-        description (str): A description of the variable.
 
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(
-        description=(
-            "The name of the variable starting with '$'. The variable should be the output"
-            " of another step, or be a constant."
-        ),
-    )
     value: Any = Field(
         default=None,
         description="If the value is not set, it will be defined by other preceding steps.",
@@ -202,14 +190,21 @@ class Variable(BaseModel):
         description="A description of the variable.",
     )
 
-    def pretty_print(self) -> str:
-        """Return the pretty print representation of the variable.
 
-        Returns:
-            str: A pretty print representation of the variable's name, value, and description.
+class OutputReference(BaseModel):
+    """A reference to an output of a step.
 
-        """
-        return f"{self.name}: {self.value} ({self.description})"
+    Args:
+        output_id (str): The ID of the output to reference, e.g. $best_offers.
+        description (str): A description of the output.
+    """
+
+    output_id: str = Field(
+        description="The ID of the output to reference, e.g. $best_offers.",
+    )
+    description: str = Field(
+        description="A description of the output.",
+    )
 
 
 class Step(BaseModel):
@@ -220,7 +215,8 @@ class Step(BaseModel):
 
     Args:
         task (str): The task that needs to be completed by this step.
-        inputs (list[Variable]): The input to the step, which can include constants and variables.
+        constants (list[Constant]): The input to the step, as a constant extracted from the user's query.
+        references (list[OutputReference]): The input to the step, as a reference to an output of a previous step.
         tool_id (str | None): The ID of the tool used in this step, if applicable.
         output (str): The unique output ID for the result of this step.
 
@@ -231,12 +227,16 @@ class Step(BaseModel):
     task: str = Field(
         description="The task that needs to be completed by this step",
     )
-    inputs: list[Variable] = Field(
+    constants: list[Constant] = Field(
         default=[],
         description=(
-            "The input to the step, as a variable with name and description. "
-            "Constants should also have a value. These are not the inputs to the tool "
-            "necessarily, but all the inputs to the step."
+            "The input to the step, as a constant extracted from the user's query."
+        ),
+    )
+    references: list[OutputReference] = Field(
+        default=[],
+        description=(
+            "The input to the step, as a reference to an output of a previous step."
         ),
     )
     tool_id: str | None = Field(
@@ -245,7 +245,7 @@ class Step(BaseModel):
     )
     output: str = Field(
         ...,
-        description="The unique output id of this step i.e. $best_offers.",
+        description="The unique output id of this step e.g. $best_offers.",
     )
     condition: str | None = Field(
         default=None,
