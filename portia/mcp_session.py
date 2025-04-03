@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from mcp import ClientSession, StdioServerParameters, stdio_client
 from mcp.client.sse import sse_client
-from mcp.client.stdio import get_default_environment
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
