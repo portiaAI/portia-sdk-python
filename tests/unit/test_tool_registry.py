@@ -12,193 +12,159 @@ from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
-from portia.tool import Tool
 from portia.tool_registry import (
-    AggregatedToolRegistry,
     InMemoryToolRegistry,
     McpToolRegistry,
+    PortiaToolRegistry,
     ToolRegistry,
     generate_pydantic_model_from_json_schema,
 )
-from tests.utils import AdditionTool, MockMcpSessionWrapper, MockTool, get_test_tool_context
+from tests.utils import MockMcpSessionWrapper, MockTool, get_test_tool_context
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from pytest_mock import MockerFixture
 
-    from portia.tool import Tool
-
 
 MOCK_TOOL_ID = "mock_tool"
 OTHER_MOCK_TOOL_ID = "other_mock_tool"
 
 
-def test_registry_base_classes() -> None:
-    """Test registry raises."""
-
-    class MyRegistry(ToolRegistry):
-        """Override to test base."""
-
-        def get_tools(self) -> list[Tool]:
-            return super().get_tools()  # type: ignore  # noqa: PGH003
-
-        def get_tool(self, tool_id: str) -> Tool:
-            return super().get_tool(tool_id)  # type: ignore  # noqa: PGH003
-
-        def register_tool(self, tool: Tool) -> None:
-            return super().register_tool(tool)  # type: ignore  # noqa: PGH003
-
-        def match_tools(
-            self,
-            query: str | None = None,
-            tool_ids: list[str] | None = None,
-        ) -> list[Tool]:
-            return super().match_tools(query, tool_ids)
-
-    registry = MyRegistry()
-
-    with pytest.raises(NotImplementedError):
-        registry.get_tools()
-
-    with pytest.raises(NotImplementedError):
-        registry.get_tool("1")
-
-    with pytest.raises(NotImplementedError):
-        registry.register_tool(AdditionTool())
-
-    with pytest.raises(NotImplementedError):
-        registry.match_tools("match")
-
-    agg_registry = AggregatedToolRegistry(registries=[registry])
-    with pytest.raises(NotImplementedError):
-        agg_registry.register_tool(AdditionTool())
-
-
-def test_local_tool_registry_register_tool() -> None:
-    """Test registering tools in the InMemoryToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry()
-    local_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))
-    tool1 = local_tool_registry.get_tool(MOCK_TOOL_ID)
+def test_tool_registry_register_tool() -> None:
+    """Test registering tools in the ToolRegistry."""
+    tool_registry = ToolRegistry()
+    tool_registry.with_tool(MockTool(id=MOCK_TOOL_ID))
+    tool1 = tool_registry.get_tool(MOCK_TOOL_ID)
     assert tool1.id == MOCK_TOOL_ID
 
     with pytest.raises(ToolNotFoundError):
-        local_tool_registry.get_tool("tool3")
+        tool_registry.get_tool("tool3")
 
     with pytest.raises(DuplicateToolError):
-        local_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))
+        tool_registry.with_tool(MockTool(id=MOCK_TOOL_ID))
+
+    tool_registry.replace_tool(
+        MockTool(
+            id=MOCK_TOOL_ID,
+            name="New Mock Tool",
+        ),
+    )
+    tool2 = tool_registry.get_tool(MOCK_TOOL_ID)
+    assert tool2.id == MOCK_TOOL_ID
+    assert tool2.name == "New Mock Tool"
 
 
-def test_local_tool_registry_get_and_plan_run() -> None:
+def test_tool_registry_get_and_plan_run() -> None:
     """Test getting and running tools in the InMemoryToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry()
-    local_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))
-    tool1 = local_tool_registry.get_tool(MOCK_TOOL_ID)
+    tool_registry = ToolRegistry()
+    tool_registry.with_tool(MockTool(id=MOCK_TOOL_ID))
+    tool1 = tool_registry.get_tool(MOCK_TOOL_ID)
     ctx = get_test_tool_context()
     tool1.run(ctx)
 
 
-def test_local_tool_registry_get_tools() -> None:
+def test_tool_registry_get_tools() -> None:
     """Test the get_tools method of InMemoryToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry.from_local_tools(
+    tool_registry = ToolRegistry(
         [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
-    tools = local_tool_registry.get_tools()
+    tools = tool_registry.get_tools()
     assert len(tools) == 2
     assert any(tool.id == MOCK_TOOL_ID for tool in tools)
     assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tools)
 
 
-def test_local_tool_registry_match_tools() -> None:
+def test_tool_registry_match_tools() -> None:
     """Test matching tools in the InMemoryToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry.from_local_tools(
+    tool_registry = ToolRegistry(
         [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
 
     # Test matching specific tool ID
-    matched_tools = local_tool_registry.match_tools(tool_ids=[MOCK_TOOL_ID])
+    matched_tools = tool_registry.match_tools(tool_ids=[MOCK_TOOL_ID])
     assert len(matched_tools) == 1
     assert matched_tools[0].id == MOCK_TOOL_ID
 
     # Test matching multiple tool IDs
-    matched_tools = local_tool_registry.match_tools(
+    matched_tools = tool_registry.match_tools(
         tool_ids=[MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID],
     )
     assert len(matched_tools) == 2
     assert {tool.id for tool in matched_tools} == {MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID}
 
     # Test matching non-existent tool ID
-    matched_tools = local_tool_registry.match_tools(tool_ids=["non_existent_tool"])
+    matched_tools = tool_registry.match_tools(tool_ids=["non_existent_tool"])
     assert len(matched_tools) == 0
 
     # Test with no tool_ids (should return all tools)
-    matched_tools = local_tool_registry.match_tools()
+    matched_tools = tool_registry.match_tools()
     assert len(matched_tools) == 2
     assert {tool.id for tool in matched_tools} == {MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID}
 
 
-def test_aggregated_tool_registry_duplicate_tool() -> None:
-    """Test searching across multiple registries in AggregatedToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
-    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+def test_combined_tool_registry_duplicate_tool() -> None:
+    """Test searching across multiple registries in ToolRegistry."""
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
+    other_tool_registry = ToolRegistry(
         [MockTool(id=MOCK_TOOL_ID)],
     )
-    aggregated_tool_registry = local_tool_registry + other_tool_registry
+    combined_tool_registry = tool_registry + other_tool_registry
 
-    tool1 = aggregated_tool_registry.get_tool(MOCK_TOOL_ID)
+    tool1 = combined_tool_registry.get_tool(MOCK_TOOL_ID)
     assert tool1.id == MOCK_TOOL_ID
 
 
-def test_aggregated_tool_registry_get_tool() -> None:
-    """Test searching across multiple registries in AggregatedToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
-    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+def test_combined_tool_registry_get_tool() -> None:
+    """Test searching across multiple registries in ToolRegistry."""
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
+    other_tool_registry = ToolRegistry(
         [MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
-    aggregated_tool_registry = local_tool_registry + other_tool_registry
+    combined_tool_registry = tool_registry + other_tool_registry
 
-    tool1 = aggregated_tool_registry.get_tool(MOCK_TOOL_ID)
+    tool1 = combined_tool_registry.get_tool(MOCK_TOOL_ID)
     assert tool1.id == MOCK_TOOL_ID
 
     with pytest.raises(ToolNotFoundError):
-        aggregated_tool_registry.get_tool("tool_not_found")
+        combined_tool_registry.get_tool("tool_not_found")
 
 
-def test_aggregated_tool_registry_get_tools() -> None:
-    """Test getting all tools from an AggregatedToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
-    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+def test_combined_tool_registry_get_tools() -> None:
+    """Test getting all tools from an ToolRegistry."""
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
+    other_tool_registry = ToolRegistry(
         [MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
-    aggregated_tool_registry = local_tool_registry + other_tool_registry
+    combined_tool_registry = tool_registry + other_tool_registry
 
-    tools = aggregated_tool_registry.get_tools()
+    tools = combined_tool_registry.get_tools()
     assert len(tools) == 2
     assert any(tool.id == MOCK_TOOL_ID for tool in tools)
 
 
-def test_aggregated_tool_registry_match_tools() -> None:
-    """Test matching tools across multiple registries in AggregatedToolRegistry."""
-    local_tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
-    other_tool_registry = InMemoryToolRegistry.from_local_tools(
+def test_combined_tool_registry_match_tools() -> None:
+    """Test matching tools across multiple registries in ToolRegistry."""
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
+    other_tool_registry = ToolRegistry(
         [MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
-    aggregated_tool_registry = local_tool_registry + other_tool_registry
+    combined_tool_registry = tool_registry + other_tool_registry
 
     # Test matching specific tool IDs
-    matched_tools = aggregated_tool_registry.match_tools(tool_ids=[MOCK_TOOL_ID])
+    matched_tools = combined_tool_registry.match_tools(tool_ids=[MOCK_TOOL_ID])
     assert len(matched_tools) == 1
     assert matched_tools[0].id == MOCK_TOOL_ID
 
     # Test matching multiple tool IDs
-    matched_tools = aggregated_tool_registry.match_tools(
+    matched_tools = combined_tool_registry.match_tools(
         tool_ids=[MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID],
     )
     assert len(matched_tools) == 2
     assert {tool.id for tool in matched_tools} == {MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID}
 
     # Test matching non-existent tool IDs
-    matched_tools = aggregated_tool_registry.match_tools(tool_ids=["non_existent_tool"])
+    matched_tools = combined_tool_registry.match_tools(tool_ids=["non_existent_tool"])
     assert len(matched_tools) == 0
 
 
@@ -209,34 +175,57 @@ def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
     mocker.patch("portia.tool_registry.logger", return_value=mock_logger)
 
     # Create registries and tools
-    registry1 = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
-    registry2 = InMemoryToolRegistry.from_local_tools([MockTool(id=OTHER_MOCK_TOOL_ID)])
+    registry1 = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
+    registry2 = ToolRegistry([MockTool(id=OTHER_MOCK_TOOL_ID)])
     tool_list = [MockTool(id="tool3")]
 
     # Test registry + registry
     combined = registry1 + registry2
-    assert isinstance(combined, AggregatedToolRegistry)
+    assert isinstance(combined, ToolRegistry)
     assert len(combined.get_tools()) == 2
     assert {tool.id for tool in combined.get_tools()} == {MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID}
 
     # Test registry + list
     combined = registry1 + tool_list  # type: ignore reportOperatorIssue
-    assert isinstance(combined, AggregatedToolRegistry)
+    assert isinstance(combined, ToolRegistry)
     assert len(combined.get_tools()) == 2
     assert {tool.id for tool in combined.get_tools()} == {MOCK_TOOL_ID, "tool3"}
 
     # Test list + registry (radd)
     combined = tool_list + registry1  # type: ignore reportOperatorIssue
-    assert isinstance(combined, AggregatedToolRegistry)
+    assert isinstance(combined, ToolRegistry)
     assert len(combined.get_tools()) == 2
     assert {tool.id for tool in combined.get_tools()} == {MOCK_TOOL_ID, "tool3"}
 
     # Test warning on duplicate tools
-    duplicate_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
+    duplicate_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
     combined = registry1 + duplicate_registry
     mock_logger.warning.assert_called_once_with(
         f"Duplicate tool ID found: {MOCK_TOOL_ID}. Unintended behavior may occur.",
     )
+
+
+def test_in_memory_tool_registry_from_local_tools() -> None:
+    """Test creating an InMemoryToolRegistry from a list of local tools."""
+    tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
+    assert isinstance(tool_registry, InMemoryToolRegistry)
+    assert len(tool_registry.get_tools()) == 1
+    assert tool_registry.get_tool(MOCK_TOOL_ID).id == MOCK_TOOL_ID
+
+
+def test_tool_registry_filter_tools() -> None:
+    """Test filtering tools in a ToolRegistry."""
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)])
+    filtered_registry = tool_registry.filter_tools(lambda tool: tool.id == MOCK_TOOL_ID)
+    filtered_tools = filtered_registry.get_tools()
+    assert len(filtered_tools) == 1
+    assert filtered_tools[0].id == MOCK_TOOL_ID
+
+
+def test_portia_tool_registry_missing_required_args() -> None:
+    """Test that PortiaToolRegistry raises an error if required args are missing."""
+    with pytest.raises(ValueError, match="Either config, client or tools must be provided"):
+        PortiaToolRegistry()
 
 
 @pytest.fixture
@@ -306,18 +295,6 @@ def test_mcp_tool_registry_get_tool(mcp_tool_registry: McpToolRegistry) -> None:
     assert tool.name == "test_tool"
     assert tool.description == "I am a tool"
     assert issubclass(tool.args_schema, BaseModel)
-
-
-def test_mcp_tool_registry_get_tool_not_found(mcp_tool_registry: McpToolRegistry) -> None:
-    """Test getting a tool from the MCPToolRegistry that does not exist."""
-    with pytest.raises(ToolNotFoundError):
-        mcp_tool_registry.get_tool("mcp:mock_mcp:non_existent_tool")
-
-
-def test_mcp_tool_registry_register_tool(mcp_tool_registry: McpToolRegistry) -> None:
-    """Test MCPToolRegistry.register_tool raises NotImplementedError."""
-    with pytest.raises(NotImplementedError):
-        mcp_tool_registry.register_tool(MockTool(id=MOCK_TOOL_ID))
 
 
 def test_generate_pydantic_model_from_json_schema() -> None:
