@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel, Field
 
-from portia.config import LLM_TOOL_MODEL_KEY
 from portia.model import Message
 from portia.tool import Tool, ToolRunContext
+
+if TYPE_CHECKING:
+    from portia.model import GenerativeModel
 
 
 class LLMToolSchema(BaseModel):
@@ -54,9 +56,16 @@ class LLMTool(Tool[str]):
         """
     tool_context: str = ""
 
+    model: GenerativeModel | None = Field(
+        default=None,
+        exclude=True,
+        description="The model to use for the LLMTool. If not provided, "
+        "the model will be resolved from the config.",
+    )
+
     def run(self, ctx: ToolRunContext, task: str) -> str:
         """Run the LLMTool."""
-        model = ctx.config.resolve_model(LLM_TOOL_MODEL_KEY)
+        model = self.model or ctx.config.resolve_model()
 
         # Define system and user messages
         context = (

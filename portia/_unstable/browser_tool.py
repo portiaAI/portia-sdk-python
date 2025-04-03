@@ -11,14 +11,17 @@ import json
 import logging
 import os
 import sys
+from typing import TYPE_CHECKING
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, Field, HttpUrl
 
 from portia.clarification import ActionClarification
-from portia.config import LLM_TOOL_MODEL_KEY
 from portia.errors import ToolHardError
 from portia.tool import Tool, ToolRunContext
+
+if TYPE_CHECKING:
+    from portia.model import LangChainGenerativeModel
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +84,13 @@ class BrowserTool(Tool[str]):
     args_schema: type[BaseModel] = BrowserToolSchema
     output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
 
+    model: LangChainGenerativeModel | None = Field(
+        default=None,
+        exclude=True,
+        description="The model to use for the BrowserTool. If not provided, "
+        "the model will be resolved from the config.",
+    )
+
     @staticmethod
     def _get_chrome_instance_path() -> str:
         """Get the path to the Chrome instance based on the operating system or env variable."""
@@ -102,7 +112,7 @@ class BrowserTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
-        model = ctx.config.resolve_langchain_model(LLM_TOOL_MODEL_KEY)
+        model = self.model or ctx.config.resolve_langchain_model()
         llm = model.to_langchain()
 
         if ctx.execution_context.end_user_id:

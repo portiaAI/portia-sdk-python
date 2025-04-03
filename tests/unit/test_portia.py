@@ -30,7 +30,7 @@ from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, 
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
 from portia.tool import Tool, ToolRunContext
-from portia.tool_registry import InMemoryToolRegistry
+from portia.tool_registry import ToolRegistry
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -61,7 +61,7 @@ def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
             DEFAULT_MODEL_KEY: default_model,
         },
     )
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+    tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
 
 
@@ -149,7 +149,7 @@ def test_portia_run_query_disk_storage(planning_model: MagicMock) -> None:
                 PLANNING_MODEL_KEY: planning_model,
             },
         )
-        tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+        tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
         portia = Portia(config=config, tools=tool_registry)
 
         planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -329,7 +329,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
             mock_call_count.count += 1
             return mock_call_count.count == 3
 
-    portia.tool_registry = InMemoryToolRegistry.from_local_tools([ReadyTool()])
+    portia.tool_registry = ToolRegistry([ReadyTool()])
     step0 = Step(
         task="Do something",
         inputs=[],
