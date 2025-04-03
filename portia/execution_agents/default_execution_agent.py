@@ -31,6 +31,7 @@ from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.llm_wrapper import LLMWrapper
 from portia.model import GenerativeModel, Message
+from portia.storage import AgentMemory
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -414,7 +415,6 @@ class VerifierModel:
                 "  made_up: bool  # if the value is made_up based on the given rules.\n\n"
                 "class VerifiedToolInputs:\n"
                 "  args: List[VerifiedToolArgument]  # List of tool arguments.\n"
-                "  contains_templated_argument: bool  # Whether the args contain any large values that need to be templated in.\n\n"
                 "Please ensure the output matches the VerifiedToolInputs schema.",
             ),
             HumanMessagePromptTemplate.from_template(
@@ -473,6 +473,7 @@ class VerifierModel:
             schema=VerifiedToolInputs,
         )
         response = VerifiedToolInputs.model_validate(response)
+        response.contains_templated_argument = tool_args.get("contains_templated_argument", False)
 
         # Validate the arguments against the tool's schema
         response = self._validate_args_against_schema(response)
@@ -652,6 +653,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         step: Step,
         plan_run: PlanRun,
         config: Config,
+        agent_memory: AgentMemory,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the agent.
@@ -660,12 +662,14 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             step (Step): The current step in the task plan.
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
+            agent_memory (AgentMemory): Memory of the agent to pull things out of
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
         super().__init__(step, plan_run, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
+        self.agent_memory = agent_memory
 
     def clarifications_or_continue(
         self,

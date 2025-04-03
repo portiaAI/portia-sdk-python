@@ -28,6 +28,7 @@ from portia.execution_agents.default_execution_agent import (
 )
 from portia.execution_agents.output import LocalOutput, Output
 from portia.plan import Step
+from portia.storage import InMemoryStorage
 from portia.tool import Tool
 from tests.utils import (
     AdditionTool,
@@ -511,6 +512,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        agent_memory=InMemoryStorage().agent_memory,
         tool=tool,
     )
 
@@ -567,6 +569,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        agent_memory=InMemoryStorage().agent_memory,
         tool=tool,
     )
     agent.verified_args = verified_tool_inputs
@@ -636,6 +639,7 @@ def test_get_last_resolved_clarification() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        agent_memory=InMemoryStorage().agent_memory,
         tool=None,
     )
     assert agent.get_last_resolved_clarification("arg") == resolved_clarification2
@@ -656,6 +660,7 @@ def test_clarifications_or_continue() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        agent_memory=InMemoryStorage().agent_memory,
         tool=None,
     )
     inputs = VerifiedToolInputs(
@@ -694,6 +699,7 @@ def test_clarifications_or_continue() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        agent_memory=InMemoryStorage().agent_memory,
         tool=None,
     )
 
@@ -725,6 +731,7 @@ def test_default_execution_agent_none_tool_execute_sync() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        agent_memory=InMemoryStorage().agent_memory,
         tool=None,
     )
 
@@ -776,6 +783,7 @@ def test_optional_args_with_none_values() -> None:
         step=Step(task="TASK_STRING", output="$out"),
         plan_run=get_test_plan_run()[1],
         config=get_test_config(),
+        agent_memory=InMemoryStorage().agent_memory,
         tool=MockTool(),
     )
     model = VerifierModel(

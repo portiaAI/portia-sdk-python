@@ -843,6 +843,7 @@ class Portia:
             step,
             plan_run,
             self.config,
+            self.storage,
             tool,
         )
 
