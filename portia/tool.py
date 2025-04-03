@@ -263,6 +263,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             "output_description": out_description,
         }
 
+        print(
+            render_template(
+                "tool_description.xml.jinja",
+                tool=template_dict,
+            ),
+        )
+
         return render_template(
             "tool_description.xml.jinja",
             tool=template_dict,
@@ -284,7 +291,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         description_length = len(self._generate_tool_description())
         if description_length > MAX_TOOL_DESCRIPTION_LENGTH:
-            raise InvalidToolDescriptionError(self.name)
+            raise InvalidToolDescriptionError(self.id)
         return self
 
     def to_langchain(self, ctx: ToolRunContext) -> StructuredTool:
