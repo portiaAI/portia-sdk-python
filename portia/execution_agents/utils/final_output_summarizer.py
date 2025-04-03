@@ -59,13 +59,13 @@ class FinalOutputSummarizer:
             if step.output in outputs:
                 output_value = (
                     outputs[step.output].summary
-                    if outputs[step.output].value_for_prompt()
+                    if outputs[step.output].get_value()
                     in (
                         PreStepIntrospectionOutcome.SKIP,
                         PreStepIntrospectionOutcome.COMPLETE,
                         PreStepIntrospectionOutcome.FAIL,
                     )
-                    else outputs[step.output].value_for_prompt()
+                    else outputs[step.output].get_value()
                 )
                 context.append(f"Task: {step.task}")
                 context.append(f"Output: {output_value}")

@@ -26,7 +26,7 @@ from portia.execution_agents.default_execution_agent import (
     VerifiedToolInputs,
     VerifierModel,
 )
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput, Output
 from portia.plan import Step
 from portia.tool import Tool
 from tests.utils import (
@@ -499,7 +499,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         return {
             "messages": ToolMessage(
                 content="Sent email",
-                artifact=Output(value="Sent email with id: 0"),
+                artifact=LocalOutput(value="Sent email with id: 0"),
                 tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
             ),
         }
@@ -516,7 +516,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
-    assert output.value == "Sent email with id: 0"
+    assert output.get_value() == "Sent email with id: 0"
 
 
 def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -555,7 +555,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
         return {
             "messages": ToolMessage(
                 content="Sent email",
-                artifact=Output(value="Sent email with id: 0"),
+                artifact=LocalOutput(value="Sent email with id: 0"),
                 tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
             ),
         }
@@ -573,7 +573,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
-    assert output.value == "Sent email with id: 0"
+    assert output.get_value() == "Sent email with id: 0"
 
 
 def test_default_execution_agent_edge_cases() -> None:

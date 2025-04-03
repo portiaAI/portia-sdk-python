@@ -16,7 +16,7 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput, Output
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import AdditionTool, get_test_config
 
@@ -122,7 +122,7 @@ def test_process_output_with_clarifications() -> None:
     result = process_output([message], clarifications=clarifications)  # type: ignore  # noqa: PGH003
 
     assert isinstance(result, Output)
-    assert result.value == clarifications
+    assert result.get_value() == clarifications
 
 
 def test_process_output_with_tool_errors() -> None:
@@ -149,13 +149,13 @@ def test_process_output_with_invalid_message() -> None:
 
 def test_process_output_with_output_artifacts() -> None:
     """Test process_output with outpu artifacts."""
-    message = ToolMessage(tool_call_id="1", content="", artifact=Output(value="test"))
-    message2 = ToolMessage(tool_call_id="2", content="", artifact=Output(value="bar"))
+    message = ToolMessage(tool_call_id="1", content="", artifact=LocalOutput(value="test"))
+    message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalOutput(value="bar"))
 
     result = process_output([message, message2], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == ["test", "bar"]
+    assert result.get_value() == ["test", "bar"]
     assert result.summary == "test, bar"
 
 
@@ -166,7 +166,7 @@ def test_process_output_with_artifacts() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == "test"
+    assert result.get_value() == "test"
 
 
 def test_process_output_with_content() -> None:
@@ -176,19 +176,19 @@ def test_process_output_with_content() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == "test"
+    assert result.get_value() == "test"
 
 
 def test_process_output_summary_matches_serialized_value() -> None:
     """Test process_output summary matches serialized value."""
     dict_value = {"key1": "value1", "key2": "value2"}
-    message = ToolMessage(tool_call_id="1", content="test", artifact=Output(value=dict_value))
+    message = ToolMessage(tool_call_id="1", content="test", artifact=LocalOutput(value=dict_value))
 
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == dict_value
-    assert result.summary == result.serialize_value(result.value)
+    assert result.get_value() == dict_value
+    assert result.summary == result.serialize_value()
 
 
 def test_process_output_summary_not_updated_if_provided() -> None:
@@ -198,13 +198,13 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     message = ToolMessage(
         tool_call_id="1",
         content="test",
-        artifact=Output(value=dict_value, summary=provided_summary),
+        artifact=LocalOutput(value=dict_value, summary=provided_summary),
     )
 
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == dict_value
+    assert result.get_value() == dict_value
     assert result.summary == provided_summary
 
 

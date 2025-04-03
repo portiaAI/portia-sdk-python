@@ -7,7 +7,7 @@ from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification, InputClarification
 from portia.execution_agents.context import build_context
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput, Output
 from portia.execution_context import ExecutionContext
 from portia.plan import Step, Variable
 from tests.utils import get_test_plan_run
@@ -31,8 +31,8 @@ def inputs() -> list[Variable]:
 def outputs() -> dict[str, Output]:
     """Return a dictionary of outputs for pytest fixtures."""
     return {
-        "$email_body": Output(value="The body of the email"),
-        "$london_weather": Output(value="rainy"),
+        "$email_body": LocalOutput(value="The body of the email"),
+        "$london_weather": LocalOutput(value="rainy"),
     }
 
 
@@ -90,9 +90,10 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
             assert variable.value in context
     for name, output in outputs.items():
         assert name in context
-        if output.value:
-            assert isinstance(output.value, str)
-            assert output.value in context
+        if output.get_value():
+            val = output.get_value()
+            assert isinstance(val, str)
+            assert val in context
 
 
 def test_system_context() -> None:
@@ -220,8 +221,9 @@ def test_context_inputs_outputs_clarifications(
             assert variable.value in context
     for name, output in outputs.items():
         assert name in context
-        if output.value:
-            assert isinstance(output.value, str)
-            assert output.value in context
+        if output.get_value():
+            val = output.get_value()
+            assert isinstance(val, str)
+            assert val in context
     assert "email cc list" in context
     assert "bob@bla.com" in context

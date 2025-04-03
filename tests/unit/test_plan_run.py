@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalOutput
 from portia.plan import PlanUUID, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, ReadOnlyPlanRun
 from portia.prefixed_uuid import PlanRunUUID
@@ -33,7 +33,7 @@ def plan_run(mock_clarification: InputClarification) -> PlanRun:
         state=PlanRunState.IN_PROGRESS,
         outputs=PlanRunOutputs(
             clarifications=[mock_clarification],
-            step_outputs={"step1": Output(value="Test output")},
+            step_outputs={"step1": LocalOutput(value="Test output")},
         ),
     )
 
@@ -114,10 +114,10 @@ def test_run_serialization() -> None:
                 ),
             ],
             step_outputs={
-                "1": Output(value=ToolHardError("this is a tool hard error")),
-                "2": Output(value=ToolSoftError("this is a tool soft error")),
+                "1": LocalOutput(value=ToolHardError("this is a tool hard error")),
+                "2": LocalOutput(value=ToolSoftError("this is a tool soft error")),
             },
-            final_output=Output(value="This is the end"),
+            final_output=LocalOutput(value="This is the end"),
         ),
     )
     assert str(plan_run) == (
@@ -125,6 +125,7 @@ def test_run_serialization() -> None:
         f"state={plan_run.state}, current_step_index={plan_run.current_step_index}, "
         f"final_output={'set' if plan_run.outputs.final_output else 'unset'})"
     )
+
     # check we can also serialize to JSON
     json_str = plan_run.model_dump_json()
     # parse back to run
