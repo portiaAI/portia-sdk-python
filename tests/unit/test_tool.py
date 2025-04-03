@@ -1,7 +1,7 @@
 """Tests for the Tool class."""
 
-from enum import Enum, StrEnum
 import json
+from enum import Enum
 from unittest.mock import MagicMock, patch
 
 import httpx
