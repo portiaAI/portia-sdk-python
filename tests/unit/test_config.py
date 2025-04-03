@@ -1,6 +1,6 @@
 """Tests for portia classes."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from pydantic import SecretStr
@@ -20,8 +20,10 @@ from portia.config import (
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
     AzureOpenAIGenerativeModel,
+    GenerativeModel,
     LangChainGenerativeModel,
 )
+from tests.utils import get_test_config
 
 
 def test_from_default() -> None:
@@ -186,6 +188,27 @@ def test_resolve_model_azure() -> None:
         azure_openai_api_key="test-azure-openai-api-key",
     )
     assert isinstance(c.resolve_model(PLANNING_MODEL_KEY), AzureOpenAIGenerativeModel)
+
+
+def test_resolve_langchain_model() -> None:
+    """Test resolve langchain model."""
+    conf = get_test_config(
+        custom_models={
+            PLANNING_MODEL_KEY: LangChainGenerativeModel(client=MagicMock(), model_name="test"),
+        },
+    )
+    assert isinstance(conf.resolve_langchain_model(PLANNING_MODEL_KEY), LangChainGenerativeModel)
+
+
+def test_resolve_langchain_model_error() -> None:
+    """Test resolve langchain model raises TypeError if model is not a LangChainGenerativeModel."""
+    conf = get_test_config(
+        custom_models={
+            PLANNING_MODEL_KEY: Mock(spec=GenerativeModel),
+        },
+    )
+    with pytest.raises(TypeError, match="A LangChainGenerativeModel is required"):
+        conf.resolve_langchain_model(PLANNING_MODEL_KEY)
 
 
 def test_custom_models() -> None:

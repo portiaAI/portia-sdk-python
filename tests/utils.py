@@ -14,7 +14,6 @@ from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_context import ExecutionContext, empty_context
-from portia.llm_wrapper import LLMWrapper
 from portia.model import LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunUUID
@@ -91,13 +90,6 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
         default_log_level=LogLevel.INFO,
         openai_api_key=SecretStr("123"),
         storage_class=StorageClass.MEMORY,
-    )
-
-
-def get_test_llm_wrapper(mock_client: BaseChatModel) -> LLMWrapper:
-    """Get a test LLM wrapper."""
-    return LLMWrapper(
-        model=LangChainGenerativeModel(client=mock_client, model_name="test"),
     )
 
 
@@ -285,3 +277,11 @@ def get_mock_base_chat_model(
     model.with_structured_output.side_effect = with_structured_output
     model.bind_tools.side_effect = bind_tools
     return model
+
+
+def get_mock_langchain_generative_model(response: Any = None) -> LangChainGenerativeModel:  # noqa: ANN401
+    """Get a mock langchain generative model."""
+    return LangChainGenerativeModel(
+        client=get_mock_base_chat_model(response),
+        model_name="test",
+    )

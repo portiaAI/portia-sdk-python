@@ -285,11 +285,11 @@ def run(
         plan = portia.plan(query)
 
         if cli_config.confirm:
-            click.echo(plan.model_dump_json(indent=4))
+            click.echo(plan.pretty_print())
             if not click.confirm("Do you want to execute the plan?"):
                 return
 
-        plan_run = portia.run(query)
+        plan_run = portia.run_plan(plan)
         click.echo(plan_run.model_dump_json(indent=4))
 
 

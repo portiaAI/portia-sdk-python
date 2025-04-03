@@ -28,6 +28,7 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    LangChainGenerativeModel,
     OpenAIGenerativeModel,
 )
 
@@ -460,6 +461,16 @@ class Config(BaseModel):
         model = self.model(usage)
         return self._construct_model(model)
 
+    def resolve_langchain_model(self, usage: str) -> LangChainGenerativeModel:
+        """Resolve a LangChain model from the config."""
+        model = self.resolve_model(usage)
+        if isinstance(model, LangChainGenerativeModel):
+            return model
+        raise TypeError(
+            f"A LangChainGenerativeModel is required, but the config for "
+            f"{usage} resolved to {model}.",
+        )
+
     def _construct_model(self, llm_model: LLMModel) -> GenerativeModel:
         """Construct a Model instance from an LLMModel."""
         match llm_model.provider():
@@ -580,7 +591,7 @@ class Config(BaseModel):
             return False
         # It doesn't really matter which model we use here, so choose gpt2 for speed.
         # More details at https://chatgpt.com/share/67ee4931-a794-8007-9859-13aca611dba9
-        encoding = tiktoken.get_encoding("gpt2").encoude(str(value))
+        encoding = tiktoken.get_encoding("gpt2").encode(str(value))
         return len(encoding) > self.large_output_threshold_tokens
 
     @model_validator(mode="after")
