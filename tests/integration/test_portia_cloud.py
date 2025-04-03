@@ -48,9 +48,6 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolNotFoundError):
         registry.get_tool("Not a Tool")
 
-    with pytest.raises(NotImplementedError):
-        registry.with_tool(AdditionTool())
-
     tool = registry.get_tool("portia:tavily::search")
     assert isinstance(tool, PortiaRemoteTool)
     tool.client = PortiaCloudClient().get_client(config)

@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Literal, Self, Union
 from pydantic import BaseModel, Field, create_model
 
 from portia.cloud import PortiaCloudClient
-from portia.errors import ToolNotFoundError
+from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.logger import logger
 from portia.mcp_session import (
     McpClientConfig,
@@ -81,18 +81,33 @@ class ToolRegistry:
             tools = {tool.id: tool for tool in tools}
         self._tools = tools
 
-    def with_tool(self, tool: Tool) -> Self:
+    def with_tool(self, tool: Tool, *, overwrite: bool = False) -> Self:
         """Update a tool based on tool ID or inserts a new tool.
 
         Args:
             tool (Tool): The tool to be added or updated.
+            overwrite (bool): Whether to overwrite an existing tool with the same ID.
 
         Returns:
             Self: A new ToolRegistry with the tool registered.
 
         """
+        if tool.id in self._tools and not overwrite:
+            raise DuplicateToolError(tool.id)
         self._tools[tool.id] = tool
         return self
+
+    def replace_tool(self, tool: Tool) -> Self:
+        """Replace a tool with a new tool.
+
+        Args:
+            tool (Tool): The tool to replace the existing tool with.
+
+        Returns:
+            Self: A new ToolRegistry with the tool registered.
+
+        """
+        return self.with_tool(tool, overwrite=True)
 
     def get_tool(self, tool_id: str) -> Tool:
         """Retrieve a tool's information.
