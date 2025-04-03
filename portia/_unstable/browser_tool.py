@@ -11,17 +11,14 @@ import json
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, Field, HttpUrl
 
 from portia.clarification import ActionClarification
 from portia.errors import ToolHardError
+from portia.model import LangChainGenerativeModel  # noqa: TC001 - used in Pydantic Schema
 from portia.tool import Tool, ToolRunContext
-
-if TYPE_CHECKING:
-    from portia.model import LangChainGenerativeModel
 
 logger = logging.getLogger(__name__)
 

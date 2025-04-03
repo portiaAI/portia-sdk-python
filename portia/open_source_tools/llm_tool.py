@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
-from portia.model import Message
+from portia.model import GenerativeModel, Message
 from portia.tool import Tool, ToolRunContext
-
-if TYPE_CHECKING:
-    from portia.model import GenerativeModel
 
 
 class LLMToolSchema(BaseModel):

@@ -5,16 +5,14 @@ from __future__ import annotations
 import base64
 import mimetypes
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 
 from langchain.schema import HumanMessage
 from pydantic import BaseModel, Field, model_validator
 
 from portia.errors import ToolHardError
+from portia.model import LangChainGenerativeModel  # noqa: TC001 - used in Pydantic Schema
 from portia.tool import Tool, ToolRunContext
-
-if TYPE_CHECKING:
-    from portia.model import LangChainGenerativeModel
 
 
 class ImageUnderstandingToolSchema(BaseModel):
