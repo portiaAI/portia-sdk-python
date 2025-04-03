@@ -7,17 +7,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from jinja2 import Template
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 from langchain_core.messages import ToolMessage
 from langgraph.graph import MessagesState  # noqa: TC002
 
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.planning_agents.context import get_tool_descriptions_for_tools
 
 if TYPE_CHECKING:
+    from portia.config import Config
     from portia.model import GenerativeModel
     from portia.plan import Step
     from portia.tool import Tool
@@ -58,6 +60,7 @@ class StepSummarizer:
 
     def __init__(
         self,
+        config: Config,
         model: GenerativeModel,
         tool: Tool,
         step: Step,
@@ -66,12 +69,14 @@ class StepSummarizer:
         """Initialize the model.
 
         Args:
+            config (Config): The configuration for the run.
             model (GenerativeModel): The language model used for summarization.
             tool (Tool): The tool used for summarization.
             step (Step): The step that produced the output.
             summary_max_length (int): The maximum length of the summary. Default is 500 characters.
 
         """
+        self.config = config
         self.model = model
         self.summary_max_length = summary_max_length
         self.tool = tool
@@ -104,6 +109,13 @@ class StepSummarizer:
 
         logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
         tool_output = last_message.content
+        if self.config.exceeds_output_threshold(tool_output):
+            tool_output = (
+                f"This is a large value (full length: {len(str(tool_output))} characters) - it is "
+                "too long to provide the full value, but it starts with:"
+                f"{self._truncate(tool_output, self.config.large_output_threshold_tokens)}"
+            )
+
         try:
             response: Message = self.model.get_response(
                 messages=[
@@ -122,3 +134,8 @@ class StepSummarizer:
             logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
 
         return {"messages": [last_message]}
+
+    def _truncate(self, content: str | dict | list[str | dict], max_len_chars: int) -> str:
+        """Truncate a value so it is no longer than max_len_chars."""
+        content_str = Template("{{ content }}").render(content=str(content))
+        return content_str[:max_len_chars]
