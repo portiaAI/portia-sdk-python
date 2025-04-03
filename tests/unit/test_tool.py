@@ -1,5 +1,6 @@
 """Tests for the Tool class."""
 
+from enum import Enum, StrEnum
 import json
 from unittest.mock import MagicMock, patch
 
@@ -514,8 +515,11 @@ def test_portia_mcp_tool_call() -> None:
         isError=False,
     )
 
+    class MyEnum(str, Enum):
+        A = "A"
+
     class TestArgSchema(BaseModel):
-        a: int
+        a: MyEnum
         b: int
 
     tool = PortiaMcpTool(
