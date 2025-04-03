@@ -86,7 +86,7 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Large output threshold value
     c = Config.from_default(
-        large_output_threshold_value=100,
+        large_output_threshold_tokens=100,
         feature_flags={
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
         },
@@ -94,7 +94,7 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.large_output_threshold_tokens == 100
     assert c.exceeds_output_threshold("Test " * 1000)
     c = Config.from_default(
-        large_output_threshold_value=100,
+        large_output_threshold_tokens=100,
         feature_flags={
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: False,
         },

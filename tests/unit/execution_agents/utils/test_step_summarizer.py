@@ -95,7 +95,7 @@ def test_summarizer_model_large_output() -> None:
     summarizer_model = StepSummarizer(
         # Set a low threshold so the above output is considered large
         config=get_test_config(
-            large_output_threshold_value=100,
+            large_output_threshold_tokens=100,
             feature_flags={
                 FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             },

@@ -568,7 +568,7 @@ class Portia:
                 last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = LocalOutput(value=str(e))
-                self._save_output(error_output, step.output, plan_run)
+                self._set_step_output(error_output, plan_run, step)
                 plan_run.outputs.final_output = error_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
                 logger().error(
@@ -584,7 +584,7 @@ class Portia:
                 )
                 return plan_run
             else:
-                self._save_output(last_executed_step_output, step.output, plan_run)
+                self._set_step_output(last_executed_step_output, plan_run, step)
                 logger().info(
                     f"Step output - {last_executed_step_output.summary!s}",
                 )
@@ -700,13 +700,13 @@ class Portia:
                     value=PreStepIntrospectionOutcome.SKIP,
                     summary=pre_step_outcome.reason,
                 )
-                self._save_output(output, step.output, plan_run)
+                self._set_step_output(output, plan_run, step)
             case PreStepIntrospectionOutcome.COMPLETE:
                 output = LocalOutput(
                     value=PreStepIntrospectionOutcome.COMPLETE,
                     summary=pre_step_outcome.reason,
                 )
-                self._save_output(output, step.output, plan_run)
+                self._set_step_output(output, plan_run, step)
                 if last_executed_step_output:
                     plan_run.outputs.final_output = self._get_final_output(
                         plan,
@@ -719,7 +719,7 @@ class Portia:
                     value=PreStepIntrospectionOutcome.FAIL,
                     summary=pre_step_outcome.reason,
                 )
-                self._save_output(failed_output, step.output, plan_run)
+                self._set_step_output(failed_output, plan_run, step)
                 plan_run.outputs.final_output = failed_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         return (plan_run, pre_step_outcome)
@@ -879,12 +879,18 @@ class Portia:
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config)
 
-    def _save_output(self, output: Output, output_name: str, plan_run: PlanRun) -> None:
-        """Save an output to agent memory if it is large enough."""
-        if self.config.exceeds_output_threshold(
-            output.serialize_value(),
-        ):
-            output = self.storage.save_plan_run_output(output_name, output, plan_run.id)
+    def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> None:
+        """Set the output for a step."""
+        plan_run.outputs.step_outputs[step.output] = output
+        self._persist_step_state(plan_run, step)
 
-        plan_run.outputs.step_outputs[output_name] = output
+    def _persist_step_state(self, plan_run: PlanRun, step: Step) -> None:
+        """Ensure the plan run state is persisted to storage."""
+        step_output = plan_run.outputs.step_outputs[step.output]
+        if isinstance(step_output, LocalOutput) and self.config.exceeds_output_threshold(
+            step_output.serialize_value(),
+        ):
+            step_output = self.storage.save_plan_run_output(step.output, step_output, plan_run.id)
+            plan_run.outputs.step_outputs[step.output] = step_output
+
         self.storage.save_plan_run(plan_run)

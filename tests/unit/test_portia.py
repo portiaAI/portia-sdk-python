@@ -72,12 +72,16 @@ def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
 
 
 @pytest.fixture
-def portia_with_agent_memory() -> Portia:
+def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
         # Set a small threshold value so all outputs are stored in agent memory
         feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
-        large_output_threshold_value=10,
+        large_output_threshold_tokens=3,
+        custom_models={
+            PLANNING_MODEL_KEY: planning_model,
+            DEFAULT_MODEL_KEY: default_model,
+        },
     )
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
@@ -550,7 +554,10 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         assert call_args["plan_run"].id == plan_run.id
 
 
-def test_portia_run_query_with_memory(portia_with_agent_memory: Portia) -> None:
+def test_portia_run_query_with_memory(
+    portia_with_agent_memory: Portia,
+    planning_model: MagicMock,
+) -> None:
     """Test run_query sets both final output and summary correctly."""
     query = "What activities can I do in London based on weather?"
 

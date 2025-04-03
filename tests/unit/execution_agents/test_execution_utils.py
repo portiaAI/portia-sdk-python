@@ -71,7 +71,7 @@ def test_next_state_after_tool_call_with_large_output() -> None:
     config = get_test_config(
         # Set a small threshold value so all outputs are stored in agent memory
         feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
-        large_output_threshold_value=10,
+        large_output_threshold_tokens=10,
     )
     result = next_state_after_tool_call(config, state, tool)
     assert result == AgentNode.SUMMARIZER
