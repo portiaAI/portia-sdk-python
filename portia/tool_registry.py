@@ -16,14 +16,14 @@ Classes:
 from __future__ import annotations
 
 import asyncio
-from enum import Enum, StrEnum
 import os
 import re
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Callable, Literal, Union
 
+from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model
-from regex import F
 
 from portia.cloud import PortiaCloudClient
 from portia.errors import DuplicateToolError, ToolNotFoundError
@@ -640,14 +640,11 @@ def generate_pydantic_model_from_json_schema(
         type[BaseModel]: The generated Pydantic model class.
 
     """
-
-    from jsonref import replace_refs
-
     schema_without_refs = replace_refs(json_schema, proxies=False)
 
     # Extract properties and required fields
-    properties = schema_without_refs.get("properties", {})
-    required = set(schema_without_refs.get("required", []))
+    properties = schema_without_refs.get("properties", {})  # type: ignore  # noqa: PGH003
+    required = set(schema_without_refs.get("required", []))  # type: ignore  # noqa: PGH003
 
     # Define fields for the model
     fields = dict(
