@@ -273,8 +273,6 @@ class LogLevel(Enum):
 PLANNING_MODEL_KEY = "planning_model_name"
 EXECUTION_MODEL_KEY = "execution_model_name"
 INTROSPECTION_MODEL_KEY = "introspection_model_name"
-LLM_TOOL_MODEL_KEY = "llm_tool_model_name"
-IMAGE_TOOL_MODEL_KEY = "image_tool_model_name"
 SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 PLANNING_DEFAULT_MODEL_KEY = "planning_default_model_name"
@@ -454,14 +452,14 @@ class Config(BaseModel):
             return self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
         return self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
 
-    def resolve_model(self, usage: str) -> GenerativeModel:
+    def resolve_model(self, usage: str = DEFAULT_MODEL_KEY) -> GenerativeModel:
         """Resolve a model from the config."""
         if usage in self.custom_models:
             return self.custom_models[usage]
         model = self.model(usage)
         return self._construct_model(model)
 
-    def resolve_langchain_model(self, usage: str) -> LangChainGenerativeModel:
+    def resolve_langchain_model(self, usage: str = DEFAULT_MODEL_KEY) -> LangChainGenerativeModel:
         """Resolve a LangChain model from the config."""
         model = self.resolve_model(usage)
         if isinstance(model, LangChainGenerativeModel):
@@ -715,8 +713,6 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         PLANNING_MODEL_KEY,
         INTROSPECTION_MODEL_KEY,
         EXECUTION_MODEL_KEY,
-        LLM_TOOL_MODEL_KEY,
-        IMAGE_TOOL_MODEL_KEY,
         SUMMARISER_MODEL_KEY,
     ]:
         model_name = kwargs.pop(model_usage, llm_model_name)

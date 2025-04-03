@@ -8,7 +8,7 @@ from portia.plan import Plan, PlanContext, Step
 from portia.plan_run import PlanRun, PlanRunState
 from portia.portia import Portia
 from portia.tool import Tool, ToolRunContext
-from portia.tool_registry import InMemoryToolRegistry
+from portia.tool_registry import ToolRegistry
 
 
 class ExecutionContextTrackerTool(Tool):
@@ -52,7 +52,7 @@ def get_test_plan_run() -> tuple[Plan, PlanRun]:
 def test_portia_no_execution_context_new() -> None:
     """Test running a query."""
     tool = ExecutionContextTrackerTool()
-    tool_registry = InMemoryToolRegistry.from_local_tools([tool])
+    tool_registry = ToolRegistry([tool])
     portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
     (plan, plan_run) = get_test_plan_run()
     portia.storage.save_plan(plan)
@@ -66,7 +66,7 @@ def test_portia_no_execution_context_new() -> None:
 def test_portia_no_execution_context_existing() -> None:
     """Test running a query."""
     tool = ExecutionContextTrackerTool()
-    tool_registry = InMemoryToolRegistry.from_local_tools([tool])
+    tool_registry = ToolRegistry([tool])
     portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
     (plan, plan_run) = get_test_plan_run()
     plan_run.execution_context = ExecutionContext(end_user_id="123")
@@ -82,7 +82,7 @@ def test_portia_no_execution_context_existing() -> None:
 def test_portia_with_execution_context_new() -> None:
     """Test running a query."""
     tool = ExecutionContextTrackerTool()
-    tool_registry = InMemoryToolRegistry.from_local_tools([tool])
+    tool_registry = ToolRegistry([tool])
     portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
     (plan, plan_run) = get_test_plan_run()
     portia.storage.save_plan(plan)
@@ -99,7 +99,7 @@ def test_portia_with_execution_context_new() -> None:
 def test_portia_with_execution_context_existing() -> None:
     """Test running a query."""
     tool = ExecutionContextTrackerTool()
-    tool_registry = InMemoryToolRegistry.from_local_tools([tool])
+    tool_registry = ToolRegistry([tool])
     portia = Portia(tools=tool_registry, config=default_config(storage_class=StorageClass.MEMORY))
     (plan, plan_run) = get_test_plan_run()
     plan_run.execution_context = ExecutionContext()

@@ -10,8 +10,8 @@ from typing import Any, Self
 from langchain.schema import HumanMessage
 from pydantic import BaseModel, Field, model_validator
 
-from portia.config import IMAGE_TOOL_MODEL_KEY
 from portia.errors import ToolHardError
+from portia.model import LangChainGenerativeModel  # noqa: TC001 - used in Pydantic Schema
 from portia.tool import Tool, ToolRunContext
 
 
@@ -63,9 +63,16 @@ class ImageUnderstandingTool(Tool[str]):
         """
     tool_context: str = ""
 
+    model: LangChainGenerativeModel | None = Field(
+        default=None,
+        exclude=True,
+        description="The model to use for the ImageUnderstandingTool. If not provided, "
+        "the model will be resolved from the config.",
+    )
+
     def run(self, ctx: ToolRunContext, **kwargs: Any) -> str:
         """Run the ImageTool."""
-        model = ctx.config.resolve_langchain_model(IMAGE_TOOL_MODEL_KEY)
+        model = self.model or ctx.config.resolve_langchain_model()
 
         tool_schema = ImageUnderstandingToolSchema(**kwargs)
 
