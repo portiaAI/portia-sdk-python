@@ -5,39 +5,6 @@ from portia.plan import Plan, PlanContext, Step, Variable
 DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
-            query="Send hello@portialabs.ai an email with a summary of the latest news on AI",
-            tool_ids=[
-                "search_tool",
-                "portia::google_gmail::send_email_tool",
-                "portia::provider::other_tool",
-            ],
-        ),
-        steps=[
-            Step(
-                task="Find and summarize the latest news on artificial intelligence",
-                tool_id="search_tool",
-                output="$ai_search_results",
-            ),
-            Step(
-                task="Email $email politely with $ai_search_results",
-                inputs=[
-                    Variable(
-                        name="$ai_search_results",
-                        description="summary of AI news",
-                    ),
-                    Variable(
-                        name="$email",
-                        value="hello@portialabs.ai",
-                        description="The email address to send the email to",
-                    ),
-                ],
-                tool_id="portia::google_gmail::send_email_tool",
-                output="$final_output",
-            ),
-        ],
-    ),
-    Plan(
-        plan_context=PlanContext(
             query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
             tool_ids=[
                 "search_tool",
@@ -108,39 +75,6 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     ),
     Plan(
         plan_context=PlanContext(
-            query="Send an email to hello@portialabs.ai with the weather in London",
-            tool_ids=[
-                "weather_tool",
-                "portia::google_gmail::send_email_tool",
-                "portia::provider::other_tool",
-            ],
-        ),
-        steps=[
-            Step(
-                task="What is the weather in London?",
-                tool_id="weather_tool",
-                output="$london_weather",
-            ),
-            Step(
-                task="Email $email_address politely with $london_weather",
-                inputs=[
-                    Variable(
-                        name="$london_weather",
-                        description="Weather in London",
-                    ),
-                    Variable(
-                        name="$email_address",
-                        value="hello@portialabs.ai",
-                        description="The email address",
-                    ),
-                ],
-                tool_id="portia::google_gmail::send_email_tool",
-                output="$email_sent",
-            ),
-        ],
-    ),
-    Plan(
-        plan_context=PlanContext(
             query="If the weather in London hotter than 10C, sum it with the weather in Cairo and "
             "send the result to hello@portialabs.ai",
             tool_ids=[
@@ -164,28 +98,59 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             Step(
                 task="Sum the weather in London and Cairo",
                 inputs=[
-                    Variable(name="$london_weather", description="Weather in London"),
-                    Variable(name="$cairo_weather", description="Weather in Cairo"),
+                    Variable(
+                        name="$london_weather",
+                        description="Weather in London",
+                    ),
+                    Variable(
+                        name="$cairo_weather",
+                        description="Weather in Cairo",
+                    ),
                 ],
                 output="$weather_sum",
                 condition="if $london_weather is hotter than 10C",
             ),
             Step(
-                task="Email $email_address politely with $weather_sum",
+                task="Email hello@portialabs.ai with $weather_sum",
                 inputs=[
                     Variable(
                         name="$weather_sum",
                         description="Sum of the weather in London and Cairo",
                     ),
-                    Variable(
-                        name="$email_address",
-                        value="hello@portialabs.ai",
-                        description="The email address",
-                    ),
                 ],
                 tool_id="portia::google_gmail::send_email_tool",
                 output="$email_sent",
                 condition="if $london_weather is hotter than 10C",
+            ),
+        ],
+    ),
+    Plan(
+        plan_context=PlanContext(
+            query="Get my (john@jo.co) availability from Google Calendar tomorrow between \
+              10:00 and 17:00\n- Schedule a 30 minute meeting with hello@jo.co at a time \
+              that works for me",
+            tool_ids=[
+                "portia::google_calendar::get_availability",
+                "portia::google_calendar::create_event",
+            ],
+        ),
+        steps=[
+            Step(
+                task="Get the availability of john@jo.co from Google Calendar tomorrow \
+                    between 10:00 and 17:00",
+                tool_id="portia::google_calendar::get_availability",
+                output="$availability",
+            ),
+            Step(
+                task="Schedule a 30 minute meeting with hello@jo.co at a time that works for me",
+                tool_id="portia::google_calendar::create_event",
+                inputs=[
+                    Variable(
+                        name="$availability",
+                        description="Availability of john@jo.co",
+                    ),
+                ],
+                output="$event_created",
             ),
         ],
     ),

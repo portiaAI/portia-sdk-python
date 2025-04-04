@@ -19,11 +19,10 @@ def inputs() -> list[Variable]:
     return [
         Variable(
             name="$email_address",
-            value="test@example.com",
             description="Target recipient for email",
         ),
         Variable(name="$email_body", description="Content for email"),
-        Variable(name="$email_title", value="Example email", description="Title for email"),
+        Variable(name="$email_title", description="Title for email"),
     ]
 
 
@@ -32,6 +31,8 @@ def outputs() -> dict[str, Output]:
     """Return a dictionary of outputs for pytest fixtures."""
     return {
         "$email_body": Output(value="The body of the email"),
+        "$email_title": Output(value="Example email"),
+        "$email_address": Output(value="test@example.com"),
         "$london_weather": Output(value="rainy"),
     }
 
@@ -39,6 +40,7 @@ def outputs() -> dict[str, Output]:
 def test_context_empty() -> None:
     """Test that the context is set up correctly."""
     (_, plan_run) = get_test_plan_run()
+    plan_run.outputs.step_outputs = {}
     context = build_context(
         ExecutionContext(),
         Step(inputs=[], output="", task=""),
@@ -51,6 +53,7 @@ def test_context_empty() -> None:
 def test_context_execution_context() -> None:
     """Test that the context is set up correctly."""
     (plan, plan_run) = get_test_plan_run()
+
     context = build_context(
         ExecutionContext(additional_data={"user_id": "123"}),
         plan.steps[0],
@@ -59,20 +62,6 @@ def test_context_execution_context() -> None:
     assert "System Context:" in context
     assert "user_id" in context
     assert "123" in context
-
-
-def test_context_inputs_only(inputs: list[Variable]) -> None:
-    """Test that the context is set up correctly with inputs."""
-    (plan, plan_run) = get_test_plan_run()
-    plan.steps[0].inputs = inputs
-    context = build_context(
-        ExecutionContext(),
-        plan.steps[0],
-        plan_run,
-    )
-    for variable in inputs:
-        if variable.value:
-            assert variable.value in context
 
 
 def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, Output]) -> None:
@@ -86,8 +75,7 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
         plan_run,
     )
     for variable in inputs:
-        if variable.value:
-            assert variable.value in context
+        assert variable.name in context
     for name, output in outputs.items():
         assert name in context
         if output.value:
@@ -215,8 +203,7 @@ def test_context_inputs_outputs_clarifications(
         plan_run,
     )
     for variable in inputs:
-        if variable.value:
-            assert variable.value in context
+        assert variable.name in context
     for name, output in outputs.items():
         assert name in context
         if output.value:
