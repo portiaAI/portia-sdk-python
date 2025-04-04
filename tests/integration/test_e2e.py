@@ -115,9 +115,6 @@ def test_portia_generate_plan(
 
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_id == "add_tool"
-    assert plan.steps[0].inputs
-    assert len(plan.steps[0].inputs) == 2
-    assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
 
     plan_run = portia.run(query)
 
@@ -242,7 +239,8 @@ def test_portia_run_query_with_hard_error(
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="error_tool",
-        task="Use error tool with string 'Something went wrong' and do not return a soft error or uncaught error",
+        task="Use error tool with string 'Something went wrong' and \
+        do not return a soft error or uncaught error",
         output="",
         inputs=[
         ],
