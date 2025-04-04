@@ -39,15 +39,15 @@ class Message(BaseModel):
         """
         if isinstance(message, HumanMessage):
             return cls.model_validate(
-                {"role": "user", "content": message.content},
+                {"role": "user", "content": message.content or ""},
             )
         if isinstance(message, AIMessage):
             return cls.model_validate(
-                {"role": "assistant", "content": message.content},
+                {"role": "assistant", "content": message.content or ""},
             )
         if isinstance(message, SystemMessage):
             return cls.model_validate(
-                {"role": "system", "content": message.content},
+                {"role": "system", "content": message.content or ""},
             )
         raise ValueError(f"Unsupported message type: {type(message)}")
 

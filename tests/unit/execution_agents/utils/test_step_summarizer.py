@@ -2,23 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
-
-from portia.plan import Step
-
-if TYPE_CHECKING:
-    from pydantic import BaseModel
+from langchain_core.messages import AIMessage, ToolMessage
 
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
 from portia.execution_agents.output import LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
+from portia.plan import Step
 from tests.utils import (
     AdditionTool,
-    get_mock_base_chat_model,
+    get_mock_langchain_generative_model,
     get_test_config,
-    get_test_llm_wrapper,
 )
 
 
@@ -26,7 +19,7 @@ def test_summarizer_model_normal_output() -> None:
     """Test the summarizer model with valid tool message."""
     summary = AIMessage(content="Short summary")
     tool = AdditionTool()
-    mock_invoker = get_mock_base_chat_model(response=summary)
+    mock_model = get_mock_langchain_generative_model(response=summary)
     tool_message = ToolMessage(
         content="Tool output content",
         tool_call_id="123",
@@ -36,14 +29,15 @@ def test_summarizer_model_normal_output() -> None:
 
     summarizer_model = StepSummarizer(
         config=get_test_config(),
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=tool,
         step=Step(task="Test task", output="$output"),
     )
+    base_chat_model = mock_model.to_langchain()
     result = summarizer_model.invoke({"messages": [tool_message]})
 
-    assert mock_invoker.invoke.called
-    messages: list[BaseMessage] = mock_invoker.invoke.call_args[0][0]
+    assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
+    messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "Tool output content" in messages[1].content
@@ -56,42 +50,41 @@ def test_summarizer_model_normal_output() -> None:
 
 def test_summarizer_model_non_tool_message() -> None:
     """Test the summarizer model with non-tool message should not invoke the LLM."""
-    mock_invoker = get_mock_base_chat_model()
+    mock_model = get_mock_langchain_generative_model()
     ai_message = AIMessage(content="AI message content")
 
     summarizer_model = StepSummarizer(
         config=get_test_config(),
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": [ai_message]})
 
-    assert not mock_invoker.invoke.called
+    assert not mock_model.to_langchain().invoke.called  # type: ignore[reportFunctionMemberAccess]
     assert result["messages"][0] == ai_message
 
 
 def test_summarizer_model_no_messages() -> None:
     """Test the summarizer model with empty message list should not invoke the LLM."""
-    mock_invoker = get_mock_base_chat_model()
+    mock_model = get_mock_langchain_generative_model()
 
     summarizer_model = StepSummarizer(
         config=get_test_config(),
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
     result = summarizer_model.invoke({"messages": []})
 
-    assert not mock_invoker.invoke.called
+    assert not mock_model.to_langchain().invoke.called  # type: ignore[reportFunctionMemberAccess]
     assert result["messages"] == [None]
 
 
 def test_summarizer_model_large_output() -> None:
     """Test the summarizer model with large output."""
     summary = AIMessage(content="Short summary")
-    mock_invoker = get_mock_base_chat_model(response=summary)
-
+    mock_model = get_mock_langchain_generative_model(response=summary)
     tool_message = ToolMessage(
         content="Test " * 1000,
         tool_call_id="123",
@@ -102,19 +95,20 @@ def test_summarizer_model_large_output() -> None:
     summarizer_model = StepSummarizer(
         # Set a low threshold so the above output is considered large
         config=get_test_config(
-            large_output_threshold_value=100,
+            large_output_threshold_tokens=100,
             feature_flags={
                 FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             },
         ),
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
+    base_chat_model = mock_model.to_langchain()
     result = summarizer_model.invoke({"messages": [tool_message]})
 
-    assert mock_invoker.invoke.called
-    messages: list[BaseMessage] = mock_invoker.invoke.call_args[0][0]
+    assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
+    messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert messages
     assert "You are a highly skilled summarizer" in messages[0].content
     assert "This is a large value" in messages[1].content
@@ -133,12 +127,8 @@ def test_summarizer_model_error_handling() -> None:
     class TestError(Exception):
         """Test error."""
 
-    def mock_invoke(**_: Any) -> AIMessage | BaseModel:
-        """Mock invoke that raises an error."""
-        raise TestError("Test error")
-
-    mock_invoker = get_mock_base_chat_model()
-    mock_invoker.invoke = mock_invoke  # type: ignore  # noqa: PGH003
+    mock_model = get_mock_langchain_generative_model()
+    mock_model.to_langchain().invoke.side_effect = TestError("Test error")  # type: ignore[reportFunctionMemberAccess]
 
     tool_message = ToolMessage(
         content="Tool output content",
@@ -149,7 +139,7 @@ def test_summarizer_model_error_handling() -> None:
 
     summarizer_model = StepSummarizer(
         config=get_test_config(),
-        llm=get_test_llm_wrapper(mock_invoker).to_langchain(),
+        model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )

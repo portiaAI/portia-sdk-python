@@ -10,17 +10,17 @@ from typing import TYPE_CHECKING, Any
 from jinja2 import Template
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
-from langchain_core.messages import BaseMessage, ToolMessage
+from langchain_core.messages import ToolMessage
 from langgraph.graph import MessagesState  # noqa: TC002
 
 from portia.execution_agents.output import Output
 from portia.logger import logger
+from portia.model import GenerativeModel, Message
 from portia.planning_agents.context import get_tool_descriptions_for_tools
 
 if TYPE_CHECKING:
-    from langchain.chat_models.base import BaseChatModel
-
     from portia.config import Config
+    from portia.model import GenerativeModel
     from portia.plan import Step
     from portia.tool import Tool
 
@@ -32,7 +32,7 @@ class StepSummarizer:
 
     Attributes:
         summarizer_prompt (ChatPromptTemplate): The prompt template used to generate the summary.
-        llm (BaseChatModel): The language model used for summarization.
+        model (GenerativeModel): The language model used for summarization.
         summary_max_length (int): The maximum length of the summary.
         step (Step): The step that produced the output.
 
@@ -61,7 +61,7 @@ class StepSummarizer:
     def __init__(
         self,
         config: Config,
-        llm: BaseChatModel,
+        model: GenerativeModel,
         tool: Tool,
         step: Step,
         summary_max_length: int = 500,
@@ -70,14 +70,14 @@ class StepSummarizer:
 
         Args:
             config (Config): The configuration for the run.
-            llm (BaseChatModel): The language model used for summarization.
+            model (GenerativeModel): The language model used for summarization.
             tool (Tool): The tool used for summarization.
             step (Step): The step that produced the output.
             summary_max_length (int): The maximum length of the summary. Default is 500 characters.
 
         """
         self.config = config
-        self.llm = llm
+        self.model = model
         self.summary_max_length = summary_max_length
         self.tool = tool
         self.step = step
@@ -113,19 +113,23 @@ class StepSummarizer:
             tool_output = (
                 f"This is a large value (full length: {len(str(tool_output))} characters) - it is "
                 "too long to provide the full value, but it starts with:"
-                f"{self._truncate(tool_output, self.config.large_output_threshold_value)}"
+                f"{self._truncate(tool_output, self.config.large_output_threshold_tokens)}"
             )
 
         try:
-            summary: BaseMessage = self.llm.invoke(
-                self.summarizer_prompt.format_messages(
-                    tool_output=tool_output,
-                    max_length=self.summary_max_length,
-                    tool_description=get_tool_descriptions_for_tools([self.tool]),
-                    task_description=self.step.task,
-                ),
+            response: Message = self.model.get_response(
+                messages=[
+                    Message.from_langchain(m)
+                    for m in self.summarizer_prompt.format_messages(
+                        tool_output=tool_output,
+                        max_length=self.summary_max_length,
+                        tool_description=get_tool_descriptions_for_tools([self.tool]),
+                        task_description=self.step.task,
+                    )
+                ],
             )
-            last_message.artifact.summary = summary.content  # type: ignore[attr-defined]
+            summary = response.content
+            last_message.artifact.summary = summary  # type: ignore[attr-defined]
         except Exception as e:  # noqa: BLE001 - we want to catch all exceptions
             logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
 

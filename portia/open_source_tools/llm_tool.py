@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from langchain.schema import HumanMessage
 from pydantic import BaseModel, Field
 
 from portia.config import LLM_TOOL_MODEL_KEY
-from portia.llm_wrapper import LLMWrapper
+from portia.model import Message
 from portia.tool import Tool, ToolRunContext
 
 
@@ -57,7 +56,7 @@ class LLMTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, task: str) -> str:
         """Run the LLMTool."""
-        llm = LLMWrapper.for_usage(LLM_TOOL_MODEL_KEY, ctx.config).to_langchain()
+        model = ctx.config.resolve_model(LLM_TOOL_MODEL_KEY)
 
         # Define system and user messages
         context = (
@@ -71,8 +70,8 @@ class LLMTool(Tool[str]):
             context += f"\nTool context: {self.tool_context}"
         content = task if not len(context.split("\n")) > 1 else f"{context}\n\n{task}"
         messages = [
-            HumanMessage(content=self.prompt),
-            HumanMessage(content=content),
+            Message(role="user", content=self.prompt),
+            Message(role="user", content=content),
         ]
-        response = llm.invoke(messages)
+        response = model.get_response(messages)
         return str(response.content)
