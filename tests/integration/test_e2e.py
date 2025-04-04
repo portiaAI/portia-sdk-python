@@ -149,13 +149,9 @@ def test_portia_run_query_with_clarifications(
     )
     clarification_step = Step(
         tool_id="clarification_tool",
-        task="Use tool",
+        task="Raise a clarification with user guidance 'Return a clarification'",
         output="",
         inputs=[
-            Variable(
-                name="user_guidance",
-                description="",
-            ),
         ],
     )
     plan = Plan(
