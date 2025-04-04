@@ -188,7 +188,7 @@ class MemoryExtractionModel:
         self.agent = agent
         self.tools = tools
 
-    def invoke(self, _: MessagesState) -> dict[str, Any]:
+    def invoke(self, _: MessagesState) -> None:
         """Invoke the model with the given message state.
 
         Args:
@@ -201,6 +201,9 @@ class MemoryExtractionModel:
             InvalidRunStateError: If the agent's tool is not available.
 
         """
+        if not self.agent.tool:
+            raise InvalidPlanRunStateError("Memory extraction model has no tool")
+
         formatted_messages = self.memory_model_prompt.format_messages(
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
@@ -217,9 +220,16 @@ class MemoryExtractionModel:
             extraction_response = MemoryExtractionModelOutput.model_validate(response)
         except ValidationError as e:
             logger.error(f"Error validating memory extraction model output: {e}")
+            return
 
-        # @@@ SORT PULLING IN
-        return {"messages": [tool_inputs.model_dump_json(indent=2)] if tool_inputs else []}
+        for input_name in extraction_response.inputs:
+            input_variable = next((i for i in self.agent.step.inputs if i.name == input_name), None)
+            if input_variable:
+                full_output = self.agent.agent_memory.get_plan_run_output(
+                    input_name,
+                    self.agent.plan_run.id,
+                )
+                input_variable.value = full_output.full_value(self.agent.agent_memory)
 
 
 class ParserModel:
@@ -459,6 +469,7 @@ class VerifierModel:
 
         messages = state["messages"]
         tool_args = messages[-1].content
+        tool_inputs = ToolInputs.model_validate_json(tool_args)
         formatted_messages = self.arg_verifier_prompt.format_messages(
             context=self.context,
             task=self.agent.step.task,
@@ -471,7 +482,7 @@ class VerifierModel:
             schema=VerifiedToolInputs,
         )
         response = VerifiedToolInputs.model_validate(response)
-        response.contains_templated_argument = tool_args.get("contains_templated_argument", False)
+        response.contains_templated_argument = tool_inputs.contains_templated_argument
 
         # Validate the arguments against the tool's schema
         response = self._validate_args_against_schema(response)
@@ -790,6 +801,10 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
+            graph.add_node(
+                AgentNode.MEMORY_EXTRACTION,
+                MemoryExtractionModel(model, context, tools, self).invoke,
+            )
             graph.add_edge(START, AgentNode.MEMORY_EXTRACTION)
             graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.ARGUMENT_PARSER)
             graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, context, self).invoke)
