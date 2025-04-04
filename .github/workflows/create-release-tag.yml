@@ -31,6 +31,21 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create tag
-        run: |
-          git tag "v${{ steps.get_version.outputs.version }}"
-          git push origin "v${{ steps.get_version.outputs.version }}" 
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.DEPLOY_PAT_TOKEN }}
+          script: |
+            const version = 'v${{ steps.get_version.outputs.version }}';
+            const sha = context.sha;
+            
+            try {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${version}`,
+                sha: sha
+              });
+              console.log(`Successfully created tag ${version}`);
+            } catch (error) {
+              core.setFailed(`Failed to create tag: ${error.message}`);
+            } 
