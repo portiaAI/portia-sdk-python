@@ -158,7 +158,6 @@ def test_portia_run_query_with_clarifications(
             Variable(
                 name="user_guidance",
                 description="",
-                value="Return a clarification",
             ),
         ],
     )
@@ -199,7 +198,6 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
             Variable(
                 name="user_guidance",
                 description="",
-                value="Return a clarification",
             ),
         ],
     )
@@ -244,24 +242,9 @@ def test_portia_run_query_with_hard_error(
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="error_tool",
-        task="Use tool",
+        task="Use error tool with string 'Something went wrong' and do not return a soft error or uncaught error",
         output="",
         inputs=[
-            Variable(
-                name="error_str",
-                description="",
-                value="Something went wrong",
-            ),
-            Variable(
-                name="return_soft_error",
-                description="",
-                value=False,
-            ),
-            Variable(
-                name="return_uncaught_error",
-                description="",
-                value=False,
-            ),
         ],
     )
     plan = Plan(
@@ -304,19 +287,9 @@ def test_portia_run_query_with_soft_error(
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add 1 + 2",
         output="",
         inputs=[
-            Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=2,
-            ),
         ],
     )
     plan = Plan(
@@ -373,35 +346,19 @@ def test_portia_run_query_with_multiple_clarifications(
 
     step_one = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add 1 + 2",
         output="$step_one",
         inputs=[
-            Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=2,
-            ),
         ],
     )
     step_two = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add $step_one + 40",
         output="",
         inputs=[
             Variable(
-                name="a",
-                description="",
-                value="$step_one",
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=40,
+                name="$step_one",
+                description="value for step one",
             ),
         ],
     )
@@ -480,35 +437,19 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
     step_one = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add 1 + 2",
         output="$step_one",
         inputs=[
-            Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=2,
-            ),
         ],
     )
     step_two = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add $step_one + 1",
         output="",
         inputs=[
             Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value="$step_one",
+                name="$step_one",
+                description="value for step one",
             ),
         ],
     )
@@ -524,7 +465,6 @@ def test_portia_run_query_with_multiple_async_clarifications(
     plan_run = portia.run_plan(plan)
 
     assert plan_run.state == PlanRunState.COMPLETE
-    # 4 = 1 (value a in step 1) + 2 (value b in step 1) + 1 (value a in step 2)
     assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.value == 4
     assert plan_run.outputs.final_output.summary is not None
