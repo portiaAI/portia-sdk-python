@@ -49,18 +49,19 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 Message(
                     role="system",
                     content="You are an outstanding task planner who can leverage many \
-                    tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
-                    steps to respond to a user's prompt. When using multiple tools, pay attention to the arguments \
-                    that tools need to make sure the chain of calls works. If you are missing information do not \
-                    make up placeholder variables like example@example.com. If you can't come up with a plan \
-                    provide a descriptive error instead - do not return plans with no steps. For EVERY tool that \
-                    requires an id as an input, make sure to check if there's a corresponding tool call that\
-                    provides the id from natural language if possible. For example, if a tool asks for a user ID\
-                    check if there's a tool call that provides the user IDs before making the tool call that \
-                    requires the user ID. For conditional steps: \
-                    1. Task field: Write only the task description without conditions. \
-                    2. Condition field: Write the condition in concise natural language. \
-                    Do not use the condition field for non-conditional steps.",
+    tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
+    steps to respond to a user's prompt. When using multiple tools, pay attention to the  \
+    tools to make sure the chain of steps works, but DO NOT provide any examples or assumptions \
+    in the task descriptions. If you are missing information do not \
+    make up placeholder variables like example@example.com. If you can't come up with a plan \
+    provide a descriptive error instead - do not return plans with no steps. For EVERY tool that \
+    requires an id as an input, make sure to check if there's a corresponding tool call that\
+    provides the id from natural language if possible. For example, if a tool asks for a user ID\
+    check if there's a tool call that provides the user IDs before making the tool call that \
+    requires the user ID. For conditional steps: \
+    1. Task field: Write only the task description without conditions. \
+    2. Condition field: Write the condition in concise natural language. \
+    Do not use the condition field for non-conditional steps.",
                 ),
                 Message(role="user", content=prompt),
             ],
