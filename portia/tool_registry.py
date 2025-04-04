@@ -18,8 +18,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Literal, Union
+from typing import TYPE_CHECKING, Any, Literal, Self, Union
 
 from pydantic import BaseModel, Field, create_model
 
@@ -50,7 +49,7 @@ if TYPE_CHECKING:
     from portia.config import Config
 
 
-class ToolRegistry(ABC):
+class ToolRegistry:
     """ToolRegistry is the base interface for managing tools.
 
     This class defines the essential methods for interacting with tool registries, including
@@ -58,8 +57,8 @@ class ToolRegistry(ABC):
     methods.
 
     Methods:
-        register_tool(tool: Tool) -> None:
-            Registers a new tool in the registry.
+        with_tool(tool: Tool) -> None:
+            Updates a tool based on tool ID or inserts a new tool.
         get_tool(tool_id: str) -> Tool:
             Retrieves a tool by its ID.
         get_tools() -> list[Tool]:
@@ -70,17 +69,49 @@ class ToolRegistry(ABC):
 
     """
 
-    @abstractmethod
-    def register_tool(self, tool: Tool) -> None:
-        """Register a new tool.
+    def __init__(self, tools: dict[str, Tool] | Sequence[Tool] | None = None) -> None:
+        """Initialize the tool registry with a sequence or dictionary of tools.
 
         Args:
-            tool (Tool): The tool to be registered.
+            tools (dict[str, Tool] | Sequence[Tool]): A sequence of tools or a
+              dictionary of tool IDs to tools.
 
         """
-        raise NotImplementedError("register_tool is not implemented")
+        if tools is None:
+            self._tools = {}
+        elif not isinstance(tools, dict):
+            self._tools = {tool.id: tool for tool in tools}
+        else:
+            self._tools = tools
 
-    @abstractmethod
+    def with_tool(self, tool: Tool, *, overwrite: bool = False) -> Self:
+        """Update a tool based on tool ID or inserts a new tool.
+
+        Args:
+            tool (Tool): The tool to be added or updated.
+            overwrite (bool): Whether to overwrite an existing tool with the same ID.
+
+        Returns:
+            Self: A new ToolRegistry with the tool registered.
+
+        """
+        if tool.id in self._tools and not overwrite:
+            raise DuplicateToolError(tool.id)
+        self._tools[tool.id] = tool
+        return self
+
+    def replace_tool(self, tool: Tool) -> Self:
+        """Replace a tool with a new tool.
+
+        Args:
+            tool (Tool): The tool to replace the existing tool with.
+
+        Returns:
+            Self: A new ToolRegistry with the tool registered.
+
+        """
+        return self.with_tool(tool, overwrite=True)
+
     def get_tool(self, tool_id: str) -> Tool:
         """Retrieve a tool's information.
 
@@ -94,9 +125,10 @@ class ToolRegistry(ABC):
             ToolNotFoundError: If the tool with the given ID does not exist.
 
         """
-        raise NotImplementedError("get_tool is not implemented")
+        if tool_id not in self._tools:
+            raise ToolNotFoundError(tool_id)
+        return self._tools[tool_id]
 
-    @abstractmethod
     def get_tools(self) -> list[Tool]:
         """Get all tools registered with the registry.
 
@@ -104,7 +136,7 @@ class ToolRegistry(ABC):
             list[Tool]: A list of all tools in the registry.
 
         """
-        raise NotImplementedError("get_tools is not implemented")
+        return list(self._tools.values())
 
     def match_tools(
         self,
@@ -154,113 +186,34 @@ class ToolRegistry(ABC):
             other (ToolRegistry): Another tool registry to be combined.
 
         Returns:
-            AggregatedToolRegistry: A new tool registry containing tools from both registries.
+            ToolRegistry: A new tool registry containing tools from both registries.
 
         """
         return self._add(other)
 
-    def _add(self, other: ToolRegistry | list[Tool]) -> AggregatedToolRegistry:
+    def _add(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Add a tool registry or Tool list to the current registry."""
-        other_registry = (
-            other
-            if isinstance(other, ToolRegistry)
-            else InMemoryToolRegistry.from_local_tools(other)
-        )
+        other_registry = other if isinstance(other, ToolRegistry) else ToolRegistry(other)
         self_tools = self.get_tools()
         other_tools = other_registry.get_tools()
-        tool_ids = set()
+        tools = {}
         for tool in [*self_tools, *other_tools]:
-            if tool.id in tool_ids:
+            if tool.id in tools:
                 logger().warning(
                     f"Duplicate tool ID found: {tool.id!s}. Unintended behavior may occur.",
                 )
-            tool_ids.add(tool.id)
+            tools[tool.id] = tool
 
-        return AggregatedToolRegistry([self, other_registry])
-
-
-class AggregatedToolRegistry(ToolRegistry):
-    """An interface over a set of tool registries.
-
-    This class aggregates multiple tool registries, allowing the user to retrieve tools from
-    any of the registries in the collection.
-    """
-
-    def __init__(self, registries: list[ToolRegistry]) -> None:
-        """Initialize the aggregated tool registry with a list of registries.
-
-        Args:
-            registries (list[ToolRegistry]): A list of tool registries to aggregate.
-
-        """
-        self.registries = registries
-
-    def register_tool(self, tool: Tool) -> None:
-        """Throw not implemented error as registration should happen in individual registries."""
-        raise NotImplementedError("tool registration should happen in individual registries.")
-
-    def get_tool(self, tool_id: str) -> Tool:
-        """Search across all registries for a given tool, returning the first match.
-
-        Args:
-            tool_id (str): The ID of the tool to retrieve.
-
-        Returns:
-            Tool: The requested tool.
-
-        Raises:
-            ToolNotFoundError: If the tool with the given ID does not exist in any registry.
-
-        """
-        for registry in self.registries:
-            try:
-                return registry.get_tool(tool_id)
-            except ToolNotFoundError:  # noqa: PERF203
-                continue
-        raise ToolNotFoundError(tool_id)
-
-    def get_tools(self) -> list[Tool]:
-        """Get all tools from all registries.
-
-        Returns:
-            list[Tool]: A list of all tools across all registries.
-
-        """
-        tools = []
-        for registry in self.registries:
-            tools += registry.get_tools()
-        return tools
-
-    def match_tools(
-        self,
-        query: str | None = None,
-        tool_ids: list[str] | None = None,
-    ) -> list[Tool]:
-        """Get all tools from all registries that match the query and tool_ids.
-
-        Args:
-            query (str | None): The query to match tools against.
-            tool_ids (list[str] | None): The list of tool ids to match.
-
-        Returns:
-            list[Tool]: A list of tools matching the query from all registries.
-
-        """
-        tools = []
-        for registry in self.registries:
-            tools += registry.match_tools(query, tool_ids)
-        return tools
+        return ToolRegistry(tools)
 
 
 class InMemoryToolRegistry(ToolRegistry):
     """Provides a simple in-memory tool registry.
 
     This class stores tools in memory, allowing for quick access without persistence.
-    """
 
-    def __init__(self) -> None:
-        """Initialize the registry with an empty list of tools."""
-        self.tools = []
+    Warning: This registry is DEPRECATED. Use ToolRegistry instead.
+    """
 
     @classmethod
     def from_local_tools(cls, tools: Sequence[Tool]) -> InMemoryToolRegistry:
@@ -273,58 +226,7 @@ class InMemoryToolRegistry(ToolRegistry):
             InMemoryToolRegistry: A new in-memory tool registry.
 
         """
-        registry = InMemoryToolRegistry()
-        for t in tools:
-            registry.register_tool(t)
-        return registry
-
-    def register_tool(self, tool: Tool) -> None:
-        """Register tool in the in-memory registry.
-
-        Args:
-            tool (Tool): The tool to register.
-
-        Raises:
-            DuplicateToolError: If the tool ID already exists in the registry.
-
-        """
-        if self._get_tool(tool.id):
-            raise DuplicateToolError(tool.id)
-        self.tools.append(tool)
-
-    def _get_tool(self, tool_id: str) -> Tool | None:
-        """Retrieve a tool by ID."""
-        for tool in self.tools:
-            if tool.id == tool_id:
-                return tool
-        return None
-
-    def get_tool(self, tool_id: str) -> Tool:
-        """Get the tool from the in-memory registry.
-
-        Args:
-            tool_id (str): The ID of the tool to retrieve.
-
-        Returns:
-            Tool: The requested tool.
-
-        Raises:
-            ToolNotFoundError: If the tool with the given ID does not exist.
-
-        """
-        tool = self._get_tool(tool_id)
-        if not tool:
-            raise ToolNotFoundError(tool_id)
-        return tool
-
-    def get_tools(self) -> list[Tool]:
-        """Get all tools in the in-memory registry.
-
-        Returns:
-            list[Tool]: A list of all tools in the registry.
-
-        """
-        return self.tools
+        return cls(tools)
 
 
 class PortiaToolRegistry(ToolRegistry):
@@ -342,51 +244,46 @@ class PortiaToolRegistry(ToolRegistry):
 
     def __init__(
         self,
-        config: Config,
-        tools: dict[str, Tool] | None = None,
+        config: Config | None = None,
         client: httpx.Client | None = None,
+        tools: dict[str, Tool] | None = None,
     ) -> None:
         """Initialize the PortiaToolRegistry with the given configuration.
 
         Args:
-            config (Config): The configuration containing the API key and endpoint.
-            tools (list[Tool] | None): A list of tools to create the registry with.
-              If not provided, all tools will be loaded from the Portia API.
+            config (Config | None): The configuration containing the API key and endpoint.
             client (httpx.Client | None): An optional httpx client to use. If not provided, a new
               client will be created.
+            tools (dict[str, Tool] | None): A dictionary of tool IDs to tools to create the
+              registry with. If not provided, all tools will be loaded from the Portia API.
 
         """
-        self.config = config
-        self.client = client or PortiaCloudClient().get_client(config)
-        self.tools = tools or self._load_tools()
+        if tools is not None:
+            super().__init__(tools)
+        elif client is not None:
+            super().__init__(self._load_tools(client))
+        elif config is not None:
+            client = PortiaCloudClient().get_client(config)
+            super().__init__(self._load_tools(client))
+        else:
+            raise ValueError("Either config or client must be provided")
 
-    @classmethod
-    def with_default_tool_filter(cls, config: Config) -> ToolRegistry:
+    def with_default_tool_filter(self) -> PortiaToolRegistry:
         """Create a PortiaToolRegistry with a default tool filter."""
-        return PortiaToolRegistry(config).filter_tools(cls.default_tool_filter)
+        return PortiaToolRegistry(
+            tools={
+                tool.id: tool
+                for tool in self.get_tools()
+                if not any(
+                    re.match(regex, tool.id) for regex in self.EXCLUDED_BY_DEFAULT_TOOL_REGEXS
+                )
+            },
+        )
 
     @classmethod
-    def default_tool_filter(cls, tool: Tool) -> bool:
-        """Filter to get the default set of tools offered by Portia cloud."""
-        return not any(re.match(regex, tool.id) for regex in cls.EXCLUDED_BY_DEFAULT_TOOL_REGEXS)
-
-    @classmethod
-    def with_unauthenticated_client(
-        cls,
-        config: Config,
-        *,
-        with_default_tool_filter: bool = True,
-    ) -> ToolRegistry:
-        """Create a PortiaToolRegistry with an unauthenticated client."""
-        client = PortiaCloudClient.new_client(config, allow_unauthenticated=True)
-        registry = cls(config, client=client)
-        if with_default_tool_filter:
-            registry = registry.filter_tools(cls.default_tool_filter)
-        return registry
-
-    def _load_tools(self) -> dict[str, Tool]:
+    def _load_tools(cls, client: httpx.Client) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
-        response = self.client.get(
+        response = client.get(
             url="/api/v0/tools/descriptions/",
         )
         response.raise_for_status()
@@ -406,52 +303,10 @@ class PortiaToolRegistry(ToolRegistry):
                     raw_tool["description"]["output_description"],
                 ),
                 # pass API info
-                client=self.client,
+                client=client,
             )
             tools[raw_tool["tool_id"]] = tool
         return tools
-
-    def register_tool(self, tool: Tool) -> None:
-        """Throw not implemented error as registration can't be done in this registry."""
-        raise NotImplementedError("Cannot register tools in the PortiaToolRegistry")
-
-    def get_tool(self, tool_id: str) -> Tool:
-        """Get the tool from the tool set.
-
-        Args:
-            tool_id (str): The ID of the tool to retrieve.
-
-        Returns:
-            Tool: The requested tool.
-
-        Raises:
-            ToolNotFoundError: If the tool with the given ID does not exist.
-
-        """
-        if tool_id in self.tools:
-            return self.tools[tool_id]
-
-        raise ToolNotFoundError(tool_id)
-
-    def get_tools(self) -> list[Tool]:
-        """Get all tools in the registry.
-
-        Returns:
-            list[Tool]: A list of all tools in the registry.
-
-        """
-        return list(self.tools.values())
-
-    def filter_tools(
-        self,
-        filter_func: Callable[[Tool], bool],
-    ) -> ToolRegistry:
-        """Return a new registry with the tools filtered by the filter function."""
-        return PortiaToolRegistry(
-            self.config,
-            client=self.client,
-            tools={tool.id: tool for tool in self.get_tools() if filter_func(tool)},
-        )
 
 
 class McpToolRegistry(ToolRegistry):
@@ -462,7 +317,7 @@ class McpToolRegistry(ToolRegistry):
 
     def __init__(self, mcp_client_config: McpClientConfig) -> None:
         """Initialize the MCPToolRegistry with the given configuration."""
-        self.tools = {t.id: t for t in self._load_tools(mcp_client_config)}
+        super().__init__({t.id: t for t in self._load_tools(mcp_client_config)})
 
     @classmethod
     def from_sse_connection(
@@ -506,7 +361,8 @@ class McpToolRegistry(ToolRegistry):
             ),
         )
 
-    def _load_tools(self, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
+    @classmethod
+    def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
         """Get a list of tools from an MCP server wrapped at Portia tools.
 
         Args:
@@ -523,13 +379,14 @@ class McpToolRegistry(ToolRegistry):
                 tools = await session.list_tools()
                 logger().debug(f"Got {len(tools.tools)} tools from MCP server")
                 return [
-                    self._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools
+                    cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools
                 ]
 
         return asyncio.run(async_inner())
 
+    @classmethod
     def _portia_tool_from_mcp_tool(
-        self,
+        cls,
         mcp_tool: mcp.Tool,
         mcp_client_config: McpClientConfig,
     ) -> PortiaMcpTool:
@@ -554,44 +411,8 @@ class McpToolRegistry(ToolRegistry):
             mcp_client_config=mcp_client_config,
         )
 
-    def register_tool(self, tool: Tool) -> None:
-        """Register a new tool.
 
-        Args:
-            tool (Tool): The tool to be registered.
-
-        """
-        raise NotImplementedError("register_tool is not supported for MCPToolRegistry")
-
-    def get_tool(self, tool_id: str) -> Tool:
-        """Retrieve a tool's information.
-
-        Args:
-            tool_id (str): The ID of the tool to retrieve.
-
-        Returns:
-            Tool: The requested tool.
-
-        Raises:
-            ToolNotFoundError: If the tool with the given ID does not exist.
-
-        """
-        tool = self.tools.get(tool_id)
-        if not tool:
-            raise ToolNotFoundError(tool_id)
-        return tool
-
-    def get_tools(self) -> list[Tool]:
-        """Get all tools registered with the registry.
-
-        Returns:
-            list[Tool]: A list of all tools in the registry.
-
-        """
-        return list(self.tools.values())
-
-
-class DefaultToolRegistry(AggregatedToolRegistry):
+class DefaultToolRegistry(ToolRegistry):
     """A registry providing a default set of tools.
 
     This includes the following tools:
@@ -603,25 +424,22 @@ class DefaultToolRegistry(AggregatedToolRegistry):
 
     def __init__(self, config: Config) -> None:
         """Initialize the default tool registry with the given configuration."""
-        in_memory_registry = InMemoryToolRegistry.from_local_tools(
-            [
-                CalculatorTool(),
-                LLMTool(),
-                FileWriterTool(),
-                FileReaderTool(),
-                ImageUnderstandingTool(),
-            ],
-        )
+        tools = [
+            CalculatorTool(),
+            LLMTool(),
+            FileWriterTool(),
+            FileReaderTool(),
+            ImageUnderstandingTool(),
+        ]
         if os.getenv("TAVILY_API_KEY"):
-            in_memory_registry.register_tool(SearchTool())
+            tools.append(SearchTool())
         if os.getenv("OPENWEATHERMAP_API_KEY"):
-            in_memory_registry.register_tool(WeatherTool())
+            tools.append(WeatherTool())
 
-        registries: list[ToolRegistry] = [in_memory_registry]
         if config.portia_api_key:
-            registries.append(PortiaToolRegistry.with_default_tool_filter(config))
+            tools.extend(PortiaToolRegistry(config).with_default_tool_filter().get_tools())
 
-        super().__init__(registries)
+        super().__init__(tools)
 
 
 def generate_pydantic_model_from_json_schema(

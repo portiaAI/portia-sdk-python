@@ -10,17 +10,17 @@ from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 from portia.tool_registry import (
-    InMemoryToolRegistry,
+    ToolRegistry,
 )
 
 logger = logging.getLogger(__name__)
 
-example_tool_registry = InMemoryToolRegistry.from_local_tools(
+example_tool_registry = ToolRegistry(
     [CalculatorTool(), WeatherTool(), SearchTool()],
 )
 
 
-open_source_tool_registry = InMemoryToolRegistry.from_local_tools(
+open_source_tool_registry = ToolRegistry(
     [
         CalculatorTool(),
         WeatherTool(),
