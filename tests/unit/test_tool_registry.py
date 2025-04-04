@@ -32,7 +32,7 @@ OTHER_MOCK_TOOL_ID = "other_mock_tool"
 
 def test_tool_registry_register_tool() -> None:
     """Test registering tools in the ToolRegistry."""
-    tool_registry = ToolRegistry([])
+    tool_registry = ToolRegistry()
     tool_registry.with_tool(MockTool(id=MOCK_TOOL_ID))
     tool1 = tool_registry.get_tool(MOCK_TOOL_ID)
     assert tool1.id == MOCK_TOOL_ID
@@ -56,7 +56,7 @@ def test_tool_registry_register_tool() -> None:
 
 def test_tool_registry_get_and_plan_run() -> None:
     """Test getting and running tools in the InMemoryToolRegistry."""
-    tool_registry = ToolRegistry([])
+    tool_registry = ToolRegistry()
     tool_registry.with_tool(MockTool(id=MOCK_TOOL_ID))
     tool1 = tool_registry.get_tool(MOCK_TOOL_ID)
     ctx = get_test_tool_context()

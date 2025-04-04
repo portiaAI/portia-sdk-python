@@ -69,7 +69,7 @@ class ToolRegistry:
 
     """
 
-    def __init__(self, tools: dict[str, Tool] | Sequence[Tool]) -> None:
+    def __init__(self, tools: dict[str, Tool] | Sequence[Tool] | None = None) -> None:
         """Initialize the tool registry with a sequence or dictionary of tools.
 
         Args:
@@ -77,9 +77,12 @@ class ToolRegistry:
               dictionary of tool IDs to tools.
 
         """
-        if not isinstance(tools, dict):
-            tools = {tool.id: tool for tool in tools}
-        self._tools = tools
+        if tools is None:
+            self._tools = {}
+        elif not isinstance(tools, dict):
+            self._tools = {tool.id: tool for tool in tools}
+        else:
+            self._tools = tools
 
     def with_tool(self, tool: Tool, *, overwrite: bool = False) -> Self:
         """Update a tool based on tool ID or inserts a new tool.
