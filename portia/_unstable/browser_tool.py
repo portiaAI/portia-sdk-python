@@ -177,3 +177,165 @@ class BrowserTool(Tool[str]):
                 chrome_instance_path=self.chrome_path,
             ),
         )
+
+
+"""Browserbase authenticated tools."""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar
+
+from browserbase import Browserbase
+from browserbase.types import SessionCreateResponse
+from playwright.sync_api import Page
+from pydantic import BaseModel, ConfigDict, Field
+
+from portia.tool import Tool, ToolHardError
+
+SUPPORTED_BASE_ELEMENTS = [
+    Page,  # Playwright
+    int,  # TODO(Emma): This actually isn't supported, but want to allow for it in the future.
+]
+T = TypeVar("T", *SUPPORTED_BASE_ELEMENTS)  # type: ignore reportGeneralTypeIssues
+
+
+class BrowserbaseAuthenticator(ABC, Generic[T]):
+    """Base class for Browserbase authenticators.
+
+    Authenticators define page scripts to run to check if the user is authenticated, and to
+    bring them to the sign-in page if they are not.
+    """
+
+    @abstractmethod
+    def check_auth(self, _: T, context: ToolRunContext) -> bool:
+        """Check if the tool is authenticated."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def pre_auth(self, _: T, context: ToolRunContext) -> None:
+        """Pre-auth script to run before authentication."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
+
+class BrowserBaseTool(ABC, Generic[T]):
+    """Base class for Browserbase tools.
+
+    This class provides a base implementation for browser-based tools that use Browserbase for
+    authentication and session management. When fully implemented, it will produce action
+    clarifications for session authentication like regular Portia cloud tools, which will enable
+    the user to sign in, and the agent to proceed once they have confirmed that they have done so.
+
+    In general, you should call `auth_and_run` at the start of the `run` method of your tool, and
+    then implement `post_auth` under the assumption that the tool is authenticated.
+
+    The tool requires a BROWSERBASE_PROJECT_ID environment variable to be set and a
+    BROWSERBASE_API_KEY environment variable to be set which can be found on the
+    [Browserbase dashboard](https://www.browserbase.com/settings). We also recommend that you change
+    the default timeout as when a user handles an authentication clarification they must do so
+    within the timeout.
+
+    The tool is designed to be extended over time with different page crawling mechanisms, for
+    the moment it only supports Playwright, but in the future we expect to add Stagehand and
+    BrowserUse.
+
+    If you want authentication to last across sessions, you should save the context ID against
+    the end-user, and override the `get_context_id` method to return the saved context ID.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    authenticator: BrowserbaseAuthenticator[T] | None = None
+
+    def __init__(self, authenticator: BrowserbaseAuthenticator[T] | None = None) -> None:
+        """Initialize the tool.
+
+        Args:
+            authenticator (BrowserbaseAuthenticator[T] | None): The authenticator to use for the
+                tool. If not provided, relevant auth methods must be implemented in the subclass.
+
+        """
+        self.authenticator = authenticator
+
+    @abstractmethod
+    def check_auth(self, script_object: T, context: ToolRunContext) -> bool:
+        """Check if the tool is authenticated.
+
+        This should run a browser based script to determine whether the user is already
+        authenticated.
+        """
+        if self.authenticator:
+            return self.authenticator.check_auth(script_object, context)
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def pre_auth(self, script_object: T, context: ToolRunContext) -> None:
+        """Pre-auth script to run before authentication.
+
+        This should run a browser based script to get the user to the sign-in page.
+        """
+        if self.authenticator:
+            self.authenticator.pre_auth(script_object, context)
+        else:
+            raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
+    def post_auth(self, _: T, __: ToolRunContext) -> Any:  # noqa: ANN401
+        """Post-auth script to run after authentication.
+
+        The browser based script to run once the user has authenticated.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def get_context_id(self, bb: Browserbase) -> str:
+        """Get the Browserbase context id.
+
+        This method can be overridden to return a saved context ID for a user.
+        """
+        return bb.contexts.create(project_id=os.environ["BROWSERBASE_PROJECT_ID"]).id
+
+    def create_session(
+        self,
+        bb: Browserbase,
+        bb_context_id: str,
+    ) -> SessionCreateResponse:
+        """Get a fresh session with the given context ID."""
+        return bb.sessions.create(
+            project_id=os.environ["BROWSERBASE_PROJECT_ID"],
+            browser_settings={
+                "context": {
+                    "id": bb_context_id,
+                    "persist": True,
+                },
+            },
+            # keep_alive is needed so that the session can last through clarification resolution.
+            keep_alive=True,
+        )
+
+    def get_bb_instance(self) -> Browserbase:
+        """Get a Browserbase instance."""
+        return Browserbase(api_key=os.environ["BROWSERBASE_API_KEY"])
+
+    def get_or_create_session(self, context: ToolRunContext, bb: Browserbase) -> tuple[str, str]:
+        """Get or create a Browserbase session."""
+        context_id = context.execution_context.additional_data.get(
+            "bb_context_id",
+            self.get_context_id(bb),
+        )
+        context.execution_context.additional_data["bb_context_id"] = context_id
+
+        session_id = context.execution_context.additional_data.get("bb_session_id", None)
+        session_connect_url = context.execution_context.additional_data.get(
+            "bb_session_connect_url",
+            None,
+        )
+
+        if not session_id or not session_connect_url:
+            session = self.create_session(bb, context_id)
+            session_connect_url = session.connect_url
+            context.execution_context.additional_data["bb_session_id"] = session_id = session.id
+            context.execution_context.additional_data["bb_session_connect_url"] = (
+                session_connect_url
+            )
+
+        return (session_id, session_connect_url)
