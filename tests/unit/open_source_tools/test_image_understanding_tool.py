@@ -113,8 +113,6 @@ def test_image_understanding_tool_run_with_context(
     mock_model.to_langchain.return_value.invoke.return_value = mock_response
     # Define task and context
     mock_image_understanding_tool.tool_context = "Context for task"
-    exec_context = mock_tool_run_context.execution_context
-    exec_context.plan_run_context = "Context from plan run context"
     schema_data = {
         "task": "What is the capital of France?",
         "image_url": "https://example.com/map.png",
@@ -129,6 +127,5 @@ def test_image_understanding_tool_run_with_context(
     assert isinstance(called_with[0], HumanMessage)
     assert isinstance(called_with[1], HumanMessage)
     assert mock_image_understanding_tool.tool_context in called_with[1].content[0]["text"]
-    assert exec_context.plan_run_context in called_with[1].content[0]["text"]
     # Assert the result is the expected response
     assert result == "Test response content"

@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from portia.config import PLANNING_MODEL_KEY
-from portia.execution_context import ExecutionContext, get_execution_context
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -29,17 +28,14 @@ class DefaultPlanningAgent(BasePlanningAgent):
 
     def generate_steps_or_error(
         self,
-        ctx: ExecutionContext,
         query: str,
         tool_list: list[Tool],
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
-        ctx = get_execution_context()
         prompt = render_prompt_insert_defaults(
             query,
             tool_list,
-            ctx.planning_agent_system_context_extension,
             examples,
         )
         response = self.model.get_structured_response(

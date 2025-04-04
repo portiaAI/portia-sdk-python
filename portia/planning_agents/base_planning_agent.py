@@ -18,7 +18,6 @@ from portia.plan import Plan, Step
 
 if TYPE_CHECKING:
     from portia.config import Config
-    from portia.execution_context import ExecutionContext
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -48,7 +47,6 @@ class BasePlanningAgent(ABC):
     @abstractmethod
     def generate_steps_or_error(
         self,
-        ctx: ExecutionContext,
         query: str,
         tool_list: list[Tool],
         examples: list[Plan] | None = None,
@@ -59,7 +57,6 @@ class BasePlanningAgent(ABC):
         on the provided query and tools.
 
         Args:
-            ctx (ExecutionContext): The context for execution.
             query (str): The user query to generate a list of steps for.
             tool_list (list[Tool]): A list of tools available for the plan.
             examples (list[Plan] | None): Optional list of example plans to guide the PlanningAgent.

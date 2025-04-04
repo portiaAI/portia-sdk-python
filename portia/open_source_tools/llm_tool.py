@@ -64,8 +64,6 @@ class LLMTool(Tool[str]):
             "run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
-        if ctx.execution_context.plan_run_context:
-            context += f"\nRun context: {ctx.execution_context.plan_run_context}"
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
         content = task if not len(context.split("\n")) > 1 else f"{context}\n\n{task}"
