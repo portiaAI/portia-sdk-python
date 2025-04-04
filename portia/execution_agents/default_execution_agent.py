@@ -27,13 +27,11 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
-from portia.llm_wrapper import LLMWrapper
-from portia.model import GenerativeModel, Message
+from portia.model import GenerativeModel, LangChainGenerativeModel, Message
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
-    from langchain_core.language_models.chat_models import BaseChatModel
 
     from portia.config import Config
     from portia.plan import Step
@@ -427,7 +425,7 @@ class ToolCallingModel:
 
     def __init__(
         self,
-        llm: BaseChatModel,
+        model: LangChainGenerativeModel,
         context: str,
         tools: list[StructuredTool],
         agent: DefaultExecutionAgent,
@@ -435,13 +433,13 @@ class ToolCallingModel:
         """Initialize the model.
 
         Args:
-            llm (BaseChatModel): The language model used for argument parsing.
+            model (LangChainGenerativeModel): The language model used for argument parsing.
             context (str): The context for argument generation.
             agent (DefaultExecutionAgent): The agent using the parser model.
             tools (list[StructuredTool]): The tools to pass to the model.
 
         """
-        self.llm = llm
+        self.model = model
         self.context = context
         self.agent = agent
         self.tools = tools
@@ -471,7 +469,7 @@ class ToolCallingModel:
                     arg.made_up = False
                     arg.schema_invalid = False
 
-        model = self.llm.bind_tools(self.tools)
+        model = self.model.to_langchain().bind_tools(self.tools)
 
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
@@ -596,9 +594,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         context = self.get_system_context()
         execution_context = get_execution_context()
         execution_context.plan_run_context = context
-        llm_wrapper = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, self.config)
-        llm = llm_wrapper.to_langchain()
-        model = llm_wrapper.model
+        model = self.config.resolve_langchain_model(EXECUTION_MODEL_KEY)
 
         tools = [
             self.tool.to_langchain_with_artifact(
@@ -641,7 +637,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 classDef last fill:#bfb6fc
         """
 
-        graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(llm, context, tools, self).invoke)
+        graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(model, context, tools, self).invoke)
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
@@ -655,7 +651,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             )
 
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm, self.tool, self.step).invoke)
+        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(model, self.tool, self.step).invoke)
         graph.add_conditional_edges(
             AgentNode.TOOLS,
             lambda state: next_state_after_tool_call(state, self.tool),

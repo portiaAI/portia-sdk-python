@@ -26,15 +26,13 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
-from portia.llm_wrapper import LLMWrapper
-from portia.plan_run import PlanRun
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
-    from langchain_core.language_models.chat_models import BaseChatModel
 
     from portia.config import Config
+    from portia.model import LangChainGenerativeModel
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.tool import Tool
@@ -51,7 +49,7 @@ class OneShotToolCallingModel:
     It is recommended to use the DefaultExecutionAgent for more complex tasks.
 
     Args:
-        llm (BaseChatModel): The language model to use for generating responses.
+        model (GenerativeModel): The language model to use for generating responses.
         context (str): The context to provide to the language model when generating a response.
         tools (list[StructuredTool]): A list of tools that can be used during the task.
         agent (OneShotAgent): The agent responsible for managing the task.
@@ -83,7 +81,7 @@ class OneShotToolCallingModel:
 
     def __init__(
         self,
-        llm: BaseChatModel,
+        model: LangChainGenerativeModel,
         context: str,
         tools: list[StructuredTool],
         agent: OneShotAgent,
@@ -91,13 +89,13 @@ class OneShotToolCallingModel:
         """Initialize the OneShotToolCallingModel.
 
         Args:
-            llm (BaseChatModel): The language model to use for generating responses.
+            model (LangChainGenerativeModel): The language model to use for generating responses.
             context (str): The context to be used when generating the response.
             tools (list[StructuredTool]): A list of tools that can be used during the task.
             agent (OneShotAgent): The agent that is managing the task.
 
         """
-        self.llm = llm
+        self.model = model
         self.context = context
         self.agent = agent
         self.tools = tools
@@ -115,7 +113,7 @@ class OneShotToolCallingModel:
             dict[str, Any]: A dictionary containing the model's generated response.
 
         """
-        model = self.llm.bind_tools(self.tools)
+        model = self.model.to_langchain().bind_tools(self.tools)
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
         response = model.invoke(
@@ -177,8 +175,7 @@ class OneShotAgent(BaseExecutionAgent):
             raise InvalidAgentError("No tool available")
 
         context = self.get_system_context()
-
-        llm = LLMWrapper.for_usage(EXECUTION_MODEL_KEY, self.config).to_langchain()
+        model = self.config.resolve_langchain_model(EXECUTION_MODEL_KEY)
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=ToolRunContext(
@@ -194,10 +191,10 @@ class OneShotAgent(BaseExecutionAgent):
         graph = StateGraph(MessagesState)
         graph.add_node(
             AgentNode.TOOL_AGENT,
-            OneShotToolCallingModel(llm, context, tools, self).invoke,
+            OneShotToolCallingModel(model, context, tools, self).invoke,
         )
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(llm, self.tool, self.step).invoke)
+        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(model, self.tool, self.step).invoke)
         graph.add_edge(START, AgentNode.TOOL_AGENT)
 
         # Use execution manager for state transitions

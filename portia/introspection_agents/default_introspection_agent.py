@@ -14,7 +14,7 @@ from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
     PreStepIntrospection,
 )
-from portia.llm_wrapper import LLMWrapper
+from portia.model import Message
 from portia.plan import Plan
 from portia.plan_run import PlanRun
 
@@ -79,18 +79,15 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """Ask the LLM whether to continue, skip or fail the plan_run."""
-        outcome = (
-            LLMWrapper.for_usage(INTROSPECTION_MODEL_KEY, self.config)
-            .to_langchain()
-            .with_structured_output(PreStepIntrospection)
-            .invoke(
-                self.prompt.format_messages(
+        return self.config.resolve_model(INTROSPECTION_MODEL_KEY).get_structured_response(
+            schema=PreStepIntrospection,
+            messages=[
+                Message.from_langchain(m)
+                for m in self.prompt.format_messages(
                     current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                     current_day_of_week=datetime.now(UTC).strftime("%A"),
                     plan_run=plan_run.model_dump_json(),
                     plan=plan.model_dump_json(),
-                ),
-            )
+                )
+            ],
         )
-
-        return PreStepIntrospection.model_validate(outcome)

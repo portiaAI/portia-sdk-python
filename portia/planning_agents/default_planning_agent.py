@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from portia.config import PLANNING_MODEL_KEY
 from portia.execution_context import ExecutionContext, get_execution_context
-from portia.llm_wrapper import LLMWrapper
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -26,7 +25,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
-        self.llm_wrapper = LLMWrapper.for_usage(PLANNING_MODEL_KEY, config)
+        self.model = config.resolve_model(PLANNING_MODEL_KEY)
 
     def generate_steps_or_error(
         self,
@@ -43,8 +42,8 @@ class DefaultPlanningAgent(BasePlanningAgent):
             ctx.planning_agent_system_context_extension,
             examples,
         )
-        response = self.llm_wrapper.to_instructor(
-            response_model=StepsOrError,
+        response = self.model.get_structured_response(
+            schema=StepsOrError,
             messages=[
                 Message(
                     role="system",

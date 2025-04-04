@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from portia.config import SUMMARISER_MODEL_KEY
 from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
-from portia.llm_wrapper import LLMWrapper
+from portia.model import Message
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -83,9 +83,9 @@ class FinalOutputSummarizer:
             str | None: The generated summary or None if generation fails.
 
         """
-        llm = LLMWrapper.for_usage(SUMMARISER_MODEL_KEY, self.config).to_langchain()
+        model = self.config.resolve_model(SUMMARISER_MODEL_KEY)
         context = self._build_tasks_and_outputs_context(plan, plan_run)
-        response = llm.invoke(
-            self.SUMMARIZE_TASK + context,
+        response = model.get_response(
+            [Message(content=self.SUMMARIZE_TASK + context, role="user")],
         )
         return str(response.content) if response.content else None

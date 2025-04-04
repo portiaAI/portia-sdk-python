@@ -27,6 +27,7 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    LangChainGenerativeModel,
     OpenAIGenerativeModel,
 )
 
@@ -455,6 +456,16 @@ class Config(BaseModel):
             return self.custom_models[usage]
         model = self.model(usage)
         return self._construct_model(model)
+
+    def resolve_langchain_model(self, usage: str) -> LangChainGenerativeModel:
+        """Resolve a LangChain model from the config."""
+        model = self.resolve_model(usage)
+        if isinstance(model, LangChainGenerativeModel):
+            return model
+        raise TypeError(
+            f"A LangChainGenerativeModel is required, but the config for "
+            f"{usage} resolved to {model}.",
+        )
 
     def _construct_model(self, llm_model: LLMModel) -> GenerativeModel:
         """Construct a Model instance from an LLMModel."""

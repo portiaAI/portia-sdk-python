@@ -27,13 +27,14 @@ from portia.execution_agents.default_execution_agent import (
     VerifiedToolInputs,
     VerifierModel,
 )
+from portia.model import LangChainGenerativeModel
 from portia.plan import Step
 from portia.tool import Tool
 from tests.utils import (
     AdditionTool,
     get_mock_base_chat_model,
+    get_mock_langchain_generative_model,
     get_test_config,
-    get_test_llm_wrapper,
     get_test_plan_run,
     get_test_tool_context,
 )
@@ -74,7 +75,7 @@ def test_parser_model() -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        model=get_test_llm_wrapper(mock_model).model,
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -110,7 +111,7 @@ def test_parser_model_with_retries() -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        model=get_test_llm_wrapper(mock_invoker).model,
+        model=LangChainGenerativeModel(client=mock_invoker, model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -137,7 +138,7 @@ def test_parser_model_with_retries_invalid_structured_response() -> None:
         description="TOOL_DESCRIPTION",
     )
     parser_model = ParserModel(
-        model=get_test_llm_wrapper(mock_model).model,
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -213,7 +214,7 @@ def test_parser_model_with_invalid_args() -> None:
     )
 
     parser_model = ParserModel(
-        model=get_test_llm_wrapper(mock_model).model,
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -269,14 +270,14 @@ def test_verifier_model() -> None:
         args_json_schema=_TestToolSchema.model_json_schema,
     )
     verifier_model = VerifierModel(
-        model=get_test_llm_wrapper(mock_model).model,
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     verifier_model.invoke({"messages": [AIMessage(content=tool_inputs.model_dump_json(indent=2))]})
 
-    assert mock_model.invoke.called
-    messages = mock_model.invoke.call_args[0][0]
+    assert mock_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
+    messages = mock_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert "You are an expert reviewer" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
@@ -314,7 +315,7 @@ def test_verifier_model_schema_validation() -> None:
         args_json_schema=_TestToolSchema.model_json_schema,
     )
     verifier_model = VerifierModel(
-        model=get_test_llm_wrapper(mock_model).model,
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -345,8 +346,8 @@ def test_tool_calling_model_no_hallucinations() -> None:
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
     )
-    mock_model = get_mock_base_chat_model(
-        response=SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),  # type: ignore  # noqa: PGH003
+    mock_model = get_mock_langchain_generative_model(
+        SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),
     )
 
     (_, plan_run) = get_test_plan_run()
@@ -363,15 +364,16 @@ def test_tool_calling_model_no_hallucinations() -> None:
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=get_test_llm_wrapper(mock_model).to_langchain(),
+        model=mock_model,
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
 
-    assert mock_model.invoke.called
-    messages = mock_model.invoke.call_args[0][0]
+    base_chat_model = mock_model.to_langchain()
+    assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
+    messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
@@ -385,8 +387,8 @@ def test_tool_calling_model_with_hallucinations() -> None:
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=True)],
     )
-    mock_model = get_mock_base_chat_model(
-        response=SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),  # type: ignore  # noqa: PGH003
+    mock_model = get_mock_langchain_generative_model(
+        SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),
     )
 
     (_, plan_run) = get_test_plan_run()
@@ -425,15 +427,16 @@ def test_tool_calling_model_with_hallucinations() -> None:
         description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
-        llm=get_test_llm_wrapper(mock_model).to_langchain(),
+        model=mock_model,
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     tool_calling_model.invoke({"messages": []})
 
-    assert mock_model.invoke.called
-    messages = mock_model.invoke.call_args[0][0]
+    base_chat_model = mock_model.to_langchain()
+    assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
+    messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
     assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
@@ -582,7 +585,7 @@ def test_default_execution_agent_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
-        model=get_test_llm_wrapper(get_mock_base_chat_model()).model,
+        model=get_mock_langchain_generative_model(get_mock_base_chat_model()),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -591,7 +594,7 @@ def test_default_execution_agent_edge_cases() -> None:
 
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
-        llm=get_test_llm_wrapper(get_mock_base_chat_model()).to_langchain(),
+        model=get_mock_langchain_generative_model(get_mock_base_chat_model()),
         context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -779,7 +782,7 @@ def test_optional_args_with_none_values() -> None:
         tool=MockTool(),
     )
     model = VerifierModel(
-        model=get_test_llm_wrapper(get_mock_base_chat_model()).model,
+        model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,
     )
@@ -806,7 +809,7 @@ def test_verifier_model_edge_cases() -> None:
     agent = SimpleNamespace()
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     verifier_model = VerifierModel(
-        model=get_test_llm_wrapper(get_mock_base_chat_model()).model,
+        model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
         context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )

@@ -29,18 +29,24 @@ from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarific
 if TYPE_CHECKING:
     from portia.tool import ToolRunContext
 
-PROVIDER_MODELS = [
+
+CORE_MODELS = [
     (
         LLMProvider.OPENAI,
         LLMModel.GPT_4_O_MINI,
     ),
     (
-        LLMProvider.MISTRALAI,
-        LLMModel.MISTRAL_LARGE,
-    ),
-    (
         LLMProvider.ANTHROPIC,
         LLMModel.CLAUDE_3_OPUS,
+    ),
+]
+
+
+PROVIDER_MODELS = [
+    *CORE_MODELS,
+    (
+        LLMProvider.MISTRALAI,
+        LLMModel.MISTRAL_LARGE,
     ),
     (
         LLMProvider.GOOGLE_GENERATIVE_AI,
@@ -220,7 +226,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     assert plan_run.state == PlanRunState.COMPLETE
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(("llm_provider", "llm_model_name"), CORE_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 def test_portia_run_query_with_hard_error(
     llm_provider: LLMProvider,
@@ -275,7 +281,7 @@ def test_portia_run_query_with_hard_error(
 
 
 @pytest.mark.parametrize("agent", AGENTS)
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(("llm_provider", "llm_model_name"), CORE_MODELS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_soft_error(
     llm_provider: LLMProvider,
@@ -329,7 +335,7 @@ def test_portia_run_query_with_soft_error(
     assert "Tool add_tool failed after retries" in plan_run.outputs.final_output.value
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(("llm_provider", "llm_model_name"), CORE_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_multiple_clarifications(

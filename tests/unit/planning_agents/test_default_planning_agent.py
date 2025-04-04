@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING
-from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
 
 from portia.execution_context import ExecutionContext, get_execution_context
-from portia.llm_wrapper import LLMWrapper
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -19,7 +17,7 @@ from portia.planning_agents.context import (
     render_prompt_insert_defaults,
 )
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
-from tests.utils import AdditionTool, get_test_config
+from tests.utils import AdditionTool, get_mock_langchain_generative_model, get_test_config
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -32,31 +30,25 @@ def mock_config() -> Config:
     return MagicMock()
 
 
-@pytest.fixture
-def planning_agent(mock_config: Config) -> DefaultPlanningAgent:
-    """Create an instance of the PlanningAgent with mocked config."""
-    return DefaultPlanningAgent(config=mock_config)
-
-
-def test_generate_steps_or_error_success(planning_agent: DefaultPlanningAgent) -> None:
+def test_generate_steps_or_error_success(mock_config: Config) -> None:
     """Test successful plan generation with valid inputs."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
-    # Mock the LLMWrapper response to simulate a successful plan generation
-    mock_response = StepsOrError(
-        steps=[],
-        error=None,
+    # Mock the Model response to simulate a successful plan generation
+    mock_model = get_mock_langchain_generative_model(
+        response=StepsOrError(
+            steps=[],
+            error=None,
+        ),
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        result = planning_agent.generate_steps_or_error(
-            ctx=get_execution_context(),
-            query=query,
-            tool_list=[],
-        )
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+
+    result = planning_agent.generate_steps_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[],
+    )
 
     assert result.steps == []
     assert result.error is None
@@ -83,25 +75,24 @@ def test_base_classes() -> None:
         wrapper.generate_steps_or_error(get_execution_context(), "", [], [])
 
 
-def test_generate_steps_or_error_failure(planning_agent: DefaultPlanningAgent) -> None:
+def test_generate_steps_or_error_failure(mock_config: Config) -> None:
     """Test handling of error when generating a plan fails."""
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
-    # Mock the LLMWrapper response to simulate an error in plan generation
-    mock_response = StepsOrError(
-        steps=[],
-        error="Unable to generate a plan",
+    # Mock the Model response to simulate an error in plan generation
+    mock_model = get_mock_langchain_generative_model(
+        response=StepsOrError(
+            steps=[],
+            error="Unable to generate a plan",
+        ),
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        result = planning_agent.generate_steps_or_error(
-            ctx=get_execution_context(),
-            query=query,
-            tool_list=[],
-        )
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = planning_agent.generate_steps_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[],
+    )
 
     assert result.error == "Unable to generate a plan"
 
@@ -171,7 +162,7 @@ def test_render_prompt() -> None:
     assert "extension" in system_context_content
 
 
-def test_generate_steps_or_error_invalid_tool_id(planning_agent: DefaultPlanningAgent) -> None:
+def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
     """Test handling of invalid tool ID in generated steps."""
     query = "Calculate something"
 
@@ -192,22 +183,22 @@ def test_generate_steps_or_error_invalid_tool_id(planning_agent: DefaultPlanning
         ],
         error=None,
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        result = planning_agent.generate_steps_or_error(
-            ctx=get_execution_context(),
-            query=query,
-            tool_list=[AdditionTool()],
-        )
+    mock_model = get_mock_langchain_generative_model(
+        response=mock_response,
+    )
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = planning_agent.generate_steps_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[AdditionTool()],
+    )
 
     assert result.error == "Missing tools no_tool_1, no_tool_2 from the provided tool_list"
     assert result.steps == mock_response.steps
 
 
-def test_generate_steps_assigns_llm_tool_id(planning_agent: DefaultPlanningAgent) -> None:
+def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
     """Test that steps without tool_id get assigned to LLMTool."""
     query = "Generate a creative story"
 
@@ -229,16 +220,16 @@ def test_generate_steps_assigns_llm_tool_id(planning_agent: DefaultPlanningAgent
         ],
         error=None,
     )
-    with mock.patch.object(
-        LLMWrapper,
-        "to_instructor",
-        new=MagicMock(return_value=mock_response),
-    ):
-        result = planning_agent.generate_steps_or_error(
-            ctx=get_execution_context(),
-            query=query,
-            tool_list=[AdditionTool()],
-        )
+    mock_model = get_mock_langchain_generative_model(
+        response=mock_response,
+    )
+    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = planning_agent.generate_steps_or_error(
+        ctx=get_execution_context(),
+        query=query,
+        tool_list=[AdditionTool()],
+    )
 
     assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)
     assert len(result.steps) == 2

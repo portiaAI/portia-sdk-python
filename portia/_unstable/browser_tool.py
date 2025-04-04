@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field, HttpUrl
 from portia.clarification import ActionClarification
 from portia.config import LLM_TOOL_MODEL_KEY
 from portia.errors import ToolHardError
-from portia.llm_wrapper import LLMWrapper
 from portia.tool import Tool, ToolRunContext
 
 logger = logging.getLogger(__name__)
@@ -103,7 +102,8 @@ class BrowserTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
-        llm = LLMWrapper.for_usage(LLM_TOOL_MODEL_KEY, ctx.config).to_langchain()
+        model = ctx.config.resolve_langchain_model(LLM_TOOL_MODEL_KEY)
+        llm = model.to_langchain()
 
         if ctx.execution_context.end_user_id:
             logger.warning(
