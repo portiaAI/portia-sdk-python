@@ -37,7 +37,7 @@ CONFIG = Config.from_default()
 MODELS: list[GenerativeModel] = [
     OpenAIGenerativeModel(model_name="gpt-4o-mini", api_key=CONFIG.openai_api_key),
     AnthropicGenerativeModel(
-        model_name="claude-3-5-sonnet-latest",
+        model_name="claude-3-7-sonnet-latest",
         api_key=CONFIG.anthropic_api_key,
     ),
     MistralAIGenerativeModel(model_name="mistral-small-latest", api_key=CONFIG.mistralai_api_key),
