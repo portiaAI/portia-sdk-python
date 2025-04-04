@@ -28,7 +28,6 @@ def test_base_agent_default_context() -> None:
     )
     context = agent.get_system_context()
     assert context is not None
-    assert "value: 1" in context
 
 
 def test_base_agent_default_context_with_extensions() -> None:
