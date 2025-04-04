@@ -180,7 +180,7 @@ class Variable(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(
         description="The name of the output to reference, e.g. $best_offers.",
@@ -188,6 +188,16 @@ class Variable(BaseModel):
     description: str = Field(
         description="A description of the output.",
     )
+
+
+    def pretty_print(self) -> str:
+        """Return the pretty print representation of the variable.
+
+        Returns:
+            str: A pretty print representation of the variable's name, and description.
+
+        """
+        return f"{self.name}: ({self.description})"
 
 
 class Step(BaseModel):
@@ -198,13 +208,13 @@ class Step(BaseModel):
 
     Args:
         task (str): The task that needs to be completed by this step.
-        inputs (list[OutputReference]): The input to the step, as a reference to an output of a previous step.
+        inputs (list[Vairable]): The input to the step, as an output of a previous step.
         tool_id (str | None): The ID of the tool used in this step, if applicable.
         output (str): The unique output ID for the result of this step.
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     task: str = Field(
         description="The task that needs to be completed by this step",

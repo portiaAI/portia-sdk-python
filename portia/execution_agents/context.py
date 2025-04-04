@@ -54,7 +54,7 @@ def generate_input_context(
     """Generate context for the inputs and indicate which ones were used.
 
     Args:
-        inputs (list[OutputReference]): The list of inputs for the current step.
+        inputs (list[Variable]): The list of inputs for the current step.
         previous_outputs (dict[str, Output]): A dictionary of previous step outputs.
 
     Returns:

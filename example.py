@@ -1,63 +1,57 @@
 """Simple Example."""
 
+from dotenv import load_dotenv
+
 from portia import (
     Config,
     LogLevel,
-    PlanRunState,
     Portia,
+    PortiaToolRegistry,
     example_tool_registry,
-    execution_context,
 )
 from portia.cli import CLIExecutionHooks
+from portia.config import StorageClass
 
+load_dotenv(override=True)
+config = Config.from_default(default_log_level=LogLevel.DEBUG, storage_class=StorageClass.MEMORY)
+tools = example_tool_registry + PortiaToolRegistry(config)
 portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
-)
-
-
-# Simple Example
-plan_run = portia.run(
-    "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
-)
-
-# We can also provide additional execution context to the process
-with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-    plan_run = portia.run(
-        "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
-    )
-
-# When we hit a clarification we can ask our end user for clarification then resume the process
-with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-    # Deliberate typo in the second place name to hit the clarification
-    plan_run = portia.run(
-        "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
-    )
-
-# Fetch run
-plan_run = portia.storage.get_plan_run(plan_run.id)
-# Update clarifications
-if plan_run.state == PlanRunState.NEED_CLARIFICATION:
-    for c in plan_run.get_outstanding_clarifications():
-        # Here you prompt the user for the response to the clarification
-        # via whatever mechanism makes sense for your use-case.
-        new_value = "Sydney"
-        plan_run = portia.resolve_clarification(
-            plan_run=plan_run,
-            clarification=c,
-            response=new_value,
-        )
-
-# Execute again with the same execution context
-with execution_context(context=plan_run.execution_context):
-    portia.resume(plan_run)
-
-# You can also pass in a clarification handler to manage clarifications
-portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
+    config,
+    tools=tools,
     execution_hooks=CLIExecutionHooks(),
 )
-plan_run = portia.run(
-    "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
+
+query = """Get my (omar@portialabs.ai) availability from Google Calendar tomorrow between 10:00 and 17:00
+- Schedule a 30 minute meeting with target@portialabs.ai at a time that works for me with the title "Portia AI Demo" and a description of the meeting as "Test demo".
+- Send an email to omar@portialabs.ai with the details of the meeting you scheduled."""
+
+# query = "Email nathan@portialabs.ai and emma@portialabs.ai via Outlook, with the title \"Meeting\" and the body \"Let's meet to discuss the project\""
+# query = "Find me the most recent report from Google Drive and its content."
+# query = "Who are all the people involved in Zendesk ticket 123456789?"
+
+# query = "Send an email to Emma (burrowse0@gmail.com) with a short history of corruption in US elections. Then retrieve the weather in London."
+
+# query = "Transfer Zendesk ticket 1234567890 to Many (ID: 567891234)"
+
+# query = "Use Google Sheets to open the file https://docs.google.com/spreadsheets/d/1vO6aZD466tHlhfzgSRW_W4HtcKy6AFNtqpyPUBxsxJhQ/edit?gid=0#gid=0 and extract the total revenue."
+
+# query  = "Find everything in my Outlook from robbie@portialabs.ai"
+
+# query = "If the weather in Milton Keynes is sunny or clear, then sum it with it the weather in Cairo"
+
+
+# query = "Search for Expenses sheet in my drive, and send a summary of car costs to omar@portialabs.ai."
+
+# Simple Example
+plan = portia.plan(
+    query,
 )
+
+print(plan.model_dump_json(indent=2))
+
+input("Press Enter to continue...")
+
+# Execute the plan
+output = portia.run_plan(plan)
+
+# print(output.model_dump_json(indent=2))
