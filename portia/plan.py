@@ -20,8 +20,6 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from portia.prefixed_uuid import PlanUUID
@@ -95,15 +93,15 @@ class PlanBuilder:
     def input(
         self,
         name: str,
-        value: Any | None = None,  # noqa: ANN401
         description: str | None = None,
         step_index: int | None = None,
     ) -> PlanBuilder:
         """Add an input variable to the chosen step in the plan (default is the last step).
 
+        Inputs are outputs from previous steps.
+
         Args:
             name (str): The name of the input.
-            value (Any | None): The value of the input.
             description (str | None): The description of the input.
             step_index (int | None): The index of the step to add the input to. If not provided,
                                     the input will be added to the last step.
@@ -116,7 +114,7 @@ class PlanBuilder:
         if description is None:
             description = ""
         self.steps[step_index].inputs.append(
-            Constant(name=name, value=value, description=description),
+            Variable(name=name, description=description),
         )
         return self
 

@@ -75,34 +75,6 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     ),
     Plan(
         plan_context=PlanContext(
-            query="Send an email to hello@portialabs.ai with the weather in London",
-            tool_ids=[
-                "weather_tool",
-                "portia::google_gmail::send_email_tool",
-                "portia::provider::other_tool",
-            ],
-        ),
-        steps=[
-            Step(
-                task="What is the weather in London?",
-                tool_id="weather_tool",
-                output="$london_weather",
-            ),
-            Step(
-                task="Email hello@portialabs.ai politely with $london_weather",
-                inputs=[
-                    Variable(
-                        name="$london_weather",
-                        description="Weather in London",
-                    ),
-                ],
-                tool_id="portia::google_gmail::send_email_tool",
-                output="$email_sent",
-            ),
-        ],
-    ),
-    Plan(
-        plan_context=PlanContext(
             query="If the weather in London hotter than 10C, sum it with the weather in Cairo and "
             "send the result to hello@portialabs.ai",
             tool_ids=[
@@ -149,6 +121,36 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                 tool_id="portia::google_gmail::send_email_tool",
                 output="$email_sent",
                 condition="if $london_weather is hotter than 10C",
+            ),
+        ],
+    ),
+    Plan(
+        plan_context=PlanContext(
+            query="Get my (john@jo.co) availability from Google Calendar tomorrow between \
+              10:00 and 17:00\n- Schedule a 30 minute meeting with hello@jo.co at a time \
+              that works for me",
+            tool_ids=[
+                "portia::google_calendar::get_availability",
+                "portia::google_calendar::create_event",
+            ],
+        ),
+        steps=[
+            Step(
+                task="Get the availability of john@jo.co from Google Calendar tomorrow \
+                    between 10:00 and 17:00",
+                tool_id="portia::google_calendar::get_availability",
+                output="$availability",
+            ),
+            Step(
+                task="Schedule a 30 minute meeting with hello@jo.co at a time that works for me",
+                tool_id="portia::google_calendar::create_event",
+                inputs=[
+                    Variable(
+                        name="$availability",
+                        description="Availability of john@jo.co",
+                    ),
+                ],
+                output="$event_created",
             ),
         ],
     ),
