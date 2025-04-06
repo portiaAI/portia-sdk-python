@@ -9,7 +9,7 @@ import json
 from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, Literal, Union
+from typing import TYPE_CHECKING, Generic, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
@@ -29,29 +29,27 @@ class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         This should not be so long that it is an issue for LLM prompts.
         """
-        raise NotImplementedError("get_value is not implemented")
 
     @abstractmethod
     def serialize_value(self) -> str:
         """Serialize the value to a string."""
-        raise NotImplementedError("serialize_value is not implemented")
 
     @abstractmethod
     def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
-        """Get the full value, fetching from remote storage or file if necessary."""
-        raise NotImplementedError("full_value is not implemented")
+        """Get the full value, fetching from remote storage or file if necessary.
+
+        This value may be long and so is not suitable for use in LLM prompts.
+        """
 
     @abstractmethod
     def get_summary(self) -> str | None:
         """Return the summary of the output."""
-        raise NotImplementedError("get_summary is not implemented")
 
 
 class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output that is stored locally."""
 
     model_config = ConfigDict(extra="forbid")
-    type: Literal["local"] = "local"
 
     value: Serializable | None = Field(
         default=None,
@@ -139,7 +137,6 @@ class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")
-    type: Literal["agent_memory"] = "agent_memory"
 
     output_name: str
     plan_run_id: PlanRunUUID
@@ -152,7 +149,10 @@ class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return self.summary
 
     def serialize_value(self) -> str:
-        """Serialize the value to a string."""
+        """Serialize the value to a string.
+
+        We use the summary as the value is too large to be retained locally.
+        """
         return self.summary
 
     def full_value(self, agent_memory: AgentMemory) -> Serializable | None:

@@ -47,7 +47,7 @@ from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.execution_utils import is_clarification
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput, Output
+from portia.execution_agents.output import LocalOutput, Output
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
@@ -177,8 +177,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             **kwargs (Any): Additional keyword arguments for the tool function.
 
         Returns:
-            Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]: The tool's output wrapped
-            in an Output object.
+            Output: The tool's output wrapped in an Output object.
 
         Raises:
             ToolSoftError: If an error occurs and it is not already a Hard or Soft Tool error.
@@ -219,7 +218,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             **kwargs (Any): Additional keyword arguments for the tool function.
 
         Returns:
-            tuple[str, Output[SERIALIZABLE_TYPE_VAR]]: A tuple containing the output and the Output.
+            tuple[str, Output]: A tuple containing the output and the Output.
 
         """
         intermediate_output = self._run(ctx, *args, **kwargs)
@@ -541,10 +540,6 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         else:
             try:
                 output = self.parse_response(ctx, response.json())
-                if isinstance(output, AgentMemoryOutput):
-                    raise ToolHardError(
-                        "Remote tool saved output directly to agent memory. This is not supported.",
-                    )
             except (ValidationError, KeyError) as e:
                 logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e

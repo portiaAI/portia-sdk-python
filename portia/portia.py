@@ -738,12 +738,7 @@ class Portia:
 
         return cls(self.config)
 
-    def _get_final_output(
-        self,
-        plan: Plan,
-        plan_run: PlanRun,
-        step_output: Output,
-    ) -> Output:
+    def _get_final_output(self, plan: Plan, plan_run: PlanRun, step_output: Output) -> Output:
         """Get the final output and add summarization to it.
 
         Args:

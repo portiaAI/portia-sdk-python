@@ -125,7 +125,6 @@ __all__ = [
     "McpToolRegistry",
     "MultipleChoiceClarification",
     "Output",
-    "Output",
     "Plan",
     "PlanContext",
     "PlanError",

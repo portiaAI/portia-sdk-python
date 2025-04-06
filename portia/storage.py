@@ -224,9 +224,9 @@ class LogAdditionalStorage(AdditionalStorage):
         )
         # Limit log to just first 1000 characters
         output = tool_call.output
-        if len(tool_call.output) > MAX_OUTPUT_LOG_LENGTH:
+        if len(str(tool_call.output)) > MAX_OUTPUT_LOG_LENGTH:
             output = (
-                tool_call.output[:MAX_OUTPUT_LOG_LENGTH]
+                str(tool_call.output)[:MAX_OUTPUT_LOG_LENGTH]
                 + "...[truncated - only first 1000 characters shown]"
             )
         match tool_call.status:
@@ -269,7 +269,6 @@ class AgentMemory(Protocol):
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("save_plan_run_output is not implemented")
 
     @abstractmethod
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
@@ -286,7 +285,6 @@ class AgentMemory(Protocol):
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("get_plan_run_output is not implemented")
 
 
 class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
@@ -587,15 +585,6 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        if not isinstance(output, LocalOutput):
-            logger().warning(
-                f"Attempting to store Output {output} which is not held locally - skipping...",
-            )
-            return output
-        if output.get_summary() is None:
-            logger().warning(
-                f"Storing Output {output} with no summary",
-            )
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
         return AgentMemoryOutput(
@@ -658,18 +647,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
     def _ensure_cache_size(self) -> None:
         """Manage the cache size by removing the oldest file if the cache is full."""
-        cache_path = Path(self.cache_dir)
-        if not cache_path.exists():
-            return
-
-        json_files = list(cache_path.glob("**/*.json"))
+        json_files = list(Path(self.cache_dir).glob("**/*.json"))
         if len(json_files) >= self.MAX_CACHE_SIZE:
             oldest_file = min(json_files, key=lambda f: f.stat().st_mtime)
-            try:
-                oldest_file.unlink()
-                logger().debug(f"Removed oldest cache file: {oldest_file}")
-            except FileNotFoundError:
-                logger().debug(f"Cache file already deleted: {oldest_file}")
+            oldest_file.unlink()
+            logger().debug(f"Removed oldest cache file: {oldest_file}")
 
     def _write_to_cache(self, file_path: str, content: BaseModel) -> None:
         """Write a serialized object to a JSON file in the cache.
@@ -955,10 +937,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 self._write_to_cache(cache_file_path, output)
                 logger().debug(f"Saved output to local cache: {cache_file_path}")
 
-            if output.get_summary() is None:
-                logger().warning(
-                    f"Storing Output {output} with no summary",
-                )
             return AgentMemoryOutput(
                 output_name=output_name,
                 plan_run_id=plan_run_id,

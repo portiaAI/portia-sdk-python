@@ -95,6 +95,12 @@ def test_in_memory_storage() -> None:
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
     storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
     assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+    # This just logs, but check it doesn't cause any issues
+    tool_call = get_test_tool_call(plan_run)
+    storage.save_tool_call(tool_call)
+    # Check with a very large output too
+    tool_call.output = "a" * 100000
+    storage.save_tool_call(tool_call)
 
 
 def test_disk_storage(tmp_path: Path) -> None:
@@ -240,6 +246,7 @@ def test_portia_cloud_storage_errors() -> None:
     )
 
     tool_call = get_test_tool_call(plan_run)
+
     mock_exception = RuntimeError("An error occurred.")
     with (
         patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
@@ -443,8 +450,46 @@ def test_portia_cloud_agent_memory() -> None:
         mock_write_cache.assert_called_once()
 
         # Verify the returned output
-        assert result.summary == "test summary"
-        assert result.value == "test value"
+        assert result.get_summary() == "test summary"
+        assert result.get_value() == "test value"
+
+
+def test_portia_cloud_agent_memory_local_cache_expiry() -> None:
+    """Test PortiaCloudStorage agent memory."""
+    config = get_test_config(portia_api_key="test_api_key")
+    agent_memory = PortiaCloudStorage(config)
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="", tool_ids=[]),
+        steps=[],
+    )
+    plan_run = PlanRun(
+        id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
+        plan_id=plan.id,
+    )
+    output = LocalOutput(value="test value", summary="test summary")
+    mock_success_response = MagicMock()
+    mock_success_response.is_success = True
+
+    mock_success_response = MagicMock()
+    mock_success_response.is_success = True
+
+    with (
+        patch.object(
+            agent_memory.form_client,
+            "put",
+            return_value=mock_success_response,
+        ),
+        patch.object(agent_memory.client, "get"),
+    ):
+        # Write 21 outputs to the cache (cache size is 20)
+        for i in range(21):
+            agent_memory.save_plan_run_output(f"test_output_{i}", output, plan_run.id)
+
+        # Check that the cache only stores 20 entries
+        cache_files = list(Path(agent_memory.cache_dir).glob("**/*.json"))
+        assert len(cache_files) == 20
+        assert "test_output_20.json" in [file.name for file in cache_files]
 
 
 def test_portia_cloud_agent_memory_errors() -> None:
