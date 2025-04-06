@@ -11,11 +11,14 @@ import json
 import logging
 import os
 import sys
+from abc import ABC, abstractmethod
+from enum import Enum
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browserbase import Browserbase
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 from portia.clarification import ActionClarification
 from portia.config import LLM_TOOL_MODEL_KEY
@@ -29,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class BrowserToolSchema(BaseModel):
-    """Input for the BrowserTool."""
+    """Input schema for the BrowserTool."""
 
     url: HttpUrl = Field(
         ...,
@@ -73,8 +76,32 @@ class BrowserTaskOutput(BaseModel):
     )
 
 
+class BrowserInfrastructureOption(Enum):
+    """Options for the browser infrastructure provider."""
+
+    LOCAL = "local"
+    BROWSERBASE = "browserbase"
+
+
 class BrowserTool(Tool[str]):
-    """General purpose browser tool. Customizable to user requirements."""
+    """General purpose browser tool. Customizable to user requirements.
+
+    This tool is designed to be used for tasks that require a browser. If authentication is
+    required, the tool will return an ActionClarification with the user guidance and login URL.
+    If authentication is not required, the tool will return the task output. It uses
+    (BrowserUse)[https://browser-use.com/] for the task navigation.
+
+    When using the tool, you should ensure that once the user has authenticated, that they
+    indicate that authentication is completed and resume the plan run.
+
+    The tool supports both local and BrowserBase infrastructure providers for running the web
+    based tasks. If using local, a local Chrome instance will be used, and the tool will not
+    support end_user_id. If using BrowserBase, a BrowserBase API key is required and the tool
+    can handle separate end users. The infrastructure provider can be specified using the
+    `infrastructure_option` argument.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: str = "browser_tool"
     name: str = "Browser Tool"
@@ -86,8 +113,110 @@ class BrowserTool(Tool[str]):
     args_schema: type[BaseModel] = BrowserToolSchema
     output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
 
+    infrastructure_option: BrowserInfrastructureOption = Field(
+        default=BrowserInfrastructureOption.BROWSERBASE,
+        description="The infrastructure provider to use for the browser tool.",
+    )
+
+    @cached_property
+    def infrastructure_provider(self) -> BrowserInfrastructureProvider:
+        """Get the infrastructure provider instance (cached)."""
+        if self.infrastructure_option == BrowserInfrastructureOption.BROWSERBASE:
+            return BrowserInfrastructureProviderBrowserBase()
+        return BrowserInfrastructureProviderLocal()
+
+    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
+        """Run the BrowserTool."""
+        model = ctx.config.resolve_langchain_model(LLM_TOOL_MODEL_KEY)
+        llm = model.to_langchain()
+
+        async def run_browser_tasks() -> str | ActionClarification:
+            # First auth check
+            auth_agent = Agent(
+                task=(
+                    f"Go to {url}. If the user is not signed in, please go to the sign in page, "
+                    "and indicate that human login is required by returning "
+                    "human_login_required=True, and the url of the sign in page as well as "
+                    "what the user should do to sign in. If the user is signed in, please "
+                    "return human_login_required=False."
+                ),
+                llm=llm,
+                browser=self.infrastructure_provider.setup_browser(ctx),
+                controller=Controller(
+                    output_model=BrowserAuthOutput,
+                ),
+            )
+            result = await auth_agent.run()
+            auth_result = BrowserAuthOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
+            if auth_result.human_login_required:
+                if auth_result.user_login_guidance is None or auth_result.login_url is None:
+                    raise ToolHardError(
+                        "Expected user guidance and login URL if human login is required",
+                    )
+                return ActionClarification(
+                    user_guidance=auth_result.user_login_guidance,
+                    action_url=HttpUrl(
+                        self.infrastructure_provider.construct_auth_clarification_url(
+                            ctx,
+                            auth_result.login_url,
+                        ),
+                    ),
+                    plan_run_id=ctx.plan_run_id,
+                )
+
+            # Main task
+            task_agent = Agent(
+                task=task,
+                llm=llm,
+                browser=self.infrastructure_provider.setup_browser(ctx),
+                controller=Controller(
+                    output_model=BrowserTaskOutput,
+                ),
+            )
+            result = await task_agent.run()
+            task_result = BrowserTaskOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
+            if task_result.human_login_required:
+                if task_result.user_login_guidance is None or task_result.login_url is None:
+                    raise ToolHardError(
+                        "Expected user guidance and login URL if human login is required",
+                    )
+                return ActionClarification(
+                    user_guidance=task_result.user_login_guidance,
+                    action_url=HttpUrl(
+                        self.infrastructure_provider.construct_auth_clarification_url(
+                            ctx,
+                            task_result.login_url,
+                        ),
+                    ),
+                    plan_run_id=ctx.plan_run_id,
+                )
+            return task_result.task_output
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return loop.run_until_complete(run_browser_tasks())
+
+
+class BrowserInfrastructureProvider(ABC):
+    """Abstract base class for browser infrastructure providers."""
+
+    @abstractmethod
+    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        """Get a Browser instance."""
+
+    @abstractmethod
+    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:
+        """Construct the URL for the auth clarification."""
+
+
+class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
+    """Browser infrastructure provider for local browser instances."""
+
     @staticmethod
-    def _get_chrome_instance_path() -> str:
+    def get_chrome_instance_path() -> str:
         """Get the path to the Chrome instance based on the operating system or env variable."""
         chrome_path_from_env = os.environ.get("PORTIA_BROWSER_LOCAL_CHROME_EXEC")
         if chrome_path_from_env:
@@ -103,110 +232,33 @@ class BrowserTool(Tool[str]):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-    chrome_path: str = Field(default_factory=_get_chrome_instance_path)
+    def __init__(self, chrome_path: str | None = None) -> None:
+        """Initialize the BrowserInfrastructureProviderLocal."""
+        self.chrome_path = chrome_path or self.get_chrome_instance_path()
 
-    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
-        """Run the BrowserTool."""
-        model = ctx.config.resolve_langchain_model(LLM_TOOL_MODEL_KEY)
-        llm = model.to_langchain()
-
+    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        """Get a Browser instance."""
         if ctx.execution_context.end_user_id:
             logger.warning(
-                "BrowserTool uses a local browser instance and does not support "
+                "BrowserTool is using a local browser instance and does not support "
                 "end_user_id. end_user_id will be ignored.",
             )
+        return Browser(config=BrowserConfig(chrome_instance_path=self.chrome_path))
 
-        async def run_browser_tasks() -> str | ActionClarification:
-            # First auth check
-            auth_agent = Agent(
-                task=(
-                    f"Go to {url}. If the user is not signed in, please go to the sign in page, "
-                    "and indicate that human login is required by returning "
-                    "human_login_required=True, and the url of the sign in page as well as "
-                    "what the user should do to sign in. If the user is signed in, please "
-                    "return human_login_required=False."
-                ),
-                llm=llm,
-                browser=self._setup_browser(),
-                controller=Controller(
-                    output_model=BrowserAuthOutput,
-                ),
-            )
-            result = await auth_agent.run()
-            auth_result = BrowserAuthOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
-            if auth_result.human_login_required:
-                if auth_result.user_login_guidance is None or auth_result.login_url is None:
-                    raise ToolHardError(
-                        "Expected user guidance and login URL if human login is required",
-                    )
-                return ActionClarification(
-                    user_guidance=auth_result.user_login_guidance,
-                    action_url=HttpUrl(auth_result.login_url),
-                    plan_run_id=ctx.plan_run_id,
-                )
-
-            # Main task
-            task_agent = Agent(
-                task=task,
-                llm=llm,
-                browser=self._setup_browser(),
-                controller=Controller(
-                    output_model=BrowserTaskOutput,
-                ),
-            )
-            result = await task_agent.run()
-            task_result = BrowserTaskOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
-            if task_result.human_login_required:
-                if task_result.user_login_guidance is None or task_result.login_url is None:
-                    raise ToolHardError(
-                        "Expected user guidance and login URL if human login is required",
-                    )
-                return ActionClarification(
-                    user_guidance=task_result.user_login_guidance,
-                    action_url=HttpUrl(task_result.login_url),
-                    plan_run_id=ctx.plan_run_id,
-                )
-            return task_result.task_output
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(run_browser_tasks())
-
-    def _setup_browser(self) -> Browser:
-        """Get the browser instance to be used by the tool."""
-        return Browser(
-            config=BrowserConfig(
-                chrome_instance_path=self.chrome_path,
-            ),
-        )
+    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:  # noqa: ARG002
+        """Construct the URL for the auth clarification."""
+        return HttpUrl(sign_in_url)
 
 
-class BrowserToolNonLocal(Tool[str]):
-    """General purpose browser tool. Customizable to user requirements."""
+class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
+    """Browser infrastructure provider for BrowserBase."""
 
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
-
-    id: str = "browser_tool_non_local"
-    name: str = "Browser Tool Non Local"
-    description: str = (
-        "General purpose browser tool. Can be used to navigate to a URL and "
-        "complete tasks. Should only be used if the task requires a browser "
-        "and you are sure of the URL."
-    )
-    args_schema: type[BaseModel] = BrowserToolSchema
-    output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
-
-    @staticmethod
-    def get_bb_instance() -> Browserbase:
-        """Get a Browserbase instance."""
-        return Browserbase(api_key=os.environ["BROWSERBASE_API_KEY"])
-
-    bb: Browserbase = Field(default_factory=get_bb_instance)
+    def __init__(self, api_key: str | None = None) -> None:
+        """Initialize the BrowserBase infrastructure provider."""
+        api_key = api_key or os.environ["BROWSERBASE_API_KEY"]
+        if not api_key:
+            raise ToolHardError("BROWSERBASE_API_KEY is not set")
+        self.bb = Browserbase(api_key=api_key)
 
     def get_context_id(self, bb: Browserbase) -> str:
         """Get the Browserbase context id.
@@ -232,16 +284,18 @@ class BrowserToolNonLocal(Tool[str]):
             keep_alive=True,
         )
 
-    def get_or_create_session(self, context: ToolRunContext, bb: Browserbase) -> tuple[str, str]:
+    def get_or_create_session(self, context: ToolRunContext, bb: Browserbase) -> str:
         """Get or create a Browserbase session."""
         context_id = context.execution_context.additional_data.get(
-            "bb_context_id", self.get_context_id(bb)
+            "bb_context_id",
+            self.get_context_id(bb),
         )
         context.execution_context.additional_data["bb_context_id"] = context_id
 
         session_id = context.execution_context.additional_data.get("bb_session_id", None)
         session_connect_url = context.execution_context.additional_data.get(
-            "bb_session_connect_url", None
+            "bb_session_connect_url",
+            None,
         )
 
         if not session_id or not session_connect_url:
@@ -252,83 +306,20 @@ class BrowserToolNonLocal(Tool[str]):
                 session_connect_url
             )
 
-        return (session_id, session_connect_url)
+        return session_connect_url
 
-    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> str:
+    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:  # noqa: ARG002
         """Construct the URL for the auth clarification."""
         if not ctx.execution_context.additional_data["bb_session_id"]:
             raise ToolHardError("Session ID not found")
-        live_view_link = self.bb.sessions.debug(ctx.execution_context.additional_data["bb_session_id"])
-        return live_view_link.debugger_fullscreen_url
+        live_view_link = self.bb.sessions.debug(
+            ctx.execution_context.additional_data["bb_session_id"],
+        )
+        return HttpUrl(live_view_link.debugger_fullscreen_url)
 
-    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
-        """Run the BrowserTool."""
-        model = ctx.config.resolve_langchain_model(LLM_TOOL_MODEL_KEY)
-        llm = model.to_langchain()
-
-        async def run_browser_tasks() -> str | ActionClarification:
-            # First auth check
-            auth_agent = Agent(
-                task=(
-                    f"Go to {url}. If the user is not signed in, please go to the sign in page, "
-                    "and indicate that human login is required by returning "
-                    "human_login_required=True, and the url of the sign in page as well as "
-                    "what the user should do to sign in. If the user is signed in, please "
-                    "return human_login_required=False."
-                ),
-                llm=llm,
-                browser=self._setup_browser(ctx),
-                controller=Controller(
-                    output_model=BrowserAuthOutput,
-                ),
-            )
-            result = await auth_agent.run()
-            auth_result = BrowserAuthOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
-            if auth_result.human_login_required:
-                if auth_result.user_login_guidance is None or auth_result.login_url is None:
-                    raise ToolHardError(
-                        "Expected user guidance and login URL if human login is required",
-                    )
-                return ActionClarification(
-                    user_guidance=auth_result.user_login_guidance,
-                    action_url=HttpUrl(self.construct_auth_clarification_url(ctx, auth_result.login_url)),
-                    plan_run_id=ctx.plan_run_id,
-                )
-
-            # Main task
-            task_agent = Agent(
-                task=task,
-                llm=llm,
-                browser=self._setup_browser(ctx),
-                controller=Controller(
-                    output_model=BrowserTaskOutput,
-                ),
-            )
-            result = await task_agent.run()
-            task_result = BrowserTaskOutput.model_validate(json.loads(result.final_result()))  # type: ignore reportArgumentType
-            if task_result.human_login_required:
-                if task_result.user_login_guidance is None or task_result.login_url is None:
-                    raise ToolHardError(
-                        "Expected user guidance and login URL if human login is required",
-                    )
-                return ActionClarification(
-                    user_guidance=task_result.user_login_guidance,
-                    action_url=HttpUrl(self.construct_auth_clarification_url(ctx, task_result.login_url)),
-                    plan_run_id=ctx.plan_run_id,
-                )
-            return task_result.task_output
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(run_browser_tasks())
-
-    def _setup_browser(self, ctx: ToolRunContext) -> Browser:
-        """Get the browser instance to be used by the tool."""
-        bb = self.get_bb_instance()
-        session_id, session_connect_url = self.get_or_create_session(ctx, bb)
+    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        """Get a Browser instance."""
+        session_connect_url = self.get_or_create_session(ctx, self.bb)
 
         return Browser(
             config=BrowserConfig(
