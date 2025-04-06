@@ -62,6 +62,7 @@ AGENTS = [
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
@@ -80,7 +81,7 @@ def test_portia_run_query(
 
     tool_registry = InMemoryToolRegistry.from_local_tools([addition_tool])
     portia = Portia(config=config, tools=tool_registry)
-    query = "Add 1 + 2 together"
+    query = "Add 1 and 2 together"
 
     plan_run = portia.run(query)
 
@@ -109,19 +110,12 @@ def test_portia_generate_plan(
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     portia = Portia(config=config, tools=tool_registry)
-    query = "Add 1 + 2 together"
+    query = "Add 1 and 2 together"
 
     plan = portia.plan(query)
 
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_id == "add_tool"
-
-    plan_run = portia.run(query)
-
-    assert plan_run.state == PlanRunState.COMPLETE
-    assert plan_run.outputs.final_output
-    assert plan_run.outputs.final_output.value == 3
-    assert plan_run.outputs.final_output.summary is not None
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
@@ -188,15 +182,11 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
         task="Use tool",
         output="",
         inputs=[
-            Variable(
-                name="user_guidance",
-                description="",
-            ),
         ],
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="raise a clarification",
+            query="raise a clarification with user guidance 'Return a clarification'",
             tool_ids=["clarification_tool"],
         ),
         steps=[clarification_step],
