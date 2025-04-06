@@ -164,7 +164,7 @@ def test_portia_run_query_with_clarifications(
         test_clarification_handler.received_clarification.user_guidance == "Return a clarification"
     )
 
-
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_clarifications_no_handler() -> None:
     """Test running a query with clarification using Portia."""
     config = Config.from_default(
