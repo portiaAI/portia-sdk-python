@@ -61,6 +61,7 @@ AGENTS = [
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query(
     llm_provider: LLMProvider,
@@ -92,15 +93,18 @@ def test_portia_run_query(
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_generate_plan(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
+    agent: ExecutionAgentType,
 ) -> None:
     """Test planning a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
         llm_model_name=llm_model_name,
+        execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
 
