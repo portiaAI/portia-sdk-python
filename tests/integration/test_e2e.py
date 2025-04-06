@@ -186,7 +186,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="raise a clarification with user guidance 'Return a clarification'",
+            query="raise a clarification with a user guidance 'Return a clarification'",
             tool_ids=["clarification_tool"],
         ),
         steps=[clarification_step],

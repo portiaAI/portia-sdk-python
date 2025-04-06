@@ -18,7 +18,6 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
-from portia.plan import Variable
 
 if TYPE_CHECKING:
     from portia.execution_agents.base_execution_agent import Output
