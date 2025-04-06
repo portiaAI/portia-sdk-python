@@ -96,7 +96,6 @@ def test_portia_run_query(
 def test_portia_generate_plan(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
-    agent: ExecutionAgentType,
 ) -> None:
     """Test planning a simple query."""
     config = Config.from_default(
