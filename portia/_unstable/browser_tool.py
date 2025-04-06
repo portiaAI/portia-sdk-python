@@ -292,7 +292,7 @@ class BrowserToolForUrl(BaseBrowserTool):
             url=url,  # type: ignore reportCallIssue
         )
 
-    def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarification:
+    def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
         """Run the BrowserToolForUrl."""
         return super().run(ctx, self.url, task)
 
