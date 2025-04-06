@@ -164,13 +164,13 @@ def test_portia_run_query_with_clarifications(
         test_clarification_handler.received_clarification.user_guidance == "Return a clarification"
     )
 
-@pytest.mark.flaky(reruns=3)
+
 def test_portia_run_query_with_clarifications_no_handler() -> None:
     """Test running a query with clarification using Portia."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=LLMProvider.OPENAI,
-        llm_model_name=LLMModel.GPT_4_O_MINI,
+        llm_model_name=LLMModel.O_3_MINI,
         execution_agent_type=ExecutionAgentType.DEFAULT,
         storage_class=StorageClass.MEMORY,
     )
@@ -179,14 +179,14 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="clarification_tool",
-        task="Use tool",
+        task="raise a clarification with a user guidance 'Return a clarification'",
         output="",
         inputs=[
         ],
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="raise a clarification with a user guidance 'Return a clarification'",
+            query="Raise a clarification",
             tool_ids=["clarification_tool"],
         ),
         steps=[clarification_step],

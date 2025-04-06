@@ -178,7 +178,7 @@ class Variable(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     name: str = Field(
         description="The name of the output to reference, e.g. $best_offers.",
