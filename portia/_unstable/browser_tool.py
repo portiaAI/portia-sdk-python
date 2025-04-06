@@ -31,6 +31,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class BrowserToolForUrlSchema(BaseModel):
+    """Input schema for the BrowserToolForUrl."""
+
+    task: str = Field(
+        ...,
+        description="The task to be completed by the Browser tool.",
+    )
+
+
 class BrowserToolSchema(BaseModel):
     """Input schema for the BrowserTool."""
 
@@ -83,34 +92,22 @@ class BrowserInfrastructureOption(Enum):
     BROWSERBASE = "browserbase"
 
 
-class BrowserTool(Tool[str]):
-    """General purpose browser tool. Customizable to user requirements.
-
-    This tool is designed to be used for tasks that require a browser. If authentication is
-    required, the tool will return an ActionClarification with the user guidance and login URL.
-    If authentication is not required, the tool will return the task output. It uses
-    (BrowserUse)[https://browser-use.com/] for the task navigation.
-
-    When using the tool, you should ensure that once the user has authenticated, that they
-    indicate that authentication is completed and resume the plan run.
-
-    The tool supports both local and BrowserBase infrastructure providers for running the web
-    based tasks. If using local, a local Chrome instance will be used, and the tool will not
-    support end_user_id. If using BrowserBase, a BrowserBase API key is required and the tool
-    can handle separate end users. The infrastructure provider can be specified using the
-    `infrastructure_option` argument.
-    """
+class BaseBrowserTool(Tool[str]):
+    """TODO: Document this."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: str = "browser_tool"
-    name: str = "Browser Tool"
-    description: str = (
-        "General purpose browser tool. Can be used to navigate to a URL and "
-        "complete tasks. Should only be used if the task requires a browser "
-        "and you are sure of the URL."
+    id: str = Field(init_var=True, default="browser_tool")
+    name: str = Field(init_var=True, default="Browser Tool")
+    description: str = Field(
+        init_var=True,
+        default=(
+            "General purpose browser tool. Can be used to navigate to a URL and "
+            "complete tasks. Should only be used if the task requires a browser "
+            "and you are sure of the URL."
+        ),
     )
-    args_schema: type[BaseModel] = BrowserToolSchema
+    args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
     output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
 
     infrastructure_option: BrowserInfrastructureOption = Field(
@@ -198,6 +195,106 @@ class BrowserTool(Tool[str]):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop.run_until_complete(run_browser_tasks())
+
+
+class BrowserTool(BaseBrowserTool):
+    """General purpose browser tool. Customizable to user requirements.
+
+    This tool is designed to be used for tasks that require a browser. If authentication is
+    required, the tool will return an ActionClarification with the user guidance and login URL.
+    If authentication is not required, the tool will return the task output. It uses
+    (BrowserUse)[https://browser-use.com/] for the task navigation.
+
+    When using the tool, you should ensure that once the user has authenticated, that they
+    indicate that authentication is completed and resume the plan run.
+
+    The tool supports both local and BrowserBase infrastructure providers for running the web
+    based tasks. If using local, a local Chrome instance will be used, and the tool will not
+    support end_user_id. If using BrowserBase, a BrowserBase API key is required and the tool
+    can handle separate end users. The infrastructure provider can be specified using the
+    `infrastructure_option` argument.
+
+    Args:
+        id (str, optional): Custom identifier for the tool. Defaults to "browser_tool".
+        name (str, optional): Display name for the tool. Defaults to "Browser Tool".
+        description (str, optional): Custom description of the tool's purpose. Defaults to a
+            general description of the browser tool's capabilities.
+        infrastructure_option (BrowserInfrastructureOption, optional): The infrastructure
+            provider to use. Can be either "local" or "browserbase". Defaults to "browserbase".
+
+    """
+
+    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
+        """Run the BrowserTool."""
+        return super().run(ctx, url, task)
+
+
+class BrowserToolForUrl(BaseBrowserTool):
+    """Browser tool for a specific URL.
+
+    This tool is designed to be used for browser-based tasks on the specified URL.
+    If authentication is required, the tool will return an ActionClarification with the user
+    guidance and login URL. If authentication is not required, the tool will return the task
+    output. It uses (BrowserUse)[https://browser-use.com/] for the task navigation.
+
+    When using the tool, the developer should ensure that once the user has completed
+    authentication, that they resume the plan run.
+
+    The tool supports both local and BrowserBase infrastructure providers for running the web
+    based tasks. If using local, a local Chrome instance will be used, and the tool will not
+    support end_user_id. If using BrowserBase, a BrowserBase API key is required and the tool
+    can handle separate end users. The infrastructure provider can be specified using the
+    `infrastructure_option` argument.
+
+    Args:
+        url (str): The URL that this browser tool will navigate to for all tasks.
+        id (str, optional): Custom identifier for the tool. If not provided, will be generated
+            based on the URL's domain.
+        name (str, optional): Display name for the tool. If not provided, will be generated
+            based on the URL's domain.
+        description (str, optional): Custom description of the tool's purpose. If not provided,
+            will be generated with the URL.
+
+    """
+
+    url: str = Field(
+        ...,
+        description="The URL to navigate to.",
+    )
+
+    def __init__(
+        self,
+        url: str,
+        id: str | None = None,  # noqa: A002
+        name: str | None = None,
+        description: str | None = None,
+    ) -> None:
+        """Initialize the BrowserToolForUrl."""
+        http_url = HttpUrl(url)
+        if not http_url.host:
+            raise ToolHardError("Invalid URL, host must be provided.")
+        domain_parts = http_url.host.split(".")
+        formatted_domain = "_".join(domain_parts)
+        if not id:
+            id = f"browser_tool_for_url_{formatted_domain}"  # noqa: A001
+        if not name:
+            name = f"Browser Tool for {formatted_domain}"
+        if not description:
+            description = (
+                f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete "
+                "tasks."
+            )
+        super().__init__(
+            id=id,
+            name=name,
+            description=description,
+            args_schema=BrowserToolForUrlSchema,
+            url=url,  # type: ignore reportCallIssue
+        )
+
+    def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarification:
+        """Run the BrowserToolForUrl."""
+        return super().run(ctx, self.url, task)
 
 
 class BrowserInfrastructureProvider(ABC):
