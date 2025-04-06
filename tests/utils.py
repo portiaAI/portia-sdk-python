@@ -128,7 +128,7 @@ class AdditionTool(Tool):
 class ClarificationToolSchema(BaseModel):
     """Input for ClarificationTool."""
 
-    user_guidance: str
+    user_guidance: str = Field(..., description="The user guidance for the clarification")
 
 
 class ClarificationTool(Tool):
