@@ -81,7 +81,7 @@ def test_portia_run_query(
 
     tool_registry = InMemoryToolRegistry.from_local_tools([addition_tool])
     portia = Portia(config=config, tools=tool_registry)
-    query = "Add 1 and 2 together"
+    query = "Add 1 + 2"
 
     plan_run = portia.run(query)
 
@@ -110,7 +110,7 @@ def test_portia_generate_plan(
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     portia = Portia(config=config, tools=tool_registry)
-    query = "Add 1 and 2 together"
+    query = "Add 1 + 2"
 
     plan = portia.plan(query)
 
