@@ -58,7 +58,7 @@ class FinalOutputSummarizer:
         for step in plan.steps:
             if step.output in outputs:
                 output_value = (
-                    outputs[step.output].summary
+                    outputs[step.output].get_summary()
                     if outputs[step.output].get_value()
                     in (
                         PreStepIntrospectionOutcome.SKIP,

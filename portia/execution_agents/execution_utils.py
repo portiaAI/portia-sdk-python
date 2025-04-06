@@ -130,7 +130,7 @@ def process_output(  # noqa: C901
     It raises errors if the tool encounters issues and returns the appropriate output.
 
     Args:
-        messages (list[BaseMessage}): The set of messages received from the agent's plan_run.
+        messages (list[BaseMessage]): The set of messages received from the agent's plan_run.
         tool (Tool | None): The tool associated with the agent, if any.
         clarifications (list[Clarification] | None): A list of clarifications, if any.
 
@@ -167,15 +167,16 @@ def process_output(  # noqa: C901
     # if there's only one output return just the value
     if len(output_values) == 1:
         output = output_values[0]
-        if output.summary is None:
-            output.summary = output.serialize_value()
-        return output
+        return LocalOutput(
+            value=output.get_value(),
+            summary=output.get_summary() or output.serialize_value(),
+        )
 
     values = []
     summaries = []
 
     for output in output_values:
         values.append(output.get_value())
-        summaries.append(output.summary or output.serialize_value())
+        summaries.append(output.get_summary() or output.serialize_value())
 
     return LocalOutput(value=values, summary=", ".join(summaries))

@@ -69,7 +69,6 @@ class PlanRunOutputs(BaseModel):
 
     step_outputs: dict[str, Output] = Field(
         default={},
-        description="A dictionary containing outputs of individual run steps.",
     )
 
     final_output: Output | None = Field(

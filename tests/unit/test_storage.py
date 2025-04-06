@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
 import pytest
 
 from portia.errors import StorageError
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.plan import Plan, PlanContext, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
@@ -23,8 +25,6 @@ from portia.storage import (
 from tests.utils import get_test_config, get_test_plan_run, get_test_tool_call
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from portia.tool_call import ToolCallRecord
 
 
@@ -93,6 +93,8 @@ def test_in_memory_storage() -> None:
     assert storage.get_plan_run(plan_run.id) == plan_run
     assert storage.get_plan_runs().results == [plan_run]
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
+    storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
+    assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
 
 
 def test_disk_storage(tmp_path: Path) -> None:
@@ -106,11 +108,12 @@ def test_disk_storage(tmp_path: Path) -> None:
     all_runs = storage.get_plan_runs()
     assert all_runs.results == [plan_run]
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
+    storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
+    assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
 
 
 def test_portia_cloud_storage() -> None:
     """Test PortiaCloudStorage raises StorageError on failure responses."""
-    """Test PortiaCloudStorage raises StorageError on failure responses using the client."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
 
@@ -237,7 +240,6 @@ def test_portia_cloud_storage_errors() -> None:
     )
 
     tool_call = get_test_tool_call(plan_run)
-
     mock_exception = RuntimeError("An error occurred.")
     with (
         patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
@@ -344,4 +346,154 @@ def test_portia_cloud_storage_errors() -> None:
                 "status": tool_call.status,
                 "latency_seconds": tool_call.latency_seconds,
             },
+        )
+
+
+def test_portia_cloud_agent_memory() -> None:
+    """Test PortiaCloudStorage agent memory."""
+    config = get_test_config(portia_api_key="test_api_key")
+    agent_memory = PortiaCloudStorage(config)
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="", tool_ids=[]),
+        steps=[],
+    )
+    plan_run = PlanRun(
+        id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
+        plan_id=plan.id,
+    )
+    output = LocalOutput(value="test value", summary="test summary")
+    mock_success_response = MagicMock()
+    mock_success_response.is_success = True
+
+    # Test saving an output
+    with (
+        patch.object(
+            agent_memory.form_client,
+            "put",
+            return_value=mock_success_response,
+        ) as mock_put,
+    ):
+        result = agent_memory.save_plan_run_output("test_output", output, plan_run.id)
+
+        mock_put.assert_called_once_with(
+            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+            files={
+                "value": (
+                    "output",
+                    ANY,
+                ),
+            },
+            data={
+                "summary": output.get_summary(),
+            },
+        )
+        assert isinstance(result, AgentMemoryOutput)
+        assert result.output_name == "test_output"
+        assert result.plan_run_id == plan_run.id
+        assert result.summary == output.get_summary()
+        assert Path(f".portia/cache/{plan_run.id}/test_output.json").is_file()
+
+    # Test getting an output when it is cached locally
+    with (
+        patch.object(agent_memory.client, "get") as mock_get,
+    ):
+        result = agent_memory.get_plan_run_output("test_output", plan_run.id)
+
+        # Verify that we didn't call Portia Cloud because we have a cached value
+        mock_get.assert_not_called()
+
+        # Verify the returned output
+        assert result.get_summary() == output.get_summary()
+        assert result.get_value() == output.get_value()
+
+    # Test getting an output when it is not cached locally
+    mock_output_response = MagicMock()
+    mock_output_response.is_success = True
+    mock_output_response.json.return_value = {
+        "summary": "test summary",
+        "url": "https://example.com/output",
+    }
+
+    mock_value_response = MagicMock()
+    mock_value_response.text = "test value"
+    mock_value_response.raise_for_status = MagicMock()
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_value_response
+
+    with (
+        patch.object(agent_memory, "_read_from_cache", side_effect=FileNotFoundError),
+        patch("httpx.Client") as mock_client_class,
+        patch.object(agent_memory.client, "get", return_value=mock_output_response) as mock_get,
+        patch.object(agent_memory, "_write_to_cache") as mock_write_cache,
+    ):
+        mock_client_class.return_value.__enter__.return_value = mock_client
+
+        result = agent_memory.get_plan_run_output("test_output", plan_run.id)
+
+        # Verify that it fetched from Portia Cloud
+        mock_get.assert_called_once_with(
+            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        )
+
+        # Verify that it fetched the value from the URL using the httpx client
+        mock_client.get.assert_called_once_with("https://example.com/output")
+
+        # Verify that it wrote to the local cache
+        mock_write_cache.assert_called_once()
+
+        # Verify the returned output
+        assert result.summary == "test summary"
+        assert result.value == "test value"
+
+
+def test_portia_cloud_agent_memory_errors() -> None:
+    """Test PortiaCloudStorage raises StorageError on agent memory failure responses."""
+    config = get_test_config(portia_api_key="test_api_key")
+    agent_memory = PortiaCloudStorage(config)
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="", tool_ids=[]),
+        steps=[],
+    )
+    plan_run = PlanRun(
+        id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
+        plan_id=plan.id,
+    )
+    output = LocalOutput(value="test value", summary="test summary")
+
+    mock_exception = RuntimeError("An error occurred.")
+    with (
+        patch.object(agent_memory.form_client, "put", side_effect=mock_exception) as mock_put,
+    ):
+        with pytest.raises(StorageError):
+            agent_memory.save_plan_run_output("test_output", output, plan_run.id)
+
+        mock_put.assert_called_once_with(
+            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+            files={
+                "value": (
+                    "output",
+                    ANY,
+                ),
+            },
+            data={
+                "summary": output.get_summary(),
+            },
+        )
+
+    with (
+        patch.object(
+            agent_memory,
+            "_read_from_cache",
+            side_effect=FileNotFoundError,
+        ) as mock_read_cache,
+        patch.object(agent_memory.client, "get", side_effect=mock_exception) as mock_get,
+    ):
+        with pytest.raises(StorageError):
+            agent_memory.get_plan_run_output("test_output", plan_run.id)
+
+        mock_read_cache.assert_called_once_with(f"{plan_run.id}/test_output.json", LocalOutput)
+        mock_get.assert_called_once_with(
+            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         )

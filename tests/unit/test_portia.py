@@ -501,7 +501,7 @@ def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock
         # Verify final output and summary
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.get_value() == activities_output.get_value()
-        assert plan_run.outputs.final_output.summary == expected_summary
+        assert plan_run.outputs.final_output.get_summary() == expected_summary
 
         # Verify create_summary was called with correct args
         mock_summarizer_agent.create_summary.assert_called_once_with(
@@ -543,7 +543,7 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         # Verify the final output
         assert output is not None
         assert output.get_value() == "Visit Hyde Park and have a picnic"
-        assert output.summary == expected_summary
+        assert output.get_summary() == expected_summary
 
         # Verify create_summary was called with correct args
         mock_summarizer.create_summary.assert_called_once()
@@ -632,7 +632,7 @@ def test_portia_run_query_with_memory(
         # Verify final output and summary
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.get_value() == activities_output.value
-        assert plan_run.outputs.final_output.summary == expected_summary
+        assert plan_run.outputs.final_output.get_summary() == expected_summary
 
 
 def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
@@ -653,7 +653,7 @@ def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
         # Verify the final output is set without summary
         assert final_output is not None
         assert final_output.get_value() == "Some output"
-        assert final_output.summary is None
+        assert final_output.get_summary() is None
 
 
 def test_portia_wait_for_ready_max_retries(portia: Portia) -> None:
@@ -971,7 +971,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
             == PreStepIntrospectionOutcome.COMPLETE
         )
         assert plan_run.outputs.final_output is not None
-        assert plan_run.outputs.final_output.summary == "Execution completed early"
+        assert plan_run.outputs.final_output.get_summary() == "Execution completed early"
 
 
 def test_portia_run_with_introspection_fail(portia: Portia, planning_model: MagicMock) -> None:
@@ -1035,7 +1035,7 @@ def test_portia_run_with_introspection_fail(portia: Portia, planning_model: Magi
         )
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.get_value() == PreStepIntrospectionOutcome.FAIL
-        assert plan_run.outputs.final_output.summary == "Missing required data"
+        assert plan_run.outputs.final_output.get_summary() == "Missing required data"
 
 
 def test_handle_introspection_outcome_complete(portia: Portia) -> None:
@@ -1079,7 +1079,10 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
             updated_plan_run.outputs.step_outputs["$test_output"].get_value()
             == PreStepIntrospectionOutcome.COMPLETE
         )
-        assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Stopping execution"
+        assert (
+            updated_plan_run.outputs.step_outputs["$test_output"].get_summary()
+            == "Stopping execution"
+        )
         assert updated_plan_run.outputs.final_output == mock_final_output
         assert updated_plan_run.state == PlanRunState.COMPLETE
 
@@ -1123,11 +1126,10 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
         updated_plan_run.outputs.step_outputs["$test_output"].get_value()
         == PreStepIntrospectionOutcome.FAIL
     )
-    assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Execution failed"
+    assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Execution failed"
     assert updated_plan_run.outputs.final_output is not None
     assert updated_plan_run.outputs.final_output.get_value() == PreStepIntrospectionOutcome.FAIL
-    assert updated_plan_run.outputs.final_output.summary is not None
-    assert updated_plan_run.outputs.final_output.summary == "Execution failed"
+    assert updated_plan_run.outputs.final_output.get_summary() == "Execution failed"
     assert updated_plan_run.state == PlanRunState.FAILED
 
 
@@ -1170,7 +1172,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
         updated_plan_run.outputs.step_outputs["$test_output"].get_value()
         == PreStepIntrospectionOutcome.SKIP
     )
-    assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Skipping step"
+    assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Skipping step"
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS  # State should remain IN_PROGRESS
 
 
@@ -1296,5 +1298,5 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         )
         assert result_plan_run.outputs.final_output is not None
         assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
-        assert result_plan_run.outputs.final_output.summary == expected_summary
+        assert result_plan_run.outputs.final_output.get_summary() == expected_summary
         assert result_plan_run.current_step_index == 3

@@ -46,21 +46,25 @@ clarification = ActionClarification(
 @pytest.mark.parametrize(
     ("input_value", "expected"),
     [
-        ("Hello World!", "Hello World!"),
-        (None, ""),
-        ({"hello": "world"}, json.dumps({"hello": "world"})),
-        ([{"hello": "world"}], json.dumps([{"hello": "world"}])),
-        (("hello", "world"), json.dumps(["hello", "world"])),
-        ({"hello"}, json.dumps(["hello"])),  # sets don't have ordering
-        (1, "1"),
-        (1.23, "1.23"),
-        (False, "false"),
-        (LLMModel.GPT_4_O, str(LLMModel.GPT_4_O.value)),
-        (MyModel(id="123"), MyModel(id="123").model_dump_json()),
-        (b"Hello World!", "Hello World!"),
-        (now, now.isoformat()),
-        (not_a_model, str(not_a_model)),
-        ([clarification], json.dumps([clarification.model_dump(mode="json")])),
+        pytest.param("Hello World!", "Hello World!", id="string"),
+        pytest.param(None, "", id="none"),
+        pytest.param({"hello": "world"}, json.dumps({"hello": "world"}), id="dict"),
+        pytest.param([{"hello": "world"}], json.dumps([{"hello": "world"}]), id="list"),
+        pytest.param(("hello", "world"), json.dumps(["hello", "world"]), id="tuple"),
+        pytest.param({"hello"}, json.dumps(["hello"]), id="set"),  # sets don't have ordering
+        pytest.param(1, "1", id="int"),
+        pytest.param(1.23, "1.23", id="float"),
+        pytest.param(False, "false", id="bool"),
+        pytest.param(LLMModel.GPT_4_O, str(LLMModel.GPT_4_O.value), id="enum"),
+        pytest.param(MyModel(id="123"), MyModel(id="123").model_dump_json(), id="model"),
+        pytest.param(b"Hello World!", "Hello World!", id="bytes"),
+        pytest.param(now, now.isoformat(), id="datetime"),
+        pytest.param(not_a_model, str(not_a_model), id="not_a_model"),
+        pytest.param(
+            [clarification],
+            json.dumps([clarification.model_dump(mode="json")]),
+            id="list_of_clarification",
+        ),
     ],
 )
 def test_output_serialize(input_value: Any, expected: Any) -> None:  # noqa: ANN401

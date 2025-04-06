@@ -653,7 +653,8 @@ class DefaultExecutionAgent(BaseExecutionAgent):
 
         graph.add_node(AgentNode.TOOLS, tool_node)
         graph.add_node(
-            AgentNode.SUMMARIZER, StepSummarizer(self.config, model, self.tool, self.step).invoke,
+            AgentNode.SUMMARIZER,
+            StepSummarizer(self.config, model, self.tool, self.step).invoke,
         )
         graph.add_conditional_edges(
             AgentNode.TOOLS,
