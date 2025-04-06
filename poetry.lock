@@ -1969,15 +1969,15 @@ files = [
 
 [[package]]
 name = "mcp"
-version = "1.4.1"
+version = "1.6.0"
 description = "Model Context Protocol SDK"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 markers = "python_version >= \"3.12\" or python_version == \"3.11\""
 files = [
-    {file = "mcp-1.4.1-py3-none-any.whl", hash = "sha256:a7716b1ec1c054e76f49806f7d96113b99fc1166fc9244c2c6f19867cb75b593"},
-    {file = "mcp-1.4.1.tar.gz", hash = "sha256:b9655d2de6313f9d55a7d1df62b3c3fe27a530100cc85bf23729145b0dba4c7a"},
+    {file = "mcp-1.6.0-py3-none-any.whl", hash = "sha256:7bd24c6ea042dbec44c754f100984d186620d8b841ec30f1b19eda9b93a634d0"},
+    {file = "mcp-1.6.0.tar.gz", hash = "sha256:d9324876de2c5637369f43161cd71eebfd803df5a95e46225cab8d280e366723"},
 ]
 
 [package.dependencies]
@@ -4299,4 +4299,4 @@ tools-browser-local = ["browser-use", "playwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "11022f8ecc84c4895a95cf77dd40d59ab52eb3356ef91253add66c1e477f1e8b"
+content-hash = "2aa00bc93d1c4b03e52dcb62d91d77ad93d3eb1f8e23a271ff3a8a1ea46757fd"
