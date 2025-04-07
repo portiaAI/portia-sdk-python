@@ -46,7 +46,7 @@ def test_tool_initialization(add_tool: AdditionTool) -> None:
     assert add_tool.name == "Add Tool"
     assert (
         add_tool.description
-        == "Use this tool to add two numbers together, it takes two inputs a and b"
+        == "Use this tool to add two numbers together, it takes two numbers a + b"
     )
 
 

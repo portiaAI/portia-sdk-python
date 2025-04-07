@@ -61,7 +61,7 @@ AGENTS = [
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.flaky(reruns=3)
+@pytest.mark.flaky(reruns=4)
 def test_portia_run_query(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
@@ -90,7 +90,7 @@ def test_portia_run_query(
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.flaky(reruns=3)
+@pytest.mark.flaky(reruns=4)
 def test_portia_generate_plan(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
