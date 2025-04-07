@@ -37,7 +37,7 @@ def test_plan_builder_syntax() -> None:
             Step(
                 task="compare prices",
                 output="$output_1",
-                inputs=[Variable(name="$output_0", value=None, description="")],
+                inputs=[Variable(name="$output_0", description="")],
                 tool_id="price_comparison",
                 condition="$flight_search has more than 30 results",
             ),

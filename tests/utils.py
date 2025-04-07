@@ -13,6 +13,7 @@ from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
+from portia.execution_agents.base_execution_agent import Output
 from portia.execution_context import ExecutionContext, empty_context
 from portia.model import LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
@@ -51,21 +52,24 @@ def get_test_tool_context(
 def get_test_plan_run() -> tuple[Plan, PlanRun]:
     """Generate a simple test plan_run."""
     step1 = Step(
-        task="Add 1 + 2",
+        task="Add $a + 2",
         inputs=[
-            Variable(name="a", value=1, description=""),
-            Variable(name="b", value=2, description=""),
+            Variable(name="$a", description="the first number"),
         ],
         output="$sum",
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="Add 1 + 2",
+            query="Add $a + 2",
             tool_ids=["add_tool"],
         ),
         steps=[step1],
     )
-    return plan, PlanRun(plan_id=plan.id, current_step_index=0)
+    plan_run = PlanRun(plan_id=plan.id, current_step_index=0)
+    plan_run.outputs.step_outputs = {
+        "$a": Output(value="3"),
+    }
+    return plan, plan_run
 
 
 def get_test_tool_call(plan_run: PlanRun) -> ToolCallRecord:
@@ -112,7 +116,7 @@ class AdditionTool(Tool):
 
     id: str = "add_tool"
     name: str = "Add Tool"
-    description: str = "Takes two numbers and adds them together"
+    description: str = "Use this tool to add two numbers together, it takes two numbers a + b"
     args_schema: type[BaseModel] = AdditionToolSchema
     output_schema: tuple[str, str] = ("int", "int: The value of the addition")
 
@@ -124,7 +128,7 @@ class AdditionTool(Tool):
 class ClarificationToolSchema(BaseModel):
     """Input for ClarificationTool."""
 
-    user_guidance: str
+    user_guidance: str = Field(..., description="The user guidance for the clarification")
 
 
 class ClarificationTool(Tool):

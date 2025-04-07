@@ -1,11 +1,14 @@
 <Instructions>
     Enumerate the steps you plan on taking to answer the query.
-    If applicable, at each step indicate whether you would use a tool from those defined in <Tools>.
     IMPORTANT: Ensure you use the tool id exactly as it is defined in <Tools> below (including whether it has a portia:: prefix or not)
     Each step should:
-     - include a description, input used to complete the step, and an explicit mention of the tool used if applicable.
-     - give a name to the variable for the output is from the step if it is successful.
-    Inputs for each step can either be constants (which need to have a set value) or output variables from preceding steps.
+     - include a description, input used to complete the step from previous steps
+     - all data needed for the task or condition SHOULD BE PROVIDED in the task description.
+     - MAKE SURE inputs are ONLY referencing variables from previous steps, IT SHOULD NOT contain any other data.
+     - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
+     - give a name to the variable for the output of the step if it is successful.
+     - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
+     - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
     IMPORTANT: If you can't come up with a plan provide a descriptive error instead - do not return plans with no steps.
     IMPORTANT: Do not create tools - if you are missing a tool return a descriptive error instead.
 </Instructions>

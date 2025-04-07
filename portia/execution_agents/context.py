@@ -53,7 +53,7 @@ def generate_input_context(
     """Generate context for the inputs and indicate which ones were used.
 
     Args:
-        inputs (list[Variable]): The list of input variables for the current step.
+        inputs (list[Variable]): The list of inputs for the current step.
         previous_outputs (dict[str, Output]): A dictionary of previous step outputs.
 
     Returns:
@@ -62,26 +62,17 @@ def generate_input_context(
     """
     input_context = ["Inputs: the original inputs provided by the planning_agent"]
     used_outputs = set()
-    for var in inputs:
-        if var.value is not None:
+    for ref in inputs:
+        if ref.name in previous_outputs:
             input_context.extend(
                 [
-                    f"input_name: {var.name}",
-                    f"input_value: {var.value}",
-                    f"input_description: {var.description}",
+                    f"input_name: {ref.name}",
+                    f"input_value: {previous_outputs[ref.name].value}",
+                    f"input_description: {ref.description}",
                     "----------",
                 ],
             )
-        elif var.name in previous_outputs:
-            input_context.extend(
-                [
-                    f"input_name: {var.name}",
-                    f"input_value: {previous_outputs[var.name].value}",
-                    f"input_description: {var.description}",
-                    "----------",
-                ],
-            )
-            used_outputs.add(var.name)
+            used_outputs.add(ref.name)
 
     unused_output_keys = set(previous_outputs.keys()) - used_outputs
     if len(unused_output_keys) > 0:
