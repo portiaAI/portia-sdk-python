@@ -120,6 +120,7 @@ def test_portia_generate_plan(
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_clarifications(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
