@@ -627,7 +627,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         """
         self.client = PortiaCloudClient().get_client(config)
         self.form_client = PortiaCloudClient().new_client(config, json_headers=False)
-        self.cache_dir = cache_dir or ".portia/cache"
+        self.cache_dir = cache_dir or ".portia/cache/agent_memory"
         self.max_cache_size = 20
         self._ensure_cache_dir()
 

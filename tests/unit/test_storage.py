@@ -399,7 +399,7 @@ def test_portia_cloud_agent_memory() -> None:
         assert result.output_name == "test_output"
         assert result.plan_run_id == plan_run.id
         assert result.summary == output.get_summary()
-        assert Path(f".portia/cache/{plan_run.id}/test_output.json").is_file()
+        assert Path(f".portia/cache/agent_memory/{plan_run.id}/test_output.json").is_file()
 
     # Test getting an output when it is cached locally
     with (
