@@ -22,6 +22,7 @@ from functools import partial
 from typing import Any, Generic, Self
 
 import httpx
+from jsonref import replace_refs
 from langchain_core.tools import StructuredTool
 from pydantic import (
     BaseModel,
@@ -245,6 +246,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 "type": attribute.get("type", None),
                 "required": arg in schema.get("required", []),
             }
+            if attribute.get("enum", None):
+                arg_dict["enum"] = attribute.get("enum")
+            if attribute.get("default", None):
+                arg_dict["default"] = attribute.get("default")
+
             args_name_description_dict.append(arg_dict)
             if "type" in attribute:
                 args.append(f"{arg}: '{attribute['type']}'")
@@ -283,7 +289,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         description_length = len(self._generate_tool_description())
         if description_length > MAX_TOOL_DESCRIPTION_LENGTH:
-            raise InvalidToolDescriptionError(self.name)
+            raise InvalidToolDescriptionError(self.id)
         return self
 
     def to_langchain(self, ctx: ToolRunContext) -> StructuredTool:
@@ -344,7 +350,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             dict[str, Any]: The JSON schema representing the tool's arguments.
 
         """
-        return self.args_schema.model_json_schema()
+        return replace_refs(self.args_schema.model_json_schema())  # type: ignore  # noqa: PGH003
 
     def __str__(self) -> str:
         """Return the string representation.
