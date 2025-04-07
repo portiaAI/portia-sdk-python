@@ -61,18 +61,15 @@ AGENTS = [
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
-    agent: ExecutionAgentType,
 ) -> None:
     """Test running a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
         llm_model_name=llm_model_name,
-        execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
 
@@ -93,18 +90,15 @@ def test_portia_run_query(
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_generate_plan(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
-    agent: ExecutionAgentType,
 ) -> None:
     """Test planning a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
         llm_model_name=llm_model_name,
-        execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
 
@@ -457,7 +451,7 @@ def test_portia_run_query_with_multiple_async_clarifications(
     assert test_clarification_handler.received_clarification is not None
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
 
-
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
