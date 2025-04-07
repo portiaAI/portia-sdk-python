@@ -145,7 +145,8 @@ class MemoryExtractionModel:
     memory_model_prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(
-                content="You are an excellent analyst and are great at working out what information is required to complete a task.",
+                content="You are an excellent analyst and are great at working out what information "
+                "is required to complete a task.",
             ),
             HumanMessagePromptTemplate.from_template(
                 "Your task is to work out what additional information we need to complete a task. "
@@ -154,15 +155,16 @@ class MemoryExtractionModel:
                 "The args schema for this tool is: {tool_args}. "
                 "As inputs for the task, we have: {inputs}. "
                 "At least one of these inputs is large and so only a summary has been provided. "
-                "You need to determine whether this is enough information for us to complete the task, "
-                "or whether we need to pull in the full value for any of these large inputs in order to call the tool with the correct args. "
-                "If we don't pull in the full value, we can pass the full value to the tool (using templating). "
-                "However, if we need to do any processing (extraction / conversion / etc) of the value before passing it to the tool, "
-                "we'll need to pull in the full value."
-                "You should return a list of the outputs we should retrieve the full value for as a list in JSON format."
-                "The output must conform to the following schema:"
-                "class MemoryExtractionModelOutput:\n"
-                "  inputs: List[str]  # List of input names that need to be pulled in the full value.",
+                "You need to determine whether this is enough information for us to complete the "
+                "task, or whether we need to pull in the full value for any of these large inputs "
+                "in order to call the tool with the correct args. If we don't pull in the full "
+                "value, we can pass the full value to the tool (using templating). However, if we "
+                "need to do any processing (extraction / conversion / etc) of the value before "
+                "passing it to the tool, we'll need to pull in the full value. "
+                "You should return a list of the outputs we should retrieve the full value for as "
+                "a list in JSON format. The output must conform to the following schema: "
+                "class MemoryExtractionModelOutput:"
+                "  inputs: List[str]  # Inputs whose full value must be pulled in.",
             ),
         ],
     )
@@ -170,23 +172,17 @@ class MemoryExtractionModel:
     def __init__(
         self,
         model: GenerativeModel,
-        context: str,
-        tools: list[StructuredTool],
         agent: DefaultExecutionAgent,
     ) -> None:
         """Initialize the memory model.
 
         Args:
             model (Model): The language model used for memory extraction.
-            context (str): The context for memory extraction.
             agent (DefaultExecutionAgent): The agent using the memory extraction model.
-            tools (list[StructuredTool]): The tools to pass to the model.
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
-        self.tools = tools
 
     def invoke(self, _: MessagesState) -> None:
         """Invoke the model with the given message state.
@@ -219,16 +215,13 @@ class MemoryExtractionModel:
             )
             extraction_response = MemoryExtractionModelOutput.model_validate(response)
         except ValidationError as e:
-            logger.error(f"Error validating memory extraction model output: {e}")
+            logger.exception("Error validating memory extraction model output")
             return
 
         for input_name in extraction_response.inputs:
             input_variable = next((i for i in self.agent.step.inputs if i.name == input_name), None)
             if input_variable:
-                full_output = self.agent.agent_memory.get_plan_run_output(
-                    input_name,
-                    self.agent.plan_run.id,
-                )
+                # FIND THE OUTPUT VARIABLE WITH THE SAME NAME
                 input_variable.value = full_output.full_value(self.agent.agent_memory)
 
 
