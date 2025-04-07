@@ -537,7 +537,10 @@ def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
     portia = Portia(config=config, tools=example_tool_registry)
-    query = "If the sum of 5 and 6 is greater than 10, then sum 4 + 5 and give me the answer, otherwise sum 1 + 2 and give me that as the answer"
+    query = (
+        "If the sum of 5 and 6 is greater than 10, then sum 4 + 5 and give me the answer, "
+        "otherwise sum 1 + 2 and give me that as the answer"
+    )
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
