@@ -272,7 +272,7 @@ class AgentMemory(Protocol):
 
     @abstractmethod
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
-        """Retrieve an Output from the storage.
+        """Retrieve an Output from agent memory.
 
         Args:
             output_name (str): The name of the output to retrieve

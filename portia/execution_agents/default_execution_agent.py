@@ -27,6 +27,7 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
+from portia.execution_agents.output import LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.model import GenerativeModel, LangChainGenerativeModel, Message
@@ -50,6 +51,7 @@ class MemoryExtractionModelOutput(BaseModel):
 
     inputs: list[str] = Field(
         description="List of input names whose full values we should template in.",
+        default=[],
     )
 
 
@@ -145,25 +147,30 @@ class MemoryExtractionModel:
     memory_model_prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(
-                content="You are an excellent analyst and are great at working out what information "
-                "is required to complete a task.",
+                content="You are an excellent analyst and are great at working out what "
+                "information is required to complete a task.",
             ),
             HumanMessagePromptTemplate.from_template(
-                "Your task is to work out what additional information we need to complete a task. "
-                "The task we are trying to complete is: {task}. "
-                "To achieve this, we are using the following tool: {tool_name} with description: {tool_description}. "
-                "The args schema for this tool is: {tool_args}. "
-                "As inputs for the task, we have: {inputs}. "
-                "At least one of these inputs is large and so only a summary has been provided. "
-                "You need to determine whether this is enough information for us to complete the "
-                "task, or whether we need to pull in the full value for any of these large inputs "
-                "in order to call the tool with the correct args. If we don't pull in the full "
-                "value, we can pass the full value to the tool (using templating). However, if we "
-                "need to do any processing (extraction / conversion / etc) of the value before "
-                "passing it to the tool, we'll need to pull in the full value. "
+                "Your task is to work out how we pre-process data for a particular task.\n"
+                "The task we are trying to complete is: {task}\n"
+                "To achieve this, we are using the following tool: {tool_name} with description: "
+                "{tool_description}.\n"
+                "The args schema for this tool is: {tool_args}.\n"
+                "As inputs for the task, we currently have: {inputs}.\n"
+                "At least one of these inputs is large and so only a summary has been provided.\n"
+                "For these large inputs, you need to determine whether the full value can be "
+                "passed into the tool without any pre-processing, or whether we need to do some "
+                "pre-processing (e.g. extraction / conversion / etc) on the data in order to get "
+                "it into a usable format for the tool.\n"
+                "As an example, if we have a list of today's meetings as a large input, we "
+                "wouldn't need pre-processing to email that list to someone, but we would need "
+                "pre-processing if we had to schedule a meeting in a free slot (as we would need "
+                "to extract a free slot from the list of meetings).\n"
                 "You should return a list of the outputs we should retrieve the full value for as "
-                "a list in JSON format. The output must conform to the following schema: "
-                "class MemoryExtractionModelOutput:"
+                "a list in JSON format. You should ONLY include large outputs for which we only "
+                "currently have a summary.\n\n"
+                "The output must conform to the following schema:\n"
+                "class MemoryExtractionModelOutput:\n"
                 "  inputs: List[str]  # Inputs whose full value must be pulled in.",
             ),
         ],
@@ -199,13 +206,22 @@ class MemoryExtractionModel:
         """
         if not self.agent.tool:
             raise InvalidPlanRunStateError("Memory extraction model has no tool")
+        previous_outputs = self.agent.plan_run.outputs.step_outputs.copy()
+        if all(isinstance(output, LocalOutput) for output in previous_outputs):
+            # If there is nothing in memory, we don't need to retrieve anything
+            get_execution_context().plan_run_context = self.agent.get_system_context(
+                previous_outputs,
+            )
+            return
+
+        previous_outputs_to_input = [previous_outputs[i.name] for i in self.agent.step.inputs]
 
         formatted_messages = self.memory_model_prompt.format_messages(
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
             tool_description=self.agent.tool.description,
             tool_args=self.agent.tool.args_json_schema(),
-            inputs=self.agent.step.inputs,
+            inputs=previous_outputs_to_input,
         )
 
         try:
@@ -214,15 +230,21 @@ class MemoryExtractionModel:
                 schema=MemoryExtractionModelOutput,
             )
             extraction_response = MemoryExtractionModelOutput.model_validate(response)
-        except ValidationError as e:
+        except ValidationError:
             logger.exception("Error validating memory extraction model output")
+            get_execution_context().plan_run_context = self.agent.get_system_context(
+                previous_outputs,
+            )
             return
 
         for input_name in extraction_response.inputs:
-            input_variable = next((i for i in self.agent.step.inputs if i.name == input_name), None)
-            if input_variable:
-                # FIND THE OUTPUT VARIABLE WITH THE SAME NAME
-                input_variable.value = full_output.full_value(self.agent.agent_memory)
+            if isinstance(previous_outputs[input_name], LocalOutput):
+                continue
+            previous_outputs[input_name] = self.agent.agent_memory.get_plan_run_output(
+                input_name,
+                self.agent.plan_run.id,
+            )
+        get_execution_context().plan_run_context = self.agent.get_system_context(previous_outputs)
 
 
 class ParserModel:
@@ -230,7 +252,6 @@ class ParserModel:
 
     Args:
         model (Model): The language model used for argument parsing.
-        context (str): The context for argument generation.
         agent (DefaultExecutionAgent): The agent using the parser model.
 
     Attributes:
@@ -254,11 +275,13 @@ class ParserModel:
                     "Your responses must clearly explain the source of each argument "
                     "(e.g., context, past messages, clarifications). "
                     "Avoid assumptions or fabricated information."
-                    "If any values are too large to be provided in full, a summary of them has been provided."
-                    "If you wish to use one of these values, you can provide the name in curly braces and "
-                    "the value will be templated in. For example: if you wish to use an output called 'large_output_value',"
-                    "you can enter {{large_value_name}} and the value will be templated in before the tool is called."
-                    "If you do this, please ensure that you set the contains_templated_argument field to True."
+                    "If any values are too large to be provided in full, a summary of them has "
+                    "been provided. If you wish to use one of these values, you can provide the "
+                    "name in curly braces and the value will be templated in. For example: if you "
+                    "wish to use an output called 'large_output_value', you can enter "
+                    "{{large_value_name}} and the value will be templated in before the tool is "
+                    "called. If you do this, please ensure that you set the "
+                    "contains_templated_argument field to True."
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
@@ -295,7 +318,7 @@ class ParserModel:
         ],
     )
 
-    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
@@ -305,7 +328,6 @@ class ParserModel:
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
         self.previous_errors: list[str] = []
         self.retries = 0
@@ -327,7 +349,7 @@ class ParserModel:
             raise InvalidPlanRunStateError("Parser model has no tool")
 
         formatted_messages = self.arg_parser_prompt.format_messages(
-            context=self.context,
+            context=get_execution_context(),
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
@@ -389,7 +411,6 @@ class VerifierModel:
     Attributes:
         arg_verifier_prompt (ChatPromptTemplate): The prompt template used for arg verification.
         model (Model): The model used to invoke the verification process.
-        context (str): The context in which the tool arguments are being validated.
         agent (DefaultExecutionAgent): The agent responsible for handling the verification process.
 
     """
@@ -415,7 +436,7 @@ class VerifierModel:
                 "USE EXACTLY the type of the argument provided in the list of arguments provided.\n"
                 "  made_up: bool  # if the value is made_up based on the given rules.\n\n"
                 "class VerifiedToolInputs:\n"
-                "  args: List[VerifiedToolArgument]  # List of tool arguments.\n"
+                "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
                 "Please ensure the output matches the VerifiedToolInputs schema.",
             ),
             HumanMessagePromptTemplate.from_template(
@@ -431,7 +452,7 @@ class VerifierModel:
         ],
     )
 
-    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
@@ -441,7 +462,6 @@ class VerifierModel:
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
 
     def invoke(self, state: MessagesState) -> dict[str, Any]:
@@ -464,7 +484,7 @@ class VerifierModel:
         tool_args = messages[-1].content
         tool_inputs = ToolInputs.model_validate_json(tool_args)
         formatted_messages = self.arg_verifier_prompt.format_messages(
-            context=self.context,
+            context=get_execution_context(),
             task=self.agent.step.task,
             arguments=tool_args,
             tool_name=self.agent.tool.name,
@@ -536,11 +556,12 @@ class ToolCallingModel:
             HumanMessagePromptTemplate.from_template(
                 "context:\n{verified_args}\n"
                 "Use the provided tool with the arguments in the context, as "
-                "long as they are valid.\n",
-                "If any values are too large to be provided in full, a summary of them has been provided."
-                "If you wish to use one of these values, you can provide the name in curly braces and "
-                "the value will be templated in. For example: if you wish to use an output called 'large_output_value',"
-                "you can enter {{large_value_name}} and the value will be templated in before the tool is called."
+                "long as they are valid.\n"
+                "If any values are too large to be provided in full, a summary of them has been "
+                "provided. If you wish to use one of these values, you can provide the name in "
+                "curly braces and the value will be templated in. For example: if you wish to use "
+                "an output called 'large_output_value', you can enter {{large_value_name}} and the "
+                "value will be templated in before the tool is called.\n"
                 "Make sure you don't repeat past errors: {past_errors}\n",
             ),
         ],
@@ -549,7 +570,6 @@ class ToolCallingModel:
     def __init__(
         self,
         model: LangChainGenerativeModel,
-        context: str,
         tools: list[StructuredTool],
         agent: DefaultExecutionAgent,
     ) -> None:
@@ -563,7 +583,6 @@ class ToolCallingModel:
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
         self.tools = tools
 
@@ -619,13 +638,13 @@ class ToolCallingModel:
             list[Clarification]: The list of clarifications that were created.
 
         """
-        parsed_response = Environment().parse(response.content)
+        parsed_response = Environment(autoescape=True).parse(response.content)
         required_args = meta.find_undeclared_variables(parsed_response)
         template_args = {}
         for arg in required_args:
             output = self.agent.plan_run.outputs.step_outputs[arg]
             if output:
-                template_args[arg] = output.full_value()
+                template_args[arg] = output.full_value(self.agent.agent_memory)
 
         templated_content = Template(response.content).render(args=template_args)
         response.content = templated_content
@@ -744,9 +763,6 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         """
         if not self.tool:
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
-        context = self.get_system_context()
-        execution_context = get_execution_context()
-        execution_context.plan_run_context = context
         model = self.config.resolve_langchain_model(EXECUTION_MODEL_KEY)
 
         tools = [
@@ -790,19 +806,18 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 classDef last fill:#bfb6fc
         """
 
-        graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(model, context, tools, self).invoke)
+        graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(model, tools, self).invoke)
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
             graph.add_node(
                 AgentNode.MEMORY_EXTRACTION,
-                MemoryExtractionModel(model, context, tools, self).invoke,
+                MemoryExtractionModel(model, self).invoke,
             )
             graph.add_edge(START, AgentNode.MEMORY_EXTRACTION)
+            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, self).invoke)
             graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.ARGUMENT_PARSER)
-            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, context, self).invoke)
-            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, context, self).invoke)
-            graph.add_edge(START, AgentNode.ARGUMENT_PARSER)
+            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, self).invoke)
             graph.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
             graph.add_conditional_edges(
                 AgentNode.ARGUMENT_VERIFIER,

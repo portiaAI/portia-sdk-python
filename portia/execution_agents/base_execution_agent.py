@@ -73,7 +73,7 @@ class BaseExecutionAgent:
 
         """
 
-    def get_system_context(self) -> str:
+    def get_system_context(self, previous_outputs: dict[str, Output]) -> str:
         """Build a generic system context string from the step and run provided.
 
         This function retrieves the execution context and generates a system context
@@ -88,4 +88,5 @@ class BaseExecutionAgent:
             ctx,
             self.step,
             self.plan_run,
+            previous_outputs,
         )

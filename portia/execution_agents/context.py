@@ -184,20 +184,22 @@ def generate_context_from_execution_context(context: ExecutionContext) -> list[s
     return execution_context
 
 
-def build_context(ctx: ExecutionContext, step: Step, plan_run: PlanRun) -> str:
+def build_context(
+    ctx: ExecutionContext, step: Step, plan_run: PlanRun, previous_outputs: dict[str, Output]
+) -> str:
     """Build the context string for the agent using inputs/outputs/clarifications/ctx.
 
     Args:
         ctx (ExecutionContext): The execution context containing agent and system metadata.
         step (Step): The current step in the PlanRun including inputs.
         plan_run (PlanRun): The current run containing outputs and clarifications.
+        previous_outputs (dict[str, Output]): A dictionary of previous step outputs.
 
     Returns:
         str: A string containing all relevant context information.
 
     """
     inputs = step.inputs
-    previous_outputs = plan_run.outputs.step_outputs
     clarifications = plan_run.outputs.clarifications
 
     system_context_extension = (

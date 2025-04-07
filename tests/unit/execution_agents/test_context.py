@@ -45,6 +45,7 @@ def test_context_empty() -> None:
         ExecutionContext(),
         Step(inputs=[], output="", task=""),
         plan_run,
+        {},
     )
     assert "System Context:" in context
     assert len(context) == 42  # length should always be the same
@@ -58,6 +59,7 @@ def test_context_execution_context() -> None:
         ExecutionContext(additional_data={"user_id": "123"}),
         plan.steps[0],
         plan_run,
+        {},
     )
     assert "System Context:" in context
     assert "user_id" in context
@@ -73,6 +75,7 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
         ExecutionContext(),
         plan.steps[0],
         plan_run,
+        {},
     )
     for variable in inputs:
         assert variable.name in context
@@ -93,6 +96,7 @@ def test_system_context() -> None:
         ),
         plan.steps[0],
         plan_run,
+        {},
     )
     assert "system context 1" in context
     assert "system context 2" in context
@@ -133,6 +137,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
         ),
         plan.steps[0],
         plan_run,
+        {},
     )
     # as LLMs are sensitive even to white space formatting we do a complete match here
     assert (
@@ -203,6 +208,7 @@ def test_context_inputs_outputs_clarifications(
         ),
         plan.steps[0],
         plan_run,
+        {},
     )
     for variable in inputs:
         assert variable.name in context
