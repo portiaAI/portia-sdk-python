@@ -44,7 +44,10 @@ def clarification_tool() -> ClarificationTool:
 def test_tool_initialization(add_tool: AdditionTool) -> None:
     """Test initialization of a Tool."""
     assert add_tool.name == "Add Tool"
-    assert add_tool.description == "Takes two numbers and adds them together"
+    assert (
+        add_tool.description
+        == "Use this tool to add two numbers together, it takes two numbers a + b"
+    )
 
 
 def test_tool_initialization_long_description() -> None:

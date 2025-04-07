@@ -628,6 +628,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         Args:
             config (Config): The configuration containing API details for Portia Cloud.
             cache_dir (str | None): Optional directory for local caching of outputs.
+            max_cache_size (int): The maximum number of files to cache locally.
 
         """
         self.client = PortiaCloudClient().get_client(config)

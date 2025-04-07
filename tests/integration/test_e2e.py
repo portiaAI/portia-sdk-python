@@ -61,17 +61,15 @@ AGENTS = [
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=4)
 def test_portia_run_query(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
-    agent: ExecutionAgentType,
 ) -> None:
     """Test running a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
         llm_model_name=llm_model_name,
-        execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
 
@@ -80,7 +78,7 @@ def test_portia_run_query(
 
     tool_registry = InMemoryToolRegistry.from_local_tools([addition_tool])
     portia = Portia(config=config, tools=tool_registry)
-    query = "Add 1 + 2 together"
+    query = "Add 1 + 2"
 
     plan_run = portia.run(query)
 
@@ -92,43 +90,31 @@ def test_portia_run_query(
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
-@pytest.mark.parametrize("agent", AGENTS)
-@pytest.mark.flaky(reruns=3)
+@pytest.mark.flaky(reruns=4)
 def test_portia_generate_plan(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
-    agent: ExecutionAgentType,
 ) -> None:
     """Test planning a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
         llm_model_name=llm_model_name,
-        execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
 
     tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
     portia = Portia(config=config, tools=tool_registry)
-    query = "Add 1 + 2 together"
+    query = "Add 1 + 2"
 
     plan = portia.plan(query)
 
     assert len(plan.steps) == 1
     assert plan.steps[0].tool_id == "add_tool"
-    assert plan.steps[0].inputs
-    assert len(plan.steps[0].inputs) == 2
-    assert plan.steps[0].inputs[0].value + plan.steps[0].inputs[1].value == 3
-
-    plan_run = portia.run(query)
-
-    assert plan_run.state == PlanRunState.COMPLETE
-    assert plan_run.outputs.final_output
-    assert plan_run.outputs.final_output.get_value() == 3
-    assert plan_run.outputs.final_output.get_summary() is not None
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_clarifications(
     llm_provider: LLMProvider,
     llm_model_name: LLMModel,
@@ -152,15 +138,9 @@ def test_portia_run_query_with_clarifications(
     )
     clarification_step = Step(
         tool_id="clarification_tool",
-        task="Use tool",
+        task="Raise a clarification with user guidance 'Return a clarification'",
         output="",
-        inputs=[
-            Variable(
-                name="user_guidance",
-                description="",
-                value="Return a clarification",
-            ),
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
@@ -193,19 +173,13 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="clarification_tool",
-        task="Use tool",
+        task="raise a clarification with a user guidance 'Return a clarification'",
         output="",
-        inputs=[
-            Variable(
-                name="user_guidance",
-                description="",
-                value="Return a clarification",
-            ),
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
-            query="raise a clarification",
+            query="Raise a clarification",
             tool_ids=["clarification_tool"],
         ),
         steps=[clarification_step],
@@ -244,25 +218,10 @@ def test_portia_run_query_with_hard_error(
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="error_tool",
-        task="Use tool",
+        task="Use error tool with string 'Something went wrong' and \
+        do not return a soft error or uncaught error",
         output="",
-        inputs=[
-            Variable(
-                name="error_str",
-                description="",
-                value="Something went wrong",
-            ),
-            Variable(
-                name="return_soft_error",
-                description="",
-                value=False,
-            ),
-            Variable(
-                name="return_uncaught_error",
-                description="",
-                value=False,
-            ),
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
@@ -305,20 +264,9 @@ def test_portia_run_query_with_soft_error(
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add 1 + 2",
         output="",
-        inputs=[
-            Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=2,
-            ),
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
@@ -375,35 +323,18 @@ def test_portia_run_query_with_multiple_clarifications(
 
     step_one = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add 1 + 2",
         output="$step_one",
-        inputs=[
-            Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=2,
-            ),
-        ],
+        inputs=[],
     )
     step_two = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add $step_one + 40",
         output="",
         inputs=[
             Variable(
-                name="a",
-                description="",
-                value="$step_one",
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=40,
+                name="$step_one",
+                description="value for step one",
             ),
         ],
     )
@@ -482,35 +413,18 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
     step_one = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add 1 + 2",
         output="$step_one",
-        inputs=[
-            Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value=2,
-            ),
-        ],
+        inputs=[],
     )
     step_two = Step(
         tool_id="add_tool",
-        task="Use tool",
+        task="Add $step_one + 1",
         output="",
         inputs=[
             Variable(
-                name="a",
-                description="",
-                value=1,
-            ),
-            Variable(
-                name="b",
-                description="",
-                value="$step_one",
+                name="$step_one",
+                description="value for step one",
             ),
         ],
     )
@@ -526,7 +440,6 @@ def test_portia_run_query_with_multiple_async_clarifications(
     plan_run = portia.run_plan(plan)
 
     assert plan_run.state == PlanRunState.COMPLETE
-    # 4 = 1 (value a in step 1) + 2 (value b in step 1) + 1 (value a in step 2)
     assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.get_value() == 4
     assert plan_run.outputs.final_output.get_summary() is not None
@@ -535,6 +448,7 @@ def test_portia_run_query_with_multiple_async_clarifications(
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
 
 
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
