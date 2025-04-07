@@ -116,7 +116,7 @@ class AdditionTool(Tool):
 
     id: str = "add_tool"
     name: str = "Add Tool"
-    description: str = "Use this tool to add two numbers together. e.g. Add a + b"
+    description: str = "Use this tool to add two numbers together, it takes two inputs a and b"
     args_schema: type[BaseModel] = AdditionToolSchema
     output_schema: tuple[str, str] = ("int", "int: The value of the addition")
 

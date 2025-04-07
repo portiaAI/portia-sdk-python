@@ -170,7 +170,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=LLMProvider.OPENAI,
-        llm_model_name=LLMModel.O_3_MINI,
+        llm_model_name=LLMModel.GPT_4_O_MINI,
         execution_agent_type=ExecutionAgentType.DEFAULT,
         storage_class=StorageClass.MEMORY,
     )
