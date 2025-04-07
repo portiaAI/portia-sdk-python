@@ -12,6 +12,9 @@ from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
+from portia.model import GenerativeModel
+from portia.open_source_tools.llm_tool import LLMTool
+from portia.open_source_tools.registry import open_source_tool_registry
 from portia.tool_registry import (
     InMemoryToolRegistry,
     McpToolRegistry,
@@ -226,6 +229,21 @@ def test_portia_tool_registry_missing_required_args() -> None:
     """Test that PortiaToolRegistry raises an error if required args are missing."""
     with pytest.raises(ValueError, match="Either config, client or tools must be provided"):
         PortiaToolRegistry()
+
+
+def test_tool_registry_reconfigure_llm_tool() -> None:
+    """Test replacing the LLMTool with a new LLMTool."""
+    registry = ToolRegistry(open_source_tool_registry.get_tools())
+    llm_tool = registry.get_tool("llm_tool")
+
+    assert llm_tool is not None
+    assert getattr(llm_tool, "model", None) is None
+
+    registry.replace_tool(LLMTool(model=MagicMock(spec=GenerativeModel)))
+
+    llm_tool = registry.get_tool("llm_tool")
+    assert llm_tool is not None
+    assert getattr(llm_tool, "model", None) is not None
 
 
 @pytest.fixture
