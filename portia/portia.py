@@ -586,7 +586,7 @@ class Portia:
             else:
                 self._set_step_output(last_executed_step_output, plan_run, step)
                 logger().info(
-                    f"Step output - {last_executed_step_output.summary!s}",
+                    f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
 
             if self._raise_clarifications(plan_run, last_executed_step_output, plan):
@@ -616,7 +616,7 @@ class Portia:
         )
         if plan_run.outputs.final_output:
             logger().info(
-                f"Final output: {plan_run.outputs.final_output.summary!s}",
+                f"Final output: {plan_run.outputs.final_output.get_summary()!s}",
             )
 
     def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:

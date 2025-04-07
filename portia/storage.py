@@ -224,9 +224,9 @@ class LogAdditionalStorage(AdditionalStorage):
         )
         # Limit log to just first 1000 characters
         output = tool_call.output
-        if len(tool_call.output) > MAX_OUTPUT_LOG_LENGTH:
+        if len(str(tool_call.output)) > MAX_OUTPUT_LOG_LENGTH:
             output = (
-                tool_call.output[:MAX_OUTPUT_LOG_LENGTH]
+                str(tool_call.output)[:MAX_OUTPUT_LOG_LENGTH]
                 + "...[truncated - only first 1000 characters shown]"
             )
         match tool_call.status:
@@ -269,7 +269,6 @@ class AgentMemory(Protocol):
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("save_plan_run_output is not implemented")
 
     @abstractmethod
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
@@ -286,7 +285,6 @@ class AgentMemory(Protocol):
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("get_plan_run_output is not implemented")
 
 
 class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
@@ -398,7 +396,7 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        if output.summary is None:
+        if output.get_summary() is None:
             logger().warning(
                 f"Storing Output {output} with no summary",
             )
@@ -406,7 +404,7 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
         return AgentMemoryOutput(
             output_name=output_name,
             plan_run_id=plan_run_id,
-            summary=output.summary or "",
+            summary=output.get_summary() or "",
         )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
@@ -587,21 +585,12 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        if not isinstance(output, LocalOutput):
-            logger().warning(
-                f"Attempting to store Output {output} which is not held locally - skipping...",
-            )
-            return output
-        if output.summary is None:
-            logger().warning(
-                f"Storing Output {output} with no summary",
-            )
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
         return AgentMemoryOutput(
             output_name=output_name,
             plan_run_id=plan_run_id,
-            summary=output.summary or "",
+            summary=output.get_summary() or "",
         )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
@@ -626,15 +615,77 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
 class PortiaCloudStorage(Storage, AgentMemory):
     """Save plans, runs and tool calls to portia cloud."""
 
-    def __init__(self, config: Config) -> None:
+    MAX_CACHE_SIZE = 20
+
+    def __init__(self, config: Config, cache_dir: str | None = None) -> None:
         """Initialize the PortiaCloudStorage instance.
 
         Args:
             config (Config): The configuration containing API details for Portia Cloud.
+            cache_dir (str | None): Optional directory for local caching of outputs.
 
         """
         self.client = PortiaCloudClient().get_client(config)
         self.form_client = PortiaCloudClient().new_client(config, json_headers=False)
+        self.cache_dir = cache_dir or ".portia/cache/agent_memory"
+        self.max_cache_size = 20
+        self._ensure_cache_dir()
+
+    def _ensure_cache_dir(self, file_path: str | None = None) -> None:
+        """Ensure that we have the cache directories required.
+
+        This ensures that the cache directory exists as well as any other sub-directories
+        needed for the file_path.
+
+        Args:
+            file_path (str | None): Optional path to ensure parent directories exist.
+
+        """
+        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
+        if file_path:
+            Path(self.cache_dir, file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    def _ensure_cache_size(self) -> None:
+        """Manage the cache size by removing the oldest file if the cache is full."""
+        json_files = list(Path(self.cache_dir).glob("**/*.json"))
+        if len(json_files) >= self.MAX_CACHE_SIZE:
+            oldest_file = min(json_files, key=lambda f: f.stat().st_mtime)
+            oldest_file.unlink()
+            logger().debug(f"Removed oldest cache file: {oldest_file}")
+
+    def _write_to_cache(self, file_path: str, content: BaseModel) -> None:
+        """Write a serialized object to a JSON file in the cache.
+
+        Args:
+            file_path (str): Path of the file to write.
+            content (BaseModel): The object to serialize.
+
+        """
+        self._ensure_cache_dir(file_path)
+        self._ensure_cache_size()
+
+        # Write the file
+        with Path(self.cache_dir, file_path).open("w") as file:
+            file.write(content.model_dump_json(indent=4))
+
+    def _read_from_cache(self, file_name: str, model: type[T]) -> T:
+        """Read a JSON file from cache and deserialize it into a BaseModel instance.
+
+        Args:
+            file_name (str): Name of the file to read.
+            model (type[T]): The model class to deserialize into.
+
+        Returns:
+            T: The deserialized model instance.
+
+        Raises:
+            FileNotFoundError: If the file is not found.
+            ValidationError: If the deserialization fails.
+
+        """
+        with Path(self.cache_dir, file_name).open("r") as file:
+            f = file.read()
+            return model.model_validate_json(f)
 
     def check_response(self, response: httpx.Response) -> None:
         """Validate the response from Portia API.
@@ -875,22 +926,24 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     ),
                 },
                 data={
-                    "summary": output.summary,
+                    "summary": output.get_summary(),
                 },
             )
-        except Exception as e:
-            raise StorageError(e) from e
-        else:
             self.check_response(response)
-            if output.summary is None:
-                logger().warning(
-                    f"Storing Output {output} with no summary",
-                )
+
+            # Save to local cache
+            if isinstance(output, LocalOutput):
+                cache_file_path = f"{plan_run_id}/{output_name}.json"
+                self._write_to_cache(cache_file_path, output)
+                logger().debug(f"Saved output to local cache: {cache_file_path}")
+
             return AgentMemoryOutput(
                 output_name=output_name,
                 plan_run_id=plan_run_id,
-                summary=output.summary or "",
+                summary=output.get_summary() or "",
             )
+        except Exception as e:
+            raise StorageError(e) from e
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
         """Retrieve an Output from Portia Cloud.
@@ -906,6 +959,16 @@ class PortiaCloudStorage(Storage, AgentMemory):
             StorageError: If the request to Portia Cloud fails or the run does not exist.
 
         """
+        # Try to get from local cache first
+        cache_file_path = f"{plan_run_id}/{output_name}.json"
+        try:
+            return self._read_from_cache(cache_file_path, LocalOutput)
+        except (FileNotFoundError, ValidationError):
+            # If not in cache, fetch from Portia Cloud
+            logger().debug(
+                f"Output not found in local cache, fetching from Portia Cloud: {cache_file_path}",
+            )
+
         try:
             # Retrieving a value is a two step process
             # 1. Get the output with the storage URL from the backend
@@ -921,10 +984,17 @@ class PortiaCloudStorage(Storage, AgentMemory):
             with httpx.Client() as client:
                 value_response = client.get(value_url)
                 value_response.raise_for_status()
-            return LocalOutput(
+
+            # Create the output object
+            output = LocalOutput(
                 summary=summary,
                 value=value_response.text,
             )
 
+            # Save to local cache for future use
+            self._write_to_cache(cache_file_path, output)
+            logger().debug(f"Saved output to local cache: {cache_file_path}")
         except Exception as e:
             raise StorageError(e) from e
+        else:
+            return output

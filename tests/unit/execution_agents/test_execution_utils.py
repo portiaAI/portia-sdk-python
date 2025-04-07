@@ -156,7 +156,7 @@ def test_process_output_with_output_artifacts() -> None:
 
     assert isinstance(result, Output)
     assert result.get_value() == ["test", "bar"]
-    assert result.summary == "test, bar"
+    assert result.get_summary() == "test, bar"
 
 
 def test_process_output_with_artifacts() -> None:
@@ -188,7 +188,7 @@ def test_process_output_summary_matches_serialized_value() -> None:
 
     assert isinstance(result, Output)
     assert result.get_value() == dict_value
-    assert result.summary == result.serialize_value()
+    assert result.get_summary() == result.serialize_value()
 
 
 def test_process_output_summary_not_updated_if_provided() -> None:
@@ -205,7 +205,7 @@ def test_process_output_summary_not_updated_if_provided() -> None:
 
     assert isinstance(result, Output)
     assert result.get_value() == dict_value
-    assert result.summary == provided_summary
+    assert result.get_summary() == provided_summary
 
 
 def test_next_state_after_tool_call_with_clarification_artifact() -> None:

@@ -6,6 +6,7 @@ These are stored and can be used as inputs to future steps
 from __future__ import annotations
 
 import json
+from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Generic, Union
@@ -19,7 +20,33 @@ if TYPE_CHECKING:
     from portia.storage import AgentMemory
 
 
-class LocalOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+    """Base interface for concrete output classes to implement."""
+
+    @abstractmethod
+    def get_value(self) -> Serializable | None:
+        """Return the value of the output.
+
+        This should not be so long that it is an issue for LLM prompts.
+        """
+
+    @abstractmethod
+    def serialize_value(self) -> str:
+        """Serialize the value to a string."""
+
+    @abstractmethod
+    def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
+        """Get the full value, fetching from remote storage or file if necessary.
+
+        This value may be long and so is not suitable for use in LLM prompts.
+        """
+
+    @abstractmethod
+    def get_summary(self) -> str | None:
+        """Return the summary of the output."""
+
+
+class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output that is stored locally."""
 
     model_config = ConfigDict(extra="forbid")
@@ -48,6 +75,10 @@ class LocalOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         As the value is stored locally, this is the same as get_value() for this type of output.
         """
         return self.value
+
+    def get_summary(self) -> str | None:
+        """Return the summary of the output."""
+        return self.summary
 
     @field_serializer("value")
     def serialize_value_field(self, value: Serializable | None) -> str:  # noqa: C901, PLR0911
@@ -102,7 +133,7 @@ class LocalOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         return str(value)  # Fallback for other types
 
 
-class AgentMemoryOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")
@@ -118,12 +149,19 @@ class AgentMemoryOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         return self.summary
 
     def serialize_value(self) -> str:
-        """Serialize the value to a string."""
+        """Serialize the value to a string.
+
+        We use the summary as the value is too large to be retained locally.
+        """
         return self.summary
 
     def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
         """Get the full value, fetching from remote storage or file if necessary."""
         return agent_memory.get_plan_run_output(self.output_name, self.plan_run_id)
+
+    def get_summary(self) -> str:
+        """Return the summary of the output."""
+        return self.summary
 
 
 Output = Union[LocalOutput, AgentMemoryOutput]
