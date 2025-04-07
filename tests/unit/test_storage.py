@@ -25,6 +25,8 @@ from portia.storage import (
 from tests.utils import get_test_config, get_test_plan_run, get_test_tool_call
 
 if TYPE_CHECKING:
+    from pytest_httpx import HTTPXMock
+
     from portia.tool_call import ToolCallRecord
 
 
@@ -356,7 +358,7 @@ def test_portia_cloud_storage_errors() -> None:
         )
 
 
-def test_portia_cloud_agent_memory() -> None:
+def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
     """Test PortiaCloudStorage agent memory."""
     config = get_test_config(portia_api_key="test_api_key")
     agent_memory = PortiaCloudStorage(config)
@@ -421,21 +423,17 @@ def test_portia_cloud_agent_memory() -> None:
         "summary": "test summary",
         "url": "https://example.com/output",
     }
-
-    mock_value_response = MagicMock()
-    mock_value_response.text = "test value"
-    mock_value_response.raise_for_status = MagicMock()
-    mock_client = MagicMock()
-    mock_client.get.return_value = mock_value_response
+    httpx_mock.add_response(
+        url="https://example.com/output",
+        status_code=200,
+        content=b"test value",
+    )
 
     with (
         patch.object(agent_memory, "_read_from_cache", side_effect=FileNotFoundError),
-        patch("httpx.Client") as mock_client_class,
         patch.object(agent_memory.client, "get", return_value=mock_output_response) as mock_get,
         patch.object(agent_memory, "_write_to_cache") as mock_write_cache,
     ):
-        mock_client_class.return_value.__enter__.return_value = mock_client
-
         result = agent_memory.get_plan_run_output("test_output", plan_run.id)
 
         # Verify that it fetched from Portia Cloud
@@ -444,7 +442,7 @@ def test_portia_cloud_agent_memory() -> None:
         )
 
         # Verify that it fetched the value from the URL using the httpx client
-        mock_client.get.assert_called_once_with("https://example.com/output")
+        assert len(httpx_mock.get_requests()) == 1
 
         # Verify that it wrote to the local cache
         mock_write_cache.assert_called_once()

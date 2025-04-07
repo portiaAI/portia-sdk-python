@@ -10,6 +10,7 @@ from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
+from langsmith import wrappers
 from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr
 
@@ -219,7 +220,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_openai(
-            client=OpenAI(api_key=api_key.get_secret_value()),
+            client=wrappers.wrap_openai(OpenAI(api_key=api_key.get_secret_value())),
             mode=instructor.Mode.JSON,
         )
         self._seed = seed
@@ -400,7 +401,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
-            client=Anthropic(api_key=api_key.get_secret_value()),
+            client=wrappers.wrap_anthropic(Anthropic(api_key=api_key.get_secret_value())),
             mode=instructor.Mode.ANTHROPIC_JSON,
         )
 

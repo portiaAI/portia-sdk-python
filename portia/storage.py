@@ -615,20 +615,26 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
 class PortiaCloudStorage(Storage, AgentMemory):
     """Save plans, runs and tool calls to portia cloud."""
 
-    MAX_CACHE_SIZE = 20
+    DEFAULT_MAX_CACHE_SIZE = 20
 
-    def __init__(self, config: Config, cache_dir: str | None = None) -> None:
+    def __init__(
+        self,
+        config: Config,
+        cache_dir: str | None = None,
+        max_cache_size: int = DEFAULT_MAX_CACHE_SIZE,
+    ) -> None:
         """Initialize the PortiaCloudStorage instance.
 
         Args:
             config (Config): The configuration containing API details for Portia Cloud.
             cache_dir (str | None): Optional directory for local caching of outputs.
+            max_cache_size (int): The maximum number of files to cache locally.
 
         """
         self.client = PortiaCloudClient().get_client(config)
         self.form_client = PortiaCloudClient().new_client(config, json_headers=False)
         self.cache_dir = cache_dir or ".portia/cache/agent_memory"
-        self.max_cache_size = 20
+        self.max_cache_size = max_cache_size
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self, file_path: str | None = None) -> None:
@@ -648,7 +654,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
     def _ensure_cache_size(self) -> None:
         """Manage the cache size by removing the oldest file if the cache is full."""
         json_files = list(Path(self.cache_dir).glob("**/*.json"))
-        if len(json_files) >= self.MAX_CACHE_SIZE:
+        if len(json_files) >= self.max_cache_size:
             oldest_file = min(json_files, key=lambda f: f.stat().st_mtime)
             oldest_file.unlink()
             logger().debug(f"Removed oldest cache file: {oldest_file}")

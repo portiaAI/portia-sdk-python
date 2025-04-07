@@ -129,7 +129,7 @@ def test_pretty_print() -> None:
             Step(
                 task="test task",
                 output="$output",
-                inputs=[Variable(name="$input", value="10", description="test input")],
+                inputs=[Variable(name="$input", description="test input")],
                 condition="x > 10",
             ),
         ],
