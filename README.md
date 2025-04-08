@@ -92,7 +92,7 @@ Note that this example also requires the environment variables `OPENAI_API_KEY` 
 The example below introduces **some** of the config options available with Portia AI:
 - The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, runs and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
 - The `default_log_level` is set using the `LogLevel.DEBUG` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, run states, tool calls and outputs at every step 😅
-- The `llm_provider`, `llm_model` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider and model. In the example below we're splurging and using GPT 4.0!
+- The `llm_provider`, `default_model` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider and model. In the example below we're splurging and using GPT 4o!
 
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
 
@@ -105,7 +105,6 @@ from portia import (
     StorageClass,
     LogLevel,
     LLMProvider,
-    LLMModel,
     example_tool_registry,
 )
 
@@ -117,7 +116,7 @@ my_config = Config.from_default(
     storage_class=StorageClass.CLOUD,
     default_log_level=LogLevel.DEBUG,
     llm_provider=LLMProvider.OPENAI, # You can use `MISTRAL`, `ANTHROPIC` instead
-    llm_model_name="openai/gpt-4o", # You can pass any of the OpenAI models here instead
+    default_model="openai/gpt-4o", # You can pass any of the OpenAI models here instead
     openai_api_key=OPENAI_API_KEY # Use `mistralai_api_key=MISTRALAI` or `anthropic_api_key=ANTHROPIC_API_KEY` instead
 )
 
