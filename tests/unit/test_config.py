@@ -411,6 +411,12 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
     assert c.llm_provider == LLMProvider.AZURE_OPENAI
 
 
+def test_custom_model_from_string_raises_error() -> None:
+    """Test custom model from string raises an error."""
+    with pytest.raises(ValueError, match="Cannot construct a custom model from a string"):
+        _ = Config.from_default(default_model="custom/test")
+
+
 def test_llm_model_name_deprecation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test using llm_model_name raises a DeprecationWarning (but works)."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")

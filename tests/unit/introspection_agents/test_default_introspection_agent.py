@@ -32,7 +32,7 @@ def mock_introspection_model() -> MagicMock:
 def introspection_agent(mock_introspection_model: MagicMock) -> DefaultIntrospectionAgent:
     """Create an instance of the DefaultIntrospectionAgent with mocked config."""
     mock_config = get_test_config(
-        custom_models={
+        models={
             INTROSPECTION_MODEL_KEY: mock_introspection_model,
         },
     )

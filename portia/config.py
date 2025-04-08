@@ -708,7 +708,7 @@ class Config(BaseModel):
             GenerativeModel: The parsed model.
 
         """
-        provider, model_name = model_string.strip().split("/")
+        provider, model_name = model_string.strip().split("/", maxsplit=1)
         llm_provider = LLMProvider(provider)
         return self._construct_model(llm_provider, model_name)
 
@@ -747,6 +747,8 @@ class Config(BaseModel):
                     api_key=self.azure_openai_api_key,
                     azure_endpoint=self.azure_openai_endpoint,
                 )
+            case LLMProvider.CUSTOM:
+                raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003
