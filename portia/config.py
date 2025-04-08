@@ -646,7 +646,7 @@ class Config(BaseModel):
         """
         if usage not in [*ALL_USAGE_KEYS, *self.models.keys()]:
             raise ConfigModelResolutionError(
-                f"Invalid usage: {usage}. Must be one of {ALL_USAGE_KEYS} or a key in the "
+                f"Invalid usage: {usage!r}. Must be one of {ALL_USAGE_KEYS} or a key in the "
                 "models dictionary.",
             )
         model: str | GenerativeModel | None = self.models.get(usage)
@@ -666,10 +666,12 @@ class Config(BaseModel):
                 # Try to return the default model
                 return self.resolve_model(DEFAULT_MODEL_KEY)
             except ConfigModelResolutionError:
+                # This should not happen due to Config model validation
+                # at instantiation time.
                 pass
 
         raise ConfigModelResolutionError(
-            f"Model could not be resolved for usage {usage}. Either an LLM Provider must be set, "
+            f"Model could not be resolved for usage {usage!r}. Either an LLM Provider must be set, "
             "a model must be provided for the usage, or a default model must be set.",
         )
 
@@ -785,14 +787,13 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     # Handle models passed directly as keyword arguments rather than in the models dictionary
     for model_usage in ALL_USAGE_KEYS:
         model_name = kwargs.pop(model_usage, None)
-        if model_name and model_name not in models:
+        if model_name and model_usage not in models:
             models[model_usage] = model_name
-        elif model_name in models:
-            warnings.warn(
-                f"Warning: {model_usage} is specified both as a keyword argument and in the "
-                "models dictionary. The keyword argument will take precedence.",
-                stacklevel=2,
-                category=UserWarning,
+        elif model_usage in models and models[model_usage] != model_name:
+            raise InvalidConfigError(
+                value=model_usage,
+                issue=f"Model for usage {model_usage} is specified both as a keyword argument and "
+                "in the models dictionary.",
             )
     # Handle deprecated llm_model_name keyword argument
     if llm_model_name := kwargs.pop("llm_model_name", None):
