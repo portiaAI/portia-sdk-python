@@ -9,9 +9,10 @@ import json
 from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, Union
+from typing import TYPE_CHECKING, Generic
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic.types import Union
 
 from portia.common import SERIALIZABLE_TYPE_VAR, Serializable
 from portia.prefixed_uuid import PlanRunUUID
