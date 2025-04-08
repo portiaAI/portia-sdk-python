@@ -293,14 +293,14 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
 PROVIDER_DEFAULT_MODELS = {
     PLANNING_MODEL_KEY: {
         LLMProvider.OPENAI: "openai/o3-mini",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-5-sonnet-latest",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistral/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
     DEFAULT_MODEL_KEY: {
         LLMProvider.OPENAI: "openai/gpt-4o",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-5-sonnet-latest",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistral/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4o",
@@ -789,7 +789,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         model_name = kwargs.pop(model_usage, None)
         if model_name and model_usage not in models:
             models[model_usage] = model_name
-        elif model_usage in models and models[model_usage] != model_name:
+        elif model_name and model_usage in models and models[model_usage] != model_name:
             raise InvalidConfigError(
                 value=model_usage,
                 issue=f"Model for usage {model_usage} is specified both as a keyword argument and "
