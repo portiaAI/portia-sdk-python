@@ -453,7 +453,10 @@ def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
     portia = Portia(config=config, tools=example_tool_registry)
-    query = "If the sum of 5 and 6 is greater than 10, then sum 4 + 5, otherwise sum 1 + 2"
+    query = (
+        "If the sum of 5 and 6 is greater than 10, then sum 4 + 5 and give me the answer, "
+        "otherwise sum 1 + 2 and give me that as the answer"
+    )
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
@@ -478,7 +481,7 @@ def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
     config = Config.from_default(portia_api_key=None, storage_class=StorageClass.MEMORY)
 
     portia = Portia(config=config)
-    query = "Send an email to John Doe"
+    query = "Send an email to John Doe using the Gmail tool"
 
     with pytest.raises(PlanError) as e:
         portia.plan(query)
