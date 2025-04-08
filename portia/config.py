@@ -294,14 +294,14 @@ PROVIDER_DEFAULT_MODELS = {
     PLANNING_MODEL_KEY: {
         LLMProvider.OPENAI: "openai/o3-mini",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
-        LLMProvider.MISTRALAI: "mistral/mistral-large-latest",
+        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
     DEFAULT_MODEL_KEY: {
         LLMProvider.OPENAI: "openai/gpt-4o",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
-        LLMProvider.MISTRALAI: "mistral/mistral-large-latest",
+        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4o",
     },
@@ -728,7 +728,7 @@ class Config(BaseModel):
                     api_key=self.must_get_api_key("anthropic_api_key"),
                 )
             case LLMProvider.MISTRALAI:
-                validate_extras_dependencies("mistral")
+                validate_extras_dependencies("mistralai")
                 from portia.model import MistralAIGenerativeModel
 
                 return MistralAIGenerativeModel(

@@ -58,6 +58,7 @@ pytest-asyncio = "^0.25.3"
 
 [tool.poetry.extras]
 mistral = ["langchain-mistralai", "mistralai"]
+mistralai = ["langchain-mistralai", "mistralai"]
 google = ["langchain-google-genai", "google-generativeai"]
 all = ["langchain-mistralai", "mistralai", "langchain-google-genai", "google-generativeai"]
 
