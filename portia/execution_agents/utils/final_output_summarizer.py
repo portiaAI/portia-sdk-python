@@ -58,14 +58,14 @@ class FinalOutputSummarizer:
         for step in plan.steps:
             if step.output in outputs:
                 output_value = (
-                    outputs[step.output].summary
-                    if outputs[step.output].value
+                    outputs[step.output].get_summary()
+                    if outputs[step.output].get_value()
                     in (
                         PreStepIntrospectionOutcome.SKIP,
                         PreStepIntrospectionOutcome.COMPLETE,
                         PreStepIntrospectionOutcome.FAIL,
                     )
-                    else outputs[step.output].value
+                    else outputs[step.output].get_value()
                 )
                 context.append(f"Task: {step.task}")
                 context.append(f"Output: {output_value}")

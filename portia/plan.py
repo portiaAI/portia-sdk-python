@@ -187,7 +187,6 @@ class Variable(BaseModel):
         description="A description of the output.",
     )
 
-
     def pretty_print(self) -> str:
         """Return the pretty print representation of the variable.
 

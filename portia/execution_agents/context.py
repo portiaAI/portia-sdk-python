@@ -20,7 +20,7 @@ from portia.clarification import (
 )
 
 if TYPE_CHECKING:
-    from portia.execution_agents.base_execution_agent import Output
+    from portia.execution_agents.output import Output
     from portia.execution_context import ExecutionContext
     from portia.plan import Step, Variable
     from portia.plan_run import PlanRun
@@ -67,7 +67,7 @@ def generate_input_context(
             input_context.extend(
                 [
                     f"input_name: {ref.name}",
-                    f"input_value: {previous_outputs[ref.name].value}",
+                    f"input_value: {previous_outputs[ref.name].get_value()}",
                     f"input_description: {ref.description}",
                     "----------",
                 ],
@@ -83,7 +83,7 @@ def generate_input_context(
         for output_key in unused_output_keys:
             # We truncate the output value to 10000 characters to avoid overwhelming the
             # LLM with too much information.
-            output_val = (str(previous_outputs[output_key].value) or "")[:10000]
+            output_val = (str(previous_outputs[output_key].get_value()) or "")[:10000]
             input_context.extend(
                 [
                     f"output_name: {output_key}",

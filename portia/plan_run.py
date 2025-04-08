@@ -23,7 +23,7 @@ from portia.clarification import (
     ClarificationListType,
 )
 from portia.common import PortiaEnum
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import Output
 from portia.execution_context import ExecutionContext, empty_context
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
 

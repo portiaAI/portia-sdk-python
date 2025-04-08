@@ -84,9 +84,9 @@ def test_portia_run_query(
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output
-    assert plan_run.outputs.final_output.value == 3
+    assert plan_run.outputs.final_output.get_value() == 3
     for output in plan_run.outputs.step_outputs.values():
-        assert output.summary is not None
+        assert output.get_summary() is not None
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
@@ -140,8 +140,7 @@ def test_portia_run_query_with_clarifications(
         tool_id="clarification_tool",
         task="Raise a clarification with user guidance 'Return a clarification'",
         output="",
-        inputs=[
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
@@ -176,8 +175,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
         tool_id="clarification_tool",
         task="raise a clarification with a user guidance 'Return a clarification'",
         output="",
-        inputs=[
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
@@ -223,8 +221,7 @@ def test_portia_run_query_with_hard_error(
         task="Use error tool with string 'Something went wrong' and \
         do not return a soft error or uncaught error",
         output="",
-        inputs=[
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
@@ -238,8 +235,9 @@ def test_portia_run_query_with_hard_error(
 
     assert plan_run.state == PlanRunState.FAILED
     assert plan_run.outputs.final_output
-    assert isinstance(plan_run.outputs.final_output.value, str)
-    assert "Something went wrong" in plan_run.outputs.final_output.value
+    final_output = plan_run.outputs.final_output.get_value()
+    assert isinstance(final_output, str)
+    assert "Something went wrong" in final_output
 
 
 @pytest.mark.parametrize("agent", AGENTS)
@@ -268,8 +266,7 @@ def test_portia_run_query_with_soft_error(
         tool_id="add_tool",
         task="Add 1 + 2",
         output="",
-        inputs=[
-        ],
+        inputs=[],
     )
     plan = Plan(
         plan_context=PlanContext(
@@ -283,8 +280,9 @@ def test_portia_run_query_with_soft_error(
 
     assert plan_run.state == PlanRunState.FAILED
     assert plan_run.outputs.final_output
-    assert isinstance(plan_run.outputs.final_output.value, str)
-    assert "Tool add_tool failed after retries" in plan_run.outputs.final_output.value
+    final_output = plan_run.outputs.final_output.get_value()
+    assert isinstance(final_output, str)
+    assert "Tool add_tool failed after retries" in final_output
 
 
 @pytest.mark.parametrize(("llm_provider", "llm_model_name"), CORE_MODELS)
@@ -327,8 +325,7 @@ def test_portia_run_query_with_multiple_clarifications(
         tool_id="add_tool",
         task="Add 1 + 2",
         output="$step_one",
-        inputs=[
-        ],
+        inputs=[],
     )
     step_two = Step(
         tool_id="add_tool",
@@ -356,8 +353,8 @@ def test_portia_run_query_with_multiple_clarifications(
     # 498 = 456 (clarification for value a in step 1) + 2 (value b in step 1)
     #  + 40 (value b in step 2)
     assert plan_run.outputs.final_output is not None
-    assert plan_run.outputs.final_output.value == 498
-    assert plan_run.outputs.final_output.summary is not None
+    assert plan_run.outputs.final_output.get_value() == 498
+    assert plan_run.outputs.final_output.get_summary() is not None
 
     assert test_clarification_handler.received_clarification is not None
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
@@ -418,8 +415,7 @@ def test_portia_run_query_with_multiple_async_clarifications(
         tool_id="add_tool",
         task="Add 1 + 2",
         output="$step_one",
-        inputs=[
-        ],
+        inputs=[],
     )
     step_two = Step(
         tool_id="add_tool",
@@ -445,11 +441,12 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
-    assert plan_run.outputs.final_output.value == 4
-    assert plan_run.outputs.final_output.summary is not None
+    assert plan_run.outputs.final_output.get_value() == 4
+    assert plan_run.outputs.final_output.get_summary() is not None
 
     assert test_clarification_handler.received_clarification is not None
     assert test_clarification_handler.received_clarification.user_guidance == "please try again"
+
 
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_conditional_steps() -> None:
@@ -461,8 +458,8 @@ def test_portia_run_query_with_conditional_steps() -> None:
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
-    assert "9" in str(plan_run.outputs.final_output.value)
-    assert "3" not in str(plan_run.outputs.final_output.value)
+    assert "9" in str(plan_run.outputs.final_output.get_value())
+    assert "3" not in str(plan_run.outputs.final_output.get_value())
 
 
 def test_portia_run_query_with_example_registry() -> None:

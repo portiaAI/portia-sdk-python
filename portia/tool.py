@@ -47,8 +47,8 @@ from portia.clarification import (
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
-from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.execution_utils import is_clarification
+from portia.execution_agents.output import LocalOutput, Output
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
@@ -167,7 +167,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]:
+    ) -> Output:
         """Invoke the Tool.run function and handle converting the result into an Output object.
 
         This is the entry point for agents to invoke a tool.
@@ -178,8 +178,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             **kwargs (Any): Additional keyword arguments for the tool function.
 
         Returns:
-            Output[SERIALIZABLE_TYPE_VAR] | Output[list[Clarification]]: The tool's output wrapped
-            in an Output object.
+            Output: The tool's output wrapped in an Output object.
 
         Raises:
             ToolSoftError: If an error occurs and it is not already a Hard or Soft Tool error.
@@ -197,17 +196,17 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         # handle clarifications cleanly
         if is_clarification(output):
             clarifications = output if isinstance(output, list) else [output]
-            return Output[list[Clarification]](
+            return LocalOutput[list[Clarification]](
                 value=clarifications,
             )
-        return Output[SERIALIZABLE_TYPE_VAR](value=output)  # type: ignore  # noqa: PGH003
+        return LocalOutput[SERIALIZABLE_TYPE_VAR](value=output)  # type: ignore  # noqa: PGH003
 
     def _run_with_artifacts(
         self,
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[str, Output[SERIALIZABLE_TYPE_VAR]]:
+    ) -> tuple[str, Output]:
         """Invoke the Tool.run function and handle converting to an Output object.
 
         This function returns a tuple consisting of the output and an Output object, as expected by
@@ -220,11 +219,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             **kwargs (Any): Additional keyword arguments for the tool function.
 
         Returns:
-            tuple[str, Output[SERIALIZABLE_TYPE_VAR]]: A tuple containing the output and the Output.
+            tuple[str, Output]: A tuple containing the output and the Output.
 
         """
         intermediate_output = self._run(ctx, *args, **kwargs)
-        return (intermediate_output.value, intermediate_output)  # type: ignore  # noqa: PGH003
+        return (intermediate_output.get_value(), intermediate_output)  # type: ignore  # noqa: PGH003
 
     def _generate_tool_description(self) -> str:
         """Generate tool descriptions.
@@ -412,20 +411,21 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolHardError: If a hard error is encountered in the response.
 
         """
-        output = Output.model_validate(response["output"])
+        output = LocalOutput.model_validate(response["output"])
+        output_value = output.get_value()
 
         # Handle Tool Errors
-        if isinstance(output.value, str):
-            if "ToolSoftError" in output.value:
-                raise ToolSoftError(output.value)
-            if "ToolHardError" in output.value:
-                raise ToolHardError(output.value)
+        if isinstance(output_value, str):
+            if "ToolSoftError" in output_value:
+                raise ToolSoftError(output_value)
+            if "ToolHardError" in output_value:
+                raise ToolHardError(output_value)
         # Handle Clarifications
-        if isinstance(output.value, list) and output.value and "category" in output.value[0]:
-            clarification = output.value[0]
+        if isinstance(output_value, list) and output_value and "category" in output_value[0]:
+            clarification = output_value[0]
             match clarification["category"]:
                 case ClarificationCategory.ACTION:
-                    return Output(
+                    return LocalOutput(
                         value=ActionClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -434,7 +434,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.INPUT:
-                    return Output(
+                    return LocalOutput(
                         value=InputClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -443,7 +443,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.MULTIPLE_CHOICE:
-                    return Output(
+                    return LocalOutput(
                         value=MultipleChoiceClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -453,7 +453,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.VALUE_CONFIRMATION:
-                    return Output(
+                    return LocalOutput(
                         value=ValueConfirmationClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -550,7 +550,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 logger().error(f"Error parsing response from Portia Cloud: {e}")
                 raise ToolHardError(e) from e
             else:
-                return output.value
+                return output.get_value()
 
 
 class PortiaMcpTool(Tool[str]):

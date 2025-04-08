@@ -15,9 +15,15 @@ from portia.clarification import (
     InputClarification,
     ValueConfirmationClarification,
 )
-from portia.config import DEFAULT_MODEL_KEY, PLANNING_MODEL_KEY, Config, StorageClass
+from portia.config import (
+    DEFAULT_MODEL_KEY,
+    FEATURE_FLAG_AGENT_MEMORY_ENABLED,
+    PLANNING_MODEL_KEY,
+    Config,
+    StorageClass,
+)
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
@@ -56,6 +62,22 @@ def default_model() -> MagicMock:
 def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
+        custom_models={
+            PLANNING_MODEL_KEY: planning_model,
+            DEFAULT_MODEL_KEY: default_model,
+        },
+    )
+    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+    return Portia(config=config, tools=tool_registry)
+
+
+@pytest.fixture
+def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock) -> Portia:
+    """Fixture to create a Portia instance for testing."""
+    config = get_test_config(
+        # Set a small threshold value so all outputs are stored in agent memory
+        feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
+        large_output_threshold_tokens=3,
         custom_models={
             PLANNING_MODEL_KEY: planning_model,
             DEFAULT_MODEL_KEY: default_model,
@@ -450,8 +472,8 @@ def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock
     )
 
     # Mock agent responses
-    weather_output = Output(value="Sunny and warm")
-    activities_output = Output(value="Visit Hyde Park and have a picnic")
+    weather_output = LocalOutput(value="Sunny and warm")
+    activities_output = LocalOutput(value="Visit Hyde Park and have a picnic")
     expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
 
     mock_step_agent = mock.MagicMock()
@@ -478,8 +500,8 @@ def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock
 
         # Verify final output and summary
         assert plan_run.outputs.final_output is not None
-        assert plan_run.outputs.final_output.value == activities_output.value
-        assert plan_run.outputs.final_output.summary == expected_summary
+        assert plan_run.outputs.final_output.get_value() == activities_output.get_value()
+        assert plan_run.outputs.final_output.get_summary() == expected_summary
 
         # Verify create_summary was called with correct args
         mock_summarizer_agent.create_summary.assert_called_once_with(
@@ -503,8 +525,8 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
     ]
 
     plan_run.outputs.step_outputs = {
-        "$london_weather": Output(value="Sunny and warm"),
-        "$activities": Output(value="Visit Hyde Park and have a picnic"),
+        "$london_weather": LocalOutput(value="Sunny and warm"),
+        "$activities": LocalOutput(value="Visit Hyde Park and have a picnic"),
     }
 
     expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
@@ -515,13 +537,13 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         "portia.portia.FinalOutputSummarizer",
         return_value=mock_summarizer,
     ):
-        last_step_output = Output(value="Visit Hyde Park and have a picnic")
+        last_step_output = LocalOutput(value="Visit Hyde Park and have a picnic")
         output = portia._get_final_output(plan, plan_run, last_step_output)  # noqa: SLF001
 
         # Verify the final output
         assert output is not None
-        assert output.value == "Visit Hyde Park and have a picnic"
-        assert output.summary == expected_summary
+        assert output.get_value() == "Visit Hyde Park and have a picnic"
+        assert output.get_summary() == expected_summary
 
         # Verify create_summary was called with correct args
         mock_summarizer.create_summary.assert_called_once()
@@ -530,6 +552,87 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         assert isinstance(call_args["plan_run"], ReadOnlyPlanRun)
         assert call_args["plan"].id == plan.id
         assert call_args["plan_run"].id == plan_run.id
+
+
+def test_portia_run_query_with_memory(
+    portia_with_agent_memory: Portia,
+    planning_model: MagicMock,
+) -> None:
+    """Test run_query sets both final output and summary correctly."""
+    query = "What activities can I do in London based on weather?"
+
+    # Mock planning_agent response
+    weather_step = Step(
+        task="Get weather in London",
+        tool_id="add_tool",
+        output="$weather",
+    )
+    activities_step = Step(
+        task="Suggest activities based on weather",
+        tool_id="add_tool",
+        output="$activities",
+    )
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[weather_step, activities_step],
+        error=None,
+    )
+
+    # Mock agent responses
+    weather_summary = "sunny"
+    weather_output = LocalOutput(value="Sunny and warm", summary=weather_summary)
+    activities_summary = "picnic"
+    activities_output = LocalOutput(
+        value="Visit Hyde Park and have a picnic",
+        summary=activities_summary,
+    )
+    expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
+
+    mock_step_agent = mock.MagicMock()
+    mock_step_agent.execute_sync.side_effect = [weather_output, activities_output]
+
+    mock_summarizer_agent = mock.MagicMock()
+    mock_summarizer_agent.create_summary.side_effect = [expected_summary]
+
+    with (
+        mock.patch(
+            "portia.portia.FinalOutputSummarizer",
+            return_value=mock_summarizer_agent,
+        ),
+        mock.patch.object(
+            portia_with_agent_memory,
+            "_get_agent_for_step",
+            return_value=mock_step_agent,
+        ),
+    ):
+        plan_run = portia_with_agent_memory.run(query)
+
+        # Verify run completed successfully
+        assert plan_run.state == PlanRunState.COMPLETE
+
+        # Verify step outputs were stored correctly
+        assert plan_run.outputs.step_outputs["$weather"] == AgentMemoryOutput(
+            output_name="$weather",
+            plan_run_id=plan_run.id,
+            summary=weather_summary,
+        )
+        assert (
+            portia_with_agent_memory.storage.get_plan_run_output("$weather", plan_run.id)
+            == weather_output
+        )
+        assert plan_run.outputs.step_outputs["$activities"] == AgentMemoryOutput(
+            output_name="$activities",
+            plan_run_id=plan_run.id,
+            summary=activities_summary,
+        )
+        assert (
+            portia_with_agent_memory.storage.get_plan_run_output("$activities", plan_run.id)
+            == activities_output
+        )
+
+        # Verify final output and summary
+        assert plan_run.outputs.final_output is not None
+        assert plan_run.outputs.final_output.get_value() == activities_output.value
+        assert plan_run.outputs.final_output.get_summary() == expected_summary
 
 
 def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
@@ -544,13 +647,13 @@ def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
         "portia.execution_agents.utils.final_output_summarizer.FinalOutputSummarizer",
         return_value=mock_agent,
     ):
-        step_output = Output(value="Some output")
+        step_output = LocalOutput(value="Some output")
         final_output = portia._get_final_output(plan, plan_run, step_output)  # noqa: SLF001
 
         # Verify the final output is set without summary
         assert final_output is not None
-        assert final_output.value == "Some output"
-        assert final_output.summary is None
+        assert final_output.get_value() == "Some output"
+        assert final_output.get_summary() is None
 
 
 def test_portia_wait_for_ready_max_retries(portia: Portia) -> None:
@@ -705,14 +808,14 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
         plan_run = portia.create_plan_run(plan)
 
         mock_step_agent.execute_sync.side_effect = [
-            Output(
+            LocalOutput(
                 value=InputClarification(
                     plan_run_id=plan_run.id,
                     user_guidance="Handle this clarification",
                     argument_name="raise_clarification",
                 ),
             ),
-            Output(value="I caught the clarification"),
+            LocalOutput(value="I caught the clarification"),
         ]
         portia.resume(plan_run)
         assert plan_run.state == PlanRunState.COMPLETE
@@ -786,7 +889,7 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
 
     # Mock step agent to return output for second step
     mock_step_agent = MagicMock()
-    mock_step_agent.execute_sync.return_value = Output(value="Step 2 result")
+    mock_step_agent.execute_sync.return_value = LocalOutput(value="Step 2 result")
 
     with (
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
@@ -798,12 +901,13 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step1_result" in plan_run.outputs.step_outputs
         assert (
-            plan_run.outputs.step_outputs["$step1_result"].value == PreStepIntrospectionOutcome.SKIP
+            plan_run.outputs.step_outputs["$step1_result"].get_value()
+            == PreStepIntrospectionOutcome.SKIP
         )
         assert "$step2_result" in plan_run.outputs.step_outputs
-        assert plan_run.outputs.step_outputs["$step2_result"].value == "Step 2 result"
+        assert plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
         assert plan_run.outputs.final_output is not None
-        assert plan_run.outputs.final_output.value == "Step 2 result"
+        assert plan_run.outputs.final_output.get_value() == "Step 2 result"
 
 
 def test_portia_run_with_introspection_complete(portia: Portia, planning_model: MagicMock) -> None:
@@ -819,7 +923,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
 
     # Mock step agent for first step
     mock_step_agent = MagicMock()
-    mock_step_agent.execute_sync.return_value = Output(value="Step 1 result")
+    mock_step_agent.execute_sync.return_value = LocalOutput(value="Step 1 result")
 
     # Configure the COMPLETE outcome for the introspection agent
     mock_introspection_complete = PreStepIntrospection(
@@ -831,11 +935,11 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         plan_run: PlanRun = kwargs.get("plan_run")  # type: ignore  # noqa: PGH003
 
         if plan_run.current_step_index == 1:
-            plan_run.outputs.step_outputs["$step2_result"] = Output(
+            plan_run.outputs.step_outputs["$step2_result"] = LocalOutput(
                 value=PreStepIntrospectionOutcome.COMPLETE,
                 summary="Remaining steps cannot be executed",
             )
-            plan_run.outputs.final_output = Output(
+            plan_run.outputs.final_output = LocalOutput(
                 value="Step 1 result",
                 summary="Execution completed early",
             )
@@ -863,11 +967,11 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert (
-            plan_run.outputs.step_outputs["$step2_result"].value
+            plan_run.outputs.step_outputs["$step2_result"].get_value()
             == PreStepIntrospectionOutcome.COMPLETE
         )
         assert plan_run.outputs.final_output is not None
-        assert plan_run.outputs.final_output.summary == "Execution completed early"
+        assert plan_run.outputs.final_output.get_summary() == "Execution completed early"
 
 
 def test_portia_run_with_introspection_fail(portia: Portia, planning_model: MagicMock) -> None:
@@ -882,7 +986,7 @@ def test_portia_run_with_introspection_fail(portia: Portia, planning_model: Magi
 
     # Mock step agent for first step
     mock_step_agent = MagicMock()
-    mock_step_agent.execute_sync.return_value = Output(value="Step 1 result")
+    mock_step_agent.execute_sync.return_value = LocalOutput(value="Step 1 result")
 
     # Configure the FAIL outcome
     mock_introspection_fail = PreStepIntrospection(
@@ -895,7 +999,7 @@ def test_portia_run_with_introspection_fail(portia: Portia, planning_model: Magi
         # If this is step 1, simulate a FAIL outcome
         if plan_run.current_step_index == 1:
             # Modify the plan_run to look like it failed
-            failed_output = Output(
+            failed_output = LocalOutput(
                 value=PreStepIntrospectionOutcome.FAIL,
                 summary="Missing required data",
             )
@@ -926,11 +1030,12 @@ def test_portia_run_with_introspection_fail(portia: Portia, planning_model: Magi
         assert plan_run.state == PlanRunState.FAILED
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert (
-            plan_run.outputs.step_outputs["$step2_result"].value == PreStepIntrospectionOutcome.FAIL
+            plan_run.outputs.step_outputs["$step2_result"].get_value()
+            == PreStepIntrospectionOutcome.FAIL
         )
         assert plan_run.outputs.final_output is not None
-        assert plan_run.outputs.final_output.value == PreStepIntrospectionOutcome.FAIL
-        assert plan_run.outputs.final_output.summary == "Missing required data"
+        assert plan_run.outputs.final_output.get_value() == PreStepIntrospectionOutcome.FAIL
+        assert plan_run.outputs.final_output.get_summary() == "Missing required data"
 
 
 def test_handle_introspection_outcome_complete(portia: Portia) -> None:
@@ -954,10 +1059,10 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     )
 
     # Mock the _get_final_output method to return a predefined output
-    mock_final_output = Output(value="Final result", summary="Final summary")
+    mock_final_output = LocalOutput(value="Final result", summary="Final summary")
     with mock.patch.object(portia, "_get_final_output", return_value=mock_final_output):
         # Call the actual method (not mocked)
-        previous_output = Output(value="Previous step result")
+        previous_output = LocalOutput(value="Previous step result")
         updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
             introspection_agent=mock_introspection,
             plan=plan,
@@ -971,10 +1076,13 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
 
         # Verify plan_run was updated correctly
         assert (
-            updated_plan_run.outputs.step_outputs["$test_output"].value
+            updated_plan_run.outputs.step_outputs["$test_output"].get_value()
             == PreStepIntrospectionOutcome.COMPLETE
         )
-        assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Stopping execution"
+        assert (
+            updated_plan_run.outputs.step_outputs["$test_output"].get_summary()
+            == "Stopping execution"
+        )
         assert updated_plan_run.outputs.final_output == mock_final_output
         assert updated_plan_run.state == PlanRunState.COMPLETE
 
@@ -1001,7 +1109,7 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
     )
 
     # Call the actual method (not mocked)
-    previous_output = Output(value="Previous step result")
+    previous_output = LocalOutput(value="Previous step result")
     updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
         introspection_agent=mock_introspection,
         plan=plan,
@@ -1015,14 +1123,13 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
 
     # Verify plan_run was updated correctly
     assert (
-        updated_plan_run.outputs.step_outputs["$test_output"].value
+        updated_plan_run.outputs.step_outputs["$test_output"].get_value()
         == PreStepIntrospectionOutcome.FAIL
     )
-    assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Execution failed"
+    assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Execution failed"
     assert updated_plan_run.outputs.final_output is not None
-    assert updated_plan_run.outputs.final_output.value == PreStepIntrospectionOutcome.FAIL
-    assert updated_plan_run.outputs.final_output.summary is not None
-    assert updated_plan_run.outputs.final_output.summary == "Execution failed"
+    assert updated_plan_run.outputs.final_output.get_value() == PreStepIntrospectionOutcome.FAIL
+    assert updated_plan_run.outputs.final_output.get_summary() == "Execution failed"
     assert updated_plan_run.state == PlanRunState.FAILED
 
 
@@ -1048,7 +1155,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     )
 
     # Call the actual method (not mocked)
-    previous_output = Output(value="Previous step result")
+    previous_output = LocalOutput(value="Previous step result")
     updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
         introspection_agent=mock_introspection,
         plan=plan,
@@ -1062,10 +1169,10 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
 
     # Verify plan_run was updated correctly
     assert (
-        updated_plan_run.outputs.step_outputs["$test_output"].value
+        updated_plan_run.outputs.step_outputs["$test_output"].get_value()
         == PreStepIntrospectionOutcome.SKIP
     )
-    assert updated_plan_run.outputs.step_outputs["$test_output"].summary == "Skipping step"
+    assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Skipping step"
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS  # State should remain IN_PROGRESS
 
 
@@ -1087,7 +1194,7 @@ def test_handle_introspection_outcome_no_condition(portia: Portia) -> None:
     mock_introspection = MagicMock()
 
     # Call the actual method
-    previous_output = Output(value="Previous step result")
+    previous_output = LocalOutput(value="Previous step result")
     updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
         introspection_agent=mock_introspection,
         plan=plan,
@@ -1132,7 +1239,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         state=PlanRunState.IN_PROGRESS,
         outputs=PlanRunOutputs(
             step_outputs={
-                "$step1_result": Output(value="Step 1 result", summary="Summary of step 1"),
+                "$step1_result": LocalOutput(value="Step 1 result", summary="Summary of step 1"),
             },
         ),
     )
@@ -1160,7 +1267,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
 
     # Mock step agent to return expected output for step 2 only (steps 3 and 4 will be skipped)
     mock_step_agent = MagicMock()
-    mock_step_agent.execute_sync.return_value = Output(
+    mock_step_agent.execute_sync.return_value = LocalOutput(
         value="Step 2 result",
         summary="Summary of step 2",
     )
@@ -1179,17 +1286,17 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
 
         assert result_plan_run.state == PlanRunState.COMPLETE
 
-        assert result_plan_run.outputs.step_outputs["$step1_result"].value == "Step 1 result"
-        assert result_plan_run.outputs.step_outputs["$step2_result"].value == "Step 2 result"
+        assert result_plan_run.outputs.step_outputs["$step1_result"].get_value() == "Step 1 result"
+        assert result_plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
         assert (
-            result_plan_run.outputs.step_outputs["$step3_result"].value
+            result_plan_run.outputs.step_outputs["$step3_result"].get_value()
             == PreStepIntrospectionOutcome.SKIP
         )
         assert (
-            result_plan_run.outputs.step_outputs["$step4_result"].value
+            result_plan_run.outputs.step_outputs["$step4_result"].get_value()
             == PreStepIntrospectionOutcome.SKIP
         )
         assert result_plan_run.outputs.final_output is not None
-        assert result_plan_run.outputs.final_output.value == "Step 2 result"
-        assert result_plan_run.outputs.final_output.summary == expected_summary
+        assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
+        assert result_plan_run.outputs.final_output.get_summary() == expected_summary
         assert result_plan_run.current_step_index == 3

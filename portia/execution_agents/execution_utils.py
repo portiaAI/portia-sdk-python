@@ -13,9 +13,10 @@ from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.execution_agents.base_execution_agent import Output
+from portia.execution_agents.output import LocalOutput, Output
 
 if TYPE_CHECKING:
+    from portia.config import Config
     from portia.tool import Tool
 
 
@@ -45,6 +46,7 @@ MAX_RETRIES = 4
 
 
 def next_state_after_tool_call(
+    config: Config,
     state: MessagesState,
     tool: Tool | None = None,
 ) -> Literal[AgentNode.TOOL_AGENT, AgentNode.SUMMARIZER, END]:  # type: ignore  # noqa: PGH003
@@ -54,6 +56,7 @@ def next_state_after_tool_call(
     should proceed to the tool agent again, to the summarizer, or end.
 
     Args:
+        config (Config): The configuration for the run.
         state (MessagesState): The current state of the messages.
         tool (Tool | None): The tool involved in the call, if any.
 
@@ -73,7 +76,12 @@ def next_state_after_tool_call(
     if (
         "ToolSoftError" not in last_message.content
         and tool
-        and getattr(tool, "should_summarize", False)
+        and (
+            getattr(tool, "should_summarize", False)
+            # If the value is larger than the threshold value, always summarise them as they are
+            # too big to store the full value locally
+            or config.exceeds_output_threshold(last_message.content)
+        )
         and isinstance(last_message, ToolMessage)
         and not is_clarification(last_message.artifact)
     ):
@@ -122,7 +130,7 @@ def process_output(  # noqa: C901
     It raises errors if the tool encounters issues and returns the appropriate output.
 
     Args:
-        messages (list[BaseMessage}): The set of messages received from the agent's plan_run.
+        messages (list[BaseMessage]): The set of messages received from the agent's plan_run.
         tool (Tool | None): The tool associated with the agent, if any.
         clarifications (list[Clarification] | None): A list of clarifications, if any.
 
@@ -142,16 +150,16 @@ def process_output(  # noqa: C901
         if "ToolHardError" in message.content and tool:
             raise ToolFailedError(tool.id, str(message.content))
         if clarifications and len(clarifications) > 0:
-            return Output[list[Clarification]](
+            return LocalOutput[list[Clarification]](
                 value=clarifications,
             )
         if isinstance(message, ToolMessage):
             if message.artifact and isinstance(message.artifact, Output):
                 output_values.append(message.artifact)
             elif message.artifact:
-                output_values.append(Output(value=message.artifact))
+                output_values.append(LocalOutput(value=message.artifact))
             else:
-                output_values.append(Output(value=message.content))
+                output_values.append(LocalOutput(value=message.content))
 
     if len(output_values) == 0:
         raise InvalidAgentOutputError(str([message.content for message in messages]))
@@ -159,15 +167,16 @@ def process_output(  # noqa: C901
     # if there's only one output return just the value
     if len(output_values) == 1:
         output = output_values[0]
-        if output.summary is None:
-            output.summary = output.serialize_value(output.value)
-        return output
+        return LocalOutput(
+            value=output.get_value(),
+            summary=output.get_summary() or output.serialize_value(),
+        )
 
     values = []
     summaries = []
 
     for output in output_values:
-        values.append(output.value)
-        summaries.append(output.summary or output.serialize_value(output.value))
+        values.append(output.get_value())
+        summaries.append(output.get_summary() or output.serialize_value())
 
-    return Output(value=values, summary=", ".join(summaries))
+    return LocalOutput(value=values, summary=", ".join(summaries))
