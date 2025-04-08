@@ -28,7 +28,7 @@ class Response(BaseModel):
 MODELS = [
     "openai/gpt-4o-mini",
     "anthropic/claude-3-5-sonnet-latest",
-    "mistral/mistral-small-latest",
+    "mistralai/mistral-small-latest",
     "google/gemini-2.0-flash",
     "azure-openai/gpt-4o-mini",
 ]

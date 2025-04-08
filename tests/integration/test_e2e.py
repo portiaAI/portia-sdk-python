@@ -45,7 +45,7 @@ PROVIDER_MODELS = [
     *CORE_MODELS,
     (
         LLMProvider.MISTRALAI,
-        "mistral/mistral-large-latest",
+        "mistralai/mistral-large-latest",
     ),
     (
         LLMProvider.GOOGLE_GENERATIVE_AI,

@@ -129,7 +129,7 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     [
         ("openai/o1-preview", OpenAIGenerativeModel, ["OPENAI_API_KEY"]),
         ("anthropic/claude-3-5-haiku-latest", AnthropicGenerativeModel, ["ANTHROPIC_API_KEY"]),
-        ("mistral/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"]),
+        ("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"]),
         ("google/gemini-2.5-preview", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]),
         (
             "azure-openai/gpt-4",
@@ -220,7 +220,7 @@ def test_set_model_with_string_other_provider_api_key_env_var_set(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
         _ = Config.from_default(
-            default_model="mistral/mistral-tiny-latest",
+            default_model="mistralai/mistral-tiny-latest",
             llm_provider="anthropic",
         )
 
@@ -231,10 +231,10 @@ def test_set_default_model_from_string_with_alternative_provider(
     """Test setting model from string from a different provider to what is explicitly set."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
-    c = Config.from_default(default_model="mistral/mistral-tiny-latest", llm_provider="anthropic")
+    c = Config.from_default(default_model="mistralai/mistral-tiny-latest", llm_provider="anthropic")
     model = c.resolve_model()
     assert isinstance(model, MistralAIGenerativeModel)
-    assert str(model) == "mistral/mistral-tiny-latest"
+    assert str(model) == "mistralai/mistral-tiny-latest"
 
     model = c.resolve_model(usage=PLANNING_MODEL_KEY)
     assert isinstance(model, AnthropicGenerativeModel)
@@ -270,13 +270,13 @@ def test_set_default_model_and_planning_model_alternative_provider(
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
     c = Config.from_default(
-        default_model="mistral/mistral-tiny-latest",
+        default_model="mistralai/mistral-tiny-latest",
         planning_model="google/gemini-1.5-flash",
         llm_provider="anthropic",
     )
     model = c.resolve_model()
     assert isinstance(model, MistralAIGenerativeModel)
-    assert str(model) == "mistral/mistral-tiny-latest"
+    assert str(model) == "mistralai/mistral-tiny-latest"
 
     model = c.resolve_model(usage=PLANNING_MODEL_KEY)
     assert isinstance(model, GoogleGenAiGenerativeModel)
@@ -300,7 +300,7 @@ def test_set_default_model_alternative_provider_missing_api_key_explicit_model(
         llm_provider="anthropic",
     )
     assert isinstance(config.resolve_model(), MistralAIGenerativeModel)
-    assert str(config.resolve_model()) == "mistral/mistral-tiny-latest"
+    assert str(config.resolve_model()) == "mistralai/mistral-tiny-latest"
 
 
 def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
@@ -316,7 +316,7 @@ def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
         ),
     )
     assert isinstance(config.resolve_model(), MistralAIGenerativeModel)
-    assert str(config.resolve_model()) == "mistral/mistral-tiny-latest"
+    assert str(config.resolve_model()) == "mistralai/mistral-tiny-latest"
     assert isinstance(config.resolve_model(usage=PLANNING_MODEL_KEY), OpenAIGenerativeModel)
     assert str(config.resolve_model(usage=PLANNING_MODEL_KEY)) == "openai/gpt-4o"
 
@@ -473,7 +473,7 @@ def test_config_model_in_kwargs_and_models_raises_error(monkeypatch: pytest.Monk
     with pytest.raises(InvalidConfigError):
         Config.from_default(
             default_model="openai/gpt-4o",
-            models={"default_model": "mistral/mistral-tiny-latest"},
+            models={"default_model": "mistralai/mistral-tiny-latest"},
         )
 
 

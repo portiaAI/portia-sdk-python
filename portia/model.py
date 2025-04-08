@@ -83,7 +83,7 @@ class LLMProvider(Enum):
 
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
-    MISTRALAI = "mistral"
+    MISTRALAI = "mistralai"
     GOOGLE_GENERATIVE_AI = "google"
     AZURE_OPENAI = "azure-openai"
     CUSTOM = "custom"
@@ -462,7 +462,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         )
 
 
-if validate_extras_dependencies("mistral", raise_error=False):
+if validate_extras_dependencies("mistralai", raise_error=False):
     from langchain_mistralai import ChatMistralAI
     from mistralai import Mistral
 
