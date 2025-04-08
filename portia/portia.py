@@ -38,9 +38,9 @@ from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
 )
-from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.execution_agents.output import LocalOutput, Output
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.execution_context import (
     execution_context,
@@ -567,8 +567,8 @@ class Portia:
             try:
                 last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                error_output = Output(value=str(e))
-                plan_run.outputs.step_outputs[step.output] = error_output
+                error_output = LocalOutput(value=str(e))
+                self._set_step_output(error_output, plan_run, step)
                 plan_run.outputs.final_output = error_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
                 logger().error(
@@ -584,9 +584,9 @@ class Portia:
                 )
                 return plan_run
             else:
-                plan_run.outputs.step_outputs[step.output] = last_executed_step_output
+                self._set_step_output(last_executed_step_output, plan_run, step)
                 logger().info(
-                    f"Step output - {last_executed_step_output.summary!s}",
+                    f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
 
             if self._raise_clarifications(plan_run, last_executed_step_output, plan):
@@ -616,7 +616,7 @@ class Portia:
         )
         if plan_run.outputs.final_output:
             logger().info(
-                f"Final output: {plan_run.outputs.final_output.summary!s}",
+                f"Final output: {plan_run.outputs.final_output.get_summary()!s}",
             )
 
     def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
@@ -637,7 +637,7 @@ class Portia:
                 if i < len(plan.steps)
                 and (step := plan.steps[i]).output in plan_run.outputs.step_outputs
                 and (step_output := plan_run.outputs.step_outputs[step.output])
-                and step_output.value != PreStepIntrospectionOutcome.SKIP
+                and step_output.get_value() != PreStepIntrospectionOutcome.SKIP
             ),
             None,
         )
@@ -696,16 +696,17 @@ class Portia:
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
-                plan_run.outputs.step_outputs[step.output] = Output(
+                output = LocalOutput(
                     value=PreStepIntrospectionOutcome.SKIP,
                     summary=pre_step_outcome.reason,
                 )
-                self.storage.save_plan_run(plan_run)
+                self._set_step_output(output, plan_run, step)
             case PreStepIntrospectionOutcome.COMPLETE:
-                plan_run.outputs.step_outputs[step.output] = Output(
+                output = LocalOutput(
                     value=PreStepIntrospectionOutcome.COMPLETE,
                     summary=pre_step_outcome.reason,
                 )
+                self._set_step_output(output, plan_run, step)
                 if last_executed_step_output:
                     plan_run.outputs.final_output = self._get_final_output(
                         plan,
@@ -713,16 +714,14 @@ class Portia:
                         last_executed_step_output,
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
-                self.storage.save_plan_run(plan_run)
             case PreStepIntrospectionOutcome.FAIL:
-                failed_output = Output(
+                failed_output = LocalOutput(
                     value=PreStepIntrospectionOutcome.FAIL,
                     summary=pre_step_outcome.reason,
                 )
-                plan_run.outputs.step_outputs[step.output] = failed_output
+                self._set_step_output(failed_output, plan_run, step)
                 plan_run.outputs.final_output = failed_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
-                self.storage.save_plan_run(plan_run)
         return (plan_run, pre_step_outcome)
 
     def _get_planning_agent(self) -> BasePlanningAgent:
@@ -748,8 +747,8 @@ class Portia:
             step_output (Output): The output of the last step.
 
         """
-        final_output = Output(
-            value=step_output.value,
+        final_output = LocalOutput(
+            value=step_output.get_value(),
             summary=None,
         )
 
@@ -778,15 +777,14 @@ class Portia:
             bool: True if clarification is needed and run execution should stop.
 
         """
-        if isinstance(step_output.value, Clarification) or (
-            isinstance(step_output.value, list)
-            and len(step_output.value) > 0
-            and all(isinstance(item, Clarification) for item in step_output.value)
+        output_value = step_output.get_value()
+        if isinstance(output_value, Clarification) or (
+            isinstance(output_value, list)
+            and len(output_value) > 0
+            and all(isinstance(item, Clarification) for item in output_value)
         ):
             new_clarifications = (
-                [step_output.value]
-                if isinstance(step_output.value, Clarification)
-                else step_output.value
+                [output_value] if isinstance(output_value, Clarification) else output_value
             )
             for clarification in new_clarifications:
                 clarification.step = plan_run.current_step_index
@@ -880,3 +878,19 @@ class Portia:
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config)
+
+    def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> None:
+        """Set the output for a step."""
+        plan_run.outputs.step_outputs[step.output] = output
+        self._persist_step_state(plan_run, step)
+
+    def _persist_step_state(self, plan_run: PlanRun, step: Step) -> None:
+        """Ensure the plan run state is persisted to storage."""
+        step_output = plan_run.outputs.step_outputs[step.output]
+        if isinstance(step_output, LocalOutput) and self.config.exceeds_output_threshold(
+            step_output.serialize_value(),
+        ):
+            step_output = self.storage.save_plan_run_output(step.output, step_output, plan_run.id)
+            plan_run.outputs.step_outputs[step.output] = step_output
+
+        self.storage.save_plan_run(plan_run)

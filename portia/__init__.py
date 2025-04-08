@@ -48,6 +48,7 @@ from portia.errors import (
     ToolNotFoundError,
     ToolRetryError,
 )
+from portia.execution_agents.output import Output
 
 # Execution context
 from portia.execution_context import (
@@ -123,6 +124,7 @@ __all__ = [
     "LogLevel",
     "McpToolRegistry",
     "MultipleChoiceClarification",
+    "Output",
     "Plan",
     "PlanContext",
     "PlanError",

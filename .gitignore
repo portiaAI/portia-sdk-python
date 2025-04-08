@@ -8,3 +8,4 @@ docs
 .venv
 *.env
 .vscode
+.portia

@@ -26,14 +26,22 @@ Each storage class handles the following tasks:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
+from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 from urllib.parse import urlencode
 
+import httpx
 from pydantic import BaseModel, ValidationError
 
 from portia.cloud import PortiaCloudClient
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
+from portia.execution_agents.output import (
+    AgentMemoryOutput,
+    LocalOutput,
+    Output,
+)
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanUUID, Step
@@ -47,11 +55,11 @@ from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
-    import httpx
-
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
+
+MAX_OUTPUT_LOG_LENGTH = 1000
 
 
 class PlanStorage(ABC):
@@ -214,23 +222,72 @@ class LogAdditionalStorage(AdditionalStorage):
         logger().debug(
             f"Tool {tool_call.tool_name!s} executed in {tool_call.latency_seconds:.2f} seconds",
         )
+        # Limit log to just first 1000 characters
+        output = tool_call.output
+        if len(str(tool_call.output)) > MAX_OUTPUT_LOG_LENGTH:
+            output = (
+                str(tool_call.output)[:MAX_OUTPUT_LOG_LENGTH]
+                + "...[truncated - only first 1000 characters shown]"
+            )
         match tool_call.status:
             case ToolCallStatus.SUCCESS:
                 logger().debug(
                     f"Tool call {tool_call.tool_name!s} completed",
-                    output=tool_call.output,
+                    output=output,
                 )
             case ToolCallStatus.FAILED:
-                logger().error("Tool returned error", output=tool_call.output)
+                logger().error("Tool returned error", output=output)
             case ToolCallStatus.NEED_CLARIFICATION:
-                logger().debug("Tool returned clarifications", output=tool_call.output)
+                logger().debug("Tool returned clarifications", output=output)
 
 
 class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
     """Combined base class for Plan Run + Additional storages."""
 
 
-class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
+class AgentMemory(Protocol):
+    """Abstract base class for storing items in agent memory."""
+
+    @abstractmethod
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> Output:
+        """Save an output from a plan run to agent memory.
+
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        Returns:
+            Output: The Output object with value marked as stored in agent memory.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+
+    @abstractmethod
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+        """Retrieve an Output from the storage.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            Output: The retrieved Output object with value filled in from agent memory.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+
+
+class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
     """Simple storage class that keeps plans + runs in memory.
 
     Tool Calls are logged via the LogAdditionalStorage.
@@ -238,11 +295,13 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
 
     plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
+    outputs: defaultdict[PlanRunUUID, dict[str, Output]]
 
     def __init__(self) -> None:
         """Initialize Storage."""
         self.plans = {}
         self.runs = {}
+        self.outputs = defaultdict(dict)
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to dict.
@@ -323,8 +382,49 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage):
             total_pages=1,
         )
 
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> Output:
+        """Save Output from a plan run to memory.
 
-class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        """
+        if output.get_summary() is None:
+            logger().warning(
+                f"Storing Output {output} with no summary",
+            )
+        self.outputs[plan_run_id][output_name] = output
+        return AgentMemoryOutput(
+            output_name=output_name,
+            plan_run_id=plan_run_id,
+            summary=output.get_summary() or "",
+        )
+
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+        """Retrieve an Output from memory.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            Output: The retrieved Output object
+
+        Raises:
+            KeyError: If the output is not found
+
+        """
+        return self.outputs[plan_run_id][output_name]
+
+
+class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
     """Disk-based implementation of the Storage interface.
 
     Stores serialized Plan and Run objects as JSON files on disk.
@@ -339,25 +439,30 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
         """
         self.storage_dir = storage_dir or ".portia"
 
-    def _ensure_storage(self) -> None:
-        """Ensure that the storage directory exists.
+    def _ensure_storage(self, file_path: str | None = None) -> None:
+        """Ensure that we have the storage directories required.
+
+        This ensures that the storage directory exists as well as any other sub-directories
+        needed for the file_path.
 
         Raises:
             FileNotFoundError: If the directory cannot be created.
 
         """
         Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
+        if file_path:
+            Path(self.storage_dir, file_path).parent.mkdir(parents=True, exist_ok=True)
 
-    def _write(self, file_name: str, content: BaseModel) -> None:
+    def _write(self, file_path: str, content: BaseModel) -> None:
         """Write a serialized Plan or Run to a JSON file.
 
         Args:
-            file_name (str): Name of the file to write.
+            file_path (str): Path of the file to write.
             content (BaseModel): The Plan or Run object to serialize.
 
         """
-        self._ensure_storage()  # Ensure storage directory exists
-        with Path(self.storage_dir, file_name).open("w") as file:
+        self._ensure_storage(file_path)  # Ensure storage directory exists
+        with Path(self.storage_dir, file_path).open("w") as file:
             file.write(content.model_dump_json(indent=4))
 
     def _read(self, file_name: str, model: type[T]) -> T:
@@ -466,18 +571,127 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage):
             total_pages=1,
         )
 
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> Output:
+        """Save Output from a plan run to agent memory on disk.
 
-class PortiaCloudStorage(Storage):
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        """
+        filename = f"{plan_run_id}/{output_name}.json"
+        self._write(filename, output)
+        return AgentMemoryOutput(
+            output_name=output_name,
+            plan_run_id=plan_run_id,
+            summary=output.get_summary() or "",
+        )
+
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+        """Retrieve an Output from agent memory on disk.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            Output: The retrieved Output object
+
+        Raises:
+            FileNotFoundError: If the output file is not found
+            ValidationError: If the deserialization fails
+
+        """
+        file_name = f"{plan_run_id}/{output_name}.json"
+        return self._read(file_name, LocalOutput)
+
+
+class PortiaCloudStorage(Storage, AgentMemory):
     """Save plans, runs and tool calls to portia cloud."""
 
-    def __init__(self, config: Config) -> None:
+    DEFAULT_MAX_CACHE_SIZE = 20
+
+    def __init__(
+        self,
+        config: Config,
+        cache_dir: str | None = None,
+        max_cache_size: int = DEFAULT_MAX_CACHE_SIZE,
+    ) -> None:
         """Initialize the PortiaCloudStorage instance.
 
         Args:
             config (Config): The configuration containing API details for Portia Cloud.
+            cache_dir (str | None): Optional directory for local caching of outputs.
+            max_cache_size (int): The maximum number of files to cache locally.
 
         """
         self.client = PortiaCloudClient().get_client(config)
+        self.form_client = PortiaCloudClient().new_client(config, json_headers=False)
+        self.cache_dir = cache_dir or ".portia/cache/agent_memory"
+        self.max_cache_size = max_cache_size
+        self._ensure_cache_dir()
+
+    def _ensure_cache_dir(self, file_path: str | None = None) -> None:
+        """Ensure that we have the cache directories required.
+
+        This ensures that the cache directory exists as well as any other sub-directories
+        needed for the file_path.
+
+        Args:
+            file_path (str | None): Optional path to ensure parent directories exist.
+
+        """
+        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
+        if file_path:
+            Path(self.cache_dir, file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    def _ensure_cache_size(self) -> None:
+        """Manage the cache size by removing the oldest file if the cache is full."""
+        json_files = list(Path(self.cache_dir).glob("**/*.json"))
+        if len(json_files) >= self.max_cache_size:
+            oldest_file = min(json_files, key=lambda f: f.stat().st_mtime)
+            oldest_file.unlink()
+            logger().debug(f"Removed oldest cache file: {oldest_file}")
+
+    def _write_to_cache(self, file_path: str, content: BaseModel) -> None:
+        """Write a serialized object to a JSON file in the cache.
+
+        Args:
+            file_path (str): Path of the file to write.
+            content (BaseModel): The object to serialize.
+
+        """
+        self._ensure_cache_dir(file_path)
+        self._ensure_cache_size()
+
+        # Write the file
+        with Path(self.cache_dir, file_path).open("w") as file:
+            file.write(content.model_dump_json(indent=4))
+
+    def _read_from_cache(self, file_name: str, model: type[T]) -> T:
+        """Read a JSON file from cache and deserialize it into a BaseModel instance.
+
+        Args:
+            file_name (str): Name of the file to read.
+            model (type[T]): The model class to deserialize into.
+
+        Returns:
+            T: The deserialized model instance.
+
+        Raises:
+            FileNotFoundError: If the file is not found.
+            ValidationError: If the deserialization fails.
+
+        """
+        with Path(self.cache_dir, file_name).open("r") as file:
+            f = file.read()
+            return model.model_validate_json(f)
 
     def check_response(self, response: httpx.Response) -> None:
         """Validate the response from Portia API.
@@ -690,3 +904,103 @@ class PortiaCloudStorage(Storage):
         else:
             self.check_response(response)
             LogAdditionalStorage.save_tool_call(self, tool_call)
+
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> Output:
+        """Save Output from a plan run to Portia Cloud.
+
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRun): The if of the current plan run
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.form_client.put(
+                url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
+                files={
+                    "value": (
+                        "output",
+                        BytesIO(output.serialize_value().encode("utf-8")),
+                    ),
+                },
+                data={
+                    "summary": output.get_summary(),
+                },
+            )
+            self.check_response(response)
+
+            # Save to local cache
+            if isinstance(output, LocalOutput):
+                cache_file_path = f"{plan_run_id}/{output_name}.json"
+                self._write_to_cache(cache_file_path, output)
+                logger().debug(f"Saved output to local cache: {cache_file_path}")
+
+            return AgentMemoryOutput(
+                output_name=output_name,
+                plan_run_id=plan_run_id,
+                summary=output.get_summary() or "",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+        """Retrieve an Output from Portia Cloud.
+
+        Args:
+            output_name: The name of the output to get from memory
+            plan_run_id (RunUUID): The ID of the run to retrieve.
+
+        Returns:
+            Run: The Run object retrieved from Portia Cloud.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails or the run does not exist.
+
+        """
+        # Try to get from local cache first
+        cache_file_path = f"{plan_run_id}/{output_name}.json"
+        try:
+            return self._read_from_cache(cache_file_path, LocalOutput)
+        except (FileNotFoundError, ValidationError):
+            # If not in cache, fetch from Portia Cloud
+            logger().debug(
+                f"Output not found in local cache, fetching from Portia Cloud: {cache_file_path}",
+            )
+
+        try:
+            # Retrieving a value is a two step process
+            # 1. Get the output with the storage URL from the backend
+            # 2. Fetch the value from the storage URL
+            output_response = self.client.get(
+                url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
+            )
+            self.check_response(output_response)
+            output_json = output_response.json()
+            summary = output_json["summary"]
+            value_url = output_json["url"]
+
+            with httpx.Client() as client:
+                value_response = client.get(value_url)
+                value_response.raise_for_status()
+
+            # Create the output object
+            output = LocalOutput(
+                summary=summary,
+                value=value_response.text,
+            )
+
+            # Save to local cache for future use
+            self._write_to_cache(cache_file_path, output)
+            logger().debug(f"Saved output to local cache: {cache_file_path}")
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            return output

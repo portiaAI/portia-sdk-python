@@ -7,8 +7,8 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import InputClarification
+from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.execution_agents.base_execution_agent import Output
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
@@ -16,8 +16,9 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
+from portia.execution_agents.output import LocalOutput, Output
 from portia.prefixed_uuid import PlanRunUUID
-from tests.utils import AdditionTool
+from tests.utils import AdditionTool, get_test_config
 
 
 def test_next_state_after_tool_call_no_error() -> None:
@@ -31,7 +32,7 @@ def test_next_state_after_tool_call_no_error() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state)
+    result = next_state_after_tool_call(get_test_config(), state)
 
     assert result == END
 
@@ -50,8 +51,29 @@ def test_next_state_after_tool_call_with_summarize() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state, tool)
+    result = next_state_after_tool_call(get_test_config(), state, tool)
 
+    assert result == AgentNode.SUMMARIZER
+
+
+def test_next_state_after_tool_call_with_large_output() -> None:
+    """Test next state when tool call succeeds and should summarize."""
+    tool = AdditionTool()
+    messages: list[ToolMessage] = [
+        ToolMessage(
+            content="Test" * 1000,
+            tool_call_id="123",
+            name="test_tool",
+        ),
+    ]
+    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
+
+    config = get_test_config(
+        # Set a small threshold value so all outputs are stored in agent memory
+        feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
+        large_output_threshold_tokens=10,
+    )
+    result = next_state_after_tool_call(config, state, tool)
     assert result == AgentNode.SUMMARIZER
 
 
@@ -68,7 +90,7 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
         ]
         state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-        result = next_state_after_tool_call(state)
+        result = next_state_after_tool_call(get_test_config(), state)
 
         expected_state = END if i == MAX_RETRIES else AgentNode.TOOL_AGENT
         assert result == expected_state, f"Failed at retry {i}"
@@ -100,7 +122,7 @@ def test_process_output_with_clarifications() -> None:
     result = process_output([message], clarifications=clarifications)  # type: ignore  # noqa: PGH003
 
     assert isinstance(result, Output)
-    assert result.value == clarifications
+    assert result.get_value() == clarifications
 
 
 def test_process_output_with_tool_errors() -> None:
@@ -127,14 +149,14 @@ def test_process_output_with_invalid_message() -> None:
 
 def test_process_output_with_output_artifacts() -> None:
     """Test process_output with outpu artifacts."""
-    message = ToolMessage(tool_call_id="1", content="", artifact=Output(value="test"))
-    message2 = ToolMessage(tool_call_id="2", content="", artifact=Output(value="bar"))
+    message = ToolMessage(tool_call_id="1", content="", artifact=LocalOutput(value="test"))
+    message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalOutput(value="bar"))
 
     result = process_output([message, message2], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == ["test", "bar"]
-    assert result.summary == "test, bar"
+    assert result.get_value() == ["test", "bar"]
+    assert result.get_summary() == "test, bar"
 
 
 def test_process_output_with_artifacts() -> None:
@@ -144,7 +166,7 @@ def test_process_output_with_artifacts() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == "test"
+    assert result.get_value() == "test"
 
 
 def test_process_output_with_content() -> None:
@@ -154,19 +176,19 @@ def test_process_output_with_content() -> None:
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == "test"
+    assert result.get_value() == "test"
 
 
 def test_process_output_summary_matches_serialized_value() -> None:
     """Test process_output summary matches serialized value."""
     dict_value = {"key1": "value1", "key2": "value2"}
-    message = ToolMessage(tool_call_id="1", content="test", artifact=Output(value=dict_value))
+    message = ToolMessage(tool_call_id="1", content="test", artifact=LocalOutput(value=dict_value))
 
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == dict_value
-    assert result.summary == result.serialize_value(result.value)
+    assert result.get_value() == dict_value
+    assert result.get_summary() == result.serialize_value()
 
 
 def test_process_output_summary_not_updated_if_provided() -> None:
@@ -176,14 +198,14 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     message = ToolMessage(
         tool_call_id="1",
         content="test",
-        artifact=Output(value=dict_value, summary=provided_summary),
+        artifact=LocalOutput(value=dict_value, summary=provided_summary),
     )
 
     result = process_output([message], clarifications=[])
 
     assert isinstance(result, Output)
-    assert result.value == dict_value
-    assert result.summary == provided_summary
+    assert result.get_value() == dict_value
+    assert result.get_summary() == provided_summary
 
 
 def test_next_state_after_tool_call_with_clarification_artifact() -> None:
@@ -207,7 +229,7 @@ def test_next_state_after_tool_call_with_clarification_artifact() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state, tool)
+    result = next_state_after_tool_call(get_test_config(), state, tool)
 
     # Should return END even though tool.should_summarize is True
     # because the message contains a clarification artifact
@@ -242,7 +264,7 @@ def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = next_state_after_tool_call(state, tool)
+    result = next_state_after_tool_call(get_test_config(), state, tool)
 
     # Should return END even though tool.should_summarize is True
     # because the message contains a list of clarifications as artifact

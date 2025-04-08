@@ -17,7 +17,7 @@ from langgraph.prebuilt import ToolNode
 
 from portia.config import EXECUTION_MODEL_KEY
 from portia.errors import InvalidAgentError
-from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.execution_utils import (
     AgentNode,
     next_state_after_tool_call,
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
     from portia.config import Config
+    from portia.execution_agents.output import Output
     from portia.model import LangChainGenerativeModel
     from portia.plan import Step
     from portia.plan_run import PlanRun
@@ -194,7 +195,10 @@ class OneShotAgent(BaseExecutionAgent):
             OneShotToolCallingModel(model, context, tools, self).invoke,
         )
         graph.add_node(AgentNode.TOOLS, tool_node)
-        graph.add_node(AgentNode.SUMMARIZER, StepSummarizer(model, self.tool, self.step).invoke)
+        graph.add_node(
+            AgentNode.SUMMARIZER,
+            StepSummarizer(self.config, model, self.tool, self.step).invoke,
+        )
         graph.add_edge(START, AgentNode.TOOL_AGENT)
 
         # Use execution manager for state transitions
@@ -204,7 +208,7 @@ class OneShotAgent(BaseExecutionAgent):
         )
         graph.add_conditional_edges(
             AgentNode.TOOLS,
-            lambda state: next_state_after_tool_call(state, self.tool),
+            lambda state: next_state_after_tool_call(self.config, state, self.tool),
         )
         graph.add_edge(AgentNode.SUMMARIZER, END)
 

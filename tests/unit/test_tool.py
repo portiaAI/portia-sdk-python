@@ -1,6 +1,7 @@
 """Tests for the Tool class."""
 
 import json
+from enum import Enum
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -43,7 +44,10 @@ def clarification_tool() -> ClarificationTool:
 def test_tool_initialization(add_tool: AdditionTool) -> None:
     """Test initialization of a Tool."""
     assert add_tool.name == "Add Tool"
-    assert add_tool.description == "Takes two numbers and adds them together"
+    assert (
+        add_tool.description
+        == "Use this tool to add two numbers together, it takes two numbers a + b"
+    )
 
 
 def test_tool_initialization_long_description() -> None:
@@ -514,8 +518,11 @@ def test_portia_mcp_tool_call() -> None:
         isError=False,
     )
 
+    class MyEnum(str, Enum):
+        A = "A"
+
     class TestArgSchema(BaseModel):
-        a: int
+        a: MyEnum
         b: int
 
     tool = PortiaMcpTool(

@@ -20,7 +20,7 @@ from portia.clarification import (
 )
 
 if TYPE_CHECKING:
-    from portia.execution_agents.base_execution_agent import Output
+    from portia.execution_agents.output import Output
     from portia.execution_context import ExecutionContext
     from portia.plan import Step, Variable
     from portia.plan_run import PlanRun
@@ -53,7 +53,7 @@ def generate_input_context(
     """Generate context for the inputs and indicate which ones were used.
 
     Args:
-        inputs (list[Variable]): The list of input variables for the current step.
+        inputs (list[Variable]): The list of inputs for the current step.
         previous_outputs (dict[str, Output]): A dictionary of previous step outputs.
 
     Returns:
@@ -62,26 +62,17 @@ def generate_input_context(
     """
     input_context = ["Inputs: the original inputs provided by the planning_agent"]
     used_outputs = set()
-    for var in inputs:
-        if var.value is not None:
+    for ref in inputs:
+        if ref.name in previous_outputs:
             input_context.extend(
                 [
-                    f"input_name: {var.name}",
-                    f"input_value: {var.value}",
-                    f"input_description: {var.description}",
+                    f"input_name: {ref.name}",
+                    f"input_value: {previous_outputs[ref.name].get_value()}",
+                    f"input_description: {ref.description}",
                     "----------",
                 ],
             )
-        elif var.name in previous_outputs:
-            input_context.extend(
-                [
-                    f"input_name: {var.name}",
-                    f"input_value: {previous_outputs[var.name].value}",
-                    f"input_description: {var.description}",
-                    "----------",
-                ],
-            )
-            used_outputs.add(var.name)
+            used_outputs.add(ref.name)
 
     unused_output_keys = set(previous_outputs.keys()) - used_outputs
     if len(unused_output_keys) > 0:
@@ -92,7 +83,7 @@ def generate_input_context(
         for output_key in unused_output_keys:
             # We truncate the output value to 10000 characters to avoid overwhelming the
             # LLM with too much information.
-            output_val = (str(previous_outputs[output_key].value) or "")[:10000]
+            output_val = (str(previous_outputs[output_key].get_value()) or "")[:10000]
             input_context.extend(
                 [
                     f"output_name: {output_key}",

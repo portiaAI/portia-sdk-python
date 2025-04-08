@@ -54,6 +54,7 @@ def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str
             "name": tool.name,
             "description": tool.description,
             "args": tool.args_schema.model_json_schema()["properties"],
+            "output_schema": str(tool.output_schema),
         }
         for tool in tool_list
     ]
