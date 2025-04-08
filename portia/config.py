@@ -397,18 +397,13 @@ class Config(BaseModel):
         description="A dictionary of configured LLM models for each usage.",
     )
 
-    feature_flags: dict[str, bool] = Field(
-        default={},
-        description="A dictionary of feature flags for the SDK.",
-    )
-
     @field_validator("models", mode="before")
     @classmethod
     def parse_models(
         cls,
         value: dict[str, LLMModel | str | GenerativeModel],
     ) -> dict[str, GenerativeModel | str]:
-        """Convert legacy LLMModel values to str."""
+        """Convert legacy LLMModel values to str with deprecation warning."""
         new_models = {}
         for key, model_value in value.items():
             new_model_value = model_value
@@ -422,6 +417,11 @@ class Config(BaseModel):
             new_models[key] = new_model_value
         return new_models
 
+    feature_flags: dict[str, bool] = Field(
+        default={},
+        description="A dictionary of feature flags for the SDK.",
+    )
+
     @model_validator(mode="after")
     def parse_feature_flags(self) -> Self:
         """Add feature flags if not provided."""
@@ -432,6 +432,185 @@ class Config(BaseModel):
             **self.feature_flags,
         }
         return self
+
+    # Storage Options
+    storage_class: StorageClass = Field(
+        default_factory=lambda: StorageClass.CLOUD
+        if os.getenv("PORTIA_API_KEY")
+        else StorageClass.MEMORY,
+        description="Where to store Plans and PlanRuns. By default these will be kept in memory"
+        "if no API key is provided.",
+    )
+
+    @field_validator("storage_class", mode="before")
+    @classmethod
+    def parse_storage_class(cls, value: str | StorageClass) -> StorageClass:
+        """Parse storage class to enum if string provided."""
+        return parse_str_to_enum(value, StorageClass)
+
+    storage_dir: str | None = Field(
+        default=None,
+        description="If storage class is set to DISK this will be the location where plans "
+        "and runs are written in a JSON format.",
+    )
+
+    # Logging Options
+
+    # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
+    # where as setting it to ERROR will only display ERROR and above.
+    default_log_level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="The log level to log at. Only respected when the default logger is used.",
+    )
+
+    @field_validator("default_log_level", mode="before")
+    @classmethod
+    def parse_default_log_level(cls, value: str | LogLevel) -> LogLevel:
+        """Parse default_log_level to enum if string provided."""
+        return parse_str_to_enum(value, LogLevel)
+
+    # default_log_sink controls where default logs are sent. By default this is STDOUT (sys.stdout)
+    # but can also be set to STDERR (sys.stderr)
+    # or to a file by setting this to a file path ("./logs.txt")
+    default_log_sink: str = Field(
+        default="sys.stdout",
+        description="Where to send logs. By default logs will be sent to sys.stdout",
+    )
+    # json_log_serialize sets whether logs are JSON serialized before sending to the log sink.
+    json_log_serialize: bool = Field(
+        default=False,
+        description="Whether to serialize logs to JSON",
+    )
+    # Agent Options
+    execution_agent_type: ExecutionAgentType = Field(
+        default=ExecutionAgentType.DEFAULT,
+        description="The default agent type to use.",
+    )
+
+    @field_validator("execution_agent_type", mode="before")
+    @classmethod
+    def parse_execution_agent_type(cls, value: str | ExecutionAgentType) -> ExecutionAgentType:
+        """Parse execution_agent_type to enum if string provided."""
+        return parse_str_to_enum(value, ExecutionAgentType)
+
+    # PlanningAgent Options
+    planning_agent_type: PlanningAgentType = Field(
+        default=PlanningAgentType.DEFAULT,
+        description="The default planning_agent_type to use.",
+    )
+
+    @field_validator("planning_agent_type", mode="before")
+    @classmethod
+    def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
+        """Parse planning_agent_type to enum if string provided."""
+        return parse_str_to_enum(value, PlanningAgentType)
+
+    large_output_threshold_tokens: int = Field(
+        default=1_000,
+        description="The threshold number of tokens before we start treating an output as a"
+        "large output and write it to agent memory rather than storing it locally",
+    )
+
+    def exceeds_output_threshold(self, value: str | list[str | dict]) -> bool:
+        """Determine whether the provided output value exceeds the large output threshold."""
+        if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
+            return False
+        # It doesn't really matter which model we use here, so choose gpt2 for speed.
+        # More details at https://chatgpt.com/share/67ee4931-a794-8007-9859-13aca611dba9
+        encoding = tiktoken.get_encoding("gpt2").encode(str(value))
+        return len(encoding) > self.large_output_threshold_tokens
+
+    @model_validator(mode="after")
+    def check_config(self) -> Self:
+        """Validate Config is consistent."""
+        # Portia API Key must be provided if using cloud storage
+        if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
+            raise InvalidConfigError(
+                "portia_api_key",
+                "A Portia API key must be provided if using cloud storage. Follow the steps at "
+                "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
+                "have one",
+            )
+        if self.storage_class == StorageClass.DISK and not self.storage_dir:
+            raise InvalidConfigError(
+                "storage_dir",
+                "A storage directory must be provided if using disk storage",
+            )
+
+        # Model config validation. Either llm_provider or default_model must be set.
+        if self.llm_provider is None and DEFAULT_MODEL_KEY not in self.models:
+            raise InvalidConfigError(
+                "llm_provider or default_model",
+                "Either llm_provider or default_model must be set",
+            )
+        # Check default_model can be resolved.
+        _ = self.resolve_model()
+        # Check that all models passed as strings are instantiable, i.e. they have the
+        # right API keys and other required configuration.
+        for model in self.models.values():
+            if isinstance(model, str):
+                self._parse_model_string(model)
+
+        return self
+
+    @classmethod
+    def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
+        """Create a Config instance with default values, allowing overrides.
+
+        Returns:
+            Config: The default config
+
+        """
+        return default_config(**kwargs)
+
+    def has_api_key(self, name: str) -> bool:
+        """Check if the given API Key is available."""
+        try:
+            self.must_get_api_key(name)
+        except InvalidConfigError:
+            return False
+        else:
+            return True
+
+    def must_get_api_key(self, name: str) -> SecretStr:
+        """Retrieve the required API key for the configured provider.
+
+        Raises:
+            ConfigNotFoundError: If no API key is found for the provider.
+
+        Returns:
+            SecretStr: The required API key.
+
+        """
+        return self.must_get(name, SecretStr)
+
+    def must_get(self, name: str, expected_type: type[T]) -> T:
+        """Retrieve any value from the config, ensuring its of the correct type.
+
+        Args:
+            name (str): The name of the config record.
+            expected_type (type[T]): The expected type of the value.
+
+        Raises:
+            ConfigNotFoundError: If no API key is found for the provider.
+            InvalidConfigError: If the config isn't valid
+
+        Returns:
+            T: The config value
+
+        """
+        if not hasattr(self, name):
+            raise ConfigNotFoundError(name)
+        value = getattr(self, name)
+        if not isinstance(value, expected_type):
+            raise InvalidConfigError(name, f"Not of expected type: {expected_type}")
+        # ensure non-empty values
+        match value:
+            case str() if value == "":
+                raise InvalidConfigError(name, "Empty value not allowed")
+            case SecretStr() if value.get_secret_value() == "":
+                raise InvalidConfigError(name, "Empty SecretStr value not allowed")
+        return value
 
     def model(self, usage: str) -> GenerativeModel:
         """Get a model from the config.
@@ -539,12 +718,12 @@ class Config(BaseModel):
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
                     model_name=model_name,
-                    api_key=self.openai_api_key,
+                    api_key=self.must_get_api_key("openai_api_key"),
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
-                    api_key=self.anthropic_api_key,
+                    api_key=self.must_get_api_key("anthropic_api_key"),
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistral")
@@ -552,7 +731,7 @@ class Config(BaseModel):
 
                 return MistralAIGenerativeModel(
                     model_name=model_name,
-                    api_key=self.mistralai_api_key,
+                    api_key=self.must_get_api_key("mistralai_api_key"),
                 )
             case LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
@@ -560,7 +739,7 @@ class Config(BaseModel):
 
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
-                    api_key=self.google_api_key,
+                    api_key=self.must_get_api_key("google_api_key"),
                 )
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
@@ -568,172 +747,6 @@ class Config(BaseModel):
                     api_key=self.azure_openai_api_key,
                     azure_endpoint=self.azure_openai_endpoint,
                 )
-
-    # Storage Options
-    storage_class: StorageClass = Field(
-        default_factory=lambda: StorageClass.CLOUD
-        if os.getenv("PORTIA_API_KEY")
-        else StorageClass.MEMORY,
-        description="Where to store Plans and PlanRuns. By default these will be kept in memory"
-        "if no API key is provided.",
-    )
-
-    @field_validator("storage_class", mode="before")
-    @classmethod
-    def parse_storage_class(cls, value: str | StorageClass) -> StorageClass:
-        """Parse storage class to enum if string provided."""
-        return parse_str_to_enum(value, StorageClass)
-
-    storage_dir: str | None = Field(
-        default=None,
-        description="If storage class is set to DISK this will be the location where plans "
-        "and runs are written in a JSON format.",
-    )
-
-    # Logging Options
-
-    # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
-    # where as setting it to ERROR will only display ERROR and above.
-    default_log_level: LogLevel = Field(
-        default=LogLevel.INFO,
-        description="The log level to log at. Only respected when the default logger is used.",
-    )
-
-    @field_validator("default_log_level", mode="before")
-    @classmethod
-    def parse_default_log_level(cls, value: str | LogLevel) -> LogLevel:
-        """Parse default_log_level to enum if string provided."""
-        return parse_str_to_enum(value, LogLevel)
-
-    # default_log_sink controls where default logs are sent. By default this is STDOUT (sys.stdout)
-    # but can also be set to STDERR (sys.stderr)
-    # or to a file by setting this to a file path ("./logs.txt")
-    default_log_sink: str = Field(
-        default="sys.stdout",
-        description="Where to send logs. By default logs will be sent to sys.stdout",
-    )
-    # json_log_serialize sets whether logs are JSON serialized before sending to the log sink.
-    json_log_serialize: bool = Field(
-        default=False,
-        description="Whether to serialize logs to JSON",
-    )
-    # Agent Options
-    execution_agent_type: ExecutionAgentType = Field(
-        default=ExecutionAgentType.DEFAULT,
-        description="The default agent type to use.",
-    )
-
-    @field_validator("execution_agent_type", mode="before")
-    @classmethod
-    def parse_execution_agent_type(cls, value: str | ExecutionAgentType) -> ExecutionAgentType:
-        """Parse execution_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, ExecutionAgentType)
-
-    # PlanningAgent Options
-    planning_agent_type: PlanningAgentType = Field(
-        default=PlanningAgentType.DEFAULT,
-        description="The default planning_agent_type to use.",
-    )
-
-    @field_validator("planning_agent_type", mode="before")
-    @classmethod
-    def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
-        """Parse planning_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, PlanningAgentType)
-
-    large_output_threshold_tokens: int = Field(
-        default=1_000,
-        description="The threshold number of tokens before we start treating an output as a"
-        "large output and write it to agent memory rather than storing it locally",
-    )
-
-    def exceeds_output_threshold(self, value: str | list[str | dict]) -> bool:
-        """Determine whether the provided output value exceeds the large output threshold."""
-        if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
-            return False
-        # It doesn't really matter which model we use here, so choose gpt2 for speed.
-        # More details at https://chatgpt.com/share/67ee4931-a794-8007-9859-13aca611dba9
-        encoding = tiktoken.get_encoding("gpt2").encode(str(value))
-        return len(encoding) > self.large_output_threshold_tokens
-
-    @model_validator(mode="after")
-    def check_config(self) -> Self:
-        """Validate Config is consistent."""
-        # Portia API Key must be provided if using cloud storage
-        if self.storage_class == StorageClass.CLOUD and not self.has_api_key("portia_api_key"):
-            raise InvalidConfigError(
-                "portia_api_key",
-                "A Portia API key must be provided if using cloud storage. Follow the steps at "
-                "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
-                "have one",
-            )
-        if self.storage_class == StorageClass.DISK and not self.storage_dir:
-            raise InvalidConfigError(
-                "storage_dir",
-                "A storage directory must be provided if using disk storage",
-            )
-
-        # TODO: Validate model configuration
-        return self
-
-    @classmethod
-    def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
-        """Create a Config instance with default values, allowing overrides.
-
-        Returns:
-            Config: The default config
-
-        """
-        return default_config(**kwargs)
-
-    def has_api_key(self, name: str) -> bool:
-        """Check if the given API Key is available."""
-        try:
-            self.must_get_api_key(name)
-        except InvalidConfigError:
-            return False
-        else:
-            return True
-
-    def must_get_api_key(self, name: str) -> SecretStr:
-        """Retrieve the required API key for the configured provider.
-
-        Raises:
-            ConfigNotFoundError: If no API key is found for the provider.
-
-        Returns:
-            SecretStr: The required API key.
-
-        """
-        return self.must_get(name, SecretStr)
-
-    def must_get(self, name: str, expected_type: type[T]) -> T:
-        """Retrieve any value from the config, ensuring its of the correct type.
-
-        Args:
-            name (str): The name of the config record.
-            expected_type (type[T]): The expected type of the value.
-
-        Raises:
-            ConfigNotFoundError: If no API key is found for the provider.
-            InvalidConfigError: If the config isn't valid
-
-        Returns:
-            T: The config value
-
-        """
-        if not hasattr(self, name):
-            raise ConfigNotFoundError(name)
-        value = getattr(self, name)
-        if not isinstance(value, expected_type):
-            raise InvalidConfigError(name, f"Not of expected type: {expected_type}")
-        # ensure non-empty values
-        match value:
-            case str() if value == "":
-                raise InvalidConfigError(name, "Empty value not allowed")
-            case SecretStr() if value.get_secret_value() == "":
-                raise InvalidConfigError(name, "Empty SecretStr value not allowed")
-        return value
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003
