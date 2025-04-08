@@ -65,6 +65,19 @@ class InvalidConfigError(PortiaBaseError):
         super().__init__(self.message)
 
 
+class ConfigModelResolutionError(PortiaBaseError):
+    """Raised when a model cannot be resolved from a string.
+
+    Args:
+        message (str): A description of the error.
+
+    """
+
+    def __init__(self, message: str) -> None:
+        """Set custom error message."""
+        super().__init__(message)
+
+
 class PlanError(PortiaBaseError):
     """Base class for exceptions in the query planning_agent module.
 

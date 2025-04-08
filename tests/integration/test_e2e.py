@@ -14,11 +14,11 @@ from portia.config import (
     Config,
     ExecutionAgentType,
     LLMModel,
-    LLMProvider,
     LogLevel,
     StorageClass,
 )
 from portia.errors import PlanError, ToolSoftError
+from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRunState
