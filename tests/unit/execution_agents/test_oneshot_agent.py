@@ -11,6 +11,7 @@ from langgraph.prebuilt import ToolNode
 from portia.errors import InvalidAgentError
 from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.execution_agents.output import LocalOutput, Output
+from portia.storage import InMemoryStorage
 from tests.utils import AdditionTool, get_test_config, get_test_plan_run
 
 
@@ -55,6 +56,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        agent_memory=InMemoryStorage(),
         tool=AdditionTool(),
     )
 
@@ -71,5 +73,6 @@ def test_oneshot_agent_without_tool_raises() -> None:
             step=plan.steps[0],
             plan_run=plan_run,
             config=get_test_config(),
+            agent_memory=InMemoryStorage(),
             tool=None,
         ).execute_sync()
