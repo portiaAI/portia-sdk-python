@@ -10,13 +10,15 @@ from portia.config import (
     DEFAULT_MODEL_KEY,
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
     PLANNING_MODEL_KEY,
+    SUPPORTED_OPENAI_MODELS,
     Config,
     ExecutionAgentType,
+    LLMModel,
     LogLevel,
     PlanningAgentType,
     StorageClass,
 )
-from portia.errors import ConfigNotFoundError, InvalidConfigError
+from portia.errors import ConfigModelResolutionError, ConfigNotFoundError, InvalidConfigError
 from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
@@ -417,6 +419,71 @@ def test_custom_model_from_string_raises_error() -> None:
         _ = Config.from_default(default_model="custom/test")
 
 
+def test_set_model_from_llm_model_raises_deprecation_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test setting model from LLMModel raises a warning."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.warns(DeprecationWarning):
+        c = Config.from_default(
+            default_model=LLMModel("gpt-4o"),
+            planning_model=LLMModel("openai/o3-mini"),
+        )
+    assert c.models[DEFAULT_MODEL_KEY] == "openai/gpt-4o"
+    assert c.models[PLANNING_MODEL_KEY] == "openai/o3-mini"
+
+
+def test_check_model_supported_raises_deprecation_warning() -> None:
+    """Test checking if a model is supported via SUPPORTED_* models lists raise a warning."""
+    with pytest.warns(DeprecationWarning):
+        assert "gpt-4o" in SUPPORTED_OPENAI_MODELS
+
+
+def test_config_model_raises_deprecation_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Config.model raises a DeprecationWarning."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.warns(DeprecationWarning):
+        model = Config.from_default().model(DEFAULT_MODEL_KEY)
+    assert isinstance(model, OpenAIGenerativeModel)
+
+
+def test_config_error_resolve_model_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Config.model raises a ConfigModelResolutionError if no model is found."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    config = Config.from_default()
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    config.llm_provider = None
+    with pytest.raises(
+        ConfigModelResolutionError,
+        match="Model could not be resolved for usage 'default_model'",
+    ):
+        config.resolve_model()
+
+    with pytest.raises(
+        ConfigModelResolutionError,
+        match="Model could not be resolved for usage 'planning_model'",
+    ):
+        config.resolve_model(usage=PLANNING_MODEL_KEY)
+
+
+def test_config_model_in_kwargs_and_models_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Config.model in kwargs and models raises an InvalidConfigError."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-api-key")
+    with pytest.raises(InvalidConfigError):
+        Config.from_default(
+            default_model="openai/gpt-4o",
+            models={"default_model": "mistral/mistral-tiny-latest"},
+        )
+
+
+def test_resolve_model_unknown_usage_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test resolve_model with unknown usage raises an ConfigModelResolutionError."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.raises(ConfigModelResolutionError):
+        Config.from_default().resolve_model(usage="unknown")
+
+
 def test_llm_model_name_deprecation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test using llm_model_name raises a DeprecationWarning (but works)."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
@@ -477,3 +544,9 @@ def test_llm_provider_default_from_api_keys_config_kwargs(
     """Test LLM provider default from API keys config kwargs."""
     c = Config.from_default(**config_kwargs)
     assert c.llm_provider == provider
+
+
+def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
+    """Test deprecated LLMModel cannot be instantiated from a string."""
+    with pytest.raises(ValueError, match="Invalid LLM model"):
+        _ = LLMModel("adijabisfbgiwjebr")
