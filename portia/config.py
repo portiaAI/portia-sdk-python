@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from collections.abc import Container
 from enum import Enum
 from typing import NamedTuple, Self, TypeVar
 
@@ -178,35 +179,27 @@ class LLMModel(Enum):
         return f"{self.provider().value}/{self.api_name}"
 
 
-SUPPORTED_OPENAI_MODELS = [
-    LLMModel.GPT_4_O,
-    LLMModel.GPT_4_O_MINI,
-    LLMModel.GPT_3_5_TURBO,
-    LLMModel.O_3_MINI,
-]
+class _AllModelsSupportedWithDeprecation(Container):
+    """A type that returns True for any contains check."""
 
-SUPPORTED_ANTHROPIC_MODELS = [
-    LLMModel.CLAUDE_3_5_HAIKU,
-    LLMModel.CLAUDE_3_5_SONNET,
-    LLMModel.CLAUDE_3_7_SONNET,
-    LLMModel.CLAUDE_3_OPUS,
-]
+    def __contains__(self, item: object) -> bool:
+        """Check if the item is in the container."""
+        warnings.warn(
+            "Supported model checks are no longer required - any model from "
+            "the provider is supported.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return True
 
-SUPPORTED_MISTRALAI_MODELS = [
-    LLMModel.MISTRAL_LARGE,
-]
 
-SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = [
-    LLMModel.GEMINI_2_0_FLASH,
-    LLMModel.GEMINI_2_0_FLASH_LITE,
-    LLMModel.GEMINI_1_5_FLASH,
-]
+ALL_MODELS_SUPPORTED_WITH_DEPRECATION = _AllModelsSupportedWithDeprecation()
 
-SUPPORTED_AZURE_OPENAI_MODELS = [
-    LLMModel.AZURE_GPT_4_O,
-    LLMModel.AZURE_GPT_4_O_MINI,
-    LLMModel.AZURE_O_3_MINI,
-]
+SUPPORTED_OPENAI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_ANTHROPIC_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_MISTRALAI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_AZURE_OPENAI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
 
 
 class ExecutionAgentType(Enum):
@@ -795,7 +788,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
             category=DeprecationWarning,
         )
         if DEFAULT_MODEL_KEY not in models:
-            models[DEFAULT_MODEL_KEY] = parse_str_to_enum(llm_model_name, LLMModel)
+            models[DEFAULT_MODEL_KEY] = llm_model_name
 
     inferred_llm_provider = llm_provider_default_from_api_keys(**kwargs)
     if "llm_provider" in kwargs or inferred_llm_provider:

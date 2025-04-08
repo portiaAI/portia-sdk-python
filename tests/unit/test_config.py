@@ -6,11 +6,12 @@ import pytest
 from pydantic import SecretStr
 
 from portia.config import (
+    ALL_USAGE_KEYS,
+    DEFAULT_MODEL_KEY,
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
     PLANNING_MODEL_KEY,
     Config,
     ExecutionAgentType,
-    LLMModel,
     LogLevel,
     PlanningAgentType,
     StorageClass,
@@ -171,11 +172,15 @@ def test_set_default_model_from_model_instance() -> None:
     assert planner_model is model
 
 
-def test_set_planning_model_default_model_not_set() -> None:
-    """Test setting planning_model from model instance without default model or provider set."""
+AGENT_MODEL_KEYS = [k for k in ALL_USAGE_KEYS if k != DEFAULT_MODEL_KEY]
+
+
+@pytest.mark.parametrize("agent_model_key", AGENT_MODEL_KEYS)
+def test_set_agent_model_default_model_not_set(agent_model_key: str) -> None:
+    """Test setting agent_model from model instance without default model or provider set."""
     model = OpenAIGenerativeModel(model_name="gpt-4o", api_key=SecretStr("test-openai-key"))
-    c = Config.from_default(planning_model=model)
-    resolved_model = c.resolve_model(usage=PLANNING_MODEL_KEY)
+    c = Config.from_default(**{agent_model_key: model})
+    resolved_model = c.resolve_model(usage=agent_model_key)
     assert resolved_model is model
 
     # Default model has not been set, so this errors
@@ -183,14 +188,16 @@ def test_set_planning_model_default_model_not_set() -> None:
         c.resolve_model()
 
 
-def test_set_planning_model_with_string_api_key_env_var_set(
+@pytest.mark.parametrize("agent_model_key", AGENT_MODEL_KEYS)
+def test_set_agent_model_with_string_api_key_env_var_set(
     monkeypatch: pytest.MonkeyPatch,
+    agent_model_key: str,
 ) -> None:
     """Test setting planning_model with string, with correct API key env var present."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     model_str = "openai/gpt-4o"
-    c = Config.from_default(planning_model=model_str)
-    resolved_model = c.resolve_model(usage=PLANNING_MODEL_KEY)
+    c = Config.from_default(**{agent_model_key: model_str})
+    resolved_model = c.resolve_model(usage=agent_model_key)
     assert str(resolved_model) == model_str
 
     # Provider inferred from env var to be OpenAI, so default model is OpenAI default model
@@ -389,25 +396,7 @@ def test_getters() -> None:
 @pytest.mark.xfail(reason="TODO: This is not raising a ConfigNotFoundError")
 def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test Azure OpenAI requires endpoint."""
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("MISTRAL_API_KEY", "")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    monkeypatch.setenv("GOOGLE_API_KEY", "")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-azure-openai-key")
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
-
-    # Without endpoint set, it errors
-    with pytest.raises(ConfigNotFoundError):
-        Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
-
-    # With endpoint set, it works
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
-    c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
-    assert c.llm_provider == LLMProvider.AZURE_OPENAI
-
-    # Also works with passing parameters to constructor
-    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
-    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    # Passing both endpoint and api key as kwargs works
     c = Config.from_default(
         llm_provider=LLMProvider.AZURE_OPENAI,
         azure_openai_endpoint="test-azure-openai-endpoint",
@@ -415,11 +404,30 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
     )
     assert c.llm_provider == LLMProvider.AZURE_OPENAI
 
+    # Without endpoint set via kwargs, it errors
+    c = Config.from_default(
+        llm_provider=LLMProvider.AZURE_OPENAI,
+        azure_openai_api_key="test-azure-openai-api-key",
+    )
+    assert c.llm_provider == LLMProvider.AZURE_OPENAI
 
-@pytest.mark.parametrize("model", list(LLMModel))
-def test_all_models_have_provider(model: LLMModel) -> None:
-    """Test all models have a provider."""
-    assert model.provider() is not None
+    # Without endpoint set via env var, it errors
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-azure-openai-key")
+    with pytest.raises(ConfigNotFoundError):
+        Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+
+    # With endpoint set via env var, it works
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
+    c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+    assert c.llm_provider == LLMProvider.AZURE_OPENAI
+
+
+def test_llm_model_name_deprecation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test using llm_model_name raises a DeprecationWarning (but works)."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.warns(DeprecationWarning):
+        c = Config.from_default(llm_model_name="openai/gpt-4o")
+    assert c.models[DEFAULT_MODEL_KEY] == "openai/gpt-4o"
 
 
 @pytest.mark.parametrize(

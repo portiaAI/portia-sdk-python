@@ -13,7 +13,6 @@ from portia.clarification_handler import ClarificationHandler
 from portia.config import (
     Config,
     ExecutionAgentType,
-    LLMModel,
     LogLevel,
     StorageClass,
 )
@@ -33,11 +32,11 @@ if TYPE_CHECKING:
 CORE_MODELS = [
     (
         LLMProvider.OPENAI,
-        LLMModel.GPT_4_O_MINI,
+        "openai/gpt-4o-mini",
     ),
     (
         LLMProvider.ANTHROPIC,
-        LLMModel.CLAUDE_3_OPUS,
+        "anthropic/claude-3-opus",
     ),
 ]
 
@@ -46,11 +45,11 @@ PROVIDER_MODELS = [
     *CORE_MODELS,
     (
         LLMProvider.MISTRALAI,
-        LLMModel.MISTRAL_LARGE,
+        "mistral/mistral-large-latest",
     ),
     (
         LLMProvider.GOOGLE_GENERATIVE_AI,
-        LLMModel.GEMINI_2_0_FLASH,
+        "google/gemini-2.0-flash",
     ),
 ]
 
@@ -60,16 +59,16 @@ AGENTS = [
 ]
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
 @pytest.mark.flaky(reruns=4)
 def test_portia_run_query(
     llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
+    default_model_name: str,
 ) -> None:
     """Test running a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
+        default_model=default_model_name,
         storage_class=StorageClass.MEMORY,
     )
 
@@ -89,16 +88,16 @@ def test_portia_run_query(
         assert output.get_summary() is not None
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
 @pytest.mark.flaky(reruns=4)
 def test_portia_generate_plan(
     llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
+    default_model_name: str,
 ) -> None:
     """Test planning a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
+        default_model=default_model_name,
         storage_class=StorageClass.MEMORY,
     )
 
@@ -112,19 +111,19 @@ def test_portia_generate_plan(
     assert plan.steps[0].tool_id == "add_tool"
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_clarifications(
     llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
+    default_model_name: str,
     agent: ExecutionAgentType,
 ) -> None:
     """Test running a query with clarification."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
+        default_model=default_model_name,
         execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
@@ -164,7 +163,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=LLMProvider.OPENAI,
-        llm_model_name=LLMModel.GPT_4_O_MINI,
+        default_model="openai/gpt-4o-mini",
         execution_agent_type=ExecutionAgentType.DEFAULT,
         storage_class=StorageClass.MEMORY,
     )
@@ -200,17 +199,17 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     assert plan_run.state == PlanRunState.COMPLETE
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), CORE_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 def test_portia_run_query_with_hard_error(
     llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
+    default_model_name: str,
     agent: ExecutionAgentType,
 ) -> None:
     """Test running a query with error."""
     config = Config.from_default(
         llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
+        default_model=default_model_name,
         execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
@@ -241,17 +240,17 @@ def test_portia_run_query_with_hard_error(
 
 
 @pytest.mark.parametrize("agent", AGENTS)
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), CORE_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_MODELS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_soft_error(
     llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
+    default_model_name: str,
     agent: ExecutionAgentType,
 ) -> None:
     """Test running a query with error."""
     config = Config.from_default(
         llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
+        default_model=default_model_name,
         execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
@@ -285,19 +284,19 @@ def test_portia_run_query_with_soft_error(
     assert "Tool add_tool failed after retries" in final_output
 
 
-@pytest.mark.parametrize(("llm_provider", "llm_model_name"), CORE_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_multiple_clarifications(
     llm_provider: LLMProvider,
-    llm_model_name: LLMModel,
+    default_model_name: str,
     agent: ExecutionAgentType,
 ) -> None:
     """Test running a query with multiple clarification."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=llm_provider,
-        llm_model_name=llm_model_name,
+        default_model=default_model_name,
         execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )

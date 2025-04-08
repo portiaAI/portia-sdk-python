@@ -117,7 +117,7 @@ my_config = Config.from_default(
     storage_class=StorageClass.CLOUD,
     default_log_level=LogLevel.DEBUG,
     llm_provider=LLMProvider.OPENAI, # You can use `MISTRAL`, `ANTHROPIC` instead
-    llm_model_name=LLMModel.GPT_4_O, # You can use any of the available models instead
+    llm_model_name="openai/gpt-4o", # You can pass any of the OpenAI models here instead
     openai_api_key=OPENAI_API_KEY # Use `mistralai_api_key=MISTRALAI` or `anthropic_api_key=ANTHROPIC_API_KEY` instead
 )
 
