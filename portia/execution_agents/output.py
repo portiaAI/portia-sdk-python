@@ -157,7 +157,7 @@ class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
 
     def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
         """Get the full value, fetching from remote storage or file if necessary."""
-        return agent_memory.get_plan_run_output(self.output_name, self.plan_run_id)
+        return agent_memory.get_plan_run_output(self.output_name, self.plan_run_id).get_value()
 
     def get_summary(self) -> str:
         """Return the summary of the output."""
