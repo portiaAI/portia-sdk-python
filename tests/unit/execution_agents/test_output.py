@@ -95,7 +95,7 @@ def test_agent_memory_output() -> None:
     assert output.serialize_value() == "test summary"
 
     mock_agent_memory = MagicMock()
-    mock_agent_memory.get_plan_run_output.return_value = "retrieved value"
+    mock_agent_memory.get_plan_run_output.return_value = LocalOutput(value="retrieved value")
 
     result = output.full_value(mock_agent_memory)
     assert result == "retrieved value"
