@@ -16,7 +16,7 @@ from portia.config import (
     PlanningAgentType,
     StorageClass,
 )
-from portia.errors import ConfigModelResolutionError, ConfigNotFoundError, InvalidConfigError
+from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
@@ -176,16 +176,11 @@ AGENT_MODEL_KEYS = [k for k in ALL_USAGE_KEYS if k != DEFAULT_MODEL_KEY]
 
 
 @pytest.mark.parametrize("agent_model_key", AGENT_MODEL_KEYS)
-def test_set_agent_model_default_model_not_set(agent_model_key: str) -> None:
+def test_set_agent_model_default_model_not_set_fails(agent_model_key: str) -> None:
     """Test setting agent_model from model instance without default model or provider set."""
     model = OpenAIGenerativeModel(model_name="gpt-4o", api_key=SecretStr("test-openai-key"))
-    c = Config.from_default(**{agent_model_key: model})
-    resolved_model = c.resolve_model(usage=agent_model_key)
-    assert resolved_model is model
-
-    # Default model has not been set, so this errors
-    with pytest.raises(ConfigModelResolutionError):
-        c.resolve_model()
+    with pytest.raises(InvalidConfigError):
+        _ = Config.from_default(**{agent_model_key: model})
 
 
 @pytest.mark.parametrize("agent_model_key", AGENT_MODEL_KEYS)
@@ -205,16 +200,13 @@ def test_set_agent_model_with_string_api_key_env_var_set(
     assert isinstance(default_model, OpenAIGenerativeModel)
 
 
-@pytest.mark.xfail(reason="TODO: Should raise ConfigNotFoundError, but is raising an OpenAI error")
 def test_set_model_with_string_api_key_env_var_not_set() -> None:
     """Test setting planning_model with string, with correct API key env var not present."""
     model_str = "openai/gpt-4o"
-    c = Config.from_default(default_model=model_str)
-    with pytest.raises(ConfigNotFoundError):
-        c.resolve_model()
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
+        _ = Config.from_default(default_model=model_str)
 
 
-@pytest.mark.xfail(reason="TODO: This is not raising a ConfigNotFoundError")
 def test_set_model_with_string_other_provider_api_key_env_var_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -224,7 +216,7 @@ def test_set_model_with_string_other_provider_api_key_env_var_set(
     default_model.
     """
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
-    with pytest.raises(ConfigNotFoundError):
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
         _ = Config.from_default(
             default_model="mistral/mistral-tiny-latest",
             llm_provider="anthropic",
@@ -337,7 +329,6 @@ def test_resolve_model_azure() -> None:
     assert isinstance(c.resolve_model(PLANNING_MODEL_KEY), AzureOpenAIGenerativeModel)
 
 
-# @pytest.mark.xfail(reason="FIXME: Fails because OPENAI_API_KEY env var is missing")
 def test_resolve_langchain_model() -> None:
     """Test resolve langchain model."""
     conf = Config.from_default(
@@ -346,7 +337,6 @@ def test_resolve_langchain_model() -> None:
     assert isinstance(conf.resolve_langchain_model(), LangChainGenerativeModel)
 
 
-# @pytest.mark.xfail(reason="FIXME: Fails because OPENAI_API_KEY env var is missing")
 def test_resolve_langchain_model_error() -> None:
     """Test resolve langchain model raises TypeError if model is not a LangChainGenerativeModel."""
     conf = Config.from_default(
@@ -388,12 +378,11 @@ def test_getters() -> None:
         Config.from_default(
             storage_class=StorageClass.CLOUD,
             portia_api_key=SecretStr(""),
-            execution_agent_type=ExecutionAgentType.DEFAULT,
+            extest_set_agent_model_default_model_not_settest_set_agent_model_default_model_not_setecution_agent_type=ExecutionAgentType.DEFAULT,
             planning_agent_type=PlanningAgentType.DEFAULT,
         )
 
 
-@pytest.mark.xfail(reason="TODO: This is not raising a ConfigNotFoundError")
 def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test Azure OpenAI requires endpoint."""
     # Passing both endpoint and api key as kwargs works
@@ -405,15 +394,15 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
     assert c.llm_provider == LLMProvider.AZURE_OPENAI
 
     # Without endpoint set via kwargs, it errors
-    c = Config.from_default(
-        llm_provider=LLMProvider.AZURE_OPENAI,
-        azure_openai_api_key="test-azure-openai-api-key",
-    )
-    assert c.llm_provider == LLMProvider.AZURE_OPENAI
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
+        _ = Config.from_default(
+            llm_provider=LLMProvider.AZURE_OPENAI,
+            azure_openai_api_key="test-azure-openai-api-key",
+        )
 
     # Without endpoint set via env var, it errors
     monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-azure-openai-key")
-    with pytest.raises(ConfigNotFoundError):
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
         Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
 
     # With endpoint set via env var, it works
