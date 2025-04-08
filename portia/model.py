@@ -86,20 +86,7 @@ class LLMProvider(Enum):
     MISTRALAI = "mistral"
     GOOGLE_GENERATIVE_AI = "google"
     AZURE_OPENAI = "azure-openai"
-
-    def to_api_key_name(self) -> str:
-        """Get the name of the API key for the provider."""
-        match self:
-            case LLMProvider.OPENAI:
-                return "openai_api_key"
-            case LLMProvider.ANTHROPIC:
-                return "anthropic_api_key"
-            case LLMProvider.MISTRALAI:
-                return "mistralai_api_key"
-            case LLMProvider.GOOGLE_GENERATIVE_AI:
-                return "google_api_key"
-            case LLMProvider.AZURE_OPENAI:
-                return "azure_openai_api_key"
+    CUSTOM = "custom"
 
 
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
@@ -160,7 +147,7 @@ class GenerativeModel(ABC):
 class LangChainGenerativeModel(GenerativeModel):
     """Base class for LangChain-based models."""
 
-    provider_name: str
+    provider: LLMProvider = LLMProvider.CUSTOM
 
     def __init__(self, client: BaseChatModel, model_name: str) -> None:
         """Initialize with LangChain client.

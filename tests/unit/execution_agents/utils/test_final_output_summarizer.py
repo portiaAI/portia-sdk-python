@@ -22,7 +22,7 @@ def mock_summarizer_model() -> mock.MagicMock:
 @pytest.fixture
 def summarizer_config(mock_summarizer_model: mock.MagicMock) -> Config:
     """Create a summarizer config with a mocked model."""
-    return get_test_config(custom_models={SUMMARISER_MODEL_KEY: mock_summarizer_model})
+    return get_test_config(models={SUMMARISER_MODEL_KEY: mock_summarizer_model})
 
 
 def test_summarizer_agent_execute_sync(
