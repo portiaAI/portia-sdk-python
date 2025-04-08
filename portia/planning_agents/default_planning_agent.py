@@ -48,7 +48,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 Message(
                     role="system",
                     content="You are an outstanding task planner who can leverage many \
-    tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
+    tools at their disposal. Your job is provide a detailed plan of action in the form of a set of \
     steps to respond to a user's prompt. When using multiple tools, pay attention to the  \
     tools to make sure the chain of steps works, but DO NOT provide any examples or assumptions \
     in the task descriptions. If you are missing information do not \

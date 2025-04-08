@@ -2,8 +2,12 @@
     Enumerate the steps you plan on taking to answer the query.
     IMPORTANT: Ensure you use the tool id exactly as it is defined in <Tools> below (including whether it has a portia:: prefix or not)
     Each step should:
-     - include a description, input used to complete the step from previous steps
-     - all data needed for the task or condition SHOULD BE PROVIDED in the task description.
+     - include a description, input used to completeplus any outputs from previous steps that will be required for this step should be specified as inputs for this step
+     - you need to ensure that all the information for carrying out the step fromwill be preovious steps
+     - all data needed for the task or condition SHOULD BE PROVIDED in the task description.ded in the combination of the task description and the inputs.
+     - the task description should include all the data from the query that is needed to carry out this step
+     - If information is being provided by an input, you DO NOT need to specify this in the description (as it is already being provided by an input)
+     - all the data needed for the condition should be provided as part of the step inputs
      - MAKE SURE inputs are ONLY referencing variables from previous steps, IT SHOULD NOT contain any other data.
      - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
      - give a name to the variable for the output of the step if it is successful.
