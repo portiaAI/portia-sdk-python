@@ -36,7 +36,7 @@ CORE_MODELS = [
     ),
     (
         LLMProvider.ANTHROPIC,
-        "anthropic/claude-3-opus-latest",
+        "anthropic/claude-3-5-sonnet-latest",
     ),
 ]
 
