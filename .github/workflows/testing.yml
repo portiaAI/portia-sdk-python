@@ -24,6 +24,11 @@ jobs:
       - name: install poetry
         run: pipx install poetry
 
+      # https://github.com/pydantic/ollama-action
+      - uses: pydantic/ollama-action@v3
+        with:
+          model: qwen2:0.5b
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
