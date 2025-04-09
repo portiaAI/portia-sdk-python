@@ -653,9 +653,10 @@ if validate_extras_dependencies("ollama", raise_error=False):
 
             """
             super().__init__(
-                client=ChatOllama(model=model_name, base_url=base_url, **kwargs),
+                client=ChatOllama(model=model_name, **kwargs),
                 model_name=model_name,
             )
+            self.base_url = base_url
 
         def get_structured_response(
             self,
@@ -676,7 +677,7 @@ if validate_extras_dependencies("ollama", raise_error=False):
             """
             client = instructor.from_openai(
                 OpenAI(
-                    base_url="http://localhost:11434/v1",
+                    base_url=self.base_url,
                     api_key="ollama",  # required, but unused
                 ),
                 mode=instructor.Mode.JSON,
