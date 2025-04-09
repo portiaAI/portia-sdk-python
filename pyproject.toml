@@ -44,6 +44,7 @@ browser-use = { version = "^0.1.40", optional = true, python = ">=3.11,<4.0" }
 tiktoken = "^0.9.0"
 jsonref = "^1.1.0"
 browserbase = { version = "^1.2.0", optional = true }
+langchain-ollama = {version = "^0.2.2", optional = true, python = ">=3.11,<4.0"}
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.8.0"
@@ -60,7 +61,8 @@ pytest-asyncio = "^0.25.3"
 mistral = ["langchain-mistralai", "mistralai"]
 mistralai = ["langchain-mistralai", "mistralai"]
 google = ["langchain-google-genai", "google-generativeai"]
-all = ["langchain-mistralai", "mistralai", "langchain-google-genai", "google-generativeai"]
+ollama = ["langchain-ollama"]
+all = ["langchain-mistralai", "mistralai", "langchain-google-genai", "google-generativeai", "langchain-ollama"]
 
 # Tools that require extra dependencies
 tools-browser-local = ["playwright", "browser-use"]

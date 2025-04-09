@@ -87,6 +87,7 @@ class LLMProvider(Enum):
     GOOGLE_GENERATIVE_AI = "google"
     AZURE_OPENAI = "azure-openai"
     CUSTOM = "custom"
+    OLLAMA = "ollama"
 
 
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
@@ -625,6 +626,64 @@ if validate_extras_dependencies("google", raise_error=False):
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return self._instructor_client.messages.create(
                 messages=instructor_messages,
+                response_model=schema,
+            )
+
+
+if validate_extras_dependencies("ollama", raise_error=False):
+    from langchain_ollama import ChatOllama
+
+    class OllamaGenerativeModel(LangChainGenerativeModel):
+        """Wrapper for Ollama models."""
+
+        provider_name: str = "ollama"
+
+        def __init__(
+            self,
+            model_name: str,
+            base_url: str = "http://localhost:11434/v1",
+            **kwargs: Any,
+        ) -> None:
+            """Initialize with Ollama client.
+
+            Args:
+                model_name: Name of the Ollama model
+                base_url: Base URL of the Ollama server
+                **kwargs: Additional keyword arguments to pass to ChatOllama
+
+            """
+            super().__init__(
+                client=ChatOllama(model=model_name, base_url=base_url, **kwargs),
+                model_name=model_name,
+            )
+
+        def get_structured_response(
+            self,
+            messages: list[Message],
+            schema: type[BaseModelT],
+            **kwargs: Any,  # noqa: ARG002
+        ) -> BaseModelT:
+            """Get structured response from Ollama model using instructor.
+
+            Args:
+                messages (list[Message]): The list of messages to send to the model.
+                schema (type[BaseModelT]): The Pydantic model to use for the response.
+                **kwargs: Additional keyword arguments to pass to the model.
+
+            Returns:
+                BaseModelT: The structured response from the model.
+
+            """
+            client = instructor.from_openai(
+                OpenAI(
+                    base_url="http://localhost:11434/v1",
+                    api_key="ollama",  # required, but unused
+                ),
+                mode=instructor.Mode.JSON,
+            )
+            return client.chat.completions.create(
+                model=self.model_name,
+                messages=[map_message_to_instructor(message) for message in messages],
                 response_model=schema,
             )
 
