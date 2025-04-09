@@ -245,14 +245,6 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
-ALL_USAGE_KEYS = [
-    PLANNING_MODEL_KEY := "planning_model",
-    EXECUTION_MODEL_KEY := "execution_model",
-    INTROSPECTION_MODEL_KEY := "introspection_model",
-    SUMMARISER_MODEL_KEY := "summariser_model",
-    DEFAULT_MODEL_KEY := "default_model",
-]
-
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
 
 
@@ -291,14 +283,14 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
 
 
 PROVIDER_DEFAULT_MODELS = {
-    PLANNING_MODEL_KEY: {
+    "planning_model": {
         LLMProvider.OPENAI: "openai/o3-mini",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
-    DEFAULT_MODEL_KEY: {
+    "default_model": {
         LLMProvider.OPENAI: "openai/gpt-4o",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
@@ -307,9 +299,17 @@ PROVIDER_DEFAULT_MODELS = {
     },
 }
 
-PLANNER_DEFAULT_MODELS = PROVIDER_DEFAULT_MODELS[PLANNING_MODEL_KEY]
 
-DEFAULT_MODELS = PROVIDER_DEFAULT_MODELS[DEFAULT_MODEL_KEY]
+class GenerativeModels(BaseModel):
+    """Configuration for a GenerativeModels."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    default_model: GenerativeModel | str | None = None
+    planning_model: GenerativeModel | str | None = None
+    execution_model: GenerativeModel | str | None = None
+    introspection_model: GenerativeModel | str | None = None
+    summariser_model: GenerativeModel | str | None = None
 
 
 class Config(BaseModel):
@@ -340,8 +340,6 @@ class Config(BaseModel):
         execution_agent_type: The execution agent type.
 
     """
-
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -392,9 +390,9 @@ class Config(BaseModel):
         "GenerativeModel instances are provided directly.",
     )
 
-    models: dict[str, str | GenerativeModel] = Field(
-        default_factory=dict,
-        description="A dictionary of configured LLM models for each usage.",
+    models: GenerativeModels = Field(
+        default_factory=lambda: GenerativeModels(),
+        description="Configuration for GenerativeModels.",
     )
 
     @field_validator("models", mode="before")
@@ -521,6 +519,28 @@ class Config(BaseModel):
         return len(encoding) > self.large_output_threshold_tokens
 
     @model_validator(mode="after")
+    def fill_default_models(self) -> Self:
+        """Fill in default models for the LLM provider if not provided."""
+        if (
+            self.models.default_model is None
+            and self.llm_provider in PROVIDER_DEFAULT_MODELS["default_model"]
+        ):
+            self.models.default_model = PROVIDER_DEFAULT_MODELS["default_model"][self.llm_provider]
+        if self.models.default_model is None:
+            raise InvalidConfigError(
+                "llm_provider or default_model",
+                "Either llm_provider or default_model must be set",
+            )
+        if (
+            self.models.planning_model is None
+            and self.llm_provider in PROVIDER_DEFAULT_MODELS["planning_model"]
+        ):
+            self.models.planning_model = PROVIDER_DEFAULT_MODELS["planning_model"][
+                self.llm_provider
+            ]
+        return self
+
+    @model_validator(mode="after")
     def check_config(self) -> Self:
         """Validate Config is consistent."""
         # Portia API Key must be provided if using cloud storage
@@ -538,18 +558,20 @@ class Config(BaseModel):
             )
 
         # Model config validation. Either llm_provider or default_model must be set.
-        if self.llm_provider is None and DEFAULT_MODEL_KEY not in self.models:
+        if self.llm_provider is None and self.models.default_model is None:
             raise InvalidConfigError(
                 "llm_provider or default_model",
                 "Either llm_provider or default_model must be set",
             )
-        # Check default_model can be resolved.
-        _ = self.resolve_model()
+
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.
-        for model in self.models.values():
-            if isinstance(model, str):
-                self._parse_model_string(model)
+        for model in self.models.model_dump().values():
+            if self._build_generative_model(model) is None:
+                raise InvalidConfigError(
+                    f"models.{model}",
+                    "All models must be instantiable",
+                )
 
         return self
 
@@ -612,86 +634,47 @@ class Config(BaseModel):
                 raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
 
-    def model(self, usage: str) -> GenerativeModel:
-        """Get a model from the config.
-
-        **DEPRECATED** Use Config.resolve_model instead.
-        """
-        warnings.warn(
-            "The model method is deprecated and will be removed in a future version.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.resolve_model(usage)
-
-    def resolve_model(self, usage: str = DEFAULT_MODEL_KEY) -> GenerativeModel:
-        """Resolve the default model from the config.
-
-        The order of precedence is:
-        1. A directly provided model object or string for the usage
-        2. The default model for the LLM provider for the usage
-        3. The default model
-
-        If none of these can be satisfied, a ConfigModelResolutionError is raised.
-
-        Args:
-            usage (str): The usage of the model. Defaults to the default model key.
-
-        Returns:
-            GenerativeModel: The default model object.
-
-        Raises:
-            InvalidConfigError: If no default model is provided or can be resolved.
-
-        """
-        if usage not in [*ALL_USAGE_KEYS, *self.models.keys()]:
-            raise ConfigModelResolutionError(
-                f"Invalid usage: {usage!r}. Must be one of {ALL_USAGE_KEYS} or a key in the "
-                "models dictionary.",
+    def get_default_model(self) -> GenerativeModel:
+        """Get or build the default model from the config."""
+        model = self.models.default_model
+        if model is None:
+            # Default model is required, but not provided.
+            raise InvalidConfigError(
+                "default_model",
+                "A default model must be set",
             )
-        model: str | GenerativeModel | None = self.models.get(usage)
-        if model and isinstance(model, GenerativeModel):
-            return model
-        if model and isinstance(model, str):
-            return self._parse_model_string(model)
-        if (
-            self.llm_provider
-            and usage in PROVIDER_DEFAULT_MODELS
-            and self.llm_provider in PROVIDER_DEFAULT_MODELS[usage]
-        ):
-            model = PROVIDER_DEFAULT_MODELS[usage][self.llm_provider]
-            return self._parse_model_string(model)
-        if usage != DEFAULT_MODEL_KEY:
-            try:
-                # Try to return the default model
-                return self.resolve_model(DEFAULT_MODEL_KEY)
-            except ConfigModelResolutionError:
-                # This should not happen due to Config model validation
-                # at instantiation time.
-                pass
+        return self._build_generative_model(model)
 
-        raise ConfigModelResolutionError(
-            f"Model could not be resolved for usage {usage!r}. Either an LLM Provider must be set, "
-            "a model must be provided for the usage, or a default model must be set.",
+    def get_planning_model(self) -> GenerativeModel:
+        """Get or build the planning model from the config."""
+        return self._build_generative_model(self.models.planning_model) or self.get_default_model()
+
+    def get_execution_model(self) -> GenerativeModel:
+        """Get or build the execution model from the config."""
+        return self._build_generative_model(self.models.execution_model) or self.get_default_model()
+
+    def get_introspection_model(self) -> GenerativeModel:
+        """Get or build the introspection model from the config."""
+        return (
+            self._build_generative_model(self.models.introspection_model)
+            or self.get_default_model()
         )
 
-    def resolve_langchain_model(self, usage: str = DEFAULT_MODEL_KEY) -> LangChainGenerativeModel:
-        """Resolve a LangChain model from the default model configuration.
-
-        Returns:
-            LangChainGenerativeModel: The LangChain GenerativeModel object.
-
-        Raises:
-            TypeError: If the resolved model is not a LangChainGenerativeModel.
-
-        """
-        model = self.resolve_model(usage)
-        if isinstance(model, LangChainGenerativeModel):
-            return model
-        raise TypeError(
-            f"A LangChainGenerativeModel is required, but the config for "
-            f"{usage} resolved to {model}.",
+    def get_summariser_model(self) -> GenerativeModel:
+        """Get or build the summariser model from the config."""
+        return (
+            self._build_generative_model(self.models.summariser_model) or self.get_default_model()
         )
+
+    def _build_generative_model(
+        self, model: str | GenerativeModel | None
+    ) -> GenerativeModel | None:
+        """Instantiate or return a GenerativeModel instance."""
+        if model is None:
+            return None
+        if isinstance(model, str):
+            return self._parse_model_string(model)
+        return model
 
     def _parse_model_string(self, model_string: str) -> GenerativeModel:
         """Parse a model string in the form of "provider-prefix/model_name` to a GenerativeModel.
@@ -783,18 +766,15 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         Config: The default config
 
     """
-    models = kwargs.pop("models", {})
-    # Handle models passed directly as keyword arguments rather than in the models dictionary
-    for model_usage in ALL_USAGE_KEYS:
-        model_name = kwargs.pop(model_usage, None)
-        if model_name and model_usage not in models:
-            models[model_usage] = model_name
-        elif model_name and model_usage in models and models[model_usage] != model_name:
-            raise InvalidConfigError(
-                value=model_usage,
-                issue=f"Model for usage {model_usage} is specified both as a keyword argument and "
-                "in the models dictionary.",
-            )
+    llm_provider_from_api_keys = llm_provider_default_from_api_keys(**kwargs)
+    if "llm_provider" in kwargs or llm_provider_from_api_keys:
+        llm_provider = parse_str_to_enum(
+            kwargs.pop("llm_provider", llm_provider_from_api_keys),
+            LLMProvider,
+        )
+    else:
+        llm_provider = None
+
     # Handle deprecated llm_model_name keyword argument
     if llm_model_name := kwargs.pop("llm_model_name", None):
         warnings.warn(
@@ -803,17 +783,20 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
             stacklevel=2,
             category=DeprecationWarning,
         )
-        if DEFAULT_MODEL_KEY not in models:
-            models[DEFAULT_MODEL_KEY] = llm_model_name
 
-    inferred_llm_provider = llm_provider_default_from_api_keys(**kwargs)
-    if "llm_provider" in kwargs or inferred_llm_provider:
-        llm_provider = parse_str_to_enum(
-            kwargs.pop("llm_provider", inferred_llm_provider),
-            LLMProvider,
-        )
-    else:
-        llm_provider = None
+    kwargs_models = {
+        "default_model": llm_model_name,
+        **kwargs.pop("models", {}),
+        **{k: v for k, v in kwargs.items() if k in GenerativeModels.model_fields},
+    }
+
+    models = GenerativeModels(
+        default_model=kwargs_models.pop("default_model", None),
+        planning_model=kwargs_models.pop("planning_model", None),
+        execution_model=kwargs_models.pop("execution_model", None),
+        introspection_model=kwargs_models.pop("introspection_model", None),
+        summariser_model=kwargs_models.pop("summariser_model", None),
+    )
 
     default_storage_class = (
         StorageClass.CLOUD if os.getenv("PORTIA_API_KEY") else StorageClass.MEMORY

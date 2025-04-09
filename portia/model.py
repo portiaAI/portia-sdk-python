@@ -143,6 +143,11 @@ class GenerativeModel(ABC):
         """Get the string representation of the model."""
         return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}")'
 
+    @abstractmethod
+    def to_langchain(self) -> BaseChatModel:
+        """Get the LangChain client."""
+        raise NotImplementedError
+
 
 class LangChainGenerativeModel(GenerativeModel):
     """Base class for LangChain-based models."""
