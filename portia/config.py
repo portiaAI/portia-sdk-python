@@ -746,8 +746,8 @@ class Config(BaseModel):
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
                     model_name=model_name,
-                    api_key=self.azure_openai_api_key,
-                    azure_endpoint=self.azure_openai_endpoint,
+                    api_key=self.must_get_api_key("azure_openai_api_key"),
+                    azure_endpoint=self.must_get("azure_openai_endpoint", str),
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
