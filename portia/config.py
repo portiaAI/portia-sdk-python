@@ -328,8 +328,9 @@ class Config(BaseModel):
         google_api_key: The API key for Google Generative AI.
         azure_openai_api_key: The API key for Azure OpenAI.
         azure_openai_endpoint: The endpoint for Azure OpenAI.
-        llm_provider: The LLM provider.
-        models: A dictionary of LLM models for each usage type.
+        llm_provider: The LLM provider. If set, Portia uses this to select the best models
+            for each agent. Can be None if custom models are provided.
+        models: A configuration for the LLM models for Portia to use.
         storage_class: The storage class used (e.g., MEMORY, DISK, CLOUD).
         storage_dir: The directory for storage, if applicable.
         default_log_level: The default log level (e.g., DEBUG, INFO).
@@ -385,13 +386,13 @@ class Config(BaseModel):
 
     llm_provider: LLMProvider | None = Field(
         default=None,
-        description="Which LLM Provider to use for resolving GenerativeModels. Can be None if "
-        "GenerativeModel instances are provided directly.",
+        description="The LLM (API) provider. If set, Portia uses this to select the "
+        " best models for each agent. Can be None if custom models are provided.",
     )
 
     models: GenerativeModels = Field(
         default_factory=lambda: GenerativeModels(),
-        description="Configuration for GenerativeModels.",
+        description="Configuration for the generative models for Portia to use.",
     )
 
     @field_validator("models", mode="before")
