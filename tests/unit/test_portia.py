@@ -36,7 +36,7 @@ from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, 
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
 from portia.tool import Tool, ToolRunContext
-from portia.tool_registry import InMemoryToolRegistry
+from portia.tool_registry import ToolRegistry
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -62,12 +62,12 @@ def default_model() -> MagicMock:
 def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
-        custom_models={
+        models={
             PLANNING_MODEL_KEY: planning_model,
             DEFAULT_MODEL_KEY: default_model,
         },
     )
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+    tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
 
 
@@ -83,7 +83,7 @@ def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock
             DEFAULT_MODEL_KEY: default_model,
         },
     )
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+    tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
 
 
@@ -143,7 +143,7 @@ def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
     query = "example query"
     portia = Portia(
         config=get_test_config(
-            custom_models={
+            models={
                 PLANNING_MODEL_KEY: planning_model,
             },
         ),
@@ -167,11 +167,11 @@ def test_portia_run_query_disk_storage(planning_model: MagicMock) -> None:
             storage_class=StorageClass.DISK,
             openai_api_key=SecretStr("123"),
             storage_dir=tmp_dir,
-            custom_models={
+            models={
                 PLANNING_MODEL_KEY: planning_model,
             },
         )
-        tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool(), ClarificationTool()])
+        tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
         portia = Portia(config=config, tools=tool_registry)
 
         planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -351,7 +351,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
             mock_call_count.count += 1
             return mock_call_count.count == 3
 
-    portia.tool_registry = InMemoryToolRegistry.from_local_tools([ReadyTool()])
+    portia.tool_registry = ToolRegistry([ReadyTool()])
     step0 = Step(
         task="Do something",
         inputs=[],
@@ -644,7 +644,7 @@ def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
     mock_agent.create_summary.side_effect = Exception("Summary failed")
 
     with mock.patch(
-        "portia.execution_agents.utils.final_output_summarizer.FinalOutputSummarizer",
+        "portia.portia.FinalOutputSummarizer",
         return_value=mock_agent,
     ):
         step_output = LocalOutput(value="Some output")
@@ -780,7 +780,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
     """Test that portia can handle a clarification."""
     clarification_handler = TestClarificationHandler()
     portia = Portia(
-        config=get_test_config(custom_models={PLANNING_MODEL_KEY: planning_model}),
+        config=get_test_config(models={PLANNING_MODEL_KEY: planning_model}),
         tools=[ClarificationTool()],
         execution_hooks=ExecutionHooks(clarification_handler=clarification_handler),
     )

@@ -22,7 +22,6 @@ from portia.config import (
     Config,
     ExecutionAgentType,
     LLMModel,
-    LLMProvider,
     LogLevel,
     PlanningAgentType,
     StorageClass,
@@ -63,6 +62,7 @@ from portia.logger import logger
 from portia.mcp_session import SseMcpClientConfig, StdioMcpClientConfig
 
 # Open source tools
+from portia.model import LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
