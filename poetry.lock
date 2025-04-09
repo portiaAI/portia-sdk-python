@@ -1707,7 +1707,7 @@ description = "An integration package connecting Ollama and LangChain"
 optional = true
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
-markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\""
+markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"ollama\" or extra == \"all\""
 files = [
     {file = "langchain_ollama-0.2.2-py3-none-any.whl", hash = "sha256:8a1ee72dbb6ea3b3ace1d9dd317e472d667a8ed491328550da59f4893a6796f8"},
     {file = "langchain_ollama-0.2.2.tar.gz", hash = "sha256:2d9bcb06ffdbe43c7c6906c46e710d36d33b6b99cd4975cbf54060f13e51c875"},
@@ -2235,7 +2235,7 @@ description = "The official Python client for Ollama."
 optional = true
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
-markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\""
+markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"ollama\" or extra == \"all\""
 files = [
     {file = "ollama-0.4.7-py3-none-any.whl", hash = "sha256:85505663cca67a83707be5fb3aeff0ea72e67846cea5985529d8eca4366564a1"},
     {file = "ollama-0.4.7.tar.gz", hash = "sha256:891dcbe54f55397d82d289c459de0ea897e103b86a3f1fad0fdb1895922a75ff"},
@@ -4196,14 +4196,15 @@ cffi = {version = ">=1.11", markers = "platform_python_implementation == \"PyPy\
 cffi = ["cffi (>=1.11)"]
 
 [extras]
-all = ["google-generativeai", "langchain-google-genai", "langchain-mistralai", "mistralai"]
+all = ["google-generativeai", "langchain-google-genai", "langchain-mistralai", "langchain-ollama", "mistralai"]
 google = ["google-generativeai", "langchain-google-genai"]
 mistral = ["langchain-mistralai", "mistralai"]
 mistralai = ["langchain-mistralai", "mistralai"]
+ollama = ["langchain-ollama"]
 tools-browser-browserbase = ["browser-use", "browserbase", "playwright"]
 tools-browser-local = ["browser-use", "playwright"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "a2a3b775f81c6a4955bf99ebe7bbb756959a670e89f4efe93bee964f63852464"
+content-hash = "f564056d5c288e020f2589dec822475c3582dd80e89fd516a292dec9cd09cecb"

@@ -59,6 +59,7 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
     "mistralai": ["mistralai", "langchain_mistralai"],  # in process of refactoring
     "google": ["google.generativeai", "langchain_google_genai"],
+    "ollama": ["langchain_ollama"],
 }
 
 
