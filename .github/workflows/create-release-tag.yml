@@ -45,6 +45,14 @@ jobs:
                 ref: `refs/tags/${version}`,
                 sha: sha
               });
+              
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/latest-prod-release`,
+                sha: sha
+              });
+              
               console.log(`Successfully created tag ${version}`);
             } catch (error) {
               core.setFailed(`Failed to create tag: ${error.message}`);
