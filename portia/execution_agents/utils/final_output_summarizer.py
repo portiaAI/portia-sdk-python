@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from portia.config import SUMMARISER_MODEL_KEY
 from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
 from portia.model import Message
 

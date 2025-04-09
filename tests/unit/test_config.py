@@ -1,6 +1,6 @@
 """Tests for portia classes."""
 
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import SecretStr

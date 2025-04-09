@@ -25,12 +25,11 @@ from pydantic import (
 )
 
 from portia.common import validate_extras_dependencies
-from portia.errors import ConfigModelResolutionError, ConfigNotFoundError, InvalidConfigError
+from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
-    LangChainGenerativeModel,
     LLMProvider,
     OpenAIGenerativeModel,
 )
@@ -667,7 +666,8 @@ class Config(BaseModel):
         )
 
     def _build_generative_model(
-        self, model: str | GenerativeModel | None
+        self,
+        model: str | GenerativeModel | None,
     ) -> GenerativeModel | None:
         """Instantiate or return a GenerativeModel instance."""
         if model is None:
