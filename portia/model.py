@@ -523,6 +523,9 @@ if validate_extras_dependencies("google", raise_error=False):
     import google.generativeai as genai
     from langchain_google_genai import ChatGoogleGenerativeAI
 
+    if TYPE_CHECKING:
+        from google.generativeai.types.generation_types import GenerationConfigDict
+
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""
 
@@ -534,6 +537,7 @@ if validate_extras_dependencies("google", raise_error=False):
             model_name: str = "gemini-2.0-flash",
             api_key: SecretStr,
             max_retries: int = 3,
+            temperature: float | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with Google Generative AI client.
@@ -542,11 +546,17 @@ if validate_extras_dependencies("google", raise_error=False):
                 model_name: Name of the Google Generative AI model
                 api_key: API key for Google Generative AI
                 max_retries: Maximum number of retries
+                temperature: Temperature parameter for model sampling
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
             # Configure genai with the api key
             genai.configure(api_key=api_key.get_secret_value())  # pyright: ignore[reportPrivateImportUsage]
+
+            generation_config: GenerationConfigDict = {}
+            if temperature is not None:
+                kwargs["temperature"] = temperature
+                generation_config["temperature"] = temperature
 
             client = ChatGoogleGenerativeAI(
                 model=model_name,
@@ -556,7 +566,10 @@ if validate_extras_dependencies("google", raise_error=False):
             )
             super().__init__(client, model_name)
             self._instructor_client = instructor.from_gemini(
-                client=genai.GenerativeModel(model_name=model_name),  # pyright: ignore[reportPrivateImportUsage]
+                client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
+                    model_name=model_name,
+                    generation_config=generation_config,
+                ),
                 mode=instructor.Mode.GEMINI_JSON,
                 use_async=False,
             )
