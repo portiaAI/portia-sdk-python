@@ -78,7 +78,7 @@ def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock
         # Set a small threshold value so all outputs are stored in agent memory
         feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
         large_output_threshold_tokens=3,
-        custom_models={
+        models={
             PLANNING_MODEL_KEY: planning_model,
             DEFAULT_MODEL_KEY: default_model,
         },
