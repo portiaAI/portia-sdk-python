@@ -28,6 +28,7 @@ from portia.clarification import (
     Clarification,
     ClarificationCategory,
 )
+from portia.cloud import PortiaCloudClient
 from portia.config import (
     Config,
     ExecutionAgentType,
@@ -66,7 +67,6 @@ from portia.storage import (
 from portia.tool import ToolRunContext
 from portia.tool_registry import (
     DefaultToolRegistry,
-    InMemoryToolRegistry,
     PortiaToolRegistry,
     ToolRegistry,
 )
@@ -127,7 +127,7 @@ class Portia:
         if isinstance(tools, ToolRegistry):
             self.tool_registry = tools
         elif isinstance(tools, list):
-            self.tool_registry = InMemoryToolRegistry.from_local_tools(tools)
+            self.tool_registry = ToolRegistry(tools)
         else:
             self.tool_registry = DefaultToolRegistry(self.config)
 
@@ -853,9 +853,14 @@ class Portia:
         example_plans: list[Plan] | None = None,
     ) -> None:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
-        cloud_registry = self.tool_registry + PortiaToolRegistry.with_unauthenticated_client(
+        unauthenticated_client = PortiaCloudClient.new_client(
             self.config,
+            allow_unauthenticated=True,
         )
+        portia_registry = PortiaToolRegistry(
+            client=unauthenticated_client,
+        ).with_default_tool_filter()
+        cloud_registry = self.tool_registry + portia_registry
         tools = cloud_registry.match_tools(query)
         planning_agent = self._get_planning_agent()
         replan_outcome = planning_agent.generate_steps_or_error(

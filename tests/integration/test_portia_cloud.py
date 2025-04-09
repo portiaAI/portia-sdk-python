@@ -12,10 +12,10 @@ from portia.execution_context import execution_context
 from portia.plan_run import PlanRunState
 from portia.portia import Portia
 from portia.storage import PortiaCloudStorage
-from portia.tool import PortiaRemoteTool, Tool, ToolHardError
+from portia.tool import PortiaRemoteTool, ToolHardError
 from portia.tool_registry import (
-    InMemoryToolRegistry,
     PortiaToolRegistry,
+    ToolRegistry,
 )
 from tests.utils import AdditionTool, get_test_plan_run, get_test_tool_context
 
@@ -47,9 +47,6 @@ def test_run_tool_error() -> None:
     with pytest.raises(ToolNotFoundError):
         registry.get_tool("Not a Tool")
 
-    with pytest.raises(NotImplementedError):
-        registry.register_tool(AdditionTool())
-
     tool = registry.get_tool("portia:tavily::search")
     assert isinstance(tool, PortiaRemoteTool)
     tool.client = PortiaCloudClient().get_client(config)
@@ -62,7 +59,7 @@ def test_portia_run_query_with_cloud_and_local() -> None:
     """Test running a simple query."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
 
-    registry = InMemoryToolRegistry.from_local_tools([AdditionTool()]) + PortiaToolRegistry(
+    registry = ToolRegistry([AdditionTool()]) + PortiaToolRegistry(
         config=config,
     )
 
@@ -110,14 +107,11 @@ def test_default_portia_has_correct_tools() -> None:
 
 def test_portia_with_microsoft_tools() -> None:
     """Test that the default portia has the correct tools."""
+    portia_registry = PortiaToolRegistry(config=Config.from_default())
+    ms_tools = [tool for tool in portia_registry.get_tools() if "microsoft:outlook" in tool.id]
+    assert len(ms_tools) > 0
 
-    # Choose to exclude gmail rather than microsoft outlook
-    def exclude_gmail_filter(tool: Tool) -> bool:
-        return "gmail" not in tool.id
-
-    registry = PortiaToolRegistry(config=Config.from_default()).filter_tools(exclude_gmail_filter)
-    portia = Portia(tools=registry)
-    tools = portia.tool_registry.get_tools()
-    assert len(tools) > 0
-    assert not any(tool.id == "portia:google:gmail:search_email" for tool in tools)
-    assert any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)
+    filtered_registry = portia_registry.with_default_tool_filter()
+    filtered_tools = filtered_registry.get_tools()
+    assert len(filtered_tools) > 0
+    assert not any("portia:microsoft:outlook" in tool.id for tool in filtered_tools)
