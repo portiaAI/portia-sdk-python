@@ -21,6 +21,7 @@ Classes in this file include:
 - `ToolHardError`: Raised when a tool encounters an unrecoverable error.
 - `ToolSoftError`: Raised when a tool encounters an error that can be retried.
 - `StorageError`: Raised when an issue occurs with storage.
+- `PortiaAPIError`: Raised when an issue occurs with the Portia API.
 
 """
 
@@ -231,6 +232,14 @@ class StorageError(PortiaBaseError):
         cause (Exception | str): The underlying exception or error message.
 
     """
+
+    def __init__(self, cause: Exception | str) -> None:
+        """Set custom error message."""
+        super().__init__(cause)
+
+
+class PortiaAPIError(PortiaBaseError):
+    """Raised when an issue occurs with the Portia API."""
 
     def __init__(self, cause: Exception | str) -> None:
         """Set custom error message."""

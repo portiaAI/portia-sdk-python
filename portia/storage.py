@@ -44,7 +44,7 @@ from portia.execution_agents.output import (
 )
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
-from portia.plan import Plan, PlanContext, PlanUUID, Step
+from portia.plan import Plan, PlanUUID
 from portia.plan_run import (
     PlanRun,
     PlanRunOutputs,
@@ -755,14 +755,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         else:
             self.check_response(response)
             response_json = response.json()
-            return Plan(
-                id=PlanUUID.from_string(response_json["id"]),
-                plan_context=PlanContext(
-                    query=response_json["query"],
-                    tool_ids=response_json["tool_ids"],
-                ),
-                steps=[Step.model_validate(step) for step in response_json["steps"]],
-            )
+            return Plan.from_response(response_json)
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun to Portia Cloud.
