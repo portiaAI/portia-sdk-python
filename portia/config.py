@@ -434,7 +434,8 @@ class Config(BaseModel):
 
     models: GenerativeModels = Field(
         default_factory=lambda: GenerativeModels(),
-        description="Configuration for the generative models for Portia to use.",
+        description="Manual configuration for the generative models for Portia to use for "
+        "different agents.",
     )
 
     feature_flags: dict[str, bool] = Field(
@@ -755,7 +756,16 @@ class Config(BaseModel):
         llm_provider: LLMProvider,
         model_name: str,
     ) -> GenerativeModel:
-        """Construct a Model instance from an LLMProvider and model name."""
+        """Construct a Model instance from an LLMProvider and model name.
+
+        Args:
+            llm_provider (LLMProvider): The LLM provider.
+            model_name (str): The model name as it appears in the LLM provider's API.
+
+        Returns:
+            GenerativeModel: The constructed model.
+
+        """
         match llm_provider:
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
