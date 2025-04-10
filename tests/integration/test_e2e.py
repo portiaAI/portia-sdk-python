@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from portia.tool import ToolRunContext
 
 
-CORE_MODELS = [
+CORE_PROVIDERS = [
     (
         LLMProvider.OPENAI,
         "openai/gpt-4o-mini",
@@ -42,7 +42,7 @@ CORE_MODELS = [
 
 
 PROVIDER_MODELS = [
-    *CORE_MODELS,
+    *CORE_PROVIDERS,
     (
         LLMProvider.MISTRALAI,
         "mistralai/mistral-large-latest",
@@ -199,7 +199,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     assert plan_run.state == PlanRunState.COMPLETE
 
 
-@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
 @pytest.mark.parametrize("agent", AGENTS)
 def test_portia_run_query_with_hard_error(
     llm_provider: LLMProvider,
@@ -240,7 +240,7 @@ def test_portia_run_query_with_hard_error(
 
 
 @pytest.mark.parametrize("agent", AGENTS)
-@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_soft_error(
     llm_provider: LLMProvider,
@@ -284,7 +284,7 @@ def test_portia_run_query_with_soft_error(
     assert "Tool add_tool failed after retries" in final_output
 
 
-@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_MODELS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_multiple_clarifications(

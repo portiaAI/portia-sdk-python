@@ -145,6 +145,10 @@ class DummyGenerativeModel(GenerativeModel):
         """Get a structured response from the model."""
         return schema()
 
+    def to_langchain(self) -> BaseChatModel:
+        """Not implemented in tests."""
+        raise NotImplementedError("This method is not used in tests")
+
 
 def test_model_to_string() -> None:
     """Test that the model to string method works."""

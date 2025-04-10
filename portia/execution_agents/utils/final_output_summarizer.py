@@ -82,7 +82,7 @@ class FinalOutputSummarizer:
             str | None: The generated summary or None if generation fails.
 
         """
-        model = self.config.get_summariser_model()
+        model = self.config.get_summarizer_model()
         context = self._build_tasks_and_outputs_context(plan, plan_run)
         response = model.get_response(
             [Message(content=self.SUMMARIZE_TASK + context, role="user")],

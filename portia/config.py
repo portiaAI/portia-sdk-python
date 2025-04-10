@@ -12,7 +12,7 @@ import os
 import warnings
 from collections.abc import Container
 from enum import Enum
-from typing import NamedTuple, Self, TypeVar
+from typing import Any, NamedTuple, Self, TypeVar
 
 import tiktoken
 from pydantic import (
@@ -300,7 +300,31 @@ PROVIDER_DEFAULT_MODELS = {
 
 
 class GenerativeModels(BaseModel):
-    """Configuration for a GenerativeModels."""
+    """Configuration for a GenerativeModels.
+
+    These models do not all need to be specified manually. If an LLM provider is configured,
+    Portia will use default models that are selected for the particular use-case.
+
+    Attributes:
+        default_model: The default generative model to use. This model is used as the fallback
+            model if no other model is specified. It is also used by default in the Portia SDK
+            tool that require an LLM.
+
+        planning_model: The model to use for the PlanningAgent. Reasoning models are a good choice
+            here, as they are able to reason about the problem and the possible solutions. If not
+            specified, the default_model will be used.
+
+        execution_model: The model to use for the ExecutionAgent. This model is used for the
+            distilling context from the plan run into tool calls. If not specified, the
+            default_model will be used.
+
+        introspection_model: The model to use for the IntrospectionAgent. This model is used to
+            introspect the problem and the plan. If not specified, the default_model will be used.
+
+        summarizer_model: The model to use for the SummarizerAgent. This model is used to
+            summarize output from the plan run. If not specified, the default_model will be used.
+
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -308,7 +332,24 @@ class GenerativeModels(BaseModel):
     planning_model: GenerativeModel | str | None = None
     execution_model: GenerativeModel | str | None = None
     introspection_model: GenerativeModel | str | None = None
-    summariser_model: GenerativeModel | str | None = None
+    summarizer_model: GenerativeModel | str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_models(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Convert legacy LLMModel values to str with deprecation warning."""
+        new_data = {}
+        for key, value in data.items():
+            if isinstance(value, LLMModel):
+                warnings.warn(
+                    "LLMModel values are deprecated and will be removed in a future version.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                new_data[key] = value.to_model_string()
+            else:
+                new_data[key] = value
+        return new_data
 
 
 class Config(BaseModel):
@@ -338,6 +379,7 @@ class Config(BaseModel):
         json_log_serialize: Whether to serialize logs in JSON format.
         planning_agent_type: The planning agent type.
         execution_agent_type: The execution agent type.
+        feature_flags: A dictionary of feature flags for the SDK.
 
     """
 
@@ -394,26 +436,6 @@ class Config(BaseModel):
         default_factory=lambda: GenerativeModels(),
         description="Configuration for the generative models for Portia to use.",
     )
-
-    @field_validator("models", mode="before")
-    @classmethod
-    def parse_models(
-        cls,
-        value: dict[str, LLMModel | str | GenerativeModel],
-    ) -> dict[str, GenerativeModel | str]:
-        """Convert legacy LLMModel values to str with deprecation warning."""
-        new_models = {}
-        for key, model_value in value.items():
-            new_model_value = model_value
-            if isinstance(model_value, LLMModel):
-                warnings.warn(
-                    "LLMModel values are deprecated and will be removed in a future version.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                new_model_value = model_value.to_model_string()
-            new_models[key] = new_model_value
-        return new_models
 
     feature_flags: dict[str, bool] = Field(
         default={},
@@ -566,10 +588,16 @@ class Config(BaseModel):
 
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.
-        for model in self.models.model_dump().values():
-            if self._build_generative_model(model) is None:
+        for model_getter in (
+            self.get_default_model,
+            self.get_planning_model,
+            self.get_execution_model,
+            self.get_introspection_model,
+            self.get_summarizer_model,
+        ):
+            if model_getter() is None:
                 raise InvalidConfigError(
-                    f"models.{model}",
+                    f"models.{model_getter.__name__}",
                     "All models must be instantiable",
                 )
 
@@ -635,38 +663,62 @@ class Config(BaseModel):
         return value
 
     def get_default_model(self) -> GenerativeModel:
-        """Get or build the default model from the config."""
-        model = self.models.default_model
+        """Get or build the default model from the config.
+
+        The default model will always be present. It is a general purpose model that is used
+        for the SDK's LLM-based Tools, such as the ImageUnderstandingTool and the LLMTool.
+
+        Additionally, unless specified all other specific agent models will default to this model.
+        """
+        model = self._construct_generative_model(self.models.default_model)
         if model is None:
             # Default model is required, but not provided.
             raise InvalidConfigError(
                 "default_model",
                 "A default model must be set",
             )
-        return self._build_generative_model(model)
+        return model
 
     def get_planning_model(self) -> GenerativeModel:
-        """Get or build the planning model from the config."""
-        return self._build_generative_model(self.models.planning_model) or self.get_default_model()
+        """Get or build the planning model from the config.
+
+        See the GenerativeModels config class for more information
+        """
+        return (
+            self._construct_generative_model(self.models.planning_model) or self.get_default_model()
+        )
 
     def get_execution_model(self) -> GenerativeModel:
-        """Get or build the execution model from the config."""
-        return self._build_generative_model(self.models.execution_model) or self.get_default_model()
+        """Get or build the execution model from the config.
 
-    def get_introspection_model(self) -> GenerativeModel:
-        """Get or build the introspection model from the config."""
+        See the GenerativeModels config class for more information
+        """
         return (
-            self._build_generative_model(self.models.introspection_model)
+            self._construct_generative_model(self.models.execution_model)
             or self.get_default_model()
         )
 
-    def get_summariser_model(self) -> GenerativeModel:
-        """Get or build the summariser model from the config."""
+    def get_introspection_model(self) -> GenerativeModel:
+        """Get or build the introspection model from the config.
+
+        See the GenerativeModels config class for more information
+        """
         return (
-            self._build_generative_model(self.models.summariser_model) or self.get_default_model()
+            self._construct_generative_model(self.models.introspection_model)
+            or self.get_default_model()
         )
 
-    def _build_generative_model(
+    def get_summarizer_model(self) -> GenerativeModel:
+        """Get or build the summarizer model from the config.
+
+        See the GenerativeModels config class for more information
+        """
+        return (
+            self._construct_generative_model(self.models.summarizer_model)
+            or self.get_default_model()
+        )
+
+    def _construct_generative_model(
         self,
         model: str | GenerativeModel | None,
     ) -> GenerativeModel | None:
@@ -696,9 +748,13 @@ class Config(BaseModel):
         """
         provider, model_name = model_string.strip().split("/", maxsplit=1)
         llm_provider = LLMProvider(provider)
-        return self._construct_model(llm_provider, model_name)
+        return self._construct_model_from_name(llm_provider, model_name)
 
-    def _construct_model(self, llm_provider: LLMProvider, model_name: str) -> GenerativeModel:
+    def _construct_model_from_name(
+        self,
+        llm_provider: LLMProvider,
+        model_name: str,
+    ) -> GenerativeModel:
         """Construct a Model instance from an LLMProvider and model name."""
         match llm_provider:
             case LLMProvider.OPENAI:
@@ -785,9 +841,19 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
             category=DeprecationWarning,
         )
 
+    models = kwargs.pop("models", {})
+    if isinstance(models, GenerativeModels):
+        models = models.model_dump(exclude_unset=True)
+    duplicate_model_keys = kwargs.keys() & models.keys()
+    if duplicate_model_keys:
+        raise InvalidConfigError(
+            ", ".join(duplicate_model_keys),
+            "Model passed in Keys in kwargs and models must be unique",
+        )
+
     kwargs_models = {
         "default_model": llm_model_name,
-        **kwargs.pop("models", {}),
+        **models,
         **{k: v for k, v in kwargs.items() if k in GenerativeModels.model_fields},
     }
 
@@ -796,7 +862,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         planning_model=kwargs_models.pop("planning_model", None),
         execution_model=kwargs_models.pop("execution_model", None),
         introspection_model=kwargs_models.pop("introspection_model", None),
-        summariser_model=kwargs_models.pop("summariser_model", None),
+        summarizer_model=kwargs_models.pop("summariser_model", None),
     )
 
     default_storage_class = (

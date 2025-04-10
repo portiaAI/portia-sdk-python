@@ -1,30 +1,25 @@
 """Tests for portia classes."""
 
-from unittest.mock import MagicMock
-
 import pytest
 from pydantic import SecretStr
 
 from portia.config import (
-    ALL_USAGE_KEYS,
-    DEFAULT_MODEL_KEY,
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
-    PLANNING_MODEL_KEY,
     SUPPORTED_OPENAI_MODELS,
     Config,
     ExecutionAgentType,
+    GenerativeModels,
     LLMModel,
     LogLevel,
     PlanningAgentType,
     StorageClass,
 )
-from portia.errors import ConfigModelResolutionError, ConfigNotFoundError, InvalidConfigError
+from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
     GoogleGenAiGenerativeModel,
-    LangChainGenerativeModel,
     LLMProvider,
     MistralAIGenerativeModel,
     OpenAIGenerativeModel,
@@ -175,29 +170,29 @@ def test_set_default_model_from_model_instance() -> None:
     assert planner_model is model
 
 
-AGENT_MODEL_KEYS = [k for k in ALL_USAGE_KEYS if k != DEFAULT_MODEL_KEY]
+MODEL_KEYS = set(GenerativeModels.model_fields) - {"default_model"}
 
 
-@pytest.mark.parametrize("agent_model_key", AGENT_MODEL_KEYS)
-def test_set_agent_model_default_model_not_set_fails(agent_model_key: str) -> None:
+@pytest.mark.parametrize("model_key", MODEL_KEYS)
+def test_set_agent_model_default_model_not_set_fails(model_key: str) -> None:
     """Test setting agent_model from model instance without default model or provider set."""
     model = OpenAIGenerativeModel(model_name="gpt-4o", api_key=SecretStr("test-openai-key"))
     with pytest.raises(InvalidConfigError):
-        _ = Config.from_default(**{agent_model_key: model})
+        _ = Config.from_default(**{model_key: model})
 
 
-@pytest.mark.skip(reason="TODO: Refactor for new model getters")
-@pytest.mark.parametrize("agent_model_key", AGENT_MODEL_KEYS)
+@pytest.mark.parametrize("model_key", MODEL_KEYS)
 def test_set_agent_model_with_string_api_key_env_var_set(
     monkeypatch: pytest.MonkeyPatch,
-    agent_model_key: str,
+    model_key: str,
 ) -> None:
     """Test setting planning_model with string, with correct API key env var present."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     model_str = "openai/gpt-4o"
-    c = Config.from_default(**{agent_model_key: model_str})
-    # resolved_model = c.get_model(usage=agent_model_key)
-    # assert str(resolved_model) == model_str
+    c = Config.from_default(**{model_key: model_str})
+    method = getattr(c, f"get_{model_key}")
+    resolved_model = method()
+    assert str(resolved_model) == model_str
 
     # Provider inferred from env var to be OpenAI, so default model is OpenAI default model
     default_model = c.get_default_model()
@@ -323,7 +318,7 @@ def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
     assert str(config.get_planning_model()) == "openai/gpt-4o"
 
 
-def test_resolve_model_azure() -> None:
+def test_get_planning_model_azure() -> None:
     """Test resolve model for Azure OpenAI."""
     c = Config.from_default(
         llm_provider=LLMProvider.AZURE_OPENAI,
@@ -331,14 +326,6 @@ def test_resolve_model_azure() -> None:
         azure_openai_api_key="test-azure-openai-api-key",
     )
     assert isinstance(c.get_planning_model(), AzureOpenAIGenerativeModel)
-
-
-def test_resolve_langchain_model() -> None:
-    """Test resolve langchain model."""
-    conf = Config.from_default(
-        default_model=LangChainGenerativeModel(client=MagicMock(), model_name="test"),
-    )
-    assert isinstance(conf.get_default_model(), LangChainGenerativeModel)
 
 
 def test_getters() -> None:
@@ -422,8 +409,8 @@ def test_set_model_from_llm_model_raises_deprecation_warning(
             default_model=LLMModel("gpt-4o"),
             planning_model=LLMModel("openai/o3-mini"),
         )
-    assert c.models[DEFAULT_MODEL_KEY] == "openai/gpt-4o"
-    assert c.models[PLANNING_MODEL_KEY] == "openai/o3-mini"
+    assert c.models.default_model == "openai/gpt-4o"
+    assert c.models.planning_model == "openai/o3-mini"
 
 
 def test_check_model_supported_raises_deprecation_warning() -> None:
@@ -432,30 +419,21 @@ def test_check_model_supported_raises_deprecation_warning() -> None:
         assert "gpt-4o" in SUPPORTED_OPENAI_MODELS
 
 
-def test_config_model_raises_deprecation_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test Config.model raises a DeprecationWarning."""
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
-    with pytest.warns(DeprecationWarning):
-        model = Config.from_default().model(DEFAULT_MODEL_KEY)
-    assert isinstance(model, OpenAIGenerativeModel)
-
-
 def test_config_error_resolve_model_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test Config.model raises a ConfigModelResolutionError if no model is found."""
+    # Setup: Its actually not currently possible to get a model in this state, but
+    # it is tested here because Config validation can change independently and we want
+    # to make sure the model getters raise a config error if that happens.
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
     config = Config.from_default()
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    config.models = GenerativeModels()
     config.llm_provider = None
-    with pytest.raises(
-        ConfigModelResolutionError,
-        match="Model could not be resolved for usage 'default_model'",
-    ):
+
+    with pytest.raises(InvalidConfigError):
         config.get_default_model()
 
-    with pytest.raises(
-        ConfigModelResolutionError,
-        match="Model could not be resolved for usage 'planning_model'",
-    ):
+    with pytest.raises(InvalidConfigError):
         config.get_planning_model()
 
 
@@ -475,7 +453,7 @@ def test_llm_model_name_deprecation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
     with pytest.warns(DeprecationWarning):
         c = Config.from_default(llm_model_name="openai/gpt-4o")
-    assert c.models[DEFAULT_MODEL_KEY] == "openai/gpt-4o"
+    assert c.models.default_model == "openai/gpt-4o"
 
 
 @pytest.mark.parametrize(

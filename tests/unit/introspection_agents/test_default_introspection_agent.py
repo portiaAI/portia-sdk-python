@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_core.messages import HumanMessage
 
-from portia.config import INTROSPECTION_MODEL_KEY
+from portia.config import GenerativeModels
 from portia.execution_agents.output import LocalOutput
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
@@ -32,9 +32,9 @@ def mock_introspection_model() -> MagicMock:
 def introspection_agent(mock_introspection_model: MagicMock) -> DefaultIntrospectionAgent:
     """Create an instance of the DefaultIntrospectionAgent with mocked config."""
     mock_config = get_test_config(
-        models={
-            INTROSPECTION_MODEL_KEY: mock_introspection_model,
-        },
+        models=GenerativeModels(
+            introspection_model=mock_introspection_model,
+        ),
     )
     return DefaultIntrospectionAgent(config=mock_config)
 

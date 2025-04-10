@@ -85,7 +85,7 @@ def messages() -> list[Message]:
 @pytest.mark.parametrize("model_str", MODELS)
 def test_get_response(model_str: str, messages: list[Message]) -> None:
     """Test get_response for each model type."""
-    model = Config.from_default(default_model=model_str).resolve_model()
+    model = Config.from_default(default_model=model_str).get_default_model()
     response = model.get_response(messages)
     assert isinstance(response, Message)
     assert response.role is not None
@@ -95,7 +95,7 @@ def test_get_response(model_str: str, messages: list[Message]) -> None:
 @pytest.mark.parametrize("model_str", MODELS)
 def test_get_structured_response(model_str: str, messages: list[Message]) -> None:
     """Test get_structured_response for each model type."""
-    model = Config.from_default(default_model=model_str).resolve_model()
+    model = Config.from_default(default_model=model_str).get_default_model()
     response = model.get_structured_response(messages, Response)
     assert isinstance(response, Response)
     assert response.message is not None
@@ -104,6 +104,6 @@ def test_get_structured_response(model_str: str, messages: list[Message]) -> Non
 @pytest.mark.parametrize("model_str", MODELS)
 def test_get_structured_response_steps_or_error(model_str: str, messages: list[Message]) -> None:
     """Test get_structured_response with StepsOrError for each model type."""
-    model = Config.from_default(default_model=model_str).resolve_model()
+    model = Config.from_default(default_model=model_str).get_default_model()
     response = model.get_structured_response(messages, StepsOrError)
     assert isinstance(response, StepsOrError)

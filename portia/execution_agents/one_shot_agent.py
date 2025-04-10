@@ -15,7 +15,6 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.config import EXECUTION_MODEL_KEY
 from portia.errors import InvalidAgentError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.execution_utils import (
@@ -33,7 +32,7 @@ if TYPE_CHECKING:
 
     from portia.config import Config
     from portia.execution_agents.output import Output
-    from portia.model import LangChainGenerativeModel
+    from portia.model import GenerativeModel
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.tool import Tool
@@ -82,7 +81,7 @@ class OneShotToolCallingModel:
 
     def __init__(
         self,
-        model: LangChainGenerativeModel,
+        model: GenerativeModel,
         context: str,
         tools: list[StructuredTool],
         agent: OneShotAgent,
@@ -90,7 +89,7 @@ class OneShotToolCallingModel:
         """Initialize the OneShotToolCallingModel.
 
         Args:
-            model (LangChainGenerativeModel): The language model to use for generating responses.
+            model (GenerativeModel): The language model to use for generating responses.
             context (str): The context to be used when generating the response.
             tools (list[StructuredTool]): A list of tools that can be used during the task.
             agent (OneShotAgent): The agent that is managing the task.
@@ -176,7 +175,7 @@ class OneShotAgent(BaseExecutionAgent):
             raise InvalidAgentError("No tool available")
 
         context = self.get_system_context()
-        model = self.config.resolve_langchain_model(EXECUTION_MODEL_KEY)
+        model = self.config.get_execution_model()
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=ToolRunContext(
