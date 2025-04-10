@@ -6,8 +6,8 @@ for each run execution, ensuring flexibility and context isolation, especially i
 multi-threaded or asynchronous applications.
 
 Key Features:
-- The `ExecutionContext` class encapsulates information such as user identification,
-  additional data, and system context extensions for planning and execution agents.
+- The `ExecutionContext` class encapsulates information such as user identification
+  and additional data for planning and execution agents.
 - The `execution_context` context manager allows for context isolation, ensuring
   that each task or thread has its own independent execution context.
 - The `get_execution_context` function allows retrieval of the current execution context.
@@ -43,10 +43,6 @@ class ExecutionContext(BaseModel):
         end_user_id (Optional[str]): The identifier of the user for whom the run is running.
             Used for authentication and debugging purposes.
         additional_data (dict[str, str]): Arbitrary additional data useful for debugging.
-        planning_agent_system_context_extension (Optional[list[str]]): Additional context for
-            planning_agents.
-        execution_agent_system_context_extension (Optional[list[str]]): Additional context for agent LLMs.
-        plan_run_context (Optional[str]): Additional context for the PlanRun.
 
     """  # noqa: E501
 
@@ -55,12 +51,6 @@ class ExecutionContext(BaseModel):
     end_user_id: str | None = None
 
     additional_data: dict[str, str] = Field(default={})
-
-    planning_agent_system_context_extension: list[str] | None = None
-
-    execution_agent_system_context_extension: list[str] | None = None
-
-    plan_run_context: str | None = Field(default=None, exclude=True)
 
 
 def empty_context() -> ExecutionContext:
@@ -73,9 +63,6 @@ def empty_context() -> ExecutionContext:
     return ExecutionContext(
         end_user_id=None,
         additional_data={},
-        planning_agent_system_context_extension=None,
-        execution_agent_system_context_extension=None,
-        plan_run_context=None,
     )
 
 
@@ -84,8 +71,6 @@ def execution_context(
     context: ExecutionContext | None = None,
     end_user_id: str | None = None,
     additional_data: dict[str, str] | None = None,
-    planning_agent_system_context_extension: list[str] | None = None,
-    agent_system_context_extension: list[str] | None = None,
 ) -> Generator[None, None, None]:
     """Set the execution context for the duration of the PlanRun.
 
@@ -102,10 +87,6 @@ def execution_context(
             the execution for specific users. Defaults to `None`.
         additional_data (Optional[Dict[str, str]]): Arbitrary additional data to associate
             with the context. Defaults to an empty dictionary.
-        planning_agent_system_context_extension (Optional[list[str]]): Additional context for
-            planning_agents. This should be concise to stay within the context window.
-        agent_system_context_extension (Optional[list[str]]): Additional context for agent
-            LLMs. This should also be concise.
 
     Yields:
         None: The block of code within the context manager executes with the specified context.
@@ -128,8 +109,6 @@ def execution_context(
         context = ExecutionContext(
             end_user_id=end_user_id,
             additional_data=additional_data or {},
-            planning_agent_system_context_extension=planning_agent_system_context_extension,
-            execution_agent_system_context_extension=agent_system_context_extension,
         )
     token = _execution_context.set(context)
     try:
