@@ -4261,4 +4261,4 @@ tools-browser-local = ["browser-use", "playwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "a6178ad9f814822d0ec2c9ed29960c979d1bfe72654bbf0cac3b70b2e9a163ec"
+content-hash = "c6fc5638f4c9e95e1239b391f3479dfd580f8c6f162bf86afa0445cf80ce0a84"
