@@ -279,7 +279,7 @@ class BrowserToolForUrl(BaseBrowserTool):
         name: str | None = None,
         description: str | None = None,
         model: LangChainGenerativeModel | None = NotSet,
-        infrastructure_option: BrowserInfrastructureOption | None = NotSet,
+        infrastructure_option: BrowserInfrastructureOption | None = NotSet
     ) -> None:
         """Initialize the BrowserToolForUrl."""
         http_url = HttpUrl(url)
