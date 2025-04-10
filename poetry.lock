@@ -1735,7 +1735,7 @@ ollama = ">=0.4.4,<1"
 name = "langchain-openai"
 version = "0.3.1"
 description = "An integration package connecting OpenAI and LangChain"
-optional = true
+optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 markers = "python_version < \"4.0\""
@@ -4276,4 +4276,4 @@ tools-browser-local = ["browser-use", "playwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "22caf3970dd8284a478f2b77e0fcc855a88fefac2e5f696b3e89aa423e0300ec"
+content-hash = "3db82c67b9a5fd77d62ff104b40ad3ab8aa095eaa13ffdfcfc6acadb686ad769"
