@@ -457,6 +457,31 @@ def test_llm_model_name_deprecation(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.parametrize(
+    ("legacy_model_key", "new_model_key"),
+    [
+        ("planning_model_name", "planning_model"),
+        ("execution_model_name", "execution_model"),
+        ("introspection_model_name", "introspection_model"),
+        ("summariser_model_name", "summarizer_model"),
+        ("default_model_name", "default_model"),
+    ],
+)
+def test_legacy_model_kwargs_deprecation(
+    legacy_model_key: str,
+    new_model_key: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test legacy model kwargs raise a DeprecationWarning (but works)."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.warns(DeprecationWarning):
+        c = Config.from_default(
+            **{legacy_model_key: "openai/o1"},
+            llm_provider=LLMProvider.OPENAI,
+        )
+    assert getattr(c.models, new_model_key) == "openai/o1"
+
+
+@pytest.mark.parametrize(
     ("env_vars", "provider"),
     [
         ({"OPENAI_API_KEY": "test-openai-api-key"}, LLMProvider.OPENAI),

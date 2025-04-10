@@ -281,6 +281,13 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     )
 
 
+PLANNING_MODEL_KEY = "planning_model_name"
+EXECUTION_MODEL_KEY = "execution_model_name"
+INTROSPECTION_MODEL_KEY = "introspection_model_name"
+SUMMARISER_MODEL_KEY = "summariser_model_name"
+DEFAULT_MODEL_KEY = "default_model_name"
+
+
 PROVIDER_DEFAULT_MODELS = {
     "planning_model": {
         LLMProvider.OPENAI: "openai/o3-mini",
@@ -851,6 +858,23 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
             category=DeprecationWarning,
         )
 
+    legacy_model_kwargs = {}
+    for legacy_model_key, new_model_key in {
+        PLANNING_MODEL_KEY: "planning_model",
+        EXECUTION_MODEL_KEY: "execution_model",
+        INTROSPECTION_MODEL_KEY: "introspection_model",
+        SUMMARISER_MODEL_KEY: "summarizer_model",
+        DEFAULT_MODEL_KEY: "default_model",
+    }.items():
+        if legacy_model_key in kwargs:
+            warnings.warn(
+                f"{legacy_model_key} is deprecated and will be removed in a future version. Use "
+                f"{new_model_key} instead.",
+                stacklevel=2,
+                category=DeprecationWarning,
+            )
+            legacy_model_kwargs[new_model_key] = kwargs.pop(legacy_model_key)
+
     models = kwargs.pop("models", {})
     if isinstance(models, GenerativeModels):
         models = models.model_dump(exclude_unset=True)
@@ -861,18 +885,23 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
             "Model passed in Keys in kwargs and models must be unique",
         )
 
+    def filter_none(mapping: dict[str, Any]) -> dict[str, Any]:
+        """Filter out None values from a dictionary."""
+        return {k: v for k, v in mapping.items() if v is not None}
+
     kwargs_models = {
-        "default_model": llm_model_name,
-        **models,
-        **{k: v for k, v in kwargs.items() if k in GenerativeModels.model_fields},
+        **filter_none(legacy_model_kwargs),
+        **filter_none({"default_model": llm_model_name}),
+        **filter_none(models),
+        **filter_none({k: v for k, v in kwargs.items() if k in GenerativeModels.model_fields}),
     }
 
     models = GenerativeModels(
-        default_model=kwargs_models.pop("default_model", None),
-        planning_model=kwargs_models.pop("planning_model", None),
-        execution_model=kwargs_models.pop("execution_model", None),
-        introspection_model=kwargs_models.pop("introspection_model", None),
-        summarizer_model=kwargs_models.pop("summariser_model", None),
+        default_model=kwargs_models.get("default_model"),
+        planning_model=kwargs_models.get("planning_model"),
+        execution_model=kwargs_models.get("execution_model"),
+        introspection_model=kwargs_models.get("introspection_model"),
+        summarizer_model=kwargs_models.get("summarizer_model"),
     )
 
     default_storage_class = (
