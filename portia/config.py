@@ -435,7 +435,7 @@ class Config(BaseModel):
     models: GenerativeModels = Field(
         default_factory=lambda: GenerativeModels(),
         description="Manual configuration for the generative models for Portia to use for "
-        "different agents.",
+        "different agents. See the GenerativeModels class for more information.",
     )
 
     feature_flags: dict[str, bool] = Field(
