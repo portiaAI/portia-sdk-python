@@ -518,7 +518,9 @@ class Config(BaseModel):
     @classmethod
     def parse_storage_class(cls, value: str | StorageClass) -> StorageClass:
         """Parse storage class to enum if string provided."""
-        return parse_str_to_enum(value, StorageClass)
+        if isinstance(value, str):
+            return parse_str_to_enum(value, StorageClass)
+        return value
 
     storage_dir: str | None = Field(
         default=None,

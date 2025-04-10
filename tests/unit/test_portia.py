@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from pydantic import HttpUrl, SecretStr
-from pytest_httpx import HTTPXMock
 
 from portia.clarification import (
     ActionClarification,
@@ -23,7 +22,7 @@ from portia.config import (
     Config,
     StorageClass,
 )
-from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError, PortiaAPIError
+from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
@@ -32,7 +31,7 @@ from portia.introspection_agents.introspection_agent import (
 from portia.model import LangChainGenerativeModel
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
-from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step
+from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
@@ -67,20 +66,6 @@ def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
             PLANNING_MODEL_KEY: planning_model,
             DEFAULT_MODEL_KEY: default_model,
         },
-    )
-    tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
-    return Portia(config=config, tools=tool_registry)
-
-
-@pytest.fixture
-def portia_with_mock_cloud_client(planning_model: MagicMock, default_model: MagicMock) -> Portia:
-    """Fixture to create a Portia instance for testing."""
-    config = get_test_config(
-        custom_models={
-            PLANNING_MODEL_KEY: planning_model,
-            DEFAULT_MODEL_KEY: default_model,
-        },
-        portia_api_key="123",
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
@@ -1315,43 +1300,3 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
         assert result_plan_run.outputs.final_output.get_summary() == expected_summary
         assert result_plan_run.current_step_index == 3
-
-
-def test_similar_plans(portia_with_mock_cloud_client: Portia, httpx_mock: HTTPXMock) -> None:
-    """Test the similar_plans method."""
-    mock_id = "plan-00000000-0000-0000-0000-000000000000"
-    mock_response = {
-        "id": mock_id,
-        "steps": [],
-        "query": "Test query",
-        "tool_ids": [],
-    }
-    endpoint = portia_with_mock_cloud_client.config.portia_api_endpoint
-    url = f"{endpoint}/api/v0/plans/embeddings/search/"
-    httpx_mock.add_response(
-        url=url,
-        status_code=200,
-        method="POST",
-        match_json={
-            "query": "Test query",
-            "threshold": 0.5,
-            "limit": 5,
-        },
-        json=[mock_response, mock_response],
-    )
-    plans = portia_with_mock_cloud_client.similar_plans("Test query")
-    assert len(plans) == 2
-    assert plans[0].id == PlanUUID.from_string(mock_id)
-    assert plans[1].id == PlanUUID.from_string(mock_id)
-
-
-def test_similar_plans_error(portia_with_mock_cloud_client: Portia, httpx_mock: HTTPXMock) -> None:
-    """Test the similar_plans method with an error."""
-    endpoint = portia_with_mock_cloud_client.config.portia_api_endpoint
-    url = f"{endpoint}/api/v0/plans/embeddings/search/"
-    httpx_mock.add_response(
-        url=url,
-        status_code=500,
-    )
-    with pytest.raises(PortiaAPIError):
-        portia_with_mock_cloud_client.similar_plans("Test query")

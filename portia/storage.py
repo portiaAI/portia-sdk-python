@@ -104,6 +104,23 @@ class PlanStorage(ABC):
         """
         raise NotImplementedError("get_plan is not implemented")
 
+    def get_similar_plans(self, query: str, threshold: float, limit: int) -> list[Plan]:
+        """Get similar plans to the query.
+
+        Args:
+            query (str): The query to get similar plans for.
+            threshold (float): The threshold for similarity.
+            limit (int): The maximum number of plans to return.
+
+        Returns:
+            list[Plan]: The list of similar plans.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("get_similar_plans is not implemented")
+
 
 class PlanRunListResponse(BaseModel):
     """Response for the get_plan_runs operation. Can support pagination."""
@@ -997,3 +1014,30 @@ class PortiaCloudStorage(Storage, AgentMemory):
             raise StorageError(e) from e
         else:
             return output
+
+    def get_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 5) -> list[Plan]:
+        """Get similar plans to the query.
+
+        Args:
+            query (str): The query to get similar plans for.
+            threshold (float): The threshold for similarity.
+            limit (int): The maximum number of plans to return.
+
+        Returns:
+            list[Plan]: The list of similar plans.
+
+        """
+        try:
+            response = self.client.post(
+                "/api/v0/plans/embeddings/search/",
+                json={
+                    "query": query,
+                    "threshold": threshold,
+                    "limit": limit,
+                },
+            )
+            self.check_response(response)
+            results = response.json()
+            return [Plan.from_response(result) for result in results]
+        except Exception as e:
+            raise StorageError(e) from e

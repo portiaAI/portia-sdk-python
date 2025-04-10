@@ -21,7 +21,6 @@ complex queries using various planning and execution agent configurations.
 
 from __future__ import annotations
 
-import json
 import time
 from typing import TYPE_CHECKING
 
@@ -39,7 +38,6 @@ from portia.config import (
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
-    PortiaAPIError,
 )
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
@@ -899,35 +897,3 @@ class Portia:
             plan_run.outputs.step_outputs[step.output] = step_output
 
         self.storage.save_plan_run(plan_run)
-
-    def similar_plans(self, query: str, threshold: float = 0.5, limit: int = 5) -> list[Plan]:
-        """Get example plans for a query from the Portia cloud based on similarity to the query.
-
-        Args:
-            query (str): The query to search for similar plans.
-            threshold (float): The threshold for similarity.
-            limit (int): The maximum number of results to return.
-
-        Returns:
-            list[Plan]: The list of similar plans.
-
-        """
-        authenticated_client = PortiaCloudClient.new_client(
-            self.config,
-            allow_unauthenticated=False,
-        )
-        try:
-            response = authenticated_client.post(
-                url=f"{self.config.portia_api_endpoint}/api/v0/plans/embeddings/search/",
-                content=json.dumps(
-                    {
-                        "query": query,
-                        "threshold": threshold,
-                        "limit": limit,
-                    },
-                ),
-            )
-            results = response.json()
-            return [Plan.from_response(result) for result in results]
-        except Exception as e:
-            raise PortiaAPIError(e) from e
