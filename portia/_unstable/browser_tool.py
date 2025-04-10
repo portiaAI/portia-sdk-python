@@ -326,8 +326,34 @@ class BrowserInfrastructureProvider(ABC):
 class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
     """Browser infrastructure provider for local browser instances."""
 
-    @staticmethod
-    def get_chrome_instance_path() -> str:
+    def __init__(
+        self,
+        chrome_path: str | None = None,
+        extra_chromium_args: list[str] | None = None,
+    ) -> None:
+        """Initialize the BrowserInfrastructureProviderLocal."""
+        self.chrome_path = chrome_path or self.get_chrome_instance_path()
+        self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
+
+    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        """Get a Browser instance."""
+        if ctx.execution_context.end_user_id:
+            logger.warning(
+                "BrowserTool is using a local browser instance and does not support "
+                "end_user_id. end_user_id will be ignored.",
+            )
+        return Browser(
+            config=BrowserConfig(
+                chrome_instance_path=self.chrome_path,
+                extra_chromium_args=self.extra_chromium_args or [],
+            ),
+        )
+
+    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:  # noqa: ARG002
+        """Construct the URL for the auth clarification."""
+        return HttpUrl(sign_in_url)
+
+    def get_chrome_instance_path(self) -> str:
         """Get the path to the Chrome instance based on the operating system or env variable."""
         chrome_path_from_env = os.environ.get("PORTIA_BROWSER_LOCAL_CHROME_EXEC")
         if chrome_path_from_env:
@@ -343,22 +369,12 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-    def __init__(self, chrome_path: str | None = None) -> None:
-        """Initialize the BrowserInfrastructureProviderLocal."""
-        self.chrome_path = chrome_path or self.get_chrome_instance_path()
-
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
-        """Get a Browser instance."""
-        if ctx.execution_context.end_user_id:
-            logger.warning(
-                "BrowserTool is using a local browser instance and does not support "
-                "end_user_id. end_user_id will be ignored.",
-            )
-        return Browser(config=BrowserConfig(chrome_instance_path=self.chrome_path))
-
-    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:  # noqa: ARG002
-        """Construct the URL for the auth clarification."""
-        return HttpUrl(sign_in_url)
+    def get_extra_chromium_args(self) -> list[str] | None:
+        """Get the extra Chromium arguments."""
+        extra_chromium_args_from_env = os.environ.get("PORTIA_BROWSER_LOCAL_EXTRA_CHROMIUM_ARGS")
+        if extra_chromium_args_from_env:
+            return extra_chromium_args_from_env.split(",")
+        return None
 
 
 class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
