@@ -12,6 +12,7 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent, Output
+from portia.execution_agents.output import LocalOutput
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import get_test_config, get_test_plan_run
 
@@ -68,5 +69,5 @@ def test_output_serialize() -> None:
     ]
 
     for tc in tcs:
-        output = Output(value=tc[0]).serialize_value(tc[0])
+        output = LocalOutput(value=tc[0]).serialize_value()
         assert output == tc[1]
