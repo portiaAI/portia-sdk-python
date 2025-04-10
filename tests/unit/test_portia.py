@@ -73,6 +73,20 @@ def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
 
 
 @pytest.fixture
+def portia_with_mock_cloud_client(planning_model: MagicMock, default_model: MagicMock) -> Portia:
+    """Fixture to create a Portia instance for testing."""
+    config = get_test_config(
+        custom_models={
+            PLANNING_MODEL_KEY: planning_model,
+            DEFAULT_MODEL_KEY: default_model,
+        },
+        portia_api_key="123",
+    )
+    tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
+    return Portia(config=config, tools=tool_registry)
+
+
+@pytest.fixture
 def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
@@ -1303,7 +1317,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         assert result_plan_run.current_step_index == 3
 
 
-def test_similar_plans(portia: Portia, httpx_mock: HTTPXMock) -> None:
+def test_similar_plans(portia_with_mock_cloud_client: Portia, httpx_mock: HTTPXMock) -> None:
     """Test the similar_plans method."""
     mock_id = "plan-00000000-0000-0000-0000-000000000000"
     mock_response = {
@@ -1312,8 +1326,10 @@ def test_similar_plans(portia: Portia, httpx_mock: HTTPXMock) -> None:
         "query": "Test query",
         "tool_ids": [],
     }
+    endpoint = portia_with_mock_cloud_client.config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/embeddings/search/"
     httpx_mock.add_response(
-        url=f"{portia.config.portia_api_endpoint}/api/v0/plans/embeddings/search/",
+        url=url,
         status_code=200,
         method="POST",
         match_json={
@@ -1323,17 +1339,19 @@ def test_similar_plans(portia: Portia, httpx_mock: HTTPXMock) -> None:
         },
         json=[mock_response, mock_response],
     )
-    plans = portia.similar_plans("Test query")
+    plans = portia_with_mock_cloud_client.similar_plans("Test query")
     assert len(plans) == 2
     assert plans[0].id == PlanUUID.from_string(mock_id)
     assert plans[1].id == PlanUUID.from_string(mock_id)
 
 
-def test_similar_plans_error(portia: Portia, httpx_mock: HTTPXMock) -> None:
+def test_similar_plans_error(portia_with_mock_cloud_client: Portia, httpx_mock: HTTPXMock) -> None:
     """Test the similar_plans method with an error."""
+    endpoint = portia_with_mock_cloud_client.config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/embeddings/search/"
     httpx_mock.add_response(
-        url=f"{portia.config.portia_api_endpoint}/api/v0/plans/embeddings/search/",
+        url=url,
         status_code=500,
     )
     with pytest.raises(PortiaAPIError):
-        portia.similar_plans("Test query")
+        portia_with_mock_cloud_client.similar_plans("Test query")
