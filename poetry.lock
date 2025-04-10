@@ -308,7 +308,7 @@ description = "Extensible memoizing collections and decorators"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "cachetools-5.5.2-py3-none-any.whl", hash = "sha256:d26a22bcc62eb95c3beabd9f1ee5e820d3d2704fe2967cbe350e20c8ffcd3f0a"},
     {file = "cachetools-5.5.2.tar.gz", hash = "sha256:1a661caa9175d26759571b2e19580f9d6393969e5dfca11fdb1f947a23e640d4"},
@@ -900,7 +900,7 @@ description = "Google Ai Generativelanguage API client library"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "google_ai_generativelanguage-0.6.15-py3-none-any.whl", hash = "sha256:5a03ef86377aa184ffef3662ca28f19eeee158733e45d7947982eb953c6ebb6c"},
     {file = "google_ai_generativelanguage-0.6.15.tar.gz", hash = "sha256:8f6d9dc4c12b065fe2d0289026171acea5183ebf2d0b11cefe12f3821e159ec3"},
@@ -922,7 +922,7 @@ description = "Google API client core library"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "google_api_core-2.24.2-py3-none-any.whl", hash = "sha256:810a63ac95f3c441b7c0e43d344e372887f62ce9071ba972eacf32672e072de9"},
     {file = "google_api_core-2.24.2.tar.gz", hash = "sha256:81718493daf06d96d6bc76a91c23874dbf2fac0adbbf542831b805ee6e974696"},
@@ -953,7 +953,7 @@ description = "Google API Client Library for Python"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "google_api_python_client-2.166.0-py2.py3-none-any.whl", hash = "sha256:dd8cc74d9fc18538ab05cbd2e93cb4f82382f910c5f6945db06c91f1deae6e45"},
     {file = "google_api_python_client-2.166.0.tar.gz", hash = "sha256:b8cf843bd9d736c134aef76cf1dc7a47c9283a2ef24267b97207b9dd43b30ef7"},
@@ -973,7 +973,7 @@ description = "Google Authentication Library"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "google_auth-2.38.0-py2.py3-none-any.whl", hash = "sha256:e7dae6694313f434a2727bf2906f27ad259bae090d7aa896590d86feec3d9d4a"},
     {file = "google_auth-2.38.0.tar.gz", hash = "sha256:8285113607d3b80a3f1543b75962447ba8a09fe85783432a784fdeef6ac094c4"},
@@ -999,7 +999,7 @@ description = "Google Authentication Library: httplib2 transport"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "google-auth-httplib2-0.2.0.tar.gz", hash = "sha256:38aa7badf48f974f1eb9861794e9c0cb2a0511a4ec0679b1f886d108f5640e05"},
     {file = "google_auth_httplib2-0.2.0-py2.py3-none-any.whl", hash = "sha256:b65a0a2123300dd71281a7bf6e64d65a0759287df52729bdd1ae2e47dc311a3d"},
@@ -1016,7 +1016,7 @@ description = "Google Generative AI High level API client library and tools."
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "google_generativeai-0.8.4-py3-none-any.whl", hash = "sha256:e987b33ea6decde1e69191ddcaec6ef974458864d243de7191db50c21a7c5b82"},
 ]
@@ -1041,7 +1041,7 @@ description = "Common protobufs used in Google APIs"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "googleapis_common_protos-1.69.2-py3-none-any.whl", hash = "sha256:0b30452ff9c7a27d80bfc5718954063e8ab53dd3697093d3bc99581f5fd24212"},
     {file = "googleapis_common_protos-1.69.2.tar.gz", hash = "sha256:3e1b904a27a33c821b4b749fd31d334c0c9c30e6113023d495e48979a3dc9c5f"},
@@ -1148,7 +1148,7 @@ description = "HTTP/2-based RPC framework"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "grpcio-1.71.0-cp310-cp310-linux_armv7l.whl", hash = "sha256:c200cb6f2393468142eb50ab19613229dcc7829b5ccee8b658a36005f6669fdd"},
     {file = "grpcio-1.71.0-cp310-cp310-macosx_12_0_universal2.whl", hash = "sha256:b2266862c5ad664a380fbbcdbdb8289d71464c42a8c29053820ee78ba0119e5d"},
@@ -1213,7 +1213,7 @@ description = "Status proto mapping for gRPC"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "grpcio_status-1.71.0-py3-none-any.whl", hash = "sha256:843934ef8c09e3e858952887467f8256aac3910c55f077a359a65b2b3cde3e68"},
     {file = "grpcio_status-1.71.0.tar.gz", hash = "sha256:11405fed67b68f406b3f3c7c5ae5104a79d2d309666d10d61b152e91d28fb968"},
@@ -1265,7 +1265,7 @@ description = "A comprehensive HTTP client library."
 optional = true
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "httplib2-0.22.0-py3-none-any.whl", hash = "sha256:14ae0a53c1ba8f3d37e9e27cf37eabb0fb9980f435ba405d546948b009dd64dc"},
     {file = "httplib2-0.22.0.tar.gz", hash = "sha256:d7a10bc5ef5ab08322488bde8c726eeee5c8618723fdb399597ec58f3d82df81"},
@@ -2770,7 +2770,7 @@ description = "Beautiful, Pythonic protocol buffers"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "python_version < \"4.0\" and (extra == \"google\" or extra == \"all\")"
 files = [
     {file = "proto_plus-1.26.1-py3-none-any.whl", hash = "sha256:13285478c2dcf2abb829db158e1047e2f1e8d63a077d94263c2b88b043c75a66"},
     {file = "proto_plus-1.26.1.tar.gz", hash = "sha256:21a515a4c4c0088a773899e23c7bbade3d18f9c66c73edd4c7ee3816bc96a012"},
@@ -2789,7 +2789,7 @@ description = ""
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "protobuf-5.29.4-cp310-abi3-win32.whl", hash = "sha256:13eb236f8eb9ec34e63fc8b1d6efd2777d062fa6aaa68268fb67cf77f6839ad7"},
     {file = "protobuf-5.29.4-cp310-abi3-win_amd64.whl", hash = "sha256:bcefcdf3976233f8a502d265eb65ea740c989bacc6c30a58290ed0e519eb4b8d"},
@@ -2835,7 +2835,7 @@ description = "Pure-Python implementation of ASN.1 types and DER/BER/CER codecs 
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "python_version < \"4.0\" or extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "pyasn1-0.6.1-py3-none-any.whl", hash = "sha256:0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629"},
     {file = "pyasn1-0.6.1.tar.gz", hash = "sha256:6f580d2bdd84365380830acf45550f2511469f673cb4a5ae3857a3170128b034"},
@@ -2848,7 +2848,7 @@ description = "A collection of ASN.1-based protocols modules"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "pyasn1_modules-0.4.2-py3-none-any.whl", hash = "sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a"},
     {file = "pyasn1_modules-0.4.2.tar.gz", hash = "sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6"},
@@ -3067,7 +3067,7 @@ description = "pyparsing module - Classes and methods to define and execute pars
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "pyparsing-3.2.3-py3-none-any.whl", hash = "sha256:a749938e02d6fd0b59b356ca504a24982314bb090c383e3cf201c95ef7e2bfcf"},
     {file = "pyparsing-3.2.3.tar.gz", hash = "sha256:b9c13f1ab8b3b542f72e28f634bad4de758ab3ce4546e4301970ad6fa77c38be"},
@@ -3506,7 +3506,7 @@ description = "Pure-Python RSA implementation"
 optional = true
 python-versions = ">=3.6,<4"
 groups = ["main"]
-markers = "python_version < \"4.0\" or extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "rsa-4.9-py3-none-any.whl", hash = "sha256:90260d9058e514786967344d0ef75fa8727eed8a7d2e43ce9f4bcf1b536174f7"},
     {file = "rsa-4.9.tar.gz", hash = "sha256:e38464a49c6c85d7f1351b0126661487a7e0a14a50f1675ec50eb34d4f20ef21"},
@@ -3856,7 +3856,7 @@ description = "Fast, Extensible Progress Meter"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "python_version < \"4.0\" or extra == \"google\" or extra == \"all\""
+markers = "python_version < \"4.0\""
 files = [
     {file = "tqdm-4.67.1-py3-none-any.whl", hash = "sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2"},
     {file = "tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2"},
@@ -3954,7 +3954,7 @@ description = "Implementation of RFC 6570 URI Templates"
 optional = true
 python-versions = ">=3.6"
 groups = ["main"]
-markers = "extra == \"google\" or extra == \"all\""
+markers = "(extra == \"google\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "uritemplate-4.1.1-py2.py3-none-any.whl", hash = "sha256:830c08b8d99bdd312ea4ead05994a38e8936266f84b9a7878232db50b044e02e"},
     {file = "uritemplate-4.1.1.tar.gz", hash = "sha256:4346edfc5c3b79f694bccd6d6099a322bbeb628dbf2cd86eea55a456ce5124f0"},
@@ -4261,4 +4261,4 @@ tools-browser-local = ["browser-use", "playwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "17d22d4d9dc1873e238e6fd288fe49dc00758c11454c8a009497e3a12cfc1a48"
+content-hash = "a6178ad9f814822d0ec2c9ed29960c979d1bfe72654bbf0cac3b70b2e9a163ec"
