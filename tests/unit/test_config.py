@@ -170,7 +170,7 @@ def test_set_default_model_from_model_instance() -> None:
     assert planner_model is model
 
 
-MODEL_KEYS = set(GenerativeModels.model_fields) - {"default_model"}
+MODEL_KEYS = sorted(set(GenerativeModels.model_fields) - {"default_model"})
 
 
 @pytest.mark.parametrize("model_key", MODEL_KEYS)

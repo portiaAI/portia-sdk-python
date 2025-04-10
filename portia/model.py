@@ -148,6 +148,11 @@ class GenerativeModel(ABC):
         """Get the LangChain client."""
         raise NotImplementedError
 
+    @property
+    def provider_name(self) -> str:
+        """Get the provider name."""
+        return self.provider.value
+
 
 class LangChainGenerativeModel(GenerativeModel):
     """Base class for LangChain-based models."""
