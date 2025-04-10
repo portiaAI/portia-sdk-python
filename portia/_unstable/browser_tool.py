@@ -14,11 +14,12 @@ import sys
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browserbase import Browserbase
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic_core import PydanticUndefined
 
 from portia.clarification import ActionClarification
 from portia.config import LLM_TOOL_MODEL_KEY
@@ -29,6 +30,8 @@ if TYPE_CHECKING:
     from browserbase.types import SessionCreateResponse
 
 logger = logging.getLogger(__name__)
+
+NotSet: Any = PydanticUndefined
 
 
 class BrowserToolForUrlSchema(BaseModel):
@@ -268,6 +271,7 @@ class BrowserToolForUrl(BaseBrowserTool):
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         description: str | None = None,
+        infrastructure_option: BrowserInfrastructureOption = NotSet,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
         http_url = HttpUrl(url)
@@ -290,6 +294,7 @@ class BrowserToolForUrl(BaseBrowserTool):
             description=description,
             args_schema=BrowserToolForUrlSchema,
             url=url,  # type: ignore reportCallIssue
+            infrastructure_option=infrastructure_option,
         )
 
     def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
@@ -329,9 +334,14 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-    def __init__(self, chrome_path: str | None = None) -> None:
+    def __init__(
+        self,
+        chrome_path: str | None = None,
+        extra_chromium_args: list[str] | None = None,
+    ) -> None:
         """Initialize the BrowserInfrastructureProviderLocal."""
         self.chrome_path = chrome_path or self.get_chrome_instance_path()
+        self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
 
     def setup_browser(self, ctx: ToolRunContext) -> Browser:
         """Get a Browser instance."""
@@ -340,7 +350,19 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end_user_id. end_user_id will be ignored.",
             )
-        return Browser(config=BrowserConfig(chrome_instance_path=self.chrome_path))
+        return Browser(
+            config=BrowserConfig(
+                chrome_instance_path=self.chrome_path,
+                extra_chromium_args=self.extra_chromium_args or [],
+            ),
+        )
+
+    def get_extra_chromium_args(self) -> list[str] | None:
+        """Get the extra Chromium arguments."""
+        extra_chromium_args_from_env = os.environ.get("PORTIA_BROWSER_LOCAL_EXTRA_CHROMIUM_ARGS")
+        if extra_chromium_args_from_env:
+            return extra_chromium_args_from_env.split(",")
+        return None
 
     def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:  # noqa: ARG002
         """Construct the URL for the auth clarification."""
