@@ -16,7 +16,7 @@ from portia.config import (
     LogLevel,
     StorageClass,
 )
-from portia.errors import PlanError, ToolSoftError
+from portia.errors import PlanError, ToolHardError, ToolSoftError
 from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import Plan, PlanContext, Step, Variable
@@ -302,8 +302,14 @@ def test_portia_run_query_with_multiple_clarifications(
     )
 
     class MyAdditionTool(AdditionTool):
+        retries: int = 0
+
         def run(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+            # Avoid an endless loop of clarifications
+            if self.retries > 2:
+                raise ToolHardError("Tool failed after 2 retries")
             if a == 1:
+                self.retries += 1
                 return InputClarification(
                     plan_run_id=ctx.plan_run_id,
                     argument_name="a",
