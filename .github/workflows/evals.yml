@@ -53,7 +53,7 @@ jobs:
       - name: Install dependencies
         working-directory: ./platform/evals
         run: |
-          uv sync --locked --no-dev
+          uv pip install -e ../../portia-sdk-python
 
       - name: Check tool IDs
         working-directory: ./platform/evals
