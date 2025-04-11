@@ -146,12 +146,6 @@ class GenerativeModel(ABC):
     @abstractmethod
     def to_langchain(self) -> BaseChatModel:
         """Get the LangChain client."""
-        raise NotImplementedError
-
-    @property
-    def provider_name(self) -> str:
-        """Get the provider name."""
-        return self.provider.value
 
 
 class LangChainGenerativeModel(GenerativeModel):
