@@ -37,7 +37,7 @@ jobs:
           script: |
             const version = 'v${{ steps.get_version.outputs.version }}';
             const sha = context.sha;
-            
+
             try {
               await github.rest.git.createRef({
                 owner: context.repo.owner,
@@ -46,6 +46,27 @@ jobs:
                 sha: sha
               });
               console.log(`Successfully created tag ${version}`);
+            } catch (error) {
+              core.setFailed(`Failed to create tag: ${error.message}`);
+            }
+
+      - name: Create latest prod release tag tag
+        if: !endsWith(github.event.pull_request.head.ref, 'alpha')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.DEPLOY_PAT_TOKEN }}
+          script: |
+            const sha = context.sha;
+
+            try {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/latest-prod-release`,
+                sha: sha,
+                force: true
+              });
+              console.log(`Successfully created tag latest-prod-release`);
             } catch (error) {
               core.setFailed(`Failed to create tag: ${error.message}`);
             } 
