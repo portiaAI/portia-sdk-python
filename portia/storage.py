@@ -119,7 +119,7 @@ class PlanStorage(ABC):
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("get_similar_plans is not implemented")
+        raise NotImplementedError("get_similar_plans is not implemented") # pragma: no cover
 
 
 class PlanRunListResponse(BaseModel):
