@@ -349,6 +349,26 @@ class Plan(BaseModel):
             f"steps={self.steps!r}"
         )
 
+    @classmethod
+    def from_response(cls, response_json: dict) -> Plan:
+        """Create a plan from a response.
+
+        Args:
+            response_json (dict): The response from the API.
+
+        Returns:
+            Plan: The plan.
+
+        """
+        return cls(
+            id=PlanUUID.from_string(response_json["id"]),
+            plan_context=PlanContext(
+                query=response_json["query"],
+                tool_ids=response_json["tool_ids"],
+            ),
+            steps=[Step.model_validate(step) for step in response_json["steps"]],
+        )
+
     def pretty_print(self) -> str:
         """Return the pretty print representation of the plan.
 

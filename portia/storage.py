@@ -44,7 +44,7 @@ from portia.execution_agents.output import (
 )
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
-from portia.plan import Plan, PlanContext, PlanUUID, Step
+from portia.plan import Plan, PlanUUID
 from portia.plan_run import (
     PlanRun,
     PlanRunOutputs,
@@ -103,6 +103,23 @@ class PlanStorage(ABC):
 
         """
         raise NotImplementedError("get_plan is not implemented")
+
+    def get_similar_plans(self, query: str, threshold: float, limit: int) -> list[Plan]:
+        """Get similar plans to the query.
+
+        Args:
+            query (str): The query to get similar plans for.
+            threshold (float): The threshold for similarity.
+            limit (int): The maximum number of plans to return.
+
+        Returns:
+            list[Plan]: The list of similar plans.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("get_similar_plans is not implemented") # pragma: no cover
 
 
 class PlanRunListResponse(BaseModel):
@@ -755,14 +772,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         else:
             self.check_response(response)
             response_json = response.json()
-            return Plan(
-                id=PlanUUID.from_string(response_json["id"]),
-                plan_context=PlanContext(
-                    query=response_json["query"],
-                    tool_ids=response_json["tool_ids"],
-                ),
-                steps=[Step.model_validate(step) for step in response_json["steps"]],
-            )
+            return Plan.from_response(response_json)
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun to Portia Cloud.
@@ -1004,3 +1014,30 @@ class PortiaCloudStorage(Storage, AgentMemory):
             raise StorageError(e) from e
         else:
             return output
+
+    def get_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 5) -> list[Plan]:
+        """Get similar plans to the query.
+
+        Args:
+            query (str): The query to get similar plans for.
+            threshold (float): The threshold for similarity.
+            limit (int): The maximum number of plans to return.
+
+        Returns:
+            list[Plan]: The list of similar plans.
+
+        """
+        try:
+            response = self.client.post(
+                "/api/v0/plans/embeddings/search/",
+                json={
+                    "query": query,
+                    "threshold": threshold,
+                    "limit": limit,
+                },
+            )
+            self.check_response(response)
+            results = response.json()
+            return [Plan.from_response(result) for result in results]
+        except Exception as e:
+            raise StorageError(e) from e

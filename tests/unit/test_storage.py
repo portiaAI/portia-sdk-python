@@ -540,3 +540,47 @@ def test_portia_cloud_agent_memory_errors() -> None:
         mock_get.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         )
+
+
+def test_similar_plans(httpx_mock: HTTPXMock) -> None:
+    """Test the similar_plans method."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+    mock_id = "plan-00000000-0000-0000-0000-000000000000"
+    mock_response = {
+        "id": mock_id,
+        "steps": [],
+        "query": "Test query",
+        "tool_ids": [],
+    }
+    endpoint = config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/embeddings/search/"
+    httpx_mock.add_response(
+        url=url,
+        status_code=200,
+        method="POST",
+        match_json={
+            "query": "Test query",
+            "threshold": 0.5,
+            "limit": 5,
+        },
+        json=[mock_response, mock_response],
+    )
+    plans = storage.get_similar_plans("Test query")
+    assert len(plans) == 2
+    assert plans[0].id == PlanUUID.from_string(mock_id)
+    assert plans[1].id == PlanUUID.from_string(mock_id)
+
+
+def test_similar_plans_error(httpx_mock: HTTPXMock) -> None:
+    """Test the similar_plans method with an error."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+    endpoint = config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/embeddings/search/"
+    httpx_mock.add_response(
+        url=url,
+        status_code=500,
+    )
+    with pytest.raises(StorageError):
+        storage.get_similar_plans("Test query")
