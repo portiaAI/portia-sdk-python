@@ -9,13 +9,11 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 from portia.execution_agents.context import build_context
-
-# TODO: Remove this once the backend / evals are updated to use the new import  # noqa: FIX002, TD002, TD003, E501
-from portia.execution_agents.output import Output  # noqa: TC001
 from portia.execution_context import get_execution_context
 
 if TYPE_CHECKING:
     from portia.config import Config
+    from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.tool import Tool
