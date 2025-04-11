@@ -236,11 +236,3 @@ class StorageError(PortiaBaseError):
     def __init__(self, cause: Exception | str) -> None:
         """Set custom error message."""
         super().__init__(cause)
-
-
-class PortiaAPIError(PortiaBaseError):
-    """Raised when an issue occurs with the Portia API."""
-
-    def __init__(self, cause: Exception | str) -> None:
-        """Set custom error message."""
-        super().__init__(cause)
