@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 from portia.model import (
     GenerativeModel,
     LangChainGenerativeModel,
+    LLMProvider,
     Message,
     map_message_to_instructor,
 )
@@ -126,7 +127,7 @@ def test_message_validation() -> None:
 class DummyGenerativeModel(GenerativeModel):
     """Dummy generative model."""
 
-    provider_name: str = "portia"
+    provider: LLMProvider = LLMProvider.CUSTOM
 
     def __init__(self, model_name: str) -> None:
         """Initialize the model."""
@@ -144,12 +145,16 @@ class DummyGenerativeModel(GenerativeModel):
         """Get a structured response from the model."""
         return schema()
 
+    def to_langchain(self) -> BaseChatModel:
+        """Not implemented in tests."""
+        raise NotImplementedError("This method is not used in tests")
+
 
 def test_model_to_string() -> None:
     """Test that the model to string method works."""
     model = DummyGenerativeModel(model_name="test")
-    assert str(model) == "portia/test"
-    assert repr(model) == 'DummyGenerativeModel("portia/test")'
+    assert str(model) == "custom/test"
+    assert repr(model) == 'DummyGenerativeModel("custom/test")'
 
 
 class StructuredOutputTestModel(BaseModel):

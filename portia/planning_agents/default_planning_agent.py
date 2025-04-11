@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from portia.config import PLANNING_MODEL_KEY
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -24,7 +23,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
-        self.model = config.resolve_model(PLANNING_MODEL_KEY)
+        self.model = config.get_planning_model()
 
     def generate_steps_or_error(
         self,

@@ -62,7 +62,7 @@ class LLMTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, task: str) -> str:
         """Run the LLMTool."""
-        model = self.model or ctx.config.resolve_model()
+        model = self.model or ctx.config.get_default_model()
 
         # Define system and user messages
         context = (

@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 
-from portia.config import INTROSPECTION_MODEL_KEY, Config
+from portia.config import Config
 from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
     PreStepIntrospection,
@@ -79,7 +79,7 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """Ask the LLM whether to continue, skip or fail the plan_run."""
-        return self.config.resolve_model(INTROSPECTION_MODEL_KEY).get_structured_response(
+        return self.config.get_introspection_model().get_structured_response(
             schema=PreStepIntrospection,
             messages=[
                 Message.from_langchain(m)

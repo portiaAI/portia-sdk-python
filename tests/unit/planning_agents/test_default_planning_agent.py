@@ -15,7 +15,7 @@ from portia.planning_agents.context import (
     render_prompt_insert_defaults,
 )
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
-from tests.utils import AdditionTool, get_mock_langchain_generative_model, get_test_config
+from tests.utils import AdditionTool, get_mock_generative_model, get_test_config
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -33,13 +33,13 @@ def test_generate_steps_or_error_success(mock_config: Config) -> None:
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
     # Mock the Model response to simulate a successful plan generation
-    mock_model = get_mock_langchain_generative_model(
+    mock_model = get_mock_generative_model(
         response=StepsOrError(
             steps=[],
             error=None,
         ),
     )
-    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
 
     result = planning_agent.generate_steps_or_error(
@@ -76,13 +76,13 @@ def test_generate_steps_or_error_failure(mock_config: Config) -> None:
     query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
 
     # Mock the Model response to simulate an error in plan generation
-    mock_model = get_mock_langchain_generative_model(
+    mock_model = get_mock_generative_model(
         response=StepsOrError(
             steps=[],
             error="Unable to generate a plan",
         ),
     )
-    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
         query=query,
@@ -169,10 +169,10 @@ def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
         ],
         error=None,
     )
-    mock_model = get_mock_langchain_generative_model(
+    mock_model = get_mock_generative_model(
         response=mock_response,
     )
-    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
         query=query,
@@ -205,10 +205,10 @@ def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
         ],
         error=None,
     )
-    mock_model = get_mock_langchain_generative_model(
+    mock_model = get_mock_generative_model(
         response=mock_response,
     )
-    mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
         query=query,

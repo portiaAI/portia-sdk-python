@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import instructor
@@ -68,13 +69,33 @@ class Message(BaseModel):
         raise ValueError(f"Unsupported role: {self.role}")
 
 
+class LLMProvider(Enum):
+    """Enum for supported LLM providers.
+
+    Attributes:
+        OPENAI: OpenAI provider.
+        ANTHROPIC: Anthropic provider.
+        MISTRALAI: MistralAI provider.
+        GOOGLE_GENERATIVE_AI: Google Generative AI provider.
+        AZURE_OPENAI: Azure OpenAI provider.
+
+    """
+
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    MISTRALAI = "mistralai"
+    GOOGLE_GENERATIVE_AI = "google"
+    AZURE_OPENAI = "azure-openai"
+    CUSTOM = "custom"
+
+
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
 
 
 class GenerativeModel(ABC):
     """Base class for all generative model clients."""
 
-    provider_name: str
+    provider: LLMProvider
 
     def __init__(self, model_name: str) -> None:
         """Initialize the model.
@@ -116,17 +137,21 @@ class GenerativeModel(ABC):
 
     def __str__(self) -> str:
         """Get the string representation of the model."""
-        return f"{self.provider_name}/{self.model_name}"
+        return f"{self.provider.value}/{self.model_name}"
 
     def __repr__(self) -> str:
         """Get the string representation of the model."""
-        return f'{self.__class__.__name__}("{self.provider_name}/{self.model_name}")'
+        return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}")'
+
+    @abstractmethod
+    def to_langchain(self) -> BaseChatModel:
+        """Get the LangChain client."""
 
 
 class LangChainGenerativeModel(GenerativeModel):
     """Base class for LangChain-based models."""
 
-    provider_name: str
+    provider: LLMProvider = LLMProvider.CUSTOM
 
     def __init__(self, client: BaseChatModel, model_name: str) -> None:
         """Initialize with LangChain client.
@@ -177,7 +202,7 @@ class LangChainGenerativeModel(GenerativeModel):
 class OpenAIGenerativeModel(LangChainGenerativeModel):
     """OpenAI model implementation."""
 
-    provider_name: str = "openai"
+    provider: LLMProvider = LLMProvider.OPENAI
 
     def __init__(
         self,
@@ -269,7 +294,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
     """Azure OpenAI model implementation."""
 
-    provider_name: str = "azure-openai"
+    provider: LLMProvider = LLMProvider.AZURE_OPENAI
 
     def __init__(  # noqa: PLR0913
         self,
@@ -371,7 +396,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
 class AnthropicGenerativeModel(LangChainGenerativeModel):
     """Anthropic model implementation."""
 
-    provider_name: str = "anthropic"
+    provider: LLMProvider = LLMProvider.ANTHROPIC
 
     def __init__(
         self,
@@ -441,14 +466,14 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         )
 
 
-if validate_extras_dependencies("mistral", raise_error=False):
+if validate_extras_dependencies("mistralai", raise_error=False):
     from langchain_mistralai import ChatMistralAI
     from mistralai import Mistral
 
     class MistralAIGenerativeModel(LangChainGenerativeModel):
         """MistralAI model implementation."""
 
-        provider_name: str = "mistralai"
+        provider: LLMProvider = LLMProvider.MISTRALAI
 
         def __init__(
             self,
@@ -529,7 +554,7 @@ if validate_extras_dependencies("google", raise_error=False):
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""
 
-        provider_name: str = "google-generative-ai"
+        provider: LLMProvider = LLMProvider.GOOGLE_GENERATIVE_AI
 
         def __init__(
             self,
