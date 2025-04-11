@@ -13,8 +13,8 @@ on:
       - labeled
 
 permissions:
-    contents: read
-    pull-requests: read
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number }}
@@ -46,16 +46,15 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.12"
-      
+
       - name: Install UV
         run: pip install uv
-      
+
       - name: Install dependencies
         working-directory: ./platform/evals
         run: |
-          uv add ../../portia-sdk-python/
           uv sync --locked --no-dev
-      
+
       - name: Check tool IDs
         working-directory: ./platform/evals
         id: check_tool_ids
