@@ -21,7 +21,6 @@ Classes in this file include:
 - `ToolHardError`: Raised when a tool encounters an unrecoverable error.
 - `ToolSoftError`: Raised when a tool encounters an error that can be retried.
 - `StorageError`: Raised when an issue occurs with storage.
-- `PortiaAPIError`: Raised when an issue occurs with the Portia API.
 
 """
 
