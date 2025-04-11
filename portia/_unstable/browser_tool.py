@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browserbase import Browserbase
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
 from portia.clarification import ActionClarification
@@ -54,12 +54,6 @@ class BrowserToolSchema(BaseModel):
         ...,
         description="The task to be completed by the Browser tool.",
     )
-
-    @field_validator("url")
-    @classmethod
-    def validate_url(cls, v: str) -> str:
-        HttpUrl(v)
-        return v
 
 
 class BrowserAuthOutput(BaseModel):
@@ -168,11 +162,9 @@ class BaseBrowserTool(Tool[str]):
                     )
                 return ActionClarification(
                     user_guidance=auth_result.user_login_guidance,
-                    action_url=HttpUrl(
-                        self.infrastructure_provider.construct_auth_clarification_url(
-                            ctx,
-                            auth_result.login_url,
-                        ),
+                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
+                        ctx,
+                        auth_result.login_url,
                     ),
                     plan_run_id=ctx.plan_run_id,
                 )
@@ -195,11 +187,9 @@ class BaseBrowserTool(Tool[str]):
                     )
                 return ActionClarification(
                     user_guidance=task_result.user_login_guidance,
-                    action_url=HttpUrl(
-                        self.infrastructure_provider.construct_auth_clarification_url(
-                            ctx,
-                            task_result.login_url,
-                        ),
+                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
+                        ctx,
+                        task_result.login_url,
                     ),
                     plan_run_id=ctx.plan_run_id,
                 )
