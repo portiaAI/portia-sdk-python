@@ -123,7 +123,7 @@ jobs:
           AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
         run: |
-          uv run jupyter nbconvert --to markdown --execute github_analysis.ipynb --output notebook_output.md --no-input
+          uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
           cat notebook_output.md
           # Removes style blocks that GitHub won't render properly
           sed -i '/<style[^>]*>/,/<\/style>/d' notebook_output.md
