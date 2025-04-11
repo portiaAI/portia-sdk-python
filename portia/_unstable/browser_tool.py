@@ -46,7 +46,7 @@ class BrowserToolForUrlSchema(BaseModel):
 class BrowserToolSchema(BaseModel):
     """Input schema for the BrowserTool."""
 
-    url: HttpUrl = Field(
+    url: str = Field(
         ...,
         description="The URL to navigate to.",
     )
@@ -162,11 +162,9 @@ class BaseBrowserTool(Tool[str]):
                     )
                 return ActionClarification(
                     user_guidance=auth_result.user_login_guidance,
-                    action_url=HttpUrl(
-                        self.infrastructure_provider.construct_auth_clarification_url(
-                            ctx,
-                            auth_result.login_url,
-                        ),
+                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
+                        ctx,
+                        auth_result.login_url,
                     ),
                     plan_run_id=ctx.plan_run_id,
                 )
@@ -189,11 +187,9 @@ class BaseBrowserTool(Tool[str]):
                     )
                 return ActionClarification(
                     user_guidance=task_result.user_login_guidance,
-                    action_url=HttpUrl(
-                        self.infrastructure_provider.construct_auth_clarification_url(
-                            ctx,
-                            task_result.login_url,
-                        ),
+                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
+                        ctx,
+                        task_result.login_url,
                     ),
                     plan_run_id=ctx.plan_run_id,
                 )
