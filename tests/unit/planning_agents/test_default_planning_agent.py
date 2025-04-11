@@ -8,12 +8,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from portia.execution_context import ExecutionContext, get_execution_context
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
 from portia.planning_agents.context import (
-    default_query_system_context,
     render_prompt_insert_defaults,
 )
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
@@ -45,7 +43,6 @@ def test_generate_steps_or_error_success(mock_config: Config) -> None:
     planning_agent = DefaultPlanningAgent(mock_config)
 
     result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
         query=query,
         tool_list=[],
     )
@@ -62,17 +59,16 @@ def test_base_classes() -> None:
 
         def generate_steps_or_error(
             self,
-            ctx: ExecutionContext,
             query: str,
             tool_list: list[Tool],
             examples: list[Plan] | None = None,
         ) -> StepsOrError:
-            return super().generate_steps_or_error(ctx, query, tool_list, examples)  # type: ignore  # noqa: PGH003
+            return super().generate_steps_or_error(query, tool_list, examples)  # type: ignore  # noqa: PGH003
 
     wrapper = MyPlanningAgent(get_test_config())
 
     with pytest.raises(NotImplementedError):
-        wrapper.generate_steps_or_error(get_execution_context(), "", [], [])
+        wrapper.generate_steps_or_error("", [], [])
 
 
 def test_generate_steps_or_error_failure(mock_config: Config) -> None:
@@ -89,18 +85,11 @@ def test_generate_steps_or_error_failure(mock_config: Config) -> None:
     mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
         query=query,
         tool_list=[],
     )
 
     assert result.error == "Unable to generate a plan"
-
-
-def test_planning_agent_default_context_with_extensions() -> None:
-    """Test default context."""
-    context = default_query_system_context(system_context_extension=["456"])
-    assert "456" in context
 
 
 def test_render_prompt() -> None:
@@ -125,14 +114,12 @@ def test_render_prompt() -> None:
         query="test query",
         tool_list=[AdditionTool()],
         examples=plans,
-        system_context_extension=["extension"],
     )
     overall_pattern = re.compile(
-        r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?"
-        r"<SystemContext>(.*?)</SystemContext>",
+        r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?",
         re.DOTALL,
     )
-    example_match, tools_content, request_content, system_context_content = overall_pattern.findall(
+    example_match, tools_content, request_content = overall_pattern.findall(
         rendered_prompt,
     )[0]
 
@@ -159,7 +146,6 @@ def test_render_prompt() -> None:
     assert "add_tool" in tools_content
 
     assert "test query" in request_content
-    assert "extension" in system_context_content
 
 
 def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
@@ -189,7 +175,6 @@ def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
     mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
         query=query,
         tool_list=[AdditionTool()],
     )
@@ -226,7 +211,6 @@ def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
     mock_config.resolve_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
-        ctx=get_execution_context(),
         query=query,
         tool_list=[AdditionTool()],
     )

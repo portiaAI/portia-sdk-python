@@ -8,7 +8,7 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification, InputClarification
 from portia.execution_agents.context import build_context
 from portia.execution_agents.output import LocalOutput, Output
-from portia.execution_context import ExecutionContext
+from portia.execution_context import ExecutionContext, get_execution_context
 from portia.plan import Step, Variable
 from tests.utils import get_test_plan_run
 
@@ -84,20 +84,6 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
             assert val in context
 
 
-def test_system_context() -> None:
-    """Test that the system context is set up correctly."""
-    (plan, plan_run) = get_test_plan_run()
-    context = build_context(
-        ExecutionContext(
-            execution_agent_system_context_extension=["system context 1", "system context 2"],
-        ),
-        plan.steps[0],
-        plan_run,
-    )
-    assert "system context 1" in context
-    assert "system context 2" in context
-
-
 def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with all contexts."""
     (plan, plan_run) = get_test_plan_run()
@@ -127,7 +113,6 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     plan_run.outputs.clarifications = clarifications
     context = build_context(
         ExecutionContext(
-            execution_agent_system_context_extension=["system context 1", "system context 2"],
             end_user_id="123",
             additional_data={"email": "hello@world.com"},
         ),
@@ -167,9 +152,7 @@ end_user_id: 123
 context_key_name: email context_key_value: hello@world.com
 ----------
 System Context:
-Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}
-system context 1
-system context 2"""
+Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""
     )
 
 
@@ -198,9 +181,7 @@ def test_context_inputs_outputs_clarifications(
     plan_run.outputs.step_outputs = outputs
     plan_run.outputs.clarifications = clarifications
     context = build_context(
-        ExecutionContext(
-            execution_agent_system_context_extension=["system context 1", "system context 2"],
-        ),
+        get_execution_context(),
         plan.steps[0],
         plan_run,
     )
