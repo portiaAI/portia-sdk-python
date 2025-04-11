@@ -13,8 +13,8 @@ on:
       - labeled
 
 permissions:
-    contents: read
-    pull-requests: read
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number }}
@@ -46,16 +46,16 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.12"
-      
+
       - name: Install UV
         run: pip install uv
-      
+
       - name: Install dependencies
         working-directory: ./platform/evals
         run: |
           uv add ../../portia-sdk-python/
           uv sync --locked --no-dev
-      
+
       - name: Check tool IDs
         working-directory: ./platform/evals
         id: check_tool_ids
@@ -124,7 +124,7 @@ jobs:
           AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
         run: |
-          uv run jupyter nbconvert --to markdown --execute github_analysis.ipynb --output notebook_output.md --no-input
+          uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
           cat notebook_output.md
           # Removes style blocks that GitHub won't render properly
           sed -i '/<style[^>]*>/,/<\/style>/d' notebook_output.md
