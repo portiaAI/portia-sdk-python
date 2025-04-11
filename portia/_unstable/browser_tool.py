@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browserbase import Browserbase
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_core import PydanticUndefined
 
 from portia.clarification import ActionClarification
@@ -46,7 +46,7 @@ class BrowserToolForUrlSchema(BaseModel):
 class BrowserToolSchema(BaseModel):
     """Input schema for the BrowserTool."""
 
-    url: HttpUrl = Field(
+    url: str = Field(
         ...,
         description="The URL to navigate to.",
     )
@@ -54,6 +54,12 @@ class BrowserToolSchema(BaseModel):
         ...,
         description="The task to be completed by the Browser tool.",
     )
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        HttpUrl(v)
+        return v
 
 
 class BrowserAuthOutput(BaseModel):
