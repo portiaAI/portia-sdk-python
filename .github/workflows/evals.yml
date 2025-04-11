@@ -124,11 +124,11 @@ jobs:
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
         run: |
           uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
-          cat notebook_output.md
+          cat analysis/notebook_output.md
           # Removes style blocks that GitHub won't render properly
-          sed -i '/<style[^>]*>/,/<\/style>/d' notebook_output.md
-          cat notebook_output.md
-          cat notebook_output.md >> $GITHUB_STEP_SUMMARY
+          sed -i '/<style[^>]*>/,/<\/style>/d' analysis/notebook_output.md
+          cat analysis/notebook_output.md
+          cat analysis/notebook_output.md >> $GITHUB_STEP_SUMMARY
 
       - name: Check for evaluation failures
         run: |
