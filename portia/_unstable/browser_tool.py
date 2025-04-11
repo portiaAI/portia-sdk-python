@@ -80,7 +80,7 @@ class BrowserTaskOutput(BaseModel):
     )
     login_url: str | None = Field(
         default=None,
-        description="The URL to navigate to for login if the user is not authenticated.",
+        description="The URL to navigate to in order to login if the user is not authenticated.",
     )
     user_login_guidance: str | None = Field(
         default=None,
