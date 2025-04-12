@@ -64,6 +64,8 @@ def test_context_execution_context() -> None:
     assert "System Context:" in context
     assert "user_id" in context
     assert "123" in context
+    assert "test_output" in context
+    assert "test_value" in context
 
 
 def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, Output]) -> None:
@@ -85,21 +87,6 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
             val = output.get_value()
             assert isinstance(val, str)
             assert val in context
-
-
-def test_system_context() -> None:
-    """Test that the system context is set up correctly."""
-    (plan, plan_run) = get_test_plan_run()
-    context = build_context(
-        ExecutionContext(
-            execution_agent_system_context_extension=["system context 1", "system context 2"],
-        ),
-        plan.steps[0],
-        plan_run,
-        plan_run.outputs.step_outputs,
-    )
-    assert "system context 1" in context
-    assert "system context 2" in context
 
 
 def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> None:

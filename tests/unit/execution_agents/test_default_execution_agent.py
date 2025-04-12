@@ -18,6 +18,8 @@ from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.default_execution_agent import (
     MAX_RETRIES,
     DefaultExecutionAgent,
+    MemoryExtractionModel,
+    MemoryExtractionModelOutput,
     ParserModel,
     ToolArgument,
     ToolCallingModel,
@@ -26,9 +28,9 @@ from portia.execution_agents.default_execution_agent import (
     VerifiedToolInputs,
     VerifierModel,
 )
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput, Output
 from portia.model import LangChainGenerativeModel
-from portia.plan import Step
+from portia.plan import Step, Variable
 from portia.storage import InMemoryStorage
 from portia.tool import Tool
 from tests.utils import (
@@ -63,6 +65,7 @@ def test_parser_model() -> None:
                 explanation="EXPLANATION_STRING",
             ),
         ],
+        contains_templated_argument=True,
     )
     mock_model = get_mock_base_chat_model(response=tool_inputs)
 
@@ -77,10 +80,14 @@ def test_parser_model() -> None:
     )
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    parser_model.invoke({})  # type: ignore  # noqa: PGH003
+
+    with mock.patch(
+        "portia.execution_agents.default_execution_agent.get_execution_context",
+        return_value="CONTEXT_STRING",
+    ):
+        result = parser_model.invoke({})  # type: ignore  # noqa: PGH003
 
     assert mock_model.invoke.called
     messages = mock_model.invoke.call_args[0][0]
@@ -93,6 +100,7 @@ def test_parser_model() -> None:
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert mock_model.with_structured_output.called
     assert mock_model.with_structured_output.call_args[0][0] == ToolInputs
+    assert result["messages"][0] == tool_inputs.model_dump_json(indent=2)
 
 
 def test_parser_model_with_retries() -> None:
@@ -113,7 +121,6 @@ def test_parser_model_with_retries() -> None:
     )
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_invoker, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
@@ -140,7 +147,6 @@ def test_parser_model_with_retries_invalid_structured_response() -> None:
     )
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
@@ -216,7 +222,6 @@ def test_parser_model_with_invalid_args() -> None:
 
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
@@ -255,6 +260,7 @@ def test_verifier_model() -> None:
                 explanation="EXPLANATION_STRING",
             ),
         ],
+        contains_templated_argument=True,
     )
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
@@ -272,10 +278,16 @@ def test_verifier_model() -> None:
     )
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    verifier_model.invoke({"messages": [AIMessage(content=tool_inputs.model_dump_json(indent=2))]})
+
+    with mock.patch(
+        "portia.execution_agents.default_execution_agent.get_execution_context",
+        return_value="CONTEXT_STRING",
+    ):
+        result = verifier_model.invoke(
+            {"messages": [AIMessage(content=tool_inputs.model_dump_json(indent=2))]},
+        )
 
     assert mock_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
     messages = mock_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
@@ -287,6 +299,7 @@ def test_verifier_model() -> None:
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert mock_model.with_structured_output.called
     assert mock_model.with_structured_output.call_args[0][0] == VerifiedToolInputs
+    assert result["messages"][0] == verified_tool_inputs.model_dump_json(indent=2)
 
 
 def test_verifier_model_schema_validation() -> None:
@@ -317,7 +330,6 @@ def test_verifier_model_schema_validation() -> None:
     )
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
@@ -347,8 +359,9 @@ def test_tool_calling_model_no_hallucinations() -> None:
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
     )
+    args = {"arg1": "ARG1_VALUE", "arg2": "ARG2_VALUE"}
     mock_model = get_mock_langchain_generative_model(
-        SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),
+        SimpleNamespace(content=[args]),
     )
 
     (_, plan_run) = get_test_plan_run()
@@ -366,11 +379,10 @@ def test_tool_calling_model_no_hallucinations() -> None:
     )
     tool_calling_model = ToolCallingModel(
         model=mock_model,
-        context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    tool_calling_model.invoke({"messages": []})
+    result = tool_calling_model.invoke({"messages": []})
 
     base_chat_model = mock_model.to_langchain()
     assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
@@ -381,6 +393,7 @@ def test_tool_calling_model_no_hallucinations() -> None:
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    assert result["messages"][0].content == [args]
 
 
 def test_tool_calling_model_with_hallucinations() -> None:
@@ -429,7 +442,6 @@ def test_tool_calling_model_with_hallucinations() -> None:
     )
     tool_calling_model = ToolCallingModel(
         model=mock_model,
-        context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -444,6 +456,84 @@ def test_tool_calling_model_with_hallucinations() -> None:
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+
+
+def test_tool_calling_model_with_templated_args() -> None:
+    """Test the tool calling model with templated arguments."""
+
+    class TestSchema(BaseModel):
+        """Test schema with two arguments."""
+
+        recipient: str = Field(..., description="The recipient of the message")
+        title: str = Field(..., description="The title of the message")
+        body: str = Field(..., description="The body of the message")
+
+    verified_tool_inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="recipient", value="test@example.com", made_up=False),
+            VerifiedToolArgument(
+                name="title",
+                value="This is a long title: {{previous_output_1}}",
+                made_up=False,
+            ),
+            VerifiedToolArgument(
+                name="body",
+                value="Hello, here's some info: {{previous_output_2}}",
+                made_up=False,
+            ),
+        ],
+        contains_templated_argument=True,
+    )
+
+    # Create a mock model that returns a response with templated values
+    args = {
+        "recipient": ["test@example.com"],
+        "title": "This is a long title: {{previous_output_1}}",
+        "body": "Hello, here's some info: {{previous_output_2}}",
+    }
+    mock_model = get_mock_langchain_generative_model(
+        SimpleNamespace(content=str(args)),
+    )
+
+    (_, plan_run) = get_test_plan_run()
+    plan_run.outputs.step_outputs = {
+        "$previous_output_1": LocalOutput(value="Previous output 1"),
+        "$previous_output_2": LocalOutput(value="Previous output 2"),
+    }
+    agent = SimpleNamespace(
+        verified_args=verified_tool_inputs,
+        clarifications=[],
+        agent_memory=InMemoryStorage(),
+    )
+    agent.step = Step(task="Send an email to the recipient with the message", output="$out")
+    agent.plan_run = plan_run
+    agent.tool = SimpleNamespace(
+        id="message_tool",
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+
+    tool_calling_model = ToolCallingModel(
+        model=mock_model,
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+
+    with mock.patch(
+        "portia.execution_agents.default_execution_agent.get_execution_context",
+        return_value="CONTEXT_STRING",
+    ):
+        result = tool_calling_model.invoke({"messages": []})
+
+    # Verify the result contains the templated values
+    assert "messages" in result
+    assert len(result["messages"]) == 1
+    message = result["messages"][0]
+    assert "test@example.com" in message.content
+    assert "This is a long title: Previous output 1" in message.content
+    assert "Hello, here's some info: Previous output 2" in message.content
+    # @@@ TODO: CHECK THE REAL OUTPUT FROM THE TOOL CALLING MODEL
 
 
 def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -469,6 +559,8 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     tool = AdditionTool()
+
+    monkeypatch.setattr(MemoryExtractionModel, "invoke", lambda _1, _2: None)
 
     def parser_model(self, state):  # noqa: ANN001, ANN202, ARG001
         return {"messages": [tool_inputs.model_dump_json(indent=2)]}
@@ -589,7 +681,6 @@ def test_default_execution_agent_edge_cases() -> None:
     agent.tool = None
     parser_model = ParserModel(
         model=get_mock_langchain_generative_model(get_mock_base_chat_model()),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidPlanRunStateError):
@@ -598,7 +689,6 @@ def test_default_execution_agent_edge_cases() -> None:
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
         model=get_mock_langchain_generative_model(get_mock_base_chat_model()),
-        context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
@@ -791,7 +881,6 @@ def test_optional_args_with_none_values() -> None:
     )
     model = VerifierModel(
         model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,
     )
 
@@ -818,7 +907,6 @@ def test_verifier_model_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
@@ -826,3 +914,224 @@ def test_verifier_model_edge_cases() -> None:
     agent.tool = None
     with pytest.raises(InvalidPlanRunStateError):
         verifier_model.invoke({"messages": []})
+
+
+def test_memory_extraction_model_all_local_inputs() -> None:
+    """Test the memory extraction model when all inputs are local."""
+    mock_model = get_mock_base_chat_model(response=MemoryExtractionModelOutput())
+
+    (_, plan_run) = get_test_plan_run()
+    plan_run.outputs.step_outputs = {
+        "$local_input1": LocalOutput(value="Local value 1"),
+        "$local_input2": LocalOutput(value="Local value 2"),
+    }
+
+    agent = SimpleNamespace()
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    agent.plan_run = plan_run
+    agent.get_system_context = mock.Mock(return_value="MOCKED_SYSTEM_CONTEXT")
+
+    memory_model = MemoryExtractionModel(
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
+        agent=agent,
+    )
+
+    with mock.patch(
+        "portia.execution_agents.default_execution_agent.get_execution_context",
+    ) as mock_context:
+        memory_model.invoke({})
+
+        assert not mock_model.invoke.called
+        assert mock_context.return_value.plan_run_context == "MOCKED_SYSTEM_CONTEXT"
+
+
+def test_memory_extraction_model_mixed_inputs_no_extraction() -> None:
+    """Test memory extraction with mixed inputs, but no extraction needed."""
+    mock_model = get_mock_base_chat_model(response=MemoryExtractionModelOutput(inputs=[]))
+
+    (_, plan_run) = get_test_plan_run()
+    plan_run.outputs.step_outputs = {
+        "$local_input": LocalOutput(value="Local value"),
+        "$remote_input1": AgentMemoryOutput(
+            output_name="remote_input1",
+            plan_run_id=plan_run.id,
+            summary="Summary 1",
+        ),
+    }
+
+    agent = SimpleNamespace()
+    agent.step = Step(
+        task="Parse data from inputs",
+        inputs=[
+            Variable(name="local_input", description="Local input description"),
+            Variable(name="remote_input1", description="Remote input description"),
+        ],
+        output="$out",
+    )
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    agent.plan_run = plan_run
+    agent.get_system_context = mock.Mock(return_value="MOCKED_SYSTEM_CONTEXT")
+
+    memory_model = MemoryExtractionModel(
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
+        agent=agent,
+    )
+
+    with mock.patch(
+        "portia.execution_agents.default_execution_agent.get_execution_context",
+    ) as mock_context:
+        memory_model.invoke({})
+
+        assert mock_model.invoke.called
+        assert mock_context.return_value.plan_run_context == "MOCKED_SYSTEM_CONTEXT"
+
+
+def test_memory_extraction_model_with_retrieval() -> None:
+    """Test memory extraction with some inputs requiring full value retrieval."""
+    mock_model = get_mock_base_chat_model(
+        response=MemoryExtractionModelOutput(inputs=["remote_input1", "remote_input2"]),
+    )
+
+    (_, plan_run) = get_test_plan_run()
+
+    local_output = LocalOutput(value="Local value")
+    remote_output1 = AgentMemoryOutput(
+        output_name="$remote_input1",
+        plan_run_id=plan_run.id,
+        summary="Summary 1",
+    )
+    remote_output2 = AgentMemoryOutput(
+        output_name="$remote_input2",
+        plan_run_id=plan_run.id,
+        summary="Summary 2",
+    )
+    remote_output3 = AgentMemoryOutput(
+        output_name="$remote_input3",
+        plan_run_id=plan_run.id,
+        summary="Summary 3",
+    )
+
+    plan_run.outputs.step_outputs = {
+        "$local_input": local_output,
+        "$remote_input1": remote_output1,
+        "$remote_input2": remote_output2,
+        "$remote_input3": remote_output3,
+    }
+
+    agent = SimpleNamespace()
+    agent.step = Step(
+        task="Process data from inputs",
+        inputs=[
+            Variable(name="$local_input", description="Local input description"),
+            Variable(name="$remote_input1", description="Remote input 1 description"),
+            Variable(name="$remote_input2", description="Remote input 2 description"),
+            Variable(name="$remote_input3", description="Remote input 3 description"),
+        ],
+        output="$out",
+    )
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    agent.plan_run = plan_run
+    agent.get_system_context = mock.Mock(return_value="MOCKED_SYSTEM_CONTEXT")
+
+    mock_memory = InMemoryStorage()
+    retrieved_output1 = LocalOutput(value="Full remote value 1")
+    retrieved_output2 = LocalOutput(value="Full remote value 2")
+    agent.agent_memory = mock_memory
+
+    def mock_get_plan_run_output(name: str, _: str) -> Output | None:
+        if name == "$remote_input1":
+            return retrieved_output1
+        if name == "$remote_input2":
+            return retrieved_output2
+        return None
+
+    memory_model = MemoryExtractionModel(
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
+        agent=agent,
+    )
+
+    with (
+        mock.patch.object(
+            mock_memory,
+            "get_plan_run_output",
+            side_effect=mock_get_plan_run_output,
+        ),
+        mock.patch(
+            "portia.execution_agents.default_execution_agent.get_execution_context",
+        ) as mock_context,
+    ):
+        memory_model.invoke({})
+
+        assert mock_model.invoke.called
+        assert mock_context.return_value.plan_run_context == "MOCKED_SYSTEM_CONTEXT"
+        assert mock_context.return_value.plan_run_context == "MOCKED_SYSTEM_CONTEXT"
+        agent.get_system_context.assert_called_with(
+            {
+                "$local_input": local_output,
+                "$remote_input1": retrieved_output1,
+                "$remote_input2": retrieved_output2,
+                "$remote_input3": remote_output3,
+            },
+        )
+
+
+def test_memory_extraction_model_no_tool_error() -> None:
+    """Test memory extraction model raises error when no tool is provided."""
+    agent_no_tool = SimpleNamespace()
+    agent_no_tool.tool = None
+
+    memory_model_no_tool = MemoryExtractionModel(
+        model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
+        agent=agent_no_tool,
+    )
+    with pytest.raises(InvalidPlanRunStateError):
+        memory_model_no_tool.invoke({})
+
+
+def test_memory_extraction_model_validation_error() -> None:
+    """Test memory extraction model handles model validation errors gracefully."""
+    mock_model = get_mock_base_chat_model(response="INVALID_RESPONSE")
+
+    (_, plan_run) = get_test_plan_run()
+    plan_run.outputs.step_outputs = {}
+
+    agent = SimpleNamespace()
+    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=_TestToolSchema.model_json_schema,
+        args_schema=_TestToolSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    agent.plan_run = plan_run
+    agent.get_system_context = mock.Mock(return_value="MOCKED_SYSTEM_CONTEXT")
+
+    memory_model = MemoryExtractionModel(
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
+        agent=agent,
+    )
+
+    with mock.patch(
+        "portia.execution_agents.default_execution_agent.get_execution_context",
+    ) as mock_context:
+        memory_model.invoke({})
+        assert mock_context.return_value.plan_run_context == "MOCKED_SYSTEM_CONTEXT"

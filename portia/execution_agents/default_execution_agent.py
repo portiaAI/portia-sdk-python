@@ -27,30 +27,35 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalOutput, Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.model import GenerativeModel, LangChainGenerativeModel, Message
-from portia.storage import AgentMemory
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
     from portia.config import Config
-    from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
+    from portia.storage import AgentMemory
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
+
+
+class ExecutionState(MessagesState):
+    """State for the execution agent."""
+
+    previous_outputs: dict[str, Output]
 
 
 class MemoryExtractionModelOutput(BaseModel):
     """Represents the output of the memory extraction model."""
 
     inputs: list[str] = Field(
-        description="List of input names whose full values we should template in.",
+        description="List of input names whose full values should be retrieved for the parser.",
         default=[],
     )
 
@@ -157,7 +162,8 @@ class MemoryExtractionModel:
                 "{tool_description}.\n"
                 "The args schema for this tool is: {tool_args}.\n"
                 "As inputs for the task, we currently have: {inputs}.\n"
-                "At least one of these inputs is large and so only a summary has been provided.\n"
+                "At least one of these inputs is large and so is an AgentMemoryOutput with only a "
+                "summary provided.\n"
                 "For these large inputs, you need to determine whether the full value can be "
                 "passed into the tool without any pre-processing, or whether we need to do some "
                 "pre-processing (e.g. extraction / conversion / etc) on the data in order to get "
@@ -191,11 +197,11 @@ class MemoryExtractionModel:
         self.model = model
         self.agent = agent
 
-    def invoke(self, _: MessagesState) -> None:
+    def invoke(self, state: ExecutionState) -> None:
         """Invoke the model with the given message state.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the execution agent.
 
         Returns:
             dict[str, Any]: The response after invoking the model.
@@ -204,24 +210,24 @@ class MemoryExtractionModel:
             InvalidRunStateError: If the agent's tool is not available.
 
         """
+        import pdb
+
+        pdb.set_trace()
         if not self.agent.tool:
             raise InvalidPlanRunStateError("Memory extraction model has no tool")
-        previous_outputs = self.agent.plan_run.outputs.step_outputs.copy()
-        if all(isinstance(output, LocalOutput) for output in previous_outputs):
-            # If there is nothing in memory, we don't need to retrieve anything
-            get_execution_context().plan_run_context = self.agent.get_system_context(
-                previous_outputs,
-            )
-            return
+        if all(isinstance(output, LocalOutput) for output in state["previous_outputs"].values()):
+            return None
 
-        previous_outputs_to_input = [previous_outputs[i.name] for i in self.agent.step.inputs]
+        previous_outputs = {
+            i.name: state["previous_outputs"][i.name] for i in self.agent.step.inputs
+        }
 
         formatted_messages = self.memory_model_prompt.format_messages(
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
             tool_description=self.agent.tool.description,
             tool_args=self.agent.tool.args_json_schema(),
-            inputs=previous_outputs_to_input,
+            inputs=previous_outputs,
         )
 
         try:
@@ -232,10 +238,7 @@ class MemoryExtractionModel:
             extraction_response = MemoryExtractionModelOutput.model_validate(response)
         except ValidationError:
             logger.exception("Error validating memory extraction model output")
-            get_execution_context().plan_run_context = self.agent.get_system_context(
-                previous_outputs,
-            )
-            return
+            return None
 
         for input_name in extraction_response.inputs:
             if isinstance(previous_outputs[input_name], LocalOutput):
@@ -244,7 +247,7 @@ class MemoryExtractionModel:
                 input_name,
                 self.agent.plan_run.id,
             )
-        get_execution_context().plan_run_context = self.agent.get_system_context(previous_outputs)
+        return {"previous_outputs": previous_outputs}
 
 
 class ParserModel:
@@ -332,11 +335,11 @@ class ParserModel:
         self.previous_errors: list[str] = []
         self.retries = 0
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the execution agent.
 
         Returns:
             dict[str, Any]: The response after invoking the model.
@@ -345,11 +348,14 @@ class ParserModel:
             InvalidRunStateError: If the agent's tool is not available.
 
         """
+        import pdb
+
+        pdb.set_trace()
         if not self.agent.tool:
             raise InvalidPlanRunStateError("Parser model has no tool")
 
         formatted_messages = self.arg_parser_prompt.format_messages(
-            context=get_execution_context(),
+            context=self.agent.get_system_context(state["previous_outputs"]),
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
@@ -429,6 +435,8 @@ class VerifierModel:
                 "it is there but in a different format, or if it can be reasonably derived from the"
                 " information that is there (then made_up should be FALSE). "
                 "\n- Arguments where the value comes from a clarification should be marked as FALSE"
+                "\n- For the contains_templated_argument, you should only set this to TRUE if one "
+                "of the valid args contains a templated input of the form {{large_value_name}}."
                 "\nThe output must conform to the following schema:\n\n"
                 "class VerifiedToolArgument:\n"
                 "  name: str  # Name of the argument requested by the tool.\n"
@@ -436,7 +444,9 @@ class VerifierModel:
                 "USE EXACTLY the type of the argument provided in the list of arguments provided.\n"
                 "  made_up: bool  # if the value is made_up based on the given rules.\n\n"
                 "class VerifiedToolInputs:\n"
-                "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
+                "  args: List[VerifiedToolArgument]  # List of tool arguments.\n"
+                "  contains_templated_argument: bool  # Whether the args contain any large values "
+                "that need to be templated in.\n\n"
                 "Please ensure the output matches the VerifiedToolInputs schema.",
             ),
             HumanMessagePromptTemplate.from_template(
@@ -464,11 +474,11 @@ class VerifierModel:
         self.model = model
         self.agent = agent
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the execution agent.
 
         Returns:
             dict[str, Any]: The response after invoking the model.
@@ -477,14 +487,16 @@ class VerifierModel:
             InvalidRunStateError: If the agent's tool is not available.
 
         """
+        import pdb
+
+        pdb.set_trace()
         if not self.agent.tool:
             raise InvalidPlanRunStateError("Verifier model has no tool")
 
         messages = state["messages"]
         tool_args = messages[-1].content
-        tool_inputs = ToolInputs.model_validate_json(tool_args)
         formatted_messages = self.arg_verifier_prompt.format_messages(
-            context=get_execution_context(),
+            context=self.agent.get_system_context(state["previous_outputs"]),
             task=self.agent.step.task,
             arguments=tool_args,
             tool_name=self.agent.tool.name,
@@ -495,7 +507,6 @@ class VerifierModel:
             schema=VerifiedToolInputs,
         )
         response = VerifiedToolInputs.model_validate(response)
-        response.contains_templated_argument = tool_inputs.contains_templated_argument
 
         # Validate the arguments against the tool's schema
         response = self._validate_args_against_schema(response)
@@ -557,11 +568,10 @@ class ToolCallingModel:
                 "context:\n{verified_args}\n"
                 "Use the provided tool with the arguments in the context, as "
                 "long as they are valid.\n"
-                "If any values are too large to be provided in full, a summary of them has been "
-                "provided. If you wish to use one of these values, you can provide the name in "
-                "curly braces and the value will be templated in. For example: if you wish to use "
-                "an output called 'large_output_value', you can enter {{large_value_name}} and the "
-                "value will be templated in before the tool is called.\n"
+                "If any values are too large to be provided in full, they have been provided in "
+                "curly braces with a value to be templated in (e.g. {{large_output_value}}). "
+                "Please keep these templated values inside double curly braces as they will be "
+                "templated in before the tool is called.\n"
                 "Make sure you don't repeat past errors: {past_errors}\n",
             ),
         ],
@@ -586,11 +596,11 @@ class ToolCallingModel:
         self.agent = agent
         self.tools = tools
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the execution agent.
 
         Returns:
             dict[str, Any]: The response after invoking the model.
@@ -628,27 +638,32 @@ class ToolCallingModel:
 
         return {"messages": [result]}
 
-    def _template_in_required_outputs(self, response: BaseMessage) -> list[Clarification]:
+    def _template_in_required_outputs(self, response: BaseMessage) -> None:
         """Template any required outputs into the tool call.
 
         Args:
             response (BaseMessage): The response to template in the required outputs.
 
         Returns:
-            list[Clarification]: The list of clarifications that were created.
+            BaseMessage: The response with templated content.
 
         """
+        for tool_call in response.tool_calls:
+            if tool_call.args:
+                for arg_name, arg_value in tool_call.args.items():
+                    if isinstance(arg_value, str) and "{{" in arg_value and "}}" in arg_value:
+                        tool_call.args[arg_name] = self._template_arg(arg_value)
+
+    def _template_arg(self, arg_value: str) -> str:
         parsed_response = Environment(autoescape=True).parse(response.content)
         required_args = meta.find_undeclared_variables(parsed_response)
         template_args = {}
         for arg in required_args:
-            output = self.agent.plan_run.outputs.step_outputs[arg]
+            lookup_arg = f"${arg}" if not arg.startswith("$") else arg
+            output = self.agent.plan_run.outputs.step_outputs[lookup_arg]
             if output:
                 template_args[arg] = output.full_value(self.agent.agent_memory)
-
-        templated_content = Template(response.content).render(args=template_args)
-        response.content = templated_content
-        return response
+        templated_content = Template(response.content).render(**template_args)
 
 
 class DefaultExecutionAgent(BaseExecutionAgent):
@@ -694,12 +709,12 @@ class DefaultExecutionAgent(BaseExecutionAgent):
 
     def clarifications_or_continue(
         self,
-        state: MessagesState,
+        state: ExecutionState,
     ) -> Literal[AgentNode.TOOL_AGENT, END]:  # type: ignore  # noqa: PGH003
         """Determine if we should continue with the tool call or request clarifications instead.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the execution agent.
 
         Returns:
             Literal[AgentNode.TOOL_AGENT, END]: The next node we should route to.
@@ -777,7 +792,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         ]
         tool_node = ToolNode(tools)
 
-        graph = StateGraph(MessagesState)
+        graph = StateGraph(ExecutionState)
         """
         The execution graph represented here can be generated using
         `print(app.get_graph().draw_mermaid())` on the compiled run (and running any agent
@@ -805,7 +820,9 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 classDef first fill-opacity:0
                 classDef last fill:#bfb6fc
         """
+        import pdb
 
+        pdb.set_trace()
         graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(model, tools, self).invoke)
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
@@ -840,7 +857,9 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
         app = graph.compile()
-        invocation_result = app.invoke({"messages": []})
+        invocation_result = app.invoke(
+            {"messages": [], "previous_outputs": self.plan_run.outputs.step_outputs.copy()},
+        )
         return process_output(
             invocation_result["messages"],
             self.tool,
