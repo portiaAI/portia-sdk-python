@@ -587,13 +587,6 @@ class Config(BaseModel):
                 "A storage directory must be provided if using disk storage",
             )
 
-        # Model config validation. Either llm_provider or default_model must be set.
-        if self.llm_provider is None and self.models.default_model is None:
-            raise InvalidConfigError(
-                "llm_provider or default_model",
-                "Either llm_provider or default_model must be set",
-            )
-
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.
         for model_getter in (
@@ -604,17 +597,12 @@ class Config(BaseModel):
             self.get_summarizer_model,
         ):
             try:
-                model = model_getter()
-            except Exception as e:
+                model_getter()
+            except Exception as e:  # noqa: PERF203
                 raise InvalidConfigError(
                     f"models.{model_getter.__name__}",
                     "All models must be instantiable",
                 ) from e
-            if model is None:
-                raise InvalidConfigError(
-                    f"models.{model_getter.__name__}",
-                    "All models must be instantiable",
-                )
         return self
 
     @classmethod
