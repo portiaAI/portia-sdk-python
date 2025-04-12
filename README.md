@@ -89,10 +89,10 @@ print(plan_run.model_dump_json(indent=2))
 Our cloud offering will allow you to easily store and retrieve plans in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view plan runs, clarifications and tool call logs. Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
 Note that this example also requires the environment variables `OPENAI_API_KEY` (or ANTHROPIC or MISTRALAI if you're using either) and `TAVILY_API_KEY` as the [previous one](#e2e-example-with-open-source-tools).
 
-The example below introduces **some** of the config options available with Portia AI:
+The example below introduces **some** of the config options available with Portia AI (check out our <a href="https://docs.portialabs.ai/manage-config" target="_blank">**docs (↗)**</a> for more):
 - The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, runs and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
 - The `default_log_level` is set using the `LogLevel.DEBUG` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, run states, tool calls and outputs at every step 😅
-- The `llm_provider`, `default_model` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider and model. In the example below we're splurging and using GPT 4o!
+- The `llm_provider` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider. In the example below we're using GPT 4o, but you can use Anthropic, Gemini and others!
 
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
 
