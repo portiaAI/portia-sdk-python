@@ -16,10 +16,9 @@ from portia.clarification import (
     ValueConfirmationClarification,
 )
 from portia.config import (
-    DEFAULT_MODEL_KEY,
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
-    PLANNING_MODEL_KEY,
     Config,
+    GenerativeModels,
     StorageClass,
 )
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
@@ -28,7 +27,7 @@ from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.model import LangChainGenerativeModel
+from portia.model import GenerativeModel
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
@@ -49,23 +48,23 @@ from tests.utils import (
 @pytest.fixture
 def planning_model() -> MagicMock:
     """Fixture to create a mock planning model."""
-    return MagicMock(spec=LangChainGenerativeModel)
+    return MagicMock(spec=GenerativeModel)
 
 
 @pytest.fixture
 def default_model() -> MagicMock:
     """Fixture to create a mock default model."""
-    return MagicMock(spec=LangChainGenerativeModel)
+    return MagicMock(spec=GenerativeModel)
 
 
 @pytest.fixture
 def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
-        custom_models={
-            PLANNING_MODEL_KEY: planning_model,
-            DEFAULT_MODEL_KEY: default_model,
-        },
+        models=GenerativeModels(
+            planning_model=planning_model,
+            default_model=default_model,
+        ),
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
@@ -78,10 +77,10 @@ def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock
         # Set a small threshold value so all outputs are stored in agent memory
         feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
         large_output_threshold_tokens=3,
-        custom_models={
-            PLANNING_MODEL_KEY: planning_model,
-            DEFAULT_MODEL_KEY: default_model,
-        },
+        models=GenerativeModels(
+            planning_model=planning_model,
+            default_model=default_model,
+        ),
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
@@ -143,9 +142,9 @@ def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
     query = "example query"
     portia = Portia(
         config=get_test_config(
-            custom_models={
-                PLANNING_MODEL_KEY: planning_model,
-            },
+            models=GenerativeModels(
+                planning_model=planning_model,
+            ),
         ),
         tools=[AdditionTool(), ClarificationTool()],
     )
@@ -167,9 +166,9 @@ def test_portia_run_query_disk_storage(planning_model: MagicMock) -> None:
             storage_class=StorageClass.DISK,
             openai_api_key=SecretStr("123"),
             storage_dir=tmp_dir,
-            custom_models={
-                PLANNING_MODEL_KEY: planning_model,
-            },
+            models=GenerativeModels(
+                planning_model=planning_model,
+            ),
         )
         tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
         portia = Portia(config=config, tools=tool_registry)
@@ -644,7 +643,7 @@ def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
     mock_agent.create_summary.side_effect = Exception("Summary failed")
 
     with mock.patch(
-        "portia.execution_agents.utils.final_output_summarizer.FinalOutputSummarizer",
+        "portia.portia.FinalOutputSummarizer",
         return_value=mock_agent,
     ):
         step_output = LocalOutput(value="Some output")
@@ -780,7 +779,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
     """Test that portia can handle a clarification."""
     clarification_handler = TestClarificationHandler()
     portia = Portia(
-        config=get_test_config(custom_models={PLANNING_MODEL_KEY: planning_model}),
+        config=get_test_config(models=GenerativeModels(planning_model=planning_model)),
         tools=[ClarificationTool()],
         execution_hooks=ExecutionHooks(clarification_handler=clarification_handler),
     )
