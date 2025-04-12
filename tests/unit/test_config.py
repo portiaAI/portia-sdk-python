@@ -400,7 +400,7 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_custom_model_from_string_raises_error() -> None:
     """Test custom model from string raises an error."""
-    with pytest.raises(ValueError, match="All models must be instantiable"):
+    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
         _ = Config.from_default(default_model="custom/test")
 
 
