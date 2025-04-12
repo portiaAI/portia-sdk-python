@@ -41,7 +41,11 @@ MODELS: list[GenerativeModel] = [
         api_key=CONFIG.anthropic_api_key,
     ),
     MistralAIGenerativeModel(model_name="mistral-small-latest", api_key=CONFIG.mistralai_api_key),
-    GoogleGenAiGenerativeModel(model_name="gemini-2.0-flash", api_key=CONFIG.google_api_key),
+    GoogleGenAiGenerativeModel(
+        model_name="gemini-2.0-flash",
+        api_key=CONFIG.google_api_key,
+        temperature=0.5,
+    ),
     AZURE_MODEL := AzureOpenAIGenerativeModel(
         model_name="gpt-4o-mini",
         api_key=SecretStr("dummy"),

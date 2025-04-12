@@ -6,8 +6,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
-from portia.config import LLM_TOOL_MODEL_KEY
-from portia.model import Message
+from portia.model import GenerativeModel, Message
 from portia.tool import Tool, ToolRunContext
 
 
@@ -54,9 +53,16 @@ class LLMTool(Tool[str]):
         """
     tool_context: str = ""
 
+    model: GenerativeModel | None = Field(
+        default=None,
+        exclude=True,
+        description="The model to use for the LLMTool. If not provided, "
+        "the model will be resolved from the config.",
+    )
+
     def run(self, ctx: ToolRunContext, task: str) -> str:
         """Run the LLMTool."""
-        model = ctx.config.resolve_model(LLM_TOOL_MODEL_KEY)
+        model = self.model or ctx.config.resolve_model()
 
         # Define system and user messages
         context = (
@@ -64,8 +70,6 @@ class LLMTool(Tool[str]):
             "run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
-        if ctx.execution_context.plan_run_context:
-            context += f"\nRun context: {ctx.execution_context.plan_run_context}"
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
         content = task if not len(context.split("\n")) > 1 else f"{context}\n\n{task}"

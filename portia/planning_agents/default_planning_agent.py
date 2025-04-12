@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from portia.config import PLANNING_MODEL_KEY
-from portia.execution_context import ExecutionContext, get_execution_context
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -29,17 +28,14 @@ class DefaultPlanningAgent(BasePlanningAgent):
 
     def generate_steps_or_error(
         self,
-        ctx: ExecutionContext,
         query: str,
         tool_list: list[Tool],
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
-        ctx = get_execution_context()
         prompt = render_prompt_insert_defaults(
             query,
             tool_list,
-            ctx.planning_agent_system_context_extension,
             examples,
         )
         response = self.model.get_structured_response(
@@ -47,20 +43,28 @@ class DefaultPlanningAgent(BasePlanningAgent):
             messages=[
                 Message(
                     role="system",
-                    content="You are an outstanding task planner who can leverage many \
-    tools as their disposal. Your job is provide a detailed plan of action in the form of a set of \
-    steps to respond to a user's prompt. When using multiple tools, pay attention to the  \
-    tools to make sure the chain of steps works, but DO NOT provide any examples or assumptions \
-    in the task descriptions. If you are missing information do not \
-    make up placeholder variables like example@example.com. If you can't come up with a plan \
-    provide a descriptive error instead - do not return plans with no steps. For EVERY tool that \
-    requires an id as an input, make sure to check if there's a corresponding tool call that\
-    provides the id from natural language if possible. For example, if a tool asks for a user ID\
-    check if there's a tool call that provides the user IDs before making the tool call that \
-    requires the user ID. For conditional steps: \
-    1. Task field: Write only the task description without conditions. \
-    2. Condition field: Write the condition in concise natural language. \
-    Do not use the condition field for non-conditional steps.",
+                    content="""
+You are an outstanding task planner who can leverage many tools at their disposal. Your job is
+to provide a detailed plan of action in the form of a set of steps to respond to a user's prompt.
+
+IMPORTANT GUIDLINES:
+- When using multiple tools, pay attention to the  tools to make sure the chain of steps works,
+ but DO NOT provide any examples or assumptions  in the task descriptions.
+- If you are missing information do not  make up placeholder variables like example@example.com.
+- When creating the description for a step of the plan, if you need information from the previous
+ step, DO NOT guess what that step will produce - instead, specify the previous step's output as an
+ input for this step and allow this to be handled when we execute the plan.
+- If you can't come up with a plan provide a descriptive error instead - do not
+ return plans with no steps.
+- For EVERY tool that requires an id as an input, make sure to check
+ if there's a corresponding tool call that provides the id from natural language if possible.
+ For example, if a tool asks for a user ID check if there's a tool call that provides
+ the user IDs before making the tool call that  requires the user ID.
+- For conditional steps:
+  1. Task field: Write only the task description without conditions.
+  2. Condition field: Write the condition in concise natural language.
+- Do not use the condition field for non-conditional steps.
+                    """,
                 ),
                 Message(role="user", content=prompt),
             ],

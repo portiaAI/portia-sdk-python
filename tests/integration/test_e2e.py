@@ -23,7 +23,7 @@ from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRunState
 from portia.portia import ExecutionHooks, Portia
-from portia.tool_registry import InMemoryToolRegistry
+from portia.tool_registry import ToolRegistry
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarificationHandler
 
 if TYPE_CHECKING:
@@ -76,7 +76,7 @@ def test_portia_run_query(
     addition_tool = AdditionTool()
     addition_tool.should_summarize = True
 
-    tool_registry = InMemoryToolRegistry.from_local_tools([addition_tool])
+    tool_registry = ToolRegistry([addition_tool])
     portia = Portia(config=config, tools=tool_registry)
     query = "Add 1 + 2"
 
@@ -102,7 +102,7 @@ def test_portia_generate_plan(
         storage_class=StorageClass.MEMORY,
     )
 
-    tool_registry = InMemoryToolRegistry.from_local_tools([AdditionTool()])
+    tool_registry = ToolRegistry([AdditionTool()])
     portia = Portia(config=config, tools=tool_registry)
     query = "Add 1 + 2"
 
@@ -130,7 +130,7 @@ def test_portia_run_query_with_clarifications(
     )
 
     test_clarification_handler = TestClarificationHandler()
-    tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
+    tool_registry = ToolRegistry([ClarificationTool()])
     portia = Portia(
         config=config,
         tools=tool_registry,
@@ -169,7 +169,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
         storage_class=StorageClass.MEMORY,
     )
 
-    tool_registry = InMemoryToolRegistry.from_local_tools([ClarificationTool()])
+    tool_registry = ToolRegistry([ClarificationTool()])
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="clarification_tool",
@@ -214,7 +214,7 @@ def test_portia_run_query_with_hard_error(
         execution_agent_type=agent,
         storage_class=StorageClass.MEMORY,
     )
-    tool_registry = InMemoryToolRegistry.from_local_tools([ErrorTool()])
+    tool_registry = ToolRegistry([ErrorTool()])
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="error_tool",
@@ -260,7 +260,7 @@ def test_portia_run_query_with_soft_error(
         def run(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
             raise ToolSoftError("Server Timeout")
 
-    tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
+    tool_registry = ToolRegistry([MyAdditionTool()])
     portia = Portia(config=config, tools=tool_registry)
     clarification_step = Step(
         tool_id="add_tool",
@@ -314,7 +314,7 @@ def test_portia_run_query_with_multiple_clarifications(
 
     test_clarification_handler = TestClarificationHandler()
     test_clarification_handler.clarification_response = 456
-    tool_registry = InMemoryToolRegistry.from_local_tools([MyAdditionTool()])
+    tool_registry = ToolRegistry([MyAdditionTool()])
     portia = Portia(
         config=config,
         tools=tool_registry,
@@ -407,7 +407,7 @@ def test_portia_run_query_with_multiple_async_clarifications(
     test_clarification_handler = ActionClarificationHandler()
     portia = Portia(
         config=config,
-        tools=InMemoryToolRegistry.from_local_tools([MyAdditionTool()]),
+        tools=ToolRegistry([MyAdditionTool()]),
         execution_hooks=ExecutionHooks(clarification_handler=test_clarification_handler),
     )
 
@@ -453,7 +453,10 @@ def test_portia_run_query_with_conditional_steps() -> None:
     """Test running a query with conditional steps."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
     portia = Portia(config=config, tools=example_tool_registry)
-    query = "If the sum of 5 and 6 is greater than 10, then sum 4 + 5, otherwise sum 1 + 2"
+    query = (
+        "If the sum of 5 and 6 is greater than 10, then sum 4 + 5 and give me the answer, "
+        "otherwise sum 1 + 2 and give me that as the answer"
+    )
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
@@ -478,7 +481,7 @@ def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
     config = Config.from_default(portia_api_key=None, storage_class=StorageClass.MEMORY)
 
     portia = Portia(config=config)
-    query = "Send an email to John Doe"
+    query = "Send an email to John Doe using the Gmail tool"
 
     with pytest.raises(PlanError) as e:
         portia.plan(query)

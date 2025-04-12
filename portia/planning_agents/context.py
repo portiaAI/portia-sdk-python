@@ -16,11 +16,10 @@ if TYPE_CHECKING:
 def render_prompt_insert_defaults(
     query: str,
     tool_list: list[Tool],
-    system_context_extension: list[str] | None = None,
     examples: list[Plan] | None = None,
 ) -> str:
     """Render the prompt for the PlanningAgent with defaults inserted if not provided."""
-    system_context = default_query_system_context(system_context_extension)
+    system_context = default_query_system_context()
 
     if examples is None:
         examples = DEFAULT_EXAMPLE_PLANS
@@ -36,14 +35,9 @@ def render_prompt_insert_defaults(
     )
 
 
-def default_query_system_context(
-    system_context_extension: list[str] | None = None,
-) -> list[str]:
+def default_query_system_context() -> list[str]:
     """Return the default system context."""
-    base_context = [f"Today is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
-    if system_context_extension:
-        base_context.extend(system_context_extension)
-    return base_context
+    return [f"Today is {datetime.now(UTC).strftime('%Y-%m-%d')}"]
 
 
 def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str]]:
@@ -54,6 +48,7 @@ def get_tool_descriptions_for_tools(tool_list: list[Tool]) -> list[dict[str, str
             "name": tool.name,
             "description": tool.description,
             "args": tool.args_schema.model_json_schema()["properties"],
+            "output_schema": str(tool.output_schema),
         }
         for tool in tool_list
     ]

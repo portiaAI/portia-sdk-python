@@ -26,24 +26,17 @@ if TYPE_CHECKING:
     from portia.plan_run import PlanRun
 
 
-def generate_main_system_context(system_context_extensions: list[str] | None = None) -> list[str]:
+def generate_main_system_context() -> list[str]:
     """Generate the main system context.
-
-    Args:
-        system_context_extensions (list[str] | None): Optional list of strings to extend
-                                                     the system context.
 
     Returns:
         list[str]: A list of strings representing the system context.
 
     """
-    system_context = [
+    return [
         "System Context:",
         f"Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}",
     ]
-    if system_context_extensions:
-        system_context.extend(system_context_extensions)
-    return system_context
 
 
 def generate_input_context(
@@ -202,12 +195,7 @@ def build_context(
     inputs = step.inputs
     clarifications = plan_run.outputs.clarifications
 
-    system_context_extension = (
-        ctx.execution_agent_system_context_extension
-        if ctx.execution_agent_system_context_extension
-        else plan_run.execution_context.execution_agent_system_context_extension
-    )
-    system_context = generate_main_system_context(system_context_extension)
+    system_context = generate_main_system_context()
 
     # exit early if no additional information
     if not inputs and not clarifications and not previous_outputs:
