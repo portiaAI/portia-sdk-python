@@ -356,12 +356,17 @@ def test_getters() -> None:
         c.must_get("portia_dashboard_url", str)
 
     # no Portia API Key
-    with pytest.raises(InvalidConfigError):
+    with pytest.raises(
+        InvalidConfigError,
+        match="A Portia API key must be provided if using cloud storage",
+    ):
         Config.from_default(
             storage_class=StorageClass.CLOUD,
             portia_api_key=SecretStr(""),
             extest_set_agent_model_default_model_not_settest_set_agent_model_default_model_not_setecution_agent_type=ExecutionAgentType.DEFAULT,
             planning_agent_type=PlanningAgentType.DEFAULT,
+            llm_provider=LLMProvider.OPENAI,
+            openai_api_key=SecretStr("test-openai-api-key"),
         )
 
 
@@ -419,6 +424,16 @@ def test_check_model_supported_raises_deprecation_warning() -> None:
         assert "gpt-4o" in SUPPORTED_OPENAI_MODELS
 
 
+def test_summarizer_model_not_instantiable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test summarizer model is not instantiable."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
+        Config.from_default(
+            default_model="openai/gpt-4o",
+            summarizer_model="mistralai/mistral-large-latest",
+        )
+
+
 def test_config_error_resolve_model_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test Config.model raises a ConfigModelResolutionError if no model is found."""
     # Setup: Its actually not currently possible to get a model in this state, but
@@ -446,6 +461,15 @@ def test_config_model_in_kwargs_and_models_raises_error(monkeypatch: pytest.Monk
             default_model="openai/gpt-4o",
             models={"default_model": "mistralai/mistral-tiny-latest"},
         )
+
+
+def test_no_provider_or_default_model_raises_error() -> None:
+    """Test no provider or default model raises an InvalidConfigError."""
+    with pytest.raises(
+        InvalidConfigError,
+        match="Either llm_provider or default_model must be set",
+    ):
+        Config.from_default()
 
 
 def test_llm_model_name_deprecation(monkeypatch: pytest.MonkeyPatch) -> None:

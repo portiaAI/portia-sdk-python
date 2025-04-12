@@ -603,12 +603,18 @@ class Config(BaseModel):
             self.get_introspection_model,
             self.get_summarizer_model,
         ):
-            if model_getter() is None:
+            try:
+                model = model_getter()
+            except Exception as e:
+                raise InvalidConfigError(
+                    f"models.{model_getter.__name__}",
+                    "All models must be instantiable",
+                ) from e
+            if model is None:
                 raise InvalidConfigError(
                     f"models.{model_getter.__name__}",
                     "All models must be instantiable",
                 )
-
         return self
 
     @classmethod
