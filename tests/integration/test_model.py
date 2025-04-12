@@ -12,7 +12,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from portia.config import Config
-from portia.model import Message
+from portia.model import GoogleGenAiGenerativeModel, LLMProvider, Message
 from portia.planning_agents.base_planning_agent import StepsOrError
 
 if TYPE_CHECKING:
@@ -107,3 +107,16 @@ def test_get_structured_response_steps_or_error(model_str: str, messages: list[M
     model = Config.from_default(default_model=model_str).get_default_model()
     response = model.get_structured_response(messages, StepsOrError)
     assert isinstance(response, StepsOrError)
+
+
+def test_google_gemini_temperature(messages: list[Message]) -> None:
+    """Test that GoogleGenAiGenerativeModel supports setting temperature."""
+    config = Config.from_default(llm_provider=LLMProvider.GOOGLE_GENERATIVE_AI)
+    model = GoogleGenAiGenerativeModel(
+        model_name="gemini-2.0-flash",
+        api_key=config.google_api_key,
+        temperature=0.5,
+    )
+    response = model.get_response(messages)
+    assert isinstance(response, Message)
+    assert response.content is not None
