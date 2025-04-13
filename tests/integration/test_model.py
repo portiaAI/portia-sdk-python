@@ -27,11 +27,11 @@ class Response(BaseModel):
 
 
 MODELS = [
-    # "openai/gpt-4o-mini",
-    # "anthropic/claude-3-5-sonnet-latest",
-    # "mistralai/mistral-small-latest",
-    # "google/gemini-2.0-flash",
-    # "azure-openai/gpt-4o-mini",
+    "openai/gpt-4o-mini",
+    "anthropic/claude-3-5-sonnet-latest",
+    "mistralai/mistral-small-latest",
+    "google/gemini-2.0-flash",
+    "azure-openai/gpt-4o-mini",
     "ollama/qwen2.5:0.5b",
 ]
 
@@ -109,9 +109,13 @@ def test_get_structured_response(model_str: str, messages: list[Message]) -> Non
     assert response.message is not None
 
 
-@pytest.mark.parametrize("model_str", MODELS)
+@pytest.mark.parametrize("model_str", [M for M in MODELS if not M.startswith("ollama/")])
 def test_get_structured_response_steps_or_error(model_str: str, messages: list[Message]) -> None:
-    """Test get_structured_response with StepsOrError for each model type."""
+    """Test get_structured_response with StepsOrError for each model type.
+
+    Skip Ollama models because the small models we used for integration testing aren't
+    good enough for complex schemas.
+    """
     model = Config.from_default(default_model=model_str).get_default_model()
     response = model.get_structured_response(messages, StepsOrError)
     assert isinstance(response, StepsOrError)
