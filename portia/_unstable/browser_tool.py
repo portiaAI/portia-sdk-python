@@ -23,7 +23,7 @@ from pydantic_core import PydanticUndefined
 
 from portia.clarification import ActionClarification
 from portia.errors import ToolHardError
-from portia.model import LangChainGenerativeModel  # noqa: TC001 - used in Pydantic Schema
+from portia.model import GenerativeModel  # noqa: TC001 - used in Pydantic Schema
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -113,7 +113,7 @@ class BaseBrowserTool(Tool[str]):
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
     output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
 
-    model: LangChainGenerativeModel | None = Field(
+    model: GenerativeModel | None = Field(
         default=None,
         exclude=True,
         description="The model to use for the BrowserTool. If not provided, "
@@ -134,7 +134,7 @@ class BaseBrowserTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
-        model = self.model or ctx.config.resolve_langchain_model()
+        model = self.model or ctx.config.get_default_model()
         llm = model.to_langchain()
 
         async def run_browser_tasks() -> str | ActionClarification:
@@ -274,7 +274,7 @@ class BrowserToolForUrl(BaseBrowserTool):
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         description: str | None = None,
-        model: LangChainGenerativeModel | None = NotSet,
+        model: GenerativeModel | None = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
     ) -> None:
         """Initialize the BrowserToolForUrl."""

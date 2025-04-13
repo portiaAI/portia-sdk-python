@@ -15,7 +15,7 @@ from portia.config import Config, LogLevel, StorageClass
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalOutput
 from portia.execution_context import ExecutionContext, empty_context
-from portia.model import LangChainGenerativeModel
+from portia.model import GenerativeModel, LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunUUID
 from portia.tool import Tool, ToolRunContext
@@ -283,8 +283,8 @@ def get_mock_base_chat_model(
     return model
 
 
-def get_mock_langchain_generative_model(response: Any = None) -> LangChainGenerativeModel:  # noqa: ANN401
-    """Get a mock langchain generative model."""
+def get_mock_generative_model(response: Any = None) -> GenerativeModel:  # noqa: ANN401
+    """Get a mock generative model."""
     return LangChainGenerativeModel(
         client=get_mock_base_chat_model(response),
         model_name="test",

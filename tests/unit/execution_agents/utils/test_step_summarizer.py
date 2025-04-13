@@ -10,7 +10,7 @@ from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.plan import Step
 from tests.utils import (
     AdditionTool,
-    get_mock_langchain_generative_model,
+    get_mock_generative_model,
     get_test_config,
 )
 
@@ -19,7 +19,7 @@ def test_summarizer_model_normal_output() -> None:
     """Test the summarizer model with valid tool message."""
     summary = AIMessage(content="Short summary")
     tool = AdditionTool()
-    mock_model = get_mock_langchain_generative_model(response=summary)
+    mock_model = get_mock_generative_model(response=summary)
     tool_message = ToolMessage(
         content="Tool output content",
         tool_call_id="123",
@@ -50,7 +50,7 @@ def test_summarizer_model_normal_output() -> None:
 
 def test_summarizer_model_non_tool_message() -> None:
     """Test the summarizer model with non-tool message should not invoke the LLM."""
-    mock_model = get_mock_langchain_generative_model()
+    mock_model = get_mock_generative_model()
     ai_message = AIMessage(content="AI message content")
 
     summarizer_model = StepSummarizer(
@@ -67,7 +67,7 @@ def test_summarizer_model_non_tool_message() -> None:
 
 def test_summarizer_model_no_messages() -> None:
     """Test the summarizer model with empty message list should not invoke the LLM."""
-    mock_model = get_mock_langchain_generative_model()
+    mock_model = get_mock_generative_model()
 
     summarizer_model = StepSummarizer(
         config=get_test_config(),
@@ -84,7 +84,7 @@ def test_summarizer_model_no_messages() -> None:
 def test_summarizer_model_large_output() -> None:
     """Test the summarizer model with large output."""
     summary = AIMessage(content="Short summary")
-    mock_model = get_mock_langchain_generative_model(response=summary)
+    mock_model = get_mock_generative_model(response=summary)
     tool_message = ToolMessage(
         content="Test " * 1000,
         tool_call_id="123",
@@ -127,7 +127,7 @@ def test_summarizer_model_error_handling() -> None:
     class TestError(Exception):
         """Test error."""
 
-    mock_model = get_mock_langchain_generative_model()
+    mock_model = get_mock_generative_model()
     mock_model.to_langchain().invoke.side_effect = TestError("Test error")  # type: ignore[reportFunctionMemberAccess]
 
     tool_message = ToolMessage(
