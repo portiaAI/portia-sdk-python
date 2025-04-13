@@ -686,6 +686,7 @@ if validate_extras_dependencies("ollama", raise_error=False):
                 model=self.model_name,
                 messages=[map_message_to_instructor(message) for message in messages],
                 response_model=schema,
+                max_retries=2,
             )
 
 

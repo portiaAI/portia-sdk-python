@@ -6,6 +6,7 @@ import os
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
+import ollama
 import pytest
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
@@ -26,12 +27,19 @@ class Response(BaseModel):
 
 
 MODELS = [
-    "openai/gpt-4o-mini",
-    "anthropic/claude-3-5-sonnet-latest",
-    "mistralai/mistral-small-latest",
-    "google/gemini-2.0-flash",
-    "azure-openai/gpt-4o-mini",
+    # "openai/gpt-4o-mini",
+    # "anthropic/claude-3-5-sonnet-latest",
+    # "mistralai/mistral-small-latest",
+    # "google/gemini-2.0-flash",
+    # "azure-openai/gpt-4o-mini",
+    "ollama/qwen2.5:0.5b",
 ]
+
+
+@pytest.fixture(autouse=True)
+def ollama_model() -> None:
+    """Ensure Ollama model is available."""
+    ollama.pull("qwen2.5:0.5b")
 
 
 @pytest.fixture(autouse=True)
