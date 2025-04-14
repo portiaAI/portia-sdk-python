@@ -32,6 +32,9 @@ MODELS = [
     "mistralai/mistral-small-latest",
     "google/gemini-2.0-flash",
     "azure-openai/gpt-4o-mini",
+]
+
+LOW_CAPABILITY_MODELS = [
     "ollama/qwen2.5:0.5b",
 ]
 
@@ -90,7 +93,7 @@ def messages() -> list[Message]:
     ]
 
 
-@pytest.mark.parametrize("model_str", MODELS)
+@pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
 def test_get_response(model_str: str, messages: list[Message]) -> None:
     """Test get_response for each model type."""
     model = Config.from_default(default_model=model_str).get_default_model()
@@ -100,7 +103,7 @@ def test_get_response(model_str: str, messages: list[Message]) -> None:
     assert response.content is not None
 
 
-@pytest.mark.parametrize("model_str", MODELS)
+@pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
 def test_get_structured_response(model_str: str, messages: list[Message]) -> None:
     """Test get_structured_response for each model type."""
     model = Config.from_default(default_model=model_str).get_default_model()
@@ -109,7 +112,7 @@ def test_get_structured_response(model_str: str, messages: list[Message]) -> Non
     assert response.message is not None
 
 
-@pytest.mark.parametrize("model_str", [M for M in MODELS if not M.startswith("ollama/")])
+@pytest.mark.parametrize("model_str", MODELS)
 def test_get_structured_response_steps_or_error(model_str: str, messages: list[Message]) -> None:
     """Test get_structured_response with StepsOrError for each model type.
 
