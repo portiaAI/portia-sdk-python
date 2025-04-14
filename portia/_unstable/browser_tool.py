@@ -113,7 +113,7 @@ class BaseBrowserTool(Tool[str]):
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
     output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
 
-    model: GenerativeModel | None = Field(
+    model: GenerativeModel | None | str = Field(
         default=None,
         exclude=True,
         description="The model to use for the BrowserTool. If not provided, "
@@ -134,7 +134,7 @@ class BaseBrowserTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
-        model = self.model or ctx.config.get_default_model()
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
         async def run_browser_tasks() -> str | ActionClarification:
@@ -274,7 +274,7 @@ class BrowserToolForUrl(BaseBrowserTool):
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         description: str | None = None,
-        model: GenerativeModel | None = NotSet,
+        model: GenerativeModel | None | str = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
     ) -> None:
         """Initialize the BrowserToolForUrl."""

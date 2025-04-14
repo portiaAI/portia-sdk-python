@@ -63,7 +63,7 @@ class ImageUnderstandingTool(Tool[str]):
         """
     tool_context: str = ""
 
-    model: GenerativeModel | None = Field(
+    model: GenerativeModel | None | str = Field(
         default=None,
         exclude=True,
         description="The model to use for the ImageUnderstandingTool. If not provided, "
@@ -72,7 +72,7 @@ class ImageUnderstandingTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, **kwargs: Any) -> str:
         """Run the ImageTool."""
-        model = self.model or ctx.config.get_default_model()
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
 
         tool_schema = ImageUnderstandingToolSchema(**kwargs)
 
