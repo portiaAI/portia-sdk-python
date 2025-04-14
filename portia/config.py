@@ -432,6 +432,10 @@ class Config(BaseModel):
         default_factory=lambda: os.getenv("AZURE_OPENAI_ENDPOINT") or "",
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
+    ollama_base_url: str = Field(
+        default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
+        description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
+    )
 
     llm_provider: LLMProvider | None = Field(
         default=None,
@@ -799,6 +803,14 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
+                )
+            case LLMProvider.OLLAMA:
+                validate_extras_dependencies("ollama")
+                from portia.model import OllamaGenerativeModel
+
+                return OllamaGenerativeModel(
+                    model_name=model_name,
+                    base_url=self.ollama_base_url,
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")

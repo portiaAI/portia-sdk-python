@@ -6,6 +6,7 @@ import os
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
+import ollama
 import pytest
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
@@ -32,6 +33,16 @@ MODELS = [
     "google/gemini-2.0-flash",
     "azure-openai/gpt-4o-mini",
 ]
+
+LOW_CAPABILITY_MODELS = [
+    "ollama/qwen2.5:0.5b",
+]
+
+
+@pytest.fixture(autouse=True)
+def ollama_model() -> None:
+    """Ensure Ollama model is available."""
+    ollama.pull("qwen2.5:0.5b")
 
 
 @pytest.fixture(autouse=True)
@@ -82,7 +93,7 @@ def messages() -> list[Message]:
     ]
 
 
-@pytest.mark.parametrize("model_str", MODELS)
+@pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
 def test_get_response(model_str: str, messages: list[Message]) -> None:
     """Test get_response for each model type."""
     model = Config.from_default(default_model=model_str).get_default_model()
@@ -92,7 +103,7 @@ def test_get_response(model_str: str, messages: list[Message]) -> None:
     assert response.content is not None
 
 
-@pytest.mark.parametrize("model_str", MODELS)
+@pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
 def test_get_structured_response(model_str: str, messages: list[Message]) -> None:
     """Test get_structured_response for each model type."""
     model = Config.from_default(default_model=model_str).get_default_model()
@@ -103,7 +114,11 @@ def test_get_structured_response(model_str: str, messages: list[Message]) -> Non
 
 @pytest.mark.parametrize("model_str", MODELS)
 def test_get_structured_response_steps_or_error(model_str: str, messages: list[Message]) -> None:
-    """Test get_structured_response with StepsOrError for each model type."""
+    """Test get_structured_response with StepsOrError for each model type.
+
+    Skip Ollama models because the small models we used for integration testing aren't
+    good enough for complex schemas.
+    """
     model = Config.from_default(default_model=model_str).get_default_model()
     response = model.get_structured_response(messages, StepsOrError)
     assert isinstance(response, StepsOrError)
