@@ -8,7 +8,7 @@ from portia.config import (
     SUPPORTED_OPENAI_MODELS,
     Config,
     ExecutionAgentType,
-    GenerativeModels,
+    GenerativeModelsConfig,
     LLMModel,
     LogLevel,
     PlanningAgentType,
@@ -170,7 +170,7 @@ def test_set_default_model_from_model_instance() -> None:
     assert planner_model is model
 
 
-MODEL_KEYS = sorted(set(GenerativeModels.model_fields) - {"default_model"})
+MODEL_KEYS = sorted(set(GenerativeModelsConfig.model_fields) - {"default_model"})
 
 
 @pytest.mark.parametrize("model_key", MODEL_KEYS)
@@ -442,7 +442,7 @@ def test_config_error_resolve_model_raises_error(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
     config = Config.from_default()
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    config.models = GenerativeModels()
+    config.models = GenerativeModelsConfig()
     config.llm_provider = None
 
     with pytest.raises(InvalidConfigError):
@@ -503,6 +503,22 @@ def test_legacy_model_kwargs_deprecation(
             llm_provider=LLMProvider.OPENAI,
         )
     assert getattr(c.models, new_model_key) == "openai/o1"
+
+
+def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test get_model for different arg types."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    c = Config.from_default()
+    model = c.get_model("openai/gpt-4o")
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+
+    assert c.get_model(None) is None
+    from_instsance = c.get_model(
+        OpenAIGenerativeModel(model_name="gpt-4o-mini", api_key=SecretStr("test-openai-api-key")),
+    )
+    assert isinstance(from_instsance, OpenAIGenerativeModel)
+    assert str(from_instsance) == "openai/gpt-4o-mini"
 
 
 @pytest.mark.parametrize(
