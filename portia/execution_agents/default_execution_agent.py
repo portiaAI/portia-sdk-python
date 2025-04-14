@@ -17,7 +17,6 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from portia.clarification import Clarification, InputClarification
-from portia.config import EXECUTION_MODEL_KEY
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.execution_utils import (
@@ -30,7 +29,7 @@ from portia.execution_agents.execution_utils import (
 from portia.execution_agents.output import LocalOutput, Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
-from portia.model import GenerativeModel, LangChainGenerativeModel, Message
+from portia.model import GenerativeModel, Message
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -579,14 +578,14 @@ class ToolCallingModel:
 
     def __init__(
         self,
-        model: LangChainGenerativeModel,
+        model: GenerativeModel,
         tools: list[StructuredTool],
         agent: DefaultExecutionAgent,
     ) -> None:
         """Initialize the model.
 
         Args:
-            model (LangChainGenerativeModel): The language model used for argument parsing.
+            model (GenerativeModel): The language model used for argument parsing.
             context (str): The context for argument generation.
             agent (DefaultExecutionAgent): The agent using the parser model.
             tools (list[StructuredTool]): The tools to pass to the model.
@@ -778,7 +777,12 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         """
         if not self.tool:
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
+<<<<<<< HEAD
         model = self.config.resolve_langchain_model(EXECUTION_MODEL_KEY)
+=======
+        context = self.get_system_context()
+        model = self.config.get_execution_model()
+>>>>>>> main
 
         tools = [
             self.tool.to_langchain_with_artifact(

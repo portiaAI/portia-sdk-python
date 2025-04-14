@@ -53,7 +53,7 @@ class LLMTool(Tool[str]):
         """
     tool_context: str = ""
 
-    model: GenerativeModel | None = Field(
+    model: GenerativeModel | str | None = Field(
         default=None,
         exclude=True,
         description="The model to use for the LLMTool. If not provided, "
@@ -62,7 +62,7 @@ class LLMTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, task: str) -> str:
         """Run the LLMTool."""
-        model = self.model or ctx.config.resolve_model()
+        model = ctx.config.get_model(self.model) or ctx.config.get_default_model()
 
         # Define system and user messages
         context = (

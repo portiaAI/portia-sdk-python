@@ -36,7 +36,7 @@ from portia.tool import Tool
 from tests.utils import (
     AdditionTool,
     get_mock_base_chat_model,
-    get_mock_langchain_generative_model,
+    get_mock_generative_model,
     get_test_config,
     get_test_plan_run,
     get_test_tool_context,
@@ -359,9 +359,8 @@ def test_tool_calling_model_no_hallucinations() -> None:
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
     )
-    args = {"arg1": "ARG1_VALUE", "arg2": "ARG2_VALUE"}
-    mock_model = get_mock_langchain_generative_model(
-        SimpleNamespace(content=[args]),
+    mock_model = get_mock_generative_model(
+        SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),
     )
 
     (_, plan_run) = get_test_plan_run()
@@ -401,7 +400,7 @@ def test_tool_calling_model_with_hallucinations() -> None:
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=True)],
     )
-    mock_model = get_mock_langchain_generative_model(
+    mock_model = get_mock_generative_model(
         SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),
     )
 
@@ -680,7 +679,8 @@ def test_default_execution_agent_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.tool = None
     parser_model = ParserModel(
-        model=get_mock_langchain_generative_model(get_mock_base_chat_model()),
+        model=get_mock_generative_model(get_mock_base_chat_model()),
+        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidPlanRunStateError):
@@ -688,7 +688,8 @@ def test_default_execution_agent_edge_cases() -> None:
 
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
-        model=get_mock_langchain_generative_model(get_mock_base_chat_model()),
+        model=get_mock_generative_model(get_mock_base_chat_model()),
+        context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )

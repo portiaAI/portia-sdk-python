@@ -21,8 +21,8 @@ from portia.config import (
     SUPPORTED_OPENAI_MODELS,
     Config,
     ExecutionAgentType,
+    GenerativeModelsConfig,
     LLMModel,
-    LLMProvider,
     LogLevel,
     PlanningAgentType,
     StorageClass,
@@ -63,6 +63,11 @@ from portia.logger import logger
 from portia.mcp_session import SseMcpClientConfig, StdioMcpClientConfig
 
 # Open source tools
+from portia.model import (
+    GenerativeModel,
+    LLMProvider,
+    Message,
+)
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
@@ -111,6 +116,8 @@ __all__ = [
     "ExecutionHooks",
     "FileReaderTool",
     "FileWriterTool",
+    "GenerativeModel",
+    "GenerativeModelsConfig",
     "InMemoryToolRegistry",
     "InputClarification",
     "InvalidAgentError",
@@ -123,6 +130,7 @@ __all__ = [
     "LLMTool",
     "LogLevel",
     "McpToolRegistry",
+    "Message",
     "MultipleChoiceClarification",
     "Output",
     "Plan",
