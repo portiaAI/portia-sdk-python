@@ -72,7 +72,7 @@ class ImageUnderstandingTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, **kwargs: Any) -> str:
         """Run the ImageTool."""
-        model = ctx.config.get_model(self.model) or ctx.config.get_default_model()
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
 
         tool_schema = ImageUnderstandingToolSchema(**kwargs)
 

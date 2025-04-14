@@ -17,7 +17,7 @@ def mock_tool_run_context(mock_model: MagicMock) -> ToolRunContext:
     """Fixture to mock ExecutionContext."""
     mock_config = MagicMock(spec=Config)
     mock_config.get_default_model.return_value = mock_model
-    mock_config.get_model.return_value = mock_model
+    mock_config.get_generative_model.return_value = mock_model
     mock_execution_context = MagicMock(spec=ExecutionContext)
     mock_execution_context.plan_run_context = None
     return ToolRunContext.model_construct(
