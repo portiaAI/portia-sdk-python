@@ -848,11 +848,13 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
 
     """
     llm_provider_from_api_keys = llm_provider_default_from_api_keys(**kwargs)
-    if "llm_provider" in kwargs or llm_provider_from_api_keys:
+    if "llm_provider" in kwargs and kwargs["llm_provider"] is not None:
         llm_provider = parse_str_to_enum(
-            kwargs.pop("llm_provider", llm_provider_from_api_keys),
+            kwargs.pop("llm_provider"),
             LLMProvider,
         )
+    elif llm_provider_from_api_keys:
+        llm_provider = llm_provider_from_api_keys
     else:
         llm_provider = None
 

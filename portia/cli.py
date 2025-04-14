@@ -141,6 +141,8 @@ def generate_cli_option_from_pydantic_field(  # noqa: C901, PLR0912
                     field_default = info.default_factory().name  # type: ignore[reportCallIssue]
                 else:
                     field_default = None
+            else:
+                return lambda: None
 
     field_help = info.description or f"Set the value for {option_name}"
 
