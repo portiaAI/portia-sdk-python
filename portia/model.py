@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import instructor
@@ -68,13 +69,34 @@ class Message(BaseModel):
         raise ValueError(f"Unsupported role: {self.role}")
 
 
+class LLMProvider(Enum):
+    """Enum for supported LLM providers.
+
+    Attributes:
+        OPENAI: OpenAI provider.
+        ANTHROPIC: Anthropic provider.
+        MISTRALAI: MistralAI provider.
+        GOOGLE_GENERATIVE_AI: Google Generative AI provider.
+        AZURE_OPENAI: Azure OpenAI provider.
+
+    """
+
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    MISTRALAI = "mistralai"
+    GOOGLE_GENERATIVE_AI = "google"
+    AZURE_OPENAI = "azure-openai"
+    CUSTOM = "custom"
+    OLLAMA = "ollama"
+
+
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
 
 
 class GenerativeModel(ABC):
     """Base class for all generative model clients."""
 
-    provider_name: str
+    provider: LLMProvider
 
     def __init__(self, model_name: str) -> None:
         """Initialize the model.
@@ -116,17 +138,21 @@ class GenerativeModel(ABC):
 
     def __str__(self) -> str:
         """Get the string representation of the model."""
-        return f"{self.provider_name}/{self.model_name}"
+        return f"{self.provider.value}/{self.model_name}"
 
     def __repr__(self) -> str:
         """Get the string representation of the model."""
-        return f'{self.__class__.__name__}("{self.provider_name}/{self.model_name}")'
+        return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}")'
+
+    @abstractmethod
+    def to_langchain(self) -> BaseChatModel:
+        """Get the LangChain client."""
 
 
 class LangChainGenerativeModel(GenerativeModel):
     """Base class for LangChain-based models."""
 
-    provider_name: str
+    provider: LLMProvider = LLMProvider.CUSTOM
 
     def __init__(self, client: BaseChatModel, model_name: str) -> None:
         """Initialize with LangChain client.
@@ -177,7 +203,7 @@ class LangChainGenerativeModel(GenerativeModel):
 class OpenAIGenerativeModel(LangChainGenerativeModel):
     """OpenAI model implementation."""
 
-    provider_name: str = "openai"
+    provider: LLMProvider = LLMProvider.OPENAI
 
     def __init__(
         self,
@@ -269,7 +295,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
     """Azure OpenAI model implementation."""
 
-    provider_name: str = "azure-openai"
+    provider: LLMProvider = LLMProvider.AZURE_OPENAI
 
     def __init__(  # noqa: PLR0913
         self,
@@ -371,7 +397,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
 class AnthropicGenerativeModel(LangChainGenerativeModel):
     """Anthropic model implementation."""
 
-    provider_name: str = "anthropic"
+    provider: LLMProvider = LLMProvider.ANTHROPIC
 
     def __init__(
         self,
@@ -441,14 +467,14 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         )
 
 
-if validate_extras_dependencies("mistral", raise_error=False):
+if validate_extras_dependencies("mistralai", raise_error=False):
     from langchain_mistralai import ChatMistralAI
     from mistralai import Mistral
 
     class MistralAIGenerativeModel(LangChainGenerativeModel):
         """MistralAI model implementation."""
 
-        provider_name: str = "mistralai"
+        provider: LLMProvider = LLMProvider.MISTRALAI
 
         def __init__(
             self,
@@ -523,10 +549,13 @@ if validate_extras_dependencies("google", raise_error=False):
     import google.generativeai as genai
     from langchain_google_genai import ChatGoogleGenerativeAI
 
+    if TYPE_CHECKING:
+        from google.generativeai.types.generation_types import GenerationConfigDict
+
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""
 
-        provider_name: str = "google-generative-ai"
+        provider: LLMProvider = LLMProvider.GOOGLE_GENERATIVE_AI
 
         def __init__(
             self,
@@ -534,6 +563,7 @@ if validate_extras_dependencies("google", raise_error=False):
             model_name: str = "gemini-2.0-flash",
             api_key: SecretStr,
             max_retries: int = 3,
+            temperature: float | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with Google Generative AI client.
@@ -542,11 +572,17 @@ if validate_extras_dependencies("google", raise_error=False):
                 model_name: Name of the Google Generative AI model
                 api_key: API key for Google Generative AI
                 max_retries: Maximum number of retries
+                temperature: Temperature parameter for model sampling
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
             # Configure genai with the api key
             genai.configure(api_key=api_key.get_secret_value())  # pyright: ignore[reportPrivateImportUsage]
+
+            generation_config: GenerationConfigDict = {}
+            if temperature is not None:
+                kwargs["temperature"] = temperature
+                generation_config["temperature"] = temperature
 
             client = ChatGoogleGenerativeAI(
                 model=model_name,
@@ -556,7 +592,10 @@ if validate_extras_dependencies("google", raise_error=False):
             )
             super().__init__(client, model_name)
             self._instructor_client = instructor.from_gemini(
-                client=genai.GenerativeModel(model_name=model_name),  # pyright: ignore[reportPrivateImportUsage]
+                client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
+                    model_name=model_name,
+                    generation_config=generation_config,
+                ),
                 mode=instructor.Mode.GEMINI_JSON,
                 use_async=False,
             )
@@ -588,6 +627,66 @@ if validate_extras_dependencies("google", raise_error=False):
             return self._instructor_client.messages.create(
                 messages=instructor_messages,
                 response_model=schema,
+            )
+
+
+if validate_extras_dependencies("ollama", raise_error=False):
+    from langchain_ollama import ChatOllama
+
+    class OllamaGenerativeModel(LangChainGenerativeModel):
+        """Wrapper for Ollama models."""
+
+        provider_name: str = "ollama"
+
+        def __init__(
+            self,
+            model_name: str,
+            base_url: str = "http://localhost:11434/v1",
+            **kwargs: Any,
+        ) -> None:
+            """Initialize with Ollama client.
+
+            Args:
+                model_name: Name of the Ollama model
+                base_url: Base URL of the Ollama server
+                **kwargs: Additional keyword arguments to pass to ChatOllama
+
+            """
+            super().__init__(
+                client=ChatOllama(model=model_name, **kwargs),
+                model_name=model_name,
+            )
+            self.base_url = base_url
+
+        def get_structured_response(
+            self,
+            messages: list[Message],
+            schema: type[BaseModelT],
+            **kwargs: Any,  # noqa: ARG002
+        ) -> BaseModelT:
+            """Get structured response from Ollama model using instructor.
+
+            Args:
+                messages (list[Message]): The list of messages to send to the model.
+                schema (type[BaseModelT]): The Pydantic model to use for the response.
+                **kwargs: Additional keyword arguments to pass to the model.
+
+            Returns:
+                BaseModelT: The structured response from the model.
+
+            """
+            client = instructor.from_openai(
+                OpenAI(
+                    base_url=self.base_url,
+                    api_key="ollama",  # required, but unused
+                ),
+                mode=instructor.Mode.JSON,
+            )
+            return client.chat.completions.create(
+                model=self.model_name,
+                messages=[map_message_to_instructor(message) for message in messages],
+                response_model=schema,
+                max_retries=2,
             )
 
 

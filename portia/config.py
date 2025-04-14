@@ -9,8 +9,10 @@ default settings.
 from __future__ import annotations
 
 import os
+import warnings
+from collections.abc import Container
 from enum import Enum
-from typing import NamedTuple, Self, TypeVar
+from typing import Any, NamedTuple, Self, TypeVar
 
 import tiktoken
 from pydantic import (
@@ -28,7 +30,7 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
-    LangChainGenerativeModel,
+    LLMProvider,
     OpenAIGenerativeModel,
 )
 
@@ -50,41 +52,10 @@ class StorageClass(Enum):
     CLOUD = "CLOUD"
 
 
-class LLMProvider(Enum):
-    """Enum for supported LLM providers.
-
-    Attributes:
-        OPENAI: OpenAI provider.
-        ANTHROPIC: Anthropic provider.
-        MISTRALAI: MistralAI provider.
-        GOOGLE_GENERATIVE_AI: Google Generative AI provider.
-        AZURE_OPENAI: Azure OpenAI provider.
-
-    """
-
-    OPENAI = "OPENAI"
-    ANTHROPIC = "ANTHROPIC"
-    MISTRALAI = "MISTRALAI"
-    GOOGLE_GENERATIVE_AI = "GOOGLE_GENERATIVE_AI"
-    AZURE_OPENAI = "AZURE_OPENAI"
-
-    def to_api_key_name(self) -> str:
-        """Get the name of the API key for the provider."""
-        match self:
-            case LLMProvider.OPENAI:
-                return "openai_api_key"
-            case LLMProvider.ANTHROPIC:
-                return "anthropic_api_key"
-            case LLMProvider.MISTRALAI:
-                return "mistralai_api_key"
-            case LLMProvider.GOOGLE_GENERATIVE_AI:
-                return "google_api_key"
-            case LLMProvider.AZURE_OPENAI:
-                return "azure_openai_api_key"
-
-
 class Model(NamedTuple):
     """Provider and model name tuple.
+
+    **DEPRECATED** Use new model configuration options on Config class instead.
 
     Attributes:
         provider: The provider of the model.
@@ -98,6 +69,8 @@ class Model(NamedTuple):
 
 class LLMModel(Enum):
     """Enum for supported LLM models.
+
+    **DEPRECATED** Use new model configuration options on Config class instead.
 
     Models are grouped by provider, with the following providers:
     - OpenAI
@@ -195,36 +168,37 @@ class LLMModel(Enum):
         """
         return self.value.provider
 
+    def to_model_string(self) -> str:
+        """Get the model string for the model.
 
-SUPPORTED_OPENAI_MODELS = [
-    LLMModel.GPT_4_O,
-    LLMModel.GPT_4_O_MINI,
-    LLMModel.GPT_3_5_TURBO,
-    LLMModel.O_3_MINI,
-]
+        Returns:
+            str: The model string.
 
-SUPPORTED_ANTHROPIC_MODELS = [
-    LLMModel.CLAUDE_3_5_HAIKU,
-    LLMModel.CLAUDE_3_5_SONNET,
-    LLMModel.CLAUDE_3_7_SONNET,
-    LLMModel.CLAUDE_3_OPUS,
-]
+        """
+        return f"{self.provider().value}/{self.api_name}"
 
-SUPPORTED_MISTRALAI_MODELS = [
-    LLMModel.MISTRAL_LARGE,
-]
 
-SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = [
-    LLMModel.GEMINI_2_0_FLASH,
-    LLMModel.GEMINI_2_0_FLASH_LITE,
-    LLMModel.GEMINI_1_5_FLASH,
-]
+class _AllModelsSupportedWithDeprecation(Container):
+    """A type that returns True for any contains check."""
 
-SUPPORTED_AZURE_OPENAI_MODELS = [
-    LLMModel.AZURE_GPT_4_O,
-    LLMModel.AZURE_GPT_4_O_MINI,
-    LLMModel.AZURE_O_3_MINI,
-]
+    def __contains__(self, item: object) -> bool:
+        """Check if the item is in the container."""
+        warnings.warn(
+            "Supported model checks are no longer required - any model from "
+            "the provider is supported.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return True
+
+
+ALL_MODELS_SUPPORTED_WITH_DEPRECATION = _AllModelsSupportedWithDeprecation()
+
+SUPPORTED_OPENAI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_ANTHROPIC_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_MISTRALAI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
+SUPPORTED_AZURE_OPENAI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
 
 
 class ExecutionAgentType(Enum):
@@ -270,13 +244,6 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
-PLANNING_MODEL_KEY = "planning_model_name"
-EXECUTION_MODEL_KEY = "execution_model_name"
-INTROSPECTION_MODEL_KEY = "introspection_model_name"
-SUMMARISER_MODEL_KEY = "summariser_model_name"
-DEFAULT_MODEL_KEY = "default_model_name"
-PLANNING_DEFAULT_MODEL_KEY = "planning_default_model_name"
-
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
 
 
@@ -314,21 +281,82 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     )
 
 
-PLANNER_DEFAULT_MODELS = {
-    LLMProvider.OPENAI: LLMModel.O_3_MINI,
-    LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
-    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
-    LLMProvider.GOOGLE_GENERATIVE_AI: LLMModel.GEMINI_2_0_FLASH,
-    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_O_3_MINI,
+PLANNING_MODEL_KEY = "planning_model_name"
+EXECUTION_MODEL_KEY = "execution_model_name"
+INTROSPECTION_MODEL_KEY = "introspection_model_name"
+SUMMARISER_MODEL_KEY = "summariser_model_name"
+DEFAULT_MODEL_KEY = "default_model_name"
+
+
+PROVIDER_DEFAULT_MODELS = {
+    "planning_model": {
+        LLMProvider.OPENAI: "openai/o3-mini",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
+        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
+        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
+        LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
+    },
+    "default_model": {
+        LLMProvider.OPENAI: "openai/gpt-4o",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
+        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
+        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
+        LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4o",
+    },
 }
 
-DEFAULT_MODELS = {
-    LLMProvider.OPENAI: LLMModel.GPT_4_O,
-    LLMProvider.ANTHROPIC: LLMModel.CLAUDE_3_5_SONNET,
-    LLMProvider.MISTRALAI: LLMModel.MISTRAL_LARGE,
-    LLMProvider.GOOGLE_GENERATIVE_AI: LLMModel.GEMINI_2_0_FLASH,
-    LLMProvider.AZURE_OPENAI: LLMModel.AZURE_GPT_4_O,
-}
+
+class GenerativeModelsConfig(BaseModel):
+    """Configuration for a Generative Models.
+
+    These models do not all need to be specified manually. If an LLM provider is configured,
+    Portia will use default models that are selected for the particular use-case.
+
+    Attributes:
+        default_model: The default generative model to use. This model is used as the fallback
+            model if no other model is specified. It is also used by default in the Portia SDK
+            tool that require an LLM.
+
+        planning_model: The model to use for the PlanningAgent. Reasoning models are a good choice
+            here, as they are able to reason about the problem and the possible solutions. If not
+            specified, the default_model will be used.
+
+        execution_model: The model to use for the ExecutionAgent. This model is used for the
+            distilling context from the plan run into tool calls. If not specified, the
+            default_model will be used.
+
+        introspection_model: The model to use for the IntrospectionAgent. This model is used to
+            introspect the problem and the plan. If not specified, the default_model will be used.
+
+        summarizer_model: The model to use for the SummarizerAgent. This model is used to
+            summarize output from the plan run. If not specified, the default_model will be used.
+
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    default_model: GenerativeModel | str | None = None
+    planning_model: GenerativeModel | str | None = None
+    execution_model: GenerativeModel | str | None = None
+    introspection_model: GenerativeModel | str | None = None
+    summarizer_model: GenerativeModel | str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_models(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Convert legacy LLMModel values to str with deprecation warning."""
+        new_data = {}
+        for key, value in data.items():
+            if isinstance(value, LLMModel):
+                warnings.warn(
+                    "LLMModel values are deprecated and will be removed in a future version.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                new_data[key] = value.to_model_string()
+            else:
+                new_data[key] = value
+        return new_data
 
 
 class Config(BaseModel):
@@ -348,8 +376,9 @@ class Config(BaseModel):
         google_api_key: The API key for Google Generative AI.
         azure_openai_api_key: The API key for Azure OpenAI.
         azure_openai_endpoint: The endpoint for Azure OpenAI.
-        llm_provider: The LLM provider.
-        models: A dictionary of LLM models for each usage type.
+        llm_provider: The LLM provider. If set, Portia uses this to select the best models
+            for each agent. Can be None if custom models are provided.
+        models: A configuration for the LLM models for Portia to use.
         storage_class: The storage class used (e.g., MEMORY, DISK, CLOUD).
         storage_dir: The directory for storage, if applicable.
         default_log_level: The default log level (e.g., DEBUG, INFO).
@@ -357,10 +386,9 @@ class Config(BaseModel):
         json_log_serialize: Whether to serialize logs in JSON format.
         planning_agent_type: The planning agent type.
         execution_agent_type: The execution agent type.
+        feature_flags: A dictionary of feature flags for the SDK.
 
     """
-
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
@@ -404,20 +432,21 @@ class Config(BaseModel):
         default_factory=lambda: os.getenv("AZURE_OPENAI_ENDPOINT") or "",
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
-
-    llm_provider: LLMProvider = Field(
-        default=LLMProvider.OPENAI,
-        description="Which LLM Provider to use.",
+    ollama_base_url: str = Field(
+        default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
+        description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
     )
 
-    models: dict[str, LLMModel] = Field(
-        default_factory=dict,
-        description="A dictionary of configured LLM models for each usage.",
+    llm_provider: LLMProvider | None = Field(
+        default=None,
+        description="The LLM (API) provider. If set, Portia uses this to select the "
+        " best models for each agent. Can be None if custom models are provided.",
     )
 
-    custom_models: dict[str, GenerativeModel] = Field(
-        default_factory=dict,
-        description="A dictionary of custom GenerativeModel instances for each usage.",
+    models: GenerativeModelsConfig = Field(
+        default_factory=lambda: GenerativeModelsConfig(),
+        description="Manual configuration for the generative models for Portia to use for "
+        "different agents. See the GenerativeModels class for more information.",
     )
 
     feature_flags: dict[str, bool] = Field(
@@ -435,75 +464,6 @@ class Config(BaseModel):
             **self.feature_flags,
         }
         return self
-
-    @model_validator(mode="after")
-    def add_default_models(self) -> Self:
-        """Add default models if not provided."""
-        self.models = {
-            PLANNING_DEFAULT_MODEL_KEY: PLANNER_DEFAULT_MODELS[self.llm_provider],
-            DEFAULT_MODEL_KEY: DEFAULT_MODELS[self.llm_provider],
-            **self.models,
-        }
-        return self
-
-    def model(self, usage: str) -> LLMModel:
-        """Get the LLM model for the given usage."""
-        if usage == PLANNING_MODEL_KEY:
-            return self.models.get(PLANNING_MODEL_KEY, self.models[PLANNING_DEFAULT_MODEL_KEY])
-        return self.models.get(usage, self.models[DEFAULT_MODEL_KEY])
-
-    def resolve_model(self, usage: str = DEFAULT_MODEL_KEY) -> GenerativeModel:
-        """Resolve a model from the config."""
-        if usage in self.custom_models:
-            return self.custom_models[usage]
-        model = self.model(usage)
-        return self._construct_model(model)
-
-    def resolve_langchain_model(self, usage: str = DEFAULT_MODEL_KEY) -> LangChainGenerativeModel:
-        """Resolve a LangChain model from the config."""
-        model = self.resolve_model(usage)
-        if isinstance(model, LangChainGenerativeModel):
-            return model
-        raise TypeError(
-            f"A LangChainGenerativeModel is required, but the config for "
-            f"{usage} resolved to {model}.",
-        )
-
-    def _construct_model(self, llm_model: LLMModel) -> GenerativeModel:
-        """Construct a Model instance from an LLMModel."""
-        match llm_model.provider():
-            case LLMProvider.OPENAI:
-                return OpenAIGenerativeModel(
-                    model_name=llm_model.api_name,
-                    api_key=self.openai_api_key,
-                )
-            case LLMProvider.ANTHROPIC:
-                return AnthropicGenerativeModel(
-                    model_name=llm_model.api_name,
-                    api_key=self.anthropic_api_key,
-                )
-            case LLMProvider.MISTRALAI:
-                validate_extras_dependencies("mistral")
-                from portia.model import MistralAIGenerativeModel
-
-                return MistralAIGenerativeModel(
-                    model_name=llm_model.api_name,
-                    api_key=self.mistralai_api_key,
-                )
-            case LLMProvider.GOOGLE_GENERATIVE_AI:
-                validate_extras_dependencies("google")
-                from portia.model import GoogleGenAiGenerativeModel
-
-                return GoogleGenAiGenerativeModel(
-                    model_name=llm_model.api_name,
-                    api_key=self.google_api_key,
-                )
-            case LLMProvider.AZURE_OPENAI:
-                return AzureOpenAIGenerativeModel(
-                    model_name=llm_model.api_name,
-                    api_key=self.azure_openai_api_key,
-                    azure_endpoint=self.azure_openai_endpoint,
-                )
 
     # Storage Options
     storage_class: StorageClass = Field(
@@ -593,6 +553,28 @@ class Config(BaseModel):
         return len(encoding) > self.large_output_threshold_tokens
 
     @model_validator(mode="after")
+    def fill_default_models(self) -> Self:
+        """Fill in default models for the LLM provider if not provided."""
+        if (
+            self.models.default_model is None
+            and self.llm_provider in PROVIDER_DEFAULT_MODELS["default_model"]
+        ):
+            self.models.default_model = PROVIDER_DEFAULT_MODELS["default_model"][self.llm_provider]
+        if self.models.default_model is None:
+            raise InvalidConfigError(
+                "llm_provider or default_model",
+                "Either llm_provider or default_model must be set",
+            )
+        if (
+            self.models.planning_model is None
+            and self.llm_provider in PROVIDER_DEFAULT_MODELS["planning_model"]
+        ):
+            self.models.planning_model = PROVIDER_DEFAULT_MODELS["planning_model"][
+                self.llm_provider
+            ]
+        return self
+
+    @model_validator(mode="after")
     def check_config(self) -> Self:
         """Validate Config is consistent."""
         # Portia API Key must be provided if using cloud storage
@@ -609,18 +591,22 @@ class Config(BaseModel):
                 "A storage directory must be provided if using disk storage",
             )
 
-        def validate_llm_api_key(provider: LLMProvider) -> None:
-            """Validate LLM Config."""
-            if not self.has_api_key(provider.to_api_key_name()):
+        # Check that all models passed as strings are instantiable, i.e. they have the
+        # right API keys and other required configuration.
+        for model_getter in (
+            self.get_default_model,
+            self.get_planning_model,
+            self.get_execution_model,
+            self.get_introspection_model,
+            self.get_summarizer_model,
+        ):
+            try:
+                model_getter()
+            except Exception as e:  # noqa: PERF203
                 raise InvalidConfigError(
-                    f"{provider.to_api_key_name()}",
-                    f"Must be provided if using {provider}",
-                )
-
-        validate_llm_api_key(self.llm_provider)
-        for model in self.models.values():
-            if isinstance(model, LLMModel):
-                validate_llm_api_key(model.provider())
+                    f"models.{model_getter.__name__}",
+                    "All models must be instantiable",
+                ) from e
         return self
 
     @classmethod
@@ -682,9 +668,163 @@ class Config(BaseModel):
                 raise InvalidConfigError(name, "Empty SecretStr value not allowed")
         return value
 
+    def get_default_model(self) -> GenerativeModel:
+        """Get or build the default model from the config.
 
-def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
-    """Get the default LLM provider from the API keys."""
+        The default model will always be present. It is a general purpose model that is used
+        for the SDK's LLM-based Tools, such as the ImageUnderstandingTool and the LLMTool.
+
+        Additionally, unless specified all other specific agent models will default to this model.
+        """
+        model = self.get_generative_model(self.models.default_model)
+        if model is None:
+            # Default model is required, but not provided.
+            raise InvalidConfigError(
+                "default_model",
+                "A default model must be set",
+            )
+        return model
+
+    def get_planning_model(self) -> GenerativeModel:
+        """Get or build the planning model from the config.
+
+        See the GenerativeModelsConfig class for more information
+        """
+        return self.get_generative_model(self.models.planning_model) or self.get_default_model()
+
+    def get_execution_model(self) -> GenerativeModel:
+        """Get or build the execution model from the config.
+
+        See the GenerativeModelsConfig class for more information
+        """
+        return self.get_generative_model(self.models.execution_model) or self.get_default_model()
+
+    def get_introspection_model(self) -> GenerativeModel:
+        """Get or build the introspection model from the config.
+
+        See the GenerativeModelsConfig class for more information
+        """
+        return (
+            self.get_generative_model(self.models.introspection_model) or self.get_default_model()
+        )
+
+    def get_summarizer_model(self) -> GenerativeModel:
+        """Get or build the summarizer model from the config.
+
+        See the GenerativeModelsConfig class for more information
+        """
+        return self.get_generative_model(self.models.summarizer_model) or self.get_default_model()
+
+    def get_generative_model(
+        self,
+        model: str | GenerativeModel | None,
+    ) -> GenerativeModel | None:
+        """Get a GenerativeModel instance.
+
+        Args:
+            model (str | GenerativeModel | None): The model to get, either specified as a
+                string in the form of "provider/model_name", or as a GenerativeModel instance.
+                Also accepts None, in which case None is returned.
+
+        Returns:
+            GenerativeModel | None: The model instance or None.
+
+        """
+        if model is None:
+            return None
+        if isinstance(model, str):
+            return self._parse_model_string(model)
+        return model
+
+    def _parse_model_string(self, model_string: str) -> GenerativeModel:
+        """Parse a model string in the form of "provider-prefix/model_name` to a GenerativeModel.
+
+        Supported provider-prefixes are:
+        - openai
+        - anthropic
+        - mistral (requires portia-sdk-python[mistral] to be installed)
+        - google (requires portia-sdk-python[google] to be installed)
+        - azure-openai
+
+        Args:
+            model_string (str): The model string to parse. E.G. "openai/gpt-4o"
+
+        Returns:
+            GenerativeModel: The parsed model.
+
+        """
+        provider, model_name = model_string.strip().split("/", maxsplit=1)
+        llm_provider = LLMProvider(provider)
+        return self._construct_model_from_name(llm_provider, model_name)
+
+    def _construct_model_from_name(
+        self,
+        llm_provider: LLMProvider,
+        model_name: str,
+    ) -> GenerativeModel:
+        """Construct a Model instance from an LLMProvider and model name.
+
+        Args:
+            llm_provider (LLMProvider): The LLM provider.
+            model_name (str): The model name as it appears in the LLM provider's API.
+
+        Returns:
+            GenerativeModel: The constructed model.
+
+        """
+        match llm_provider:
+            case LLMProvider.OPENAI:
+                return OpenAIGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("openai_api_key"),
+                )
+            case LLMProvider.ANTHROPIC:
+                return AnthropicGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("anthropic_api_key"),
+                )
+            case LLMProvider.MISTRALAI:
+                validate_extras_dependencies("mistralai")
+                from portia.model import MistralAIGenerativeModel
+
+                return MistralAIGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("mistralai_api_key"),
+                )
+            case LLMProvider.GOOGLE_GENERATIVE_AI:
+                validate_extras_dependencies("google")
+                from portia.model import GoogleGenAiGenerativeModel
+
+                return GoogleGenAiGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("google_api_key"),
+                )
+            case LLMProvider.AZURE_OPENAI:
+                return AzureOpenAIGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("azure_openai_api_key"),
+                    azure_endpoint=self.must_get("azure_openai_endpoint", str),
+                )
+            case LLMProvider.OLLAMA:
+                validate_extras_dependencies("ollama")
+                from portia.model import OllamaGenerativeModel
+
+                return OllamaGenerativeModel(
+                    model_name=model_name,
+                    base_url=self.ollama_base_url,
+                )
+            case LLMProvider.CUSTOM:
+                raise ValueError(f"Cannot construct a custom model from a string {model_name}")
+
+
+def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003
+    """Get the default LLM provider from the API keys.
+
+    Returns:
+        LLMProvider: The default LLM provider.
+        None: If no API key is found.
+
+    """
     if os.getenv("OPENAI_API_KEY") or kwargs.get("openai_api_key"):
         return LLMProvider.OPENAI
     if os.getenv("ANTHROPIC_API_KEY") or kwargs.get("anthropic_api_key"):
@@ -697,7 +837,7 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider:  # noqa: ANN003
         kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
     ):
         return LLMProvider.AZURE_OPENAI
-    raise InvalidConfigError(LLMProvider.OPENAI.to_api_key_name(), "No LLM API key found")
+    return None
 
 
 def default_config(**kwargs) -> Config:  # noqa: ANN003
@@ -707,21 +847,72 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         Config: The default config
 
     """
-    llm_model_name = kwargs.pop("llm_model_name", None)
-    models = kwargs.pop("models", {})
-    for model_usage in [
-        PLANNING_MODEL_KEY,
-        INTROSPECTION_MODEL_KEY,
-        EXECUTION_MODEL_KEY,
-        SUMMARISER_MODEL_KEY,
-    ]:
-        model_name = kwargs.pop(model_usage, llm_model_name)
-        if model_name and model_name not in models:
-            models[model_usage] = parse_str_to_enum(model_name, LLMModel)
+    llm_provider_from_api_keys = llm_provider_default_from_api_keys(**kwargs)
+    if "llm_provider" in kwargs and kwargs["llm_provider"] is not None:
+        llm_provider = parse_str_to_enum(
+            kwargs.pop("llm_provider"),
+            LLMProvider,
+        )
+    elif llm_provider_from_api_keys:
+        llm_provider = llm_provider_from_api_keys
+    else:
+        llm_provider = None
 
-    llm_provider = parse_str_to_enum(
-        kwargs.pop("llm_provider", llm_provider_default_from_api_keys(**kwargs)),
-        LLMProvider,
+    # Handle deprecated llm_model_name keyword argument
+    if llm_model_name := kwargs.pop("llm_model_name", None):
+        warnings.warn(
+            "llm_model_name is deprecated and will be removed in a future version. Use "
+            "'default_model' instead.",
+            stacklevel=2,
+            category=DeprecationWarning,
+        )
+
+    legacy_model_kwargs = {}
+    for legacy_model_key, new_model_key in {
+        PLANNING_MODEL_KEY: "planning_model",
+        EXECUTION_MODEL_KEY: "execution_model",
+        INTROSPECTION_MODEL_KEY: "introspection_model",
+        SUMMARISER_MODEL_KEY: "summarizer_model",
+        DEFAULT_MODEL_KEY: "default_model",
+    }.items():
+        if legacy_model_key in kwargs:
+            warnings.warn(
+                f"{legacy_model_key} is deprecated and will be removed in a future version. Use "
+                f"{new_model_key} instead.",
+                stacklevel=2,
+                category=DeprecationWarning,
+            )
+            legacy_model_kwargs[new_model_key] = kwargs.pop(legacy_model_key)
+
+    models = kwargs.pop("models", {})
+    if isinstance(models, GenerativeModelsConfig):
+        models = models.model_dump(exclude_unset=True)
+    duplicate_model_keys = kwargs.keys() & models.keys()
+    if duplicate_model_keys:
+        raise InvalidConfigError(
+            ", ".join(duplicate_model_keys),
+            "Model passed in Keys in kwargs and models must be unique",
+        )
+
+    def filter_none(mapping: dict[str, Any]) -> dict[str, Any]:
+        """Filter out None values from a dictionary."""
+        return {k: v for k, v in mapping.items() if v is not None}
+
+    kwargs_models = {
+        **filter_none(legacy_model_kwargs),
+        **filter_none({"default_model": llm_model_name}),
+        **filter_none(models),
+        **filter_none(
+            {k: v for k, v in kwargs.items() if k in GenerativeModelsConfig.model_fields},
+        ),
+    }
+
+    models = GenerativeModelsConfig(
+        default_model=kwargs_models.get("default_model"),
+        planning_model=kwargs_models.get("planning_model"),
+        execution_model=kwargs_models.get("execution_model"),
+        introspection_model=kwargs_models.get("introspection_model"),
+        summarizer_model=kwargs_models.get("summarizer_model"),
     )
 
     default_storage_class = (

@@ -57,7 +57,9 @@ def combine_args_kwargs(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
 
 EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
+    "mistralai": ["mistralai", "langchain_mistralai"],  # in process of refactoring
     "google": ["google.generativeai", "langchain_google_genai"],
+    "ollama": ["langchain_ollama"],
 }
 
 
@@ -67,7 +69,7 @@ def validate_extras_dependencies(extra_group: str, *, raise_error: bool = True) 
     Returns True if all dependencies are installed, False otherwise.
 
     Args:
-        extra_group (str): The extras group to validate, e.g. "mistral" or "google".
+        extra_group (str): The extras group to validate, e.g. "mistralai" or "google".
         raise_error (bool): Whether to raise an ImportError if the dependencies are not installed.
 
     Returns:

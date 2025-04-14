@@ -13,8 +13,8 @@ on:
       - labeled
 
 permissions:
-    contents: read
-    pull-requests: read
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number }}
@@ -46,16 +46,15 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.12"
-      
+
       - name: Install UV
         run: pip install uv
-      
+
       - name: Install dependencies
         working-directory: ./platform/evals
         run: |
-          uv add ../../portia-sdk-python/
-          uv sync --locked --no-dev
-      
+          uv pip install --system -e ../../portia-sdk-python
+
       - name: Check tool IDs
         working-directory: ./platform/evals
         id: check_tool_ids
@@ -101,7 +100,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=claude-3-5-sonnet-latest --threshold_file=agents/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=claude-3-5-sonnet-latest --threshold_file=execution/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -124,12 +123,12 @@ jobs:
           AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
         run: |
-          uv run jupyter nbconvert --to markdown --execute github_analysis.ipynb --output notebook_output.md --no-input
-          cat notebook_output.md
+          uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
+          cat analysis/notebook_output.md
           # Removes style blocks that GitHub won't render properly
-          sed -i '/<style[^>]*>/,/<\/style>/d' notebook_output.md
-          cat notebook_output.md
-          cat notebook_output.md >> $GITHUB_STEP_SUMMARY
+          sed -i '/<style[^>]*>/,/<\/style>/d' analysis/notebook_output.md
+          cat analysis/notebook_output.md
+          cat analysis/notebook_output.md >> $GITHUB_STEP_SUMMARY
 
       - name: Check for evaluation failures
         run: |
