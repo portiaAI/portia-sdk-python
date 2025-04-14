@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-from portia.config import Config, GenerativeModels
+from portia.config import Config, GenerativeModelsConfig
 from portia.execution_agents.output import LocalOutput
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
@@ -22,7 +22,7 @@ def mock_summarizer_model() -> mock.MagicMock:
 @pytest.fixture
 def summarizer_config(mock_summarizer_model: mock.MagicMock) -> Config:
     """Create a summarizer config with a mocked model."""
-    return get_test_config(models=GenerativeModels(summarizer_model=mock_summarizer_model))
+    return get_test_config(models=GenerativeModelsConfig(summarizer_model=mock_summarizer_model))
 
 
 def test_summarizer_agent_execute_sync(
