@@ -475,7 +475,7 @@ def test_portia_run_query_with_example_registry() -> None:
     config = Config.from_default()
 
     portia = Portia(config=config, tools=example_tool_registry)
-    query = "Add 1 + 2 together and then write a haiku about the answer"
+    query = "Add 1 + 2 together and then write me a haiku about the answer"
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
