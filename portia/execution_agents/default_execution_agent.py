@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from portia.clarification import Clarification, InputClarification
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
@@ -24,8 +25,10 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
+from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.tool import ToolRunContext
 
@@ -36,7 +39,14 @@ if TYPE_CHECKING:
     from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
+    from portia.storage import AgentMemory
     from portia.tool import Tool
+
+
+class ExecutionState(MessagesState):
+    """State for the execution agent."""
+
+    step_inputs: list[StepInput]
 
 
 class ToolArgument(BaseModel):
@@ -117,6 +127,65 @@ class VerifiedToolInputs(BaseModel):
     args: list[VerifiedToolArgument] = Field(description="Arguments for the tool.")
 
 
+class MemoryExtractionStep:
+    """A step that extracts memory from the context."""
+
+    def __init__(
+        self,
+        agent: DefaultExecutionAgent,
+    ) -> None:
+        """Initialize the memory extraction step.
+
+        Args:
+            agent (DefaultExecutionAgent): The agent using the memory extraction step.
+
+        """
+        self.agent = agent
+
+    def invoke(self, _: ExecutionState) -> dict[str, Any]:
+        """Invoke the model with the given message state.
+
+        Args:
+            state (ExecutionState): The current state of the execution agent.
+
+        Returns:
+            dict[str, Any]: The response after invoking the model.
+
+        Raises:
+            InvalidRunStateError: If the agent's tool is not available.
+
+        """
+        step_inputs = []
+        previous_outputs = self.agent.plan_run.outputs.step_outputs
+        for step_input in self.agent.step.inputs:
+            if step_input.name not in previous_outputs:
+                continue
+            previous_output = previous_outputs.get(step_input.name)
+
+            if isinstance(previous_output, LocalOutput):
+                output_value = previous_output.value
+            elif isinstance(previous_output, AgentMemoryOutput):
+                output_value = self.agent.agent_memory.get_plan_run_output(
+                    previous_output.output_name,
+                    self.agent.plan_run.id,
+                ).value
+            else:
+                logger().warning(
+                    "Received unknown output type: %s",
+                    previous_output,
+                )
+                continue
+
+            step_inputs.append(
+                StepInput(
+                    name=step_input.name,
+                    value=output_value,
+                    description=step_input.description,
+                ),
+            )
+        return {"step_inputs": step_inputs}
+
+
 class ParserModel:
     """Model to parse the arguments for a tool.
 
@@ -168,6 +237,9 @@ class ParserModel:
                 "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
+                "- Do not include references to any of the input values (e.g. 'as provided in "
+                "the input') - you must put the exact value the tool should be called with in "
+                "the value field\n"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
                 "class ToolInputs:\n"
@@ -181,26 +253,24 @@ class ParserModel:
         ],
     )
 
-    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
             model (Model): The language model used for argument parsing.
-            context (str): The context for argument generation.
             agent (DefaultExecutionAgent): The agent using the parser model.
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
         self.previous_errors: list[str] = []
         self.retries = 0
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the conversation.
 
         Returns:
             dict[str, Any]: The response after invoking the model.
@@ -213,7 +283,7 @@ class ParserModel:
             raise InvalidPlanRunStateError("Parser model has no tool")
 
         formatted_messages = self.arg_parser_prompt.format_messages(
-            context=self.context,
+            context=self.agent.get_system_context(state["step_inputs"]),
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
@@ -272,7 +342,6 @@ class VerifierModel:
     Attributes:
         arg_verifier_prompt (ChatPromptTemplate): The prompt template used for arg verification.
         model (Model): The model used to invoke the verification process.
-        context (str): The context in which the tool arguments are being validated.
         agent (DefaultExecutionAgent): The agent responsible for handling the verification process.
 
     """
@@ -314,7 +383,7 @@ class VerifierModel:
         ],
     )
 
-    def __init__(self, model: GenerativeModel, context: str, agent: DefaultExecutionAgent) -> None:
+    def __init__(self, model: GenerativeModel, agent: DefaultExecutionAgent) -> None:
         """Initialize the model.
 
         Args:
@@ -324,14 +393,13 @@ class VerifierModel:
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the conversation.
 
         Returns:
             dict[str, Any]: The response after invoking the model.
@@ -346,7 +414,7 @@ class VerifierModel:
         messages = state["messages"]
         tool_args = messages[-1].content
         formatted_messages = self.arg_verifier_prompt.format_messages(
-            context=self.context,
+            context=self.agent.get_system_context(state["step_inputs"]),
             task=self.agent.step.task,
             arguments=tool_args,
             tool_name=self.agent.tool.name,
@@ -426,7 +494,6 @@ class ToolCallingModel:
     def __init__(
         self,
         model: GenerativeModel,
-        context: str,
         tools: list[StructuredTool],
         agent: DefaultExecutionAgent,
     ) -> None:
@@ -434,21 +501,19 @@ class ToolCallingModel:
 
         Args:
             model (GenerativeModel): The language model used for argument parsing.
-            context (str): The context for argument generation.
             agent (DefaultExecutionAgent): The agent using the parser model.
             tools (list[StructuredTool]): The tools to pass to the model.
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
         self.tools = tools
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the conversation.
 
         Returns:
             dict[str, Any]: The response after invoking the model.
@@ -505,6 +570,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         step: Step,
         plan_run: PlanRun,
         config: Config,
+        agent_memory: AgentMemory,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the agent.
@@ -513,21 +579,23 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             step (Step): The current step in the task plan.
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
+            agent_memory (AgentMemory): The agent memory to be used for the task.
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
         super().__init__(step, plan_run, config, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
+        self.agent_memory = agent_memory
 
     def clarifications_or_continue(
         self,
-        state: MessagesState,
+        state: ExecutionState,
     ) -> Literal[AgentNode.TOOL_AGENT, END]:  # type: ignore  # noqa: PGH003
         """Determine if we should continue with the tool call or request clarifications instead.
 
         Args:
-            state (MessagesState): The current state of the conversation.
+            state (ExecutionState): The current state of the conversation.
 
         Returns:
             Literal[AgentNode.TOOL_AGENT, END]: The next node we should route to.
@@ -591,7 +659,6 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         """
         if not self.tool:
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
-        context = self.get_system_context()
         model = self.config.get_execution_model()
 
         tools = [
@@ -606,7 +673,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         ]
         tool_node = ToolNode(tools)
 
-        graph = StateGraph(MessagesState)
+        graph = StateGraph(ExecutionState)
         """
         The execution graph represented here can be generated using
         `print(app.get_graph().draw_mermaid())` on the compiled run (and running any agent
@@ -635,13 +702,15 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 classDef last fill:#bfb6fc
         """
 
-        graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(model, context, tools, self).invoke)
+        graph.add_node(AgentNode.TOOL_AGENT, ToolCallingModel(model, tools, self).invoke)
         if self.verified_args:
             graph.add_edge(START, AgentNode.TOOL_AGENT)
         else:
-            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, context, self).invoke)
-            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, context, self).invoke)
-            graph.add_edge(START, AgentNode.ARGUMENT_PARSER)
+            graph.add_node(AgentNode.MEMORY_EXTRACTION, MemoryExtractionStep(self).invoke)
+            graph.add_edge(START, AgentNode.MEMORY_EXTRACTION)
+            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, self).invoke)
+            graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.ARGUMENT_PARSER)
+            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, self).invoke)
             graph.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
             graph.add_conditional_edges(
                 AgentNode.ARGUMENT_VERIFIER,
@@ -664,7 +733,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
         app = graph.compile()
-        invocation_result = app.invoke({"messages": []})
+        invocation_result = app.invoke({"messages": [], "step_inputs": []})
         return process_output(
             invocation_result["messages"],
             self.tool,

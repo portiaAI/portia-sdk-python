@@ -19,7 +19,6 @@ def mock_tool_run_context(mock_model: MagicMock) -> ToolRunContext:
     mock_config.get_default_model.return_value = mock_model
     mock_config.get_model.return_value = mock_model
     mock_execution_context = MagicMock(spec=ExecutionContext)
-    mock_execution_context.plan_run_context = None
     return ToolRunContext.model_construct(
         execution_context=mock_execution_context,
         plan_run_id=PlanRunUUID(uuid=uuid.uuid4()),

@@ -17,12 +17,14 @@ from langgraph.prebuilt import ToolNode
 
 from portia.errors import InvalidAgentError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
     AgentNode,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
 )
+from portia.execution_agents.output import LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.tool import ToolRunContext
@@ -35,6 +37,7 @@ if TYPE_CHECKING:
     from portia.model import GenerativeModel
     from portia.plan import Step
     from portia.plan_run import PlanRun
+    from portia.storage import AgentMemory
     from portia.tool import Tool
 
 
@@ -149,6 +152,7 @@ class OneShotAgent(BaseExecutionAgent):
         step: Step,
         plan_run: PlanRun,
         config: Config,
+        _: AgentMemory,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the OneShotAgent.
@@ -157,6 +161,7 @@ class OneShotAgent(BaseExecutionAgent):
             step (Step): The current step in the task plan.
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
+            agent_memory (AgentMemory): Not supported in this execution agent.
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
@@ -174,7 +179,21 @@ class OneShotAgent(BaseExecutionAgent):
         if not self.tool:
             raise InvalidAgentError("No tool available")
 
-        context = self.get_system_context()
+        previous_outputs = {
+            output_name: output.value
+            for output_name, output in self.plan_run.outputs.step_outputs.items()
+            if isinstance(output, LocalOutput)
+        }
+        step_inputs = [
+            StepInput(
+                name=step_input.name,
+                value=previous_outputs.get(step_input.name).value,
+                description=step_input.description,
+            )
+            for step_input in self.step.inputs
+            if step_input.name in previous_outputs
+        ]
+        context = self.get_system_context(step_inputs)
         model = self.config.get_execution_model()
         tools = [
             self.tool.to_langchain_with_artifact(

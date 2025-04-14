@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
-from portia.execution_agents.context import build_context
+from portia.execution_agents.context import StepInput, build_context
 
 # TODO: Remove this once the backend / evals are updated to use the new import  # noqa: FIX002, TD002, TD003, E501
 from portia.execution_agents.output import Output  # noqa: TC001
@@ -73,7 +73,7 @@ class BaseExecutionAgent:
 
         """
 
-    def get_system_context(self) -> str:
+    def get_system_context(self, step_inputs: list[StepInput]) -> str:
         """Build a generic system context string from the step and run provided.
 
         This function retrieves the execution context and generates a system context
@@ -86,6 +86,6 @@ class BaseExecutionAgent:
         ctx = get_execution_context()
         return build_context(
             ctx,
-            self.step,
             self.plan_run,
+            step_inputs,
         )
