@@ -12,6 +12,7 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.context import StepInput
 from portia.execution_agents.output import LocalOutput
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import get_test_config, get_test_plan_run
@@ -26,8 +27,11 @@ def test_base_agent_default_context() -> None:
         get_test_config(),
         None,
     )
-    context = agent.get_system_context([])
+    context = agent.get_system_context(
+        [StepInput(name="$output1", value="test1", description="Previous output 1")],
+    )
     assert context is not None
+    assert "test1" in context
 
 
 def test_output_serialize() -> None:

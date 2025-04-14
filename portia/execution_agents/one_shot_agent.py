@@ -152,7 +152,7 @@ class OneShotAgent(BaseExecutionAgent):
         step: Step,
         plan_run: PlanRun,
         config: Config,
-        _: AgentMemory,
+        agent_memory: AgentMemory,  # noqa: ARG002
         tool: Tool | None = None,
     ) -> None:
         """Initialize the OneShotAgent.
@@ -187,7 +187,7 @@ class OneShotAgent(BaseExecutionAgent):
         step_inputs = [
             StepInput(
                 name=step_input.name,
-                value=previous_outputs.get(step_input.name).value,
+                value=previous_outputs.get(step_input.name),
                 description=step_input.description,
             )
             for step_input in self.step.inputs

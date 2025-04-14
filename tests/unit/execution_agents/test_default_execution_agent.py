@@ -18,6 +18,7 @@ from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.default_execution_agent import (
     MAX_RETRIES,
     DefaultExecutionAgent,
+    MemoryExtractionStep,
     ParserModel,
     ToolArgument,
     ToolCallingModel,
@@ -28,7 +29,8 @@ from portia.execution_agents.default_execution_agent import (
 )
 from portia.execution_agents.output import LocalOutput, Output
 from portia.model import LangChainGenerativeModel
-from portia.plan import Step
+from portia.plan import Step, Variable
+from portia.storage import InMemoryStorage
 from portia.tool import Tool
 from tests.utils import (
     AdditionTool,
@@ -74,12 +76,13 @@ def test_parser_model() -> None:
         args_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
+
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    parser_model.invoke({})  # type: ignore  # noqa: PGH003
+    parser_model.invoke({"messages": [], "step_inputs": []})
 
     assert mock_model.invoke.called
     messages = mock_model.invoke.call_args[0][0]
@@ -110,14 +113,15 @@ def test_parser_model_with_retries() -> None:
         args_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
+
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_invoker, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
     with mock.patch.object(parser_model, "invoke", side_effect=parser_model.invoke) as mock_invoke:
-        parser_model.invoke({})  # type: ignore  # noqa: PGH003
+        parser_model.invoke({"step_inputs": []})  # type: ignore  # noqa: PGH003
 
     assert mock_invoke.call_count == MAX_RETRIES + 1
 
@@ -137,14 +141,15 @@ def test_parser_model_with_retries_invalid_structured_response() -> None:
         args_schema=_TestToolSchema,
         description="TOOL_DESCRIPTION",
     )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
+
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
     with mock.patch.object(parser_model, "invoke", side_effect=parser_model.invoke) as mock_invoke:
-        parser_model.invoke({"messages": []})  # type: ignore  # noqa: PGH003
+        parser_model.invoke({"messages": [], "step_inputs": []})  # type: ignore  # noqa: PGH003
 
     assert mock_invoke.call_count == MAX_RETRIES + 1
 
@@ -212,15 +217,15 @@ def test_parser_model_with_invalid_args() -> None:
         args_schema=TestSchema,
         description="TOOL_DESCRIPTION",
     )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
     # First call should store the error and retry
-    result = parser_model.invoke({"messages": []})
+    result = parser_model.invoke({"messages": [], "step_inputs": []})
 
     # Verify that the error was stored
     assert len(parser_model.previous_errors) == 1
@@ -269,12 +274,17 @@ def test_verifier_model() -> None:
         description="TOOL_DESCRIPTION",
         args_json_schema=_TestToolSchema.model_json_schema,
     )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    verifier_model.invoke({"messages": [AIMessage(content=tool_inputs.model_dump_json(indent=2))]})
+    verifier_model.invoke(
+        {
+            "messages": [AIMessage(content=tool_inputs.model_dump_json(indent=2))],
+            "step_inputs": [],
+        },
+    )
 
     assert mock_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
     messages = mock_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
@@ -314,14 +324,17 @@ def test_verifier_model_schema_validation() -> None:
         description="TOOL_DESCRIPTION",
         args_json_schema=_TestToolSchema.model_json_schema,
     )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
     result = verifier_model.invoke(
-        {"messages": [AIMessage(content=verified_tool_inputs.model_dump_json(indent=2))]},
+        {
+            "messages": [AIMessage(content=verified_tool_inputs.model_dump_json(indent=2))],
+            "step_inputs": [],
+        },
     )
 
     result_inputs = VerifiedToolInputs.model_validate_json(result["messages"][0])
@@ -365,17 +378,15 @@ def test_tool_calling_model_no_hallucinations() -> None:
     )
     tool_calling_model = ToolCallingModel(
         model=mock_model,
-        context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    tool_calling_model.invoke({"messages": []})
+    tool_calling_model.invoke({"messages": [], "step_inputs": []})
 
     base_chat_model = mock_model.to_langchain()
     assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
     messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
-    assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
@@ -428,17 +439,15 @@ def test_tool_calling_model_with_hallucinations() -> None:
     )
     tool_calling_model = ToolCallingModel(
         model=mock_model,
-        context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
-    tool_calling_model.invoke({"messages": []})
+    tool_calling_model.invoke({"messages": [], "step_inputs": []})
 
     base_chat_model = mock_model.to_langchain()
     assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
     messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
     assert "You are very powerful assistant" in messages[0].content  # type: ignore  # noqa: PGH003
-    assert "CONTEXT_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
@@ -468,6 +477,11 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     tool = AdditionTool()
+
+    def memory_extraction_step(self, state):  # noqa: ANN001, ANN202, ARG001
+        return {"step_inputs": []}
+
+    monkeypatch.setattr(MemoryExtractionStep, "invoke", memory_extraction_step)
 
     def parser_model(self, state):  # noqa: ANN001, ANN202, ARG001
         return {"messages": [tool_inputs.model_dump_json(indent=2)]}
@@ -515,6 +529,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         plan_run=plan_run,
         config=get_test_config(),
         tool=tool,
+        agent_memory=InMemoryStorage(),
     )
 
     output = agent.execute_sync()
@@ -571,6 +586,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
         plan_run=plan_run,
         config=get_test_config(),
         tool=tool,
+        agent_memory=InMemoryStorage(),
     )
     agent.verified_args = verified_tool_inputs
 
@@ -586,21 +602,19 @@ def test_default_execution_agent_edge_cases() -> None:
     agent.tool = None
     parser_model = ParserModel(
         model=get_mock_generative_model(get_mock_base_chat_model()),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidPlanRunStateError):
-        parser_model.invoke({"messages": []})
+        parser_model.invoke({"messages": [], "step_inputs": []})
 
     agent.verified_args = None
     tool_calling_model = ToolCallingModel(
         model=get_mock_generative_model(get_mock_base_chat_model()),
-        context="CONTEXT_STRING",
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
     with pytest.raises(InvalidPlanRunStateError):
-        tool_calling_model.invoke({"messages": []})
+        tool_calling_model.invoke({"messages": [], "step_inputs": []})
 
 
 def test_get_last_resolved_clarification() -> None:
@@ -640,6 +654,7 @@ def test_get_last_resolved_clarification() -> None:
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
+        agent_memory=InMemoryStorage(),
     )
     assert agent.get_last_resolved_clarification("arg") == resolved_clarification2
 
@@ -660,6 +675,7 @@ def test_clarifications_or_continue() -> None:
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
+        agent_memory=InMemoryStorage(),
     )
     inputs = VerifiedToolInputs(
         args=[
@@ -675,6 +691,7 @@ def test_clarifications_or_continue() -> None:
                     content=inputs.model_dump_json(indent=2),
                 ),
             ],
+            "step_inputs": [],
         },
     )
     assert output == END
@@ -698,6 +715,7 @@ def test_clarifications_or_continue() -> None:
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
+        agent_memory=InMemoryStorage(),
     )
 
     inputs = VerifiedToolInputs(
@@ -713,6 +731,7 @@ def test_clarifications_or_continue() -> None:
                     content=inputs.model_dump_json(indent=2),
                 ),
             ],
+            "step_inputs": [],
         },
     )
     assert output == "tool_agent"
@@ -729,6 +748,7 @@ def test_default_execution_agent_none_tool_execute_sync() -> None:
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
+        agent_memory=InMemoryStorage(),
     )
 
     with pytest.raises(InvalidAgentError) as exc_info:
@@ -780,10 +800,10 @@ def test_optional_args_with_none_values() -> None:
         plan_run=get_test_plan_run()[1],
         config=get_test_config(),
         tool=MockTool(),
+        agent_memory=InMemoryStorage(),
     )
     model = VerifierModel(
         model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,
     )
 
@@ -810,11 +830,122 @@ def test_verifier_model_edge_cases() -> None:
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
-        context="CONTEXT_STRING",
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
     # Check error with no tool specified
     agent.tool = None
     with pytest.raises(InvalidPlanRunStateError):
-        verifier_model.invoke({"messages": []})
+        verifier_model.invoke({"messages": [], "step_inputs": []})
+
+
+def test_memory_extraction_step_no_inputs() -> None:
+    """Test MemoryExtractionStep with no step inputs."""
+    (_, plan_run) = get_test_plan_run()
+    agent = DefaultExecutionAgent(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        plan_run=plan_run,
+        config=get_test_config(),
+        tool=None,
+        agent_memory=InMemoryStorage(),
+    )
+
+    memory_extraction_step = MemoryExtractionStep(agent=agent)
+    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
+
+    assert result == {"step_inputs": []}
+
+
+def test_memory_extraction_step_with_inputs() -> None:
+    """Test MemoryExtractionStep with step inputs (one local, one from agent memory)."""
+    (_, plan_run) = get_test_plan_run()
+
+    storage = InMemoryStorage()
+    saved_output = storage.save_plan_run_output(
+        "$memory_output",
+        LocalOutput(value="memory_value"),
+        plan_run.id,
+    )
+    plan_run.outputs.step_outputs = {
+        "$local_output": LocalOutput(value="local_value"),
+        "$memory_output": saved_output,
+    }
+
+    agent = DefaultExecutionAgent(
+        step=Step(
+            task="DESCRIPTION_STRING",
+            output="$out",
+            inputs=[
+                Variable(name="$local_output", description="Local input description"),
+                Variable(name="$memory_output", description="Memory input description"),
+            ],
+        ),
+        plan_run=plan_run,
+        config=get_test_config(),
+        tool=None,
+        agent_memory=storage,
+    )
+
+    memory_extraction_step = MemoryExtractionStep(agent=agent)
+    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
+
+    assert len(result["step_inputs"]) == 2
+    assert result["step_inputs"][0].name == "$local_output"
+    assert result["step_inputs"][0].value == "local_value"
+    assert result["step_inputs"][0].description == "Local input description"
+    assert result["step_inputs"][1].name == "$memory_output"
+    assert result["step_inputs"][1].value == "memory_value"
+    assert result["step_inputs"][1].description == "Memory input description"
+
+
+def test_memory_extraction_step_ignores_missing_inputs() -> None:
+    """Test MemoryExtractionStep ignores step inputs that aren't in previous outputs."""
+    (_, plan_run) = get_test_plan_run()
+    agent = DefaultExecutionAgent(
+        step=Step(
+            task="DESCRIPTION_STRING",
+            output="$out",
+            inputs=[
+                Variable(name="$missing_input", description="Missing input description"),
+                Variable(name="$a", description="A value"),
+            ],
+        ),
+        plan_run=plan_run,
+        config=get_test_config(),
+        tool=None,
+        agent_memory=InMemoryStorage(),
+    )
+
+    memory_extraction_step = MemoryExtractionStep(agent=agent)
+    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
+
+    assert len(result["step_inputs"]) == 1
+    assert result["step_inputs"][0].name == "$a"
+    assert result["step_inputs"][0].value == "3"
+    assert result["step_inputs"][0].description == "A value"
+
+
+def test_memory_extraction_step_handles_unknown_output_type() -> None:
+    """Test MemoryExtractionStep handles unknown output types gracefully."""
+    (_, plan_run) = get_test_plan_run()
+    plan_run.outputs.step_outputs = {
+        "unexpected_input": SimpleNamespace(value="Unexpected input value"),  # pyright: ignore[reportAttributeAccessIssue]
+    }
+    agent = DefaultExecutionAgent(
+        step=Step(
+            task="DESCRIPTION_STRING",
+            output="$out",
+            inputs=[
+                Variable(name="$unexpected_input", description="Unexpected input description"),
+            ],
+        ),
+        plan_run=plan_run,
+        config=get_test_config(),
+        tool=None,
+        agent_memory=InMemoryStorage(),
+    )
+
+    memory_extraction_step = MemoryExtractionStep(agent=agent)
+    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
+
+    assert len(result["step_inputs"]) == 0
