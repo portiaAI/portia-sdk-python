@@ -509,12 +509,12 @@ def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test get_model for different arg types."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
     c = Config.from_default()
-    model = c.get_model("openai/gpt-4o")
+    model = c.get_generative_model("openai/gpt-4o")
     assert isinstance(model, OpenAIGenerativeModel)
     assert str(model) == "openai/gpt-4o"
 
-    assert c.get_model(None) is None
-    from_instsance = c.get_model(
+    assert c.get_generative_model(None) is None
+    from_instsance = c.get_generative_model(
         OpenAIGenerativeModel(model_name="gpt-4o-mini", api_key=SecretStr("test-openai-api-key")),
     )
     assert isinstance(from_instsance, OpenAIGenerativeModel)

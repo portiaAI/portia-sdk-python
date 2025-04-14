@@ -676,7 +676,7 @@ class Config(BaseModel):
 
         Additionally, unless specified all other specific agent models will default to this model.
         """
-        model = self.get_model(self.models.default_model)
+        model = self.get_generative_model(self.models.default_model)
         if model is None:
             # Default model is required, but not provided.
             raise InvalidConfigError(
@@ -690,30 +690,32 @@ class Config(BaseModel):
 
         See the GenerativeModelsConfig class for more information
         """
-        return self.get_model(self.models.planning_model) or self.get_default_model()
+        return self.get_generative_model(self.models.planning_model) or self.get_default_model()
 
     def get_execution_model(self) -> GenerativeModel:
         """Get or build the execution model from the config.
 
         See the GenerativeModelsConfig class for more information
         """
-        return self.get_model(self.models.execution_model) or self.get_default_model()
+        return self.get_generative_model(self.models.execution_model) or self.get_default_model()
 
     def get_introspection_model(self) -> GenerativeModel:
         """Get or build the introspection model from the config.
 
         See the GenerativeModelsConfig class for more information
         """
-        return self.get_model(self.models.introspection_model) or self.get_default_model()
+        return (
+            self.get_generative_model(self.models.introspection_model) or self.get_default_model()
+        )
 
     def get_summarizer_model(self) -> GenerativeModel:
         """Get or build the summarizer model from the config.
 
         See the GenerativeModelsConfig class for more information
         """
-        return self.get_model(self.models.summarizer_model) or self.get_default_model()
+        return self.get_generative_model(self.models.summarizer_model) or self.get_default_model()
 
-    def get_model(
+    def get_generative_model(
         self,
         model: str | GenerativeModel | None,
     ) -> GenerativeModel | None:
