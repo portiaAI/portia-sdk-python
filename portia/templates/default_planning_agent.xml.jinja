@@ -51,6 +51,11 @@
         {{query}}
     </Query>
 </Request>
+{% if non_default_examples_provided %}
+Use the example plans as a scaffold to build this plan, following the same structure and steps. 
+You must use the example plans as a template if at all applicable and they are similar to the query.
+{% endif %}
+
 {% if system_context %}
 <SystemContext>{% for context in system_context %}
     {{context}}{% endfor %}

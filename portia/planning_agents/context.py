@@ -20,10 +20,11 @@ def render_prompt_insert_defaults(
 ) -> str:
     """Render the prompt for the PlanningAgent with defaults inserted if not provided."""
     system_context = default_query_system_context()
+    non_default_examples_provided = True
 
     if examples is None:
         examples = DEFAULT_EXAMPLE_PLANS
-
+        non_default_examples_provided = False
     tools_with_descriptions = get_tool_descriptions_for_tools(tool_list=tool_list)
 
     return render_template(
@@ -32,6 +33,7 @@ def render_prompt_insert_defaults(
         tools=tools_with_descriptions,
         examples=examples,
         system_context=system_context,
+        non_default_examples_provided=non_default_examples_provided,
     )
 
 
