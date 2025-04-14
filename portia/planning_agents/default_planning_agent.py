@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from portia.config import PLANNING_MODEL_KEY
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -24,7 +23,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
 
     def __init__(self, config: Config) -> None:
         """Init with the config."""
-        self.model = config.resolve_model(PLANNING_MODEL_KEY)
+        self.model = config.get_planning_model()
 
     def generate_steps_or_error(
         self,
@@ -54,8 +53,8 @@ IMPORTANT GUIDLINES:
 - When creating the description for a step of the plan, if you need information from the previous
  step, DO NOT guess what that step will produce - instead, specify the previous step's output as an
  input for this step and allow this to be handled when we execute the plan.
-- If you can't come up with a plan provide a descriptive error instead - do not
- return plans with no steps.
+- If you can't come up with a plan provide a descriptive error instead - DO NOT
+ create plan with zero steps.
 - For EVERY tool that requires an id as an input, make sure to check
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides

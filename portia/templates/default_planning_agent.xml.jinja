@@ -12,8 +12,8 @@
      - give a name to the variable for the output of the step if it is successful.
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
      - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
-    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - do not return plans with no steps.
-    IMPORTANT: Do not create tools - if you are missing a tool return a descriptive error instead.
+    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create plan with zero steps.
+    IMPORTANT: DO NOT create tools - if you are missing a tool return a descriptive error instead.
 </Instructions>
 
 <Examples>{% for example in examples %}
@@ -51,6 +51,11 @@
         {{query}}
     </Query>
 </Request>
+{% if non_default_examples_provided %}
+Use the example plans as a scaffold to build this plan, following the same structure and steps. 
+You must use the example plans as a template if at all applicable and they are similar to the query.
+{% endif %}
+
 {% if system_context %}
 <SystemContext>{% for context in system_context %}
     {{context}}{% endfor %}

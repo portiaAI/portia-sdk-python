@@ -1,29 +1,46 @@
 """Tests for portia classes."""
 
-from unittest.mock import MagicMock, Mock
-
 import pytest
 from pydantic import SecretStr
 
 from portia.config import (
-    EXECUTION_MODEL_KEY,
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
-    PLANNING_MODEL_KEY,
+    SUPPORTED_OPENAI_MODELS,
     Config,
     ExecutionAgentType,
+    GenerativeModelsConfig,
     LLMModel,
-    LLMProvider,
     LogLevel,
     PlanningAgentType,
     StorageClass,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
+    AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
-    LangChainGenerativeModel,
+    GoogleGenAiGenerativeModel,
+    LLMProvider,
+    MistralAIGenerativeModel,
+    OpenAIGenerativeModel,
 )
-from tests.utils import get_test_config
+
+PROVIDER_ENV_VARS = [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "MISTRAL_API_KEY",
+    "GOOGLE_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "OLLAMA_BASE_URL",
+]
+
+
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unset the provider env vars."""
+    for env_var in PROVIDER_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
 
 
 def test_from_default() -> None:
@@ -103,128 +120,212 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert not c.exceeds_output_threshold("Test " * 1000)
 
 
-def test_set_llms(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test setting LLM models."""
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
-    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+@pytest.mark.parametrize(
+    ("model_string", "model_type", "present_env_vars"),
+    [
+        ("openai/o1-preview", OpenAIGenerativeModel, ["OPENAI_API_KEY"]),
+        ("anthropic/claude-3-5-haiku-latest", AnthropicGenerativeModel, ["ANTHROPIC_API_KEY"]),
+        ("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"]),
+        ("google/gemini-2.5-preview", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]),
+        (
+            "azure-openai/gpt-4",
+            AzureOpenAIGenerativeModel,
+            ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"],
+        ),
+    ],
+)
+def test_set_default_model_from_string(
+    model_string: str,
+    model_type: type[GenerativeModel],
+    present_env_vars: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test setting default model from string."""
+    for env_var in present_env_vars:
+        monkeypatch.setenv(env_var, "test-key")
 
-    # Models can be set individually
-    c = Config.from_default(
-        planning_model_name=LLMModel.GPT_4_O,
-        execution_model_name=LLMModel.GPT_4_O_MINI,
-    )
-    assert c.model(PLANNING_MODEL_KEY) == LLMModel.GPT_4_O
-    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GPT_4_O_MINI
+    # Default model
+    c = Config.from_default(default_model=model_string)
+    model = c.get_default_model()
+    assert isinstance(model, model_type)
+    assert str(model) == model_string
 
-    # llm_model_name sets all models
-    c = Config.from_default(llm_model_name="mistral_large")
-    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
-    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
+    # Planning_model
+    c = Config.from_default(planning_model=model_string)
+    model = c.get_planning_model()
+    assert isinstance(model, model_type)
+    assert str(model) == model_string
 
-    # llm_provider sets default model for all providers
-    c = Config.from_default(llm_provider="mistralai")
-    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
-    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
 
-    # With nothing specified, it chooses a model we have API keys for
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
-    c = Config.from_default()
-    assert c.model(PLANNING_MODEL_KEY) == LLMModel.MISTRAL_LARGE
-    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.MISTRAL_LARGE
+def test_set_default_model_from_model_instance() -> None:
+    """Test setting default model from model instance without provider set."""
+    model = OpenAIGenerativeModel(model_name="gpt-4o", api_key=SecretStr("test-openai-key"))
+    c = Config.from_default(default_model=model)
+    resolved_model = c.get_default_model()
+    assert resolved_model is model
 
-    # With all API key set, correct default models are chosen
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
-    c = Config.from_default()
-    assert c.model(PLANNING_MODEL_KEY) == LLMModel.O_3_MINI
-    assert c.model(EXECUTION_MODEL_KEY) == LLMModel.GPT_4_O
+    # Planning_model has not been set, and we dont have a provider set, so this returns the
+    # default model
+    planner_model = c.get_planning_model()
+    assert planner_model is model
 
-    # No api key for provider model
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("MISTRAL_API_KEY", "")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    monkeypatch.setenv("GOOGLE_API_KEY", "")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "")
-    for provider in [
-        LLMProvider.OPENAI,
-        LLMProvider.ANTHROPIC,
-        LLMProvider.MISTRALAI,
-        LLMProvider.GOOGLE_GENERATIVE_AI,
-        LLMProvider.AZURE_OPENAI,
-    ]:
-        with pytest.raises(InvalidConfigError):
-            Config.from_default(
-                storage_class=StorageClass.MEMORY,
-                llm_provider=provider,
-                execution_agent_type=ExecutionAgentType.DEFAULT,
-                planning_agent_type=PlanningAgentType.DEFAULT,
-            )
 
-    # Wrong api key for provider model
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
-    monkeypatch.setenv("MISTRAL_API_KEY", "")
+MODEL_KEYS = sorted(set(GenerativeModelsConfig.model_fields) - {"default_model"})
+
+
+@pytest.mark.parametrize("model_key", MODEL_KEYS)
+def test_set_agent_model_default_model_not_set_fails(model_key: str) -> None:
+    """Test setting agent_model from model instance without default model or provider set."""
+    model = OpenAIGenerativeModel(model_name="gpt-4o", api_key=SecretStr("test-openai-key"))
     with pytest.raises(InvalidConfigError):
-        Config.from_default(
-            storage_class=StorageClass.MEMORY,
-            llm_model_name=LLMModel.MISTRAL_LARGE,
-            execution_agent_type=ExecutionAgentType.DEFAULT,
-            planning_agent_type=PlanningAgentType.DEFAULT,
+        _ = Config.from_default(**{model_key: model})
+
+
+@pytest.mark.parametrize("model_key", MODEL_KEYS)
+def test_set_agent_model_with_string_api_key_env_var_set(
+    monkeypatch: pytest.MonkeyPatch,
+    model_key: str,
+) -> None:
+    """Test setting planning_model with string, with correct API key env var present."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    model_str = "openai/gpt-4o"
+    c = Config.from_default(**{model_key: model_str})
+    method = getattr(c, f"get_{model_key}")
+    resolved_model = method()
+    assert str(resolved_model) == model_str
+
+    # Provider inferred from env var to be OpenAI, so default model is OpenAI default model
+    default_model = c.get_default_model()
+    assert isinstance(default_model, OpenAIGenerativeModel)
+
+
+def test_set_model_with_string_api_key_env_var_not_set() -> None:
+    """Test setting planning_model with string, with correct API key env var not present."""
+    model_str = "openai/gpt-4o"
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
+        _ = Config.from_default(default_model=model_str)
+
+
+def test_set_model_with_string_other_provider_api_key_env_var_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test setting default model from string with no API key env var set.
+
+    In this case, the env var is present for Anthropic, but user sets a Mistral model as
+    default_model.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
+        _ = Config.from_default(
+            default_model="mistralai/mistral-tiny-latest",
+            llm_provider="anthropic",
         )
 
-    # Unrecognised providers error
-    with pytest.raises(InvalidConfigError):
-        c = Config.from_default(llm_provider="personal", llm_model_name="other-model")
+
+def test_set_default_model_from_string_with_alternative_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test setting model from string from a different provider to what is explicitly set."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+    c = Config.from_default(default_model="mistralai/mistral-tiny-latest", llm_provider="anthropic")
+    model = c.get_default_model()
+    assert isinstance(model, MistralAIGenerativeModel)
+    assert str(model) == "mistralai/mistral-tiny-latest"
+
+    model = c.get_planning_model()
+    assert isinstance(model, AnthropicGenerativeModel)
 
 
-def test_resolve_model_azure() -> None:
+def test_provider_set_from_env_planner_model_overriden(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test when provider is set from an environment variable, and planning_model overriden.
+
+    The planning_model should respect the explicit planning_model, but the default model should
+    respect the provider set from the environment variable.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    c = Config.from_default(
+        planning_model=AzureOpenAIGenerativeModel(
+            model_name="gpt-4o",
+            api_key=SecretStr("test-azure-openai-key"),
+            azure_endpoint="test-azure-openai-endpoint",
+        ),
+    )
+    model = c.get_planning_model()
+    assert isinstance(model, AzureOpenAIGenerativeModel)
+    assert str(model) == "azure-openai/gpt-4o"
+
+    default_model = c.get_default_model()
+    assert isinstance(default_model, AnthropicGenerativeModel)
+
+
+def test_set_default_model_and_planning_model_alternative_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test setting default model and planning_model from string with alternative provider."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    c = Config.from_default(
+        default_model="mistralai/mistral-tiny-latest",
+        planning_model="google/gemini-1.5-flash",
+        llm_provider="anthropic",
+    )
+    model = c.get_default_model()
+    assert isinstance(model, MistralAIGenerativeModel)
+    assert str(model) == "mistralai/mistral-tiny-latest"
+
+    model = c.get_planning_model()
+    assert isinstance(model, GoogleGenAiGenerativeModel)
+    assert str(model) == "google/gemini-1.5-flash"
+
+
+def test_set_default_model_alternative_provider_missing_api_key_explicit_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test setting default model with a model instance different to LLM provider.
+
+    The user sets the Mistral model object explicitly. This works, because the API key is
+    set in the constructor of GenerativeModel.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    config = Config.from_default(
+        default_model=MistralAIGenerativeModel(
+            model_name="mistral-tiny-latest",
+            api_key=SecretStr("test-mistral-key"),
+        ),
+        llm_provider="anthropic",
+    )
+    assert isinstance(config.get_default_model(), MistralAIGenerativeModel)
+    assert str(config.get_default_model()) == "mistralai/mistral-tiny-latest"
+
+
+def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
+    """Test setting default model and planning_model with model instances, and no provider set."""
+    config = Config.from_default(
+        default_model=MistralAIGenerativeModel(
+            model_name="mistral-tiny-latest",
+            api_key=SecretStr("test-mistral-key"),
+        ),
+        planning_model=OpenAIGenerativeModel(
+            model_name="gpt-4o",
+            api_key=SecretStr("test-openai-key"),
+        ),
+    )
+    assert isinstance(config.get_default_model(), MistralAIGenerativeModel)
+    assert str(config.get_default_model()) == "mistralai/mistral-tiny-latest"
+    assert isinstance(config.get_planning_model(), OpenAIGenerativeModel)
+    assert str(config.get_planning_model()) == "openai/gpt-4o"
+
+
+def test_get_planning_model_azure() -> None:
     """Test resolve model for Azure OpenAI."""
     c = Config.from_default(
         llm_provider=LLMProvider.AZURE_OPENAI,
         azure_openai_endpoint="http://test-azure-openai-endpoint",
         azure_openai_api_key="test-azure-openai-api-key",
     )
-    assert isinstance(c.resolve_model(PLANNING_MODEL_KEY), AzureOpenAIGenerativeModel)
-
-
-def test_resolve_langchain_model() -> None:
-    """Test resolve langchain model."""
-    conf = get_test_config(
-        custom_models={
-            PLANNING_MODEL_KEY: LangChainGenerativeModel(client=MagicMock(), model_name="test"),
-        },
-    )
-    assert isinstance(conf.resolve_langchain_model(PLANNING_MODEL_KEY), LangChainGenerativeModel)
-
-
-def test_resolve_langchain_model_error() -> None:
-    """Test resolve langchain model raises TypeError if model is not a LangChainGenerativeModel."""
-    conf = get_test_config(
-        custom_models={
-            PLANNING_MODEL_KEY: Mock(spec=GenerativeModel),
-        },
-    )
-    with pytest.raises(TypeError, match="A LangChainGenerativeModel is required"):
-        conf.resolve_langchain_model(PLANNING_MODEL_KEY)
-
-
-def test_custom_models() -> None:
-    """Test custom models."""
-    c = Config.from_default(
-        custom_models={
-            PLANNING_MODEL_KEY: LangChainGenerativeModel(
-                client=MagicMock(),
-                model_name="gpt-4o",
-            ),
-        },
-        openai_api_key=SecretStr("test-openai-key"),
-    )
-    resolved_model = c.resolve_model(PLANNING_MODEL_KEY)
-    assert isinstance(resolved_model, LangChainGenerativeModel)
-    assert resolved_model.model_name == "gpt-4o"
+    assert isinstance(c.get_planning_model(), AzureOpenAIGenerativeModel)
 
 
 def test_getters() -> None:
@@ -255,37 +356,23 @@ def test_getters() -> None:
         c.must_get("portia_dashboard_url", str)
 
     # no Portia API Key
-    with pytest.raises(InvalidConfigError):
+    with pytest.raises(
+        InvalidConfigError,
+        match="A Portia API key must be provided if using cloud storage",
+    ):
         Config.from_default(
             storage_class=StorageClass.CLOUD,
             portia_api_key=SecretStr(""),
-            execution_agent_type=ExecutionAgentType.DEFAULT,
+            extest_set_agent_model_default_model_not_settest_set_agent_model_default_model_not_setecution_agent_type=ExecutionAgentType.DEFAULT,
             planning_agent_type=PlanningAgentType.DEFAULT,
+            llm_provider=LLMProvider.OPENAI,
+            openai_api_key=SecretStr("test-openai-api-key"),
         )
 
 
 def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test Azure OpenAI requires endpoint."""
-    monkeypatch.setenv("OPENAI_API_KEY", "")
-    monkeypatch.setenv("MISTRAL_API_KEY", "")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    monkeypatch.setenv("GOOGLE_API_KEY", "")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-azure-openai-key")
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
-
-    # Without endpoint set, it errors
-    with pytest.raises(InvalidConfigError):
-        Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
-
-    # With endpoint set, it works
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
-    c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
-    assert c.llm_provider == LLMProvider.AZURE_OPENAI
-    assert c.model(PLANNING_MODEL_KEY).provider() == LLMProvider.AZURE_OPENAI
-
-    # Also works with passing parameters to constructor
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "")
+    # Passing both endpoint and api key as kwargs works
     c = Config.from_default(
         llm_provider=LLMProvider.AZURE_OPENAI,
         azure_openai_endpoint="test-azure-openai-endpoint",
@@ -293,50 +380,145 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
     )
     assert c.llm_provider == LLMProvider.AZURE_OPENAI
 
+    # Without endpoint set via kwargs, it errors
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
+        _ = Config.from_default(
+            llm_provider=LLMProvider.AZURE_OPENAI,
+            azure_openai_api_key="test-azure-openai-api-key",
+        )
 
-@pytest.mark.parametrize("model", list(LLMModel))
-def test_all_models_have_provider(model: LLMModel) -> None:
-    """Test all models have a provider."""
-    assert model.provider() is not None
+    # Without endpoint set via env var, it errors
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-azure-openai-key")
+    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
+        Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+
+    # With endpoint set via env var, it works
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-azure-openai-endpoint")
+    c = Config.from_default(llm_provider=LLMProvider.AZURE_OPENAI)
+    assert c.llm_provider == LLMProvider.AZURE_OPENAI
+
+
+def test_custom_model_from_string_raises_error() -> None:
+    """Test custom model from string raises an error."""
+    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
+        _ = Config.from_default(default_model="custom/test")
+
+
+def test_set_model_from_llm_model_raises_deprecation_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test setting model from LLMModel raises a warning."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.warns(DeprecationWarning):
+        c = Config.from_default(
+            default_model=LLMModel("gpt-4o"),
+            planning_model=LLMModel("openai/o3-mini"),
+        )
+    assert c.models.default_model == "openai/gpt-4o"
+    assert c.models.planning_model == "openai/o3-mini"
+
+
+def test_check_model_supported_raises_deprecation_warning() -> None:
+    """Test checking if a model is supported via SUPPORTED_* models lists raise a warning."""
+    with pytest.warns(DeprecationWarning):
+        assert "gpt-4o" in SUPPORTED_OPENAI_MODELS
+
+
+def test_summarizer_model_not_instantiable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test summarizer model is not instantiable."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
+        Config.from_default(
+            default_model="openai/gpt-4o",
+            summarizer_model="mistralai/mistral-large-latest",
+        )
+
+
+def test_config_error_resolve_model_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Config.model raises a ConfigModelResolutionError if no model is found."""
+    # Setup: Its actually not currently possible to get a model in this state, but
+    # it is tested here because Config validation can change independently and we want
+    # to make sure the model getters raise a config error if that happens.
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    config = Config.from_default()
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    config.models = GenerativeModelsConfig()
+    config.llm_provider = None
+
+    with pytest.raises(InvalidConfigError):
+        config.get_default_model()
+
+    with pytest.raises(InvalidConfigError):
+        config.get_planning_model()
+
+
+def test_config_model_in_kwargs_and_models_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Config.model in kwargs and models raises an InvalidConfigError."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-api-key")
+    with pytest.raises(InvalidConfigError):
+        Config.from_default(
+            default_model="openai/gpt-4o",
+            models={"default_model": "mistralai/mistral-tiny-latest"},
+        )
+
+
+def test_no_provider_or_default_model_raises_error() -> None:
+    """Test no provider or default model raises an InvalidConfigError."""
+    with pytest.raises(
+        InvalidConfigError,
+        match="Either llm_provider or default_model must be set",
+    ):
+        Config.from_default()
+
+
+def test_llm_model_name_deprecation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test using llm_model_name raises a DeprecationWarning (but works)."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.warns(DeprecationWarning):
+        c = Config.from_default(llm_model_name="openai/gpt-4o")
+    assert c.models.default_model == "openai/gpt-4o"
 
 
 @pytest.mark.parametrize(
-    ("model_name", "expected"),
+    ("legacy_model_key", "new_model_key"),
     [
-        ("gpt-4o", LLMModel.GPT_4_O),
-        ("openai/gpt-4o", LLMModel.GPT_4_O),
-        ("azure_openai/gpt-4o", LLMModel.AZURE_GPT_4_O),
-        ("claude-3-5-haiku-latest", LLMModel.CLAUDE_3_5_HAIKU),
-        ("mistral-large-latest", LLMModel.MISTRAL_LARGE),
-        ("gemini-2.0-flash", LLMModel.GEMINI_2_0_FLASH),
+        ("planning_model_name", "planning_model"),
+        ("execution_model_name", "execution_model"),
+        ("introspection_model_name", "introspection_model"),
+        ("summariser_model_name", "summarizer_model"),
+        ("default_model_name", "default_model"),
     ],
 )
-def test_llm_model_instantiate_from_string(model_name: str, expected: LLMModel) -> None:
-    """Test LLM model from string."""
-    model = LLMModel(model_name)
-    assert model == expected
+def test_legacy_model_kwargs_deprecation(
+    legacy_model_key: str,
+    new_model_key: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test legacy model kwargs raise a DeprecationWarning (but works)."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    with pytest.warns(DeprecationWarning):
+        c = Config.from_default(
+            **{legacy_model_key: "openai/o1"},
+            llm_provider=LLMProvider.OPENAI,
+        )
+    assert getattr(c.models, new_model_key) == "openai/o1"
 
 
-def test_llm_model_instantiate_from_string_missing() -> None:
-    """Test LLM model from string missing."""
-    with pytest.raises(ValueError, match="Invalid LLM model"):
-        LLMModel("not-a-model")
+def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test get_model for different arg types."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
+    c = Config.from_default()
+    model = c.get_generative_model("openai/gpt-4o")
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
 
-
-PROVIDER_ENV_VARS = [
-    "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "MISTRAL_API_KEY",
-    "GOOGLE_API_KEY",
-    "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_ENDPOINT",
-]
-
-
-def clear_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Clear env vars for the Provider APIs."""
-    for env_var in PROVIDER_ENV_VARS:
-        monkeypatch.delenv(env_var, raising=False)
+    assert c.get_generative_model(None) is None
+    from_instsance = c.get_generative_model(
+        OpenAIGenerativeModel(model_name="gpt-4o-mini", api_key=SecretStr("test-openai-api-key")),
+    )
+    assert isinstance(from_instsance, OpenAIGenerativeModel)
+    assert str(from_instsance) == "openai/gpt-4o-mini"
 
 
 @pytest.mark.parametrize(
@@ -361,7 +543,6 @@ def test_llm_provider_default_from_api_keys_env_vars(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test LLM provider default from API keys env vars."""
-    clear_env_vars(monkeypatch)
     for env_var_name, env_var_value in env_vars.items():
         monkeypatch.setenv(env_var_name, env_var_value)
 
@@ -388,9 +569,13 @@ def test_llm_provider_default_from_api_keys_env_vars(
 def test_llm_provider_default_from_api_keys_config_kwargs(
     config_kwargs: dict[str, str],
     provider: LLMProvider,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test LLM provider default from API keys config kwargs."""
-    clear_env_vars(monkeypatch)
     c = Config.from_default(**config_kwargs)
     assert c.llm_provider == provider
+
+
+def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
+    """Test deprecated LLMModel cannot be instantiated from a string."""
+    with pytest.raises(ValueError, match="Invalid LLM model"):
+        _ = LLMModel("adijabisfbgiwjebr")
