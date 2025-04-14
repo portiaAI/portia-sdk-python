@@ -306,8 +306,8 @@ PROVIDER_DEFAULT_MODELS = {
 }
 
 
-class GenerativeModels(BaseModel):
-    """Configuration for a GenerativeModels.
+class GenerativeModelsConfig(BaseModel):
+    """Configuration for a Generative Models.
 
     These models do not all need to be specified manually. If an LLM provider is configured,
     Portia will use default models that are selected for the particular use-case.
@@ -443,8 +443,8 @@ class Config(BaseModel):
         " best models for each agent. Can be None if custom models are provided.",
     )
 
-    models: GenerativeModels = Field(
-        default_factory=lambda: GenerativeModels(),
+    models: GenerativeModelsConfig = Field(
+        default_factory=lambda: GenerativeModelsConfig(),
         description="Manual configuration for the generative models for Portia to use for "
         "different agents. See the GenerativeModels class for more information.",
     )
@@ -676,7 +676,7 @@ class Config(BaseModel):
 
         Additionally, unless specified all other specific agent models will default to this model.
         """
-        model = self._construct_generative_model(self.models.default_model)
+        model = self.get_model(self.models.default_model)
         if model is None:
             # Default model is required, but not provided.
             raise InvalidConfigError(
@@ -688,47 +688,46 @@ class Config(BaseModel):
     def get_planning_model(self) -> GenerativeModel:
         """Get or build the planning model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
-        return (
-            self._construct_generative_model(self.models.planning_model) or self.get_default_model()
-        )
+        return self.get_model(self.models.planning_model) or self.get_default_model()
 
     def get_execution_model(self) -> GenerativeModel:
         """Get or build the execution model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
-        return (
-            self._construct_generative_model(self.models.execution_model)
-            or self.get_default_model()
-        )
+        return self.get_model(self.models.execution_model) or self.get_default_model()
 
     def get_introspection_model(self) -> GenerativeModel:
         """Get or build the introspection model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
-        return (
-            self._construct_generative_model(self.models.introspection_model)
-            or self.get_default_model()
-        )
+        return self.get_model(self.models.introspection_model) or self.get_default_model()
 
     def get_summarizer_model(self) -> GenerativeModel:
         """Get or build the summarizer model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
-        return (
-            self._construct_generative_model(self.models.summarizer_model)
-            or self.get_default_model()
-        )
+        return self.get_model(self.models.summarizer_model) or self.get_default_model()
 
-    def _construct_generative_model(
+    def get_model(
         self,
         model: str | GenerativeModel | None,
     ) -> GenerativeModel | None:
-        """Instantiate or return a GenerativeModel instance."""
+        """Get a GenerativeModel instance.
+
+        Args:
+            model (str | GenerativeModel | None): The model to get, either specified as a
+                string in the form of "provider/model_name", or as a GenerativeModel instance.
+                Also accepts None, in which case None is returned.
+
+        Returns:
+            GenerativeModel | None: The model instance or None.
+
+        """
         if model is None:
             return None
         if isinstance(model, str):
@@ -882,7 +881,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
             legacy_model_kwargs[new_model_key] = kwargs.pop(legacy_model_key)
 
     models = kwargs.pop("models", {})
-    if isinstance(models, GenerativeModels):
+    if isinstance(models, GenerativeModelsConfig):
         models = models.model_dump(exclude_unset=True)
     duplicate_model_keys = kwargs.keys() & models.keys()
     if duplicate_model_keys:
@@ -899,10 +898,12 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         **filter_none(legacy_model_kwargs),
         **filter_none({"default_model": llm_model_name}),
         **filter_none(models),
-        **filter_none({k: v for k, v in kwargs.items() if k in GenerativeModels.model_fields}),
+        **filter_none(
+            {k: v for k, v in kwargs.items() if k in GenerativeModelsConfig.model_fields},
+        ),
     }
 
-    models = GenerativeModels(
+    models = GenerativeModelsConfig(
         default_model=kwargs_models.get("default_model"),
         planning_model=kwargs_models.get("planning_model"),
         execution_model=kwargs_models.get("execution_model"),
