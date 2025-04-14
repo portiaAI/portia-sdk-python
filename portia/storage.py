@@ -104,7 +104,7 @@ class PlanStorage(ABC):
         """
         raise NotImplementedError("get_plan is not implemented")
 
-    def get_similar_plans(self, query: str, threshold: float, limit: int) -> list[Plan]:
+    def get_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 10) -> list[Plan]:
         """Get similar plans to the query.
 
         Args:

@@ -9,3 +9,4 @@ docs
 *.env
 .vscode
 .portia
+scratch
