@@ -134,7 +134,7 @@ class BaseBrowserTool(Tool[str]):
 
     def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
         """Run the BrowserTool."""
-        model = ctx.config.get_model(self.model) or ctx.config.get_default_model()
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
         async def run_browser_tasks() -> str | ActionClarification:
