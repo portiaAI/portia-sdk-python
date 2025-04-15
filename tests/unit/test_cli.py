@@ -75,7 +75,6 @@ def test_cli_run_config_set_planner_model(mock_portia_cls: MagicMock) -> None:
     assert config.models.planning_model == "openai/gpt-3.5-turbo"
 
 
-@pytest.mark.xfail(reason="TODO: tool-id setting is not working, broken enum")
 def test_cli_run_config_multi_setting(mock_portia_cls: MagicMock) -> None:
     """Test the CLI --planning-model argument."""
     runner = CliRunner()
@@ -101,7 +100,9 @@ def test_cli_run_config_multi_setting(mock_portia_cls: MagicMock) -> None:
     assert config.models.planning_model == "openai/gpt-3.5-turbo"
     assert config.llm_provider == LLMProvider.ANTHROPIC
     assert config.storage_class == StorageClass.MEMORY
-    assert config.tool_id == "llm_tool"
+    tools = mock_portia_cls.call_args.kwargs["tools"]
+    assert len(tools) == 1
+    assert tools[0].id == "llm_tool"
 
 
 def test_cli_run_no_confirmation(mock_portia_cls: MagicMock) -> None:
