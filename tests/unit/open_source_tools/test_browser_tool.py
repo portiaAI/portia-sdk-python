@@ -70,11 +70,11 @@ def mock_browserbase_provider(
 class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
     """Mock browser infrastructure provider."""
 
-    def setup_browser(self, _: ToolRunContext) -> Browser:
+    def setup_browser(self, _: ToolRunContext) -> Browser:  # type: ignore reportIncompatibleMethodOverride
         """Create the browser with a mock for testing."""
         return MagicMock()
 
-    def construct_auth_clarification_url(self, _: ToolRunContext, sign_in_url: str) -> HttpUrl:
+    def construct_auth_clarification_url(self, _: ToolRunContext, sign_in_url: str) -> HttpUrl:  # type: ignore reportIncompatibleMethodOverride
         """Construct the auth clarification for testing."""
         return HttpUrl(sign_in_url)
 
@@ -111,7 +111,7 @@ def test_browser_tool_auth_check(
         mock_agent.return_value = mock_agent_instance
 
         browser_tool = BrowserTool(
-            custom_infrastructure_provider=mock_browser_infrastructure_provider
+            custom_infrastructure_provider=mock_browser_infrastructure_provider,
         )
         context = get_test_tool_context()
 
@@ -293,11 +293,11 @@ def test_browserbase_provider_get_context_id(
     """Test getting context ID."""
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
-    mock_browserbase_provider.bb.contexts.create.return_value = mock_context
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
 
     context_id = mock_browserbase_provider.get_context_id(mock_browserbase_provider.bb)
 
-    mock_browserbase_provider.bb.contexts.create.assert_called_once_with(project_id="test_project")
+    mock_browserbase_provider.bb.contexts.create.assert_called_once_with(project_id="test_project")  # type: ignore reportFunctionMemberAccess
     assert context_id == "test_context_id"
 
 
@@ -306,11 +306,11 @@ def test_browserbase_provider_create_session(
 ) -> None:
     """Test creating a new session."""
     mock_session = MagicMock()
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
 
     session = mock_browserbase_provider.create_session("test_context_id")
 
-    mock_browserbase_provider.bb.sessions.create.assert_called_once_with(
+    mock_browserbase_provider.bb.sessions.create.assert_called_once_with(  # type: ignore reportFunctionMemberAccess
         project_id="test_project",
         browser_settings={
             "context": {
@@ -334,8 +334,8 @@ def test_browserbase_provider_get_or_create_session_new(
 
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
-    mock_browserbase_provider.bb.contexts.create.return_value = mock_context
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
 
     connect_url = mock_browserbase_provider.get_or_create_session(
         context, mock_browserbase_provider.bb
@@ -363,7 +363,7 @@ def test_browserbase_provider_get_or_create_session_existing(
     )
 
     assert connect_url == "existing_connect_url"
-    mock_browserbase_provider.bb.sessions.create.assert_not_called()
+    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # type: ignore reportFunctionMemberAccess
 
 
 def test_browserbase_provider_construct_auth_clarification_url(
@@ -375,13 +375,13 @@ def test_browserbase_provider_construct_auth_clarification_url(
 
     mock_debug = MagicMock()
     mock_debug.debugger_fullscreen_url = "https://debug.example.com"
-    mock_browserbase_provider.bb.sessions.debug.return_value = mock_debug
+    mock_browserbase_provider.bb.sessions.debug.return_value = mock_debug  # type: ignore reportFunctionMemberAccess
 
     url = mock_browserbase_provider.construct_auth_clarification_url(
         context, "https://example.com/login"
     )
 
-    mock_browserbase_provider.bb.sessions.debug.assert_called_once_with("test_session_id")
+    mock_browserbase_provider.bb.sessions.debug.assert_called_once_with("test_session_id")  # type: ignore reportFunctionMemberAccess
     assert str(url) == "https://debug.example.com/"
 
 
@@ -409,8 +409,8 @@ def test_browserbase_provider_setup_browser(
 
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
-    mock_browserbase_provider.bb.contexts.create.return_value = mock_context
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
 
     browser = mock_browserbase_provider.setup_browser(context)
 
