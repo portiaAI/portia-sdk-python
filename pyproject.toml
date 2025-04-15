@@ -120,6 +120,7 @@ omit = [
     "*/tests/*", # Don't cover test files themselves
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
+    "portia/cli.py",  # Best effort test coverage
 ]
 
 [tool.coverage.report]
