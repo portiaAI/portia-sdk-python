@@ -15,7 +15,6 @@ import json
 import sys
 from enum import Enum
 from functools import wraps
-from pathlib import Path
 from types import NoneType, UnionType
 from typing import TYPE_CHECKING, Any, Callable, get_args
 
@@ -64,11 +63,6 @@ class CLIConfig(BaseModel):
         description="The location of the environment variables.",
     )
 
-    config_file: str = Field(
-        default=f"{DEFAULT_FILE_PATH}/config.json",
-        description="The location of the JSON config file for the CLI to use.",
-    )
-
     end_user_id: str = Field(
         default="",
         description="The end user id to use in the execution context.",
@@ -77,11 +71,6 @@ class CLIConfig(BaseModel):
     confirm: bool = Field(
         default=True,
         description="Whether to confirm plans before running them.",
-    )
-
-    output_path: str = Field(
-        default=DEFAULT_FILE_PATH,
-        description="Where to output to",
     )
 
     tool_id: str | None = Field(
@@ -360,23 +349,6 @@ def list_tools(
         click.echo(tool.model_dump_json(indent=4))
 
 
-@click.command()
-@common_options
-def config_write(
-    **kwargs,  # noqa: ANN003
-) -> None:
-    """Write config file to disk."""
-    cli_config, config = _get_config(**kwargs)
-
-    output_path = Path(cli_config.output_path, "config.json")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    file_contents = config.model_dump_json(indent=4)
-
-    with output_path.open("w") as f:
-        f.write(file_contents)
-
-
 def _get_config(
     **kwargs,  # noqa: ANN003
 ) -> tuple[CLIConfig, Config]:
@@ -397,7 +369,6 @@ cli.add_command(version)
 cli.add_command(run)
 cli.add_command(plan)
 cli.add_command(list_tools)
-cli.add_command(config_write)
 
 if __name__ == "__main__":
     cli(obj={})
