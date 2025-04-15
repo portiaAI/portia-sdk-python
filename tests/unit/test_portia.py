@@ -18,7 +18,7 @@ from portia.clarification import (
 from portia.config import (
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
     Config,
-    GenerativeModels,
+    GenerativeModelsConfig,
     StorageClass,
 )
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
@@ -61,7 +61,7 @@ def default_model() -> MagicMock:
 def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
-        models=GenerativeModels(
+        models=GenerativeModelsConfig(
             planning_model=planning_model,
             default_model=default_model,
         ),
@@ -77,7 +77,7 @@ def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock
         # Set a small threshold value so all outputs are stored in agent memory
         feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
         large_output_threshold_tokens=3,
-        models=GenerativeModels(
+        models=GenerativeModelsConfig(
             planning_model=planning_model,
             default_model=default_model,
         ),
@@ -142,7 +142,7 @@ def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
     query = "example query"
     portia = Portia(
         config=get_test_config(
-            models=GenerativeModels(
+            models=GenerativeModelsConfig(
                 planning_model=planning_model,
             ),
         ),
@@ -166,7 +166,7 @@ def test_portia_run_query_disk_storage(planning_model: MagicMock) -> None:
             storage_class=StorageClass.DISK,
             openai_api_key=SecretStr("123"),
             storage_dir=tmp_dir,
-            models=GenerativeModels(
+            models=GenerativeModelsConfig(
                 planning_model=planning_model,
             ),
         )
@@ -779,7 +779,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
     """Test that portia can handle a clarification."""
     clarification_handler = TestClarificationHandler()
     portia = Portia(
-        config=get_test_config(models=GenerativeModels(planning_model=planning_model)),
+        config=get_test_config(models=GenerativeModelsConfig(planning_model=planning_model)),
         tools=[ClarificationTool()],
         execution_hooks=ExecutionHooks(clarification_handler=clarification_handler),
     )

@@ -306,8 +306,8 @@ PROVIDER_DEFAULT_MODELS = {
 }
 
 
-class GenerativeModels(BaseModel):
-    """Configuration for a GenerativeModels.
+class GenerativeModelsConfig(BaseModel):
+    """Configuration for a Generative Models.
 
     These models do not all need to be specified manually. If an LLM provider is configured,
     Portia will use default models that are selected for the particular use-case.
@@ -432,6 +432,10 @@ class Config(BaseModel):
         default_factory=lambda: os.getenv("AZURE_OPENAI_ENDPOINT") or "",
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
+    ollama_base_url: str = Field(
+        default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
+        description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
+    )
 
     llm_provider: LLMProvider | None = Field(
         default=None,
@@ -439,8 +443,8 @@ class Config(BaseModel):
         " best models for each agent. Can be None if custom models are provided.",
     )
 
-    models: GenerativeModels = Field(
-        default_factory=lambda: GenerativeModels(),
+    models: GenerativeModelsConfig = Field(
+        default_factory=lambda: GenerativeModelsConfig(),
         description="Manual configuration for the generative models for Portia to use for "
         "different agents. See the GenerativeModels class for more information.",
     )
@@ -672,7 +676,7 @@ class Config(BaseModel):
 
         Additionally, unless specified all other specific agent models will default to this model.
         """
-        model = self._construct_generative_model(self.models.default_model)
+        model = self.get_generative_model(self.models.default_model)
         if model is None:
             # Default model is required, but not provided.
             raise InvalidConfigError(
@@ -684,47 +688,48 @@ class Config(BaseModel):
     def get_planning_model(self) -> GenerativeModel:
         """Get or build the planning model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
-        return (
-            self._construct_generative_model(self.models.planning_model) or self.get_default_model()
-        )
+        return self.get_generative_model(self.models.planning_model) or self.get_default_model()
 
     def get_execution_model(self) -> GenerativeModel:
         """Get or build the execution model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
-        return (
-            self._construct_generative_model(self.models.execution_model)
-            or self.get_default_model()
-        )
+        return self.get_generative_model(self.models.execution_model) or self.get_default_model()
 
     def get_introspection_model(self) -> GenerativeModel:
         """Get or build the introspection model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
         return (
-            self._construct_generative_model(self.models.introspection_model)
-            or self.get_default_model()
+            self.get_generative_model(self.models.introspection_model) or self.get_default_model()
         )
 
     def get_summarizer_model(self) -> GenerativeModel:
         """Get or build the summarizer model from the config.
 
-        See the GenerativeModels config class for more information
+        See the GenerativeModelsConfig class for more information
         """
-        return (
-            self._construct_generative_model(self.models.summarizer_model)
-            or self.get_default_model()
-        )
+        return self.get_generative_model(self.models.summarizer_model) or self.get_default_model()
 
-    def _construct_generative_model(
+    def get_generative_model(
         self,
         model: str | GenerativeModel | None,
     ) -> GenerativeModel | None:
-        """Instantiate or return a GenerativeModel instance."""
+        """Get a GenerativeModel instance.
+
+        Args:
+            model (str | GenerativeModel | None): The model to get, either specified as a
+                string in the form of "provider/model_name", or as a GenerativeModel instance.
+                Also accepts None, in which case None is returned.
+
+        Returns:
+            GenerativeModel | None: The model instance or None.
+
+        """
         if model is None:
             return None
         if isinstance(model, str):
@@ -800,6 +805,14 @@ class Config(BaseModel):
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
                 )
+            case LLMProvider.OLLAMA:
+                validate_extras_dependencies("ollama")
+                from portia.model import OllamaGenerativeModel
+
+                return OllamaGenerativeModel(
+                    model_name=model_name,
+                    base_url=self.ollama_base_url,
+                )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
@@ -835,11 +848,13 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
 
     """
     llm_provider_from_api_keys = llm_provider_default_from_api_keys(**kwargs)
-    if "llm_provider" in kwargs or llm_provider_from_api_keys:
+    if "llm_provider" in kwargs and (kwargs_provider := kwargs.pop("llm_provider")) is not None:
         llm_provider = parse_str_to_enum(
-            kwargs.pop("llm_provider", llm_provider_from_api_keys),
+            kwargs_provider,
             LLMProvider,
         )
+    elif llm_provider_from_api_keys:
+        llm_provider = llm_provider_from_api_keys
     else:
         llm_provider = None
 
@@ -870,7 +885,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
             legacy_model_kwargs[new_model_key] = kwargs.pop(legacy_model_key)
 
     models = kwargs.pop("models", {})
-    if isinstance(models, GenerativeModels):
+    if isinstance(models, GenerativeModelsConfig):
         models = models.model_dump(exclude_unset=True)
     duplicate_model_keys = kwargs.keys() & models.keys()
     if duplicate_model_keys:
@@ -887,10 +902,12 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         **filter_none(legacy_model_kwargs),
         **filter_none({"default_model": llm_model_name}),
         **filter_none(models),
-        **filter_none({k: v for k, v in kwargs.items() if k in GenerativeModels.model_fields}),
+        **filter_none(
+            {k: v for k, v in kwargs.items() if k in GenerativeModelsConfig.model_fields},
+        ),
     }
 
-    models = GenerativeModels(
+    models = GenerativeModelsConfig(
         default_model=kwargs_models.get("default_model"),
         planning_model=kwargs_models.get("planning_model"),
         execution_model=kwargs_models.get("execution_model"),

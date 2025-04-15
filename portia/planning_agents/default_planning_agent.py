@@ -53,8 +53,8 @@ IMPORTANT GUIDLINES:
 - When creating the description for a step of the plan, if you need information from the previous
  step, DO NOT guess what that step will produce - instead, specify the previous step's output as an
  input for this step and allow this to be handled when we execute the plan.
-- If you can't come up with a plan provide a descriptive error instead - do not
- return plans with no steps.
+- If you can't come up with a plan provide a descriptive error instead - DO NOT
+ create plan with zero steps.
 - For EVERY tool that requires an id as an input, make sure to check
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides
