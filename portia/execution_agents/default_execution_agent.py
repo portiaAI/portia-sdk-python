@@ -149,16 +149,17 @@ class MemoryExtractionStep:
             state (ExecutionState): The current state of the execution agent.
 
         Returns:
-            dict[str, Any]: The response after invoking the model.
-
-        Raises:
-            InvalidRunStateError: If the agent's tool is not available.
+            dict[str, Any]: The LangGraph state update.
 
         """
         step_inputs = []
         previous_outputs = self.agent.plan_run.outputs.step_outputs
         for step_input in self.agent.step.inputs:
             if step_input.name not in previous_outputs:
+                logger().warning(
+                    "Received step unknown step input with name: %s, skipping...",
+                    step_input.name,
+                )
                 continue
             previous_output = previous_outputs.get(step_input.name)
 

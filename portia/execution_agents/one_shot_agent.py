@@ -179,6 +179,7 @@ class OneShotAgent(BaseExecutionAgent):
         if not self.tool:
             raise InvalidAgentError("No tool available")
 
+        # Note: the one-shot agent does not support pulling outputs from agent memory
         previous_outputs = {
             output_name: output.value
             for output_name, output in self.plan_run.outputs.step_outputs.items()
