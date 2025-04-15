@@ -16,7 +16,8 @@ import sys
 from enum import Enum
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from types import NoneType, UnionType
+from typing import TYPE_CHECKING, Any, Callable, get_args
 
 import click
 from dotenv import load_dotenv
@@ -25,7 +26,7 @@ from pydantic_core import PydanticUndefined
 from typing_extensions import get_origin
 
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config
+from portia.config import Config, GenerativeModelsConfig
 from portia.errors import InvalidConfigError
 from portia.execution_context import execution_context
 from portia.logger import logger
@@ -89,6 +90,39 @@ class CLIConfig(BaseModel):
     )
 
 
+def _get_enum_type(annotation: type[Any] | None) -> type[Enum] | None:
+    """Extract enum from an annotation.
+
+    Handles Union[Enum, None] as well as just Enum.
+    """
+    if isinstance(annotation, type) and issubclass(annotation, Enum):
+        return annotation
+    if (
+        get_origin(annotation) is UnionType
+        and len(get_args(annotation)) == 2  # noqa: PLR2004
+        and issubclass(get_args(annotation)[0], Enum)
+        and get_args(annotation)[1] is NoneType
+    ):
+        return get_args(annotation)[0]
+    return None
+
+
+def generate_str_cli_option(
+    f: Callable[..., Any],
+    field: str,
+    default: str | None = None,
+    help: str | None = None,  # noqa: A002
+) -> Callable[..., Any]:
+    """Generate a click option for a stringfield."""
+    option_name = field.replace("_", "-")
+    return click.option(
+        f"--{option_name}",
+        type=click.STRING,
+        default=default,
+        help=help or f"Set the value for {option_name}",
+    )(f)
+
+
 def generate_cli_option_from_pydantic_field(  # noqa: C901, PLR0912
     f: Callable[..., Any],
     field: str,
@@ -130,9 +164,9 @@ def generate_cli_option_from_pydantic_field(  # noqa: C901, PLR0912
 
             callback = dict_callback
         case _:
-            if isinstance(info.annotation, type) and issubclass(info.annotation, Enum):
+            if enum := _get_enum_type(info.annotation):
                 field_type = click.Choice(
-                    [e.name for e in info.annotation],
+                    [e.name for e in enum],
                     case_sensitive=False,
                 )
                 if info.default and info.default is not PydanticUndefined:
@@ -159,6 +193,8 @@ def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
     """Define common options for CLI commands."""
     for field, info in Config.model_fields.items():
         generate_cli_option_from_pydantic_field(f, field, info)
+    for field in GenerativeModelsConfig.model_fields:
+        generate_str_cli_option(f, field)
     for field, info in CLIConfig.model_fields.items():
         generate_cli_option_from_pydantic_field(f, field, info)
 
