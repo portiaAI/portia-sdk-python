@@ -929,7 +929,7 @@ def test_memory_extraction_step_handles_unknown_output_type() -> None:
     """Test MemoryExtractionStep handles unknown output types gracefully."""
     (_, plan_run) = get_test_plan_run()
     plan_run.outputs.step_outputs = {
-        "unexpected_input": SimpleNamespace(value="Unexpected input value"),  # pyright: ignore[reportAttributeAccessIssue]
+        "$unexpected_input": SimpleNamespace(value="Unexpected input value"),  # pyright: ignore[reportAttributeAccessIssue]
     }
     agent = DefaultExecutionAgent(
         step=Step(
