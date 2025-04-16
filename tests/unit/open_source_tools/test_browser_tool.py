@@ -11,7 +11,6 @@ from pydantic import HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
 from portia.open_source_tools.browser_tool import (
-    BrowserAuthOutput,
     BrowserInfrastructureProvider,
     BrowserInfrastructureProviderBrowserBase,
     BrowserInfrastructureProviderLocal,
@@ -90,7 +89,7 @@ def test_browser_tool_auth_check(
 ) -> None:
     """Test the authentication check in browser tool."""
     # Mock response data
-    mock_auth_response = BrowserAuthOutput(
+    mock_auth_response = BrowserTaskOutput(
         human_login_required=True,
         login_url="https://example.com/login",
         user_login_guidance="Login to example.com",
@@ -137,26 +136,17 @@ def test_browser_tool_no_auth_required(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool when no authentication is required."""
-    # Mock auth response data (no login required)
-    mock_auth_response = BrowserAuthOutput(
-        human_login_required=False,
-    )
-
     # Mock task response data
     mock_task_response = BrowserTaskOutput(
         task_output="Task completed successfully",
         human_login_required=False,
     )
 
-    # Create mock result objects for both auth check and task
-    mock_auth_result = MagicMock()
-    mock_auth_result.final_result.return_value = json.dumps(mock_auth_response.model_dump())
-
     mock_task_result = MagicMock()
     mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
 
     # Create async mock for agent.run() that returns different results for auth and task
-    mock_run = AsyncMock(side_effect=[mock_auth_result, mock_task_result])
+    mock_run = AsyncMock(return_value=mock_task_result)
 
     # Patch the Agent class
     with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
@@ -173,9 +163,9 @@ def test_browser_tool_no_auth_required(
         # Run the tool
         result = browser_tool.run(context, "https://example.com", "test task")
 
-        # Verify Agent was called twice (once for auth, once for task)
-        assert mock_agent.call_count == 2
-        assert mock_run.call_count == 2
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1
 
         # Verify the final result is the task output
         assert result == "Task completed successfully"
