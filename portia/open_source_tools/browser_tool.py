@@ -86,32 +86,6 @@ class BrowserToolSchema(BaseModel):
     )
 
 
-class BrowserAuthOutput(BaseModel):
-    """Output schema for the browser authentication check.
-
-    This class represents the response from an authentication check,
-    indicating whether user login is required and providing necessary login information.
-
-    Attributes:
-        human_login_required (bool): Indicates if manual user authentication is needed.
-        login_url (str, optional): The URL where the user needs to go to authenticate.
-            Only provided when human_login_required is True.
-        user_login_guidance (str, optional): Instructions for the user on how to complete
-            the login process. Only provided when human_login_required is True.
-
-    """
-
-    human_login_required: bool
-    login_url: str | None = Field(
-        default=None,
-        description="The URL to navigate to for login if the user is not authenticated.",
-    )
-    user_login_guidance: str | None = Field(
-        default=None,
-        description="Guidance for the user to login if they are not authenticated.",
-    )
-
-
 class BrowserTaskOutput(BaseModel):
     """Output schema for browser task execution.
 
@@ -129,7 +103,10 @@ class BrowserTaskOutput(BaseModel):
 
     """
 
-    task_output: str
+    task_output: str | None = Field(
+        default=None,
+        description="The output from the task. `None` if authentication is required.",
+    )
     human_login_required: bool = Field(
         default=False,
         description="Whether the user needs to login to complete the task.",
@@ -238,7 +215,7 @@ class BrowserTool(Tool[str]):
 
         async def run_browser_tasks() -> str | ActionClarification:
             def handle_login_requirement(
-                result: BrowserAuthOutput | BrowserTaskOutput,
+                result: BrowserTaskOutput,
             ) -> ActionClarification:
                 """Handle cases where login is required with an ActionClarification."""
                 if result.user_login_guidance is None or result.login_url is None:
@@ -256,8 +233,8 @@ class BrowserTool(Tool[str]):
 
             async def run_agent_task(
                 task_description: str,
-                output_model: type[BrowserAuthOutput | BrowserTaskOutput],
-            ) -> BrowserAuthOutput | BrowserTaskOutput:
+                output_model: type[BrowserTaskOutput],
+            ) -> BrowserTaskOutput:
                 """Run a browser agent task with the given configuration."""
                 agent = Agent(
                     task=task_description,
@@ -268,27 +245,20 @@ class BrowserTool(Tool[str]):
                 result = await agent.run()
                 return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
 
-            # First auth check
-            auth_task = (
-                f"Go to {url}. If the user is not signed in, please go to the sign in page, "
-                "and indicate that human login is required by returning "
-                "human_login_required=True, and the url of the sign in page as well as "
-                "what the user should do to sign in. If the user is signed in, please "
-                "return human_login_required=False."
-            )
-            auth_result = await run_agent_task(auth_task, BrowserAuthOutput)
-            if auth_result.human_login_required:
-                return handle_login_requirement(auth_result)
-
             # Main task
-            task_result = await run_agent_task(task, BrowserTaskOutput)
+            task_to_complete = (
+                f"Go to {url} and complete the following task: {task}. If at any point the user "
+                "needs to login to complete the task, please return human_login_required=True, "
+                "and the url of the sign in page as well as what the user should do to sign in"
+            )
+            task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
             if task_result.human_login_required:
                 return handle_login_requirement(task_result)
             return task_result.task_output  # type: ignore reportCallIssue
 
         try:
             loop = asyncio.get_event_loop()
-        except RuntimeError:
+        except RuntimeError:  # pragma: no cover
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop.run_until_complete(run_browser_tasks())
@@ -344,10 +314,7 @@ class BrowserToolForUrl(BrowserTool):
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
-        http_url = HttpUrl(url)
-        if not http_url.host:
-            raise ToolHardError("Invalid URL, host must be provided.")
-        domain_parts = http_url.host.split(".")
+        domain_parts = str(HttpUrl(url).host).split(".")
         formatted_domain = "_".join(domain_parts)
         if not id:
             id = f"browser_tool_for_url_{formatted_domain}"  # noqa: A001
@@ -370,7 +337,7 @@ class BrowserToolForUrl(BrowserTool):
 
     def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
         """Run the BrowserToolForUrl."""
-        return super().run(ctx, self.url, task)
+        return super().run(ctx, self.url, task)  # pragma: no cover
 
 
 class BrowserInfrastructureProvider(ABC):

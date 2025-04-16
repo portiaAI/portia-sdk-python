@@ -11,13 +11,14 @@ from pydantic import HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
 from portia.open_source_tools.browser_tool import (
-    BrowserAuthOutput,
     BrowserInfrastructureOption,
     BrowserInfrastructureProvider,
     BrowserInfrastructureProviderBrowserBase,
     BrowserInfrastructureProviderLocal,
     BrowserTaskOutput,
     BrowserTool,
+    BrowserToolForUrl,
+    BrowserToolForUrlSchema,
 )
 from tests.utils import assert_clarification_equality_without_uuid, get_test_tool_context
 
@@ -91,7 +92,7 @@ def test_browser_tool_auth_check(
 ) -> None:
     """Test the authentication check in browser tool."""
     # Mock response data
-    mock_auth_response = BrowserAuthOutput(
+    mock_auth_response = BrowserTaskOutput(
         human_login_required=True,
         login_url="https://example.com/login",
         user_login_guidance="Login to example.com",
@@ -139,7 +140,7 @@ def test_browser_tool_bad_response(
 ) -> None:
     """Test the browser tool when no authentication is required."""
     # Mock auth response data but with bad data
-    mock_auth_response = BrowserAuthOutput(
+    mock_auth_response = BrowserTaskOutput(
         human_login_required=True,
     )
     # Create mock result objects for both auth check and task
@@ -174,26 +175,17 @@ def test_browser_tool_no_auth_required(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool when no authentication is required."""
-    # Mock auth response data (no login required)
-    mock_auth_response = BrowserAuthOutput(
-        human_login_required=False,
-    )
-
     # Mock task response data
     mock_task_response = BrowserTaskOutput(
         task_output="Task completed successfully",
         human_login_required=False,
     )
 
-    # Create mock result objects for both auth check and task
-    mock_auth_result = MagicMock()
-    mock_auth_result.final_result.return_value = json.dumps(mock_auth_response.model_dump())
-
     mock_task_result = MagicMock()
     mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
 
     # Create async mock for agent.run() that returns different results for auth and task
-    mock_run = AsyncMock(side_effect=[mock_auth_result, mock_task_result])
+    mock_run = AsyncMock(return_value=mock_task_result)
 
     # Patch the Agent class
     with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
@@ -210,9 +202,9 @@ def test_browser_tool_no_auth_required(
         # Run the tool
         result = browser_tool.run(context, "https://example.com", "test task")
 
-        # Verify Agent was called twice (once for auth, once for task)
-        assert mock_agent.call_count == 2
-        assert mock_run.call_count == 2
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1
 
         # Verify the final result is the task output
         assert result == "Task completed successfully"
@@ -364,6 +356,15 @@ def test_browserbase_provider_init_missing_api_key() -> None:
         BrowserInfrastructureProviderBrowserBase()
 
 
+def test_browserbase_provider_init_missing_project_id() -> None:
+    """Test initialization fails when project ID is missing."""
+    with (
+        patch.dict(os.environ, {"BROWSERBASE_API_KEY": "test_key"}, clear=True),
+        pytest.raises(ToolHardError, match="BROWSERBASE_PROJECT_ID is not set"),
+    ):
+        BrowserInfrastructureProviderBrowserBase()
+
+
 def test_browserbase_provider_get_context_id(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
@@ -493,3 +494,48 @@ def test_browserbase_provider_setup_browser(
 
     assert isinstance(browser, Browser)
     assert browser.config.cdp_url == "test_connect_url"
+
+
+def test_browser_tool_for_url_init_default_parameters() -> None:
+    """Test BrowserToolForUrl initialization with default parameters."""
+    url = "https://example.com"
+    tool = BrowserToolForUrl(url=url)
+
+    assert tool.url == url
+    assert tool.id == "browser_tool_for_url_example_com"
+    assert tool.name == "Browser Tool for example_com"
+    assert tool.description == (
+        f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete tasks."
+    )
+    assert tool.args_schema == BrowserToolForUrlSchema
+
+
+def test_browser_tool_for_url_init_custom_parameters() -> None:
+    """Test BrowserToolForUrl initialization with custom parameters."""
+    url = "https://example.com"
+    custom_id = "custom_browser_tool"
+    custom_name = "Custom Browser Tool"
+    custom_description = "Custom description for browser tool"
+
+    tool = BrowserToolForUrl(
+        url=url,
+        id=custom_id,
+        name=custom_name,
+        description=custom_description,
+    )
+
+    assert tool.url == url
+    assert tool.id == custom_id
+    assert tool.name == custom_name
+    assert tool.description == custom_description
+    assert tool.args_schema == BrowserToolForUrlSchema
+
+
+def test_browser_tool_for_url_init_subdomain_handling() -> None:
+    """Test BrowserToolForUrl initialization correctly handles subdomains."""
+    url = "https://sub.example.com"
+    tool = BrowserToolForUrl(url=url)
+
+    assert tool.url == url
+    assert tool.id == "browser_tool_for_url_sub_example_com"
+    assert tool.name == "Browser Tool for sub_example_com"
