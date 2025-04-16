@@ -898,7 +898,7 @@ def test_memory_extraction_step_with_inputs() -> None:
     assert result["step_inputs"][1].description == "Memory input description"
 
 
-def test_memory_extraction_step_ignores_missing_inputs() -> None:
+def test_memory_extraction_step_errors_with_missing_input() -> None:
     """Test MemoryExtractionStep ignores step inputs that aren't in previous outputs."""
     (_, plan_run) = get_test_plan_run()
     agent = DefaultExecutionAgent(
@@ -917,12 +917,8 @@ def test_memory_extraction_step_ignores_missing_inputs() -> None:
     )
 
     memory_extraction_step = MemoryExtractionStep(agent=agent)
-    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
-
-    assert len(result["step_inputs"]) == 1
-    assert result["step_inputs"][0].name == "$a"
-    assert result["step_inputs"][0].value == "3"
-    assert result["step_inputs"][0].description == "A value"
+    with pytest.raises(InvalidPlanRunStateError):
+        memory_extraction_step.invoke({"messages": [], "step_inputs": []})
 
 
 def test_memory_extraction_step_handles_unknown_output_type() -> None:

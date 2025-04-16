@@ -156,26 +156,23 @@ class MemoryExtractionStep:
         previous_outputs = self.agent.plan_run.outputs.step_outputs
         for step_input in self.agent.step.inputs:
             if step_input.name not in previous_outputs:
-                logger().warning(
-                    "Received step unknown step input with name: %s, skipping...",
-                    step_input.name,
-                )
-                continue
+                raise InvalidPlanRunStateError("Received unknown step input: %s", step_input.name)
             previous_output = previous_outputs.get(step_input.name)
 
-            if isinstance(previous_output, LocalOutput):
-                output_value = previous_output.value
-            elif isinstance(previous_output, AgentMemoryOutput):
-                output_value = self.agent.agent_memory.get_plan_run_output(
-                    previous_output.output_name,
-                    self.agent.plan_run.id,
-                ).value
-            else:
-                logger().warning(
-                    "Received unknown output type: %s",
-                    previous_output,
-                )
-                continue
+            match previous_output:
+                case LocalOutput():
+                    output_value = previous_output.value
+                case AgentMemoryOutput():
+                    output_value = self.agent.agent_memory.get_plan_run_output(
+                        previous_output.output_name,
+                        self.agent.plan_run.id,
+                    ).value
+                case _:
+                    logger().warning(
+                        "Received unknown output type: %s",
+                        previous_output,
+                    )
+                    continue
 
             step_inputs.append(
                 StepInput(
@@ -239,7 +236,7 @@ class ParserModel:
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
                 "- Do not provide placeholder values (e.g., 'example@example.com').\n"
                 "- Do not include references to any of the input values (e.g. 'as provided in "
-                "the input') - you must put the exact value the tool should be called with in "
+                "the input'): you must put the exact value the tool should be called with in "
                 "the value field\n"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"

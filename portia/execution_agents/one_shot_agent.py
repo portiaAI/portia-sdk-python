@@ -15,7 +15,7 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.errors import InvalidAgentError
+from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
@@ -24,7 +24,7 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.tool import ToolRunContext
@@ -178,8 +178,14 @@ class OneShotAgent(BaseExecutionAgent):
         """
         if not self.tool:
             raise InvalidAgentError("No tool available")
+        if any(
+            isinstance(output, AgentMemoryOutput)
+            for output in self.plan_run.outputs.step_outputs.values()
+        ):
+            raise InvalidPlanRunStateError(
+                "One-shot agent does not support pulling outputs from agent memory",
+            )
 
-        # Note: the one-shot agent does not support pulling outputs from agent memory
         previous_outputs = {
             output_name: output.value
             for output_name, output in self.plan_run.outputs.step_outputs.items()

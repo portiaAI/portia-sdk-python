@@ -891,8 +891,13 @@ class Portia:
     def _persist_step_state(self, plan_run: PlanRun, step: Step) -> None:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
-        if isinstance(step_output, LocalOutput) and self.config.exceeds_output_threshold(
-            step_output.serialize_value(),
+        if (
+            isinstance(step_output, LocalOutput)
+            and self.config.exceeds_output_threshold(
+                step_output.serialize_value(),
+            )
+            # One-shot agent does not support pulling outputs from agent memory
+            and self.config.execution_agent_type != ExecutionAgentType.ONE_SHOT
         ):
             step_output = self.storage.save_plan_run_output(step.output, step_output, plan_run.id)
             plan_run.outputs.step_outputs[step.output] = step_output

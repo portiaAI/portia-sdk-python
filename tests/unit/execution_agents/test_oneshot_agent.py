@@ -8,9 +8,9 @@ import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
-from portia.errors import InvalidAgentError
+from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import AgentMemoryOutput, LocalOutput, Output
 from portia.storage import InMemoryStorage
 from tests.utils import AdditionTool, get_test_config, get_test_plan_run
 
@@ -75,4 +75,22 @@ def test_oneshot_agent_without_tool_raises() -> None:
             config=get_test_config(),
             agent_memory=InMemoryStorage(),
             tool=None,
+        ).execute_sync()
+
+
+def test_oneshot_agent_with_memory_output_raises() -> None:
+    """Test oneshot agent with memory output raises."""
+    (plan, plan_run) = get_test_plan_run()
+    plan_run.outputs.step_outputs["test"] = AgentMemoryOutput(
+        output_name="test",
+        plan_run_id=plan_run.id,
+        summary="test",
+    )
+    with pytest.raises(InvalidPlanRunStateError):
+        OneShotAgent(
+            step=plan.steps[0],
+            plan_run=plan_run,
+            config=get_test_config(),
+            agent_memory=InMemoryStorage(),
+            tool=AdditionTool(),
         ).execute_sync()
