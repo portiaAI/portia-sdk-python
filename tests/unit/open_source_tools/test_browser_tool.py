@@ -12,6 +12,7 @@ from pydantic import HttpUrl
 from portia import ActionClarification, ToolHardError, ToolRunContext
 from portia.open_source_tools.browser_tool import (
     BrowserAuthOutput,
+    BrowserInfrastructureOption,
     BrowserInfrastructureProvider,
     BrowserInfrastructureProviderBrowserBase,
     BrowserInfrastructureProviderLocal,
@@ -133,6 +134,42 @@ def test_browser_tool_auth_check(
         )
 
 
+def test_browser_tool_bad_response(
+    mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
+) -> None:
+    """Test the browser tool when no authentication is required."""
+    # Mock auth response data but with bad data
+    mock_auth_response = BrowserAuthOutput(
+        human_login_required=True,
+    )
+    # Create mock result objects for both auth check and task
+    mock_auth_result = MagicMock()
+    mock_auth_result.final_result.return_value = json.dumps(mock_auth_response.model_dump())
+
+    # Create async mock for agent.run() that returns different results for auth and task
+    mock_run = AsyncMock(return_value=mock_auth_result)
+
+    # Patch the Agent class
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserTool(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider
+        )
+        context = get_test_tool_context()
+
+        # Run the tool
+        with pytest.raises(ToolHardError, match="Expected user guidance and login URL"):
+            browser_tool.run(context, "https://example.com", "test task")
+
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1
+
+
 def test_browser_tool_no_auth_required(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
@@ -179,6 +216,46 @@ def test_browser_tool_no_auth_required(
 
         # Verify the final result is the task output
         assert result == "Task completed successfully"
+
+
+def test_browser_tool_infrastructure_provider_custom() -> None:
+    """Test infrastructure_provider property returns custom provider when set."""
+    mock_provider = MockBrowserInfrastructureProvider()
+    browser_tool = BrowserTool(custom_infrastructure_provider=mock_provider)
+
+    assert browser_tool.infrastructure_provider is mock_provider
+
+
+def test_browser_tool_infrastructure_provider_remote() -> None:
+    """Test infrastructure_provider property returns BrowserBase provider for REMOTE option."""
+    browser_tool = BrowserTool(infrastructure_option=BrowserInfrastructureOption.REMOTE)
+
+    with patch(
+        "portia.open_source_tools.browser_tool.BrowserInfrastructureProviderBrowserBase"
+    ) as mock_browserbase_provider_class:
+        mock_provider = MagicMock()
+        mock_browserbase_provider_class.return_value = mock_provider
+
+        provider = browser_tool.infrastructure_provider
+
+        assert provider is mock_provider
+        mock_browserbase_provider_class.assert_called_once()
+
+
+def test_browser_tool_infrastructure_provider_local() -> None:
+    """Test infrastructure_provider property returns Local provider for LOCAL option."""
+    browser_tool = BrowserTool(infrastructure_option=BrowserInfrastructureOption.LOCAL)
+
+    with patch(
+        "portia.open_source_tools.browser_tool.BrowserInfrastructureProviderLocal"
+    ) as mock_local_provider_class:
+        mock_provider = MagicMock()
+        mock_local_provider_class.return_value = mock_provider
+
+        provider = browser_tool.infrastructure_provider
+
+        assert provider is mock_provider
+        mock_local_provider_class.assert_called_once()
 
 
 def test_browser_infra_local_get_chrome_instance_path_from_env(
