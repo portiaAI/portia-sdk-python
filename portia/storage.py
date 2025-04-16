@@ -871,7 +871,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "current_step_index": plan_run.current_step_index,
                     "state": plan_run.state,
                     "execution_context": plan_run.execution_context.model_dump(mode="json"),
-                    "end_user_external_id": plan_run.end_user_id,
+                    "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
                 },
@@ -906,7 +906,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
             return PlanRun(
                 id=PlanRunUUID.from_string(response_json["id"]),
                 plan_id=PlanUUID.from_string(response_json["plan"]["id"]),
-                end_user_id=response_json["end_user"]["external_id"],
+                end_user_id=response_json["end_user"],
                 current_step_index=response_json["current_step_index"],
                 state=PlanRunState(response_json["state"]),
                 execution_context=ExecutionContext.model_validate(
@@ -953,7 +953,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                         id=PlanRunUUID.from_string(plan_run["id"]),
                         plan_id=PlanUUID.from_string(plan_run["plan"]["id"]),
                         current_step_index=plan_run["current_step_index"],
-                        end_user_id=plan_run["end_user_id"],
+                        end_user_id=plan_run["end_user"],
                         state=PlanRunState(plan_run["state"]),
                         execution_context=ExecutionContext.model_validate(
                             plan_run["execution_context"],
