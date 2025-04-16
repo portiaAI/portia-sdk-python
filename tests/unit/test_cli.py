@@ -27,13 +27,6 @@ def mock_portia_cls() -> Iterator[MagicMock]:
         yield mock_portia
 
 
-@pytest.fixture
-def mock_execution_context() -> Iterator[MagicMock]:
-    """Mock the execution context."""
-    with patch("portia.cli.execution_context", autospec=True) as mock:
-        yield mock
-
-
 def test_cli_run(mock_portia_cls: MagicMock) -> None:
     """Test the CLI --run command."""
     mock_portia = mock_portia_cls.return_value
@@ -123,7 +116,6 @@ def test_cli_run_no_confirmation(mock_portia_cls: MagicMock) -> None:
 
 def test_cli_run_custom_end_user_id(
     mock_portia_cls: MagicMock,
-    mock_execution_context: MagicMock,
 ) -> None:
     """Test the CLI run command with a custom end user id.
 
@@ -138,10 +130,9 @@ def test_cli_run_custom_end_user_id(
     )
     assert result.exit_code == 0
 
-    assert mock_execution_context.call_args_list[0].kwargs["end_user_id"] == "user-123"
-
     mock_portia = mock_portia_cls.return_value
     assert mock_portia.plan.call_args[0][0] == "Sum 1 + 1"
+    assert mock_portia.plan.call_args[1]["end_user"] == "user-123"
     assert mock_portia.run_plan.call_count == 1
 
 

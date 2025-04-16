@@ -14,6 +14,7 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from portia.clarification import InputClarification
+from portia.end_user import EndUser
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.default_execution_agent import (
     MAX_RETRIES,
@@ -513,6 +514,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
         plan_run=plan_run,
+        end_user=EndUser(external_id="123"),
         config=get_test_config(),
         tool=tool,
     )
@@ -570,6 +572,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        end_user=EndUser(external_id="123"),
         tool=tool,
     )
     agent.verified_args = verified_tool_inputs
@@ -639,6 +642,7 @@ def test_get_last_resolved_clarification() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        end_user=EndUser(external_id="123"),
         tool=None,
     )
     assert agent.get_last_resolved_clarification("arg") == resolved_clarification2
@@ -659,6 +663,7 @@ def test_clarifications_or_continue() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        end_user=EndUser(external_id="123"),
         tool=None,
     )
     inputs = VerifiedToolInputs(
@@ -695,6 +700,7 @@ def test_clarifications_or_continue() -> None:
     plan_run.outputs.clarifications = [clarification]
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
+        end_user=EndUser(external_id="123"),
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
@@ -727,6 +733,7 @@ def test_default_execution_agent_none_tool_execute_sync() -> None:
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
         plan_run=plan_run,
+        end_user=EndUser(external_id="123"),
         config=get_test_config(),
         tool=None,
     )
@@ -777,6 +784,7 @@ def test_optional_args_with_none_values() -> None:
     """
     agent = DefaultExecutionAgent(
         step=Step(task="TASK_STRING", output="$out"),
+        end_user=EndUser(external_id="123"),
         plan_run=get_test_plan_run()[1],
         config=get_test_config(),
         tool=MockTool(),

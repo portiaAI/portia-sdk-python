@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from portia.end_user import EndUser
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -45,6 +46,7 @@ def test_generate_steps_or_error_success(mock_config: Config) -> None:
     result = planning_agent.generate_steps_or_error(
         query=query,
         tool_list=[],
+        end_user=EndUser(external_id="123"),
     )
 
     assert result.steps == []
@@ -61,14 +63,15 @@ def test_base_classes() -> None:
             self,
             query: str,
             tool_list: list[Tool],
+            end_user: EndUser,
             examples: list[Plan] | None = None,
         ) -> StepsOrError:
-            return super().generate_steps_or_error(query, tool_list, examples)  # type: ignore  # noqa: PGH003
+            return super().generate_steps_or_error(query, tool_list, end_user, examples)  # type: ignore  # noqa: PGH003
 
     wrapper = MyPlanningAgent(get_test_config())
 
     with pytest.raises(NotImplementedError):
-        wrapper.generate_steps_or_error("", [], [])
+        wrapper.generate_steps_or_error("", [], EndUser(external_id="123"), [])
 
 
 def test_generate_steps_or_error_failure(mock_config: Config) -> None:
@@ -87,6 +90,7 @@ def test_generate_steps_or_error_failure(mock_config: Config) -> None:
     result = planning_agent.generate_steps_or_error(
         query=query,
         tool_list=[],
+        end_user=EndUser(external_id="123"),
     )
 
     assert result.error == "Unable to generate a plan"
@@ -114,6 +118,7 @@ def test_render_prompt() -> None:
         query="test query",
         tool_list=[AdditionTool()],
         examples=plans,
+        end_user=EndUser(external_id="123"),
     )
     overall_pattern = re.compile(
         r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?",
@@ -177,6 +182,7 @@ def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
     result = planning_agent.generate_steps_or_error(
         query=query,
         tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
     )
 
     assert result.error == "Missing tools no_tool_1, no_tool_2 from the provided tool_list"
@@ -213,6 +219,7 @@ def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
     result = planning_agent.generate_steps_or_error(
         query=query,
         tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
     )
 
     assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)

@@ -7,8 +7,8 @@ import pytest
 from portia.clarification import ActionClarification
 from portia.cloud import PortiaCloudClient
 from portia.config import Config, StorageClass
+from portia.end_user import EndUser
 from portia.errors import ToolNotFoundError
-from portia.execution_context import execution_context
 from portia.plan_run import PlanRunState
 from portia.portia import Portia
 from portia.storage import PortiaCloudStorage
@@ -76,8 +76,7 @@ def test_portia_run_query_with_oauth() -> None:
     portia = Portia()
     query = "Star the portiaai/portia-sdk-repo"
 
-    with execution_context(end_user_id=str(uuid.uuid4())):
-        plan_run = portia.run(query)
+    plan_run = portia.run(query, end_user=EndUser(external_id=str(uuid.uuid4())))
 
     assert plan_run.state == PlanRunState.NEED_CLARIFICATION
     assert len(plan_run.outputs.clarifications) == 1

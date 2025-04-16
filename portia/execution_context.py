@@ -40,15 +40,11 @@ class ExecutionContext(BaseModel):
     information to planning and execution agents for dynamic adjustments.
 
     Attributes:
-        end_user_id (Optional[str]): The identifier of the user for whom the run is running.
-            Used for authentication and debugging purposes.
         additional_data (dict[str, str]): Arbitrary additional data useful for debugging.
 
     """  # noqa: E501
 
     model_config = ConfigDict(extra="ignore")
-
-    end_user_id: str | None = None
 
     additional_data: dict[str, str] = Field(default={})
 
@@ -61,7 +57,6 @@ def empty_context() -> ExecutionContext:
 
     """
     return ExecutionContext(
-        end_user_id=None,
         additional_data={},
     )
 
@@ -69,7 +64,6 @@ def empty_context() -> ExecutionContext:
 @contextmanager
 def execution_context(
     context: ExecutionContext | None = None,
-    end_user_id: str | None = None,
     additional_data: dict[str, str] | None = None,
 ) -> Generator[None, None, None]:
     """Set the execution context for the duration of the PlanRun.
@@ -83,8 +77,6 @@ def execution_context(
     Args:
         context (Optional[ExecutionContext]): The execution context to set for the current task.
             If not provided, a new `ExecutionContext` is created using the provided parameters.
-        end_user_id (Optional[str]): An identifier for the end user, used to customize
-            the execution for specific users. Defaults to `None`.
         additional_data (Optional[Dict[str, str]]): Arbitrary additional data to associate
             with the context. Defaults to an empty dictionary.
 
@@ -99,7 +91,7 @@ def execution_context(
 
     Example:
     ```python
-        with execution_context(end_user_id="user123", additional_data={"key": "value"}):
+        with execution_context(additional_data={"key": "value"}):
             # Code here runs with the specified execution context
         # Outside the block, the execution context is cleared for the current task.
     ```
@@ -107,7 +99,6 @@ def execution_context(
     """
     if context is None:
         context = ExecutionContext(
-            end_user_id=end_user_id,
             additional_data=additional_data or {},
         )
     token = _execution_context.set(context)

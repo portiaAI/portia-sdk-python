@@ -83,6 +83,7 @@ def mock_plan_run() -> PlanRun:
         plan_id=PlanUUID(),
         current_step_index=1,
         state=PlanRunState.IN_PROGRESS,
+        end_user_id="123",
         outputs=PlanRunOutputs(
             step_outputs={
                 "$result1": LocalOutput(value="Task 1 result", summary="Task 1 summary"),
@@ -119,7 +120,10 @@ def test_base_introspection_agent_initialization() -> None:
         plan_context=PlanContext(query="test", tool_ids=[]),
         steps=[],
     )
-    empty_plan_run = PlanRun(plan_id=empty_plan.id)
+    empty_plan_run = PlanRun(
+        plan_id=empty_plan.id,
+        end_user_id="123",
+    )
 
     result = agent.pre_step_introspection(empty_plan, empty_plan_run)
 
@@ -150,7 +154,10 @@ def test_base_introspection_agent_abstract_method_raises_error() -> None:
         plan_context=PlanContext(query="test", tool_ids=[]),
         steps=[],
     )
-    empty_plan_run = PlanRun(plan_id=empty_plan.id)
+    empty_plan_run = PlanRun(
+        plan_id=empty_plan.id,
+        end_user_id="123",
+    )
 
     with pytest.raises(NotImplementedError, match="pre_step_introspection is not implemented"):
         agent.pre_step_introspection(empty_plan, empty_plan_run)

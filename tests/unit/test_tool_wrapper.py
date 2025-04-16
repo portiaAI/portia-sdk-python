@@ -3,6 +3,7 @@
 import pytest
 
 from portia.clarification import Clarification
+from portia.end_user import EndUser
 from portia.errors import ToolHardError
 from portia.execution_agents.output import LocalOutput
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
@@ -24,10 +25,33 @@ class MockStorage(AdditionalStorage):
     def __init__(self) -> None:
         """Save records in array."""
         self.records = []
+        self.end_users = {}
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save records in array."""
         self.records.append(tool_call)
+
+    def save_end_user(self, end_user: EndUser) -> EndUser:
+        """Add end_user to dict.
+
+        Args:
+            end_user (EndUser): The EndUser object to save.
+
+        """
+        self.end_users[end_user.external_id] = end_user
+        return end_user
+
+    def get_end_user(self, end_user_id: str) -> EndUser:
+        """Get end_user from dict or init a new one.
+
+        Args:
+            end_user_id (str): The id of the end user object to get.
+
+        """
+        if end_user_id in self.end_users:
+            return self.end_users[end_user_id]
+        end_user = EndUser(external_id=end_user_id)
+        return self.save_end_user(end_user)
 
 
 @pytest.fixture

@@ -381,6 +381,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
         plan_id=plan.id,
         current_step_index=1,
         state=PlanRunState.NEED_CLARIFICATION,
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             clarifications=[
                 ActionClarification(
@@ -770,7 +771,7 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan)
+        mockcreate_plan_run.assert_called_once_with(plan, portia.handle_end_user())
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
@@ -1081,6 +1082,7 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     )
     plan_run = PlanRun(
         plan_id=plan.id,
+        end_user_id="test123",
         current_step_index=0,
         state=PlanRunState.IN_PROGRESS,
     )
@@ -1131,6 +1133,7 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
     plan_run = PlanRun(
         plan_id=plan.id,
         current_step_index=0,
+        end_user_id="test123",
         state=PlanRunState.IN_PROGRESS,
     )
 
@@ -1176,6 +1179,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     )
     plan_run = PlanRun(
         plan_id=plan.id,
+        end_user_id="test123",
         current_step_index=0,
         state=PlanRunState.IN_PROGRESS,
     )
@@ -1220,6 +1224,7 @@ def test_handle_introspection_outcome_no_condition(portia: Portia) -> None:
     plan_run = PlanRun(
         plan_id=plan.id,
         current_step_index=0,
+        end_user_id="test123",
         state=PlanRunState.IN_PROGRESS,
     )
 
@@ -1270,6 +1275,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         plan_id=plan.id,
         current_step_index=1,  # Resume from step 2
         state=PlanRunState.IN_PROGRESS,
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             step_outputs={
                 "$step1_result": LocalOutput(value="Step 1 result", summary="Summary of step 1"),

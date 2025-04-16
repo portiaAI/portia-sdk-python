@@ -18,6 +18,7 @@ from portia.plan import Plan, Step
 
 if TYPE_CHECKING:
     from portia.config import Config
+    from portia.end_user import EndUser
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ class BasePlanningAgent(ABC):
         self,
         query: str,
         tool_list: list[Tool],
+        end_user: EndUser,
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
         """Generate a list of steps for the given query.
@@ -59,6 +61,7 @@ class BasePlanningAgent(ABC):
         Args:
             query (str): The user query to generate a list of steps for.
             tool_list (list[Tool]): A list of tools available for the plan.
+            end_user (EndUser): The end user for this plan
             examples (list[Plan] | None): Optional list of example plans to guide the PlanningAgent.
 
         Returns:

@@ -8,6 +8,7 @@ import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
+from portia.end_user import EndUser
 from portia.errors import InvalidAgentError
 from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.execution_agents.output import LocalOutput, Output
@@ -54,6 +55,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = OneShotAgent(
         step=plan.steps[0],
         plan_run=plan_run,
+        end_user=EndUser(external_id="123"),
         config=get_test_config(),
         tool=AdditionTool(),
     )
@@ -70,6 +72,7 @@ def test_oneshot_agent_without_tool_raises() -> None:
         OneShotAgent(
             step=plan.steps[0],
             plan_run=plan_run,
+            end_user=EndUser(external_id="123"),
             config=get_test_config(),
             tool=None,
         ).execute_sync()

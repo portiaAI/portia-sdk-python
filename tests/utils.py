@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, SecretStr
 from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, LogLevel, StorageClass
+from portia.end_user import EndUser
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalOutput
 from portia.execution_context import ExecutionContext, empty_context
@@ -35,17 +36,22 @@ if TYPE_CHECKING:
 def get_test_tool_context(
     plan_run_id: PlanRunUUID | None = None,
     config: Config | None = None,
+    end_user: EndUser | None = None,
 ) -> ToolRunContext:
     """Return a test tool context."""
     if not plan_run_id:
         plan_run_id = PlanRunUUID()
     if not config:
         config = get_test_config()
+    if not end_user:
+        end_user = EndUser(external_id="test")
+
     return ToolRunContext(
         execution_context=get_execution_ctx(),
         plan_run_id=plan_run_id,
         config=config,
         clarifications=[],
+        end_user=end_user,
     )
 
 
@@ -65,7 +71,7 @@ def get_test_plan_run() -> tuple[Plan, PlanRun]:
         ),
         steps=[step1],
     )
-    plan_run = PlanRun(plan_id=plan.id, current_step_index=0)
+    plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
     plan_run.outputs.step_outputs = {
         "$a": LocalOutput(value="3"),
     }
