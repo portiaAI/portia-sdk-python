@@ -158,7 +158,7 @@ class BrowserInfrastructureOption(Enum):
     """
 
     LOCAL = "local"
-    BROWSERBASE = "browserbase"
+    REMOTE = "remote"
 
 
 class BrowserTool(Tool[str]):
@@ -185,8 +185,8 @@ class BrowserTool(Tool[str]):
             general description of the browser tool's capabilities.
         infrastructure_option (BrowserInfrastructureOption, optional): The infrastructure
             provider to use. Can be either `BrowserInfrastructureOption.LOCAL` or
-            `BrowserInfrastructureOption.BROWSERBASE`. Defaults to
-            `BrowserInfrastructureOption.BROWSERBASE`.
+            `BrowserInfrastructureOption.REMOTE`. Defaults to
+            `BrowserInfrastructureOption.REMOTE`.
         custom_infrastructure_provider (BrowserInfrastructureProvider, optional): A custom
             infrastructure provider to use. If not provided, the infrastructure provider will be
             resolved from the `infrastructure_option` argument.
@@ -216,7 +216,7 @@ class BrowserTool(Tool[str]):
     )
 
     infrastructure_option: BrowserInfrastructureOption = Field(
-        default=BrowserInfrastructureOption.BROWSERBASE,
+        default=BrowserInfrastructureOption.REMOTE,
         description="The infrastructure provider to use for the browser tool.",
     )
 
@@ -227,7 +227,7 @@ class BrowserTool(Tool[str]):
         """Get the infrastructure provider instance (cached)."""
         if self.custom_infrastructure_provider:
             return self.custom_infrastructure_provider
-        if self.infrastructure_option == BrowserInfrastructureOption.BROWSERBASE:
+        if self.infrastructure_option == BrowserInfrastructureOption.REMOTE:
             return BrowserInfrastructureProviderBrowserBase()
         return BrowserInfrastructureProviderLocal()
 
@@ -321,8 +321,8 @@ class BrowserToolForUrl(BrowserTool):
             will be generated with the URL.
         infrastructure_option (BrowserInfrastructureOption, optional): The infrastructure
             provider to use. Can be either `BrowserInfrastructureOption.LOCAL` or
-            `BrowserInfrastructureOption.BROWSERBASE`. Defaults to
-            `BrowserInfrastructureOption.BROWSERBASE`.
+            `BrowserInfrastructureOption.REMOTE`. Defaults to
+            `BrowserInfrastructureOption.REMOTE`.
         custom_infrastructure_provider (BrowserInfrastructureProvider, optional): A custom
             infrastructure provider to use. If not provided, the infrastructure provider will be
             resolved from the `infrastructure_option` argument.
