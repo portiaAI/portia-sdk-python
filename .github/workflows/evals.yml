@@ -87,8 +87,8 @@ jobs:
             echo "has_failing_eval_planner_scores=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: eval agent (verifier)
-        id: eval_agent_verifier
+      - name: eval agent (execution)
+        id: eval_agent_execution
         working-directory: ./platform/evals
         env:
           LANGCHAIN_TRACING_V2: "true"
@@ -143,7 +143,7 @@ jobs:
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
-          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
+          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_execution.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
           AGENT_INTROSPECTION_EXPERIMENT_ID: ${{ steps.eval_agent_introspection.outputs.eval_name }}
         run: |
@@ -165,16 +165,16 @@ jobs:
             CONTAINS_THRESHOLD_BREACH=true
           fi
 
-          # Check if the verifier agent has failing scores
-          if [[ "${{ steps.eval_agent_verifier.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
-            echo "Agent eval (verifier) failed or has breaches."
-            echo "Breaches: ${{ steps.eval_agent_verifier.outputs.metric_breaches }}"
+          # Check if the execution agent has failing scores
+          if [[ "${{ steps.eval_agent_execution.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
+            echo "Execution agent failed or has breaches."
+            echo "Breaches: ${{ steps.eval_agent_execution.outputs.metric_breaches }}"
             CONTAINS_THRESHOLD_BREACH=true
           fi
 
           # Check if the introspection agent has failing scores
           if [[ "${{ steps.eval_agent_introspection.outputs.has_failing_eval_introspection_scores }}" == "true" ]]; then
-            echo "Agent eval (introspection) failed or has breaches."
+            echo "Introspection agent failed or has breaches."
             echo "Breaches: ${{ steps.eval_agent_introspection.outputs.metric_breaches }}"
             CONTAINS_THRESHOLD_BREACH=true
           fi
