@@ -23,8 +23,8 @@ def cli_handler() -> CLIClarificationHandler:
     return CLIClarificationHandler()
 
 
-@patch("portia.cli_clarification_handler.logger")
-def test_action_clarification(mock_logger: MagicMock, cli_handler: CLIClarificationHandler) -> None:
+@patch("portia.cli_clarification_handler.click.echo")
+def test_action_clarification(mock_echo: MagicMock, cli_handler: CLIClarificationHandler) -> None:
     """Test handling of action clarifications."""
     on_resolution = MagicMock()
     on_error = MagicMock()
@@ -37,11 +37,11 @@ def test_action_clarification(mock_logger: MagicMock, cli_handler: CLIClarificat
 
     cli_handler.handle_action_clarification(clarification, on_resolution, on_error)
 
-    # Verify logger was called with the expected message
-    mock_logger.return_value.info.assert_called_once()
-    log_message = mock_logger.return_value.info.call_args[0][0]
-    assert "Please authenticate" in log_message
-    assert "https://example.com/auth" in log_message
+    # Verify echo was called with the expected message
+    mock_echo.assert_called_once()
+    echo_message = mock_echo.call_args[0][0]
+    assert "Please authenticate" in click.unstyle(echo_message)
+    assert "https://example.com/auth" in click.unstyle(echo_message)
 
     # Verify callbacks were not called
     on_resolution.assert_not_called()

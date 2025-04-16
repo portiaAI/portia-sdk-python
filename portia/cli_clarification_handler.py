@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Callable
 import click
 
 from portia.clarification_handler import ClarificationHandler
-from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.clarification import (
@@ -39,7 +38,7 @@ class CLIClarificationHandler(ClarificationHandler):
         Does this by showing the user the URL on the CLI and instructing them to click on
         it to proceed.
         """
-        logger().info(
+        click.echo(
             click.style(
                 f"{clarification.user_guidance} -- Please click on the link below to proceed."
                 f"{clarification.action_url}",
