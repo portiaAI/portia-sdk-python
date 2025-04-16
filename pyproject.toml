@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.2.0-alpha"
+version = "0.2.1"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
@@ -120,6 +120,7 @@ omit = [
     "*/tests/*", # Don't cover test files themselves
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
+    "portia/cli.py",  # Best effort test coverage
 ]
 
 [tool.coverage.report]
