@@ -14,10 +14,11 @@ from portia.portia import Portia
 from portia.storage import PortiaCloudStorage
 from portia.tool import PortiaRemoteTool, ToolHardError
 from portia.tool_registry import (
+    InMemoryToolRegistry,
     PortiaToolRegistry,
     ToolRegistry,
 )
-from tests.utils import AdditionTool, get_test_plan_run, get_test_tool_context
+from tests.utils import AdditionTool, EndUserUpdateTool, get_test_plan_run, get_test_tool_context
 
 
 def test_portia_run_query_with_cloud() -> None:
@@ -114,3 +115,26 @@ def test_portia_with_microsoft_tools() -> None:
     filtered_tools = filtered_registry.get_tools()
     assert len(filtered_tools) > 0
     assert not any("portia:microsoft:outlook" in tool.id for tool in filtered_tools)
+
+
+def test_portia_end_user_update_with_cloud() -> None:
+    """Test running a query that updates end user state."""
+    config = Config.from_default(storage_class=StorageClass.CLOUD)
+    portia = Portia(
+        config=config,
+        tools=InMemoryToolRegistry.from_local_tools([EndUserUpdateTool()]),
+    )
+    query = "Update the name of my end user to Jeff"
+
+    plan_run = portia.run(query, end_user=EndUser(external_id="123", name="Bob"))
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output
+
+    storage = portia.storage
+    # check we can get items back
+    storage.get_plan(plan_run.plan_id)
+    storage.get_plan_run(plan_run.id)
+    end_user = storage.get_end_user("123")
+
+    assert end_user.name == "Jeff"

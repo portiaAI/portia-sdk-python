@@ -131,6 +131,27 @@ class AdditionTool(Tool):
         return a + b
 
 
+class EndUserUpdateToolSchema(BaseModel):
+    """Input for AdditionTool."""
+
+    name: str | None = Field(default=None, description="The new name for the end user.")
+
+
+class EndUserUpdateTool(Tool):
+    """Adds two numbers."""
+
+    id: str = "end_user_update"
+    name: str = "End User Update Tool"
+    description: str = "Updates the name of the end user"
+    args_schema: type[BaseModel] = EndUserUpdateToolSchema
+    output_schema: tuple[str, str] = ("str", "str: The new name")
+
+    def run(self, ctx: ToolRunContext, name: str) -> str:
+        """Change the name."""
+        ctx.end_user.name = name
+        return name
+
+
 class ClarificationToolSchema(BaseModel):
     """Input for ClarificationTool."""
 
