@@ -104,7 +104,7 @@ def test_browser_tool_auth_check(
     mock_run = AsyncMock(return_value=mock_result)
 
     # Path the Agent class
-    with patch("portia._unstable.browser_tool.Agent") as mock_agent:
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
         # Configure the mock Agent instance
         mock_agent_instance = MagicMock()
         mock_agent_instance.run = mock_run
@@ -159,7 +159,7 @@ def test_browser_tool_no_auth_required(
     mock_run = AsyncMock(side_effect=[mock_auth_result, mock_task_result])
 
     # Patch the Agent class
-    with patch("portia._unstable.browser_tool.Agent") as mock_agent:
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
         # Configure the mock Agent instance
         mock_agent_instance = MagicMock()
         mock_agent_instance.run = mock_run
