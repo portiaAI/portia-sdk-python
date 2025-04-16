@@ -43,6 +43,13 @@
     </Tool>{% endfor %}
 </Tools>
 
+<EndUser>
+    <EndUser.Email>{{ end_user.email }}</EndUser.Email>
+    <EndUser.Name>{{ end_user.name }}</EndUser.Name>
+    <EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>
+    <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
+</EndUser>
+
 <Request>
     <Tools>
         {{tools | map(attribute='id') | list}}

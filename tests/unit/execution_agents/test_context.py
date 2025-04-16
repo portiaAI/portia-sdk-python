@@ -8,9 +8,16 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification, InputClarification
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.output import LocalOutput, Output
-from portia.execution_context import ExecutionContext, get_execution_context
+from portia.execution_context import get_execution_context
 from portia.plan import Variable
 from tests.utils import get_test_plan_run
+from portia.end_user import EndUser
+from portia.execution_agents.context import build_context
+from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_context import get_execution_context
+from portia.plan import Variable
+from portia.tool import ToolRunContext
+from tests.utils import get_test_config, get_test_plan_run
 
 
 @pytest.fixture
@@ -42,7 +49,16 @@ def test_context_empty() -> None:
     (_, plan_run) = get_test_plan_run()
     plan_run.outputs.step_outputs = {}
     context = build_context(
-        ExecutionContext(),
+        ToolRunContext(
+            execution_context=get_execution_context(),
+            end_user=EndUser(
+                external_id="123",
+                additional_data={"email": "hello@world.com"},
+            ),
+            plan_run_id=plan_run.id,
+            config=get_test_config(),
+            clarifications=[],
+        ),
         plan_run,
         [],
     )
@@ -55,7 +71,16 @@ def test_context_execution_context() -> None:
     (plan, plan_run) = get_test_plan_run()
 
     context = build_context(
-        ExecutionContext(additional_data={"user_id": "123"}),
+        ToolRunContext(
+            execution_context=get_execution_context(),
+            end_user=EndUser(
+                external_id="123",
+                additional_data={"email": "hello@world.com"},
+            ),
+            plan_run_id=plan_run.id,
+            config=get_test_config(),
+            clarifications=[],
+        ),
         plan_run,
         [StepInput(name="$output1", value="test1", description="Previous output 1")],
     )
@@ -71,7 +96,16 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
     plan.steps[0].inputs = inputs
     plan_run.outputs.step_outputs = outputs
     context = build_context(
-        ExecutionContext(),
+        ToolRunContext(
+            execution_context=get_execution_context(),
+            end_user=EndUser(
+                external_id="123",
+                additional_data={"email": "hello@world.com"},
+            ),
+            plan_run_id=plan_run.id,
+            config=get_test_config(),
+            clarifications=[],
+        ),
         plan_run,
         [],
     )
@@ -113,9 +147,15 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     ]
     plan_run.outputs.clarifications = clarifications
     context = build_context(
-        ExecutionContext(
-            end_user_id="123",
-            additional_data={"email": "hello@world.com"},
+        ToolRunContext(
+            execution_context=get_execution_context(),
+            end_user=EndUser(
+                external_id="123",
+                additional_data={"email": "hello@world.com"},
+            ),
+            plan_run_id=plan_run.id,
+            config=get_test_config(),
+            clarifications=clarifications,
         ),
         plan_run,
         [
@@ -165,8 +205,13 @@ clarification_reason: email cc list
 input_value: bob@bla.com
 ----------
 Metadata: This section contains general context about this execution.
-end_user_id: 123
-context_key_name: email context_key_value: hello@world.com
+Details on the end user.
+You can use this information if no other information is provided in the task.
+end_user_id:123
+end_user_name:
+end_user_email:
+end_user_phone:
+end_user_attributes:{{"email": "hello@world.com"}}
 ----------
 System Context:
 Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""
@@ -198,7 +243,13 @@ def test_context_inputs_outputs_clarifications(
     plan_run.outputs.step_outputs = outputs
     plan_run.outputs.clarifications = clarifications
     context = build_context(
-        get_execution_context(),
+        ToolRunContext(
+            execution_context=get_execution_context(),
+            end_user=EndUser(external_id="123"),
+            plan_run_id=plan_run.id,
+            config=get_test_config(),
+            clarifications=clarifications,
+        ),
         plan_run,
         [],
     )

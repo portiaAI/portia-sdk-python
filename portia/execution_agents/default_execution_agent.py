@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
     from portia.config import Config
+    from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
@@ -251,16 +252,23 @@ class ParserModel:
         ],
     )
 
-    def __init__(self, model: GenerativeModel, agent: DefaultExecutionAgent) -> None:
+    def __init__(
+        self,
+        model: GenerativeModel,
+        agent: DefaultExecutionAgent,
+        tool_context: ToolRunContext,
+    ) -> None:
         """Initialize the model.
 
         Args:
             model (Model): The language model used for argument parsing.
             agent (DefaultExecutionAgent): The agent using the parser model.
+            tool_context (ToolRunContext): The context for the tool.
 
         """
         self.model = model
         self.agent = agent
+        self.tool_context = tool_context
         self.previous_errors: list[str] = []
         self.retries = 0
 
@@ -281,7 +289,7 @@ class ParserModel:
             raise InvalidPlanRunStateError("Parser model has no tool")
 
         formatted_messages = self.arg_parser_prompt.format_messages(
-            context=self.agent.get_system_context(state["step_inputs"]),
+            context=self.agent.get_system_context(self.tool_context, state["step_inputs"]),
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
@@ -381,17 +389,24 @@ class VerifierModel:
         ],
     )
 
-    def __init__(self, model: GenerativeModel, agent: DefaultExecutionAgent) -> None:
+    def __init__(
+        self,
+        model: GenerativeModel,
+        agent: DefaultExecutionAgent,
+        tool_context: ToolRunContext,
+    ) -> None:
         """Initialize the model.
 
         Args:
             model (Model): The model used for argument verification.
             context (str): The context for argument generation.
             agent (DefaultExecutionAgent): The agent using the verifier model.
+            tool_context (ToolRunContext): The context for the tool.
 
         """
         self.model = model
         self.agent = agent
+        self.tool_context = tool_context
 
     def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
@@ -412,7 +427,7 @@ class VerifierModel:
         messages = state["messages"]
         tool_args = messages[-1].content
         formatted_messages = self.arg_verifier_prompt.format_messages(
-            context=self.agent.get_system_context(state["step_inputs"]),
+            context=self.agent.get_system_context(self.tool_context, state["step_inputs"]),
             task=self.agent.step.task,
             arguments=tool_args,
             tool_name=self.agent.tool.name,
@@ -563,12 +578,13 @@ class DefaultExecutionAgent(BaseExecutionAgent):
      1. This approach (as well as the other agents) could be improved for arguments that are lists
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         step: Step,
         plan_run: PlanRun,
         config: Config,
         agent_memory: AgentMemory,
+        end_user: EndUser,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the agent.
@@ -578,10 +594,11 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
             agent_memory (AgentMemory): The agent memory to be used for the task.
+            end_user (EndUser): The end user for this execution
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
-        super().__init__(step, plan_run, config, tool)
+        super().__init__(step, plan_run, config, end_user, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
         self.agent_memory = agent_memory
@@ -657,16 +674,20 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         """
         if not self.tool:
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
+
+        tool_run_ctx = ToolRunContext(
+            execution_context=get_execution_context(),
+            end_user=self.end_user,
+            plan_run_id=self.plan_run.id,
+            config=self.config,
+            clarifications=self.plan_run.get_clarifications_for_step(),
+        )
+
         model = self.config.get_execution_model()
 
         tools = [
             self.tool.to_langchain_with_artifact(
-                ctx=ToolRunContext(
-                    execution_context=get_execution_context(),
-                    plan_run_id=self.plan_run.id,
-                    config=self.config,
-                    clarifications=self.plan_run.get_clarifications_for_step(),
-                ),
+                ctx=tool_run_ctx,
             ),
         ]
         tool_node = ToolNode(tools)
@@ -706,9 +727,11 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         else:
             graph.add_node(AgentNode.MEMORY_EXTRACTION, MemoryExtractionStep(self).invoke)
             graph.add_edge(START, AgentNode.MEMORY_EXTRACTION)
-            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, self).invoke)
+            graph.add_node(AgentNode.ARGUMENT_PARSER, ParserModel(model, self, tool_run_ctx).invoke)
             graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.ARGUMENT_PARSER)
-            graph.add_node(AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, self).invoke)
+            graph.add_node(
+                AgentNode.ARGUMENT_VERIFIER, VerifierModel(model, self, tool_run_ctx).invoke
+            )
             graph.add_edge(AgentNode.ARGUMENT_PARSER, AgentNode.ARGUMENT_VERIFIER)
             graph.add_conditional_edges(
                 AgentNode.ARGUMENT_VERIFIER,

@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
     from portia.config import Config
+    from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.model import GenerativeModel
     from portia.plan import Step
@@ -153,6 +154,7 @@ class OneShotAgent(BaseExecutionAgent):
         plan_run: PlanRun,
         config: Config,
         agent_memory: AgentMemory,  # noqa: ARG002
+        end_user: EndUser,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the OneShotAgent.
@@ -162,10 +164,11 @@ class OneShotAgent(BaseExecutionAgent):
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
             agent_memory (AgentMemory): Not supported in this execution agent.
+            end_user (EndUser): The end user for the execution.
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
-        super().__init__(step, plan_run, config, tool)
+        super().__init__(step, plan_run, config, end_user, tool)
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.
@@ -200,16 +203,19 @@ class OneShotAgent(BaseExecutionAgent):
             for step_input in self.step.inputs
             if step_input.name in previous_outputs
         ]
-        context = self.get_system_context(step_inputs)
+        tool_run_ctx = ToolRunContext(
+            execution_context=get_execution_context(),
+            end_user=self.end_user,
+            plan_run_id=self.plan_run.id,
+            config=self.config,
+            clarifications=self.plan_run.get_clarifications_for_step(),
+        )
+
+        context = self.get_system_context(tool_run_ctx, step_inputs)
         model = self.config.get_execution_model()
         tools = [
             self.tool.to_langchain_with_artifact(
-                ctx=ToolRunContext(
-                    execution_context=get_execution_context(),
-                    plan_run_id=self.plan_run.id,
-                    config=self.config,
-                    clarifications=self.plan_run.get_clarifications_for_step(),
-                ),
+                ctx=tool_run_ctx,
             ),
         ]
         tool_node = ToolNode(tools)

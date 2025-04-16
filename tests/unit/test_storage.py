@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from portia.end_user import EndUser
 from portia.errors import StorageError
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.plan import Plan, PlanContext, PlanUUID
@@ -58,10 +59,17 @@ def test_storage_base_classes() -> None:
         def save_tool_call(self, tool_call: ToolCallRecord) -> None:
             return super().save_tool_call(tool_call)  # type: ignore  # noqa: PGH003
 
+        def save_end_user(self, end_user: EndUser) -> EndUser:
+            return super().save_end_user(end_user)  # type: ignore  # noqa: PGH003
+
+        def get_end_user(self, end_user_id: str) -> EndUser:
+            return super().get_end_user(end_user_id)  # type: ignore  # noqa: PGH003
+
     storage = MyStorage()
     plan = Plan(plan_context=PlanContext(query="", tool_ids=[]), steps=[])
     plan_run = PlanRun(
         plan_id=plan.id,
+        end_user_id="test123",
     )
 
     tool_call = get_test_tool_call(plan_run)
@@ -145,8 +153,11 @@ def test_portia_cloud_storage() -> None:
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
+        end_user_id="test123",
     )
     tool_call = get_test_tool_call(plan_run)
+
+    end_user = EndUser(external_id="123")
 
     mock_response = MagicMock()
     mock_response.is_success = False
@@ -193,6 +204,7 @@ def test_portia_cloud_storage() -> None:
             json={
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
+                "end_user_id": plan_run.end_user_id,
                 "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
@@ -243,6 +255,29 @@ def test_portia_cloud_storage() -> None:
             },
         )
 
+    with (
+        patch.object(storage.client, "get", return_value=mock_response) as mock_get,
+    ):
+        # Test get_run failure
+        with pytest.raises(StorageError, match="An error occurred."):
+            storage.get_end_user(end_user.external_id)
+
+        mock_get.assert_called_once_with(
+            url=f"/api/v0/end-user/{end_user.external_id}/",
+        )
+
+    with (
+        patch.object(storage.client, "put", return_value=mock_response) as mock_put,
+    ):
+        # Test save_tool_call failure
+        with pytest.raises(StorageError, match="An error occurred."):
+            storage.save_end_user(end_user)
+
+        mock_put.assert_called_once_with(
+            url=f"/api/v0/end-user/{end_user.external_id}/",
+            json=end_user.model_dump(mode="json"),
+        )
+
 
 def test_portia_cloud_storage_errors() -> None:
     """Test PortiaCloudStorage raises StorageError on failure responses."""
@@ -257,9 +292,12 @@ def test_portia_cloud_storage_errors() -> None:
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
+        end_user_id="test123",
     )
 
     tool_call = get_test_tool_call(plan_run)
+
+    end_user = EndUser(external_id="123")
 
     mock_exception = RuntimeError("An error occurred.")
     with (
@@ -304,6 +342,7 @@ def test_portia_cloud_storage_errors() -> None:
             json={
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
+                "end_user_id": plan_run.end_user_id,
                 "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
@@ -369,6 +408,31 @@ def test_portia_cloud_storage_errors() -> None:
             },
         )
 
+    with (
+        patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
+    ):
+        # Test get_run failure
+        with pytest.raises(StorageError):
+            storage.save_end_user(end_user)
+
+        mock_put.assert_called_once_with(
+            url=f"/api/v0/end-user/{end_user.external_id}/",
+            json=end_user.model_dump(mode="json"),
+        )
+
+    with (
+        patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
+        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
+    ):
+        # Test get_run failure
+        with pytest.raises(StorageError):
+            storage.get_end_user(end_user.external_id)
+
+        mock_get.assert_called_once_with(
+            url=f"/api/v0/end-user/{end_user.external_id}/",
+        )
+
 
 def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
     """Test PortiaCloudStorage agent memory."""
@@ -382,6 +446,7 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
+        end_user_id="test123",
     )
     output = LocalOutput(value="test value", summary="test summary")
     mock_success_response = MagicMock()
@@ -476,6 +541,7 @@ def test_portia_cloud_agent_memory_local_cache_expiry() -> None:
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
+        end_user_id="test123",
     )
     output = LocalOutput(value="test value", summary="test summary")
     mock_success_response = MagicMock()
@@ -514,6 +580,7 @@ def test_portia_cloud_agent_memory_errors() -> None:
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
+        end_user_id="test123",
     )
     output = LocalOutput(value="test value", summary="test summary")
 
