@@ -238,6 +238,7 @@ class Portia:
             PlanRun: The resulting PlanRun object.
 
         """
+        self.storage.save_plan(plan)
         plan_run = self.create_plan_run(plan)
         return self.resume(plan_run)
 
