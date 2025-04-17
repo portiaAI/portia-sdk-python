@@ -8,6 +8,7 @@ from portia.common import PortiaEnum
 from portia.config import Config
 from portia.plan import Plan
 from portia.plan_run import PlanRun
+from portia.storage import AgentMemory
 
 
 class PreStepIntrospectionOutcome(PortiaEnum):
@@ -43,14 +44,16 @@ class BaseIntrospectionAgent(ABC):
 
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, agent_memory: AgentMemory) -> None:
         """Initialize the BaseIntrospectionAgent with configuration.
 
         Args:
             config (Config): The configuration to initialize the BaseIntrospectionAgent.
+            agent_memory (AgentMemory): The agent memory to use
 
         """
         self.config = config
+        self.agent_memory = agent_memory
 
     @abstractmethod
     def pre_step_introspection(
