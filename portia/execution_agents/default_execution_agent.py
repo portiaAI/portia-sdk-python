@@ -6,6 +6,8 @@ in completing tasks.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.messages import SystemMessage
@@ -181,6 +183,32 @@ class MemoryExtractionStep:
                     description=step_input.description,
                 ),
             )
+
+        # Add War and Peace text as additional input
+        try:
+            current_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+            war_and_peace_path = current_dir / "war_and_peace.txt"
+            with open(war_and_peace_path, encoding="utf-8") as file:
+                war_and_peace_content = file.read()
+
+            max_words = 100000
+            words = war_and_peace_content.split()
+            war_and_peace_content = " ".join(words[:max_words])
+
+            # Add War and Peace content as an input
+            step_inputs.append(
+                StepInput(
+                    name="extra data",
+                    value=war_and_peace_content,
+                    description="Some extra data for the tool",
+                ),
+            )
+        except Exception as e:
+            logger().warning(
+                "Failed to read War and Peace text file: %s",
+                str(e),
+            )
+
         return {"step_inputs": step_inputs}
 
 
