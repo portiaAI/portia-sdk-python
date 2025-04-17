@@ -76,7 +76,8 @@ def test_input_clarification(mock_prompt: MagicMock, cli_handler: CLIClarificati
 
 @patch("portia.cli_clarification_handler.click.prompt")
 def test_multiple_choice_clarification(
-    mock_prompt: MagicMock, cli_handler: CLIClarificationHandler,
+    mock_prompt: MagicMock,
+    cli_handler: CLIClarificationHandler,
 ) -> None:
     """Test handling of multiple choice clarifications."""
     on_resolution = MagicMock()
@@ -110,7 +111,8 @@ def test_multiple_choice_clarification(
 
 @patch("portia.cli_clarification_handler.click.confirm")
 def test_value_confirmation_clarification_confirmed(
-    mock_confirm: MagicMock, cli_handler: CLIClarificationHandler,
+    mock_confirm: MagicMock,
+    cli_handler: CLIClarificationHandler,
 ) -> None:
     """Test handling of value confirmation clarifications when confirmed."""
     on_resolution = MagicMock()
@@ -138,7 +140,8 @@ def test_value_confirmation_clarification_confirmed(
 
 @patch("portia.cli_clarification_handler.click.confirm")
 def test_value_confirmation_clarification_rejected(
-    mock_confirm: MagicMock, cli_handler: CLIClarificationHandler,
+    mock_confirm: MagicMock,
+    cli_handler: CLIClarificationHandler,
 ) -> None:
     """Test handling of value confirmation clarifications when rejected."""
     on_resolution = MagicMock()
@@ -166,7 +169,9 @@ def test_value_confirmation_clarification_rejected(
 @patch("portia.cli_clarification_handler.click.echo")
 @patch("portia.cli_clarification_handler.click.prompt")
 def test_custom_clarification(
-    mock_prompt: MagicMock, mock_echo: MagicMock, cli_handler: CLIClarificationHandler,
+    mock_prompt: MagicMock,
+    mock_echo: MagicMock,
+    cli_handler: CLIClarificationHandler,
 ) -> None:
     """Test handling of custom clarifications."""
     on_resolution = MagicMock()
