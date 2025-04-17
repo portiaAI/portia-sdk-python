@@ -13,7 +13,6 @@ from portia.config import Config
 from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
     PreStepIntrospection,
-    PreStepIntrospectionOutcome,
 )
 from portia.model import Message
 from portia.plan import Plan
@@ -86,16 +85,12 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
     ) -> PreStepIntrospection:
         """Ask the LLM whether to continue, skip or fail the plan_run."""
         introspection_condition = plan.steps[plan_run.current_step_index].condition
-        if not introspection_condition:
-            return PreStepIntrospection(
-                outcome=PreStepIntrospectionOutcome.CONTINUE,
-                reason="No condition provided for step",
-            )
 
         memory_outputs = [
             self.agent_memory.get_plan_run_output(output.output_name, plan_run.id)
             for output in plan_run.outputs.step_outputs.values()
             if isinstance(output, AgentMemoryOutput)
+            and introspection_condition
             and output.output_name in introspection_condition
         ]
 
