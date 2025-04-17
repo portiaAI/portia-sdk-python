@@ -288,8 +288,8 @@ class AgentMemory(Protocol):
         """
 
     @abstractmethod
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
-        """Retrieve an Output from the storage.
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+        """Retrieve an Output from agent memory.
 
         Args:
             output_name (str): The name of the output to retrieve
@@ -312,7 +312,7 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
 
     plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
-    outputs: defaultdict[PlanRunUUID, dict[str, Output]]
+    outputs: defaultdict[PlanRunUUID, dict[str, LocalOutput]]
 
     def __init__(self) -> None:
         """Initialize Storage."""
@@ -417,6 +417,12 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             logger().warning(
                 f"Storing Output {output} with no summary",
             )
+        if not isinstance(output, LocalOutput):
+            logger().warning(
+                f"Storing output that is already in agent memory: {output}",
+            )
+            return output
+
         self.outputs[plan_run_id][output_name] = output
         return AgentMemoryOutput(
             output_name=output_name,
@@ -424,7 +430,7 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             summary=output.get_summary() or "",
         )
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
         """Retrieve an Output from memory.
 
         Args:
@@ -610,7 +616,7 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             summary=output.get_summary() or "",
         )
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
         """Retrieve an Output from agent memory on disk.
 
         Args:
@@ -961,7 +967,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         except Exception as e:
             raise StorageError(e) from e
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> Output:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
         """Retrieve an Output from Portia Cloud.
 
         Args:

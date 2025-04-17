@@ -12,17 +12,19 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+
 from portia.clarification import (
     ClarificationListType,
     InputClarification,
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
+from portia.common import Serializable
 
 if TYPE_CHECKING:
     from portia.execution_agents.output import Output
     from portia.execution_context import ExecutionContext
-    from portia.plan import Step, Variable
     from portia.plan_run import PlanRun
 
 
@@ -39,14 +41,22 @@ def generate_main_system_context() -> list[str]:
     ]
 
 
+class StepInput(BaseModel):
+    """An input for a step being executed by an execution agent."""
+
+    name: str
+    value: Serializable | None
+    description: str
+
+
 def generate_input_context(
-    inputs: list[Variable],
+    step_inputs: list[StepInput],
     previous_outputs: dict[str, Output],
 ) -> list[str]:
     """Generate context for the inputs and indicate which ones were used.
 
     Args:
-        inputs (list[Variable]): The list of inputs for the current step.
+        step_inputs (list[StepInput]): The list of inputs for the current step.
         previous_outputs (dict[str, Output]): A dictionary of previous step outputs.
 
     Returns:
@@ -55,17 +65,16 @@ def generate_input_context(
     """
     input_context = ["Inputs: the original inputs provided by the planning_agent"]
     used_outputs = set()
-    for ref in inputs:
-        if ref.name in previous_outputs:
-            input_context.extend(
-                [
-                    f"input_name: {ref.name}",
-                    f"input_value: {previous_outputs[ref.name].get_value()}",
-                    f"input_description: {ref.description}",
-                    "----------",
-                ],
-            )
-            used_outputs.add(ref.name)
+    for step_input in step_inputs:
+        input_context.extend(
+            [
+                f"input_name: {step_input.name}",
+                f"input_value: {step_input.value}",
+                f"input_description: {step_input.description}",
+                "----------",
+            ],
+        )
+        used_outputs.add(step_input.name)
 
     unused_output_keys = set(previous_outputs.keys()) - used_outputs
     if len(unused_output_keys) > 0:
@@ -177,32 +186,35 @@ def generate_context_from_execution_context(context: ExecutionContext) -> list[s
     return execution_context
 
 
-def build_context(ctx: ExecutionContext, step: Step, plan_run: PlanRun) -> str:
+def build_context(
+    ctx: ExecutionContext,
+    plan_run: PlanRun,
+    step_inputs: list[StepInput],
+) -> str:
     """Build the context string for the agent using inputs/outputs/clarifications/ctx.
 
     Args:
         ctx (ExecutionContext): The execution context containing agent and system metadata.
-        step (Step): The current step in the PlanRun including inputs.
         plan_run (PlanRun): The current run containing outputs and clarifications.
+        step_inputs (list[StepInput]): The inputs for the current step.
 
     Returns:
         str: A string containing all relevant context information.
 
     """
-    inputs = step.inputs
     previous_outputs = plan_run.outputs.step_outputs
     clarifications = plan_run.outputs.clarifications
 
     system_context = generate_main_system_context()
 
     # exit early if no additional information
-    if not inputs and not clarifications and not previous_outputs:
+    if not step_inputs and not clarifications and not previous_outputs:
         return "\n".join(system_context)
 
     context = ["Additional context: You MUST use this information to complete your task."]
 
     # Generate and append input context
-    input_context = generate_input_context(inputs, previous_outputs)
+    input_context = generate_input_context(step_inputs, previous_outputs)
     context.extend(input_context)
 
     # Generate and append clarifications context
