@@ -115,6 +115,7 @@ addopts = [
   "--cov-report=html",
   "--import-mode=importlib"
 ]
+asyncio_mode = "auto"
 
 [tool.coverage.run]
 omit = [
