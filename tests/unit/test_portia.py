@@ -22,6 +22,7 @@ from portia.config import (
     GenerativeModelsConfig,
     StorageClass,
 )
+from portia.end_user import EndUser
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.introspection_agents.introspection_agent import (
@@ -803,7 +804,10 @@ def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan)
+        mockcreate_plan_run.assert_called_once_with(
+            plan,
+            EndUser(external_id="portia:default_user"),
+        )
 
         mock_resume.assert_called_once_with(mock_plan_run)
 

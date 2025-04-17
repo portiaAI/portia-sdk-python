@@ -316,7 +316,7 @@ def test_browser_infra_local_setup_browser(
 
         # Verify warning was logged for end_user_id
         mock_warning.assert_called_once()
-        assert "does not support end_user_id" in mock_warning.call_args[0][0]
+        assert "does not support end users" in mock_warning.call_args[0][0]
 
         # Verify browser instance
         assert isinstance(browser, Browser)
