@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any, Union
 from unittest.mock import MagicMock, patch
 
@@ -275,6 +276,19 @@ def mock_get_mcp_session() -> Iterator[None]:
 @pytest.fixture
 def mcp_tool_registry(mock_get_mcp_session: None) -> McpToolRegistry:  # noqa: ARG001
     """Fixture for a McpToolRegistry."""
+    return McpToolRegistry.from_stdio_connection(
+        server_name="mock_mcp",
+        command="test",
+        args=["test"],
+    )
+
+
+@pytest.fixture
+@pytest.mark.asyncio
+async def mcp_tool_registry_in_async(mock_get_mcp_session: None) -> McpToolRegistry:  # noqa: ARG001
+    """Fixture for a McpToolRegistry."""
+    loop = asyncio.get_running_loop()
+    assert loop.is_running()
     return McpToolRegistry.from_stdio_connection(
         server_name="mock_mcp",
         command="test",

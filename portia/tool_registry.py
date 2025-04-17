@@ -19,7 +19,8 @@ import asyncio
 import os
 import re
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Callable, Literal, Union
+from types import CoroutineType
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Union
 
 from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model
@@ -388,6 +389,25 @@ class McpToolRegistry(ToolRegistry):
 
         """
 
+        def run_async(
+            func: Callable[[], CoroutineType[Any, Any, list[PortiaMcpTool]]],
+        ) -> list[PortiaMcpTool]:
+            """Run async code in a sync context."""
+            try:
+                # Check if we are in an async environment (i.e., an event loop is running)
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    future = asyncio.run_coroutine_threadsafe(
+                        func(),
+                        loop,
+                    )
+                    return future.result()
+            except RuntimeError:
+                pass
+
+            # No event loop running, create a new one for this function
+            return asyncio.run(func())
+
         async def async_inner() -> list[PortiaMcpTool]:
             async with get_mcp_session(mcp_client_config) as session:
                 logger().debug("Fetching tools from MCP server")
@@ -397,7 +417,7 @@ class McpToolRegistry(ToolRegistry):
                     cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools
                 ]
 
-        return asyncio.run(async_inner())
+        return run_async(async_inner)
 
     @classmethod
     def _portia_tool_from_mcp_tool(
