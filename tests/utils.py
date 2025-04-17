@@ -289,3 +289,29 @@ def get_mock_generative_model(response: Any = None) -> GenerativeModel:  # noqa:
         client=get_mock_base_chat_model(response),
         model_name="test",
     )
+
+
+def assert_clarification_equality_without_uuid(
+    clarification1: Clarification,
+    clarification2: Clarification,
+) -> None:
+    """Assert that two clarifications are equal without comparing the UUID.
+
+    Args:
+        clarification1: First clarification to compare
+        clarification2: Second clarification to compare
+
+    Raises:
+        AssertionError: If the clarifications differ in any field except UUID
+
+    """
+    # Get dictionaries of both objects
+    dict1 = clarification1.model_dump()
+    dict2 = clarification2.model_dump()
+
+    # Remove UUID fields from comparison
+    dict1.pop("id", None)
+    dict2.pop("id", None)
+
+    # Assert all remaining fields are equal
+    assert dict1 == dict2, f"Clarifications differ in fields other than UUID:\n{dict1}\nvs\n{dict2}"

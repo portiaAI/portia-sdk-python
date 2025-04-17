@@ -78,7 +78,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=claude-3-5-sonnet-latest --threshold_file=query_planner/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk" --slice_name main  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=anthropic/claude-3-5-sonnet-latest --threshold_file=query_planner/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk" --slice_name main  --max_concurrency 32)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -87,8 +87,8 @@ jobs:
             echo "has_failing_eval_planner_scores=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: eval agent (verifier)
-        id: eval_agent_verifier
+      - name: eval agent (execution)
+        id: eval_agent_execution
         working-directory: ./platform/evals
         env:
           LANGCHAIN_TRACING_V2: "true"
@@ -100,7 +100,7 @@ jobs:
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=claude-3-5-sonnet-latest --threshold_file=execution/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=anthropic/claude-3-5-sonnet-latest --threshold_file=execution/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -108,6 +108,29 @@ jobs:
             echo "BREACHES: $BREACHES"
             echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
             echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: eval agent (introspection)
+        id: eval_agent_introspection
+        working-directory: ./platform/evals
+        env:
+          LANGCHAIN_TRACING_V2: "true"
+          LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
+          LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
+          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
+          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
+        run: |
+          EVAL_OUTPUT=$(uv run cli.py introspection eval --slice_name=main --model=anthropic/claude-3-5-sonnet-latest --threshold_file=introspection/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 2 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
+          echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
+          echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
+            BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
+            echo "BREACHES: $BREACHES"
+            echo "metric_breaches=${BREACHES}" >> $GITHUB_OUTPUT
+            echo "has_failing_eval_introspection_scores=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Summary results
@@ -120,8 +143,9 @@ jobs:
           LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
-          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_verifier.outputs.eval_name }}
+          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_execution.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
+          INTROSPECTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_introspection.outputs.eval_name }}
         run: |
           uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
           cat analysis/notebook_output.md
@@ -141,10 +165,17 @@ jobs:
             CONTAINS_THRESHOLD_BREACH=true
           fi
 
-          # Check if the verifier agent has failing scores
-          if [[ "${{ steps.eval_agent_verifier.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
-            echo "Agent eval (verifier) failed or has breaches."
-            echo "Breaches: ${{ steps.eval_agent_verifier.outputs.metric_breaches }}"
+          # Check if the execution agent has failing scores
+          if [[ "${{ steps.eval_agent_execution.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
+            echo "Execution agent failed or has breaches."
+            echo "Breaches: ${{ steps.eval_agent_execution.outputs.metric_breaches }}"
+            CONTAINS_THRESHOLD_BREACH=true
+          fi
+
+          # Check if the introspection agent has failing scores
+          if [[ "${{ steps.eval_agent_introspection.outputs.has_failing_eval_introspection_scores }}" == "true" ]]; then
+            echo "Introspection agent failed or has breaches."
+            echo "Breaches: ${{ steps.eval_agent_introspection.outputs.metric_breaches }}"
             CONTAINS_THRESHOLD_BREACH=true
           fi
 

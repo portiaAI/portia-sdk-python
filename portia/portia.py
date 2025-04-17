@@ -38,6 +38,7 @@ from portia.config import (
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
+    PlanNotFoundError,
 )
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
@@ -238,6 +239,13 @@ class Portia:
             PlanRun: The resulting PlanRun object.
 
         """
+        # ensure we have the plan in storage.
+        # we won't if for example the user used PlanBuilder instead of dynamic planning.
+        try:
+            self.storage.get_plan(plan.id)
+        except PlanNotFoundError:
+            self.storage.save_plan(plan)
+
         plan_run = self.create_plan_run(plan)
         return self.resume(plan_run)
 
