@@ -881,7 +881,7 @@ class Portia:
             ) from PlanError(original_error)
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
-        return DefaultIntrospectionAgent(self.config)
+        return DefaultIntrospectionAgent(self.config, self.storage)
 
     def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> None:
         """Set the output for a step."""

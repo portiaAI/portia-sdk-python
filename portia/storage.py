@@ -306,9 +306,9 @@ class AgentMemory(Protocol):
 
         """
 
-    def _check_size(self: Storage, output_name: str, output: Output) -> None:
+    def _check_size(self: AgentMemory, output_name: str, output: Output) -> None:
         """Raise an error if the output is too large to store."""
-        if sys.getsizeof(output.value) > self.MAX_OUTPUT_SIZE:
+        if sys.getsizeof(output) > self.MAX_OUTPUT_BYTES:
             raise StorageError(
                 f"Attempted to save an agent output that is too large: {output_name}",
             )
