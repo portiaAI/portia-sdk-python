@@ -347,7 +347,7 @@ class Portia:
                 )
                 if len(ready.clarifications) > 0:
                     logger().info(
-                        f"Tool {tool.name} has {len(ready.clarifications)} clarifications"
+                        f"Tool {tool.name} has {len(ready.clarifications)} clarifications",
                     )
                     all_clarifications.extend(ready.clarifications)
         plan_run.outputs.clarifications.extend(all_clarifications)
