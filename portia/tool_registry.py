@@ -330,10 +330,6 @@ class McpToolRegistry(ToolRegistry):
     See https://modelcontextprotocol.io/introduction for more information on MCP.
     """
 
-    def __init__(self, tools: list[PortiaMcpTool]) -> None:
-        """Initialize the MCPToolRegistry with the given list of tools."""
-        super().__init__({t.id: t for t in tools})
-
     @classmethod
     def from_sse_connection(
         cls,
