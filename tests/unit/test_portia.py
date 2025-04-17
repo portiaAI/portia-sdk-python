@@ -801,10 +801,13 @@ def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock
         mock_resumed_plan_run = MagicMock()
         mockcreate_plan_run.return_value = mock_plan_run
         mock_resume.return_value = mock_resumed_plan_run
-        end_user = EndUser(external_id="123")
-        result = portia.run_plan(plan, end_user)
 
-        mockcreate_plan_run.assert_called_once_with(plan, end_user)
+        result = portia.run_plan(plan)
+
+        mockcreate_plan_run.assert_called_once_with(
+            plan,
+            EndUser(external_id="portia:default_user"),
+        )
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
