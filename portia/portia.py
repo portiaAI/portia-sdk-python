@@ -331,7 +331,24 @@ class Portia:
             raise InvalidPlanRunStateError(plan_run.id)
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
-
+        remaining_steps = plan.steps[plan_run.current_step_index:]
+        all_clarifications = []
+        for step in remaining_steps:
+            tool = self._get_tool_for_step(step, plan_run)
+            if tool:
+                logger().info(f"Checking tool {tool.name} for clarifications")
+                ready = tool.ready(
+                    ToolRunContext(
+                        execution_context=plan_run.execution_context,
+                        plan_run_id=plan_run.id,
+                        config=self.config,
+                        clarifications=[],
+                    ),
+                )
+                if len(ready.clarifications) > 0:
+                    logger().info(f"Tool {tool.name} has {len(ready.clarifications)} clarifications")
+                    all_clarifications.extend(ready.clarifications)
+        plan_run.outputs.clarifications.extend(all_clarifications)
         # if the run has execution context associated, but none is set then use it
         if not is_execution_context_set():
             with execution_context(plan_run.execution_context):
@@ -503,7 +520,7 @@ class Portia:
                     ),
                 )
                 logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
-                if tool_ready:
+                if tool_ready.ready:
                     for clarification in current_step_clarifications:
                         if clarification.category is ClarificationCategory.ACTION:
                             clarification.resolved = True

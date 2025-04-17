@@ -84,6 +84,13 @@ class _ArgsSchemaPlaceholder(BaseModel):
     """Placeholder ArgsSchema for tools that take no arguments."""
 
 
+class ReadyResponse(BaseModel):
+    """Response from the /ready endpoint."""
+
+    ready: bool
+    clarifications: ClarificationListType
+
+
 class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Abstract base class for a tool.
 
@@ -126,7 +133,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "Tools may not require a summary if they already produce a nice textual output.",
     )
 
-    def ready(self, ctx: ToolRunContext) -> bool:  # noqa: ARG002
+    def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
         """Check whether the tool can be plan_run.
 
         This method can be implemented by subclasses to allow checking if the tool can be plan_run.
@@ -137,10 +144,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             ctx (ToolRunContext): Context of the tool run
 
         Returns:
-            bool: Whether the tool is ready to run
+            list[Clarification]: A list of clarifications before the tool is ready. If the tool is
+            ready, return an empty list.
 
         """
-        return True
+        return ReadyResponse(ready=True, clarifications=[])
 
     @abstractmethod
     def run(
@@ -465,7 +473,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     )
         return output
 
-    def ready(self, ctx: ToolRunContext) -> bool:
+    def ready(self, ctx: ToolRunContext) -> ReadyResponse:
         """Check if the remote tool is ready by calling the /ready endpoint.
 
         Args:
@@ -495,7 +503,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             return False
         else:
             response_json = response.json()
-            return "success" in response_json
+            return ReadyResponse.model_validate(response_json)
 
     def run(
         self,
