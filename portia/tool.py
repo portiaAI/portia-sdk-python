@@ -46,6 +46,7 @@ from portia.clarification import (
 )
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
+from portia.end_user import EndUser
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.output import LocalOutput, Output
@@ -73,6 +74,7 @@ class ToolRunContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     execution_context: ExecutionContext
+    end_user: EndUser
     plan_run_id: PlanRunUUID
     config: Config
     clarifications: ClarificationListType
@@ -480,7 +482,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 content=json.dumps(
                     {
                         "execution_context": {
-                            "end_user_id": ctx.execution_context.end_user_id or "",
+                            "end_user_id": ctx.end_user.external_id,
                             "plan_run_id": str(ctx.plan_run_id),
                             "additional_data": ctx.execution_context.additional_data or {},
                         },
@@ -529,7 +531,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
-                            "end_user_id": ctx.execution_context.end_user_id or "",
+                            "end_user_id": ctx.end_user.external_id,
                             "plan_run_id": str(ctx.plan_run_id),
                             "additional_data": ctx.execution_context.additional_data or {},
                         },
