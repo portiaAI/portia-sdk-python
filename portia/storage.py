@@ -25,6 +25,7 @@ Each storage class handles the following tasks:
 
 from __future__ import annotations
 
+import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from io import BytesIO
@@ -265,6 +266,8 @@ class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
 class AgentMemory(Protocol):
     """Abstract base class for storing items in agent memory."""
 
+    MAX_OUTPUT_BYTES = 32_000_000
+
     @abstractmethod
     def save_plan_run_output(
         self,
@@ -302,6 +305,13 @@ class AgentMemory(Protocol):
             NotImplementedError: If the method is not implemented.
 
         """
+
+    def _check_size(self: Storage, output_name: str, output: Output) -> None:
+        """Raise an error if the output is too large to store."""
+        if sys.getsizeof(output.value) > self.MAX_OUTPUT_SIZE:
+            raise StorageError(
+                f"Attempted to save an agent output that is too large: {output_name}",
+            )
 
 
 class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
@@ -413,6 +423,7 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
+        self._check_size(output_name, output)
         if output.get_summary() is None:
             logger().warning(
                 f"Storing Output {output} with no summary",
@@ -608,6 +619,7 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
+        self._check_size(output_name, output)
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
         return AgentMemoryOutput(
@@ -939,6 +951,8 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
+            self._check_size(output_name, output)
+
             response = self.form_client.put(
                 url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
                 files={
