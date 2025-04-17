@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Union
 from unittest.mock import MagicMock, patch
 
 import mcp
+from numpy import inner
 import pytest
 from mcp import ClientSession
 from pydantic import BaseModel
@@ -283,19 +284,6 @@ def mcp_tool_registry(mock_get_mcp_session: None) -> McpToolRegistry:  # noqa: A
     )
 
 
-@pytest.fixture
-@pytest.mark.asyncio
-async def mcp_tool_registry_in_async(mock_get_mcp_session: None) -> McpToolRegistry:  # noqa: ARG001
-    """Fixture for a McpToolRegistry."""
-    loop = asyncio.get_running_loop()
-    assert loop.is_running()
-    return McpToolRegistry.from_stdio_connection(
-        server_name="mock_mcp",
-        command="test",
-        args=["test"],
-    )
-
-
 @pytest.mark.usefixtures("mock_get_mcp_session")
 def test_mcp_tool_registry_from_sse_connection() -> None:
     """Test constructing a McpToolRegistry from an SSE connection."""
@@ -304,6 +292,29 @@ def test_mcp_tool_registry_from_sse_connection() -> None:
         url="http://localhost:8000",
     )
     assert isinstance(mcp_registry_sse, McpToolRegistry)
+
+
+def test_mcp_tool_registry_get_tools_async() -> None:
+    """Test getting tools from the MCPToolRegistry."""
+
+    async def async_inner() -> None:
+        local_registry = McpToolRegistry.from_stdio_connection(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        )
+        tools = local_registry.get_tools()
+        assert len(tools) == 2
+        assert tools[0].id == "mcp:mock_mcp:test_tool"
+        assert tools[0].name == "test_tool"
+        assert tools[0].description == "I am a tool"
+        assert issubclass(tools[0].args_schema, BaseModel)
+        assert tools[1].id == "mcp:mock_mcp:test_tool_2"
+        assert tools[1].name == "test_tool_2"
+        assert tools[1].description == "I am another tool"
+        assert issubclass(tools[1].args_schema, BaseModel)
+
+    asyncio.run(async_inner())
 
 
 def test_mcp_tool_registry_get_tools(mcp_tool_registry: McpToolRegistry) -> None:
