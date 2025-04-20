@@ -11,6 +11,7 @@ from typing import Callable
 
 from portia.clarification import (
     ActionClarification,
+    ActionClarificationWithUserConfirmation,
     Clarification,
     CustomClarification,
     InputClarification,
@@ -43,6 +44,12 @@ class ClarificationHandler(ABC):  # noqa: B024
         match clarification:
             case ActionClarification():
                 return self.handle_action_clarification(
+                    clarification,
+                    on_resolution,
+                    on_error,
+                )
+            case ActionClarificationWithUserConfirmation():
+                return self.handle_action_clarification_with_user_confirmation(
                     clarification,
                     on_resolution,
                     on_error,
@@ -84,6 +91,15 @@ class ClarificationHandler(ABC):  # noqa: B024
     ) -> None:
         """Handle an action clarification."""
         raise NotImplementedError("handle_action_clarification is not implemented")
+    
+    def handle_action_clarification_with_user_confirmation(
+        self,
+        clarification: ActionClarificationWithUserConfirmation,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],
+    ) -> None:
+        """Handle an action clarification with user confirmation."""
+        raise NotImplementedError("handle_action_clarification_with_user_confirmation is not implemented")
 
     def handle_input_clarification(
         self,

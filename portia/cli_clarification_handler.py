@@ -16,6 +16,7 @@ from portia.clarification_handler import ClarificationHandler
 if TYPE_CHECKING:
     from portia.clarification import (
         ActionClarification,
+        ActionClarificationWithUserConfirmation,
         Clarification,
         CustomClarification,
         InputClarification,
@@ -45,6 +46,25 @@ class CLIClarificationHandler(ClarificationHandler):
                 fg=87,
             ),
         )
+
+    def handle_action_clarification_with_user_confirmation(
+        self,
+        clarification: ActionClarificationWithUserConfirmation,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],
+    ) -> None:
+        """Handle an action clarification with user confirmation."""
+        click.echo(
+            click.style(
+                f"{clarification.user_guidance} -- Please click on the link below to proceed and confirm once the action is complete."
+                f"{clarification.action_url}",
+                fg=87,
+            ),
+        )
+        if click.confirm(text=click.style("Confirm once the action is complete.", fg=87), default=False):
+            on_resolution(clarification, True)  # noqa: FBT003
+        else:
+            on_error(clarification, "Clarification was rejected by the user")
 
     def handle_input_clarification(
         self,
