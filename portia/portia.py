@@ -38,6 +38,7 @@ from portia.config import (
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
+    PlanNotFoundError,
 )
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
@@ -238,6 +239,13 @@ class Portia:
             PlanRun: The resulting PlanRun object.
 
         """
+        # ensure we have the plan in storage.
+        # we won't if for example the user used PlanBuilder instead of dynamic planning.
+        try:
+            self.storage.get_plan(plan.id)
+        except PlanNotFoundError:
+            self.storage.save_plan(plan)
+
         plan_run = self.create_plan_run(plan)
         return self.resume(plan_run)
 
@@ -842,6 +850,7 @@ class Portia:
             step,
             plan_run,
             self.config,
+            self.storage,
             tool,
         )
 
@@ -890,8 +899,13 @@ class Portia:
     def _persist_step_state(self, plan_run: PlanRun, step: Step) -> None:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
-        if isinstance(step_output, LocalOutput) and self.config.exceeds_output_threshold(
-            step_output.serialize_value(),
+        if (
+            isinstance(step_output, LocalOutput)
+            and self.config.exceeds_output_threshold(
+                step_output.serialize_value(),
+            )
+            # One-shot agent does not support pulling outputs from agent memory
+            and self.config.execution_agent_type != ExecutionAgentType.ONE_SHOT
         ):
             step_output = self.storage.save_plan_run_output(step.output, step_output, plan_run.id)
             plan_run.outputs.step_outputs[step.output] = step_output

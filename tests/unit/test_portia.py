@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 from pydantic import HttpUrl, SecretStr
@@ -34,6 +35,7 @@ from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
+from portia.prefixed_uuid import PlanUUID
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
@@ -755,6 +757,38 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
         error=None,
     )
     plan = portia.plan(query)
+
+    # Mock the create_plan_run and resume methods
+    with (
+        mock.patch.object(portia, "create_plan_run") as mockcreate_plan_run,
+        mock.patch.object(portia, "resume") as mock_resume,
+    ):
+        mock_plan_run = MagicMock()
+        mock_resumed_plan_run = MagicMock()
+        mockcreate_plan_run.return_value = mock_plan_run
+        mock_resume.return_value = mock_resumed_plan_run
+
+        result = portia.run_plan(plan)
+
+        mockcreate_plan_run.assert_called_once_with(plan)
+
+        mock_resume.assert_called_once_with(mock_plan_run)
+
+        assert result == mock_resumed_plan_run
+
+
+def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that run_plan calls create_plan_run and resume."""
+    query = "example query"
+
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[],
+        error=None,
+    )
+    plan = portia.plan(query)
+
+    # update the id to functionally make this a new plan
+    plan.id = PlanUUID(uuid=uuid4())
 
     # Mock the create_plan_run and resume methods
     with (

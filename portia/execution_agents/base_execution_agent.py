@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
-from portia.execution_agents.context import build_context
+from portia.execution_agents.context import StepInput, build_context
 from portia.execution_context import get_execution_context
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ class BaseExecutionAgent:
 
         """
 
-    def get_system_context(self) -> str:
+    def get_system_context(self, step_inputs: list[StepInput]) -> str:
         """Build a generic system context string from the step and run provided.
 
         This function retrieves the execution context and generates a system context
@@ -84,6 +84,6 @@ class BaseExecutionAgent:
         ctx = get_execution_context()
         return build_context(
             ctx,
-            self.step,
             self.plan_run,
+            step_inputs,
         )

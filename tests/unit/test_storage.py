@@ -95,8 +95,20 @@ def test_in_memory_storage() -> None:
     assert storage.get_plan_run(plan_run.id) == plan_run
     assert storage.get_plan_runs().results == [plan_run]
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
-    storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
+    saved_output_1 = storage.save_plan_run_output(
+        "test name",
+        LocalOutput(value="test value"),
+        plan_run.id,
+    )
     assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+    # Check that we ignore outputs that are already in agent memory
+    saved_output_2 = storage.save_plan_run_output(
+        "test name",
+        saved_output_1,
+        plan_run.id,
+    )
+    assert saved_output_2 == saved_output_1
+
     # This just logs, but check it doesn't cause any issues
     tool_call = get_test_tool_call(plan_run)
     storage.save_tool_call(tool_call)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Union
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import mcp
 import pytest
@@ -250,19 +250,21 @@ def test_tool_registry_reconfigure_llm_tool() -> None:
 def mock_get_mcp_session() -> Iterator[None]:
     """Fixture to mock the get_mcp_session function."""
     mock_session = MagicMock(spec=ClientSession)
-    mock_session.list_tools.return_value = mcp.ListToolsResult(
-        tools=[
-            mcp.Tool(
-                name="test_tool",
-                description="I am a tool",
-                inputSchema={"type": "object", "properties": {"input": {"type": "string"}}},
-            ),
-            mcp.Tool(
-                name="test_tool_2",
-                description="I am another tool",
-                inputSchema={"type": "object", "properties": {"input": {"type": "number"}}},
-            ),
-        ],
+    mock_session.list_tools = AsyncMock(
+        return_value=mcp.ListToolsResult(
+            tools=[
+                mcp.Tool(
+                    name="test_tool",
+                    description="I am a tool",
+                    inputSchema={"type": "object", "properties": {"input": {"type": "string"}}},
+                ),
+                mcp.Tool(
+                    name="test_tool_2",
+                    description="I am another tool",
+                    inputSchema={"type": "object", "properties": {"input": {"type": "number"}}},
+                ),
+            ],
+        )
     )
 
     with patch(
@@ -290,6 +292,27 @@ def test_mcp_tool_registry_from_sse_connection() -> None:
         url="http://localhost:8000",
     )
     assert isinstance(mcp_registry_sse, McpToolRegistry)
+
+
+@pytest.mark.usefixtures("mock_get_mcp_session")
+async def test_mcp_tool_registry_from_sse_connection_async() -> None:
+    """Test constructing a McpToolRegistry from an SSE connection."""
+    mcp_registry_sse = await McpToolRegistry.from_sse_connection_async(
+        server_name="mock_mcp",
+        url="http://localhost:8000",
+    )
+    assert isinstance(mcp_registry_sse, McpToolRegistry)
+
+
+@pytest.mark.usefixtures("mock_get_mcp_session")
+async def test_mcp_tool_registry_get_tools_async() -> None:
+    """Test getting tools from the MCPToolRegistry."""
+    mcp_registry_stdio = await McpToolRegistry.from_stdio_connection_async(
+        server_name="mock_mcp",
+        command="test",
+        args=["test"],
+    )
+    assert isinstance(mcp_registry_stdio, McpToolRegistry)
 
 
 def test_mcp_tool_registry_get_tools(mcp_tool_registry: McpToolRegistry) -> None:
