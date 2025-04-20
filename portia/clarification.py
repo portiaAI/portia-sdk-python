@@ -32,6 +32,7 @@ class ClarificationCategory(PortiaEnum):
     """
 
     ACTION = "Action"
+    ACTION_WITH_USER_CONFIRMATION = "Action with User Confirmation"
     INPUT = "Input"
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
@@ -109,6 +110,20 @@ class ActionClarification(Clarification):
 
         """
         return str(action_url)
+
+
+class ActionClarificationWithUserConfirmation(ActionClarification):
+    """Action clarification with user confirmation.
+
+    Represents a clarification that involves an action, such as clicking a link. The response is set
+    to `True` once the user has completed the action associated with the link.
+    The user should be prompted to confirm the action before it is resolved.
+    """
+
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.ACTION_WITH_USER_CONFIRMATION,
+        description="The category of this clarification",
+    )
 
 
 class InputClarification(Clarification):
