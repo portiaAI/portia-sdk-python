@@ -111,6 +111,7 @@ class ActionClarification(Clarification):
         """
         return str(action_url)
 
+
 class ActionClarificationWithUserConfirmation(ActionClarification):
     """Action clarification with user confirmation.
 
@@ -123,6 +124,7 @@ class ActionClarificationWithUserConfirmation(ActionClarification):
         default=ClarificationCategory.ACTION_WITH_USER_CONFIRMATION,
         description="The category of this clarification",
     )
+
 
 class InputClarification(Clarification):
     """Input-based clarification.

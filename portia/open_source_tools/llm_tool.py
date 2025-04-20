@@ -17,6 +17,10 @@ class LLMToolSchema(BaseModel):
         ...,
         description="The task to be completed by the LLM tool.",
     )
+    inputs: list[str] | None = Field(
+        default=None,
+        description="The inputs to the LLM tool. Include any inputs available. If provided, the LLM tool will use these inputs to complete the task.",
+    )
 
 
 class LLMTool(Tool[str]):
@@ -60,9 +64,12 @@ class LLMTool(Tool[str]):
         "the model will be resolved from the config.",
     )
 
-    def run(self, ctx: ToolRunContext, task: str) -> str:
+    def run(self, ctx: ToolRunContext, task: str, inputs: list[str] | None = None) -> str:
         """Run the LLMTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+
+        if inputs:
+            inputs_str = "\n".join(inputs)
 
         # Define system and user messages
         context = (
@@ -77,5 +84,7 @@ class LLMTool(Tool[str]):
             Message(role="user", content=self.prompt),
             Message(role="user", content=content),
         ]
+        if inputs:
+            messages.append(Message(role="user", content=inputs_str))
         response = model.get_response(messages)
         return str(response.content)

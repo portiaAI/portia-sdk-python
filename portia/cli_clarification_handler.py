@@ -61,7 +61,9 @@ class CLIClarificationHandler(ClarificationHandler):
                 fg=87,
             ),
         )
-        if click.confirm(text=click.style("Confirm once the action is complete.", fg=87), default=False):
+        if click.confirm(
+            text=click.style("Confirm once the action is complete.", fg=87), default=False
+        ):
             on_resolution(clarification, True)  # noqa: FBT003
         else:
             on_error(clarification, "Clarification was rejected by the user")

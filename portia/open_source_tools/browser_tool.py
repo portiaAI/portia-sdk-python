@@ -8,7 +8,7 @@ Browserbase, a Browserbase API key is required and project ID is required, and t
 separate end user authentication.
 
 The browser tool can be used to navigate to a URL and complete tasks. If authentication is
-required, the tool will return an ActionClarification with the user guidance and login URL.
+required, the tool will return an ActionClarificationWithUserConfirmation with the user guidance and login URL.
 If authentication is not required, the tool will return the task output. It uses
 (BrowserUse)[https://browser-use.com/] for the task navigation.
 
@@ -31,7 +31,7 @@ from browserbase import Browserbase
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
-from portia.clarification import ActionClarification
+from portia.clarification import ActionClarificationWithUserConfirmation
 from portia.errors import ToolHardError
 from portia.model import GenerativeModel  # noqa: TC001 - used in Pydantic Schema
 from portia.tool import Tool, ToolRunContext
@@ -208,21 +208,23 @@ class BrowserTool(Tool[str]):
             return BrowserInfrastructureProviderBrowserBase()
         return BrowserInfrastructureProviderLocal()
 
-    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
+    def run(
+        self, ctx: ToolRunContext, url: str, task: str
+    ) -> str | ActionClarificationWithUserConfirmation:
         """Run the BrowserTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
-        async def run_browser_tasks() -> str | ActionClarification:
+        async def run_browser_tasks() -> str | ActionClarificationWithUserConfirmation:
             def handle_login_requirement(
                 result: BrowserTaskOutput,
-            ) -> ActionClarification:
-                """Handle cases where login is required with an ActionClarification."""
+            ) -> ActionClarificationWithUserConfirmation:
+                """Handle cases where login is required with an ActionClarificationWithUserConfirmation."""
                 if result.user_login_guidance is None or result.login_url is None:
                     raise ToolHardError(
                         "Expected user guidance and login URL if human login is required",
                     )
-                return ActionClarification(
+                return ActionClarificationWithUserConfirmation(
                     user_guidance=result.user_login_guidance,
                     action_url=self.infrastructure_provider.construct_auth_clarification_url(
                         ctx,
@@ -335,7 +337,7 @@ class BrowserToolForUrl(BrowserTool):
             infrastructure_option=infrastructure_option,
         )
 
-    def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
+    def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarificationWithUserConfirmation:  # type: ignore reportIncompatibleMethodOverride
         """Run the BrowserToolForUrl."""
         return super().run(ctx, self.url, task)  # pragma: no cover
 
