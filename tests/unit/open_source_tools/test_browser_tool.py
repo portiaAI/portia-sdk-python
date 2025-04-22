@@ -132,6 +132,7 @@ def test_browser_tool_auth_check(
                 user_guidance="Login to example.com",
                 action_url=HttpUrl("https://example.com/login"),
                 plan_run_id=context.plan_run_id,
+                require_confirmation=True,
             ),
         )
 
