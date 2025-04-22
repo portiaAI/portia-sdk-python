@@ -137,3 +137,4 @@ def test_portia_end_user_update_with_cloud() -> None:
     storage.get_plan_run(plan_run.id)
     end_user = storage.get_end_user("123")
     assert end_user
+    assert end_user.name == "Jeff"
