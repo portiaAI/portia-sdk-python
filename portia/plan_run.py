@@ -149,7 +149,7 @@ class PlanRun(BaseModel):
         return [
             clarification
             for clarification in self.outputs.clarifications
-            if clarification.step == step
+            if clarification.step == step or clarification.step is None
         ]
 
     def __str__(self) -> str:
