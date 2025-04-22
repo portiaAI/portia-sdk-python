@@ -238,7 +238,7 @@ class AdditionalStorage(ABC):
 
     @abstractmethod
     def get_end_user(self, external_id: str) -> EndUser | None:
-        """Save a ToolCall.
+        """Get an End User.
 
         Args:
             external_id (str): The id of the end user to get.
