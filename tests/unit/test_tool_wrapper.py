@@ -1,13 +1,15 @@
 """Tests for the ToolCallWrapper class."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
 from portia.clarification import Clarification
-from portia.end_user import EndUser
 from portia.errors import ToolHardError
 from portia.execution_agents.output import LocalOutput
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
-from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
 from tests.utils import (
     AdditionTool,
@@ -17,6 +19,10 @@ from tests.utils import (
     get_test_plan_run,
     get_test_tool_context,
 )
+
+if TYPE_CHECKING:
+    from portia.end_user import EndUser
+    from portia.tool import Tool
 
 
 class MockStorage(AdditionalStorage):
@@ -41,7 +47,7 @@ class MockStorage(AdditionalStorage):
         self.end_users[end_user.external_id] = end_user
         return end_user
 
-    def get_end_user(self, external_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser | None:
         """Get end_user from dict or init a new one.
 
         Args:
@@ -50,8 +56,7 @@ class MockStorage(AdditionalStorage):
         """
         if external_id in self.end_users:
             return self.end_users[external_id]
-        end_user = EndUser(external_id=external_id)
-        return self.save_end_user(end_user)
+        return None
 
 
 @pytest.fixture
