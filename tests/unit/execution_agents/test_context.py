@@ -203,8 +203,6 @@ end_user_email:
 end_user_phone:
 end_user_attributes:{{"email": "hello@world.com"}}
 ----------
-context_key_name: exec_context context_key_value: true
-----------
 System Context:
 Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""
     )
