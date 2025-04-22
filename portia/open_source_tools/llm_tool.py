@@ -15,7 +15,8 @@ class LLMToolSchema(BaseModel):
 
     task: str = Field(
         ...,
-        description="The task to be completed by the LLM tool.",
+        description="The task to be completed by the LLM tool including all relevant "
+        "context and inputs in full detail.",
     )
 
 
