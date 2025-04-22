@@ -11,11 +11,12 @@ from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
+from portia.end_user import EndUser
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.output import LocalOutput
 from portia.prefixed_uuid import PlanRunUUID
-from tests.utils import get_test_config, get_test_plan_run
+from tests.utils import get_test_config, get_test_plan_run, get_test_tool_context
 
 
 def test_base_agent_default_context() -> None:
@@ -25,9 +26,11 @@ def test_base_agent_default_context() -> None:
         plan.steps[0],
         plan_run,
         get_test_config(),
+        EndUser(external_id="test"),
         None,
     )
     context = agent.get_system_context(
+        get_test_tool_context(),
         [StepInput(name="$output1", value="test1", description="Previous output 1")],
     )
     assert context is not None

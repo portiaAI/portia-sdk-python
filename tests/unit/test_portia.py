@@ -22,6 +22,7 @@ from portia.config import (
     GenerativeModelsConfig,
     StorageClass,
 )
+from portia.end_user import EndUser
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.introspection_agents.introspection_agent import (
@@ -381,6 +382,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
         plan_id=plan.id,
         current_step_index=1,
         state=PlanRunState.NEED_CLARIFICATION,
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             clarifications=[
                 ActionClarification(
@@ -770,7 +772,7 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan)
+        mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user())
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
@@ -802,7 +804,10 @@ def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan)
+        mockcreate_plan_run.assert_called_once_with(
+            plan,
+            EndUser(external_id="portia:default_user"),
+        )
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
@@ -1081,6 +1086,7 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     )
     plan_run = PlanRun(
         plan_id=plan.id,
+        end_user_id="test123",
         current_step_index=0,
         state=PlanRunState.IN_PROGRESS,
     )
@@ -1131,6 +1137,7 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
     plan_run = PlanRun(
         plan_id=plan.id,
         current_step_index=0,
+        end_user_id="test123",
         state=PlanRunState.IN_PROGRESS,
     )
 
@@ -1176,6 +1183,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     )
     plan_run = PlanRun(
         plan_id=plan.id,
+        end_user_id="test123",
         current_step_index=0,
         state=PlanRunState.IN_PROGRESS,
     )
@@ -1220,6 +1228,7 @@ def test_handle_introspection_outcome_no_condition(portia: Portia) -> None:
     plan_run = PlanRun(
         plan_id=plan.id,
         current_step_index=0,
+        end_user_id="test123",
         state=PlanRunState.IN_PROGRESS,
     )
 
@@ -1270,6 +1279,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         plan_id=plan.id,
         current_step_index=1,  # Resume from step 2
         state=PlanRunState.IN_PROGRESS,
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             step_outputs={
                 "$step1_result": LocalOutput(value="Step 1 result", summary="Summary of step 1"),
@@ -1333,3 +1343,24 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
         assert result_plan_run.outputs.final_output.get_summary() == expected_summary
         assert result_plan_run.current_step_index == 3
+
+
+def test_portia_initialize_end_user(portia: Portia) -> None:
+    """Test end user handling."""
+    end_user = EndUser(external_id="123")
+
+    portia.storage.save_end_user(end_user)
+
+    # with no end user should return default
+    assert portia.initialize_end_user().external_id == "portia:default_user"
+
+    # with str should return full user
+    assert portia.initialize_end_user(end_user.external_id) == end_user
+
+    end_user.name = "Bob Smith"
+
+    # with full user should save + return
+    assert portia.initialize_end_user(end_user) == end_user
+    storage_end_user = portia.storage.get_end_user(end_user.external_id)
+    assert storage_end_user
+    assert storage_end_user.name == "Bob Smith"

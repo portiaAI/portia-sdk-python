@@ -136,7 +136,7 @@ def test_remote_tool_hard_error_from_server() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -172,7 +172,7 @@ def test_remote_tool_soft_error() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -205,7 +205,7 @@ def test_remote_tool_bad_response() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -239,7 +239,7 @@ def test_remote_tool_hard_error() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -270,7 +270,7 @@ def test_remote_tool_ready() -> None:
 
     content = {
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -304,7 +304,7 @@ def test_remote_tool_ready_error() -> None:
 
     content = {
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -352,7 +352,7 @@ def test_remote_tool_action_clarifications() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -400,7 +400,7 @@ def test_remote_tool_input_clarifications() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -450,7 +450,7 @@ def test_remote_tool_mc_clarifications() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },
@@ -498,7 +498,7 @@ def test_remote_tool_value_confirm_clarifications() -> None:
     content = {
         "arguments": {},
         "execution_context": {
-            "end_user_id": ctx.execution_context.end_user_id or "",
+            "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
             "additional_data": ctx.execution_context.additional_data or {},
         },

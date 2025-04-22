@@ -36,6 +36,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from portia.cloud import PortiaCloudClient
+from portia.end_user import EndUser
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
 from portia.execution_agents.output import (
     AgentMemoryOutput,
@@ -222,43 +223,34 @@ class AdditionalStorage(ABC):
         """
         raise NotImplementedError("save_tool_call is not implemented")
 
-
-class LogAdditionalStorage(AdditionalStorage):
-    """AdditionalStorage that logs calls rather than persisting them.
-
-    Useful for storages that don't care about tool_calls etc.
-    """
-
-    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
-        """Log the tool call.
+    @abstractmethod
+    def save_end_user(self, end_user: EndUser) -> EndUser:
+        """Save an end user.
 
         Args:
-            tool_call (ToolCallRecord): The ToolCallRecord object to log.
+            end_user (EndUser): The EndUser object to save.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
 
         """
-        logger().debug(
-            f"Tool {tool_call.tool_name!s} executed in {tool_call.latency_seconds:.2f} seconds",
-        )
-        # Limit log to just first 1000 characters
-        output = tool_call.output
-        if len(str(tool_call.output)) > MAX_OUTPUT_LOG_LENGTH:
-            output = (
-                str(tool_call.output)[:MAX_OUTPUT_LOG_LENGTH]
-                + "...[truncated - only first 1000 characters shown]"
-            )
-        match tool_call.status:
-            case ToolCallStatus.SUCCESS:
-                logger().debug(
-                    f"Tool call {tool_call.tool_name!s} completed",
-                    output=output,
-                )
-            case ToolCallStatus.FAILED:
-                logger().error("Tool returned error", output=output)
-            case ToolCallStatus.NEED_CLARIFICATION:
-                logger().debug("Tool returned clarifications", output=output)
+        raise NotImplementedError("save_toolsave_end_user_call is not implemented")
+
+    @abstractmethod
+    def get_end_user(self, external_id: str) -> EndUser | None:
+        """Get an end user.
+
+        Args:
+            external_id (str): The id of the end user to get.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("get_end_user is not implemented")
 
 
-class Storage(PlanStorage, RunStorage, LogAdditionalStorage):
+class Storage(PlanStorage, RunStorage, AdditionalStorage):
     """Combined base class for Plan Run + Additional storages."""
 
 
@@ -304,7 +296,36 @@ class AgentMemory(Protocol):
         """
 
 
-class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
+def log_tool_call(tool_call: ToolCallRecord) -> None:
+    """Log the tool call.
+
+    Args:
+        tool_call (ToolCallRecord): The ToolCallRecord object to log.
+
+    """
+    logger().debug(
+        f"Tool {tool_call.tool_name!s} executed in {tool_call.latency_seconds:.2f} seconds",
+    )
+    # Limit log to just first 1000 characters
+    output = tool_call.output
+    if len(str(tool_call.output)) > MAX_OUTPUT_LOG_LENGTH:
+        output = (
+            str(tool_call.output)[:MAX_OUTPUT_LOG_LENGTH]
+            + "...[truncated - only first 1000 characters shown]"
+        )
+    match tool_call.status:
+        case ToolCallStatus.SUCCESS:
+            logger().debug(
+                f"Tool call {tool_call.tool_name!s} completed",
+                output=output,
+            )
+        case ToolCallStatus.FAILED:
+            logger().error("Tool returned error", output=output)
+        case ToolCallStatus.NEED_CLARIFICATION:
+            logger().debug("Tool returned clarifications", output=output)
+
+
+class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
     """Simple storage class that keeps plans + runs in memory.
 
     Tool Calls are logged via the LogAdditionalStorage.
@@ -313,12 +334,14 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
     plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
     outputs: defaultdict[PlanRunUUID, dict[str, LocalOutput]]
+    end_users: dict[str, EndUser]
 
     def __init__(self) -> None:
         """Initialize Storage."""
         self.plans = {}
         self.runs = {}
         self.outputs = defaultdict(dict)
+        self.end_users = {}
 
     def save_plan(self, plan: Plan) -> None:
         """Add plan to dict.
@@ -446,8 +469,33 @@ class InMemoryStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
         """
         return self.outputs[plan_run_id][output_name]
 
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Log the tool call."""
+        return log_tool_call(tool_call)
 
-class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory):
+    def save_end_user(self, end_user: EndUser) -> EndUser:
+        """Add end_user to dict.
+
+        Args:
+            end_user (EndUser): The EndUser object to save.
+
+        """
+        self.end_users[end_user.external_id] = end_user
+        return end_user
+
+    def get_end_user(self, external_id: str) -> EndUser | None:
+        """Get end_user from dict or init a new one.
+
+        Args:
+            external_id (str): The id of the end user object to get.
+
+        """
+        if external_id in self.end_users:
+            return self.end_users[external_id]
+        return None
+
+
+class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
     """Disk-based implementation of the Storage interface.
 
     Stores serialized Plan and Run objects as JSON files on disk.
@@ -634,6 +682,32 @@ class DiskFileStorage(PlanStorage, RunStorage, LogAdditionalStorage, AgentMemory
         file_name = f"{plan_run_id}/{output_name}.json"
         return self._read(file_name, LocalOutput)
 
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Log the tool call."""
+        return log_tool_call(tool_call)
+
+    def save_end_user(self, end_user: EndUser) -> EndUser:
+        """Write end_user to dict.
+
+        Args:
+            end_user (EndUser): The EndUser object to save.
+
+        """
+        self._write(f"{end_user.external_id}.json", end_user)
+        return end_user
+
+    def get_end_user(self, external_id: str) -> EndUser | None:
+        """Get end_user from dict or init a new one.
+
+        Args:
+            external_id (str): The id of the end user object to get.
+
+        """
+        try:
+            return self._read(f"{external_id}.json", EndUser)
+        except (ValidationError, FileNotFoundError):
+            return None
+
 
 class PortiaCloudStorage(Storage, AgentMemory):
     """Save plans, runs and tool calls to portia cloud."""
@@ -797,6 +871,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "current_step_index": plan_run.current_step_index,
                     "state": plan_run.state,
                     "execution_context": plan_run.execution_context.model_dump(mode="json"),
+                    "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
                 },
@@ -831,6 +906,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
             return PlanRun(
                 id=PlanRunUUID.from_string(response_json["id"]),
                 plan_id=PlanUUID.from_string(response_json["plan"]["id"]),
+                end_user_id=response_json["end_user"],
                 current_step_index=response_json["current_step_index"],
                 state=PlanRunState(response_json["state"]),
                 execution_context=ExecutionContext.model_validate(
@@ -877,6 +953,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                         id=PlanRunUUID.from_string(plan_run["id"]),
                         plan_id=PlanUUID.from_string(plan_run["plan"]["id"]),
                         current_step_index=plan_run["current_step_index"],
+                        end_user_id=plan_run["end_user"],
                         state=PlanRunState(plan_run["state"]),
                         execution_context=ExecutionContext.model_validate(
                             plan_run["execution_context"],
@@ -919,7 +996,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
             raise StorageError(e) from e
         else:
             self.check_response(response)
-            LogAdditionalStorage.save_tool_call(self, tool_call)
+            log_tool_call(tool_call)
 
     def save_plan_run_output(
         self,
@@ -1047,3 +1124,54 @@ class PortiaCloudStorage(Storage, AgentMemory):
             return [Plan.from_response(result) for result in results]
         except Exception as e:
             raise StorageError(e) from e
+
+    def save_end_user(self, end_user: EndUser) -> EndUser:
+        """Save an end_user to Portia Cloud.
+
+        Args:
+            end_user (EndUser): The EndUser object to save to the cloud.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.put(
+                url=f"/api/v0/end-user/{end_user.external_id}/",
+                json=end_user.model_dump(mode="json"),
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            return end_user
+
+    def get_end_user(self, external_id: str) -> EndUser:
+        """Retrieve an end user from Portia Cloud.
+
+        Args:
+            external_id (str): The ID of the end user to retrieve.
+
+        Returns:
+            EndUser: The EndUser object retrieved from Portia Cloud.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails or the plan does not exist.
+
+        """
+        try:
+            response = self.client.get(
+                url=f"/api/v0/end-user/{external_id}/",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return EndUser(
+                external_id=response_json["external_id"],
+                name=response_json["name"],
+                email=response_json["email"],
+                phone_number=response_json["phone_number"],
+                additional_data=response_json["additional_data"],
+            )
