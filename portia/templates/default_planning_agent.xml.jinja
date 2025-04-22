@@ -11,6 +11,7 @@
      - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
      - give a name to the variable for the output of the step if it is successful.
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
+     - Additional information about the caller is provided in the EndUser section. You can use this if the query refers to the end user, i.e. Send me an email.
      - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
     IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create plan with zero steps.
     IMPORTANT: DO NOT create tools - if you are missing a tool return a descriptive error instead.
@@ -42,6 +43,13 @@
             {{tool.args | safe}}
     </Tool>{% endfor %}
 </Tools>
+
+<EndUser>
+    <EndUser.Email>{{ end_user.email }}</EndUser.Email>
+    <EndUser.Name>{{ end_user.name }}</EndUser.Name>
+    <EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>
+    <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
+</EndUser>
 
 <Request>
     <Tools>

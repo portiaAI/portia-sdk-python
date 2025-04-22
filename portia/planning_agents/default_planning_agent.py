@@ -12,6 +12,7 @@ from portia.planning_agents.context import render_prompt_insert_defaults
 
 if TYPE_CHECKING:
     from portia.config import Config
+    from portia.end_user import EndUser
     from portia.plan import Plan, Step
     from portia.tool import Tool
 
@@ -29,12 +30,14 @@ class DefaultPlanningAgent(BasePlanningAgent):
         self,
         query: str,
         tool_list: list[Tool],
+        end_user: EndUser,
         examples: list[Plan] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         prompt = render_prompt_insert_defaults(
             query,
             tool_list,
+            end_user,
             examples,
         )
         response = self.model.get_structured_response(

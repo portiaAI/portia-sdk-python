@@ -379,10 +379,10 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             Browser: A configured Browser instance for local browser automation.
 
         """
-        if ctx.execution_context.end_user_id:
+        if ctx.end_user.external_id:
             logger.warning(
                 "BrowserTool is using a local browser instance and does not support "
-                "end_user_id. end_user_id will be ignored.",
+                "end users and so will be ignored.",
             )
         return Browser(
             config=BrowserConfig(

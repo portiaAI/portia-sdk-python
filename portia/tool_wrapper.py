@@ -108,7 +108,7 @@ class ToolCallWrapper(Tool):
             tool_name=self._child_tool.name,
             plan_run_id=self._plan_run.id,
             step=self._plan_run.current_step_index,
-            end_user_id=ctx.execution_context.end_user_id,
+            end_user_id=ctx.end_user.external_id,
             additional_data=ctx.execution_context.additional_data,
             status=ToolCallStatus.IN_PROGRESS,
         )
@@ -119,10 +119,13 @@ class ToolCallWrapper(Tool):
         try:
             output = self._child_tool.run(ctx, *args, **kwargs)
         except Exception as e:
+            # handle the tool call record
             record.output = str(e)
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             record.status = ToolCallStatus.FAILED
             self._storage.save_tool_call(record)
+            # persist changes to the end_user
+            self._storage.save_end_user(ctx.end_user)
             raise
         else:
             if isinstance(output, Clarification):
@@ -136,4 +139,6 @@ class ToolCallWrapper(Tool):
                 record.status = ToolCallStatus.SUCCESS
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             self._storage.save_tool_call(record)
+            # persist changes to the end_user
+            self._storage.save_end_user(ctx.end_user)
         return output

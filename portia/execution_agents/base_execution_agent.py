@@ -9,14 +9,14 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 from portia.execution_agents.context import StepInput, build_context
-from portia.execution_context import get_execution_context
 
 if TYPE_CHECKING:
     from portia.config import Config
+    from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
-    from portia.tool import Tool
+    from portia.tool import Tool, ToolRunContext
 
 
 class BaseExecutionAgent:
@@ -38,6 +38,7 @@ class BaseExecutionAgent:
         step: Step,
         plan_run: PlanRun,
         config: Config,
+        end_user: EndUser,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the base agent with the given args.
@@ -51,6 +52,7 @@ class BaseExecutionAgent:
             step (Step): The step that defines the task to be executed.
             plan_run (PlanRun): The run that contains the step and related data.
             config (Config): The configuration settings for the agent.
+            end_user (EndUser): The end user for the execution.
             tool (Tool | None): An optional tool associated with the agent (default is None).
 
         """
@@ -58,6 +60,7 @@ class BaseExecutionAgent:
         self.tool = tool
         self.config = config
         self.plan_run = plan_run
+        self.end_user = end_user
 
     @abstractmethod
     def execute_sync(self) -> Output:
@@ -71,17 +74,20 @@ class BaseExecutionAgent:
 
         """
 
-    def get_system_context(self, step_inputs: list[StepInput]) -> str:
+    def get_system_context(self, ctx: ToolRunContext, step_inputs: list[StepInput]) -> str:
         """Build a generic system context string from the step and run provided.
 
         This function retrieves the execution context and generates a system context
         based on the step and run provided to the agent.
 
+        Args:
+            ctx (ToolRunContext): The tool run ctx.
+            step_inputs (list[StepInput]): The inputs for the step.
+
         Returns:
             str: A string containing the system context for the agent.
 
         """
-        ctx = get_execution_context()
         return build_context(
             ctx,
             self.plan_run,
