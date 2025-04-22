@@ -50,7 +50,6 @@ from portia.end_user import EndUser
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.output import LocalOutput, Output
-from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
 from portia.plan_run import PlanRunUUID
@@ -64,7 +63,6 @@ class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
     Attributes:
-        execution_context(ExecutionContext): The execution context the tool is running in.
         plan_run_id(RunUUID): The run id the tool run is part of.
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
@@ -73,7 +71,6 @@ class ToolRunContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    execution_context: ExecutionContext
     end_user: EndUser
     plan_run_id: PlanRunUUID
     config: Config
@@ -298,7 +295,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return a LangChain representation of this tool.
 
         This function provides a LangChain-compatible version of the tool. The response format is
-        the default one without including artifacts. The ExecutionContext is baked into the
+        the default one without including artifacts. The ToolRunContext is baked into the
         StructuredTool via a partial run function.
 
         Args:

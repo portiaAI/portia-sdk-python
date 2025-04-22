@@ -4,15 +4,12 @@ A plan run encapsulates all execution state, serving as the definitive record of
 As the run runs, its `PlanRunState`, `current_step_index`, and `outputs` evolve to reflect
 the current execution state.
 
-The run also retains an `ExecutionContext`, which provides valuable insights for debugging
-and analytics, capturing contextual information relevant to the run's execution.
 
 Key Components
 --------------
 - **RunState**: Tracks the current status of the run (e.g., NOT_STARTED, IN_PROGRESS).
 - **current_step_index**: Represents the step within the plan currently being executed.
 - **outputs**: Stores the intermediate and final results of the PlanRun.
-- **ExecutionContext**: Provides contextual metadata useful for logging and performance analysis.
 """
 
 from __future__ import annotations
@@ -24,7 +21,6 @@ from portia.clarification import (
 )
 from portia.common import PortiaEnum
 from portia.execution_agents.output import Output
-from portia.execution_context import ExecutionContext, empty_context
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
 
 
@@ -86,7 +82,6 @@ class PlanRun(BaseModel):
         plan_id (PlanUUID): The ID of the Plan this run uses.
         current_step_index (int): The current step that is being executed.
         state (PlanRunState): The current state of the PlanRun.
-        execution_context (ExecutionContext): Execution context for the PlanRun.
         outputs (PlanRunOutputs): Outputs of the PlanRun including clarifications.
 
     """
@@ -107,10 +102,6 @@ class PlanRun(BaseModel):
     state: PlanRunState = Field(
         default=PlanRunState.NOT_STARTED,
         description="The current state of the PlanRun.",
-    )
-    execution_context: ExecutionContext = Field(
-        default=empty_context(),
-        description="Execution Context for the PlanRun.",
     )
     end_user_id: str = Field(
         ...,

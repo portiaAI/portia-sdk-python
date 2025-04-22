@@ -15,7 +15,6 @@ from portia.config import Config, LogLevel, StorageClass
 from portia.end_user import EndUser
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalOutput
-from portia.execution_context import ExecutionContext, empty_context
 from portia.model import GenerativeModel, LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunUUID
@@ -29,7 +28,6 @@ if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
     from mcp import ClientSession
 
-    from portia.execution_context import ExecutionContext
     from portia.mcp_session import McpClientConfig
 
 
@@ -101,13 +99,6 @@ def get_test_config(**kwargs) -> Config:  # noqa: ANN003
         openai_api_key=SecretStr("123"),
         storage_class=StorageClass.MEMORY,
     )
-
-
-def get_execution_ctx(plan_run: PlanRun | None = None) -> ExecutionContext:
-    """Return an execution context from a PlanRun."""
-    if plan_run:
-        return plan_run.execution_context
-    return empty_context()
 
 
 class AdditionToolSchema(BaseModel):

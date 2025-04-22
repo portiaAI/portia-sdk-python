@@ -50,12 +50,6 @@ from portia.errors import (
 )
 from portia.execution_agents.output import Output
 
-# Execution context
-from portia.execution_context import (
-    ExecutionContext,
-    execution_context,
-)
-
 # Logging
 from portia.logger import logger
 
@@ -112,7 +106,6 @@ __all__ = [
     "DefaultToolRegistry",
     "DuplicateToolError",
     "ExecutionAgentType",
-    "ExecutionContext",
     "ExecutionHooks",
     "FileReaderTool",
     "FileWriterTool",

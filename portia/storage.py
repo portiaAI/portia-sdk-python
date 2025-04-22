@@ -43,7 +43,6 @@ from portia.execution_agents.output import (
     LocalOutput,
     Output,
 )
-from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanUUID
 from portia.plan_run import (
@@ -909,9 +908,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 end_user_id=response_json["end_user"],
                 current_step_index=response_json["current_step_index"],
                 state=PlanRunState(response_json["state"]),
-                execution_context=ExecutionContext.model_validate(
-                    response_json["execution_context"],
-                ),
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
             )
 
@@ -955,9 +951,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                         current_step_index=plan_run["current_step_index"],
                         end_user_id=plan_run["end_user"],
                         state=PlanRunState(plan_run["state"]),
-                        execution_context=ExecutionContext.model_validate(
-                            plan_run["execution_context"],
-                        ),
                         outputs=PlanRunOutputs.model_validate(plan_run["outputs"]),
                     )
                     for plan_run in response_json["results"]

@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from portia.config import Config
-from portia.execution_context import ExecutionContext
 from portia.model import GenerativeModel
 from portia.prefixed_uuid import PlanRunUUID
 from portia.tool import ToolRunContext
@@ -14,13 +13,11 @@ from portia.tool import ToolRunContext
 
 @pytest.fixture
 def mock_tool_run_context(mock_model: MagicMock) -> ToolRunContext:
-    """Fixture to mock ExecutionContext."""
+    """Fixture to mock ToolRunContext."""
     mock_config = MagicMock(spec=Config)
     mock_config.get_default_model.return_value = mock_model
     mock_config.get_generative_model.return_value = mock_model
-    mock_execution_context = MagicMock(spec=ExecutionContext)
     return ToolRunContext.model_construct(
-        execution_context=mock_execution_context,
         plan_run_id=PlanRunUUID(uuid=uuid.uuid4()),
         config=mock_config,
         clarifications=[],

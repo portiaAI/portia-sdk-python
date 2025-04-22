@@ -161,7 +161,7 @@ def generate_context_from_run_context(context: ToolRunContext) -> list[str]:
     """Generate context from the execution context.
 
     Args:
-        context (ExecutionContext): The execution context containing metadata and additional data.
+        context (ToolRunContext): The execution context containing metadata and additional data.
 
     Returns:
         list[str]: A list of strings representing the execution context.

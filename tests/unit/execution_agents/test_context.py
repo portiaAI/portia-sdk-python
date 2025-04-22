@@ -9,7 +9,6 @@ from portia.clarification import ActionClarification, InputClarification
 from portia.end_user import EndUser
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.output import LocalOutput, Output
-from portia.execution_context import ExecutionContext, get_execution_context
 from portia.plan import Variable
 from portia.tool import ToolRunContext
 from tests.utils import get_test_config, get_test_plan_run
@@ -143,7 +142,6 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     plan_run.outputs.clarifications = clarifications
     context = build_context(
         ToolRunContext(
-            execution_context=ExecutionContext(additional_data={"exec_context": "true"}),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
