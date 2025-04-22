@@ -41,16 +41,16 @@ class MockStorage(AdditionalStorage):
         self.end_users[end_user.external_id] = end_user
         return end_user
 
-    def get_end_user(self, end_user_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser:
         """Get end_user from dict or init a new one.
 
         Args:
-            end_user_id (str): The id of the end user object to get.
+            external_id (str): The id of the end user object to get.
 
         """
-        if end_user_id in self.end_users:
-            return self.end_users[end_user_id]
-        end_user = EndUser(external_id=end_user_id)
+        if external_id in self.end_users:
+            return self.end_users[external_id]
+        end_user = EndUser(external_id=external_id)
         return self.save_end_user(end_user)
 
 
