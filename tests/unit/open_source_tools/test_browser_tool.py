@@ -421,9 +421,9 @@ def test_browserbase_provider_get_or_create_session_new(
     )
 
     assert connect_url == "test_connect_url"
-    assert context.execution_context.additional_data["bb_session_id"] == "test_session_id"
-    assert context.execution_context.additional_data["bb_session_connect_url"] == "test_connect_url"
-    assert context.execution_context.additional_data["bb_context_id"] == "test_context_id"
+    assert context.end_user.get_additional_data("bb_session_id") == "test_session_id"
+    assert context.end_user.get_additional_data("bb_session_connect_url") == "test_connect_url"
+    assert context.end_user.get_additional_data("bb_context_id") == "test_context_id"
 
 
 def test_browserbase_provider_get_or_create_session_existing(
@@ -431,7 +431,7 @@ def test_browserbase_provider_get_or_create_session_existing(
 ) -> None:
     """Test getting existing session."""
     context = get_test_tool_context()
-    context.execution_context.additional_data = {
+    context.end_user.additional_data = {
         "bb_context_id": "existing_context_id",
         "bb_session_id": "existing_session_id",
         "bb_session_connect_url": "existing_connect_url",
@@ -450,7 +450,7 @@ def test_browserbase_provider_construct_auth_clarification_url(
 ) -> None:
     """Test constructing auth clarification URL."""
     context = get_test_tool_context()
-    context.execution_context.additional_data["bb_session_id"] = "test_session_id"
+    context.end_user.set_additional_data("bb_session_id", "test_session_id")
 
     mock_debug = MagicMock()
     mock_debug.debugger_fullscreen_url = "https://debug.example.com"

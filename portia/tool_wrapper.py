@@ -109,7 +109,6 @@ class ToolCallWrapper(Tool):
             plan_run_id=self._plan_run.id,
             step=self._plan_run.current_step_index,
             end_user_id=ctx.end_user.external_id,
-            additional_data=ctx.execution_context.additional_data,
             status=ToolCallStatus.IN_PROGRESS,
         )
         logger().info(

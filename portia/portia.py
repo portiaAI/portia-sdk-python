@@ -45,11 +45,6 @@ from portia.execution_agents.default_execution_agent import DefaultExecutionAgen
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import LocalOutput, Output
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
-from portia.execution_context import (
-    execution_context,
-    get_execution_context,
-    is_execution_context_set,
-)
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
@@ -332,11 +327,6 @@ class Portia:
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
-        # if the run has execution context associated, but none is set then use it
-        if not is_execution_context_set():
-            with execution_context(plan_run.execution_context):
-                return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
-
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
 
     def execute_plan_run_and_handle_clarifications(
@@ -349,7 +339,6 @@ class Portia:
             PlanRunState.COMPLETE,
             PlanRunState.FAILED,
         ]:
-            plan_run.execution_context = get_execution_context()
             plan_run = self._execute_plan_run(plan, plan_run)
 
             # If we don't have a clarification handler, return the plan run even if a clarification
@@ -495,7 +484,6 @@ class Portia:
             if next_tool:
                 tool_ready = next_tool.ready(
                     ToolRunContext(
-                        execution_context=plan_run.execution_context,
                         end_user=self.initialize_end_user(plan_run.end_user_id),
                         plan_run_id=plan_run.id,
                         config=self.config,
@@ -546,7 +534,6 @@ class Portia:
         plan_run = PlanRun(
             plan_id=plan.id,
             state=PlanRunState.NOT_STARTED,
-            execution_context=get_execution_context(),
             end_user_id=end_user.external_id,
         )
         self.storage.save_plan_run(plan_run)

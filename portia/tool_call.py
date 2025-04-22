@@ -59,7 +59,6 @@ class ToolCallRecord(BaseModel):
     step: int
     # execution context is tracked here so we get a snapshot if its updated
     end_user_id: str | None
-    additional_data: dict[str, str]
     # details of the tool call are below
     status: ToolCallStatus
     input: Any

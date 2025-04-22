@@ -154,7 +154,6 @@ __all__ = [
     "WeatherTool",
     "default_config",
     "example_tool_registry",
-    "execution_context",
     "logger",
     "open_source_tool_registry",
 ]

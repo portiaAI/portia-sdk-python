@@ -869,7 +869,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 json={
                     "current_step_index": plan_run.current_step_index,
                     "state": plan_run.state,
-                    "execution_context": plan_run.execution_context.model_dump(mode="json"),
                     "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
@@ -978,7 +977,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "tool_name": tool_call.tool_name,
                     "step": tool_call.step,
                     "end_user_id": tool_call.end_user_id or "",
-                    "additional_data": tool_call.additional_data,
                     "input": tool_call.input,
                     "output": tool_call.output,
                     "status": tool_call.status,

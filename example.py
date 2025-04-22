@@ -6,7 +6,6 @@ from portia import (
     PlanRunState,
     Portia,
     example_tool_registry,
-    execution_context,
 )
 from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
@@ -54,10 +53,6 @@ if plan_run.state == PlanRunState.NEED_CLARIFICATION:
             clarification=c,
             response=new_value,
         )
-
-# Execute again with the same execution context
-with execution_context(context=plan_run.execution_context):
-    portia.resume(plan_run)
 
 # You can also pass in a clarification handler to manage clarifications
 portia = Portia(

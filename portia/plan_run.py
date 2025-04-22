@@ -184,5 +184,4 @@ class ReadOnlyPlanRun(PlanRun):
             outputs=plan_run.outputs,
             state=plan_run.state,
             end_user_id=plan_run.end_user_id,
-            execution_context=plan_run.execution_context,
         )

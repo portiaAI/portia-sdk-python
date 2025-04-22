@@ -45,7 +45,6 @@ def get_test_tool_context(
         end_user = EndUser(external_id="test")
 
     return ToolRunContext(
-        execution_context=get_execution_ctx(),
         plan_run_id=plan_run_id,
         config=config,
         clarifications=[],
@@ -83,7 +82,6 @@ def get_test_tool_call(plan_run: PlanRun) -> ToolCallRecord:
         plan_run_id=plan_run.id,
         step=1,
         end_user_id="1",
-        additional_data={},
         output={},
         input={},
         latency_seconds=10,

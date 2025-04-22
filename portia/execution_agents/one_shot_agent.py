@@ -26,7 +26,6 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.execution_context import get_execution_context
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -206,7 +205,6 @@ class OneShotAgent(BaseExecutionAgent):
             if step_input.name in previous_outputs
         ]
         tool_run_ctx = ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=self.end_user,
             plan_run_id=self.plan_run.id,
             config=self.config,

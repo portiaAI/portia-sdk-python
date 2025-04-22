@@ -44,7 +44,6 @@ def test_context_empty() -> None:
     plan_run.outputs.step_outputs = {}
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
@@ -60,13 +59,12 @@ def test_context_empty() -> None:
     assert len(context) == 42  # length should always be the same
 
 
-def test_context_execution_context() -> None:
+def test_context_tool_context() -> None:
     """Test that the context is set up correctly."""
     (plan, plan_run) = get_test_plan_run()
 
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
@@ -91,7 +89,6 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
     plan_run.outputs.step_outputs = outputs
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
@@ -239,7 +236,6 @@ def test_context_inputs_outputs_clarifications(
     plan_run.outputs.clarifications = clarifications
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(external_id="123"),
             plan_run_id=plan_run.id,
             config=get_test_config(),
