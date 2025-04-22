@@ -234,11 +234,11 @@ class AdditionalStorage(ABC):
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("save_tool_call is not implemented")
+        raise NotImplementedError("save_toolsave_end_user_call is not implemented")
 
     @abstractmethod
-    def get_end_user(self, external_id: str) -> EndUser:
-        """Save a ToolCall.
+    def get_end_user(self, external_id: str) -> EndUser | None:
+        """Get an end user.
 
         Args:
             external_id (str): The id of the end user to get.
@@ -247,7 +247,7 @@ class AdditionalStorage(ABC):
             NotImplementedError: If the method is not implemented.
 
         """
-        raise NotImplementedError("save_tool_call is not implemented")
+        raise NotImplementedError("get_end_user is not implemented")
 
 
 class Storage(PlanStorage, RunStorage, AdditionalStorage):
@@ -483,7 +483,7 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         self.end_users[end_user.external_id] = end_user
         return end_user
 
-    def get_end_user(self, external_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser | None:
         """Get end_user from dict or init a new one.
 
         Args:
@@ -492,8 +492,7 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         """
         if external_id in self.end_users:
             return self.end_users[external_id]
-        end_user = EndUser(external_id=external_id)
-        return self.save_end_user(end_user)
+        return None
 
 
 class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
@@ -697,7 +696,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         self._write(f"{end_user.external_id}.json", end_user)
         return end_user
 
-    def get_end_user(self, external_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser | None:
         """Get end_user from dict or init a new one.
 
         Args:
@@ -707,8 +706,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         try:
             return self._read(f"{external_id}.json", EndUser)
         except (ValidationError, FileNotFoundError):
-            end_user = EndUser(external_id=external_id)
-            return self.save_end_user(end_user)
+            return None
 
 
 class PortiaCloudStorage(Storage, AgentMemory):

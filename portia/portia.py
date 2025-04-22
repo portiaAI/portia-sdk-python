@@ -35,6 +35,7 @@ from portia.config import (
     PlanningAgentType,
     StorageClass,
 )
+from portia.end_user import EndUser
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
@@ -75,7 +76,6 @@ from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.clarification_handler import ClarificationHandler
-    from portia.end_user import EndUser
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
     from portia.tool import Tool
@@ -141,12 +141,20 @@ class Portia:
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
 
-    def handle_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
-        """Handle initializing the end_user."""
+    def initialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
+        """Handle initializing the end_user based on the provided type."""
+        default_external_id = "portia:default_user"
         if isinstance(end_user, str):
-            return self.storage.get_end_user(external_id=end_user)
+            end_user_instance = self.storage.get_end_user(external_id=end_user)
+            if end_user_instance:
+                return end_user_instance
+            end_user_instance = EndUser(external_id=end_user or default_external_id)
+            return self.storage.save_end_user(end_user_instance)
+
         if not end_user:
-            return self.storage.get_end_user(external_id="portia:default_user")
+            end_user = EndUser(external_id=default_external_id)
+            return self.storage.save_end_user(end_user)
+
         return self.storage.save_end_user(end_user)
 
     def run(
@@ -173,7 +181,7 @@ class Portia:
 
         """
         plan = self.plan(query, tools, example_plans, end_user)
-        end_user = self.handle_end_user(end_user)
+        end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user)
         return self.resume(plan_run)
 
@@ -210,7 +218,7 @@ class Portia:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
-        end_user = self.handle_end_user(end_user)
+        end_user = self.initialize_end_user(end_user)
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
         outcome = planning_agent.generate_steps_or_error(
@@ -273,7 +281,7 @@ class Portia:
         except PlanNotFoundError:
             self.storage.save_plan(plan)
 
-        end_user = self.handle_end_user(end_user)
+        end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user)
         return self.resume(plan_run)
 
@@ -488,7 +496,7 @@ class Portia:
                 tool_ready = next_tool.ready(
                     ToolRunContext(
                         execution_context=plan_run.execution_context,
-                        end_user=self.storage.get_end_user(plan_run.end_user_id),
+                        end_user=self.initialize_end_user(plan_run.end_user_id),
                         plan_run_id=plan_run.id,
                         config=self.config,
                         clarifications=current_step_clarifications,
@@ -534,7 +542,7 @@ class Portia:
             PlanRun: The created PlanRun object.
 
         """
-        end_user = self.handle_end_user(end_user)
+        end_user = self.initialize_end_user(end_user)
         plan_run = PlanRun(
             plan_id=plan.id,
             state=PlanRunState.NOT_STARTED,
@@ -887,7 +895,7 @@ class Portia:
             plan_run,
             self.config,
             self.storage,
-            self.storage.get_end_user(plan_run.end_user_id),
+            self.initialize_end_user(plan_run.end_user_id),
             tool,
         )
 

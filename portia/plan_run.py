@@ -114,7 +114,7 @@ class PlanRun(BaseModel):
     )
     end_user_id: str = Field(
         ...,
-        description="The end user this plan was run for",
+        description="The id of the end user this plan was run for",
     )
     outputs: PlanRunOutputs = Field(
         default=PlanRunOutputs(),

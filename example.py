@@ -25,10 +25,13 @@ plan_run = portia.run(
 # We can also provide additional data about the end user to the process
 
 plan_run = portia.run(
-    "Please email me with a haiku about the weather in london",
+    "Please tell me a joke that is customized to my favorite sport",
     end_user=EndUser(
         external_id="user_789",
-        email="tom@portialabs.ai",
+        email="hello@portialabs.ai",
+        additional_data={
+            "favorite_sport": "football",
+        },
     ),
 )
 

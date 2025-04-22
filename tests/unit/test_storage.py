@@ -132,6 +132,12 @@ def test_in_memory_storage() -> None:
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
 
+    end_user = EndUser(external_id="123")
+
+    assert storage.get_end_user("123") is None
+    assert storage.save_end_user(end_user) == end_user
+    assert storage.get_end_user("123") is not None
+
 
 def test_disk_storage(tmp_path: Path) -> None:
     """Test disk storage."""
@@ -152,6 +158,12 @@ def test_disk_storage(tmp_path: Path) -> None:
     # Check with a very large output too
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
+
+    end_user = EndUser(external_id="123")
+
+    assert storage.get_end_user("123") is None
+    assert storage.save_end_user(end_user) == end_user
+    assert storage.get_end_user("123") is not None
 
 
 def test_portia_cloud_storage() -> None:

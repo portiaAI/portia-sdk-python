@@ -772,7 +772,7 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan, portia.handle_end_user())
+        mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user())
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
@@ -1345,20 +1345,22 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         assert result_plan_run.current_step_index == 3
 
 
-def test_portia_handle_end_user(portia: Portia) -> None:
+def test_portia_initialize_end_user(portia: Portia) -> None:
     """Test end user handling."""
     end_user = EndUser(external_id="123")
 
     portia.storage.save_end_user(end_user)
 
     # with no end user should return default
-    assert portia.handle_end_user().external_id == "portia:default_user"
+    assert portia.initialize_end_user().external_id == "portia:default_user"
 
     # with str should return full user
-    assert portia.handle_end_user(end_user.external_id) == end_user
+    assert portia.initialize_end_user(end_user.external_id) == end_user
 
     end_user.name = "Bob Smith"
 
     # with full user should save + return
-    assert portia.handle_end_user(end_user) == end_user
-    assert portia.storage.get_end_user(end_user.external_id).name == "Bob Smith"
+    assert portia.initialize_end_user(end_user) == end_user
+    storage_end_user = portia.storage.get_end_user(end_user.external_id)
+    assert storage_end_user
+    assert storage_end_user.name == "Bob Smith"
