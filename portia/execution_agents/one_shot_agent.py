@@ -67,7 +67,7 @@ class OneShotToolCallingModel:
     tool_calling_prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessage(
-                content="You are very powerful assistant, but don't know current events.",
+                content="You are a very powerful assistant, but don't know current events.",
             ),
             HumanMessagePromptTemplate.from_template(
                 [
@@ -75,8 +75,10 @@ class OneShotToolCallingModel:
                     "{query}",
                     "context:",
                     "{context}",
-                    "Use the provided tool. You should provide arguments that match the tool's"
+                    "Use the provided tool. You should provide arguments that match the tool's "
                     "schema using the information contained in the query and context."
+                    "Important! Make sure to take into account previous clarifications in the "
+                    "context which are from the user and may change the query"
                     "Make sure you don't repeat past errors: {past_errors}",
                 ],
             ),
