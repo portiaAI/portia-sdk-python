@@ -30,8 +30,8 @@ class CLIClarificationHandler(ClarificationHandler):
     def handle_action_clarification(
         self,
         clarification: ActionClarification,
-        on_resolution: Callable[[Clarification, object], None],  # noqa: ARG002
-        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],
     ) -> None:
         """Handle an action clarification.
 
@@ -45,6 +45,14 @@ class CLIClarificationHandler(ClarificationHandler):
                 fg=87,
             ),
         )
+        if clarification.require_confirmation:
+            if click.confirm(
+                text=click.style("Please confirm once the action is complete.", fg=87),
+                default=False,
+            ):
+                on_resolution(clarification, True)  # noqa: FBT003
+            else:
+                on_error(clarification, "Clarification was rejected by the user")
 
     def handle_input_clarification(
         self,

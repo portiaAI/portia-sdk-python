@@ -229,6 +229,7 @@ class BrowserTool(Tool[str]):
                         result.login_url,
                     ),
                     plan_run_id=ctx.plan_run_id,
+                    require_confirmation=True,
                 )
 
             async def run_agent_task(
