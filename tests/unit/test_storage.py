@@ -62,8 +62,8 @@ def test_storage_base_classes() -> None:
         def save_end_user(self, end_user: EndUser) -> EndUser:
             return super().save_end_user(end_user)  # type: ignore  # noqa: PGH003
 
-        def get_end_user(self, end_user_id: str) -> EndUser:
-            return super().get_end_user(end_user_id)  # type: ignore  # noqa: PGH003
+        def get_end_user(self, external_id: str) -> EndUser:
+            return super().get_end_user(external_id)  # type: ignore  # noqa: PGH003
 
     storage = MyStorage()
     plan = Plan(plan_context=PlanContext(query="", tool_ids=[]), steps=[])
@@ -73,6 +73,8 @@ def test_storage_base_classes() -> None:
     )
 
     tool_call = get_test_tool_call(plan_run)
+
+    end_user = EndUser(external_id="123")
 
     with pytest.raises(NotImplementedError):
         storage.save_plan(plan)
@@ -91,6 +93,12 @@ def test_storage_base_classes() -> None:
 
     with pytest.raises(NotImplementedError):
         storage.save_tool_call(tool_call)
+
+    with pytest.raises(NotImplementedError):
+        storage.save_end_user(end_user)
+
+    with pytest.raises(NotImplementedError):
+        storage.get_end_user(end_user.external_id)
 
 
 def test_in_memory_storage() -> None:
@@ -138,6 +146,12 @@ def test_disk_storage(tmp_path: Path) -> None:
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
     storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
     assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+    # This just logs, but check it doesn't cause any issues
+    tool_call = get_test_tool_call(plan_run)
+    storage.save_tool_call(tool_call)
+    # Check with a very large output too
+    tool_call.output = "a" * 100000
+    storage.save_tool_call(tool_call)
 
 
 def test_portia_cloud_storage() -> None:

@@ -237,11 +237,11 @@ class AdditionalStorage(ABC):
         raise NotImplementedError("save_tool_call is not implemented")
 
     @abstractmethod
-    def get_end_user(self, end_user_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser:
         """Save a ToolCall.
 
         Args:
-            end_user_id (str): The id of the end user to get.
+            external_id (str): The id of the end user to get.
 
         Raises:
             NotImplementedError: If the method is not implemented.
@@ -483,16 +483,16 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         self.end_users[end_user.external_id] = end_user
         return end_user
 
-    def get_end_user(self, end_user_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser:
         """Get end_user from dict or init a new one.
 
         Args:
-            end_user_id (str): The id of the end user object to get.
+            external_id (str): The id of the end user object to get.
 
         """
-        if end_user_id in self.end_users:
-            return self.end_users[end_user_id]
-        end_user = EndUser(external_id=end_user_id)
+        if external_id in self.end_users:
+            return self.end_users[external_id]
+        end_user = EndUser(external_id=external_id)
         return self.save_end_user(end_user)
 
 
@@ -697,17 +697,17 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         self._write(f"{end_user.external_id}.json", end_user)
         return end_user
 
-    def get_end_user(self, end_user_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser:
         """Get end_user from dict or init a new one.
 
         Args:
-            end_user_id (str): The id of the end user object to get.
+            external_id (str): The id of the end user object to get.
 
         """
         try:
-            return self._read(f"{end_user_id}.json", EndUser)
+            return self._read(f"{external_id}.json", EndUser)
         except (ValidationError, FileNotFoundError):
-            end_user = EndUser(external_id=end_user_id)
+            end_user = EndUser(external_id=external_id)
             return self.save_end_user(end_user)
 
 
@@ -1148,11 +1148,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
             self.check_response(response)
             return end_user
 
-    def get_end_user(self, end_user_id: str) -> EndUser:
+    def get_end_user(self, external_id: str) -> EndUser:
         """Retrieve an end user from Portia Cloud.
 
         Args:
-            end_user_id (str): The ID of the end user to retrieve.
+            external_id (str): The ID of the end user to retrieve.
 
         Returns:
             EndUser: The EndUser object retrieved from Portia Cloud.
@@ -1163,7 +1163,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         """
         try:
             response = self.client.get(
-                url=f"/api/v0/end-user/{end_user_id}/",
+                url=f"/api/v0/end-user/{external_id}/",
             )
         except Exception as e:
             raise StorageError(e) from e

@@ -144,9 +144,9 @@ class Portia:
     def handle_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
         """Handle initializing the end_user."""
         if isinstance(end_user, str):
-            return self.storage.get_end_user(end_user_id=end_user)
+            return self.storage.get_end_user(external_id=end_user)
         if not end_user:
-            return self.storage.get_end_user(end_user_id="portia:default_user")
+            return self.storage.get_end_user(external_id="portia:default_user")
         return self.storage.save_end_user(end_user)
 
     def run(

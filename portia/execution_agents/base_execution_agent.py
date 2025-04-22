@@ -9,8 +9,6 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 from portia.execution_agents.context import StepInput, build_context
-from portia.execution_context import get_execution_context
-from portia.execution_agents.context import build_context
 
 if TYPE_CHECKING:
     from portia.config import Config

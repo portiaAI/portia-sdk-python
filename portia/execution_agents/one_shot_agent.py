@@ -148,7 +148,7 @@ class OneShotAgent(BaseExecutionAgent):
 
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         step: Step,
         plan_run: PlanRun,
