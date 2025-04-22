@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel, Field
 
 from portia.model import GenerativeModel, Message
 from portia.tool import Tool, ToolRunContext
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class LLMToolSchema(BaseModel):
@@ -15,9 +18,12 @@ class LLMToolSchema(BaseModel):
 
     task: str = Field(
         ...,
-        description="The task to be completed by the LLM tool including all relevant "
-        "context and inputs in their entirety (i.e. not a summary or a cropped version of "
-        "the full context and inputs)",
+        description="The task to be completed by the LLM tool",
+    )
+    input_data: list[str] = Field(
+        default_factory=list,
+        description="Any relevant data that should be used to complete the task. This should "
+        "include all relevant data in their entirety (i.e. not a summary).",
     )
 
 
@@ -62,7 +68,7 @@ class LLMTool(Tool[str]):
         "the model will be resolved from the config.",
     )
 
-    def run(self, ctx: ToolRunContext, task: str) -> str:
+    def run(self, ctx: ToolRunContext, task: str, input_data: Sequence[str] = ()) -> str:
         """Run the LLMTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
 
@@ -72,9 +78,13 @@ class LLMTool(Tool[str]):
             "run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
+        input_data_str = "\n".join(input_data)
+        task_str = task
+        if input_data_str:
+            task_str += f"\nInput data: {input_data_str}"
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
-        content = task if not len(context.split("\n")) > 1 else f"{context}\n\n{task}"
+        content = task_str if not len(context.split("\n")) > 1 else f"{context}\n\n{task_str}"
         messages = [
             Message(role="user", content=self.prompt),
             Message(role="user", content=content),
