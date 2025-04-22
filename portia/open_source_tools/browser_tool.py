@@ -193,7 +193,9 @@ class BrowserTool(Tool[str]):
     )
 
     infrastructure_option: BrowserInfrastructureOption = Field(
-        default=BrowserInfrastructureOption.REMOTE,
+        default_factory=lambda: BrowserInfrastructureOption.REMOTE
+        if os.getenv("BROWSERBASE_API_KEY") and os.getenv("BROWSERBASE_PROJECT_ID")
+        else BrowserInfrastructureOption.LOCAL,
         description="The infrastructure provider to use for the browser tool.",
     )
 
