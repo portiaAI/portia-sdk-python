@@ -27,11 +27,11 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
-from browserbase import Browserbase
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
 from portia.clarification import ActionClarification
+from portia.common import validate_extras_dependencies
 from portia.errors import ToolHardError
 from portia.model import GenerativeModel  # noqa: TC001 - used in Pydantic Schema
 from portia.tool import Tool, ToolRunContext
@@ -42,6 +42,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 NotSet: Any = PydanticUndefined
+
+BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase", raise_error=False)
 
 
 class BrowserToolForUrlSchema(BaseModel):
@@ -194,7 +196,11 @@ class BrowserTool(Tool[str]):
 
     infrastructure_option: BrowserInfrastructureOption = Field(
         default_factory=lambda: BrowserInfrastructureOption.REMOTE
-        if os.getenv("BROWSERBASE_API_KEY") and os.getenv("BROWSERBASE_PROJECT_ID")
+        if (
+            BROWSERBASE_AVAILABLE
+            and os.getenv("BROWSERBASE_API_KEY")
+            and os.getenv("BROWSERBASE_PROJECT_ID")
+        )
         else BrowserInfrastructureOption.LOCAL,
         description="The infrastructure provider to use for the browser tool.",
     )
@@ -207,6 +213,8 @@ class BrowserTool(Tool[str]):
         if self.custom_infrastructure_provider:
             return self.custom_infrastructure_provider
         if self.infrastructure_option == BrowserInfrastructureOption.REMOTE:
+            # Ensure error is raised if not installed
+            validate_extras_dependencies("tools-browser-browserbase", raise_error=True)
             return BrowserInfrastructureProviderBrowserBase()
         return BrowserInfrastructureProviderLocal()
 
@@ -393,7 +401,11 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             ),
         )
 
-    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:  # noqa: ARG002
+    def construct_auth_clarification_url(
+        self,
+        ctx: ToolRunContext,  # noqa: ARG002
+        sign_in_url: str,
+    ) -> HttpUrl:
         """Construct the URL for the auth clarification.
 
         Args:
@@ -449,31 +461,19 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         return None
 
 
-class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
-    """Browser infrastructure provider for BrowserBase.
+if BROWSERBASE_AVAILABLE:
+    from browserbase import Browserbase
 
-    This provider implements browser automation using BrowserBase's cloud infrastructure. It manages
-    browser sessions and contexts for remote browser automation, with support for user-specific
-    contexts.
+    class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
+        """Browser infrastructure provider for BrowserBase.
 
-    The provider requires both a BrowserBase API key and project ID, which can be provided either
-    directly through the constructor or via environment variables (BROWSERBASE_API_KEY and
-    BROWSERBASE_PROJECT_ID).
+        This provider implements browser automation using BrowserBase's cloud infrastructure.
+        It manages browser sessions and contexts for remote browser automation, with support
+        for user-specific contexts.
 
-    Args:
-        api_key (str, optional): The BrowserBase API key. If not provided, will be read from
-            the BROWSERBASE_API_KEY environment variable.
-        project_id (str, optional): The BrowserBase project ID. If not provided, will be read
-            from the BROWSERBASE_PROJECT_ID environment variable.
-
-    Raises:
-        ToolHardError: If either the API key or project ID is not provided and cannot be found
-            in environment variables.
-
-    """
-
-    def __init__(self, api_key: str | None = None, project_id: str | None = None) -> None:
-        """Initialize the BrowserBase infrastructure provider.
+        The provider requires both a BrowserBase API key and project ID, which can be provided
+        either directly through the constructor or via environment variables (BROWSERBASE_API_KEY
+        and BROWSERBASE_PROJECT_ID).
 
         Args:
             api_key (str, optional): The BrowserBase API key. If not provided, will be read from
@@ -486,136 +486,156 @@ class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
                 in environment variables.
 
         """
-        api_key = api_key or os.environ.get("BROWSERBASE_API_KEY")
-        if not api_key:
-            raise ToolHardError("BROWSERBASE_API_KEY is not set")
 
-        self.project_id = project_id or os.environ.get("BROWSERBASE_PROJECT_ID")
-        if not self.project_id:
-            raise ToolHardError("BROWSERBASE_PROJECT_ID is not set")
+        def __init__(self, api_key: str | None = None, project_id: str | None = None) -> None:
+            """Initialize the BrowserBase infrastructure provider.
 
-        self.bb = Browserbase(api_key=api_key)
+            Args:
+                api_key (str, optional): The BrowserBase API key. If not provided, will be read from
+                    the BROWSERBASE_API_KEY environment variable.
+                project_id (str, optional): The BrowserBase project ID. If not provided, will be
+                    read from the BROWSERBASE_PROJECT_ID environment variable.
 
-    def get_context_id(self, bb: Browserbase) -> str:
-        """Get the Browserbase context id.
+            Raises:
+                ToolHardError: If either the API key or project ID is not provided and cannot be
+                    found in environment variables.
 
-        Creates a new context in the BrowserBase project. This method can be overridden in
-        subclasses to implement custom context management, such as returning a saved context ID
-        for a specific user.
+            """
+            api_key = api_key or os.environ.get("BROWSERBASE_API_KEY")
+            if not api_key:
+                raise ToolHardError("BROWSERBASE_API_KEY is not set")
 
-        Args:
-            bb (Browserbase): The Browserbase client instance.
+            self.project_id = project_id or os.environ.get("BROWSERBASE_PROJECT_ID")
+            if not self.project_id:
+                raise ToolHardError("BROWSERBASE_PROJECT_ID is not set")
 
-        Returns:
-            str: The ID of the created or retrieved context.
+            self.bb = Browserbase(api_key=api_key)
 
-        """
-        return bb.contexts.create(project_id=self.project_id).id  # type: ignore reportArgumentType
+        def get_context_id(self, bb: Browserbase) -> str:
+            """Get the Browserbase context id.
 
-    def create_session(self, bb_context_id: str) -> SessionCreateResponse:
-        """Create a new BrowserBase session with the given context ID.
+            Creates a new context in the BrowserBase project. This method can be overridden in
+            subclasses to implement custom context management, such as returning a saved context ID
+            for a specific user.
 
-        Creates a persistent session that will remain active through clarification resolution.
+            Args:
+                bb (Browserbase): The Browserbase client instance.
 
-        Args:
-            bb_context_id (str): The BrowserBase context ID to associate with the session.
+            Returns:
+                str: The ID of the created or retrieved context.
 
-        Returns:
-            SessionCreateResponse: The response containing session details including the
-                session ID and connection URL.
+            """
+            return bb.contexts.create(project_id=self.project_id).id  # type: ignore reportArgumentType
 
-        """
-        return self.bb.sessions.create(
-            project_id=self.project_id,  # type: ignore reportArgumentType
-            browser_settings={
-                "context": {
-                    "id": bb_context_id,
-                    "persist": True,
+        def create_session(self, bb_context_id: str) -> SessionCreateResponse:
+            """Create a new BrowserBase session with the given context ID.
+
+            Creates a persistent session that will remain active through clarification resolution.
+
+            Args:
+                bb_context_id (str): The BrowserBase context ID to associate with the session.
+
+            Returns:
+                SessionCreateResponse: The response containing session details including the
+                    session ID and connection URL.
+
+            """
+            return self.bb.sessions.create(
+                project_id=self.project_id,  # type: ignore reportArgumentType
+                browser_settings={
+                    "context": {
+                        "id": bb_context_id,
+                        "persist": True,
+                    },
+                    "solve_captchas": False,  # We use HITL to solve captchas.
                 },
-                "solve_captchas": False,  # We use HITL to solve captchas.
-            },
-            # keep_alive is needed so that the session can last through clarification resolution.
-            keep_alive=True,
-        )
-
-    def get_or_create_session(self, context: ToolRunContext, bb: Browserbase) -> str:
-        """Get an existing session or create a new one if none exists.
-
-        Manages session lifecycle by either retrieving an existing session from the context
-        or creating a new one. Session details are stored in the execution context's
-        additional_data for future retrieval.
-
-        Args:
-            context (ToolRunContext): The tool run context containing execution information.
-            bb (Browserbase): The Browserbase client instance.
-
-        Returns:
-            str: The session connection URL that can be used to connect to the browser.
-
-        """
-        context_id = context.execution_context.additional_data.get(
-            "bb_context_id",
-            self.get_context_id(bb),
-        )
-        context.execution_context.additional_data["bb_context_id"] = context_id
-
-        session_id = context.execution_context.additional_data.get("bb_session_id", None)
-        session_connect_url = context.execution_context.additional_data.get(
-            "bb_session_connect_url",
-            None,
-        )
-
-        if not session_id or not session_connect_url:
-            session = self.create_session(context_id)
-            session_connect_url = session.connect_url
-            context.execution_context.additional_data["bb_session_id"] = session_id = session.id
-            context.execution_context.additional_data["bb_session_connect_url"] = (
-                session_connect_url
+                # keep_alive is needed so that the session can last through clarification
+                # resolution.
+                keep_alive=True,
             )
 
-        return session_connect_url
+        def get_or_create_session(self, context: ToolRunContext, bb: Browserbase) -> str:
+            """Get an existing session or create a new one if none exists.
 
-    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:  # noqa: ARG002
-        """Construct the URL for authentication clarification.
+            Manages session lifecycle by either retrieving an existing session from the context
+            or creating a new one. Session details are stored in the execution context's
+            additional_data for future retrieval.
 
-        Creates URL that allows viewing the browser session during authentication flows.
+            Args:
+                context (ToolRunContext): The tool run context containing execution information.
+                bb (Browserbase): The Browserbase client instance.
 
-        Args:
-            ctx (ToolRunContext): The tool run context containing execution information.
-            sign_in_url (str): The URL where authentication should occur (not used in this
-                implementation as we return the debug view URL instead).
+            Returns:
+                str: The session connection URL that can be used to connect to the browser.
 
-        Returns:
-            HttpUrl: The URL for the debug view of the browser session.
+            """
+            context_id = context.execution_context.additional_data.get(
+                "bb_context_id",
+                self.get_context_id(bb),
+            )
+            context.execution_context.additional_data["bb_context_id"] = context_id
 
-        Raises:
-            ToolHardError: If no session ID is found in the context.
+            session_id = context.execution_context.additional_data.get("bb_session_id", None)
+            session_connect_url = context.execution_context.additional_data.get(
+                "bb_session_connect_url",
+                None,
+            )
 
-        """
-        if not ctx.execution_context.additional_data.get("bb_session_id"):
-            raise ToolHardError("Session ID not found")
-        live_view_link = self.bb.sessions.debug(
-            ctx.execution_context.additional_data["bb_session_id"],
-        )
-        return HttpUrl(live_view_link.debugger_fullscreen_url)
+            if not session_id or not session_connect_url:
+                session = self.create_session(context_id)
+                session_connect_url = session.connect_url
+                context.execution_context.additional_data["bb_session_id"] = session_id = session.id
+                context.execution_context.additional_data["bb_session_connect_url"] = (
+                    session_connect_url
+                )
 
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
-        """Set up a Browser instance connected to BrowserBase.
+            return session_connect_url
 
-        Creates or retrieves a BrowserBase session and configures a Browser instance
-        to connect to it using the Chrome DevTools Protocol (CDP).
+        def construct_auth_clarification_url(
+            self,
+            ctx: ToolRunContext,
+            sign_in_url: str,  # noqa: ARG002
+        ) -> HttpUrl:
+            """Construct the URL for authentication clarification.
 
-        Args:
-            ctx (ToolRunContext): The tool run context containing execution information.
+            Creates URL that allows viewing the browser session during authentication flows.
 
-        Returns:
-            Browser: A configured Browser instance connected to the BrowserBase session.
+            Args:
+                ctx (ToolRunContext): The tool run context containing execution information.
+                sign_in_url (str): The URL where authentication should occur (not used in this
+                    implementation as we return the debug view URL instead).
 
-        """
-        session_connect_url = self.get_or_create_session(ctx, self.bb)
+            Returns:
+                HttpUrl: The URL for the debug view of the browser session.
 
-        return Browser(
-            config=BrowserConfig(
-                cdp_url=session_connect_url,
-            ),
-        )
+            Raises:
+                ToolHardError: If no session ID is found in the context.
+
+            """
+            if not ctx.execution_context.additional_data.get("bb_session_id"):
+                raise ToolHardError("Session ID not found")
+            live_view_link = self.bb.sessions.debug(
+                ctx.execution_context.additional_data["bb_session_id"],
+            )
+            return HttpUrl(live_view_link.debugger_fullscreen_url)
+
+        def setup_browser(self, ctx: ToolRunContext) -> Browser:
+            """Set up a Browser instance connected to BrowserBase.
+
+            Creates or retrieves a BrowserBase session and configures a Browser instance
+            to connect to it using the Chrome DevTools Protocol (CDP).
+
+            Args:
+                ctx (ToolRunContext): The tool run context containing execution information.
+
+            Returns:
+                Browser: A configured Browser instance connected to the BrowserBase session.
+
+            """
+            session_connect_url = self.get_or_create_session(ctx, self.bb)
+
+            return Browser(
+                config=BrowserConfig(
+                    cdp_url=session_connect_url,
+                ),
+            )
