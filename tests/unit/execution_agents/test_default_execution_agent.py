@@ -14,6 +14,7 @@ from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from portia.clarification import InputClarification
+from portia.end_user import EndUser
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.default_execution_agent import (
     MAX_RETRIES,
@@ -81,6 +82,7 @@ def test_parser_model() -> None:
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
     parser_model.invoke({"messages": [], "step_inputs": []})
 
@@ -118,6 +120,7 @@ def test_parser_model_with_retries() -> None:
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_invoker, model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
 
     with mock.patch.object(parser_model, "invoke", side_effect=parser_model.invoke) as mock_invoke:
@@ -146,6 +149,7 @@ def test_parser_model_with_retries_invalid_structured_response() -> None:
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
 
     with mock.patch.object(parser_model, "invoke", side_effect=parser_model.invoke) as mock_invoke:
@@ -222,6 +226,7 @@ def test_parser_model_with_invalid_args() -> None:
     parser_model = ParserModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
 
     # First call should store the error and retry
@@ -278,6 +283,7 @@ def test_verifier_model() -> None:
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
     verifier_model.invoke(
         {
@@ -328,6 +334,7 @@ def test_verifier_model_schema_validation() -> None:
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=mock_model, model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
 
     result = verifier_model.invoke(
@@ -527,6 +534,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
         plan_run=plan_run,
+        end_user=EndUser(external_id="123"),
         config=get_test_config(),
         tool=tool,
         agent_memory=InMemoryStorage(),
@@ -585,6 +593,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        end_user=EndUser(external_id="123"),
         tool=tool,
         agent_memory=InMemoryStorage(),
     )
@@ -603,6 +612,7 @@ def test_default_execution_agent_edge_cases() -> None:
     parser_model = ParserModel(
         model=get_mock_generative_model(get_mock_base_chat_model()),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
     with pytest.raises(InvalidPlanRunStateError):
         parser_model.invoke({"messages": [], "step_inputs": []})
@@ -653,6 +663,7 @@ def test_get_last_resolved_clarification() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        end_user=EndUser(external_id="123"),
         tool=None,
         agent_memory=InMemoryStorage(),
     )
@@ -674,6 +685,7 @@ def test_clarifications_or_continue() -> None:
         step=plan.steps[0],
         plan_run=plan_run,
         config=get_test_config(),
+        end_user=EndUser(external_id="123"),
         tool=None,
         agent_memory=InMemoryStorage(),
     )
@@ -712,6 +724,7 @@ def test_clarifications_or_continue() -> None:
     plan_run.outputs.clarifications = [clarification]
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
+        end_user=EndUser(external_id="123"),
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
@@ -746,6 +759,7 @@ def test_default_execution_agent_none_tool_execute_sync() -> None:
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
         plan_run=plan_run,
+        end_user=EndUser(external_id="123"),
         config=get_test_config(),
         tool=None,
         agent_memory=InMemoryStorage(),
@@ -797,6 +811,7 @@ def test_optional_args_with_none_values() -> None:
     """
     agent = DefaultExecutionAgent(
         step=Step(task="TASK_STRING", output="$out"),
+        end_user=EndUser(external_id="123"),
         plan_run=get_test_plan_run()[1],
         config=get_test_config(),
         tool=MockTool(),
@@ -805,6 +820,7 @@ def test_optional_args_with_none_values() -> None:
     model = VerifierModel(
         model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
         agent=agent,
+        tool_context=get_test_tool_context(),
     )
 
     #  Optional arg and made_up is True == not made_up
@@ -831,6 +847,7 @@ def test_verifier_model_edge_cases() -> None:
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
     )
 
     # Check error with no tool specified
@@ -848,6 +865,7 @@ def test_memory_extraction_step_no_inputs() -> None:
         config=get_test_config(),
         tool=None,
         agent_memory=InMemoryStorage(),
+        end_user=EndUser(external_id="123"),
     )
 
     memory_extraction_step = MemoryExtractionStep(agent=agent)
@@ -884,6 +902,7 @@ def test_memory_extraction_step_with_inputs() -> None:
         config=get_test_config(),
         tool=None,
         agent_memory=storage,
+        end_user=EndUser(external_id="123"),
     )
 
     memory_extraction_step = MemoryExtractionStep(agent=agent)
@@ -914,6 +933,7 @@ def test_memory_extraction_step_errors_with_missing_input() -> None:
         config=get_test_config(),
         tool=None,
         agent_memory=InMemoryStorage(),
+        end_user=EndUser(external_id="123"),
     )
 
     memory_extraction_step = MemoryExtractionStep(agent=agent)
@@ -939,6 +959,7 @@ def test_memory_extraction_step_handles_unknown_output_type() -> None:
         config=get_test_config(),
         tool=None,
         agent_memory=InMemoryStorage(),
+        end_user=EndUser(external_id="123"),
     )
 
     memory_extraction_step = MemoryExtractionStep(agent=agent)

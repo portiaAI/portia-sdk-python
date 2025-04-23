@@ -112,6 +112,10 @@ class PlanRun(BaseModel):
         default=empty_context(),
         description="Execution Context for the PlanRun.",
     )
+    end_user_id: str = Field(
+        ...,
+        description="The id of the end user this plan was run for",
+    )
     outputs: PlanRunOutputs = Field(
         default=PlanRunOutputs(),
         description="Outputs of the run including clarifications.",
@@ -188,5 +192,6 @@ class ReadOnlyPlanRun(PlanRun):
             current_step_index=plan_run.current_step_index,
             outputs=plan_run.outputs,
             state=plan_run.state,
+            end_user_id=plan_run.end_user_id,
             execution_context=plan_run.execution_context,
         )

@@ -9,6 +9,7 @@ additional system or user-provided data.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -24,8 +25,8 @@ from portia.common import Serializable
 
 if TYPE_CHECKING:
     from portia.execution_agents.output import Output
-    from portia.execution_context import ExecutionContext
     from portia.plan_run import PlanRun
+    from portia.tool import ToolRunContext
 
 
 def generate_main_system_context() -> list[str]:
@@ -156,7 +157,7 @@ def generate_clarification_context(clarifications: ClarificationListType, step: 
     return clarification_context
 
 
-def generate_context_from_execution_context(context: ExecutionContext) -> list[str]:
+def generate_context_from_run_context(context: ToolRunContext) -> list[str]:
     """Generate context from the execution context.
 
     Args:
@@ -166,17 +167,20 @@ def generate_context_from_execution_context(context: ExecutionContext) -> list[s
         list[str]: A list of strings representing the execution context.
 
     """
-    if not context.end_user_id and not context.additional_data:
-        return []
-
     execution_context = ["Metadata: This section contains general context about this execution."]
-    if context.end_user_id:
-        execution_context.extend(
-            [
-                f"end_user_id: {context.end_user_id}",
-            ],
-        )
-    for key, value in context.additional_data.items():
+    execution_context.extend(
+        [
+            "Details on the end user.",
+            "You can use this information if no other information is provided in the task.",
+            f"end_user_id:{context.end_user.external_id}",
+            f"end_user_name:{context.end_user.name}",
+            f"end_user_email:{context.end_user.email}",
+            f"end_user_phone:{context.end_user.phone_number}",
+            f"end_user_attributes:{json.dumps(context.end_user.additional_data)}",
+            "----------",
+        ],
+    )
+    for key, value in context.execution_context.additional_data.items():
         execution_context.extend(
             [
                 f"context_key_name: {key} context_key_value: {value}",
@@ -187,14 +191,14 @@ def generate_context_from_execution_context(context: ExecutionContext) -> list[s
 
 
 def build_context(
-    ctx: ExecutionContext,
+    ctx: ToolRunContext,
     plan_run: PlanRun,
     step_inputs: list[StepInput],
 ) -> str:
     """Build the context string for the agent using inputs/outputs/clarifications/ctx.
 
     Args:
-        ctx (ExecutionContext): The execution context containing agent and system metadata.
+        ctx (ToolRunContext): The tool run context containing agent and system metadata.
         plan_run (PlanRun): The current run containing outputs and clarifications.
         step_inputs (list[StepInput]): The inputs for the current step.
 
@@ -225,7 +229,7 @@ def build_context(
     context.extend(clarification_context)
 
     # Handle execution context
-    execution_context = generate_context_from_execution_context(ctx)
+    execution_context = generate_context_from_run_context(ctx)
     context.extend(execution_context)
 
     # Append System Context

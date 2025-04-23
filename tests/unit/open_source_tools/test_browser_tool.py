@@ -10,6 +10,7 @@ from browser_use import Browser
 from pydantic import HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
+from portia.end_user import EndUser
 from portia.open_source_tools.browser_tool import (
     BrowserInfrastructureOption,
     BrowserInfrastructureProvider,
@@ -309,14 +310,14 @@ def test_browser_infra_local_setup_browser(
 ) -> None:
     """Test browser setup."""
     context = get_test_tool_context()
-    context.execution_context.end_user_id = "test_user"
+    context.end_user = EndUser(external_id="test_user")
 
     with patch("logging.Logger.warning") as mock_warning:
         browser = local_browser_provider.setup_browser(context)
 
-        # Verify warning was logged for end_user_id
+        # Verify warning was logged for end_user
         mock_warning.assert_called_once()
-        assert "does not support end_user_id" in mock_warning.call_args[0][0]
+        assert "does not support end users" in mock_warning.call_args[0][0]
 
         # Verify browser instance
         assert isinstance(browser, Browser)

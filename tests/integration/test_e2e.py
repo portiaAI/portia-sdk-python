@@ -18,7 +18,7 @@ from portia.config import (
 )
 from portia.errors import PlanError, ToolHardError, ToolSoftError
 from portia.model import LLMProvider
-from portia.open_source_tools.registry import example_tool_registry
+from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRunState
 from portia.portia import ExecutionHooks, Portia
@@ -474,8 +474,9 @@ def test_portia_run_query_with_example_registry() -> None:
     """Test we can run a query using the example registry."""
     config = Config.from_default()
 
-    portia = Portia(config=config, tools=example_tool_registry)
-    query = "Add 1 + 2 together and then write me a haiku about the answer"
+    portia = Portia(config=config, tools=open_source_tool_registry)
+    query = """Add 1 + 2 together and then write me a haiku about the answer.
+    You can use the LLM tool to generate a haiku."""
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE

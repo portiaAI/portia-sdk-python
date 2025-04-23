@@ -33,7 +33,10 @@ def test_in_memory_storage_save_and_get_plan_run() -> None:
     """Test saving and retrieving PlanRun in InMemoryStorage."""
     storage = InMemoryStorage()
     plan = Plan(plan_context=PlanContext(query="query", tool_ids=[]), steps=[])
-    plan_run = PlanRun(plan_id=plan.id)
+    plan_run = PlanRun(
+        plan_id=plan.id,
+        end_user_id="test123",
+    )
     storage.save_plan_run(plan_run)
     retrieved_plan_run = storage.get_plan_run(plan_run.id)
 
@@ -63,7 +66,10 @@ def test_disk_file_storage_save_and_get_plan_run(tmp_path: Path) -> None:
         plan_context=PlanContext(query="query", tool_ids=[]),
         steps=[],
     )
-    plan_run = PlanRun(plan_id=plan.id)
+    plan_run = PlanRun(
+        plan_id=plan.id,
+        end_user_id="test123",
+    )
     storage.save_plan_run(plan_run)
     retrieved_plan_run = storage.get_plan_run(plan_run.id)
 
@@ -80,9 +86,17 @@ def test_disk_file_storage_save_and_get_plan_runs(tmp_path: Path) -> None:
         plan_context=PlanContext(query="query", tool_ids=[]),
         steps=[],
     )
-    plan_run = PlanRun(plan_id=plan.id, state=PlanRunState.IN_PROGRESS)
+    plan_run = PlanRun(
+        plan_id=plan.id,
+        state=PlanRunState.IN_PROGRESS,
+        end_user_id="test123",
+    )
     storage.save_plan_run(plan_run)
-    plan_run = PlanRun(plan_id=plan.id, state=PlanRunState.FAILED)
+    plan_run = PlanRun(
+        plan_id=plan.id,
+        state=PlanRunState.FAILED,
+        end_user_id="test123",
+    )
     storage.save_plan_run(plan_run)
 
     runs = storage.get_plan_runs(PlanRunState.IN_PROGRESS)

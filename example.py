@@ -9,6 +9,7 @@ from portia import (
     execution_context,
 )
 from portia.cli import CLIExecutionHooks
+from portia.end_user import EndUser
 
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),
@@ -21,18 +22,24 @@ plan_run = portia.run(
     "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
 )
 
-# We can also provide additional execution context to the process
-with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-    plan_run = portia.run(
-        "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
-    )
+# We can also provide additional data about the end user to the process
+
+plan_run = portia.run(
+    "Please tell me a joke that is customized to my favorite sport",
+    end_user=EndUser(
+        external_id="user_789",
+        email="hello@portialabs.ai",
+        additional_data={
+            "favorite_sport": "football",
+        },
+    ),
+)
 
 # When we hit a clarification we can ask our end user for clarification then resume the process
-with execution_context(end_user_id="123", additional_data={"email_address": "hello@portialabs.ai"}):
-    # Deliberate typo in the second place name to hit the clarification
-    plan_run = portia.run(
-        "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
-    )
+# Deliberate typo in the second place name to hit the clarification
+plan_run = portia.run(
+    "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
+)
 
 # Fetch run
 plan_run = portia.storage.get_plan_run(plan_run.id)

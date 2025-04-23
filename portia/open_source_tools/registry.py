@@ -16,7 +16,7 @@ from portia.tool_registry import (
 logger = logging.getLogger(__name__)
 
 example_tool_registry = ToolRegistry(
-    [CalculatorTool(), WeatherTool(), SearchTool()],
+    [CalculatorTool(), WeatherTool(), SearchTool(), LLMTool()],
 )
 
 

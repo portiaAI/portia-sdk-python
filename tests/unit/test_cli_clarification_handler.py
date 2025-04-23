@@ -85,6 +85,43 @@ def test_action_clarification_with_confirmation(
     on_error.assert_not_called()
 
 
+@patch("portia.cli_clarification_handler.click.echo")
+@patch("portia.cli_clarification_handler.click.confirm")
+def test_action_clarification_with_confirmation_rejected(
+    mock_confirm: MagicMock,
+    mock_echo: MagicMock,
+    cli_handler: CLIClarificationHandler,
+) -> None:
+    """Test handling of action clarifications."""
+    on_resolution = MagicMock()
+    on_error = MagicMock()
+
+    mock_confirm.return_value = False
+
+    clarification = ActionClarification(
+        plan_run_id=PlanRunUUID(),
+        user_guidance="Please authenticate",
+        action_url=HttpUrl("https://example.com/auth"),
+        require_confirmation=True,
+    )
+
+    cli_handler.handle_action_clarification(clarification, on_resolution, on_error)
+
+    # Verify echo was called with the expected message
+    mock_echo.assert_called_once()
+    echo_message = mock_echo.call_args[0][0]
+    assert "Please authenticate" in click.unstyle(echo_message)
+    assert "https://example.com/auth" in click.unstyle(echo_message)
+
+    mock_confirm.assert_called_once()
+    confirm_message = mock_confirm.call_args[1]["text"]
+    assert "Please confirm once the action is complete." in click.unstyle(confirm_message)
+
+    # Verify resolution callback was called with True
+    on_resolution.assert_not_called()
+    on_error.assert_called_once_with(clarification, "Clarification was rejected by the user")
+
+
 @patch("portia.cli_clarification_handler.click.prompt")
 def test_input_clarification(mock_prompt: MagicMock, cli_handler: CLIClarificationHandler) -> None:
     """Test handling of input clarifications."""
