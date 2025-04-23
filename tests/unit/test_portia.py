@@ -1357,6 +1357,9 @@ def test_portia_initialize_end_user(portia: Portia) -> None:
     # with no end user should return default
     assert portia.initialize_end_user().external_id == "portia:default_user"
 
+    # with empty end user should return default
+    assert portia.initialize_end_user("").external_id == "portia:default_user"
+
     # with str should return full user
     assert portia.initialize_end_user(end_user.external_id) == end_user
 

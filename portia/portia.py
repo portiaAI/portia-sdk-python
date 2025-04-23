@@ -145,6 +145,8 @@ class Portia:
         """Handle initializing the end_user based on the provided type."""
         default_external_id = "portia:default_user"
         if isinstance(end_user, str):
+            if end_user == "":
+                end_user = default_external_id
             end_user_instance = self.storage.get_end_user(external_id=end_user)
             if end_user_instance:
                 return end_user_instance
