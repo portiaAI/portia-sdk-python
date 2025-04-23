@@ -397,6 +397,7 @@ def test_browserbase_provider_create_session(
                 "id": "test_context_id",
                 "persist": True,
             },
+            "solve_captchas": False,
         },
         keep_alive=True,
     )
