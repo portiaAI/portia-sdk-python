@@ -179,7 +179,7 @@ class BrowserTool(Tool[str]):
         default=(
             "General purpose browser tool. Can be used to navigate to a URL and "
             "complete tasks. Should only be used if the task requires a browser "
-            "and you are sure of the URL."
+            "and you are sure of the URL. Do not break the task into multiple browser tool steps!"
         ),
     )
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
@@ -250,9 +250,10 @@ class BrowserTool(Tool[str]):
 
             # Main task
             task_to_complete = (
-                f"Go to {url} and complete the following task: {task}. If at any point the user "
-                "needs to login to complete the task, please return human_login_required=True, "
-                "and the url of the sign in page as well as what the user should do to sign in"
+                f"Go to {url} and complete the following task: {task}. If the user is not already "
+                "logged in and at any point the user needs to login to complete the task, please "
+                "return human_login_required=True, and the url of the sign in page as well as what "
+                "the user should do to sign in"
             )
             task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
             if task_result.human_login_required:
