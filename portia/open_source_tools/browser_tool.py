@@ -532,6 +532,7 @@ class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
                     "id": bb_context_id,
                     "persist": True,
                 },
+                "solve_captchas": False,  # We use HITL to solve captchas.
             },
             # keep_alive is needed so that the session can last through clarification resolution.
             keep_alive=True,
