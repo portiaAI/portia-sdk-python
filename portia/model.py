@@ -406,6 +406,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         api_key: SecretStr,
         timeout: int = 120,
         max_retries: int = 3,
+        max_tokens: int = 8096,
         **kwargs: Any,
     ) -> None:
         """Initialize with Anthropic client.
@@ -414,6 +415,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             model_name: Name of the Anthropic model
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries
+            max_tokens: Maximum number of tokens to generate
             api_key: API key for Anthropic
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
@@ -422,14 +424,18 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             model_name=model_name,
             timeout=timeout,
             max_retries=max_retries,
+            max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
             api_key=api_key,
             **kwargs,
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
-            client=wrappers.wrap_anthropic(Anthropic(api_key=api_key.get_secret_value())),
+            client=wrappers.wrap_anthropic(
+                Anthropic(api_key=api_key.get_secret_value()),
+            ),
             mode=instructor.Mode.ANTHROPIC_JSON,
         )
+        self.max_tokens = max_tokens
 
     def get_structured_response(
         self,
@@ -463,7 +469,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             model=self.model_name,
             response_model=schema,
             messages=instructor_messages,
-            max_tokens=2048,
+            max_tokens=self.max_tokens,
         )
 
 
