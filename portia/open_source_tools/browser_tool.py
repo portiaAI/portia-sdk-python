@@ -29,8 +29,6 @@ from typing import TYPE_CHECKING, Any, Optional
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browser_use.browser.context import BrowserContext, BrowserContextConfig, BrowserSession
 from browserbase import Browserbase
-from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
 from playwright.async_api import BrowserContext as PlaywrightContext
 from playwright.async_api import Page
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -205,6 +203,7 @@ class BrowserTool(Tool[str]):
     )
 
     custom_infrastructure_provider: BrowserInfrastructureProvider | None = Field(default=None)
+    context: BrowserContext | None = Field(default=None, exclude=True)
 
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
@@ -252,7 +251,14 @@ class BrowserTool(Tool[str]):
                     context=context,
                     controller=Controller(output_model=output_model),
                 )
+                print("yep got here, looking at state")
+                state = await context.get_state()
+                print(state)
                 result = await agent.run()
+                print("yep got here, examining pages")
+                print(state)
+                print(context.session)
+                [print(page.title) for page in context.session.context.pages]
                 return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
 
             # Main task
@@ -458,14 +464,16 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
 
 class ExtendedBrowserSession(BrowserSession):
     """Extended version of BrowserSession that includes current_page"""
+
     def __init__(
         self,
         context: PlaywrightContext,
         cached_state: Optional[dict] = None,
-        current_page: Optional[Page] = None
+        current_page: Optional[Page] = None,
     ):
         super().__init__(context=context, cached_state=cached_state)
         self.current_page = current_page
+
 
 class UseBrowserbaseContext(BrowserContext):
     async def _initialize_session(self) -> ExtendedBrowserSession:
@@ -473,6 +481,7 @@ class UseBrowserbaseContext(BrowserContext):
 
         Returns:
             ExtendedBrowserSession: The initialized browser session with current page.
+
         """
         playwright_browser = await self.browser.get_playwright_browser()
         context = await self._create_context(playwright_browser)
@@ -661,9 +670,11 @@ class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
                 cdp_url=session_connect_url,
             ),
         )
-        context = UseBrowserbaseContext(browser,
-                                        BrowserContextConfig(
-                                            wait_for_network_idle_page_load_time=10.0,
-                                            highlight_elements=True,
-                                        ))
+        context = UseBrowserbaseContext(
+            browser,
+            BrowserContextConfig(
+                wait_for_network_idle_page_load_time=10.0,
+                highlight_elements=True,
+            ),
+        )
         return browser, context
