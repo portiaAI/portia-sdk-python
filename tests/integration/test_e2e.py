@@ -517,17 +517,13 @@ def test_portia_plan_steps_inputs_dependencies(
 
     portia = Portia(config=config, tools=open_source_tool_registry)
 
-    # Simple query that requires multiple dependent steps
     query = """First calculate 25 * 3, then write a haiku about the result,
     and finally summarize the haiku with the result of the calculation.
     If the result of the calculation is greater than 100, then final summary should
      be saved to a file.
     """
 
-    # Generate the plan
     plan = portia.plan(query)
-
-    print(plan.pretty_print())
 
     assert len(plan.steps) == 4, "Plan should have 4 steps"
 
