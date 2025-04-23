@@ -24,10 +24,15 @@ import sys
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
+from browser_use.browser.context import BrowserContext, BrowserContextConfig, BrowserSession
 from browserbase import Browserbase
+from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+from playwright.async_api import BrowserContext as PlaywrightContext
+from playwright.async_api import Page
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
@@ -239,10 +244,12 @@ class BrowserTool(Tool[str]):
                 output_model: type[BrowserTaskOutput],
             ) -> BrowserTaskOutput:
                 """Run a browser agent task with the given configuration."""
+                browser, context = self.infrastructure_provider.setup_browser(ctx)
                 agent = Agent(
                     task=task_description,
                     llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx),
+                    browser=browser,
+                    context=context,
                     controller=Controller(output_model=output_model),
                 )
                 result = await agent.run()
@@ -449,6 +456,42 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         return None
 
 
+class ExtendedBrowserSession(BrowserSession):
+    """Extended version of BrowserSession that includes current_page"""
+    def __init__(
+        self,
+        context: PlaywrightContext,
+        cached_state: Optional[dict] = None,
+        current_page: Optional[Page] = None
+    ):
+        super().__init__(context=context, cached_state=cached_state)
+        self.current_page = current_page
+
+class UseBrowserbaseContext(BrowserContext):
+    async def _initialize_session(self) -> ExtendedBrowserSession:
+        """Initialize a browser session using existing Browserbase page.
+
+        Returns:
+            ExtendedBrowserSession: The initialized browser session with current page.
+        """
+        playwright_browser = await self.browser.get_playwright_browser()
+        context = await self._create_context(playwright_browser)
+        self._add_new_page_listener(context)
+
+        self.session = ExtendedBrowserSession(
+            context=context,
+            cached_state=None,
+        )
+
+        # Get existing page or create new one
+        self.session.current_page = context.pages[0] if context.pages else await context.new_page()
+
+        # Initialize session state
+        self.session.cached_state = await self._update_state()
+
+        return self.session
+
+
 class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
     """Browser infrastructure provider for BrowserBase.
 
@@ -613,8 +656,14 @@ class BrowserInfrastructureProviderBrowserBase(BrowserInfrastructureProvider):
         """
         session_connect_url = self.get_or_create_session(ctx, self.bb)
 
-        return Browser(
+        browser = Browser(
             config=BrowserConfig(
                 cdp_url=session_connect_url,
             ),
         )
+        context = UseBrowserbaseContext(browser,
+                                        BrowserContextConfig(
+                                            wait_for_network_idle_page_load_time=10.0,
+                                            highlight_elements=True,
+                                        ))
+        return browser, context
