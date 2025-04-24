@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
@@ -467,7 +466,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         # Anthropic sometimes struggles serializing large JSON responses, so we fall back to
         # instructor if the response is above a certain size.
         if isinstance(raw_response.get("parsing_error"), ValidationError) and (
-            len(tiktoken.get_encoding("gpt2").encode(json.dumps(raw_response["raw"])))
+            len(tiktoken.get_encoding("gpt2").encode(raw_response["raw"].model_dump_json()))
             > self._output_instructor_threshold
         ):
             return self.get_structured_response_instructor(messages, schema)
