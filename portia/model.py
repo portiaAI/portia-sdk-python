@@ -15,7 +15,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
 from openai import AzureOpenAI, OpenAI
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.common import validate_extras_dependencies
 
@@ -466,7 +466,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             raise TypeError(f"Expected dict, got {type(raw_response)}")
         # Anthropic sometimes struggles serializing large JSON responses, so we fall back to
         # instructor if the response is above a certain size.
-        if (raw_response.get("parsing_error") or {}).get("error") == "ValidationError" and (
+        if isinstance(raw_response.get("parsing_error"), ValidationError) and (
             len(tiktoken.get_encoding("gpt2").encode(json.dumps(raw_response["raw"])))
             > self._output_instructor_threshold
         ):
