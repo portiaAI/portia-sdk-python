@@ -181,7 +181,7 @@ def test_langchain_model_structured_output_returns_dict() -> None:
     assert result.test_field == "Response from model"
 
 
-def test_anthropic_model_structured_output_returns_dict() -> None:
+def test_anthropic_model_structured_output_returns_invalid_data() -> None:
     """Test that AnthropicModel.structured_output returns a dict."""
     mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
     structured_output = MagicMock()
@@ -196,6 +196,24 @@ def test_anthropic_model_structured_output_returns_dict() -> None:
                 messages=[Message(role="user", content="Hello")],
                 schema=StructuredOutputTestModel,
             )
+
+
+def test_anthropic_model_structured_output_returns_dict() -> None:
+    """Test that AnthropicModel.structured_output returns a dict."""
+    mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
+    structured_output = MagicMock()
+    mock_chat_anthropic.with_structured_output.return_value = structured_output
+    structured_output.invoke.return_value = {"parsed": {"test_field": "Response from model"}}
+
+    with mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls:
+        mock_chat_anthropic_cls.return_value = mock_chat_anthropic
+        model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        result = model.get_structured_response(
+            messages=[Message(role="user", content="Hello")],
+            schema=StructuredOutputTestModel,
+        )
+        assert isinstance(result, StructuredOutputTestModel)
+        assert result.test_field == "Response from model"
 
 
 def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
