@@ -351,6 +351,8 @@ class McpToolRegistry(ToolRegistry):
         headers: dict[str, Any] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        *,
+        use_oauth: bool = False,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Sync version)."""
         config = SseMcpClientConfig(
@@ -359,6 +361,7 @@ class McpToolRegistry(ToolRegistry):
             headers=headers,
             timeout=timeout,
             sse_read_timeout=sse_read_timeout,
+            use_oauth=use_oauth,
         )
         tools = cls._load_tools(config)
         return cls(tools)
