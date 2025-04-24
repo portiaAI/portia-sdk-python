@@ -264,10 +264,6 @@ class BrowserTool(Tool[str]):
                 "the user should do to sign in"
             )
             task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
-            live_view_link = self.infrastructure_provider.bb.sessions.debug(
-                ctx.execution_context.additional_data["bb_session_id"],
-            )
-            print("liveview pages", live_view_link.pages)
             if task_result.human_login_required:
                 return handle_login_requirement(task_result)
             return task_result.task_output  # type: ignore reportCallIssue
@@ -621,7 +617,8 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(
                 ctx.execution_context.additional_data["bb_session_id"],
             )
-            print("liveview pages", live_view_link.pages)
+            if len(live_view_link.pages) > 1:
+                return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
             return HttpUrl(live_view_link.debugger_fullscreen_url)
 
         def setup_browser(self, ctx: ToolRunContext) -> Browser:
