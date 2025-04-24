@@ -441,7 +441,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         self,
         messages: list[Message],
         schema: type[BaseModelT],
-        **kwargs: Any,
+        **kwargs: Any,  # noqa: ARG002
     ) -> BaseModelT:
         """Call the model in structured output mode targeting the given Pydantic model.
 
@@ -454,9 +454,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
-            return self.get_structured_response_instructor(messages, schema)
-        return super().get_structured_response(messages, schema, **kwargs)
+        return self.get_structured_response_instructor(messages, schema)
 
     def get_structured_response_instructor(
         self,
