@@ -466,7 +466,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         # instructor if the response is above a certain size.
         if (
             isinstance(response, dict)
-            and response.get("parsing_error", {}).get("error") == "ValidationError"
+            and (response.get("parsing_error") or {}).get("error") == "ValidationError"
             and (
                 len(tiktoken.get_encoding("gpt2").encode(json.dumps(response["raw"])))
                 > self._output_instructor_threshold
