@@ -461,18 +461,17 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
-        response = structured_client.invoke(langchain_messages)
+        raw_response = structured_client.invoke(langchain_messages)
+        if not isinstance(raw_response, dict):
+            raise TypeError(f"Expected dict, got {type(raw_response)}")
         # Anthropic sometimes struggles serializing large JSON responses, so we fall back to
         # instructor if the response is above a certain size.
-        if (
-            isinstance(response, dict)
-            and (response.get("parsing_error") or {}).get("error") == "ValidationError"
-            and (
-                len(tiktoken.get_encoding("gpt2").encode(json.dumps(response["raw"])))
-                > self._output_instructor_threshold
-            )
+        if (raw_response.get("parsing_error") or {}).get("error") == "ValidationError" and (
+            len(tiktoken.get_encoding("gpt2").encode(json.dumps(raw_response["raw"])))
+            > self._output_instructor_threshold
         ):
             return self.get_structured_response_instructor(messages, schema)
+        response = raw_response["parsed"]
         if isinstance(response, schema):
             return response
         return schema.model_validate(response)
