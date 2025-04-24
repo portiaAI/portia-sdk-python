@@ -17,7 +17,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from portia.clarification import Clarification, InputClarification
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
@@ -25,10 +24,9 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
+from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
-from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.tool import ToolRunContext
 
@@ -37,6 +35,7 @@ if TYPE_CHECKING:
 
     from portia.config import Config
     from portia.end_user import EndUser
+    from portia.execution_agents.context import StepInput
     from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
@@ -126,63 +125,6 @@ class VerifiedToolInputs(BaseModel):
     """
 
     args: list[VerifiedToolArgument] = Field(description="Arguments for the tool.")
-
-
-class MemoryExtractionStep:
-    """A step that extracts memory from the context."""
-
-    def __init__(
-        self,
-        agent: DefaultExecutionAgent,
-    ) -> None:
-        """Initialize the memory extraction step.
-
-        Args:
-            agent (DefaultExecutionAgent): The agent using the memory extraction step.
-
-        """
-        self.agent = agent
-
-    def invoke(self, _: ExecutionState) -> dict[str, Any]:
-        """Invoke the model with the given message state.
-
-        Args:
-            state (ExecutionState): The current state of the execution agent.
-
-        Returns:
-            dict[str, Any]: The LangGraph state update.
-
-        """
-        step_inputs = []
-        previous_outputs = self.agent.plan_run.outputs.step_outputs
-        for step_input in self.agent.step.inputs:
-            if step_input.name not in previous_outputs:
-                raise InvalidPlanRunStateError("Received unknown step input: %s", step_input.name)
-            previous_output = previous_outputs.get(step_input.name)
-
-            match previous_output:
-                case LocalOutput():
-                    output_value = previous_output.value
-                case AgentMemoryOutput():
-                    output_value = self.agent.agent_memory.get_plan_run_output(
-                        previous_output.output_name,
-                        self.agent.plan_run.id,
-                    ).value
-                case _:
-                    logger().warning(
-                        "Received unknown output type: %s",
-                        previous_output,
-                    )
-                    continue
-
-            step_inputs.append(
-                StepInput(
-                    name=step_input.name,
-                    value=output_value,
-                    description=step_input.description,
-                ),
-            )
-        return {"step_inputs": step_inputs}
 
 
 class ParserModel:
@@ -598,10 +540,9 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
-        super().__init__(step, plan_run, config, end_user, tool)
+        super().__init__(step, plan_run, config, end_user, agent_memory, tool)
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
-        self.agent_memory = agent_memory
 
     def clarifications_or_continue(
         self,

@@ -16,6 +16,7 @@ from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.output import LocalOutput
 from portia.prefixed_uuid import PlanRunUUID
+from portia.storage import InMemoryStorage
 from tests.utils import get_test_config, get_test_plan_run, get_test_tool_context
 
 
@@ -27,6 +28,7 @@ def test_base_agent_default_context() -> None:
         plan_run,
         get_test_config(),
         EndUser(external_id="test"),
+        InMemoryStorage(),
         None,
     )
     context = agent.get_system_context(
