@@ -1,6 +1,7 @@
 """Example registry containing simple tools."""
 
 import logging
+import os
 
 from portia.common import validate_extras_dependencies
 from portia.open_source_tools.calculator_tool import CalculatorTool
@@ -36,3 +37,9 @@ if validate_extras_dependencies("tools-browser-local", raise_error=False):
     from .browser_tool import BrowserTool
 
     open_source_tool_registry.with_tool(BrowserTool())
+if validate_extras_dependencies("tools-pdf-reader", raise_error=False) and os.getenv(
+    "MISTRAL_API_KEY"
+):
+    from .pdf_reader_tool import PDFReaderTool
+
+    open_source_tool_registry.with_tool(PDFReaderTool())

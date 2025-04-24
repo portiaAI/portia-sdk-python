@@ -66,6 +66,7 @@ ollama = ["langchain-ollama"]
 # Tools that require extra dependencies
 tools-browser-local = ["playwright", "browser-use"]
 tools-browser-browserbase = ["playwright", "browser-use", "browserbase"]
+tools-pdf-reader = ["mistralai"]
 
 # All group - add all dependencies from above
 all = [
