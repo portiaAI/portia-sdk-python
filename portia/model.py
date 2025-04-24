@@ -462,7 +462,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
         raw_response = structured_client.invoke(langchain_messages)
         if not isinstance(raw_response, dict):
-            raise TypeError(f"Expected dict, got {type(raw_response)}")
+            raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
         # Anthropic sometimes struggles serializing large JSON responses, so we fall back to
         # instructor if the response is above a certain size.
         if isinstance(raw_response.get("parsing_error"), ValidationError) and (
