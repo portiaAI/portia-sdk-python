@@ -88,6 +88,8 @@ class ActionClarification(Clarification):
     Attributes:
         category (ClarificationCategory): The category for this clarification, 'Action'.
         action_url (HttpUrl): The URL for the action that the user needs to complete.
+        require_confirmation (bool): Whether the user needs to confirm once the action has been
+            completed.
 
     """
 
@@ -96,6 +98,10 @@ class ActionClarification(Clarification):
         description="The category of this clarification",
     )
     action_url: HttpUrl
+    require_confirmation: bool = Field(
+        default=False,
+        description="Whether the user needs to confirm once the action has been completed.",
+    )
 
     @field_serializer("action_url")
     def serialize_action_url(self, action_url: HttpUrl) -> str:

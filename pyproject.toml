@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.2.0-alpha"
+version = "0.3.0"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
@@ -62,11 +62,22 @@ mistral = ["langchain-mistralai", "mistralai"]
 mistralai = ["langchain-mistralai", "mistralai"]
 google = ["langchain-google-genai", "google-generativeai"]
 ollama = ["langchain-ollama"]
-all = ["langchain-mistralai", "mistralai", "langchain-google-genai", "google-generativeai", "langchain-ollama"]
 
 # Tools that require extra dependencies
 tools-browser-local = ["playwright", "browser-use"]
 tools-browser-browserbase = ["playwright", "browser-use", "browserbase"]
+
+# All group - add all dependencies from above
+all = [
+  "langchain-mistralai",
+  "mistralai",
+  "langchain-google-genai",
+  "google-generativeai",
+  "langchain-ollama",
+  "playwright",
+  "browser-use",
+  "browserbase",
+]
 
 [tool.ruff]
 line-length=100
@@ -74,6 +85,7 @@ line-length=100
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+  "COM812",  # Disables checks for trailing commas as they are fixed by the formatted and running both is not recommended.
   "D203",    # Disables checks for having a blank line before a class docstring. We instead have no-blank-line-before-class (D211) enabled.
   "D213",    # Disables checks for multi-line docstrings not starting on the first line. We instead have multi-line-summary-first-line (D212) enabled.
   "EM101",   # Disables checks for missing exception message arguments. We prefer single-line exception statements for simplicity and terseness.
@@ -114,12 +126,14 @@ addopts = [
   "--cov-report=html",
   "--import-mode=importlib"
 ]
+asyncio_mode = "auto"
 
 [tool.coverage.run]
 omit = [
     "*/tests/*", # Don't cover test files themselves
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
+    "portia/cli.py",  # Best effort test coverage
 ]
 
 [tool.coverage.report]

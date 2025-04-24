@@ -330,10 +330,6 @@ class McpToolRegistry(ToolRegistry):
     See https://modelcontextprotocol.io/introduction for more information on MCP.
     """
 
-    def __init__(self, mcp_client_config: McpClientConfig) -> None:
-        """Initialize the MCPToolRegistry with the given configuration."""
-        super().__init__({t.id: t for t in self._load_tools(mcp_client_config)})
-
     @classmethod
     def from_sse_connection(
         cls,
@@ -343,16 +339,36 @@ class McpToolRegistry(ToolRegistry):
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
     ) -> McpToolRegistry:
-        """Create a new MCPToolRegistry using an SSE connection."""
-        return cls(
-            SseMcpClientConfig(
-                server_name=server_name,
-                url=url,
-                headers=headers,
-                timeout=timeout,
-                sse_read_timeout=sse_read_timeout,
-            ),
+        """Create a new MCPToolRegistry using an SSE connection (Sync version)."""
+        config = SseMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
         )
+        tools = cls._load_tools(config)
+        return cls(tools)
+
+    @classmethod
+    async def from_sse_connection_async(
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 5,
+        sse_read_timeout: float = 60 * 5,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using an SSE connection (Async version)."""
+        config = SseMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
+        )
+        tools = await cls._load_tools_async(config)
+        return cls(tools)
 
     @classmethod
     def from_stdio_connection(  # noqa: PLR0913
@@ -364,40 +380,53 @@ class McpToolRegistry(ToolRegistry):
         encoding: str = "utf-8",
         encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
     ) -> McpToolRegistry:
-        """Create a new MCPToolRegistry using a stdio connection."""
-        return cls(
-            StdioMcpClientConfig(
-                server_name=server_name,
-                command=command,
-                args=args if args is not None else [],
-                env=env,
-                encoding=encoding,
-                encoding_error_handler=encoding_error_handler,
-            ),
+        """Create a new MCPToolRegistry using a stdio connection (Sync version)."""
+        config = StdioMcpClientConfig(
+            server_name=server_name,
+            command=command,
+            args=args if args is not None else [],
+            env=env,
+            encoding=encoding,
+            encoding_error_handler=encoding_error_handler,
         )
+        tools = cls._load_tools(config)
+        return cls(tools)
+
+    @classmethod
+    async def from_stdio_connection_async(  # noqa: PLR0913
+        cls,
+        server_name: str,
+        command: str,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        encoding: str = "utf-8",
+        encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a stdio connection (Async version)."""
+        config = StdioMcpClientConfig(
+            server_name=server_name,
+            command=command,
+            args=args if args is not None else [],
+            env=env,
+            encoding=encoding,
+            encoding_error_handler=encoding_error_handler,
+        )
+        tools = await cls._load_tools_async(config)
+        return cls(tools)
 
     @classmethod
     def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
-        """Get a list of tools from an MCP server wrapped at Portia tools.
+        """Sync version to load tools from an MCP server."""
+        return asyncio.run(cls._load_tools_async(mcp_client_config))
 
-        Args:
-            mcp_client_config: The configuration for the MCP client
-
-        Returns:
-            A list of Portia tools
-
-        """
-
-        async def async_inner() -> list[PortiaMcpTool]:
-            async with get_mcp_session(mcp_client_config) as session:
-                logger().debug("Fetching tools from MCP server")
-                tools = await session.list_tools()
-                logger().debug(f"Got {len(tools.tools)} tools from MCP server")
-                return [
-                    cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools
-                ]
-
-        return asyncio.run(async_inner())
+    @classmethod
+    async def _load_tools_async(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
+        """Async version to load tools from an MCP server."""
+        async with get_mcp_session(mcp_client_config) as session:
+            logger().debug("Fetching tools from MCP server")
+            tools = await session.list_tools()
+            logger().debug(f"Got {len(tools.tools)} tools from MCP server")
+            return [cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools]
 
     @classmethod
     def _portia_tool_from_mcp_tool(

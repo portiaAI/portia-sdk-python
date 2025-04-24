@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, SecretStr
 from portia.clarification import Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, LogLevel, StorageClass
+from portia.end_user import EndUser
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalOutput
 from portia.execution_context import ExecutionContext, empty_context
@@ -35,17 +36,22 @@ if TYPE_CHECKING:
 def get_test_tool_context(
     plan_run_id: PlanRunUUID | None = None,
     config: Config | None = None,
+    end_user: EndUser | None = None,
 ) -> ToolRunContext:
     """Return a test tool context."""
     if not plan_run_id:
         plan_run_id = PlanRunUUID()
     if not config:
         config = get_test_config()
+    if not end_user:
+        end_user = EndUser(external_id="test")
+
     return ToolRunContext(
         execution_context=get_execution_ctx(),
         plan_run_id=plan_run_id,
         config=config,
         clarifications=[],
+        end_user=end_user,
     )
 
 
@@ -65,7 +71,7 @@ def get_test_plan_run() -> tuple[Plan, PlanRun]:
         ),
         steps=[step1],
     )
-    plan_run = PlanRun(plan_id=plan.id, current_step_index=0)
+    plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
     plan_run.outputs.step_outputs = {
         "$a": LocalOutput(value="3"),
     }
@@ -123,6 +129,27 @@ class AdditionTool(Tool):
     def run(self, _: ToolRunContext, a: int, b: int) -> int:
         """Add the numbers."""
         return a + b
+
+
+class EndUserUpdateToolSchema(BaseModel):
+    """Input for AdditionTool."""
+
+    name: str | None = Field(default=None, description="The new name for the end user.")
+
+
+class EndUserUpdateTool(Tool):
+    """Adds two numbers."""
+
+    id: str = "end_user_update"
+    name: str = "End User Update Tool"
+    description: str = "Updates the name of the end user"
+    args_schema: type[BaseModel] = EndUserUpdateToolSchema
+    output_schema: tuple[str, str] = ("str", "str: The new name")
+
+    def run(self, ctx: ToolRunContext, name: str) -> str:
+        """Change the name."""
+        ctx.end_user.name = name
+        return name
 
 
 class ClarificationToolSchema(BaseModel):
@@ -289,3 +316,29 @@ def get_mock_generative_model(response: Any = None) -> GenerativeModel:  # noqa:
         client=get_mock_base_chat_model(response),
         model_name="test",
     )
+
+
+def assert_clarification_equality_without_uuid(
+    clarification1: Clarification,
+    clarification2: Clarification,
+) -> None:
+    """Assert that two clarifications are equal without comparing the UUID.
+
+    Args:
+        clarification1: First clarification to compare
+        clarification2: Second clarification to compare
+
+    Raises:
+        AssertionError: If the clarifications differ in any field except UUID
+
+    """
+    # Get dictionaries of both objects
+    dict1 = clarification1.model_dump()
+    dict2 = clarification2.model_dump()
+
+    # Remove UUID fields from comparison
+    dict1.pop("id", None)
+    dict2.pop("id", None)
+
+    # Assert all remaining fields are equal
+    assert dict1 == dict2, f"Clarifications differ in fields other than UUID:\n{dict1}\nvs\n{dict2}"

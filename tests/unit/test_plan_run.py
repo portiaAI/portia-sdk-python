@@ -31,6 +31,7 @@ def plan_run(mock_clarification: InputClarification) -> PlanRun:
         plan_id=PlanUUID(),
         current_step_index=1,
         state=PlanRunState.IN_PROGRESS,
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             clarifications=[mock_clarification],
             step_outputs={"step1": LocalOutput(value="Test output")},
@@ -41,7 +42,10 @@ def plan_run(mock_clarification: InputClarification) -> PlanRun:
 def test_run_initialization() -> None:
     """Test initialization of PlanRun instance."""
     plan_id = PlanUUID()
-    plan_run = PlanRun(plan_id=plan_id)
+    plan_run = PlanRun(
+        plan_id=plan_id,
+        end_user_id="test123",
+    )
 
     assert plan_run.id is not None
     assert plan_run.plan_id == plan_id
@@ -65,7 +69,11 @@ def test_run_get_outstanding_clarifications(
 
 def test_run_get_outstanding_clarifications_none() -> None:
     """Test get_outstanding_clarifications when no clarifications are outstanding."""
-    plan_run = PlanRun(plan_id=PlanUUID(), outputs=PlanRunOutputs(clarifications=[]))
+    plan_run = PlanRun(
+        plan_id=PlanUUID(),
+        outputs=PlanRunOutputs(clarifications=[]),
+        end_user_id="test123",
+    )
 
     assert plan_run.get_outstanding_clarifications() == []
 
@@ -81,7 +89,10 @@ def test_run_state_enum() -> None:
 
 def test_read_only_run_immutable() -> None:
     """Test immutability of plan_run."""
-    plan_run = PlanRun(plan_id=PlanUUID(uuid=uuid4()))
+    plan_run = PlanRun(
+        plan_id=PlanUUID(uuid=uuid4()),
+        end_user_id="test123",
+    )
     read_only = ReadOnlyPlanRun.from_plan_run(plan_run)
 
     with pytest.raises(ValidationError):
@@ -103,6 +114,7 @@ def test_run_serialization() -> None:
     plan_run = PlanRun(
         id=plan_run_id,
         plan_id=PlanUUID(),
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             clarifications=[
                 InputClarification(

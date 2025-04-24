@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 from pydantic import HttpUrl, SecretStr
@@ -21,6 +22,7 @@ from portia.config import (
     GenerativeModelsConfig,
     StorageClass,
 )
+from portia.end_user import EndUser
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.introspection_agents.introspection_agent import (
@@ -34,6 +36,7 @@ from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
+from portia.prefixed_uuid import PlanUUID
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
@@ -100,7 +103,10 @@ def test_portia_local_default_config_with_api_keys() -> None:
     ):
         portia = Portia()
         assert portia.config == Config.from_default()
-        assert len(portia.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools())
+        assert (
+            len(portia.tool_registry.get_tools())
+            == len(open_source_tool_registry.get_tools()) - 1  # BrowserTool is excluded
+        )
 
 
 def test_portia_local_default_config_without_api_keys() -> None:
@@ -119,7 +125,7 @@ def test_portia_local_default_config_without_api_keys() -> None:
         portia = Portia()
         assert portia.config == Config.from_default()
         assert (
-            len(portia.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools()) - 2
+            len(portia.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools()) - 3
         )
 
 
@@ -379,6 +385,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
         plan_id=plan.id,
         current_step_index=1,
         state=PlanRunState.NEED_CLARIFICATION,
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             clarifications=[
                 ActionClarification(
@@ -768,7 +775,42 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan)
+        mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user())
+
+        mock_resume.assert_called_once_with(mock_plan_run)
+
+        assert result == mock_resumed_plan_run
+
+
+def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that run_plan calls create_plan_run and resume."""
+    query = "example query"
+
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[],
+        error=None,
+    )
+    plan = portia.plan(query)
+
+    # update the id to functionally make this a new plan
+    plan.id = PlanUUID(uuid=uuid4())
+
+    # Mock the create_plan_run and resume methods
+    with (
+        mock.patch.object(portia, "create_plan_run") as mockcreate_plan_run,
+        mock.patch.object(portia, "resume") as mock_resume,
+    ):
+        mock_plan_run = MagicMock()
+        mock_resumed_plan_run = MagicMock()
+        mockcreate_plan_run.return_value = mock_plan_run
+        mock_resume.return_value = mock_resumed_plan_run
+
+        result = portia.run_plan(plan)
+
+        mockcreate_plan_run.assert_called_once_with(
+            plan,
+            EndUser(external_id="portia:default_user"),
+        )
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
@@ -1047,6 +1089,7 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     )
     plan_run = PlanRun(
         plan_id=plan.id,
+        end_user_id="test123",
         current_step_index=0,
         state=PlanRunState.IN_PROGRESS,
     )
@@ -1097,6 +1140,7 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
     plan_run = PlanRun(
         plan_id=plan.id,
         current_step_index=0,
+        end_user_id="test123",
         state=PlanRunState.IN_PROGRESS,
     )
 
@@ -1142,6 +1186,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     )
     plan_run = PlanRun(
         plan_id=plan.id,
+        end_user_id="test123",
         current_step_index=0,
         state=PlanRunState.IN_PROGRESS,
     )
@@ -1186,6 +1231,7 @@ def test_handle_introspection_outcome_no_condition(portia: Portia) -> None:
     plan_run = PlanRun(
         plan_id=plan.id,
         current_step_index=0,
+        end_user_id="test123",
         state=PlanRunState.IN_PROGRESS,
     )
 
@@ -1236,6 +1282,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         plan_id=plan.id,
         current_step_index=1,  # Resume from step 2
         state=PlanRunState.IN_PROGRESS,
+        end_user_id="test123",
         outputs=PlanRunOutputs(
             step_outputs={
                 "$step1_result": LocalOutput(value="Step 1 result", summary="Summary of step 1"),
@@ -1299,3 +1346,27 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
         assert result_plan_run.outputs.final_output.get_summary() == expected_summary
         assert result_plan_run.current_step_index == 3
+
+
+def test_portia_initialize_end_user(portia: Portia) -> None:
+    """Test end user handling."""
+    end_user = EndUser(external_id="123")
+
+    portia.storage.save_end_user(end_user)
+
+    # with no end user should return default
+    assert portia.initialize_end_user().external_id == "portia:default_user"
+
+    # with empty end user should return default
+    assert portia.initialize_end_user("").external_id == "portia:default_user"
+
+    # with str should return full user
+    assert portia.initialize_end_user(end_user.external_id) == end_user
+
+    end_user.name = "Bob Smith"
+
+    # with full user should save + return
+    assert portia.initialize_end_user(end_user) == end_user
+    storage_end_user = portia.storage.get_end_user(end_user.external_id)
+    assert storage_end_user
+    assert storage_end_user.name == "Bob Smith"
