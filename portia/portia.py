@@ -731,8 +731,8 @@ class Portia:
             )
 
         logger().info(
-            f"Running Pre Introspection for Step #{current_step_index}, "
-            f"evaluating condition: #{step.condition}",
+            f"Evaluating condition for Step #{current_step_index}: "
+            f"#{step.condition}",
         )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
@@ -741,15 +741,15 @@ class Portia:
         )
 
         log_message = (
-            f"Pre Introspection Outcome for Step #{current_step_index}: "
-            f"{pre_step_outcome.outcome} for {step.output}. "
+            f"Condition Evaluation Outcome for Step #{current_step_index} is "
+            f"{pre_step_outcome.outcome.value}. "
             f"Reason: {pre_step_outcome.reason}",
         )
 
         if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
             logger().error(*log_message)
         else:
-            logger().debug(*log_message)
+            logger().info(*log_message)
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:

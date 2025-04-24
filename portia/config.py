@@ -296,6 +296,13 @@ PROVIDER_DEFAULT_MODELS = {
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
+    "introspection_model": {
+        LLMProvider.OPENAI: "openai/o3-mini",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
+        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
+        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
+        LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
+    },
     "default_model": {
         LLMProvider.OPENAI: "openai/gpt-4o",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
@@ -570,6 +577,13 @@ class Config(BaseModel):
             and self.llm_provider in PROVIDER_DEFAULT_MODELS["planning_model"]
         ):
             self.models.planning_model = PROVIDER_DEFAULT_MODELS["planning_model"][
+                self.llm_provider
+            ]
+        if (
+            self.models.introspection_model is None
+            and self.llm_provider in PROVIDER_DEFAULT_MODELS["introspection_model"]
+        ):
+            self.models.introspection_model = PROVIDER_DEFAULT_MODELS["introspection_model"][
                 self.llm_provider
             ]
         return self
