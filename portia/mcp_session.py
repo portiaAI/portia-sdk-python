@@ -20,7 +20,7 @@ import threading
 import webbrowser
 from contextlib import asynccontextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import TYPE_CHECKING, Any, AsyncIterator, Literal, Optional  # noqa: UP035
+from typing import TYPE_CHECKING, Any, AsyncIterator, Literal  # noqa: UP035
 from urllib.parse import parse_qs, urlparse
 
 import httpx
