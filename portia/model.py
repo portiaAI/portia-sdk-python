@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import instructor
+import tiktoken
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -398,6 +400,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     """Anthropic model implementation."""
 
     provider: LLMProvider = LLMProvider.ANTHROPIC
+    _output_instructor_threshold = 512
 
     def __init__(
         self,
@@ -441,7 +444,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         self,
         messages: list[Message],
         schema: type[BaseModelT],
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> BaseModelT:
         """Call the model in structured output mode targeting the given Pydantic model.
 
@@ -454,7 +457,25 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        return self.get_structured_response_instructor(messages, schema)
+        if schema.__name__ == "StepsOrError":
+            return self.get_structured_response_instructor(messages, schema)
+        langchain_messages = [msg.to_langchain() for msg in messages]
+        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        response = structured_client.invoke(langchain_messages)
+        # Anthropic sometimes struggles serializing large JSON responses, so we fall back to
+        # instructor if the response is above a certain size.
+        if (
+            isinstance(response, dict)
+            and response.get("parsing_error", {}).get("error") == "ValidationError"
+            and (
+                len(tiktoken.get_encoding("gpt2").encode(json.dumps(response["raw"])))
+                > self._output_instructor_threshold
+            )
+        ):
+            return self.get_structured_response_instructor(messages, schema)
+        if isinstance(response, schema):
+            return response
+        return schema.model_validate(response)
 
     def get_structured_response_instructor(
         self,
