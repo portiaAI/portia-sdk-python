@@ -486,3 +486,33 @@ def test_generate_pydantic_model_from_json_schema_not_single_type_or_union_field
     }
     model = generate_pydantic_model_from_json_schema("TestNullSchema", json_schema)
     assert model.model_fields["unknown"].annotation is Any
+
+
+def test_generate_pydantic_model_from_json_schema_handles_omissible_fields() -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check it handles fields that are not required in the JSON schema, but that are not nullable.
+    """
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "The name of the customer"},
+            "email": {
+                "type": "string",
+                "format": "email",
+                "description": "The email of the customer",
+            },
+        },
+        "required": ["name"],
+        "additionalProperties": False,
+        "$schema": "http://json-schema.org/draft-07/schema#",
+    }
+    model = generate_pydantic_model_from_json_schema("TestOmissibleFields", json_schema)
+    assert model.model_fields["name"].annotation is str
+    assert model.model_fields["name"].default is PydanticUndefined
+    assert model.model_fields["email"].annotation == str | None
+    assert model.model_fields["email"].default is None
+    deserialized = model.model_validate({"name": "John"})
+    assert deserialized.name == "John"  # pyright: ignore[reportAttributeAccessIssue]
+    assert deserialized.email is None  # pyright: ignore[reportAttributeAccessIssue]
+    assert deserialized.model_dump() == {"name": "John"}

@@ -729,8 +729,7 @@ class Portia:
             )
 
         logger().info(
-            f"Evaluating condition for Step #{current_step_index}: "
-            f"#{step.condition}",
+            f"Evaluating condition for Step #{current_step_index}: #{step.condition}",
         )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
