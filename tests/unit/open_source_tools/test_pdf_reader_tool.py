@@ -20,13 +20,13 @@ def pdf_reader_tool() -> PDFReaderTool:
 def mock_mistral_client() -> MagicMock:
     """Fixture to create a mock for the Mistral client."""
     mock = MagicMock()
-    # Setup the OCR response structure
+
     pages = [MagicMock(markdown="Page 1 content"), MagicMock(markdown="Page 2 content")]
     mock.ocr.process.return_value = MagicMock(pages=pages)
-    # Setup the signed URL
+
     mock.files.get_signed_url.return_value = MagicMock(url="https://signed-url.com")
-    # Setup the upload response
     mock.files.upload.return_value = MagicMock(id="file_id_123")
+
     return mock
 
 
