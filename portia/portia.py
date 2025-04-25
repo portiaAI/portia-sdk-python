@@ -22,6 +22,7 @@ complex queries using various planning and execution agent configurations.
 from __future__ import annotations
 
 import time
+from importlib.metadata import version
 from typing import TYPE_CHECKING
 
 from portia.clarification import (
@@ -32,6 +33,7 @@ from portia.cloud import PortiaCloudClient
 from portia.config import (
     Config,
     ExecutionAgentType,
+    GenerativeModelsConfig,
     PlanningAgentType,
     StorageClass,
 )
@@ -120,6 +122,8 @@ class Portia:
         """
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
+        logger().info(f"Starting Portia v{version('portia-sdk-python')}")
+        self._log_models(self.config)
         self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
         if not self.config.has_api_key("portia_api_key"):
             logger().warning(
@@ -727,8 +731,8 @@ class Portia:
             )
 
         logger().info(
-            f"Running Pre Introspection for Step #{current_step_index}, "
-            f"evaluating condition: #{step.condition}",
+            f"Evaluating condition for Step #{current_step_index}: "
+            f"#{step.condition}",
         )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
@@ -737,15 +741,15 @@ class Portia:
         )
 
         log_message = (
-            f"Pre Introspection Outcome for Step #{current_step_index}: "
-            f"{pre_step_outcome.outcome} for {step.output}. "
+            f"Condition Evaluation Outcome for Step #{current_step_index} is "
+            f"{pre_step_outcome.outcome.value}. "
             f"Reason: {pre_step_outcome.reason}",
         )
 
         if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
             logger().error(*log_message)
         else:
-            logger().debug(*log_message)
+            logger().info(*log_message)
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
@@ -960,3 +964,11 @@ class Portia:
             plan_run.outputs.step_outputs[step.output] = step_output
 
         self.storage.save_plan_run(plan_run)
+
+    @staticmethod
+    def _log_models(config: Config) -> None:
+        """Log the models set in the configuration."""
+        logger().debug("Portia Generative Models")
+        for model in GenerativeModelsConfig.model_fields:
+            getter = getattr(config, f"get_{model}")
+            logger().debug(f"{model}: {getter()}")

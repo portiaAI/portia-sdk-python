@@ -40,6 +40,16 @@ CORE_PROVIDERS = [
     ),
 ]
 
+PLANNING_PROVIDERS = [
+    (
+        LLMProvider.OPENAI,
+        "openai/o3-mini",
+    ),
+    (
+        LLMProvider.ANTHROPIC,
+        "anthropic/claude-3-5-sonnet-latest",
+    ),
+]
 
 PROVIDER_MODELS = [
     *CORE_PROVIDERS,
@@ -492,3 +502,54 @@ def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
     with pytest.raises(PlanError) as e:
         portia.plan(query)
     assert "PORTIA_API_KEY is required to use Portia cloud tools." in str(e.value)
+
+
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), PLANNING_PROVIDERS)
+def test_portia_plan_steps_inputs_dependencies(
+    llm_provider: LLMProvider,
+    default_model_name: str,
+) -> None:
+    """Test that a dynamically generated plan properly creates step dependencies."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        default_model=default_model_name,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    portia = Portia(config=config, tools=open_source_tool_registry)
+
+    query = """First calculate 25 * 3, then write a haiku about the result,
+    and finally summarize the haiku with the result of the calculation.
+    If the result of the calculation is greater than 100, then final summary should
+     be saved to a file.
+    """
+
+    plan = portia.plan(query)
+
+    assert len(plan.steps) == 4, "Plan should have 4 steps"
+
+    assert plan.steps[0].inputs == [], "First step should not have inputs"
+    assert plan.steps[0].tool_id == "calculator_tool", "First step should have the calculator tool"
+    assert plan.steps[0].condition is None, "First step should not have a condition"
+
+    assert len(plan.steps[1].inputs) == 1, "Second step should have 1 input from calculation step"
+    assert (
+        plan.steps[1].inputs[0].name == plan.steps[0].output
+    ), "Second step should equal the output of the first step"
+    assert plan.steps[1].tool_id == "llm_tool", "Second step should have the LLM tool"
+    assert plan.steps[1].condition is None, "Second step should not have a condition"
+
+    assert len(plan.steps[2].inputs) == 2, "Third step should have (calculation and haiku) inputs"
+    assert {inp.name for inp in plan.steps[2].inputs} == {
+        plan.steps[0].output,
+        plan.steps[1].output,
+    }, "Third step inputs should match outputs of (calculation and haiku) steps"
+    assert plan.steps[2].condition is None, "Third step should not have a condition"
+    assert plan.steps[2].tool_id == "llm_tool", "Third step should be llm_tool"
+
+    assert len(plan.steps[3].inputs) >= 1, "Fourth step should have summary input"
+    assert any(
+        inp.name == plan.steps[2].output for inp in plan.steps[3].inputs
+    ), "Fourth step inputs should have summary input"
+    assert plan.steps[3].tool_id == "file_writer_tool", "Fourth step should be file_writer_tool"
+    assert "100" in str(plan.steps[3].condition), "Fourth step condition does not contain 100"
