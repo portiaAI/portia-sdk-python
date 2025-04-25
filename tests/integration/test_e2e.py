@@ -494,14 +494,22 @@ def test_portia_run_query_with_example_registry() -> None:
 
 def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
     """Test that running a query requiring cloud tools fails but points user to sign up."""
-    config = Config.from_default(portia_api_key=None, storage_class=StorageClass.MEMORY)
+    config = Config.from_default(
+        portia_api_key=None,
+        storage_class=StorageClass.MEMORY,
+        default_log_level=LogLevel.DEBUG,
+    )
 
     portia = Portia(config=config)
-    query = "Send an email to John Doe using the Gmail tool"
+    query = (
+        "Send an email to John Doe using the Gmail tool. Only use the Gmail tool and "
+        "fail if you can't use it."
+    )
 
     with pytest.raises(PlanError) as e:
         portia.plan(query)
     assert "PORTIA_API_KEY is required to use Portia cloud tools." in str(e.value)
+
 
 @pytest.mark.parametrize(("llm_provider", "default_model_name"), PLANNING_PROVIDERS)
 def test_portia_plan_steps_inputs_dependencies(
@@ -539,15 +547,16 @@ def test_portia_plan_steps_inputs_dependencies(
     assert plan.steps[1].condition is None, "Second step should not have a condition"
 
     assert len(plan.steps[2].inputs) == 2, "Third step should have (calculation and haiku) inputs"
-    assert (
-        {inp.name for inp in plan.steps[2].inputs} == {plan.steps[0].output, plan.steps[1].output}
-    ), "Third step inputs should match outputs of (calculation and haiku) steps"
+    assert {inp.name for inp in plan.steps[2].inputs} == {
+        plan.steps[0].output,
+        plan.steps[1].output,
+    }, "Third step inputs should match outputs of (calculation and haiku) steps"
     assert plan.steps[2].condition is None, "Third step should not have a condition"
     assert plan.steps[2].tool_id == "llm_tool", "Third step should be llm_tool"
 
     assert len(plan.steps[3].inputs) >= 1, "Fourth step should have summary input"
-    assert (
-        any(inp.name == plan.steps[2].output for inp in plan.steps[3].inputs)
+    assert any(
+        inp.name == plan.steps[2].output for inp in plan.steps[3].inputs
     ), "Fourth step inputs should have summary input"
     assert plan.steps[3].tool_id == "file_writer_tool", "Fourth step should be file_writer_tool"
     assert "100" in str(plan.steps[3].condition), "Fourth step condition does not contain 100"
