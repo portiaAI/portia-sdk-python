@@ -7,64 +7,47 @@ from portia import (
     Portia,
     example_tool_registry,
     execution_context,
+    open_source_tool_registry,
 )
 from portia.cli import CLIExecutionHooks
+from portia.config import StorageClass
 from portia.end_user import EndUser
+from dotenv import load_dotenv
 
+from portia.open_source_tools.browser_tool import BrowserTool, BrowserToolForUrl
+from portia.tool_registry import PortiaToolRegistry
+
+load_dotenv(override=True)
+
+config = Config.from_default(default_log_level=LogLevel.DEBUG, storage_class=StorageClass.MEMORY)
 portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
-)
-
-
-# Simple Example
-plan_run = portia.run(
-    "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
-)
-
-# We can also provide additional data about the end user to the process
-
-plan_run = portia.run(
-    "Please tell me a joke that is customized to my favorite sport",
-    end_user=EndUser(
-        external_id="user_789",
-        email="hello@portialabs.ai",
-        additional_data={
-            "favorite_sport": "football",
-        },
-    ),
-)
-
-# When we hit a clarification we can ask our end user for clarification then resume the process
-# Deliberate typo in the second place name to hit the clarification
-plan_run = portia.run(
-    "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
-)
-
-# Fetch run
-plan_run = portia.storage.get_plan_run(plan_run.id)
-# Update clarifications
-if plan_run.state == PlanRunState.NEED_CLARIFICATION:
-    for c in plan_run.get_outstanding_clarifications():
-        # Here you prompt the user for the response to the clarification
-        # via whatever mechanism makes sense for your use-case.
-        new_value = "Sydney"
-        plan_run = portia.resolve_clarification(
-            plan_run=plan_run,
-            clarification=c,
-            response=new_value,
-        )
-
-# Execute again with the same execution context
-with execution_context(context=plan_run.execution_context):
-    portia.resume(plan_run)
-
-# You can also pass in a clarification handler to manage clarifications
-portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
+    config,
+    tools= PortiaToolRegistry(config=config).get_tools() + open_source_tool_registry.get_tools() + [BrowserTool()],
+    
     execution_hooks=CLIExecutionHooks(),
 )
-plan_run = portia.run(
-    "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
-)
+
+
+query = """
+Search for Food Receipt in my google drive (only png).
+Create a list of urls as (e.g https://drive.usercontent.google.com/download?id=ID_FROM_GOOGLE_DRIVE) only for shared images.
+Then, Analyse each url image. 
+Finally, extract how much each person is to be paid and make sure you divide extra charges like service charge, vat, etc.
+"""
+
+# query = """
+# Analyze the reciept image and extract how much each person is to be paid from https://drive.usercontent.google.com/download?id=1NI3Y9GHRLgzkKltWCvSjbz70itSfjBLO
+# Each item is to be paid by the person named in the reciept, make sure you divide extra charges like service charge, vat, etc.
+# """
+
+plan = portia.plan(query=query)
+print(plan.pretty_print())
+input("Press Enter to continue...")
+
+
+
+
+# input("Press Enter to continue...")
+
+
+plan_run = portia.run_plan(plan)

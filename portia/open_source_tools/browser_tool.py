@@ -617,6 +617,8 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(
                 ctx.execution_context.additional_data["bb_session_id"],
             )
+            if len(live_view_link.pages) > 1:
+                return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
             return HttpUrl(live_view_link.debugger_fullscreen_url)
 
         def setup_browser(self, ctx: ToolRunContext) -> Browser:

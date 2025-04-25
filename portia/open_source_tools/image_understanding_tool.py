@@ -47,7 +47,7 @@ class ImageUnderstandingTool(Tool[str]):
     id: str = "image_understanding_tool"
     name: str = "Image Understanding Tool"
     description: str = (
-        "Tool for understanding images from a URL. Capable of tasks like object detection, "
+        "Tool to analyze images from a URL. Capable of tasks like object detection, "
         "OCR, scene recognition, and image-based Q&A. This tool uses its native capabilities "
         "to analyze images and provide insights."
     )
