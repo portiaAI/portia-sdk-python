@@ -497,10 +497,21 @@ def test_generate_pydantic_model_from_json_schema_handles_omissible_fields() -> 
         "type": "object",
         "properties": {
             "name": {"type": "string", "description": "The name of the customer"},
+            # Email is not nullable, but is not required in the JSON schema
+            # so it MUST be ommitted from the serialized output if it is None
             "email": {
                 "type": "string",
                 "format": "email",
                 "description": "The email of the customer",
+            },
+            # Phone is nullable, but is not required in the JSON schema
+            # In this case, we do not omit the field from the serialized output
+            "phone": {
+                "oneOf": [
+                    {"type": "string", "description": "The phone number of the customer"},
+                    {"type": "null"},
+                ],
+                "description": "The phone number of the customer",
             },
         },
         "required": ["name"],
@@ -512,7 +523,10 @@ def test_generate_pydantic_model_from_json_schema_handles_omissible_fields() -> 
     assert model.model_fields["name"].default is PydanticUndefined
     assert model.model_fields["email"].annotation == str | None
     assert model.model_fields["email"].default is None
+    assert model.model_fields["phone"].annotation == str | None
+    assert model.model_fields["phone"].default is None
     deserialized = model.model_validate({"name": "John"})
     assert deserialized.name == "John"  # pyright: ignore[reportAttributeAccessIssue]
     assert deserialized.email is None  # pyright: ignore[reportAttributeAccessIssue]
-    assert deserialized.model_dump() == {"name": "John"}
+    assert deserialized.phone is None  # pyright: ignore[reportAttributeAccessIssue]
+    assert deserialized.model_dump() == {"name": "John", "phone": None}

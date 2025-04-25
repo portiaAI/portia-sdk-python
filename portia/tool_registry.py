@@ -19,7 +19,7 @@ import asyncio
 import os
 import re
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, Union, get_args, get_origin
 
 from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model, model_serializer
@@ -491,19 +491,18 @@ class DefaultToolRegistry(ToolRegistry):
 class GeneratedBaseModel(BaseModel):
     """BaseModel that is generated from a JSON schema.
 
-    Handles serialization of omissible fields: fields that are not required in
-    the JSON schema, but that are not nullable. Pydantic has no concept of an omitted
-    field, so we must for it to be nullable and then make sure we don't serialize any
-    None values.
+    Handles serialization of fields that must omit None values: fields that are not required in
+    the JSON schema, but that are not nullable. Pydantic has no concept of an omissible field,
+    so we must for it to be nullable and then make sure we don't serialize None values.
     """
 
-    _private_exclude_unset_field: ClassVar[list[str]] = []
+    _fields_must_omit_none_on_serialize: ClassVar[list[str]] = []
 
     @model_serializer(mode="wrap")
     def serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
-        """Serialize the model to a dictionary, excluding omissible fields if appropriate."""
+        """Serialize the model to a dictionary, excluding fields for which we must omit None."""
         ser = handler(self)
-        for field in self._private_exclude_unset_field:
+        for field in self._fields_must_omit_none_on_serialize:
             if field in ser and (ser[field] is PydanticUndefined or ser[field] is None):
                 del ser[field]
         return ser
@@ -511,7 +510,7 @@ class GeneratedBaseModel(BaseModel):
     @classmethod
     def extend_exclude_unset_fields(cls, fields: list[str]) -> None:
         """Extend the list of fields to exclude from serialization."""
-        cls._private_exclude_unset_field.extend(fields)
+        cls._fields_must_omit_none_on_serialize.extend(fields)
 
 
 def generate_pydantic_model_from_json_schema(
@@ -534,24 +533,41 @@ def generate_pydantic_model_from_json_schema(
     properties = schema_without_refs.get("properties", {})  # type: ignore  # noqa: PGH003
     required = set(schema_without_refs.get("required", []))  # type: ignore  # noqa: PGH003
 
-    omissible_fields = [
+    non_nullable_omissible_fields = [
         field_name
         for field_name, field in properties.items()
-        if "default" not in field and field_name not in required
+        if (
+            "default" not in field
+            and field_name not in required
+            and not _is_nullable_field(field_name, field)
+        )
     ]
 
     # Define fields for the model
     fields = dict(
         [
-            _generate_field(key, value, required=key in required, omissible=key in omissible_fields)
+            _generate_field(
+                key,
+                value,
+                required=key in required,
+                force_nullable=key in non_nullable_omissible_fields,
+            )
             for key, value in properties.items()
         ],
     )
 
     # Create the Pydantic model dynamically
     model = create_model(model_name, __base__=GeneratedBaseModel, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
-    model.extend_exclude_unset_fields(omissible_fields)
+    model.extend_exclude_unset_fields(non_nullable_omissible_fields)
     return model
+
+
+def _is_nullable_field(field_name: str, field: dict[str, Any]) -> bool:
+    """Check if a field is nullable."""
+    python_type = _map_pydantic_type(field_name, field)
+    if get_origin(python_type) is Union:
+        return type(None) in get_args(python_type)
+    return False
 
 
 def _generate_field(
@@ -559,12 +575,12 @@ def _generate_field(
     field: dict[str, Any],
     *,
     required: bool,
-    omissible: bool,
+    force_nullable: bool,
 ) -> tuple[str, tuple[type | Any, Any]]:
     """Generate a Pydantic field from a JSON schema field."""
     default_from_schema = field.get("default")
     field_type = _map_pydantic_type(field_name, field)
-    if omissible:
+    if force_nullable:
         field_type = field_type | None
     return (
         field_name,
