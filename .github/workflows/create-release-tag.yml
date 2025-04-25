@@ -59,7 +59,7 @@ jobs:
             const sha = context.sha;
 
             try {
-              await github.rest.git.createRef({
+              await github.rest.git.updateRef{
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: `refs/tags/latest-prod-release`,

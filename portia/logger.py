@@ -191,6 +191,7 @@ class LoggerManager:
             level="INFO",
             format=self.formatter.format,
             serialize=False,
+            catch=True,
         )
         self._logger: LoggerInterface = custom_logger or default_logger  # type: ignore  # noqa: PGH003
         self.custom_logger = False
@@ -242,6 +243,7 @@ class LoggerManager:
                 level=config.default_log_level.value,
                 format=self.formatter.format,
                 serialize=config.json_log_serialize,
+                catch=True,
             )
 
 
