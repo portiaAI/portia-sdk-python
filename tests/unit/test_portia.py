@@ -105,7 +105,8 @@ def test_portia_local_default_config_with_api_keys() -> None:
         assert portia.config == Config.from_default()
         assert (
             len(portia.tool_registry.get_tools())
-            == len(open_source_tool_registry.get_tools()) - 1  # BrowserTool is excluded
+            == len(open_source_tool_registry.get_tools())
+            - 2  # BrowserTool + PDF reader are excluded
         )
 
 
@@ -125,7 +126,7 @@ def test_portia_local_default_config_without_api_keys() -> None:
         portia = Portia()
         assert portia.config == Config.from_default()
         assert (
-            len(portia.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools()) - 3
+            len(portia.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools()) - 4
         )
 
 

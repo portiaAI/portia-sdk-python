@@ -60,8 +60,10 @@ def test_pdf_reader_tool_file_not_found(pdf_reader_tool: PDFReaderTool) -> None:
         pdf_reader_tool.run(get_test_tool_context(), "/non/existent/file.pdf")
 
 
-@patch.dict(os.environ, {})  # Empty environment to ensure MISTRAL_API_KEY is not set
+@patch("portia.open_source_tools.pdf_reader_tool.Mistral")
+@patch.dict(os.environ, {}, clear=True)
 def test_pdf_reader_tool_missing_api_key(
+    mock_mistral_class: MagicMock,
     pdf_reader_tool: PDFReaderTool,
     tmp_path: Path,
 ) -> None:
@@ -71,3 +73,6 @@ def test_pdf_reader_tool_missing_api_key(
 
     with pytest.raises(ValueError, match="MISTRAL_API_KEY environment variable is not set"):
         pdf_reader_tool.run(get_test_tool_context(), str(pdf_path))
+
+    # Make sure Mistral class was never instantiated
+    mock_mistral_class.assert_not_called()
