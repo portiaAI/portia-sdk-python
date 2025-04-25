@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from portia.clarification import Clarification, InputClarification
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
@@ -35,7 +36,6 @@ if TYPE_CHECKING:
 
     from portia.config import Config
     from portia.end_user import EndUser
-    from portia.execution_agents.context import StepInput
     from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun

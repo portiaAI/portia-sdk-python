@@ -6,7 +6,7 @@ However, for more complex tool calls, the DefaultExecutionAgent is recommended a
 be more successful than the OneShotAgent.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 from typing import TYPE_CHECKING, Any
 
@@ -27,13 +27,14 @@ from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.tool import ToolRunContext
+from portia.execution_agents.context import StepInput  # noqa: TC001
+
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
     from portia.config import Config
     from portia.end_user import EndUser
-    from portia.execution_agents.context import StepInput
     from portia.execution_agents.output import Output
     from portia.model import GenerativeModel
     from portia.plan import Step

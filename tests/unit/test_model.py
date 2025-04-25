@@ -1,14 +1,17 @@
 """Unit tests for the Message class in portia.model."""
 
 from types import SimpleNamespace
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
+from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.model import (
+    AnthropicGenerativeModel,
     GenerativeModel,
     LangChainGenerativeModel,
     LLMProvider,
@@ -176,3 +179,62 @@ def test_langchain_model_structured_output_returns_dict() -> None:
     )
     assert isinstance(result, StructuredOutputTestModel)
     assert result.test_field == "Response from model"
+
+
+def test_anthropic_model_structured_output_returns_invalid_data() -> None:
+    """Test that AnthropicModel.structured_output returns a dict."""
+    mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
+    structured_output = MagicMock()
+    mock_chat_anthropic.with_structured_output.return_value = structured_output
+    structured_output.invoke.return_value = None
+
+    with mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls:
+        mock_chat_anthropic_cls.return_value = mock_chat_anthropic
+        model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        with pytest.raises(TypeError, match="Expected dict, got None"):
+            model.get_structured_response(
+                messages=[Message(role="user", content="Hello")],
+                schema=StructuredOutputTestModel,
+            )
+
+
+def test_anthropic_model_structured_output_returns_dict() -> None:
+    """Test that AnthropicModel.structured_output returns a dict."""
+    mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
+    structured_output = MagicMock()
+    mock_chat_anthropic.with_structured_output.return_value = structured_output
+    structured_output.invoke.return_value = {"parsed": {"test_field": "Response from model"}}
+
+    with mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls:
+        mock_chat_anthropic_cls.return_value = mock_chat_anthropic
+        model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        result = model.get_structured_response(
+            messages=[Message(role="user", content="Hello")],
+            schema=StructuredOutputTestModel,
+        )
+        assert isinstance(result, StructuredOutputTestModel)
+        assert result.test_field == "Response from model"
+
+
+def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
+    """Test that AnthropicModel.structured_output falls back to instructor when expected."""
+    mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
+    structured_output = MagicMock()
+    mock_chat_anthropic.with_structured_output.return_value = structured_output
+    structured_output.invoke.return_value = {
+        "parsing_error": ValidationError("Test error", []),
+        "raw": AIMessage(content=" ".join("portia" for _ in range(10000))),
+        "parsed": None,
+    }
+
+    with (
+        mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls,
+        mock.patch("instructor.from_anthropic") as mock_instructor,
+    ):
+        mock_chat_anthropic_cls.return_value = mock_chat_anthropic
+        model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        _ = model.get_structured_response(
+            messages=[Message(role="user", content="Hello")],
+            schema=StructuredOutputTestModel,
+        )
+        mock_instructor.return_value.chat.completions.create.assert_called_once()
