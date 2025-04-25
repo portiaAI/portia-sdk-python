@@ -7,13 +7,14 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import instructor
+import tiktoken
 from anthropic import Anthropic
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
 from openai import AzureOpenAI, OpenAI
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.common import validate_extras_dependencies
 
@@ -398,6 +399,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     """Anthropic model implementation."""
 
     provider: LLMProvider = LLMProvider.ANTHROPIC
+    _output_instructor_threshold = 512
 
     def __init__(
         self,
@@ -406,6 +408,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         api_key: SecretStr,
         timeout: int = 120,
         max_retries: int = 3,
+        max_tokens: int = 8096,
         **kwargs: Any,
     ) -> None:
         """Initialize with Anthropic client.
@@ -414,6 +417,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             model_name: Name of the Anthropic model
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries
+            max_tokens: Maximum number of tokens to generate
             api_key: API key for Anthropic
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
@@ -422,14 +426,18 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             model_name=model_name,
             timeout=timeout,
             max_retries=max_retries,
+            max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
             api_key=api_key,
             **kwargs,
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
-            client=wrappers.wrap_anthropic(Anthropic(api_key=api_key.get_secret_value())),
+            client=wrappers.wrap_anthropic(
+                Anthropic(api_key=api_key.get_secret_value()),
+            ),
             mode=instructor.Mode.ANTHROPIC_JSON,
         )
+        self.max_tokens = max_tokens
 
     def get_structured_response(
         self,
@@ -450,7 +458,22 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         """
         if schema.__name__ == "StepsOrError":
             return self.get_structured_response_instructor(messages, schema)
-        return super().get_structured_response(messages, schema, **kwargs)
+        langchain_messages = [msg.to_langchain() for msg in messages]
+        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        raw_response = structured_client.invoke(langchain_messages)
+        if not isinstance(raw_response, dict):
+            raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
+        # Anthropic sometimes struggles serializing large JSON responses, so we fall back to
+        # instructor if the response is above a certain size.
+        if isinstance(raw_response.get("parsing_error"), ValidationError) and (
+            len(tiktoken.get_encoding("gpt2").encode(raw_response["raw"].model_dump_json()))
+            > self._output_instructor_threshold
+        ):
+            return self.get_structured_response_instructor(messages, schema)
+        response = raw_response["parsed"]
+        if isinstance(response, schema):
+            return response
+        return schema.model_validate(response)
 
     def get_structured_response_instructor(
         self,
@@ -463,7 +486,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             model=self.model_name,
             response_model=schema,
             messages=instructor_messages,
-            max_tokens=2048,
+            max_tokens=self.max_tokens,
         )
 
 
