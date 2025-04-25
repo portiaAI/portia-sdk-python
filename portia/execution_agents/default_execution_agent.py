@@ -25,10 +25,8 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
-from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.tool import ToolRunContext
 
@@ -155,33 +153,29 @@ class MemoryExtractionStep:
         """
         step_inputs = []
         previous_outputs = self.agent.plan_run.outputs.step_outputs
-        for step_input in self.agent.step.inputs:
-            if step_input.name not in previous_outputs:
-                raise InvalidPlanRunStateError("Received unknown step input: %s", step_input.name)
-            previous_output = previous_outputs.get(step_input.name)
+        plan_inputs = self.agent.plan_run.outputs.plan_inputs
 
-            match previous_output:
-                case LocalOutput():
-                    output_value = previous_output.value
-                case AgentMemoryOutput():
-                    output_value = self.agent.agent_memory.get_plan_run_output(
-                        previous_output.output_name,
-                        self.agent.plan_run.id,
-                    ).value
-                case _:
-                    logger().warning(
-                        "Received unknown output type: %s",
-                        previous_output,
-                    )
-                    continue
+        for input_variable in self.agent.step.inputs:
+            input_value = None
+
+            if input_variable.name in previous_outputs:
+                previous_output = previous_outputs.get(input_variable.name)
+                input_value = previous_output.full_value(self.agent.agent_memory)
+            elif input_variable.name in plan_inputs:
+                input_value = plan_inputs[input_variable.name]
+            else:
+                raise InvalidPlanRunStateError(
+                    f"Received unknown step input: {input_variable.name}"
+                )
 
             step_inputs.append(
-                StepInput(
-                    name=step_input.name,
-                    value=output_value,
-                    description=step_input.description,
-                ),
+                step_input=StepInput(
+                    name=input_variable.name,
+                    value=input_value,
+                    description=input_variable.description,
+                )
             )
+
         return {"step_inputs": step_inputs}
 
 

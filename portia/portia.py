@@ -30,6 +30,7 @@ from portia.clarification import (
     ClarificationCategory,
 )
 from portia.cloud import PortiaCloudClient
+from portia.common import Serializable
 from portia.config import (
     Config,
     ExecutionAgentType,
@@ -60,7 +61,7 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
+from portia.plan import Plan, PlanContext, PlanInput, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.storage import (
@@ -169,6 +170,7 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
+        plan_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -181,15 +183,18 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
+            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping PlanInput
+            objects to their values.
 
         Returns:
             PlanRun: The run resulting from executing the query.
 
         """
-        plan = self.plan(query, tools, example_plans, end_user)
+        plan_input_list = list(plan_inputs.keys()) if plan_inputs else None
+        plan = self.plan(query, tools, example_plans, end_user, plan_input_list)
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user)
-        return self.resume(plan_run)
+        return self.resume(plan_run, plan_inputs)
 
     def plan(
         self,
@@ -197,6 +202,7 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
+        plan_inputs: list[PlanInput] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples.
 
@@ -207,6 +213,8 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
+            plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
+            the inputs required for the plan.
 
         Returns:
             Plan: The plan for executing the query.
@@ -232,6 +240,7 @@ class Portia:
             tool_list=tools,
             end_user=end_user,
             examples=example_plans,
+            plan_inputs=plan_inputs,
         )
         if outcome.error:
             if (
@@ -247,12 +256,14 @@ class Portia:
             else:
                 logger().error(f"Error in planning - {outcome.error}")
                 raise PlanError(outcome.error)
+
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
                 tool_ids=[tool.id for tool in tools],
             ),
             steps=outcome.steps,
+            inputs=plan_inputs or [],
         )
         self.storage.save_plan(plan)
         logger().info(
@@ -269,12 +280,15 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
+        plan_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
         Args:
             plan (Plan): The plan to run.
             end_user (str | EndUser | None = None): The end user to use.
+            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping PlanInput
+            objects to their values.
 
         Returns:
             PlanRun: The resulting PlanRun object.
@@ -289,12 +303,13 @@ class Portia:
 
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user)
-        return self.resume(plan_run)
+        return self.resume(plan_run, plan_inputs)
 
     def resume(
         self,
         plan_run: PlanRun | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
+        plan_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """Resume a PlanRun.
 
@@ -308,6 +323,8 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
+            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping PlanInput
+                objects to their values.
 
         Returns:
             PlanRun: The resulting PlanRun after execution.
@@ -338,12 +355,74 @@ class Portia:
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
+        # Process plan input values if provided
+        if plan_inputs:
+            self._process_plan_input_values(plan, plan_run, plan_inputs)
+
         # if the run has execution context associated, but none is set then use it
         if not is_execution_context_set():
             with execution_context(plan_run.execution_context):
                 return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
 
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
+
+    def _process_plan_input_values(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        plan_inputs: dict[PlanInput, Serializable] | None,
+    ) -> None:
+        """Process plan input values and add them to the plan run.
+
+        Args:
+            plan (Plan): The plan containing required inputs.
+            plan_run (PlanRun): The plan run to update with input values.
+            plan_inputs (dict[PlanInput, Serializable] | None): Values for plan inputs.
+
+        Raises:
+            ValueError: If required plan inputs are missing.
+            ValidationError: If input values don't match the specified schema.
+
+        """
+        # Process plan input values if provided
+        if plan_inputs and plan.inputs:
+            # Convert to name-based dictionary for easier processing
+            input_values_by_name = {
+                input_obj.name: value for input_obj, value in plan_inputs.items()
+            }
+
+            # Validate all required inputs are provided
+            missing_inputs = []
+            for plan_input in plan.inputs:
+                if plan_input.name not in input_values_by_name:
+                    missing_inputs.append(plan_input.name)
+
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+
+            for plan_input in plan.inputs:
+                if plan_input.name in input_values_by_name:
+                    value = input_values_by_name[plan_input.name]
+
+                    # Validate against schema if present
+                    if plan_input.value_schema is not None:
+                        try:
+                            # Validate and convert the value using the schema
+                            value = plan_input.value_schema.model_validate(value)
+                        except Exception as e:
+                            raise ValueError(
+                                f"Invalid value for input '{plan_input.name}': {e!s}"
+                            ) from e
+
+                    plan_run.outputs.plan_inputs[plan_input.name] = value
+
+            # Check for unknown inputs
+            for input_obj in plan_inputs.keys():
+                if not any(plan_input.name == input_obj.name for plan_input in plan.inputs):
+                    logger().warning(f"Ignoring unknown plan input: {input_obj.name}")
+
+            # Save the updated plan run
+            self.storage.save_plan_run(plan_run)
 
     def execute_plan_run_and_handle_clarifications(
         self,
@@ -381,14 +460,14 @@ class Portia:
     def resolve_clarification(
         self,
         clarification: Clarification,
-        response: object,
+        response: Serializable,
         plan_run: PlanRun | None = None,
     ) -> PlanRun:
         """Resolve a clarification updating the run state as needed.
 
         Args:
             clarification (Clarification): The clarification to resolve.
-            response (object): The response to the clarification.
+            response (Serializable): The response to the clarification.
             plan_run (PlanRun | None): Optional - the plan run being updated.
 
         Returns:
@@ -731,8 +810,7 @@ class Portia:
             )
 
         logger().info(
-            f"Evaluating condition for Step #{current_step_index}: "
-            f"#{step.condition}",
+            f"Evaluating condition for Step #{current_step_index}: #{step.condition}",
         )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(

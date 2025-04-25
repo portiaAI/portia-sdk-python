@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.clarification import (
     ClarificationListType,
 )
-from portia.common import PortiaEnum
+from portia.common import PortiaEnum, Serializable
 from portia.execution_agents.output import Output
 from portia.execution_context import ExecutionContext, empty_context
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
@@ -57,6 +57,7 @@ class PlanRunOutputs(BaseModel):
         step_outputs (dict[str, Output]): A dictionary containing outputs of individual steps.
             Outputs are indexed by the value given by the `step.output` field of the plan.
         final_output (Output | None): The final consolidated output of the PlanRun if available.
+        plan_inputs (dict[str, Serializable]): Values for the plan inputs.
 
     """
 
@@ -70,6 +71,11 @@ class PlanRunOutputs(BaseModel):
     step_outputs: dict[str, Output] = Field(
         default={},
         description="A dictionary containing outputs of individual run steps.",
+    )
+
+    plan_inputs: dict[str, Serializable] = Field(
+        default={},
+        description="Values for the plan inputs.",
     )
 
     final_output: Output | None = Field(

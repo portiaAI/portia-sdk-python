@@ -14,6 +14,7 @@
      - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
     IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create plan with zero steps.
     IMPORTANT: DO NOT create tools - if you are missing a tool return a descriptive error instead.
+    {% if plan_inputs %}IMPORTANT: Note the plan inputs below. These will be provided when the plan is executed, so make sure to use them in your steps appropriately.{% endif %}
 </Instructions>
 
 <Examples>{% for example in examples %}
@@ -49,6 +50,14 @@
     <EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>
     <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
 </EndUser>
+
+{% if plan_inputs %}
+<PlanInputs>{% for input in plan_inputs %}
+    <PlanInput name="{{input.name}}">
+        {{input.description}}
+    </PlanInput>{% endfor %}
+</PlanInputs>
+{% endif %}
 
 <Request>
     <Tools>

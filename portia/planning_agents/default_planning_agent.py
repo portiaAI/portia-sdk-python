@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
+from portia.plan import PlanInput
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
 from portia.planning_agents.context import render_prompt_insert_defaults
 
@@ -32,13 +33,28 @@ class DefaultPlanningAgent(BasePlanningAgent):
         tool_list: list[Tool],
         end_user: EndUser,
         examples: list[Plan] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
-        """Generate a plan or error using an LLM from a query and a list of tools."""
+        """Generate a plan or error using an LLM from a query and a list of tools.
+
+        Args:
+            query (str): The query to generate a plan for.
+            tool_list (list[Tool]): List of available tools.
+            end_user (EndUser): The end user making the request.
+            examples (list[Plan] | None): Optional example plans.
+            plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
+                the inputs required for the plan.
+
+        Returns:
+            StepsOrError: The generated steps or an error.
+
+        """
         prompt = render_prompt_insert_defaults(
             query,
             tool_list,
             end_user,
             examples,
+            plan_inputs,
         )
         response = self.model.get_structured_response(
             schema=StepsOrError,
@@ -66,6 +82,7 @@ IMPORTANT GUIDLINES:
   1. Task field: Write only the task description without conditions.
   2. Condition field: Write the condition in concise natural language.
 - Do not use the condition field for non-conditional steps.
+- If plan inputs are provided, make sure to use them appropriately in your steps.
                     """,
                 ),
                 Message(role="user", content=prompt),
