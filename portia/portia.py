@@ -30,7 +30,6 @@ from portia.clarification import (
     ClarificationCategory,
 )
 from portia.cloud import PortiaCloudClient
-from portia.common import Serializable
 from portia.config import (
     Config,
     ExecutionAgentType,
@@ -79,6 +78,7 @@ from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.clarification_handler import ClarificationHandler
+    from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
     from portia.tool import Tool
@@ -183,8 +183,8 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
-            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping PlanInput
-            objects to their values.
+            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
+                PlanInput objects to their values.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -194,7 +194,7 @@ class Portia:
         plan = self.plan(query, tools, example_plans, end_user, plan_input_list)
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user)
-        return self.resume(plan_run, plan_inputs)
+        return self.resume(plan_run=plan_run, plan_inputs=plan_inputs)
 
     def plan(
         self,
@@ -287,8 +287,8 @@ class Portia:
         Args:
             plan (Plan): The plan to run.
             end_user (str | EndUser | None = None): The end user to use.
-            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping PlanInput
-            objects to their values.
+            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
+                PlanInput objects to their values.
 
         Returns:
             PlanRun: The resulting PlanRun object.
@@ -303,7 +303,7 @@ class Portia:
 
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user)
-        return self.resume(plan_run, plan_inputs)
+        return self.resume(plan_run=plan_run, plan_inputs=plan_inputs)
 
     def resume(
         self,
@@ -323,8 +323,8 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
-            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping PlanInput
-                objects to their values.
+            plan_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
+                PlanInput objects to their values.
 
         Returns:
             PlanRun: The resulting PlanRun after execution.
@@ -392,10 +392,11 @@ class Portia:
             }
 
             # Validate all required inputs are provided
-            missing_inputs = []
-            for plan_input in plan.inputs:
-                if plan_input.name not in input_values_by_name:
-                    missing_inputs.append(plan_input.name)
+            missing_inputs = [
+                input_obj.name
+                for input_obj in plan.inputs
+                if input_obj.name not in input_values_by_name
+            ]
 
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
@@ -417,7 +418,7 @@ class Portia:
                     plan_run.outputs.plan_inputs[plan_input.name] = value
 
             # Check for unknown inputs
-            for input_obj in plan_inputs.keys():
+            for input_obj in plan_inputs:
                 if not any(plan_input.name == input_obj.name for plan_input in plan.inputs):
                     logger().warning(f"Ignoring unknown plan input: {input_obj.name}")
 

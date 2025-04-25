@@ -7,14 +7,13 @@ from typing import TYPE_CHECKING
 
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import PlanInput
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
 from portia.planning_agents.context import render_prompt_insert_defaults
 
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.end_user import EndUser
-    from portia.plan import Plan, Step
+    from portia.plan import Plan, PlanInput, Step
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)

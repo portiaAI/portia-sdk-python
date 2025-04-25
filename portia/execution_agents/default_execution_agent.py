@@ -160,7 +160,7 @@ class MemoryExtractionStep:
 
             if input_variable.name in previous_outputs:
                 previous_output = previous_outputs.get(input_variable.name)
-                input_value = previous_output.full_value(self.agent.agent_memory)
+                input_value = previous_output.full_value(self.agent.agent_memory)  # pyright: ignore[reportOptionalMemberAccess]
             elif input_variable.name in plan_inputs:
                 input_value = plan_inputs[input_variable.name]
             else:
@@ -169,7 +169,7 @@ class MemoryExtractionStep:
                 )
 
             step_inputs.append(
-                step_input=StepInput(
+                StepInput(
                     name=input_variable.name,
                     value=input_value,
                     description=input_variable.description,
