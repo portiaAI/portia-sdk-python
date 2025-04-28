@@ -461,14 +461,14 @@ class Portia:
     def resolve_clarification(
         self,
         clarification: Clarification,
-        response: Serializable,
+        response: object,
         plan_run: PlanRun | None = None,
     ) -> PlanRun:
         """Resolve a clarification updating the run state as needed.
 
         Args:
             clarification (Clarification): The clarification to resolve.
-            response (Serializable): The response to the clarification.
+            response (object): The response to the clarification.
             plan_run (PlanRun | None): Optional - the plan run being updated.
 
         Returns:

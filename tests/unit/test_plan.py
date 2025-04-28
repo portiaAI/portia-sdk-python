@@ -1,9 +1,18 @@
 """Plan tests."""
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
-from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step, Variable
+from portia.plan import (
+    Plan,
+    PlanBuilder,
+    PlanContext,
+    PlanInput,
+    PlanUUID,
+    ReadOnlyPlan,
+    Step,
+    Variable,
+)
 from tests.utils import get_test_plan_run
 
 
@@ -133,6 +142,46 @@ def test_pretty_print() -> None:
                 condition="x > 10",
             ),
         ],
+        inputs=[PlanInput(name="$input", description="test input")],
     )
     output = plan.pretty_print()
     assert isinstance(output, str)
+
+
+def test_plan_builder_with_schema_plan_input() -> None:
+    """Test that plan builder can create plans with schema-validated inputs."""
+
+    class PersonSchema(BaseModel):
+        """Test schema for a person."""
+
+        name: str = Field(description="Person's name")
+        age: int = Field(description="Person's age")
+
+    plan = (
+        PlanBuilder("Process a person's information")
+        .step("Process person", "person_processor")
+        .plan_input(
+            name="$person",
+            description="Person's information",
+            value_schema=PersonSchema,
+        )
+        .build()
+    )
+
+    assert len(plan.inputs) == 1
+    assert plan.inputs[0].name == "$person"
+    assert plan.inputs[0].description == "Person's information"
+    assert plan.inputs[0].value_schema == PersonSchema
+
+
+def test_plan_inputs_must_be_unique() -> None:
+    """Test that plan inputs must have unique names."""
+    with pytest.raises(ValidationError, match="Plan input names must be unique"):
+        Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[Step(task="test task", output="$output")],
+            inputs=[
+                PlanInput(name="$duplicate", description="First input"),
+                PlanInput(name="$duplicate", description="Second input with same name"),
+            ],
+        )

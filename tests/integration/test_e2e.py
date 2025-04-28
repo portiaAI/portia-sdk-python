@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
@@ -19,9 +19,10 @@ from portia.config import (
 from portia.errors import PlanError, ToolHardError, ToolSoftError
 from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
-from portia.plan import Plan, PlanContext, Step, Variable
+from portia.plan import Plan, PlanContext, PlanInput, Step, Variable
 from portia.plan_run import PlanRunState
 from portia.portia import ExecutionHooks, Portia
+from portia.tool import Tool
 from portia.tool_registry import ToolRegistry
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarificationHandler
 
@@ -553,3 +554,49 @@ def test_portia_plan_steps_inputs_dependencies(
     ), "Fourth step inputs should have summary input"
     assert plan.steps[3].tool_id == "file_writer_tool", "Fourth step should be file_writer_tool"
     assert "100" in str(plan.steps[3].condition), "Fourth step condition does not contain 100"
+
+
+def test_plan_input_with_schema_validation() -> None:
+    """Test running a plan with schema-validated plan inputs."""
+
+    class PersonData(BaseModel):
+        name: str = Field(description="Person's name")
+        age: int = Field(description="Person's age")
+
+    class PersonTool(Tool):
+        """Tool that processes person data."""
+
+        def run(self, ctx: ToolRunContext, person: PersonData) -> str:  # type: ignore[override]  # noqa: ARG002
+            return f"Processed {person.name} who is {person.age} years old"
+
+    input_person = PlanInput(
+        name="$person", description="The person to process", value_schema=PersonData
+    )
+    plan_inputs = {
+        input_person: {
+            "name": "John Doe",
+            "age": 30,
+        }
+    }
+
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        llm_provider=LLMProvider.OPENAI,
+        default_model="openai/gpt-4o-mini",
+        storage_class=StorageClass.MEMORY,
+    )
+    portia = Portia(config=config, tools=ToolRegistry([PersonTool()]))
+    plan = portia.plan("Use the person tool to process the person")
+    plan_run = portia.run_plan(plan, plan_inputs=plan_inputs)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert "Processed John Doe who is 30 years old" in str(
+        plan_run.outputs.final_output.get_value()
+    )
+
+    # Try with invalid input - this should fail validation
+    invalid_inputs = {
+        input_person: {"name": "Jane Doe", "age": "thirty"}  # age should be an int
+    }
+    with pytest.raises(ValueError):  # noqa: PT011
+        portia.run_plan(plan, plan_inputs=invalid_inputs)

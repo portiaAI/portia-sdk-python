@@ -237,7 +237,7 @@ class PlanInput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: str = Field(
-        description="The name of the input, e.g. $api_key.",
+        description="The name of the input",
     )
     description: str = Field(
         description="A description of the input.",

@@ -966,3 +966,34 @@ def test_memory_extraction_step_handles_unknown_output_type() -> None:
     result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
 
     assert len(result["step_inputs"]) == 0
+
+
+def test_memory_extraction_step_with_plan_inputs() -> None:
+    """Test MemoryExtractionStep with inputs from plan_inputs."""
+    (_, plan_run) = get_test_plan_run()
+    plan_run.outputs.plan_inputs = {
+        "$plan_input": "plan_input_value",
+    }
+
+    agent = DefaultExecutionAgent(
+        step=Step(
+            task="DESCRIPTION_STRING",
+            output="$out",
+            inputs=[
+                Variable(name="$plan_input", description="Plan input description"),
+            ],
+        ),
+        plan_run=plan_run,
+        config=get_test_config(),
+        tool=None,
+        agent_memory=InMemoryStorage(),
+        end_user=EndUser(external_id="123"),
+    )
+
+    memory_extraction_step = MemoryExtractionStep(agent=agent)
+    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
+
+    assert len(result["step_inputs"]) == 1
+    assert result["step_inputs"][0].name == "$plan_input"
+    assert result["step_inputs"][0].value == "plan_input_value"
+    assert result["step_inputs"][0].description == "Plan input description"

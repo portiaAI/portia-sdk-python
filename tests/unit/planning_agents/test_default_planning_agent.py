@@ -10,7 +10,7 @@ import pytest
 
 from portia.end_user import EndUser
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, Step, Variable
+from portia.plan import Plan, PlanContext, PlanInput, Step, Variable
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
 from portia.planning_agents.context import (
     render_prompt_insert_defaults,
@@ -112,6 +112,9 @@ def test_render_prompt() -> None:
                     output="$plan_output1",
                 ),
             ],
+            inputs=[
+                PlanInput(name="$plan_input", description="Plan input description"),
+            ],
         ),
     ]
     rendered_prompt = render_prompt_insert_defaults(
@@ -146,6 +149,10 @@ def test_render_prompt() -> None:
     assert "plan_tool1a" in response_match
     assert "$plan_input1" in response_match
     assert "$plan_output1" in response_match
+
+    # Check that plan inputs are included in the example
+    assert "$plan_input" in example_match
+    assert "Plan input description" in example_match
 
     assert "Use this tool to add two numbers together" in tools_content
     assert "add_tool" in tools_content
@@ -224,4 +231,49 @@ def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
 
     assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)
     assert len(result.steps) == 2
+    assert result.error is None
+
+
+def test_generate_steps_with_plan_inputs(mock_config: Config) -> None:
+    """Test plan generation with plan inputs."""
+    plan_inputs = [
+        PlanInput(
+            name="$username",
+            description="Username for the service",
+        ),
+        PlanInput(
+            name="$user_id",
+            description="ID of the user",
+        ),
+    ]
+
+    mock_model = get_mock_generative_model(
+        response=StepsOrError(
+            steps=[
+                Step(
+                    task="Process user addition",
+                    tool_id="add_tool",
+                    inputs=[Variable(name="$user_id", description="ID of the user")],
+                    output="$output",
+                ),
+            ],
+            error=None,
+        ),
+    )
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+
+    result = planning_agent.generate_steps_or_error(
+        query="Process user data",
+        tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
+        plan_inputs=plan_inputs,
+    )
+
+    assert mock_model.get_structured_response.called
+    messages = mock_model.get_structured_response.call_args[1]["messages"]
+    prompt_text = messages[1].content
+
+    assert "$user_id" in prompt_text
+    assert "ID of the user" in prompt_text
     assert result.error is None

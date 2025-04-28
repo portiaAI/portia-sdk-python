@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalOutput
-from portia.plan import PlanUUID, ReadOnlyStep, Step
+from portia.plan import PlanInput, PlanUUID, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, ReadOnlyPlanRun
 from portia.prefixed_uuid import PlanRunUUID
 
@@ -42,9 +42,11 @@ def plan_run(mock_clarification: InputClarification) -> PlanRun:
 def test_run_initialization() -> None:
     """Test initialization of PlanRun instance."""
     plan_id = PlanUUID()
+    plan_inputs = [PlanInput(name="$input1", description="First test input")]
     plan_run = PlanRun(
         plan_id=plan_id,
         end_user_id="test123",
+        plan_inputs=plan_inputs,
     )
 
     assert plan_run.id is not None
@@ -54,6 +56,8 @@ def test_run_initialization() -> None:
     assert plan_run.outputs.clarifications == []
     assert plan_run.state == PlanRunState.NOT_STARTED
     assert plan_run.outputs.step_outputs == {}
+    assert len(plan_run.plan_inputs) == 2
+    assert plan_run.plan_inputs[0].name == "$input1"
 
 
 def test_run_get_outstanding_clarifications(
