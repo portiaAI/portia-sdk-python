@@ -963,7 +963,10 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
         # Verify result
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step1_result" in plan_run.outputs.step_outputs
-        assert plan_run.outputs.step_outputs["$step1_result"].get_value() == "Tool execution skipped"
+        assert (
+            plan_run.outputs.step_outputs["$step1_result"].get_value()
+            == "Tool execution skipped"
+        )
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
         assert plan_run.outputs.final_output is not None
@@ -1353,8 +1356,14 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
 
         assert result_plan_run.outputs.step_outputs["$step1_result"].get_value() == "Step 1 result"
         assert result_plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
-        assert result_plan_run.outputs.step_outputs["$step3_result"].get_value() == "Tool execution skipped"
-        assert result_plan_run.outputs.step_outputs["$step4_result"].get_value() == "Tool execution skipped"
+        assert (
+            result_plan_run.outputs.step_outputs["$step3_result"].get_value()
+            == "Tool execution skipped"
+        )
+        assert (
+            result_plan_run.outputs.step_outputs["$step4_result"].get_value()
+            == "Tool execution skipped"
+        )
         assert result_plan_run.outputs.final_output is not None
         assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
         assert result_plan_run.outputs.final_output.get_summary() == expected_summary
