@@ -18,7 +18,6 @@ class PreStepIntrospectionOutcome(PortiaEnum):
     FAIL = "FAIL"
     COMPLETE = "COMPLETE"
 
-
 class PreStepIntrospection(BaseModel):
     """The outcome of a pre-step introspection."""
 

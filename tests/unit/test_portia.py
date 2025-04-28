@@ -1160,18 +1160,15 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
         last_executed_step_output=previous_output,
     )
 
-    # Verify the outcome
-    assert outcome.outcome == PreStepIntrospectionOutcome.FAIL
+    failed_outcome = "Tool Execution Skipped and Failed Plan Run"
+
+    assert outcome.outcome == failed_outcome
     assert outcome.reason == "Execution failed"
 
-    # Verify plan_run was updated correctly
-    assert (
-        updated_plan_run.outputs.step_outputs["$test_output"].get_value()
-        == PreStepIntrospectionOutcome.FAIL
-    )
+    assert updated_plan_run.outputs.step_outputs["$test_output"].get_value() == failed_outcome
     assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Execution failed"
     assert updated_plan_run.outputs.final_output is not None
-    assert updated_plan_run.outputs.final_output.get_value() == PreStepIntrospectionOutcome.FAIL
+    assert updated_plan_run.outputs.final_output.get_value() == failed_outcome
     assert updated_plan_run.outputs.final_output.get_summary() == "Execution failed"
     assert updated_plan_run.state == PlanRunState.FAILED
 
@@ -1191,14 +1188,12 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
         state=PlanRunState.IN_PROGRESS,
     )
 
-    # Mock the introspection agent to return SKIP
     mock_introspection = MagicMock()
     mock_introspection.pre_step_introspection.return_value = PreStepIntrospection(
         outcome=PreStepIntrospectionOutcome.SKIP,
         reason="Skipping step",
     )
 
-    # Call the actual method (not mocked)
     previous_output = LocalOutput(value="Previous step result")
     updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
         introspection_agent=mock_introspection,
@@ -1207,15 +1202,12 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
         last_executed_step_output=previous_output,
     )
 
-    # Verify the outcome
-    assert outcome.outcome == PreStepIntrospectionOutcome.SKIP
+    skipped_outcome = "Tool Execution Skipped - By Introspection Agent"
+
+    assert outcome.outcome == skipped_outcome
     assert outcome.reason == "Skipping step"
 
-    # Verify plan_run was updated correctly
-    assert (
-        updated_plan_run.outputs.step_outputs["$test_output"].get_value()
-        == PreStepIntrospectionOutcome.SKIP
-    )
+    assert updated_plan_run.outputs.step_outputs["$test_output"].get_value() == skipped_outcome
     assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Skipping step"
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS  # State should remain IN_PROGRESS
 
