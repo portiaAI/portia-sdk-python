@@ -944,7 +944,7 @@ def test_memory_extraction_step_errors_with_missing_input() -> None:
 def test_memory_extraction_step_with_plan_inputs() -> None:
     """Test MemoryExtractionStep with inputs from plan_inputs."""
     (_, plan_run) = get_test_plan_run()
-    plan_run.outputs.plan_inputs = {
+    plan_run.plan_inputs = {
         "$plan_input": "plan_input_value",
     }
 

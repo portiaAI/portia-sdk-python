@@ -153,7 +153,7 @@ class MemoryExtractionStep:
         """
         step_inputs = []
         previous_outputs = self.agent.plan_run.outputs.step_outputs
-        plan_inputs = self.agent.plan_run.outputs.plan_inputs
+        plan_inputs = self.agent.plan_run.plan_inputs
 
         for input_variable in self.agent.step.inputs:
             input_value = None

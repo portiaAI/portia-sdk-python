@@ -65,6 +65,7 @@ def test_base_classes() -> None:
             tool_list: list[Tool],
             end_user: EndUser,
             examples: list[Plan] | None = None,
+            plan_inputs: list[PlanInput] | None = None,  # noqa: ARG002
         ) -> StepsOrError:
             return super().generate_steps_or_error(query, tool_list, end_user, examples)  # type: ignore  # noqa: PGH003
 
@@ -270,10 +271,9 @@ def test_generate_steps_with_plan_inputs(mock_config: Config) -> None:
         end_user=EndUser(external_id="123"),
         plan_inputs=plan_inputs,
     )
+    assert result.error is None
 
-    assert mock_model._client.invoke.called  # noqa: SLF001
-    prompt_text = mock_model._client.invoke.call_args[0][0][1].content  # noqa: SLF001
-
+    assert mock_model._client.invoke.called  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+    prompt_text = mock_model._client.invoke.call_args[0][0][1].content  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
     assert "$user_id" in prompt_text
     assert "ID of the user" in prompt_text
-    assert result.error is None

@@ -46,9 +46,7 @@ def test_run_initialization() -> None:
     plan_run = PlanRun(
         plan_id=plan_id,
         end_user_id="test123",
-        outputs=PlanRunOutputs(
-            plan_inputs=plan_inputs,
-        ),
+        plan_inputs=plan_inputs,
     )
 
     assert plan_run.id is not None
@@ -58,8 +56,8 @@ def test_run_initialization() -> None:
     assert plan_run.outputs.clarifications == []
     assert plan_run.state == PlanRunState.NOT_STARTED
     assert plan_run.outputs.step_outputs == {}
-    assert len(plan_run.outputs.plan_inputs) == 1
-    assert plan_run.outputs.plan_inputs["$input1"] == "test_input_value"
+    assert len(plan_run.plan_inputs) == 1
+    assert plan_run.plan_inputs["$input1"] == "test_input_value"
 
 
 def test_run_get_outstanding_clarifications(
@@ -121,6 +119,7 @@ def test_run_serialization() -> None:
         id=plan_run_id,
         plan_id=PlanUUID(),
         end_user_id="test123",
+        plan_inputs={"$test_input": "input_value"},
         outputs=PlanRunOutputs(
             clarifications=[
                 InputClarification(
@@ -150,3 +149,5 @@ def test_run_serialization() -> None:
     parsed_plan_run = PlanRun.model_validate_json(json_str)
     # ensure clarification types are maintained
     assert isinstance(parsed_plan_run.outputs.clarifications[0], InputClarification)
+    # ensure plan inputs are maintained
+    assert parsed_plan_run.plan_inputs["$test_input"] == "input_value"

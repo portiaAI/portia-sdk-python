@@ -193,8 +193,8 @@ class Portia:
         plan_input_list = list(plan_inputs.keys()) if plan_inputs else None
         plan = self.plan(query, tools, example_plans, end_user, plan_input_list)
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user)
-        return self.resume(plan_run=plan_run, plan_inputs=plan_inputs)
+        plan_run = self.create_plan_run(plan, end_user, plan_inputs)
+        return self.resume(plan_run)
 
     def plan(
         self,
@@ -214,7 +214,7 @@ class Portia:
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
             plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
-            the inputs required for the plan.
+              the inputs required for the plan.
 
         Returns:
             Plan: The plan for executing the query.
@@ -256,7 +256,6 @@ class Portia:
             else:
                 logger().error(f"Error in planning - {outcome.error}")
                 raise PlanError(outcome.error)
-
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
@@ -302,14 +301,13 @@ class Portia:
             self.storage.save_plan(plan)
 
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user)
-        return self.resume(plan_run=plan_run, plan_inputs=plan_inputs)
+        plan_run = self.create_plan_run(plan, end_user, plan_inputs)
+        return self.resume(plan_run)
 
     def resume(
         self,
         plan_run: PlanRun | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
-        plan_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """Resume a PlanRun.
 
@@ -355,10 +353,6 @@ class Portia:
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
-        # Process plan input values if provided
-        if plan_inputs:
-            self._process_plan_input_values(plan, plan_run, plan_inputs)
-
         # if the run has execution context associated, but none is set then use it
         if not is_execution_context_set():
             with execution_context(plan_run.execution_context):
@@ -366,7 +360,7 @@ class Portia:
 
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
 
-    def _process_plan_input_values(
+    def _process_plan_input_values(  # noqa: C901
         self,
         plan: Plan,
         plan_run: PlanRun,
@@ -384,9 +378,14 @@ class Portia:
             ValidationError: If input values don't match the specified schema.
 
         """
-        # Process plan input values if provided
+        if plan.inputs and not plan_inputs:
+            raise ValueError("Inputs are required for this plan but have not been specified")
+        if plan_inputs and not plan.inputs:
+            logger().warning(
+                "Inputs are not required for this plan but plan inputs were provided",
+            )
+
         if plan_inputs and plan.inputs:
-            # Convert to name-based dictionary for easier processing
             input_values_by_name = {
                 input_obj.name: value for input_obj, value in plan_inputs.items()
             }
@@ -397,7 +396,6 @@ class Portia:
                 for input_obj in plan.inputs
                 if input_obj.name not in input_values_by_name
             ]
-
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
 
@@ -412,10 +410,10 @@ class Portia:
                             value = plan_input.value_schema.model_validate(value)
                         except Exception as e:
                             raise ValueError(
-                                f"Invalid value for input '{plan_input.name}': {e!s}"
+                                f"Received invalid value for input '{plan_input.name}': {e!s}"
                             ) from e
 
-                    plan_run.outputs.plan_inputs[plan_input.name] = value
+                    plan_run.plan_inputs[plan_input.name] = value
 
             # Check for unknown inputs
             for input_obj in plan_inputs:
@@ -617,12 +615,15 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
+        plan_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """Create a PlanRun from a Plan.
 
         Args:
             plan (Plan): The plan to create a plan run from.
             end_user (str | EndUser | None = None): The end user this plan run is for.
+            plan_inputs (dict[PlanInput, Serializable] | None = None): The plan inputs for the plan
+              run.
 
         Returns:
             PlanRun: The created PlanRun object.
@@ -635,6 +636,8 @@ class Portia:
             execution_context=get_execution_context(),
             end_user_id=end_user.external_id,
         )
+        # Process plan input values if provided
+        self._process_plan_input_values(plan, plan_run, plan_inputs)
         self.storage.save_plan_run(plan_run)
         return plan_run
 

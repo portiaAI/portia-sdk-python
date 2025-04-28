@@ -269,6 +269,16 @@ class PlanInput(BaseModel):
         """
         return value.__name__ if value else None
 
+    def __hash__(self) -> int:
+        """Make PlanInput hashable by using name and description as the hash key."""
+        return hash((self.name, self.description))
+
+    def __eq__(self, other: object) -> bool:
+        """Compare PlanInput objects for equality based on name."""
+        if not isinstance(other, PlanInput):
+            return False
+        return self.name == other.name and self.description == other.description
+
 
 class Step(BaseModel):
     """A step in a PlanRun.

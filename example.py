@@ -10,6 +10,7 @@ from portia import (
 )
 from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
+from portia.plan import PlanInput
 
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),
@@ -68,3 +69,9 @@ portia = Portia(
 plan_run = portia.run(
     "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
 )
+
+# You can pass inputs into a plan
+plan_inputs = {
+    PlanInput(name="$city", description="The city to get the temperature for"): "Lisbon",
+}
+plan_run = portia.run("Get the temperature for the provided city", plan_inputs=plan_inputs)

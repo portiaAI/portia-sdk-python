@@ -57,7 +57,6 @@ class PlanRunOutputs(BaseModel):
         step_outputs (dict[str, Output]): A dictionary containing outputs of individual steps.
             Outputs are indexed by the value given by the `step.output` field of the plan.
         final_output (Output | None): The final consolidated output of the PlanRun if available.
-        plan_inputs (dict[str, Serializable]): Values for the plan inputs.
 
     """
 
@@ -71,11 +70,6 @@ class PlanRunOutputs(BaseModel):
     step_outputs: dict[str, Output] = Field(
         default={},
         description="A dictionary containing outputs of individual run steps.",
-    )
-
-    plan_inputs: dict[str, Serializable] = Field(
-        default={},
-        description="Values for the plan inputs.",
     )
 
     final_output: Output | None = Field(
@@ -94,6 +88,7 @@ class PlanRun(BaseModel):
         state (PlanRunState): The current state of the PlanRun.
         execution_context (ExecutionContext): Execution context for the PlanRun.
         outputs (PlanRunOutputs): Outputs of the PlanRun including clarifications.
+        plan_inputs (dict[str, Serializable]): Dict mapping plan input names to their values.
 
     """
 
@@ -125,6 +120,10 @@ class PlanRun(BaseModel):
     outputs: PlanRunOutputs = Field(
         default=PlanRunOutputs(),
         description="Outputs of the run including clarifications.",
+    )
+    plan_inputs: dict[str, Serializable] = Field(
+        default={},
+        description="Dict mapping plan input names to their values.",
     )
 
     def get_outstanding_clarifications(self) -> ClarificationListType:
@@ -200,4 +199,5 @@ class ReadOnlyPlanRun(PlanRun):
             state=plan_run.state,
             end_user_id=plan_run.end_user_id,
             execution_context=plan_run.execution_context,
+            plan_inputs=plan_run.plan_inputs,
         )

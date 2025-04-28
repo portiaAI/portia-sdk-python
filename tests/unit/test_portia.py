@@ -44,7 +44,6 @@ from portia.plan import (
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
-from portia.prefixed_uuid import PlanUUID
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
@@ -783,9 +782,9 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user())
+        mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user(), None)
 
-        mock_resume.assert_called_once_with(plan_run=mock_plan_run, plan_inputs=None)
+        mock_resume.assert_called_once_with(mock_plan_run)
 
         assert result == mock_resumed_plan_run
 
@@ -816,11 +815,10 @@ def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock
         result = portia.run_plan(plan)
 
         mockcreate_plan_run.assert_called_once_with(
-            plan,
-            EndUser(external_id="portia:default_user"),
+            plan, EndUser(external_id="portia:default_user"), None
         )
 
-        mock_resume.assert_called_once_with(plan_run=mock_plan_run, plan_inputs=None)
+        mock_resume.assert_called_once_with(mock_plan_run)
 
         assert result == mock_resumed_plan_run
 
@@ -1419,6 +1417,7 @@ def test_portia_run_with_plan_inputs(portia: Portia, planning_model: MagicMock) 
     planning_model.get_structured_response.assert_called_once()
     assert "$num_a" in planning_model.get_structured_response.call_args[1]["messages"][1].content
     assert "$num_b" in planning_model.get_structured_response.call_args[1]["messages"][1].content
+    assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.get_value() == 3
 
 
@@ -1487,7 +1486,50 @@ def test_portia_run_plan_with_plan_inputs(portia: Portia) -> None:
         plan_run = portia.run_plan(plan, plan_inputs=plan_inputs)
 
     assert plan_run.plan_id == plan.id
-    assert len(plan_run.outputs.plan_inputs) == 2
-    assert plan_run.outputs.plan_inputs["$num_a"] == 1
-    assert plan_run.outputs.plan_inputs["$num_b"] == 2
-    assert plan_run.outputs.final_output.value == 3
+    assert len(plan_run.plan_inputs) == 2
+    assert plan_run.plan_inputs["$num_a"] == 1
+    assert plan_run.plan_inputs["$num_b"] == 2
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == 3
+
+
+def test_portia_run_plan_missing_required_inputs(portia: Portia) -> None:
+    """Test that run_plan raises error when required inputs are missing."""
+    # Create a plan with inputs
+    required_input = PlanInput(name="$required", description="Required input")
+
+    plan = Plan(
+        plan_context=PlanContext(query="Plan requiring inputs", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Use the required input",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$required", description="Required value"),
+                ],
+                output="$result",
+            ),
+        ],
+        inputs=[required_input],
+    )
+
+    # Try to run the plan without providing required inputs
+    with pytest.raises(
+        ValueError, match="Inputs are required for this plan but have not been specified"
+    ):
+        portia.run_plan(plan)
+
+
+def test_portia_run_plan_with_extra_inputs(portia: Portia) -> None:
+    """Test that run_plan logs warning when extra inputs are provided."""
+    # Create a plan with no inputs
+    plan = Plan(
+        plan_context=PlanContext(query="Plan with no inputs", tool_ids=["add_tool"]),
+        steps=[],
+        inputs=[],  # No inputs required
+    )
+
+    # Run with input that isn't in the plan's inputs
+    extra_input = PlanInput(name="$extra", description="Extra unused input")
+    plan_run = portia.run_plan(plan, plan_inputs={extra_input: "value"})
+    assert plan_run.plan_inputs == {}
