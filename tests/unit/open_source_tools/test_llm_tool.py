@@ -39,7 +39,7 @@ def test_llm_tool_plan_run(
 
 def test_llm_tool_schema_valid_input() -> None:
     """Test that the LLMToolSchema correctly validates the input."""
-    schema_data = {"task": "Solve a math problem"}
+    schema_data = {"task": "Solve a math problem", "input_data": ["1 + 1 = 2"]}
     schema = LLMToolSchema(**schema_data)
 
     assert schema.task == "Solve a math problem"

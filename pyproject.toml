@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.2.1"
+version = "0.3.0"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
@@ -62,11 +62,22 @@ mistral = ["langchain-mistralai", "mistralai"]
 mistralai = ["langchain-mistralai", "mistralai"]
 google = ["langchain-google-genai", "google-generativeai"]
 ollama = ["langchain-ollama"]
-all = ["langchain-mistralai", "mistralai", "langchain-google-genai", "google-generativeai", "langchain-ollama"]
 
 # Tools that require extra dependencies
 tools-browser-local = ["playwright", "browser-use"]
 tools-browser-browserbase = ["playwright", "browser-use", "browserbase"]
+
+# All group - add all dependencies from above
+all = [
+  "langchain-mistralai",
+  "mistralai",
+  "langchain-google-genai",
+  "google-generativeai",
+  "langchain-ollama",
+  "playwright",
+  "browser-use",
+  "browserbase",
+]
 
 [tool.ruff]
 line-length=100

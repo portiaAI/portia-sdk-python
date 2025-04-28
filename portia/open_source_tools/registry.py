@@ -2,6 +2,7 @@
 
 import logging
 
+from portia.common import validate_extras_dependencies
 from portia.open_source_tools.calculator_tool import CalculatorTool
 from portia.open_source_tools.image_understanding_tool import ImageUnderstandingTool
 from portia.open_source_tools.llm_tool import LLMTool
@@ -16,7 +17,7 @@ from portia.tool_registry import (
 logger = logging.getLogger(__name__)
 
 example_tool_registry = ToolRegistry(
-    [CalculatorTool(), WeatherTool(), SearchTool()],
+    [CalculatorTool(), WeatherTool(), SearchTool(), LLMTool()],
 )
 
 
@@ -31,3 +32,7 @@ open_source_tool_registry = ToolRegistry(
         ImageUnderstandingTool(),
     ],
 )
+if validate_extras_dependencies("tools-browser-local", raise_error=False):
+    from .browser_tool import BrowserTool
+
+    open_source_tool_registry.with_tool(BrowserTool())

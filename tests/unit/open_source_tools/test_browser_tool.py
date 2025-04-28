@@ -10,6 +10,7 @@ from browser_use import Browser
 from pydantic import HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
+from portia.end_user import EndUser
 from portia.open_source_tools.browser_tool import (
     BrowserInfrastructureOption,
     BrowserInfrastructureProvider,
@@ -131,6 +132,7 @@ def test_browser_tool_auth_check(
                 user_guidance="Login to example.com",
                 action_url=HttpUrl("https://example.com/login"),
                 plan_run_id=context.plan_run_id,
+                require_confirmation=True,
             ),
         )
 
@@ -308,14 +310,14 @@ def test_browser_infra_local_setup_browser(
 ) -> None:
     """Test browser setup."""
     context = get_test_tool_context()
-    context.execution_context.end_user_id = "test_user"
+    context.end_user = EndUser(external_id="test_user")
 
     with patch("logging.Logger.warning") as mock_warning:
         browser = local_browser_provider.setup_browser(context)
 
-        # Verify warning was logged for end_user_id
+        # Verify warning was logged for end_user
         mock_warning.assert_called_once()
-        assert "does not support end_user_id" in mock_warning.call_args[0][0]
+        assert "does not support end users" in mock_warning.call_args[0][0]
 
         # Verify browser instance
         assert isinstance(browser, Browser)
@@ -395,6 +397,7 @@ def test_browserbase_provider_create_session(
                 "id": "test_context_id",
                 "persist": True,
             },
+            "solve_captchas": False,
         },
         keep_alive=True,
     )
@@ -452,7 +455,7 @@ def test_browserbase_provider_construct_auth_clarification_url(
     context.execution_context.additional_data["bb_session_id"] = "test_session_id"
 
     mock_debug = MagicMock()
-    mock_debug.debugger_fullscreen_url = "https://debug.example.com"
+    mock_debug.pages = [MagicMock(debugger_fullscreen_url="https://debug.example.com")]
     mock_browserbase_provider.bb.sessions.debug.return_value = mock_debug  # type: ignore reportFunctionMemberAccess
 
     url = mock_browserbase_provider.construct_auth_clarification_url(

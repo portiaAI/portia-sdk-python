@@ -22,6 +22,7 @@ complex queries using various planning and execution agent configurations.
 from __future__ import annotations
 
 import time
+from importlib.metadata import version
 from typing import TYPE_CHECKING
 
 from portia.clarification import (
@@ -32,9 +33,11 @@ from portia.cloud import PortiaCloudClient
 from portia.config import (
     Config,
     ExecutionAgentType,
+    GenerativeModelsConfig,
     PlanningAgentType,
     StorageClass,
 )
+from portia.end_user import EndUser
 from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
@@ -119,6 +122,8 @@ class Portia:
         """
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
+        logger().info(f"Starting Portia v{version('portia-sdk-python')}")
+        self._log_models(self.config)
         self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
         if not self.config.has_api_key("portia_api_key"):
             logger().warning(
@@ -140,11 +145,30 @@ class Portia:
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
 
+    def initialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
+        """Handle initializing the end_user based on the provided type."""
+        default_external_id = "portia:default_user"
+        if isinstance(end_user, str):
+            if end_user == "":
+                end_user = default_external_id
+            end_user_instance = self.storage.get_end_user(external_id=end_user)
+            if end_user_instance:
+                return end_user_instance
+            end_user_instance = EndUser(external_id=end_user or default_external_id)
+            return self.storage.save_end_user(end_user_instance)
+
+        if not end_user:
+            end_user = EndUser(external_id=default_external_id)
+            return self.storage.save_end_user(end_user)
+
+        return self.storage.save_end_user(end_user)
+
     def run(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
+        end_user: str | EndUser | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -156,13 +180,15 @@ class Portia:
             If not provided all tools in the registry will be used.
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
+            end_user (str | EndUser | None = None): The end user for this plan run.
 
         Returns:
             PlanRun: The run resulting from executing the query.
 
         """
-        plan = self.plan(query, tools, example_plans)
-        plan_run = self.create_plan_run(plan)
+        plan = self.plan(query, tools, example_plans, end_user)
+        end_user = self.initialize_end_user(end_user)
+        plan_run = self.create_plan_run(plan, end_user)
         return self.resume(plan_run)
 
     def plan(
@@ -170,6 +196,7 @@ class Portia:
         query: str,
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
+        end_user: str | EndUser | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples.
 
@@ -179,6 +206,7 @@ class Portia:
             If not provided all tools in the registry will be used.
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
+            end_user (str | EndUser | None = None): The optional end user for this plan.
 
         Returns:
             Plan: The plan for executing the query.
@@ -195,11 +223,14 @@ class Portia:
 
         if not tools:
             tools = self.tool_registry.match_tools(query)
+
+        end_user = self.initialize_end_user(end_user)
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
         outcome = planning_agent.generate_steps_or_error(
             query=query,
             tool_list=tools,
+            end_user=end_user,
             examples=example_plans,
         )
         if outcome.error:
@@ -207,7 +238,12 @@ class Portia:
                 isinstance(self.tool_registry, DefaultToolRegistry)
                 and not self.config.portia_api_key
             ):
-                self._log_replan_with_portia_cloud_tools(outcome.error, query, example_plans)
+                self._log_replan_with_portia_cloud_tools(
+                    outcome.error,
+                    query,
+                    end_user,
+                    example_plans,
+                )
             else:
                 logger().error(f"Error in planning - {outcome.error}")
                 raise PlanError(outcome.error)
@@ -227,11 +263,16 @@ class Portia:
 
         return plan
 
-    def run_plan(self, plan: Plan) -> PlanRun:
+    def run_plan(
+        self,
+        plan: Plan,
+        end_user: str | EndUser | None = None,
+    ) -> PlanRun:
         """Run a plan.
 
         Args:
             plan (Plan): The plan to run.
+            end_user (str | EndUser | None = None): The end user to use.
 
         Returns:
             PlanRun: The resulting PlanRun object.
@@ -244,7 +285,8 @@ class Portia:
         except PlanNotFoundError:
             self.storage.save_plan(plan)
 
-        plan_run = self.create_plan_run(plan)
+        end_user = self.initialize_end_user(end_user)
+        plan_run = self.create_plan_run(plan, end_user)
         return self.resume(plan_run)
 
     def resume(
@@ -458,6 +500,7 @@ class Portia:
                 tool_ready = next_tool.ready(
                     ToolRunContext(
                         execution_context=plan_run.execution_context,
+                        end_user=self.initialize_end_user(plan_run.end_user_id),
                         plan_run_id=plan_run.id,
                         config=self.config,
                         clarifications=current_step_clarifications,
@@ -488,20 +531,27 @@ class Portia:
         plan_run.state = state
         self.storage.save_plan_run(plan_run)
 
-    def create_plan_run(self, plan: Plan) -> PlanRun:
+    def create_plan_run(
+        self,
+        plan: Plan,
+        end_user: str | EndUser | None = None,
+    ) -> PlanRun:
         """Create a PlanRun from a Plan.
 
         Args:
             plan (Plan): The plan to create a plan run from.
+            end_user (str | EndUser | None = None): The end user this plan run is for.
 
         Returns:
             PlanRun: The created PlanRun object.
 
         """
+        end_user = self.initialize_end_user(end_user)
         plan_run = PlanRun(
             plan_id=plan.id,
             state=PlanRunState.NOT_STARTED,
             execution_context=get_execution_context(),
+            end_user_id=end_user.external_id,
         )
         self.storage.save_plan_run(plan_run)
         return plan_run
@@ -679,8 +729,8 @@ class Portia:
             )
 
         logger().info(
-            f"Running Pre Introspection for Step #{current_step_index}, "
-            f"evaluating condition: #{step.condition}",
+            f"Evaluating condition for Step #{current_step_index}: "
+            f"#{step.condition}",
         )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
@@ -689,15 +739,15 @@ class Portia:
         )
 
         log_message = (
-            f"Pre Introspection Outcome for Step #{current_step_index}: "
-            f"{pre_step_outcome.outcome} for {step.output}. "
+            f"Condition Evaluation Outcome for Step #{current_step_index} is "
+            f"{pre_step_outcome.outcome.value}. "
             f"Reason: {pre_step_outcome.reason}",
         )
 
         if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
             logger().error(*log_message)
         else:
-            logger().debug(*log_message)
+            logger().info(*log_message)
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
@@ -849,6 +899,7 @@ class Portia:
             plan_run,
             self.config,
             self.storage,
+            self.initialize_end_user(plan_run.end_user_id),
             tool,
         )
 
@@ -856,6 +907,7 @@ class Portia:
         self,
         original_error: str,
         query: str,
+        end_user: EndUser,
         example_plans: list[Plan] | None = None,
     ) -> None:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
@@ -872,6 +924,7 @@ class Portia:
         replan_outcome = planning_agent.generate_steps_or_error(
             query=query,
             tool_list=tools,
+            end_user=end_user,
             examples=example_plans,
         )
         if not replan_outcome.error:
@@ -909,3 +962,11 @@ class Portia:
             plan_run.outputs.step_outputs[step.output] = step_output
 
         self.storage.save_plan_run(plan_run)
+
+    @staticmethod
+    def _log_models(config: Config) -> None:
+        """Log the models set in the configuration."""
+        logger().debug("Portia Generative Models")
+        for model in GenerativeModelsConfig.model_fields:
+            getter = getattr(config, f"get_{model}")
+            logger().debug(f"{model}: {getter()}")

@@ -26,7 +26,6 @@ from typing_extensions import get_origin
 from portia.cli_clarification_handler import CLIClarificationHandler
 from portia.config import Config, GenerativeModelsConfig
 from portia.errors import InvalidConfigError
-from portia.execution_context import execution_context
 from portia.logger import logger
 from portia.portia import ExecutionHooks, Portia
 from portia.tool_registry import DefaultToolRegistry
@@ -189,16 +188,15 @@ def run(
         execution_hooks=CLIExecutionHooks(),
     )
 
-    with execution_context(end_user_id=cli_config.end_user_id):
-        plan = portia.plan(query)
+    plan = portia.plan(query, end_user=cli_config.end_user_id)
 
-        if cli_config.confirm:
-            click.echo(plan.pretty_print())
-            if not click.confirm("Do you want to execute the plan?"):
-                return
+    if cli_config.confirm:
+        click.echo(plan.pretty_print())
+        if not click.confirm("Do you want to execute the plan?"):
+            return
 
-        plan_run = portia.run_plan(plan)
-        click.echo(plan_run.model_dump_json(indent=4))
+    plan_run = portia.run_plan(plan, end_user=cli_config.end_user_id)
+    click.echo(plan_run.model_dump_json(indent=4))
 
 
 @click.command()
@@ -212,8 +210,7 @@ def plan(
     cli_config, config = _get_config(**kwargs)
     portia = Portia(config=config)
 
-    with execution_context(end_user_id=cli_config.end_user_id):
-        output = portia.plan(query)
+    output = portia.plan(query, end_user=cli_config.end_user_id)
 
     click.echo(output.model_dump_json(indent=4))
 

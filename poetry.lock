@@ -220,7 +220,7 @@ description = "Function decoration for backoff and retry"
 optional = true
 python-versions = ">=3.7,<4.0"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8"},
     {file = "backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba"},
@@ -233,7 +233,7 @@ description = "Screen-scraping library"
 optional = true
 python-versions = ">=3.7.0"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "beautifulsoup4-4.13.3-py3-none-any.whl", hash = "sha256:99045d7d3f08f91f0d656bc9b7efbae189426cd913d830294a15eefa0ea4df16"},
     {file = "beautifulsoup4-4.13.3.tar.gz", hash = "sha256:1bd32405dacc920b42b83ba01644747ed77456a65760e285fbc47633ceddaf8b"},
@@ -257,7 +257,7 @@ description = "Make websites accessible for AI agents"
 optional = true
 python-versions = "<4.0,>=3.11"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "browser_use-0.1.40-py3-none-any.whl", hash = "sha256:8deb6846bec00819bf150808357406e7847204c383351147c1f3d261c1904fb9"},
     {file = "browser_use-0.1.40.tar.gz", hash = "sha256:ddafcda30a9f9fe0f63612af5bf19a0ec03454d2774f54543eee70eef7ab369f"},
@@ -287,7 +287,7 @@ description = "The official Python library for the Browserbase API"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"tools-browser-browserbase\""
+markers = "extra == \"tools-browser-browserbase\" or extra == \"all\""
 files = [
     {file = "browserbase-1.2.0-py3-none-any.whl", hash = "sha256:0b8d9429dea58f787b42b0109306f7a193770b78a24329ed13f50864debdf959"},
     {file = "browserbase-1.2.0.tar.gz", hash = "sha256:44a1dbf2562893a8f9447c3d6de6fe72d3ae30fe743a5c2c52439928d0464a7b"},
@@ -1060,7 +1060,7 @@ description = "Lightweight in-process concurrent programming"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "(platform_machine == \"aarch64\" or platform_machine == \"ppc64le\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"win32\" or platform_machine == \"WIN32\") and python_version < \"3.14\" or extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\""
+markers = "(platform_machine == \"aarch64\" or platform_machine == \"ppc64le\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"win32\" or platform_machine == \"WIN32\") and python_version < \"3.14\" or extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\""
 files = [
     {file = "greenlet-3.1.1-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:0bbae94a29c9e5c7e4a2b7f0aae5c17e8e90acbfd3bf6270eeba60c39fce3563"},
     {file = "greenlet-3.1.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0fde093fb93f35ca72a556cf72c92ea3ebfda3d79fc35bb19fbe685853869a83"},
@@ -1720,7 +1720,7 @@ description = "An integration package connecting Ollama and LangChain"
 optional = true
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"ollama\" or extra == \"all\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\" or extra == \"ollama\") and python_version < \"4.0\""
 files = [
     {file = "langchain_ollama-0.2.2-py3-none-any.whl", hash = "sha256:8a1ee72dbb6ea3b3ace1d9dd317e472d667a8ed491328550da59f4893a6796f8"},
     {file = "langchain_ollama-0.2.2.tar.gz", hash = "sha256:2d9bcb06ffdbe43c7c6906c46e710d36d33b6b99cd4975cbf54060f13e51c875"},
@@ -1900,7 +1900,7 @@ description = "Convert HTML to markdown."
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "markdownify-0.14.1-py3-none-any.whl", hash = "sha256:4c46a6c0c12c6005ddcd49b45a5a890398b002ef51380cd319db62df5e09bc2a"},
     {file = "markdownify-0.14.1.tar.gz", hash = "sha256:a62a7a216947ed0b8dafb95b99b2ef4a0edd1e18d5653c656f68f03db2bfb2f1"},
@@ -2052,7 +2052,7 @@ description = "An implementation of time.monotonic() for Python 2 & < 3.3"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "monotonic-1.6-py2.py3-none-any.whl", hash = "sha256:68687e19a14f11f26d140dd5c86f3dba4bf5df58003000ed467e0e2a69bca96c"},
     {file = "monotonic-1.6.tar.gz", hash = "sha256:3a55207bcfed53ddd5c5bae174524062935efed17792e9de2ad0205ce9ad63f7"},
@@ -2258,7 +2258,7 @@ description = "The official Python client for Ollama."
 optional = true
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"ollama\" or extra == \"all\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\" or extra == \"ollama\") and python_version < \"4.0\""
 files = [
     {file = "ollama-0.4.7-py3-none-any.whl", hash = "sha256:85505663cca67a83707be5fb3aeff0ea72e67846cea5985529d8eca4366564a1"},
     {file = "ollama-0.4.7.tar.gz", hash = "sha256:891dcbe54f55397d82d289c459de0ea897e103b86a3f1fad0fdb1895922a75ff"},
@@ -2564,7 +2564,7 @@ description = "A high-level API to automate web browsers"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\""
+markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\""
 files = [
     {file = "playwright-1.51.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:bcaaa3d5d73bda659bfb9ff2a288b51e85a91bd89eda86eaf8186550973e416a"},
     {file = "playwright-1.51.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:2e0ae6eb44297b24738e1a6d9c580ca4243b4e21b7e65cf936a71492c08dd0d4"},
@@ -2602,7 +2602,7 @@ description = "Integrate PostHog into any python application."
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "posthog-3.23.0-py2.py3-none-any.whl", hash = "sha256:2b07d06670170ac2e21465dffa8d356722834cc877ab34e583da6e525c1037df"},
     {file = "posthog-3.23.0.tar.gz", hash = "sha256:1ac0305ab6c54a80c4a82c137231f17616bef007bbf474d1a529cda032d808eb"},
@@ -3019,7 +3019,7 @@ description = "A rough port of Node.js's EventEmitter to Python with a few trick
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\""
+markers = "extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\""
 files = [
     {file = "pyee-12.1.1-py3-none-any.whl", hash = "sha256:18a19c650556bb6b32b406d7f017c8f513aceed1ef7ca618fb65de7bd2d347ef"},
     {file = "pyee-12.1.1.tar.gz", hash = "sha256:bbc33c09e2ff827f74191e3e5bbc6be7da02f627b7ec30d86f5ce1a6fb2424a3"},
@@ -3537,7 +3537,7 @@ description = "Easily download, build, install, upgrade, and uninstall Python pa
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "setuptools-78.1.0-py3-none-any.whl", hash = "sha256:3e386e96793c8702ae83d17b853fb93d3e09ef82ec62722e61da5cd22376dcd8"},
     {file = "setuptools-78.1.0.tar.gz", hash = "sha256:18fd474d4a82a5f83dac888df697af65afa82dec7323d09c3e37d1f14288da54"},
@@ -3596,7 +3596,7 @@ description = "A modern CSS selector implementation for Beautiful Soup."
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\") and python_version < \"4.0\""
+markers = "(extra == \"tools-browser-local\" or extra == \"tools-browser-browserbase\" or extra == \"all\") and python_version < \"4.0\""
 files = [
     {file = "soupsieve-2.6-py3-none-any.whl", hash = "sha256:e72c4ff06e4fb6e4b5a9f0f55fe6e81514581fca1515028625d0f299c602ccc9"},
     {file = "soupsieve-2.6.tar.gz", hash = "sha256:e2e68417777af359ec65daac1057404a3c8a5455bb8abc36f1a9866ab1a51abb"},
@@ -4234,7 +4234,7 @@ cffi = {version = ">=1.11", markers = "platform_python_implementation == \"PyPy\
 cffi = ["cffi (>=1.11)"]
 
 [extras]
-all = ["google-generativeai", "langchain-google-genai", "langchain-mistralai", "langchain-ollama", "mistralai"]
+all = ["browser-use", "browserbase", "google-generativeai", "langchain-google-genai", "langchain-mistralai", "langchain-ollama", "mistralai", "playwright"]
 google = ["google-generativeai", "langchain-google-genai"]
 mistral = ["langchain-mistralai", "mistralai"]
 mistralai = ["langchain-mistralai", "mistralai"]
@@ -4245,4 +4245,4 @@ tools-browser-local = ["browser-use", "playwright"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "b5687d6e5c10fa0c3276d0b6ca1e62688bda77f44396b040c075ff3797781766"
+content-hash = "c2b3834458f88289a1d9a37555b03f21e8d42a28ed34f2a488ec9d28681ee4a5"
