@@ -17,6 +17,7 @@ from portia.introspection_agents.introspection_agent import (
 from portia.model import Message
 from portia.plan import Plan
 from portia.plan_run import PlanRun
+from portia.storage import AgentMemory, AgentMemoryOutput
 
 
 class DefaultIntrospectionAgent(BaseIntrospectionAgent):
@@ -29,14 +30,16 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
 
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, agent_memory: AgentMemory) -> None:
         """Initialize the DefaultIntrospectionAgent with configuration.
 
         Args:
             config (Config): The configuration to initialize the DefaultIntrospectionAgent.
+            agent_memory (AgentMemory): The agent memory to use
 
         """
         self.config = config
+        self.agent_memory = agent_memory
 
         self.prompt = ChatPromptTemplate.from_messages(
             [
@@ -103,6 +106,16 @@ Return the outcome and reason in the given format.
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """Ask the LLM whether to continue, skip or fail the plan_run."""
+        introspection_condition = plan.steps[plan_run.current_step_index].condition
+
+        memory_outputs = [
+            self.agent_memory.get_plan_run_output(output.output_name, plan_run.id)
+            for output in plan_run.outputs.step_outputs.values()
+            if isinstance(output, AgentMemoryOutput)
+            and introspection_condition
+            and output.output_name in introspection_condition
+        ]
+
         return self.config.get_introspection_model().get_structured_response(
             schema=PreStepIntrospection,
             messages=[
@@ -118,6 +131,12 @@ Return the outcome and reason in the given format.
                     plan=self._get_plan_steps_pretty(plan),
                 )
             ],
+        )
+
+    def _get_plan_steps_pretty(self, plan: Plan) -> str:
+        """Get the pretty print representation of the plan steps."""
+        return "\n".join(
+            [f"Step {i+1}: {step.pretty_print()}" for i, step in enumerate(plan.steps)]
         )
 
     def _get_plan_steps_pretty(self, plan: Plan) -> str:

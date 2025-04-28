@@ -455,7 +455,7 @@ def test_browserbase_provider_construct_auth_clarification_url(
     context.execution_context.additional_data["bb_session_id"] = "test_session_id"
 
     mock_debug = MagicMock()
-    mock_debug.debugger_fullscreen_url = "https://debug.example.com"
+    mock_debug.pages = [MagicMock(debugger_fullscreen_url="https://debug.example.com")]
     mock_browserbase_provider.bb.sessions.debug.return_value = mock_debug  # type: ignore reportFunctionMemberAccess
 
     url = mock_browserbase_provider.construct_auth_clarification_url(

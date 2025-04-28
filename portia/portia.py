@@ -259,9 +259,7 @@ class Portia:
             f"Plan created with {len(plan.steps)} steps",
             plan=str(plan.id),
         )
-        logger().debug(
-            "Plan: " + plan.model_dump_json(indent=4),
-        )
+        logger().debug(plan.pretty_print())
 
         return plan
 
@@ -731,8 +729,7 @@ class Portia:
             )
 
         logger().info(
-            f"Evaluating condition for Step #{current_step_index}: "
-            f"#{step.condition}",
+            f"Evaluating condition for Step #{current_step_index}: #{step.condition}",
         )
 
         pre_step_outcome = introspection_agent.pre_step_introspection(
@@ -942,7 +939,7 @@ class Portia:
             ) from PlanError(original_error)
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
-        return DefaultIntrospectionAgent(self.config)
+        return DefaultIntrospectionAgent(self.config, self.storage)
 
     def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> None:
         """Set the output for a step."""
