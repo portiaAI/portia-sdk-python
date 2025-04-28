@@ -95,7 +95,9 @@ Return the outcome and reason in the given format.
                     "Total number of steps in the plan is: {total_steps_count}.\n"
                     "The original query: {query}\n"
                     "All Plan Steps: \n{plan}\n"
-                    "Previous Step Outputs: \n{plan_run_outputs}\n"
+                    "Previous Step Outputs: \n{prev_step_outputs}\n"
+                    "If any relevant outputs are stored in agent memory, they have been extracted "
+                    "and included here: {memory_outputs}\n",
                 ),
             ],
         )
@@ -123,7 +125,8 @@ Return the outcome and reason in the given format.
                 for m in self.prompt.format_messages(
                     current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                     current_day_of_week=datetime.now(UTC).strftime("%A"),
-                    plan_run_outputs=plan_run.outputs.model_dump_json(),
+                    prev_step_outputs=plan_run.outputs.model_dump_json(),
+                    memory_outputs=memory_outputs,
                     query=plan.plan_context.query,
                     condition=plan.steps[plan_run.current_step_index].condition,
                     current_step_idex=plan_run.current_step_index + 1,
