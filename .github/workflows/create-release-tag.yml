@@ -63,7 +63,7 @@ jobs:
               await github.rest.git.updateRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: `refs/tags/latest-prod-release`,
+                ref: `tags/latest-prod-release`,
                 sha: sha,
                 force: true
               });
