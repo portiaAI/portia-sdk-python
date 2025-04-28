@@ -1,6 +1,5 @@
 """Tests for the Tool class."""
 
-import json
 from enum import Enum
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +8,7 @@ import mcp
 import pytest
 from mcp import ClientSession
 from pydantic import BaseModel, HttpUrl
+from pytest_httpx import HTTPXMock
 
 from portia.clarification import (
     ActionClarification,
@@ -113,21 +113,21 @@ def test_tool_serialization() -> None:
     AdditionTool().model_dump_json()
 
 
-def test_remote_tool_hard_error_from_server() -> None:
+def test_remote_tool_hard_error_from_server(httpx_mock: HTTPXMock) -> None:
     """Test http errors come back to hard errors."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = Exception()
-    mock_response.json.return_value = {"output": {"value": "An error occurred."}}
-
-    mock_client.post.return_value = mock_response
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        status_code=500,
+        json={"output": {"value": "An error occurred."}},
+    )
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError):
@@ -142,27 +142,30 @@ def test_remote_tool_hard_error_from_server() -> None:
         },
     }
 
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_soft_error() -> None:
+def test_remote_tool_soft_error(httpx_mock: HTTPXMock) -> None:
     """Test remote soft errors come back to soft errors."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json = MagicMock(
-        return_value={"output": {"value": "ToolSoftError: An error occurred."}},
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={"output": {"value": "ToolSoftError: An error occurred."}},
     )
-    mock_client.post.return_value = mock_response
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
 
     ctx = get_test_tool_context()
@@ -177,25 +180,30 @@ def test_remote_tool_soft_error() -> None:
             "additional_data": ctx.execution_context.additional_data or {},
         },
     }
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_bad_response() -> None:
+def test_remote_tool_bad_response(httpx_mock: HTTPXMock) -> None:
     """Test remote soft errors come back to soft errors."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"ot": {"value": "An error occurred."}}
-    mock_client.post.return_value = mock_response
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={"ot": {"value": "An error occurred."}},
+    )
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
 
     ctx = get_test_tool_context()
@@ -211,25 +219,30 @@ def test_remote_tool_bad_response() -> None:
         },
     }
 
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_hard_error() -> None:
+def test_remote_tool_hard_error(httpx_mock: HTTPXMock) -> None:
     """Test remote hard errors come back to hard errors."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"output": {"value": "ToolHardError: An error occurred."}}
-    mock_client.post.return_value = mock_response
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={"output": {"value": "ToolHardError: An error occurred."}},
+    )
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
 
     ctx = get_test_tool_context()
@@ -244,29 +257,41 @@ def test_remote_tool_hard_error() -> None:
             "additional_data": ctx.execution_context.additional_data or {},
         },
     }
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_ready() -> None:
+@pytest.mark.parametrize(
+    ("response_json", "is_ready"),
+    [
+        ({"success": "true"}, True),
+        ({}, False),
+        ({"ready": True, "clarifications": []}, True),
+        ({"ready": False, "clarifications": []}, False),
+    ],
+)
+def test_remote_tool_ready(httpx_mock: HTTPXMock, response_json: dict, is_ready: bool) -> None:  # noqa: FBT001
     """Test remote tool ready."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json = MagicMock(
-        return_value={"success": "true"},
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/ready/",
+        json=response_json,
     )
-    mock_client.post.return_value = mock_response
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
     ctx = get_test_tool_context()
-    assert tool.ready(ctx).ready
+    assert tool.ready(ctx).ready == is_ready
 
     content = {
         "execution_context": {
@@ -275,53 +300,47 @@ def test_remote_tool_ready() -> None:
             "additional_data": ctx.execution_context.additional_data or {},
         },
     }
-
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/ready/",
-        content=json.dumps(content),
+    assert len(httpx_mock.get_requests()) == 1
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/ready/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_ready_error() -> None:
+@pytest.mark.parametrize(
+    ("status_code", "is_ready"),
+    [(500, False), (404, False), (200, True)],
+)
+def test_remote_tool_ready_error(httpx_mock: HTTPXMock, status_code: int, is_ready: bool) -> None:  # noqa: FBT001
     """Test remote tool ready."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = Exception()
-    mock_response.json = MagicMock(
-        return_value={"success": "true"},
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/ready/",
+        status_code=status_code,
+        json={"success": "true"},
     )
-    mock_client.post.return_value = mock_response
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
 
     ctx = get_test_tool_context()
-    assert not tool.ready(ctx).ready
-
-    content = {
-        "execution_context": {
-            "end_user_id": ctx.end_user.external_id,
-            "plan_run_id": str(ctx.plan_run_id),
-            "additional_data": ctx.execution_context.additional_data or {},
-        },
-    }
-
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/ready/",
-        content=json.dumps(content),
-    )
+    assert tool.ready(ctx).ready == is_ready
 
 
-def test_remote_tool_action_clarifications() -> None:
+def test_remote_tool_action_clarifications(httpx_mock: HTTPXMock) -> None:
     """Test action clarifications."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json = MagicMock(
-        return_value={
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={
             "output": {
                 "value": [
                     {
@@ -334,14 +353,13 @@ def test_remote_tool_action_clarifications() -> None:
             },
         },
     )
-    mock_client.post.return_value = mock_response
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
     ctx = get_test_tool_context()
     output = tool.run(ctx)
@@ -358,18 +376,22 @@ def test_remote_tool_action_clarifications() -> None:
         },
     }
 
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_input_clarifications() -> None:
+def test_remote_tool_input_clarifications(httpx_mock: HTTPXMock) -> None:
     """Test Input clarifications."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json = MagicMock(
-        return_value={
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={
             "output": {
                 "value": [
                     {
@@ -382,20 +404,19 @@ def test_remote_tool_input_clarifications() -> None:
             },
         },
     )
-    mock_client.post.return_value = mock_response
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
-
     ctx = get_test_tool_context()
     output = tool.run(ctx)
     assert output is not None
     assert isinstance(output, InputClarification)
+    assert output.argument_name == "t"
 
     content = {
         "arguments": {},
@@ -405,19 +426,22 @@ def test_remote_tool_input_clarifications() -> None:
             "additional_data": ctx.execution_context.additional_data or {},
         },
     }
-
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_mc_clarifications() -> None:
+def test_remote_tool_mc_clarifications(httpx_mock: HTTPXMock) -> None:
     """Test Multi Choice clarifications."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json = MagicMock(
-        return_value={
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={
             "output": {
                 "value": [
                     {
@@ -431,16 +455,14 @@ def test_remote_tool_mc_clarifications() -> None:
             },
         },
     )
-    mock_client.post.return_value = mock_response
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
-
     ctx = get_test_tool_context()
     output = tool.run(ctx)
     assert output is not None
@@ -455,19 +477,22 @@ def test_remote_tool_mc_clarifications() -> None:
             "additional_data": ctx.execution_context.additional_data or {},
         },
     }
-
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
-def test_remote_tool_value_confirm_clarifications() -> None:
+def test_remote_tool_value_confirm_clarifications(httpx_mock: HTTPXMock) -> None:
     """Test value confirm clarifications."""
-    mock_client = MagicMock(spec=httpx.Client)
-    mock_response = MagicMock()
-    mock_response.json = MagicMock(
-        return_value={
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={
             "output": {
                 "value": [
                     {
@@ -480,14 +505,13 @@ def test_remote_tool_value_confirm_clarifications() -> None:
             },
         },
     )
-    mock_client.post.return_value = mock_response
 
     tool = PortiaRemoteTool(
         id="test",
         name="test",
         description="",
         output_schema=("", ""),
-        client=mock_client,
+        client=httpx.Client(base_url=endpoint),
     )
 
     ctx = get_test_tool_context()
@@ -504,9 +528,13 @@ def test_remote_tool_value_confirm_clarifications() -> None:
         },
     }
 
-    mock_client.post.assert_called_once_with(
-        url="/api/v0/tools/test/run/",
-        content=json.dumps(content),
+    assert (
+        httpx_mock.get_request(
+            method="POST",
+            url=f"{endpoint}/api/v0/tools/test/run/",
+            match_json=content,
+        )
+        is not None
     )
 
 
