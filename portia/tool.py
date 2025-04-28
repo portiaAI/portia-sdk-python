@@ -56,8 +56,8 @@ from portia.mcp_session import McpClientConfig, get_mcp_session
 from portia.plan_run import PlanRunUUID
 from portia.templates.render import render_template
 
-"""MAX_TOOL_DESCRIPTION_LENGTH is the max length tool descriptions can be to respect API limits."""
-MAX_TOOL_DESCRIPTION_LENGTH = 1024
+"""MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
+MAX_TOOL_DESCRIPTION_LENGTH = 4096
 
 
 class ToolRunContext(BaseModel):
