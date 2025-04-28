@@ -259,9 +259,7 @@ class Portia:
             f"Plan created with {len(plan.steps)} steps",
             plan=str(plan.id),
         )
-        logger().debug(
-            "Plan: " + plan.model_dump_json(indent=4),
-        )
+        logger().debug(plan.pretty_print())
 
         return plan
 
