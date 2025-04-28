@@ -21,7 +21,6 @@ example_tool_registry = ToolRegistry(
     [CalculatorTool(), WeatherTool(), SearchTool(), LLMTool()],
 )
 
-
 open_source_tool_registry = ToolRegistry(
     [
         CalculatorTool(),

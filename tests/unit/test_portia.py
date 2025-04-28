@@ -1,5 +1,6 @@
 """Tests for portia classes."""
 
+import os
 import tempfile
 import threading
 import time
@@ -103,10 +104,19 @@ def test_portia_local_default_config_with_api_keys() -> None:
     ):
         portia = Portia()
         assert portia.config == Config.from_default()
+
+        # BrowserTool is in open_source_tool_registry but not in the default tool registry
+        # avaialble to the Portia instance. PDF reader is in open_source_tool_registry if
+        # Mistral API key is set, and isn't in the default tool registry.
+        # Unfortunately this is determined when the registry file is imported, so we can't just mock
+        # the Mistral API key here.
+        expected_diff = 1
+        if os.getenv("MISTRAL_API_KEY"):
+            expected_diff = 2
+
         assert (
             len(portia.tool_registry.get_tools())
-            == len(open_source_tool_registry.get_tools())
-            - 2  # BrowserTool + PDF reader are excluded
+            == len(open_source_tool_registry.get_tools()) - expected_diff
         )
 
 
@@ -125,8 +135,19 @@ def test_portia_local_default_config_without_api_keys() -> None:
     ):
         portia = Portia()
         assert portia.config == Config.from_default()
+
+        # BrowserTool, SerachTool + WeatherTool are in open_source_tool_registry but not in the
+        # default tool registry avaialble to the Portia instance. PDF reader is in
+        # open_source_tool_registry if Mistral API key is set, and isn't in the default tool
+        # registry Unfortunately this is determined when the registry file is imported, so we
+        # can't just mock the Mistral API key here.
+        expected_diff = 3
+        if os.getenv("MISTRAL_API_KEY"):
+            expected_diff = 4
+
         assert (
-            len(portia.tool_registry.get_tools()) == len(open_source_tool_registry.get_tools()) - 4
+            len(portia.tool_registry.get_tools())
+            == len(open_source_tool_registry.get_tools()) - expected_diff
         )
 
 
