@@ -97,7 +97,7 @@ def test_run_method_with_uncaught_error() -> None:
 def test_ready() -> None:
     """Test the ready method."""
     tool = ErrorTool()
-    assert tool.ready(get_test_tool_context())
+    assert tool.ready(get_test_tool_context()).ready
 
 
 def test_tool_serialization() -> None:
@@ -266,7 +266,7 @@ def test_remote_tool_ready() -> None:
         client=mock_client,
     )
     ctx = get_test_tool_context()
-    assert tool.ready(ctx)
+    assert tool.ready(ctx).ready
 
     content = {
         "execution_context": {
@@ -300,7 +300,7 @@ def test_remote_tool_ready_error() -> None:
     )
 
     ctx = get_test_tool_context()
-    assert not tool.ready(ctx)
+    assert not tool.ready(ctx).ready
 
     content = {
         "execution_context": {
