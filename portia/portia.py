@@ -751,13 +751,13 @@ class Portia:
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
                 output = LocalOutput(
-                    value="Tool Execution Skipped",
+                    value="Tool execution skipped",
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
             case PreStepIntrospectionOutcome.COMPLETE:
                 output = LocalOutput(
-                    value="Tool Execution Skipped and Completed Plan Run",
+                    value="Tool execution skipped and completed the plan run",
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
@@ -770,7 +770,7 @@ class Portia:
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
             case PreStepIntrospectionOutcome.FAIL:
                 failed_output = LocalOutput(
-                    value="Tool Execution Skipped and Failed Plan Run",
+                    value="Tool execution skipped and failed the plan run",
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(failed_output, plan_run, step)
