@@ -234,7 +234,7 @@ class PlanInput(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     name: str = Field(
         description="The name of the input",
@@ -255,6 +255,19 @@ class PlanInput(BaseModel):
 
         """
         return f"{self.name}: ({self.description})"
+
+    @field_serializer("value_schema")
+    def serialize_value_schema(self, value: type[BaseModel] | None) -> str | None:
+        """Serialize the value_schema by returning its class name.
+
+        Args:
+            value (type[BaseModel] | None): The schema class
+
+        Returns:
+            str | None: The class name of the schema or None.
+
+        """
+        return value.__name__ if value else None
 
 
 class Step(BaseModel):

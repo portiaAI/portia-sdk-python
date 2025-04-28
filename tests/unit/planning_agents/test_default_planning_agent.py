@@ -98,6 +98,7 @@ def test_generate_steps_or_error_failure(mock_config: Config) -> None:
 
 def test_render_prompt() -> None:
     """Test render prompt."""
+    plan_input = PlanInput(name="$plan_input", description="Plan input description")
     plans = [
         Plan(
             plan_context=PlanContext(
@@ -112,9 +113,7 @@ def test_render_prompt() -> None:
                     output="$plan_output1",
                 ),
             ],
-            inputs=[
-                PlanInput(name="$plan_input", description="Plan input description"),
-            ],
+            inputs=[plan_input],
         ),
     ]
     rendered_prompt = render_prompt_insert_defaults(
@@ -122,6 +121,7 @@ def test_render_prompt() -> None:
         tool_list=[AdditionTool()],
         examples=plans,
         end_user=EndUser(external_id="123"),
+        plan_inputs=[plan_input],
     )
     overall_pattern = re.compile(
         r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?",
@@ -150,9 +150,11 @@ def test_render_prompt() -> None:
     assert "$plan_input1" in response_match
     assert "$plan_output1" in response_match
 
-    # Check that plan inputs are included in the example
     assert "$plan_input" in example_match
-    assert "Plan input description" in example_match
+    assert "Plan input description" in rendered_prompt
+    assert "<PlanInputs>" in rendered_prompt
+    assert '<PlanInput name="$plan_input">' in rendered_prompt
+    assert "Plan input description" in rendered_prompt
 
     assert "Use this tool to add two numbers together" in tools_content
     assert "add_tool" in tools_content
@@ -247,32 +249,30 @@ def test_generate_steps_with_plan_inputs(mock_config: Config) -> None:
         ),
     ]
 
-    mock_model = get_mock_generative_model(
-        response=StepsOrError(
-            steps=[
-                Step(
-                    task="Process user addition",
-                    tool_id="add_tool",
-                    inputs=[Variable(name="$user_id", description="ID of the user")],
-                    output="$output",
-                ),
-            ],
-            error=None,
-        ),
+    mock_response = StepsOrError(
+        steps=[
+            Step(
+                task="Process user addition",
+                tool_id="add_tool",
+                inputs=[Variable(name="$user_id", description="ID of the user")],
+                output="$output",
+            ),
+        ],
+        error=None,
     )
+    mock_model = get_mock_generative_model(response=mock_response)
     mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
 
     result = planning_agent.generate_steps_or_error(
-        query="Process user data",
+        query="Process user addition",
         tool_list=[AdditionTool()],
         end_user=EndUser(external_id="123"),
         plan_inputs=plan_inputs,
     )
 
-    assert mock_model.get_structured_response.called
-    messages = mock_model.get_structured_response.call_args[1]["messages"]
-    prompt_text = messages[1].content
+    assert mock_model._client.invoke.called  # noqa: SLF001
+    prompt_text = mock_model._client.invoke.call_args[0][0][1].content  # noqa: SLF001
 
     assert "$user_id" in prompt_text
     assert "ID of the user" in prompt_text

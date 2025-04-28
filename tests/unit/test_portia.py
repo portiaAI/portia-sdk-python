@@ -785,7 +785,7 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user())
 
-        mock_resume.assert_called_once_with(mock_plan_run)
+        mock_resume.assert_called_once_with(plan_run=mock_plan_run, plan_inputs=None)
 
         assert result == mock_resumed_plan_run
 
@@ -820,7 +820,7 @@ def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock
             EndUser(external_id="portia:default_user"),
         )
 
-        mock_resume.assert_called_once_with(mock_plan_run)
+        mock_resume.assert_called_once_with(plan_run=mock_plan_run, plan_inputs=None)
 
         assert result == mock_resumed_plan_run
 
@@ -1388,7 +1388,49 @@ def test_portia_run_with_plan_inputs(portia: Portia, planning_model: MagicMock) 
     planning_model.get_structured_response.return_value = StepsOrError(
         steps=[
             Step(
-                task="Do something with the API key",
+                task="Add the inputs",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$num_a", description="Number A"),
+                    Variable(name="$num_b", description="Number B"),
+                ],
+                output="$output",
+            ),
+        ],
+        error=None,
+    )
+    mock_step_agent = mock.MagicMock()
+    mock_step_agent.execute_sync.return_value = LocalOutput(value=3)
+    mock_summarizer_agent = mock.MagicMock()
+    mock_summarizer_agent.create_summary.side_effect = "Summary"
+
+    with (
+        mock.patch(
+            "portia.portia.FinalOutputSummarizer",
+            return_value=mock_summarizer_agent,
+        ),
+        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+    ):
+        plan_run = portia.run(
+            query="Add the two numbers together",
+            plan_inputs={num_a_input: 1, num_b_input: 2},
+        )
+
+    planning_model.get_structured_response.assert_called_once()
+    assert "$num_a" in planning_model.get_structured_response.call_args[1]["messages"][1].content
+    assert "$num_b" in planning_model.get_structured_response.call_args[1]["messages"][1].content
+    assert plan_run.outputs.final_output.get_value() == 3
+
+
+def test_portia_plan_with_plan_inputs(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that Portia.plan handles plan inputs correctly."""
+    num_a_input = PlanInput(name="$num_a", description="Number A")
+    num_b_input = PlanInput(name="$num_b", description="Number B")
+
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[
+            Step(
+                task="Do something with the user ID",
                 tool_id="add_tool",
                 inputs=[
                     Variable(name="$num_a", description="Number A"),
@@ -1400,50 +1442,25 @@ def test_portia_run_with_plan_inputs(portia: Portia, planning_model: MagicMock) 
         error=None,
     )
 
-    plan_inputs = {num_a_input: 1, num_b_input: 2}
-
-    plan_run = portia.run(
-        query="Add the two numbers together",
-        plan_inputs=plan_inputs,
-    )
-
-    planning_model.get_structured_response.assert_called_once()
-    assert "1" in planning_model.get_structured_response.call_args[1]["messages"][1].content
-    assert "2" in planning_model.get_structured_response.call_args[1]["messages"][1].content
-    assert plan_run.outputs.final_output.get_value() == 3
-
-
-def test_portia_plan_with_plan_inputs(portia: Portia, planning_model: MagicMock) -> None:
-    """Test that Portia.plan handles plan inputs correctly."""
-    user_name = PlanInput(name="$user_name", description="Name of the user")
-    user_id_input = PlanInput(name="$user_id", description="ID of the user")
-
-    planning_model.get_structured_response.return_value = StepsOrError(
-        steps=[
-            Step(
-                task="Do something with the user ID",
-                tool_id="llm_tool",
-                inputs=[Variable(name="$user_id", description="ID of the user")],
-                output="$output",
-            ),
-        ],
-        error=None,
-    )
-
     plan = portia.plan(
         query="Use these inputs to do something",
-        plan_inputs=[user_name, user_id_input],
+        plan_inputs=[num_a_input, num_b_input],
+        tools=[AdditionTool()],
     )
 
     assert len(plan.inputs) == 2
-    assert any(input_.name == "$user_name" for input_ in plan.inputs)
-    assert any(input_.name == "$user_id" for input_ in plan.inputs)
+    assert any(input_.name == "$num_a" for input_ in plan.inputs)
+    assert any(input_.name == "$num_b" for input_ in plan.inputs)
     assert len(plan.steps) == 1
-    assert any(input_.name == "$user_id" for input_ in plan.steps[0].inputs)
+    assert any(input_.name == "$num_a" for input_ in plan.steps[0].inputs)
+    assert any(input_.name == "$num_b" for input_ in plan.steps[0].inputs)
 
 
-def test_portia_run_plan_with_plan_inputs() -> None:
+def test_portia_run_plan_with_plan_inputs(portia: Portia) -> None:
     """Test that run_plan correctly handles plan inputs."""
+    num_a_input = PlanInput(name="$num_a", description="First number to add")
+    num_b_input = PlanInput(name="$num_b", description="Second number to add")
+
     plan = Plan(
         plan_context=PlanContext(query="Add two numbers", tool_ids=["add_tool"]),
         steps=[
@@ -1457,36 +1474,20 @@ def test_portia_run_plan_with_plan_inputs() -> None:
                 output="$result",
             ),
         ],
-        inputs=[
-            PlanInput(name="$num_a", description="First number to add"),
-            PlanInput(name="$num_b", description="Second number to add"),
-        ],
+        inputs=[num_a_input, num_b_input],
     )
 
-    plan_inputs = [
-        PlanInput(name="$num_a", description="First number to add", value=1),
-        PlanInput(name="$num_b", description="Second number to add", value=2),
-    ]
+    plan_inputs = {num_a_input: 1, num_b_input: 2}
 
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalOutput(value=3)
 
-    # Mock the _get_agent_for_step method to return our mock agent
+    # Mock the get_agent_for_step method to return our mock agent
     with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
         plan_run = portia.run_plan(plan, plan_inputs=plan_inputs)
 
     assert plan_run.plan_id == plan.id
-    assert len(plan_run.plan_inputs) == 2
-    assert plan_run.plan_inputs[0].name == "$num_a"
-    assert plan_run.plan_inputs[0].value == 1
-    assert plan_run.plan_inputs[1].name == "$num_b"
-    assert plan_run.plan_inputs[1].value == 2
-
-    mock_agent.invoke.assert_called_once()
-    call_args = mock_agent.invoke.call_args[1]
-    assert call_args["step"].inputs[0].name == "$num_a"
-    assert call_args["step"].inputs[1].name == "$num_b"
-    assert call_args["step_inputs"]["$num_a"] == 1
-    assert call_args["step_inputs"]["$num_b"] == 2
-
+    assert len(plan_run.outputs.plan_inputs) == 2
+    assert plan_run.outputs.plan_inputs["$num_a"] == 1
+    assert plan_run.outputs.plan_inputs["$num_b"] == 2
     assert plan_run.outputs.final_output.value == 3
