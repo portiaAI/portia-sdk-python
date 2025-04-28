@@ -1144,7 +1144,14 @@ class PortiaCloudStorage(Storage, AgentMemory):
             raise StorageError(e) from e
         else:
             self.check_response(response)
-            return end_user
+            response_json = response.json()
+            return EndUser(
+                external_id=response_json["external_id"],
+                name=response_json["name"],
+                email=response_json["email"],
+                phone_number=response_json["phone_number"],
+                additional_data=response_json["additional_data"],
+            )
 
     def get_end_user(self, external_id: str) -> EndUser:
         """Retrieve an end user from Portia Cloud.
