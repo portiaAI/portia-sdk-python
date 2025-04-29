@@ -496,7 +496,7 @@ class Portia:
             step = plan.steps[plan_run.current_step_index]
             next_tool = self._get_tool_for_step(step, plan_run)
             if next_tool:
-                tool_ready = next_tool.ready(
+                ready_response = next_tool.ready(
                     ToolRunContext(
                         execution_context=plan_run.execution_context,
                         end_user=self.initialize_end_user(plan_run.end_user_id),
@@ -505,8 +505,8 @@ class Portia:
                         clarifications=current_step_clarifications,
                     ),
                 )
-                logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
-                if tool_ready:
+                logger().debug(f"Tool state for {next_tool.name} is ready={ready_response.ready}")
+                if ready_response.ready:
                     for clarification in current_step_clarifications:
                         if clarification.category is ClarificationCategory.ACTION:
                             clarification.resolved = True
