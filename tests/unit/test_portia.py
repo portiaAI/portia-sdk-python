@@ -1533,3 +1533,71 @@ def test_portia_run_plan_with_extra_inputs(portia: Portia) -> None:
     extra_input = PlanInput(name="$extra", description="Extra unused input")
     plan_run = portia.run_plan(plan, plan_inputs={extra_input: "value"})
     assert plan_run.plan_inputs == {}
+
+
+def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
+    """Test that run_plan raises error when required inputs are missing."""
+    required_input1 = PlanInput(name="$required1", description="Required input 1")
+    required_input2 = PlanInput(name="$required2", description="Required input 2")
+
+    plan = Plan(
+        plan_context=PlanContext(query="Plan requiring inputs", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Use the required input",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$required1", description="Required value"),
+                    Variable(name="$required2", description="Required value"),
+                ],
+                output="$result",
+            ),
+        ],
+        inputs=[required_input1, required_input2],
+    )
+
+    # Try to run the plan without providing required inputs
+    with pytest.raises(ValueError):  # noqa: PT011
+        portia.run_plan(plan, plan_inputs={})
+
+    # Should fail with just one of the two required
+    with pytest.raises(ValueError):  # noqa: PT011
+        portia.run_plan(plan, plan_inputs={required_input1: "value"})
+
+    # Should work if we provide only the required input
+    with mock.patch.object(portia, "resume") as mock_resume:
+        portia.run_plan(plan, plan_inputs={required_input1: "value 1", required_input2: "value 2"})
+        mock_resume.assert_called_once()
+
+
+def test_portia_run_plan_with_unknown_inputs(portia: Portia) -> None:
+    """Test that run_plan ignores unknown inputs."""
+    expected_input = PlanInput(name="$expected", description="Expected input")
+
+    plan = Plan(
+        plan_context=PlanContext(query="Plan with specific input", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Use the expected input",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$expected", description="Expected value"),
+                ],
+                output="$result",
+            ),
+        ],
+        inputs=[expected_input],
+    )
+
+    unknown_input = PlanInput(name="$unknown", description="Unknown input")
+
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+        plan_run = portia.run_plan(
+            plan, plan_inputs={expected_input: "expected_value", unknown_input: "unknown_value"}
+        )
+
+        assert "$expected" in plan_run.plan_inputs
+        assert plan_run.plan_inputs["$expected"] == "expected_value"
+        assert "$unknown" not in plan_run.plan_inputs
+        mock_resume.assert_called_once()

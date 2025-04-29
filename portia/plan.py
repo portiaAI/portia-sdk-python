@@ -234,6 +234,7 @@ class PlanInput(BaseModel):
 
     """
 
+    # Use frozen=True to allow this to be a dictionary key
     model_config = ConfigDict(extra="ignore", frozen=True)
 
     name: str = Field(

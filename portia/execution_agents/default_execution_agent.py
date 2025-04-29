@@ -162,7 +162,7 @@ class MemoryExtractionStep:
                 previous_output = previous_outputs.get(input_variable.name)
                 input_value = previous_output.full_value(self.agent.agent_memory)  # pyright: ignore[reportOptionalMemberAccess]
             elif input_variable.name in plan_inputs:
-                input_value = plan_inputs[input_variable.name]
+                input_value = plan_inputs.get(input_variable.name)
             else:
                 raise InvalidPlanRunStateError(
                     f"Received unknown step input: {input_variable.name}"

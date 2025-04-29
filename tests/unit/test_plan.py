@@ -186,3 +186,21 @@ def test_plan_inputs_must_be_unique() -> None:
                 PlanInput(name="$duplicate", description="Second input with same name"),
             ],
         )
+
+
+def test_plan_input_equality() -> None:
+    """Test equality comparison of PlanInput objects."""
+    original_input = PlanInput(name="$test", description="Test input")
+
+    identical_input = PlanInput(name="$test", description="Test input")
+    assert original_input == identical_input
+
+    different_descr_input = PlanInput(name="$test", description="Different description")
+    assert original_input != different_descr_input
+
+    different_name_input = PlanInput(name="$different", description="Test input")
+    assert original_input != different_name_input
+
+    # Test inequality with different types
+    assert original_input != "not a plan input"
+    assert original_input != 42
