@@ -502,8 +502,8 @@ def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
 
     portia = Portia(config=config)
     query = (
-        "Send an email to John Doe using the Gmail tool. Only use the Gmail tool and "
-        "fail if you can't use it."
+        "Send an email to John Doe (john.doe@example.com) using the Gmail tool. Only use the Gmail "
+        "tool and fail if you can't use it."
     )
 
     with pytest.raises(PlanError) as e:

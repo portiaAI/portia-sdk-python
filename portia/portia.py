@@ -244,9 +244,8 @@ class Portia:
                     end_user,
                     example_plans,
                 )
-            else:
-                logger().error(f"Error in planning - {outcome.error}")
-                raise PlanError(outcome.error)
+            logger().error(f"Error in planning - {outcome.error}")
+            raise PlanError(outcome.error)
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
