@@ -267,6 +267,24 @@ def test_remote_tool_hard_error(httpx_mock: HTTPXMock) -> None:
     )
 
 
+def test_remote_tool_run_unhandled_error(httpx_mock: HTTPXMock) -> None:
+    """Test tool ready unhandled error."""
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_exception(
+        url=f"{endpoint}/api/v0/tools/test/ready/",
+        exception=httpx.HTTPError("Unhandled error"),
+    )
+    tool = PortiaRemoteTool(
+        id="test",
+        name="test",
+        description="",
+        output_schema=("", ""),
+        client=httpx.Client(base_url=endpoint),
+    )
+    with pytest.raises(ToolHardError, match="Unhandled error from Portia Cloud"):
+        tool.run(get_test_tool_context())
+
+
 @pytest.mark.parametrize(
     ("response_json", "is_ready"),
     [
