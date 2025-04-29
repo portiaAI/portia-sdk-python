@@ -7,7 +7,10 @@ import pytest
 from portia.config import Config, GenerativeModelsConfig
 from portia.execution_agents.output import LocalOutput
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
-from portia.introspection_agents.introspection_agent import COMPLETED_OUTPUT, SKIPPED_OUTPUT, PreStepIntrospectionOutcome
+from portia.introspection_agents.introspection_agent import (
+    COMPLETED_OUTPUT,
+    SKIPPED_OUTPUT,
+)
 from portia.model import GenerativeModel, Message
 from portia.plan import Step
 from tests.utils import get_test_config, get_test_plan_run
