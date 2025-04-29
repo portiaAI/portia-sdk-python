@@ -258,10 +258,10 @@ class BrowserTool(Tool[str]):
 
             # Main task
             task_to_complete = (
-                f"Go to {url} and complete the following task: {task}. If the user is not already "
-                "logged in and at any point the user needs to login to complete the task, please "
-                "return human_login_required=True, and the url of the sign in page as well as what "
-                "the user should do to sign in"
+                f"Go to {url} and complete the following task: {task}. The user may already be "
+                "logged in. If the user is NOT already logged in and at any point login is "
+                "required to complete the task, please return human_login_required=True, and the "
+                "url of the sign in page as well as what the user should do to sign in"
             )
             task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
             if task_result.human_login_required:

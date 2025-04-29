@@ -84,6 +84,13 @@ class _ArgsSchemaPlaceholder(BaseModel):
     """Placeholder ArgsSchema for tools that take no arguments."""
 
 
+class ReadyResponse(BaseModel):
+    """Response from the /ready endpoint."""
+
+    ready: bool
+    clarifications: ClarificationListType
+
+
 class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     """Abstract base class for a tool.
 
@@ -126,7 +133,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "Tools may not require a summary if they already produce a nice textual output.",
     )
 
-    def ready(self, ctx: ToolRunContext) -> bool:  # noqa: ARG002
+    def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
         """Check whether the tool can be plan_run.
 
         This method can be implemented by subclasses to allow checking if the tool can be plan_run.
@@ -134,13 +141,15 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         If left unimplemented will always return true.
 
         Args:
-            ctx (ToolRunContext): Context of the tool run
+            ctx (ToolRunContext): Co
+            ntext of the tool run
 
         Returns:
-            bool: Whether the tool is ready to run
+            ReadyResponse: Whether the tool is ready to run and any clarifications that need to be
+            resolved
 
         """
-        return True
+        return ReadyResponse(ready=True, clarifications=[])
 
     @abstractmethod
     def run(
@@ -465,14 +474,15 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     )
         return output
 
-    def ready(self, ctx: ToolRunContext) -> bool:
+    def ready(self, ctx: ToolRunContext) -> ReadyResponse:
         """Check if the remote tool is ready by calling the /ready endpoint.
 
         Args:
             ctx (ToolRunContext): Context of the environment
 
         Returns:
-            bool: Whether the tool is ready to run
+            ReadyResponse: Whether the tool is ready to run and any clarifications that
+              need to be resolved
 
         """
         try:
@@ -492,10 +502,19 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             response.raise_for_status()
         except Exception as e:  # noqa: BLE001
             logger().error(f"Unhandled error from Portia Cloud: {e}")
-            return False
+            return ReadyResponse(ready=False, clarifications=[])
         else:
             response_json = response.json()
-            return "success" in response_json
+            try:
+                ready = ReadyResponse.model_validate(response_json)
+            except ValidationError:
+                # Old format response
+                return ReadyResponse(
+                    ready="success" in response_json,
+                    clarifications=response_json.get("clarifications", []),
+                )
+            else:
+                return ready
 
     def run(
         self,

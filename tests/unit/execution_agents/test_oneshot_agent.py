@@ -9,9 +9,11 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from portia.end_user import EndUser
-from portia.errors import InvalidAgentError, InvalidPlanRunStateError
+from portia.errors import InvalidAgentError
+from portia.execution_agents.context import StepInput
+from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput, Output
+from portia.execution_agents.output import LocalOutput, Output
 from portia.storage import InMemoryStorage
 from tests.utils import AdditionTool, get_test_config, get_test_plan_run
 
@@ -23,7 +25,26 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     are running in order and being called correctly and passed out correctly.
     """
 
+    def memory_extraction_step(self, _) -> dict[str, Any]:  # noqa: ANN001, ARG001
+        return {
+            "step_inputs": [
+                StepInput(
+                    name="previous_input",
+                    value="previous value",
+                    description="Previous step input",
+                )
+            ]
+        }
+
+    monkeypatch.setattr(MemoryExtractionStep, "invoke", memory_extraction_step)
+
     def tool_calling_model(self, state) -> dict[str, Any]:  # noqa: ANN001, ARG001
+        # Verify memory extraction step was called
+        assert "step_inputs" in state
+        assert len(state["step_inputs"]) == 1
+        assert state["step_inputs"][0].name == "previous_input"
+        assert state["step_inputs"][0].value == "previous value"
+
         response = AIMessage(content="")
         response.tool_calls = [
             {
@@ -78,23 +99,4 @@ def test_oneshot_agent_without_tool_raises() -> None:
             config=get_test_config(),
             agent_memory=InMemoryStorage(),
             tool=None,
-        ).execute_sync()
-
-
-def test_oneshot_agent_with_memory_output_raises() -> None:
-    """Test oneshot agent with memory output raises."""
-    (plan, plan_run) = get_test_plan_run()
-    plan_run.outputs.step_outputs["test"] = AgentMemoryOutput(
-        output_name="test",
-        plan_run_id=plan_run.id,
-        summary="test",
-    )
-    with pytest.raises(InvalidPlanRunStateError):
-        OneShotAgent(
-            step=plan.steps[0],
-            plan_run=plan_run,
-            config=get_test_config(),
-            agent_memory=InMemoryStorage(),
-            end_user=EndUser(external_id="123"),
-            tool=AdditionTool(),
         ).execute_sync()

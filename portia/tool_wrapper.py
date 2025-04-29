@@ -20,7 +20,7 @@ from portia.common import combine_args_kwargs
 from portia.execution_agents.output import LocalOutput
 from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
-from portia.tool import Tool, ToolRunContext
+from portia.tool import ReadyResponse, Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from portia.plan_run import PlanRun
@@ -68,16 +68,8 @@ class ToolCallWrapper(Tool):
         self._storage = storage
         self._plan_run = plan_run
 
-    def ready(self, ctx: ToolRunContext) -> bool:
-        """Check if the child tool is ready.
-
-        Args:
-            ctx (ToolRunContext): Context of the tool run
-
-        Returns:
-            bool: Whether the tool is ready to run
-
-        """
+    def ready(self, ctx: ToolRunContext) -> ReadyResponse:
+        """Check if the child tool is ready and return ReadyResponse."""
         return self._child_tool.ready(ctx)
 
     def run(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
