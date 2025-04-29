@@ -1001,7 +1001,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
 
         if plan_run.current_step_index == 1:
             plan_run.outputs.step_outputs["$step2_result"] = LocalOutput(
-                value="Tool execution skipped and completed the plan run",
+                value=COMPLETED_OUTPUT,
                 summary="Remaining steps cannot be executed",
             )
             plan_run.outputs.final_output = LocalOutput(
@@ -1125,7 +1125,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
 
     assert (
         updated_plan_run.outputs.step_outputs["$test_output"].get_value()
-        == "Tool execution skipped"
+        == SKIPPED_OUTPUT
     )
     assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Skipping step"
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS  # State should remain IN_PROGRESS
@@ -1247,11 +1247,11 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         assert result_plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
         assert (
             result_plan_run.outputs.step_outputs["$step3_result"].get_value()
-            == "Tool execution skipped"
+            == SKIPPED_OUTPUT
         )
         assert (
             result_plan_run.outputs.step_outputs["$step4_result"].get_value()
-            == "Tool execution skipped"
+            == SKIPPED_OUTPUT
         )
         assert result_plan_run.outputs.final_output is not None
         assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
