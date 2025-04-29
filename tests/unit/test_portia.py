@@ -27,6 +27,8 @@ from portia.end_user import EndUser
 from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
 from portia.introspection_agents.introspection_agent import (
+    COMPLETED_OUTPUT,
+    SKIPPED_OUTPUT,
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
@@ -965,7 +967,7 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
         assert "$step1_result" in plan_run.outputs.step_outputs
         assert (
             plan_run.outputs.step_outputs["$step1_result"].get_value()
-            == "Tool execution skipped"
+            == SKIPPED_OUTPUT
         )
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
@@ -1031,7 +1033,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert (
             plan_run.outputs.step_outputs["$step2_result"].get_value()
-            == "Tool execution skipped and completed the plan run"
+            == COMPLETED_OUTPUT
         )
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.get_summary() == "Execution completed early"
@@ -1077,7 +1079,7 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
         # Verify plan_run was updated correctly
         assert (
             updated_plan_run.outputs.step_outputs["$test_output"].get_value()
-            == "Tool execution skipped and completed the plan run"
+            == COMPLETED_OUTPUT
         )
         assert (
             updated_plan_run.outputs.step_outputs["$test_output"].get_summary()

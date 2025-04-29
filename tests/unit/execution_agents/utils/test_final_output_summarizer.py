@@ -7,7 +7,7 @@ import pytest
 from portia.config import Config, GenerativeModelsConfig
 from portia.execution_agents.output import LocalOutput
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
-from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
+from portia.introspection_agents.introspection_agent import COMPLETED_OUTPUT, SKIPPED_OUTPUT, PreStepIntrospectionOutcome
 from portia.model import GenerativeModel, Message
 from portia.plan import Step
 from tests.utils import get_test_config, get_test_plan_run
@@ -245,11 +245,11 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
     plan_run.outputs.step_outputs = {
         "$regular_output": LocalOutput(value="Regular result", summary="Not used"),
         "$skipped_output": LocalOutput(
-            value=PreStepIntrospectionOutcome.SKIP,
+            value=SKIPPED_OUTPUT,
             summary="This task was skipped as it was unnecessary",
         ),
         "$complete_output": LocalOutput(
-            value=PreStepIntrospectionOutcome.COMPLETE,
+            value=COMPLETED_OUTPUT,
             summary="The plan execution was completed early",
         ),
     }
