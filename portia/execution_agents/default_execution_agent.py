@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import SystemMessage
+from jinja2 import Template
+from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -29,6 +30,7 @@ from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.model import GenerativeModel, Message
+from portia.plan import Variable
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -127,6 +129,16 @@ class VerifiedToolInputs(BaseModel):
     args: list[VerifiedToolArgument] = Field(description="Arguments for the tool.")
 
 
+def _contains_template_variables(inputs: list[Variable], test_args: dict[str, Any]) -> bool:
+    """Check if the arguments contain any template variables."""
+    return any(_arg_contains_template_variables(inputs, arg) for arg in test_args.values())
+
+
+def _arg_contains_template_variables(inputs: list[Variable], arg: Any) -> bool:
+    """Check if an argument contains any template variables."""
+    return any(f"{{{input_.name}}}" in str(arg) for input_ in inputs)
+
+
 class ParserModel:
     """Model to parse the arguments for a tool.
 
@@ -156,6 +168,11 @@ class ParserModel:
                     "Your responses must clearly explain the source of each argument "
                     "(e.g., context, past messages, clarifications). "
                     "Avoid assumptions or fabricated information."
+                    "If any of the inputs are large, rather than repeating them, you can provide "
+                    "the name in curly braces and it will templated in."
+                    "For example: if you wish to use an input called 'large_output_value', "
+                    "you can enter {{$large_value_name}} and the value will be templated in before "
+                    "the tool is called"
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
@@ -260,7 +277,9 @@ class ParserModel:
             # actually work for the schema of the tool
             # if not we can retry
             try:
-                self.agent.tool.args_schema.model_validate(test_args)
+                # We can't validate the model if we have template variables
+                if not _contains_template_variables(self.agent.step.inputs, test_args):
+                    self.agent.tool.args_schema.model_validate(test_args)
             except ValidationError as e:
                 errors.append(str(e) + "\n")
 
@@ -400,7 +419,9 @@ class VerifierModel:
         arg_dict = {arg.name: arg.value for arg in tool_inputs.args}
 
         try:
-            if self.agent.tool:
+            if self.agent.tool and not _contains_template_variables(
+                self.agent.step.inputs, arg_dict
+            ):
                 self.agent.tool.args_schema.model_validate(arg_dict)
         except ValidationError as e:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
@@ -439,9 +460,13 @@ class ToolCallingModel:
             ),
             HumanMessagePromptTemplate.from_template(
                 "context:\n{verified_args}\n"
-                "Make sure you don't repeat past errors: {past_errors}\n"
                 "Use the provided tool with the arguments in the context, as "
                 "long as they are valid.\n",
+                "If any values are too large to be provided in full, they have been provided in "
+                "curly braces with a value to be templated in (e.g. {{large_output_value}}). "
+                "Please keep these templated values inside double curly braces as they will be "
+                "templated in before the tool is called.\n"
+                "Make sure you don't repeat past errors: {past_errors}\n",
             ),
         ],
     )
@@ -499,7 +524,22 @@ class ToolCallingModel:
                 past_errors=past_errors,
             ),
         )
-        return {"messages": [response]}
+        result = self._template_in_required_outputs(response, state["step_inputs"])
+        return {"messages": [result]}
+
+    def _template_in_required_outputs(
+        self, response: BaseMessage, step_inputs: list[StepInput]
+    ) -> None:
+        """Template any required inputs into the tool calls."""
+        for tool_call in response.tool_calls:
+            if not tool_call.args:
+                continue
+
+            for arg_name, arg_value in tool_call.args.items():
+                if not _arg_contains_template_variables(self.agent.step.inputs, arg_value):
+                    continue
+                template_args = {input_.name: input_.value for input_ in step_inputs}
+                tool_call.args[arg_name] = Template(arg_value).render(**template_args)
 
 
 class DefaultExecutionAgent(BaseExecutionAgent):
