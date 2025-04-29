@@ -64,11 +64,10 @@ all inputs are present and its condition is true (if the step has condition).
 Provide an outcome from the following list (ordered by preference):
   1- COMPLETE -> stops the execution and does not execute remaining steps.
    - You should favour this outcome if no steps remaining in the list
-    that  can be executed without the current step output.
+    that can be executed without the current step output.
    - You should favour this outcome if the condition of this step applies
    to all remaining steps.
   2- SKIP -> ONLY skips the current step and continue executing next steps.
-  3- FAIL -> fail and stops the execution of all the remaining steps in the plan.
   4- CONTINUE -> continue execution for the current step.
 
 You should evaluate the condition and provide the outcome based on the following criteria IN ORDER:
@@ -78,10 +77,7 @@ You should evaluate the condition and provide the outcome based on the following
  whenever possible (e.g if it is the last step).
  3- If you cannot evaluate the condition because some data had been skipped
   in previous steps then return SKIP.
- 4- If the condition is impossible to evaluate ONLY because the output variable name
- is missing from previous outputs then return FAIL. IMPORTANT: If the output is there
- but has missing or corrupted data favour the previous outcomes.
- 5- Otherwise return CONTINUE.
+ 4- Otherwise return CONTINUE.
 
 Return the outcome and reason in the given format.
 """
@@ -91,8 +87,7 @@ Return the outcome and reason in the given format.
                     "Today's date is {current_date} and today is {current_day_of_week}.\n"
                     "Review the following plan + current PlanRun.\n"
                     "The condition to evaluate is: {condition}.\n"
-                    "The current step index is: {current_step_idex}.\n"
-                    "Total number of steps in the plan is: {total_steps_count}.\n"
+                    "We are at step {current_step_idex} out of {total_steps_count} in total.\n"
                     "The original query: {query}\n"
                     "All Plan Steps: \n{plan}\n"
                     "Previous Step Outputs: \n{prev_step_outputs}\n"

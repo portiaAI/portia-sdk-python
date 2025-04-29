@@ -1168,16 +1168,13 @@ def test_handle_introspection_outcome_fail(portia: Portia) -> None:
         end_user_id="test123",
         state=PlanRunState.IN_PROGRESS,
     )
-
-
     mock_introspection = MagicMock()
     mock_introspection.pre_step_introspection.return_value = PreStepIntrospection(
         outcome=PreStepIntrospectionOutcome.FAIL,
         reason="Execution failed",
     )
-
-
     previous_output = LocalOutput(value="Previous step result")
+
     updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
         introspection_agent=mock_introspection,
         plan=plan,
