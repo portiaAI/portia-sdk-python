@@ -6,7 +6,7 @@ However, for more complex tool calls, the DefaultExecutionAgent is recommended a
 be more successful than the OneShotAgent.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 from typing import TYPE_CHECKING, Any
 
@@ -15,19 +15,20 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.errors import InvalidAgentError, InvalidPlanRunStateError
+from portia.errors import InvalidAgentError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
     AgentNode,
     next_state_after_tool_call,
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
+from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_context import get_execution_context
 from portia.tool import ToolRunContext
+from portia.execution_agents.context import StepInput  # noqa: TC001
+
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -42,6 +43,12 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 
+class ExecutionState(MessagesState):
+    """State for the execution agent."""
+
+    step_inputs: list[StepInput]
+
+
 class OneShotToolCallingModel:
     """One-shot model for calling a given tool.
 
@@ -54,7 +61,6 @@ class OneShotToolCallingModel:
 
     Args:
         model (GenerativeModel): The language model to use for generating responses.
-        context (str): The context to provide to the language model when generating a response.
         tools (list[StructuredTool]): A list of tools that can be used during the task.
         agent (OneShotAgent): The agent responsible for managing the task.
 
@@ -88,32 +94,32 @@ class OneShotToolCallingModel:
     def __init__(
         self,
         model: GenerativeModel,
-        context: str,
         tools: list[StructuredTool],
         agent: OneShotAgent,
+        tool_context: ToolRunContext,
     ) -> None:
         """Initialize the OneShotToolCallingModel.
 
         Args:
             model (GenerativeModel): The language model to use for generating responses.
-            context (str): The context to be used when generating the response.
             tools (list[StructuredTool]): A list of tools that can be used during the task.
             agent (OneShotAgent): The agent that is managing the task.
+            tool_context (ToolRunContext): The context for the tool.
 
         """
         self.model = model
-        self.context = context
         self.agent = agent
         self.tools = tools
+        self.tool_context = tool_context
 
-    def invoke(self, state: MessagesState) -> dict[str, Any]:
+    def invoke(self, state: ExecutionState) -> dict[str, Any]:
         """Invoke the model with the given message state.
 
         This method formats the input for the language model using the query, context,
         and past errors, then generates a response by invoking the model.
 
         Args:
-            state (MessagesState): The state containing the messages and other necessary data.
+            state (ExecutionState): The state containing the messages and other necessary data.
 
         Returns:
             dict[str, Any]: A dictionary containing the model's generated response.
@@ -122,10 +128,11 @@ class OneShotToolCallingModel:
         model = self.model.to_langchain().bind_tools(self.tools)
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
+        context = self.agent.get_system_context(self.tool_context, state["step_inputs"])
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 query=self.agent.step.task,
-                context=self.context,
+                context=context,
                 past_errors=past_errors,
             ),
         )
@@ -136,13 +143,16 @@ class OneShotAgent(BaseExecutionAgent):
     """Agent responsible for achieving a task by using langgraph.
 
     This agent performs the following steps:
-    1. Calls the tool with unverified arguments.
-    2. Retries tool calls up to 4 times.
+    1. Extracts inputs from agent memory (if applicable)
+    2. Calls the tool with unverified arguments.
+    3. Retries tool calls up to 4 times.
 
     Args:
         step (Step): The current step in the task plan.
         plan_run (PlanRun): The run that defines the task execution process.
         config (Config): The configuration settings for the agent.
+        agent_memory (AgentMemory): The agent memory for persisting outputs.
+        end_user (EndUser): The end user for the execution.
         tool (Tool | None): The tool to be used for the task (optional).
 
     Methods:
@@ -155,7 +165,7 @@ class OneShotAgent(BaseExecutionAgent):
         step: Step,
         plan_run: PlanRun,
         config: Config,
-        agent_memory: AgentMemory,  # noqa: ARG002
+        agent_memory: AgentMemory,
         end_user: EndUser,
         tool: Tool | None = None,
     ) -> None:
@@ -165,12 +175,12 @@ class OneShotAgent(BaseExecutionAgent):
             step (Step): The current step in the task plan.
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
-            agent_memory (AgentMemory): Not supported in this execution agent.
+            agent_memory (AgentMemory): The agent memory for persisting outputs.
             end_user (EndUser): The end user for the execution.
             tool (Tool | None): The tool to be used for the task (optional).
 
         """
-        super().__init__(step, plan_run, config, end_user, tool)
+        super().__init__(step, plan_run, config, end_user, agent_memory, tool)
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.
@@ -183,28 +193,7 @@ class OneShotAgent(BaseExecutionAgent):
         """
         if not self.tool:
             raise InvalidAgentError("No tool available")
-        if any(
-            isinstance(output, AgentMemoryOutput)
-            for output in self.plan_run.outputs.step_outputs.values()
-        ):
-            raise InvalidPlanRunStateError(
-                "One-shot agent does not support pulling outputs from agent memory",
-            )
 
-        previous_outputs = {
-            output_name: output.value
-            for output_name, output in self.plan_run.outputs.step_outputs.items()
-            if isinstance(output, LocalOutput)
-        }
-        step_inputs = [
-            StepInput(
-                name=step_input.name,
-                value=previous_outputs.get(step_input.name),
-                description=step_input.description,
-            )
-            for step_input in self.step.inputs
-            if step_input.name in previous_outputs
-        ]
         tool_run_ctx = ToolRunContext(
             execution_context=get_execution_context(),
             end_user=self.end_user,
@@ -213,7 +202,6 @@ class OneShotAgent(BaseExecutionAgent):
             clarifications=self.plan_run.get_clarifications_for_step(),
         )
 
-        context = self.get_system_context(tool_run_ctx, step_inputs)
         model = self.config.get_execution_model()
         tools = [
             self.tool.to_langchain_with_artifact(
@@ -222,17 +210,21 @@ class OneShotAgent(BaseExecutionAgent):
         ]
         tool_node = ToolNode(tools)
 
-        graph = StateGraph(MessagesState)
+        graph = StateGraph(ExecutionState)
+        graph.add_node(AgentNode.MEMORY_EXTRACTION, MemoryExtractionStep(self).invoke)
+        graph.add_edge(START, AgentNode.MEMORY_EXTRACTION)
+
         graph.add_node(
             AgentNode.TOOL_AGENT,
-            OneShotToolCallingModel(model, context, tools, self).invoke,
+            OneShotToolCallingModel(model, tools, self, tool_run_ctx).invoke,
         )
+        graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.TOOL_AGENT)
+
         graph.add_node(AgentNode.TOOLS, tool_node)
         graph.add_node(
             AgentNode.SUMMARIZER,
             StepSummarizer(self.config, model, self.tool, self.step).invoke,
         )
-        graph.add_edge(START, AgentNode.TOOL_AGENT)
 
         # Use execution manager for state transitions
         graph.add_conditional_edges(
@@ -246,6 +238,6 @@ class OneShotAgent(BaseExecutionAgent):
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
         app = graph.compile()
-        invocation_result = app.invoke({"messages": []})
+        invocation_result = app.invoke({"messages": [], "step_inputs": []})
 
         return process_output(invocation_result["messages"], self.tool)

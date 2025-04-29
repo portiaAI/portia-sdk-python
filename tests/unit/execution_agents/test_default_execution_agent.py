@@ -19,7 +19,6 @@ from portia.errors import InvalidAgentError, InvalidPlanRunStateError
 from portia.execution_agents.default_execution_agent import (
     MAX_RETRIES,
     DefaultExecutionAgent,
-    MemoryExtractionStep,
     ParserModel,
     ToolArgument,
     ToolCallingModel,
@@ -28,9 +27,10 @@ from portia.execution_agents.default_execution_agent import (
     VerifiedToolInputs,
     VerifierModel,
 )
+from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.output import LocalOutput, Output
 from portia.model import LangChainGenerativeModel
-from portia.plan import Step, Variable
+from portia.plan import Step
 from portia.storage import InMemoryStorage
 from portia.tool import Tool
 from tests.utils import (
@@ -348,17 +348,17 @@ def test_verifier_model_schema_validation() -> None:
 
     required_field1 = next(arg for arg in result_inputs.args if arg.name == "required_field1")
     required_field2 = next(arg for arg in result_inputs.args if arg.name == "required_field2")
-    assert (
-        required_field1.schema_invalid
-    ), "required_field1 should be marked as missing when validation fails"
-    assert (
-        required_field2.schema_invalid
-    ), "required_field2 should be marked as missing when validation fails"
+    assert required_field1.schema_invalid, (
+        "required_field1 should be marked as missing when validation fails"
+    )
+    assert required_field2.schema_invalid, (
+        "required_field2 should be marked as missing when validation fails"
+    )
 
     optional_field = next(arg for arg in result_inputs.args if arg.name == "optional_field")
-    assert (
-        not optional_field.schema_invalid
-    ), "optional_field should not be marked as missing when validation fails"
+    assert not optional_field.schema_invalid, (
+        "optional_field should not be marked as missing when validation fails"
+    )
 
 
 def test_tool_calling_model_no_hallucinations() -> None:
@@ -854,115 +854,3 @@ def test_verifier_model_edge_cases() -> None:
     agent.tool = None
     with pytest.raises(InvalidPlanRunStateError):
         verifier_model.invoke({"messages": [], "step_inputs": []})
-
-
-def test_memory_extraction_step_no_inputs() -> None:
-    """Test MemoryExtractionStep with no step inputs."""
-    (_, plan_run) = get_test_plan_run()
-    agent = DefaultExecutionAgent(
-        step=Step(task="DESCRIPTION_STRING", output="$out"),
-        plan_run=plan_run,
-        config=get_test_config(),
-        tool=None,
-        agent_memory=InMemoryStorage(),
-        end_user=EndUser(external_id="123"),
-    )
-
-    memory_extraction_step = MemoryExtractionStep(agent=agent)
-    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
-
-    assert result == {"step_inputs": []}
-
-
-def test_memory_extraction_step_with_inputs() -> None:
-    """Test MemoryExtractionStep with step inputs (one local, one from agent memory)."""
-    (_, plan_run) = get_test_plan_run()
-
-    storage = InMemoryStorage()
-    saved_output = storage.save_plan_run_output(
-        "$memory_output",
-        LocalOutput(value="memory_value"),
-        plan_run.id,
-    )
-    plan_run.outputs.step_outputs = {
-        "$local_output": LocalOutput(value="local_value"),
-        "$memory_output": saved_output,
-    }
-
-    agent = DefaultExecutionAgent(
-        step=Step(
-            task="DESCRIPTION_STRING",
-            output="$out",
-            inputs=[
-                Variable(name="$local_output", description="Local input description"),
-                Variable(name="$memory_output", description="Memory input description"),
-            ],
-        ),
-        plan_run=plan_run,
-        config=get_test_config(),
-        tool=None,
-        agent_memory=storage,
-        end_user=EndUser(external_id="123"),
-    )
-
-    memory_extraction_step = MemoryExtractionStep(agent=agent)
-    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
-
-    assert len(result["step_inputs"]) == 2
-    assert result["step_inputs"][0].name == "$local_output"
-    assert result["step_inputs"][0].value == "local_value"
-    assert result["step_inputs"][0].description == "Local input description"
-    assert result["step_inputs"][1].name == "$memory_output"
-    assert result["step_inputs"][1].value == "memory_value"
-    assert result["step_inputs"][1].description == "Memory input description"
-
-
-def test_memory_extraction_step_errors_with_missing_input() -> None:
-    """Test MemoryExtractionStep ignores step inputs that aren't in previous outputs."""
-    (_, plan_run) = get_test_plan_run()
-    agent = DefaultExecutionAgent(
-        step=Step(
-            task="DESCRIPTION_STRING",
-            output="$out",
-            inputs=[
-                Variable(name="$missing_input", description="Missing input description"),
-                Variable(name="$a", description="A value"),
-            ],
-        ),
-        plan_run=plan_run,
-        config=get_test_config(),
-        tool=None,
-        agent_memory=InMemoryStorage(),
-        end_user=EndUser(external_id="123"),
-    )
-
-    memory_extraction_step = MemoryExtractionStep(agent=agent)
-    with pytest.raises(InvalidPlanRunStateError):
-        memory_extraction_step.invoke({"messages": [], "step_inputs": []})
-
-
-def test_memory_extraction_step_handles_unknown_output_type() -> None:
-    """Test MemoryExtractionStep handles unknown output types gracefully."""
-    (_, plan_run) = get_test_plan_run()
-    plan_run.outputs.step_outputs = {
-        "$unexpected_input": SimpleNamespace(value="Unexpected input value"),  # pyright: ignore[reportAttributeAccessIssue]
-    }
-    agent = DefaultExecutionAgent(
-        step=Step(
-            task="DESCRIPTION_STRING",
-            output="$out",
-            inputs=[
-                Variable(name="$unexpected_input", description="Unexpected input description"),
-            ],
-        ),
-        plan_run=plan_run,
-        config=get_test_config(),
-        tool=None,
-        agent_memory=InMemoryStorage(),
-        end_user=EndUser(external_id="123"),
-    )
-
-    memory_extraction_step = MemoryExtractionStep(agent=agent)
-    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
-
-    assert len(result["step_inputs"]) == 0
