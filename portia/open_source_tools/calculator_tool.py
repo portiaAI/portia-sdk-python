@@ -1,11 +1,58 @@
 """Simple Calculator Implementation."""
 
+import ast
+import operator
 import re
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError
 from portia.tool import Tool, ToolRunContext
+
+# Define allowed operators
+allowed_operators = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+    ast.Mod: operator.mod,
+}
+
+
+def safe_eval(node: Any) -> Any:  # noqa: ANN401
+    """Walk expression safely."""
+    if isinstance(node, ast.Expression):
+        return safe_eval(node.body)
+    if isinstance(node, ast.BinOp):
+        left = safe_eval(node.left)
+        right = safe_eval(node.right)
+        op_type = type(node.op)
+        if op_type in allowed_operators:
+            return allowed_operators[op_type](left, right)
+    elif isinstance(node, ast.UnaryOp):
+        operand = safe_eval(node.operand)
+        op_type = type(node.op)
+        if op_type in allowed_operators:
+            return allowed_operators[op_type](operand)
+    elif isinstance(node, ast.Num):
+        return node.n
+    elif isinstance(node, ast.Constant):  # For Python 3.8+
+        if isinstance(node.value, (int, float)):
+            return node.value
+    raise ValueError("Unsafe or unsupported expression")
+
+
+def save_evaluate(expression: str) -> float:
+    """Use ast.safe_eval to evaluate expression."""
+    parsed = ast.parse(expression, mode="eval")
+    result = safe_eval(parsed)
+    if isinstance(result, (float, int)):
+        return float(result)
+    raise ValueError("unexpected result from calculation.")
 
 
 class CalculatorToolSchema(BaseModel):
@@ -37,8 +84,7 @@ class CalculatorTool(Tool[float]):
             raise ToolHardError("No valid mathematical expression found in the input.")
 
         try:
-            result = eval(expression)  # noqa: S307
-            return float(result)
+            return save_evaluate(expression)
         except ZeroDivisionError as e:
             raise ToolHardError("Error: Division by zero.") from e
         except Exception as e:
