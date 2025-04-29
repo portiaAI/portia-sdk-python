@@ -1037,73 +1037,6 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         assert plan_run.outputs.final_output.get_summary() == "Execution completed early"
 
 
-def test_portia_run_with_introspection_fail(portia: Portia, planning_model: MagicMock) -> None:
-    """Test run with introspection agent returning FAIL outcome."""
-    # Setup mock plan and response
-    step1 = Step(task="Step 1", inputs=[], output="$step1_result")
-    step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="some_condition")
-    planning_model.get_structured_response.return_value = StepsOrError(
-        steps=[step1, step2],
-        error=None,
-    )
-
-    # Mock step agent for first step
-    mock_step_agent = MagicMock()
-    mock_step_agent.execute_sync.return_value = LocalOutput(value="Step 1 result")
-
-    # Configure the FAIL outcome
-    mock_introspection_fail = PreStepIntrospection(
-        outcome=PreStepIntrospectionOutcome.FAIL,
-        reason="Missing required data",
-    )
-
-    def custom_handle_introspection(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
-        plan_run: PlanRun = kwargs.get("plan_run")  # type: ignore  # noqa: PGH003
-        # If this is step 1, simulate a FAIL outcome
-        if plan_run.current_step_index == 1:
-            # Modify the plan_run to look like it failed
-            failed_output = LocalOutput(
-                value="Tool execution skipped and failed the plan run",
-                summary="Missing required data",
-            )
-            plan_run.outputs.step_outputs["$step2_result"] = failed_output
-            plan_run.outputs.final_output = failed_output
-            plan_run.state = PlanRunState.FAILED
-
-            # Return FAIL outcome
-            return (plan_run, mock_introspection_fail)
-
-        # Otherwise continue normally
-        return (
-            plan_run,
-            PreStepIntrospection(
-                outcome=PreStepIntrospectionOutcome.CONTINUE,
-                reason="Condition met",
-            ),
-        )
-
-    with (
-        mock.patch.object(portia, "_handle_introspection_outcome", custom_handle_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
-    ):
-        # Run the test
-        plan_run = portia.run("Test query with failed execution")
-
-        # Verify the expected outcome
-        assert plan_run.state == PlanRunState.FAILED
-        assert "$step2_result" in plan_run.outputs.step_outputs
-        assert (
-            plan_run.outputs.step_outputs["$step2_result"].get_value()
-            == "Tool execution skipped and failed the plan run"
-        )
-        assert plan_run.outputs.final_output is not None
-        assert (
-            plan_run.outputs.final_output.get_value()
-            == "Tool execution skipped and failed the plan run"
-        )
-        assert plan_run.outputs.final_output.get_summary() == "Missing required data"
-
-
 def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     """Test the actual implementation of _handle_introspection_outcome for COMPLETE outcome."""
     # Create a plan with conditions
@@ -1154,49 +1087,6 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
         assert updated_plan_run.state == PlanRunState.COMPLETE
 
 
-def test_handle_introspection_outcome_fail(portia: Portia) -> None:
-    """Test the actual implementation of _handle_introspection_outcome for FAIL outcome."""
-    # Create a plan with conditions
-    step = Step(task="Test step", inputs=[], output="$test_output", condition="some_condition")
-    plan = Plan(
-        plan_context=PlanContext(query="test query", tool_ids=[]),
-        steps=[step],
-    )
-    plan_run = PlanRun(
-        plan_id=plan.id,
-        current_step_index=0,
-        end_user_id="test123",
-        state=PlanRunState.IN_PROGRESS,
-    )
-    mock_introspection = MagicMock()
-    mock_introspection.pre_step_introspection.return_value = PreStepIntrospection(
-        outcome=PreStepIntrospectionOutcome.FAIL,
-        reason="Execution failed",
-    )
-    previous_output = LocalOutput(value="Previous step result")
-
-    updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
-        introspection_agent=mock_introspection,
-        plan=plan,
-        plan_run=plan_run,
-        last_executed_step_output=previous_output,
-    )
-
-    assert outcome.outcome == PreStepIntrospectionOutcome.FAIL
-    assert outcome.reason == "Execution failed"
-
-    assert (
-        updated_plan_run.outputs.step_outputs["$test_output"].get_value()
-        == "Tool execution skipped and failed the plan run"
-    )
-    assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Execution failed"
-    assert updated_plan_run.outputs.final_output is not None
-    assert (
-        updated_plan_run.outputs.final_output.get_value()
-        == "Tool execution skipped and failed the plan run"
-    )
-    assert updated_plan_run.outputs.final_output.get_summary() == "Execution failed"
-    assert updated_plan_run.state == PlanRunState.FAILED
 
 
 def test_handle_introspection_outcome_skip(portia: Portia) -> None:

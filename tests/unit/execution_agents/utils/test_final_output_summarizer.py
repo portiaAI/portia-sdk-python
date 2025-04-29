@@ -233,10 +233,6 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
             output="$regular_output",
         ),
         Step(
-            task="Failed task",
-            output="$failed_output",
-        ),
-        Step(
             task="Skipped task",
             output="$skipped_output",
         ),
@@ -248,10 +244,6 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
 
     plan_run.outputs.step_outputs = {
         "$regular_output": LocalOutput(value="Regular result", summary="Not used"),
-        "$failed_output": LocalOutput(
-            value=PreStepIntrospectionOutcome.FAIL,
-            summary="This task failed due to an error",
-        ),
         "$skipped_output": LocalOutput(
             value=PreStepIntrospectionOutcome.SKIP,
             summary="This task was skipped as it was unnecessary",
@@ -273,9 +265,6 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
         "----------\n"
         "Task: Regular task\n"
         "Output: Regular result\n"
-        "----------\n"
-        "Task: Failed task\n"
-        "Output: This task failed due to an error\n"
         "----------\n"
         "Task: Skipped task\n"
         "Output: This task was skipped as it was unnecessary\n"

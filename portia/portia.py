@@ -742,10 +742,7 @@ class Portia:
             f"Reason: {pre_step_outcome.reason}",
         )
 
-        if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
-            logger().error(*log_message)
-        else:
-            logger().info(*log_message)
+        logger().info(*log_message)
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
@@ -767,14 +764,6 @@ class Portia:
                         last_executed_step_output,
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
-            case PreStepIntrospectionOutcome.FAIL:
-                failed_output = LocalOutput(
-                    value="Tool execution skipped and failed the plan run",
-                    summary=pre_step_outcome.reason,
-                )
-                self._set_step_output(failed_output, plan_run, step)
-                plan_run.outputs.final_output = failed_output
-                self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         return (plan_run, pre_step_outcome)
 
     def _get_planning_agent(self) -> BasePlanningAgent:

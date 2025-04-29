@@ -61,8 +61,7 @@ class FinalOutputSummarizer:
                     if outputs[step.output].get_value()
                     in (
                         PreStepIntrospectionOutcome.SKIP,
-                        PreStepIntrospectionOutcome.COMPLETE,
-                        PreStepIntrospectionOutcome.FAIL,
+                        PreStepIntrospectionOutcome.COMPLETE
                     )
                     else outputs[step.output].get_value()
                 )
