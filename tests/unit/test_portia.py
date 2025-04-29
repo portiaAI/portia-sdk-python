@@ -38,7 +38,7 @@ from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, 
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
 from portia.prefixed_uuid import PlanUUID
-from portia.tool import Tool, ToolRunContext
+from portia.tool import ReadyResponse, Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
     AdditionTool,
@@ -374,9 +374,9 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
         def run(self, ctx: ToolRunContext, user_guidance: str) -> str:  # noqa: ARG002
             return "result"
 
-        def ready(self, ctx: ToolRunContext) -> bool:  # noqa: ARG002
+        def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
             mock_call_count.count += 1
-            return mock_call_count.count == 3
+            return ReadyResponse(ready=mock_call_count.count == 3, clarifications=[])
 
     portia.tool_registry = ToolRegistry([ReadyTool()])
     step0 = Step(

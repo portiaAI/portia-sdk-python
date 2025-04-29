@@ -1039,7 +1039,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     ),
                 },
                 data={
-                    "summary": output.get_summary(),
+                    "summary": output.get_summary() or "",
                 },
             )
             self.check_response(response)
