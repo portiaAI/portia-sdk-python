@@ -338,8 +338,8 @@ class Portia:
         # Perform initial readiness check
         if len(ready_clarifications := self._check_remaining_tool_readiness(plan, plan_run)):
             self._raise_clarifications(ready_clarifications, plan_run)
-            self._handle_clarifications(plan_run)
-            return plan_run
+            if not self._handle_clarifications(plan_run):
+                return plan_run
 
         # if the run has execution context associated, but none is set then use it
         if not is_execution_context_set():
