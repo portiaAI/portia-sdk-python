@@ -63,21 +63,20 @@ all inputs are present and its condition is true (if the step has condition).
 
 Provide an outcome from the following list (ordered by preference):
   1- COMPLETE -> stops the execution and does not execute remaining steps.
-   - You should favour this outcome if no steps remaining in the list
-    that can be executed without the current step output.
-   - You should favour this outcome if the condition of this step applies
-   to all remaining steps.
+   - Choose COMPLETE if all remaining steps depend on the current step's output.
+   - Choose COMPLETE if the condition of this step is the same for all remaining steps.
   2- SKIP -> ONLY skips the current step and continue executing next steps.
   3- CONTINUE -> continue execution for the current step.
 
 You should evaluate the condition and provide the outcome based on the following criteria IN ORDER:
- 1- If the condition is false and all remaining steps would depend on the output of this step
+ 1- If condition is false and all remaining steps depend on the output of this step
  then return COMPLETE.
- 2- If condition is false you return SKIP. But favour the point 1 as outcome
- whenever possible (e.g if it is the last step).
- 3- If you cannot evaluate the condition because some data had been skipped
+ 2- If condition is false and all remaining steps have the same condition return COMPLETE.
+ 3- If condition is false you return SKIP. But favour COMPLETE whenever possible
+ (e.g if it is the last step).
+ 4- If you cannot evaluate the condition because some data had been skipped
   in previous steps then return SKIP.
- 4- Otherwise return CONTINUE.
+ 5- Otherwise return CONTINUE.
 
 Return the outcome and reason in the given format.
 """

@@ -47,7 +47,6 @@ from portia.plan import (
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
-from portia.prefixed_uuid import PlanUUID
 from portia.tool import ReadyResponse, Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
