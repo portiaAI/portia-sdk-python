@@ -361,16 +361,25 @@ class Portia:
             plan_run.execution_context = get_execution_context()
             plan_run = self._execute_plan_run(plan, plan_run)
 
-            self._handle_clarifications(plan_run)
+            if not self._handle_clarifications(plan_run):
+                return plan_run
 
         return plan_run
 
-    def _handle_clarifications(self, plan_run: PlanRun) -> None:
-        """Handle any clarifications that are raised during the execution of a plan run."""
+    def _handle_clarifications(self, plan_run: PlanRun) -> bool:
+        """Handle any clarifications that are raised during the execution of a plan run.
+
+        Args:
+            plan_run (PlanRun): The plan run to handle clarifications for.
+
+        Returns:
+            bool: True if clarifications could not be handled in-band and run execution should stop.
+
+        """
         # If we don't have a clarification handler, return the plan run even if a clarification
         # has been raised
         if not self.execution_hooks.clarification_handler:
-            return
+            return False
 
         clarifications = plan_run.get_outstanding_clarifications()
         for clarification in clarifications:
@@ -384,7 +393,7 @@ class Portia:
             # If clarifications are handled synchronously, we'll go through this immediately.
             # If they're handled asynchronously, we'll wait for the plan run to be ready.
             plan_run = self.wait_for_ready(plan_run)
-        return
+        return len(plan_run.get_outstanding_clarifications()) == 0
 
     def resolve_clarification(
         self,
