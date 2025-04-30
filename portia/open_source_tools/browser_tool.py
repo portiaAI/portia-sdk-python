@@ -247,14 +247,17 @@ class BrowserTool(Tool[str]):
                 output_model: type[BrowserTaskOutput],
             ) -> BrowserTaskOutput:
                 """Run a browser agent task with the given configuration."""
+                browser = self.infrastructure_provider.setup_browser(ctx)
                 agent = Agent(
                     task=task_description,
                     llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx),
+                    browser=browser,
                     controller=Controller(output_model=output_model),
                 )
                 result = await agent.run()
-                return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
+                final_result = output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
+                #print("got here, it was:", browser.playwright_browser.contexts[0].pages[0].title)
+                return final_result
 
             # Main task
             task_to_complete = (
@@ -394,12 +397,14 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        return Browser(
+        browser = Browser(
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
             ),
         )
+        p = browser.playwright_browser.contexts[0].pages[0]
+        return browser
 
     def construct_auth_clarification_url(
         self,
