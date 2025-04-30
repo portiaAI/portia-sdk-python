@@ -1018,13 +1018,13 @@ class Portia:
                         end_user=end_user,
                         plan_run_id=plan_run.id,
                         config=self.config,
-                        # Pass only clarifications relevant to this *specific* step/tool if available,
-                        # otherwise, pass none for the general readiness check.
+                        # Pass only clarifications relevant to this *specific* step/tool if
+                        # available, otherwise, pass none for the general readiness check.
                         clarifications=plan_run.get_clarifications_for_step(step_index),
                     ),
                 )
                 if not ready_response.ready:
-                    existing_clarification_ids = {c.id for c in plan_run.outputs.clarifications}
+                    existing_clarification_ids = {c.id for c in plan_run.outputs.clarifications}  # pyright: ignore[reportUnhashable]
                     for clarification in ready_response.clarifications:
                         if clarification.id not in existing_clarification_ids:
                             clarification.step = (
