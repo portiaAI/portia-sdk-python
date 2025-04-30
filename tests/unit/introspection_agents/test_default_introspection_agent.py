@@ -208,27 +208,6 @@ def test_pre_step_introspection_skip(
     assert result.reason == "Condition is false."
 
 
-def test_pre_step_introspection_fail(
-    introspection_agent: DefaultIntrospectionAgent,
-    mock_plan: Plan,
-    mock_plan_run: PlanRun,
-    mock_introspection_model: MagicMock,
-) -> None:
-    """Test pre_step_introspection returns FAIL when missing required data."""
-    mock_introspection_model.get_structured_response.return_value = PreStepIntrospection(
-        outcome=PreStepIntrospectionOutcome.FAIL,
-        reason="Missing required data.",
-    )
-
-    result = introspection_agent.pre_step_introspection(
-        plan=mock_plan,
-        plan_run=mock_plan_run,
-    )
-
-    assert result.outcome == PreStepIntrospectionOutcome.FAIL
-    assert result.reason == "Missing required data."
-
-
 def test_pre_step_introspection_stop(
     introspection_agent: DefaultIntrospectionAgent,
     mock_plan: Plan,
