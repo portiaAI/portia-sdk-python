@@ -467,7 +467,8 @@ def test_no_provider_or_default_model_raises_error() -> None:
     """Test no provider or default model raises an InvalidConfigError."""
     with pytest.raises(
         InvalidConfigError,
-        match="Either llm_provider or default_model must be set",
+        match=".*Either llm_provider must be set, default model must be set, or an API key must be "
+        "provided to allow for automatic model selection*",
     ):
         Config.from_default()
 
