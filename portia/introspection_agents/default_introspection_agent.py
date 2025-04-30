@@ -63,8 +63,8 @@ all inputs are present and its condition is true (if the step has condition).
 
 Provide an outcome from the following list (ordered by preference):
   1- COMPLETE -> stops the execution and does not execute remaining steps.
-   - You should favour this outcome if no steps remaining in the list
-    that can be executed without the current step output.
+   - You should ONLY favour this outcome if no remaining steps that are affected
+     by the current step output.
    - You should favour this outcome if the condition of this step applies
    to all remaining steps.
   2- SKIP -> ONLY skips the current step and continue executing next steps.
