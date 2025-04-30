@@ -184,7 +184,7 @@ def test_portia_cloud_storage() -> None:
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
         end_user_id="test123",
-        plan_inputs={"param1": "test", "param2": 456},
+        plan_run_inputs={"param1": "test", "param2": 456},
     )
     tool_call = get_test_tool_call(plan_run)
 
@@ -243,7 +243,7 @@ def test_portia_cloud_storage() -> None:
                 "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
-                "plan_inputs": plan_run.plan_inputs,
+                "plan_run_inputs": plan_run.plan_run_inputs,
             },
         )
 
@@ -383,7 +383,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
-                "plan_inputs": plan_run.plan_inputs,
+                "plan_run_inputs": plan_run.plan_run_inputs,
             },
         )
 

@@ -577,16 +577,16 @@ def test_plan_input_with_schema_validation() -> None:
         "Use the addition tool to add together the two provided numbers",
         plan_inputs=[numbers_input],
     )
-    plan_run = portia.run_plan(plan, plan_inputs=plan_inputs)
+    plan_run = portia.run_plan(plan, plan_run_inputs=plan_inputs)
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.get_value() == 12  # 5 + 7 = 12
 
     # Check that plan inputs were stored correctly
-    assert "$numbers" in plan_run.plan_inputs
-    assert plan_run.plan_inputs["$numbers"].num_a == 5
-    assert plan_run.plan_inputs["$numbers"].num_b == 7
+    assert "$numbers" in plan_run.plan_run_inputs
+    assert plan_run.plan_run_inputs["$numbers"].num_a == 5
+    assert plan_run.plan_run_inputs["$numbers"].num_b == 7
 
     # Try with invalid input - this should fail validation
     invalid_inputs = {
@@ -596,4 +596,4 @@ def test_plan_input_with_schema_validation() -> None:
         }
     }
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_inputs=invalid_inputs)
+        portia.run_plan(plan, plan_run_inputs=invalid_inputs)

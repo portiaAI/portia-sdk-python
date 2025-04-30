@@ -875,7 +875,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
-                    "plan_inputs": plan_run.plan_inputs,
+                    "plan_run_inputs": plan_run.plan_run_inputs,
                 },
             )
         except Exception as e:
@@ -915,7 +915,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     response_json["execution_context"],
                 ),
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
-                plan_inputs=response_json["plan_inputs"],
+                plan_run_inputs=response_json["plan_run_inputs"],
             )
 
     def get_plan_runs(

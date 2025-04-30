@@ -88,7 +88,7 @@ class PlanRun(BaseModel):
         state (PlanRunState): The current state of the PlanRun.
         execution_context (ExecutionContext): Execution context for the PlanRun.
         outputs (PlanRunOutputs): Outputs of the PlanRun including clarifications.
-        plan_inputs (dict[str, Serializable]): Dict mapping plan input names to their values.
+        plan_run_inputs (dict[str, Serializable]): Dict mapping plan input names to their values.
 
     """
 
@@ -121,7 +121,7 @@ class PlanRun(BaseModel):
         default=PlanRunOutputs(),
         description="Outputs of the run including clarifications.",
     )
-    plan_inputs: dict[str, Serializable] = Field(
+    plan_run_inputs: dict[str, Serializable] = Field(
         default={},
         description="Dict mapping plan input names to their values.",
     )
@@ -199,5 +199,5 @@ class ReadOnlyPlanRun(PlanRun):
             state=plan_run.state,
             end_user_id=plan_run.end_user_id,
             execution_context=plan_run.execution_context,
-            plan_inputs=plan_run.plan_inputs,
+            plan_run_inputs=plan_run.plan_run_inputs,
         )

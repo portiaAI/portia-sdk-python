@@ -1378,7 +1378,7 @@ def test_portia_initialize_end_user(portia: Portia) -> None:
     assert storage_end_user.name == "Bob Smith"
 
 
-def test_portia_run_with_plan_inputs(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMock) -> None:
     """Test that Portia.run handles plan inputs correctly."""
     num_a_input = PlanInput(name="$num_a", description="Number A")
     num_b_input = PlanInput(name="$num_b", description="Number B")
@@ -1411,7 +1411,7 @@ def test_portia_run_with_plan_inputs(portia: Portia, planning_model: MagicMock) 
     ):
         plan_run = portia.run(
             query="Add the two numbers together",
-            plan_inputs={num_a_input: 1, num_b_input: 2},
+            plan_run_inputs={num_a_input: 1, num_b_input: 2},
         )
 
     planning_model.get_structured_response.assert_called_once()
@@ -1455,7 +1455,7 @@ def test_portia_plan_with_plan_inputs(portia: Portia, planning_model: MagicMock)
     assert any(input_.name == "$num_b" for input_ in plan.steps[0].inputs)
 
 
-def test_portia_run_plan_with_plan_inputs(portia: Portia) -> None:
+def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
     """Test that run_plan correctly handles plan inputs."""
     num_a_input = PlanInput(name="$num_a", description="First number to add")
     num_b_input = PlanInput(name="$num_b", description="Second number to add")
@@ -1476,19 +1476,19 @@ def test_portia_run_plan_with_plan_inputs(portia: Portia) -> None:
         inputs=[num_a_input, num_b_input],
     )
 
-    plan_inputs = {num_a_input: 1, num_b_input: 2}
+    plan_run_inputs = {num_a_input: 1, num_b_input: 2}
 
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalOutput(value=3)
 
     # Mock the get_agent_for_step method to return our mock agent
     with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
-        plan_run = portia.run_plan(plan, plan_inputs=plan_inputs)
+        plan_run = portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
 
     assert plan_run.plan_id == plan.id
-    assert len(plan_run.plan_inputs) == 2
-    assert plan_run.plan_inputs["$num_a"] == 1
-    assert plan_run.plan_inputs["$num_b"] == 2
+    assert len(plan_run.plan_run_inputs) == 2
+    assert plan_run.plan_run_inputs["$num_a"] == 1
+    assert plan_run.plan_run_inputs["$num_b"] == 2
     assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.get_value() == 3
 
@@ -1531,8 +1531,8 @@ def test_portia_run_plan_with_extra_inputs(portia: Portia) -> None:
 
     # Run with input that isn't in the plan's inputs
     extra_input = PlanInput(name="$extra", description="Extra unused input")
-    plan_run = portia.run_plan(plan, plan_inputs={extra_input: "value"})
-    assert plan_run.plan_inputs == {}
+    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: "value"})
+    assert plan_run.plan_run_inputs == {}
 
 
 def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
@@ -1558,15 +1558,17 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
 
     # Try to run the plan without providing required inputs
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_inputs={})
+        portia.run_plan(plan, plan_run_inputs={})
 
     # Should fail with just one of the two required
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_inputs={required_input1: "value"})
+        portia.run_plan(plan, plan_run_inputs={required_input1: "value"})
 
     # Should work if we provide only the required input
     with mock.patch.object(portia, "resume") as mock_resume:
-        portia.run_plan(plan, plan_inputs={required_input1: "value 1", required_input2: "value 2"})
+        portia.run_plan(
+            plan, plan_run_inputs={required_input1: "value 1", required_input2: "value 2"}
+        )
         mock_resume.assert_called_once()
 
 
@@ -1594,10 +1596,10 @@ def test_portia_run_plan_with_unknown_inputs(portia: Portia) -> None:
     with mock.patch.object(portia, "resume") as mock_resume:
         mock_resume.side_effect = lambda x: x
         plan_run = portia.run_plan(
-            plan, plan_inputs={expected_input: "expected_value", unknown_input: "unknown_value"}
+            plan, plan_run_inputs={expected_input: "expected_value", unknown_input: "unknown_value"}
         )
 
-        assert "$expected" in plan_run.plan_inputs
-        assert plan_run.plan_inputs["$expected"] == "expected_value"
-        assert "$unknown" not in plan_run.plan_inputs
+        assert "$expected" in plan_run.plan_run_inputs
+        assert plan_run.plan_run_inputs["$expected"] == "expected_value"
+        assert "$unknown" not in plan_run.plan_run_inputs
         mock_resume.assert_called_once()

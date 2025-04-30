@@ -71,7 +71,7 @@ plan_run = portia.run(
 )
 
 # You can pass inputs into a plan
-plan_inputs = {
+plan_run_inputs = {
     PlanInput(name="$city", description="The city to get the temperature for"): "Lisbon",
 }
-plan_run = portia.run("Get the temperature for the provided city", plan_inputs=plan_inputs)
+plan_run = portia.run("Get the temperature for the provided city", plan_run_inputs=plan_run_inputs)

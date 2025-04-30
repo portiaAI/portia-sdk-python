@@ -941,11 +941,11 @@ def test_memory_extraction_step_errors_with_missing_input() -> None:
         memory_extraction_step.invoke({"messages": [], "step_inputs": []})
 
 
-def test_memory_extraction_step_with_plan_inputs() -> None:
-    """Test MemoryExtractionStep with inputs from plan_inputs."""
+def test_memory_extraction_step_with_plan_run_inputs() -> None:
+    """Test MemoryExtractionStep with inputs from plan_run_inputs."""
     (_, plan_run) = get_test_plan_run()
-    plan_run.plan_inputs = {
-        "$plan_input": "plan_input_value",
+    plan_run.plan_run_inputs = {
+        "$plan_run_input": "plan_run_input_value",
     }
 
     agent = DefaultExecutionAgent(
@@ -953,7 +953,7 @@ def test_memory_extraction_step_with_plan_inputs() -> None:
             task="DESCRIPTION_STRING",
             output="$out",
             inputs=[
-                Variable(name="$plan_input", description="Plan input description"),
+                Variable(name="$plan_run_input", description="Plan run input description"),
             ],
         ),
         plan_run=plan_run,
@@ -967,6 +967,6 @@ def test_memory_extraction_step_with_plan_inputs() -> None:
     result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
 
     assert len(result["step_inputs"]) == 1
-    assert result["step_inputs"][0].name == "$plan_input"
-    assert result["step_inputs"][0].value == "plan_input_value"
-    assert result["step_inputs"][0].description == "Plan input description"
+    assert result["step_inputs"][0].name == "$plan_run_input"
+    assert result["step_inputs"][0].value == "plan_run_input_value"
+    assert result["step_inputs"][0].description == "Plan run input description"
