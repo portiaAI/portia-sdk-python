@@ -68,7 +68,7 @@ Provide an outcome from the following list (ordered by preference):
    - You should favour this outcome if the condition of this step applies
    to all remaining steps.
   2- SKIP -> ONLY skips the current step and continue executing next steps.
-  4- CONTINUE -> continue execution for the current step.
+  3- CONTINUE -> continue execution for the current step.
 
 You should evaluate the condition and provide the outcome based on the following criteria IN ORDER:
  1- If the condition is false and all remaining steps would depend on the output of this step
