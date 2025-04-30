@@ -340,8 +340,8 @@ class Portia:
 
         # If the readiness check resulted in needing clarification, return immediately
         if plan_run.state == PlanRunState.NEED_CLARIFICATION:
-           logger().debug("Returning plan run early due to readiness check clarifications.")
-           return plan_run
+            logger().debug("Returning plan run early due to readiness check clarifications.")
+            return plan_run
 
         # if the run has execution context associated, but none is set then use it
         if not is_execution_context_set():
@@ -993,6 +993,7 @@ class Portia:
 
         Returns:
             True if new clarifications were raised, False otherwise.
+
         """
         checked_tool_ids = set()
         new_clarifications_raised = False

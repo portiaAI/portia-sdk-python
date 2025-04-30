@@ -1,4 +1,5 @@
 """Tests for pull auth forward changes."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -35,7 +36,8 @@ class ReadyTool(Tool):
         is_ready = (
             self.is_ready
             if isinstance(self.is_ready, bool)
-            else self.is_ready.pop(0) if isinstance(self.is_ready, list) and len(self.is_ready) > 0
+            else self.is_ready.pop(0)
+            if isinstance(self.is_ready, list) and len(self.is_ready) > 0
             else False
         )
         if is_ready:
