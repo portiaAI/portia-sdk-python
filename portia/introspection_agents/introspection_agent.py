@@ -10,13 +10,14 @@ from portia.plan import Plan
 from portia.plan_run import PlanRun
 from portia.storage import AgentMemory
 
+SKIPPED_OUTPUT = "Tool execution skipped"
+COMPLETED_OUTPUT = "Tool execution skipped and completed the plan run"
 
 class PreStepIntrospectionOutcome(PortiaEnum):
     """The Outcome of the introspection."""
 
     CONTINUE = "CONTINUE"
     SKIP = "SKIP"
-    FAIL = "FAIL"
     COMPLETE = "COMPLETE"
 
 

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from portia.introspection_agents.introspection_agent import PreStepIntrospectionOutcome
+from portia.introspection_agents.introspection_agent import (
+    COMPLETED_OUTPUT,
+    SKIPPED_OUTPUT,
+)
 from portia.model import Message
 
 if TYPE_CHECKING:
@@ -60,9 +63,8 @@ class FinalOutputSummarizer:
                     outputs[step.output].get_summary()
                     if outputs[step.output].get_value()
                     in (
-                        PreStepIntrospectionOutcome.SKIP,
-                        PreStepIntrospectionOutcome.COMPLETE,
-                        PreStepIntrospectionOutcome.FAIL,
+                        SKIPPED_OUTPUT,
+                        COMPLETED_OUTPUT,
                     )
                     else outputs[step.output].get_value()
                 )
