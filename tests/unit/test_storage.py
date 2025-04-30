@@ -12,7 +12,7 @@ import pytest
 from portia.end_user import EndUser
 from portia.errors import StorageError
 from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
-from portia.plan import Plan, PlanContext, PlanUUID
+from portia.plan import Plan, PlanContext, PlanInput, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
     AdditionalStorage,
@@ -175,11 +175,16 @@ def test_portia_cloud_storage() -> None:
         id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
+        inputs=[
+            PlanInput(name="key1", description="Test input 1"),
+            PlanInput(name="key2", description="Test input 2"),
+        ],
     )
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
         end_user_id="test123",
+        plan_inputs={"param1": "test", "param2": 456},
     )
     tool_call = get_test_tool_call(plan_run)
 
@@ -204,6 +209,10 @@ def test_portia_cloud_storage() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
+                "inputs": [
+                    {"name": "key1", "description": "Test input 1", "value_schema": None},
+                    {"name": "key2", "description": "Test input 2", "value_schema": None},
+                ],
             },
         )
 
@@ -234,6 +243,7 @@ def test_portia_cloud_storage() -> None:
                 "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
+                "plan_inputs": plan_run.plan_inputs,
             },
         )
 
@@ -341,6 +351,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
+                "inputs": [],
             },
         )
     with (
@@ -372,6 +383,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
+                "plan_inputs": plan_run.plan_inputs,
             },
         )
 

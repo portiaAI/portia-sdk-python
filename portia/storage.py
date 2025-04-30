@@ -823,6 +823,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "query": plan.plan_context.query,
                     "tool_ids": plan.plan_context.tool_ids,
                     "steps": [step.model_dump(mode="json") for step in plan.steps],
+                    "inputs": [input_.model_dump(mode="json") for input_ in plan.inputs],
                 },
             )
         except Exception as e:
@@ -847,10 +848,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
             response = self.client.get(
                 url=f"/api/v0/plans/{plan_id}/",
             )
+            self.check_response(response)
         except Exception as e:
             raise StorageError(e) from e
         else:
-            self.check_response(response)
             response_json = response.json()
             return Plan.from_response(response_json)
 
@@ -874,6 +875,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
+                    "plan_inputs": plan_run.plan_inputs,
                 },
             )
         except Exception as e:
@@ -913,6 +915,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     response_json["execution_context"],
                 ),
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
+                plan_inputs=response_json["plan_inputs"],
             )
 
     def get_plan_runs(

@@ -42,6 +42,7 @@ from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
     PlanNotFoundError,
+    StorageError,
 )
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
@@ -297,7 +298,7 @@ class Portia:
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
         try:
             self.storage.get_plan(plan.id)
-        except PlanNotFoundError:
+        except (PlanNotFoundError, StorageError):
             self.storage.save_plan(plan)
 
         end_user = self.initialize_end_user(end_user)
