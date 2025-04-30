@@ -46,9 +46,9 @@ def safe_eval(node: Any) -> Any:  # noqa: ANN401
     raise ValueError("Unsafe or unsupported expression")
 
 
-def save_evaluate(expression: str) -> float:
+def safe_evaluate(expression: str) -> float:
     """Use ast.safe_eval to evaluate expression."""
-    parsed = ast.parse(expression, mode="eval")
+    parsed = ast.parse(expression.strip(), mode="eval")
     result = safe_eval(parsed)
     if isinstance(result, (float, int)):
         return float(result)
@@ -84,7 +84,7 @@ class CalculatorTool(Tool[float]):
             raise ToolHardError("No valid mathematical expression found in the input.")
 
         try:
-            return save_evaluate(expression)
+            return safe_evaluate(expression)
         except ZeroDivisionError as e:
             raise ToolHardError("Error: Division by zero.") from e
         except Exception as e:
