@@ -1027,7 +1027,6 @@ class Portia:
                     existing_clarification_ids = {c.id for c in plan_run.outputs.clarifications}  # pyright: ignore[reportUnhashable]
                     for clarification in ready_response.clarifications:
                         if clarification.id not in existing_clarification_ids:
-                            clarification.step = None  # Update backend to return None for ready
                             plan_run.outputs.clarifications.append(clarification)
                             new_clarifications_raised = True
                             logger().info(
