@@ -335,64 +335,13 @@ class Portia:
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
-        # Check ready status of all tools remaining in the plan
-        checked_tool_ids = set()
-        new_clarifications_raised = False
-        end_user = self.initialize_end_user(plan_run.end_user_id)
-        for step_index in range(plan_run.current_step_index, len(plan.steps)):
-            step = plan.steps[step_index]
-            if not step.tool_id or step.tool_id in checked_tool_ids:
-                continue
-
-            tool = self._get_tool_for_step(step, plan_run)
-            if not tool:
-                continue  # Should not happen if tool_id is set, but defensive check
-
-            checked_tool_ids.add(step.tool_id)
-            logger().debug(f"Checking readiness for tool: {tool.name} (ID: {step.tool_id})")
-            try:
-                ready_response = tool.ready(
-                    ToolRunContext(
-                        execution_context=plan_run.execution_context,
-                        end_user=end_user,
-                        plan_run_id=plan_run.id,
-                        config=self.config,
-                        clarifications=plan_run.get_clarifications_for_step(step_index),
-                    ),
-                )
-                if not ready_response.ready:
-                    existing_clarification_ids = {
-                        c.id for c in plan_run.outputs.clarifications
-                    }
-                    for clarification in ready_response.clarifications:
-                        if clarification.id not in existing_clarification_ids:
-                            clarification.step = (
-                                step_index  # Assign step index for context, even if tool-level
-                            )
-                            plan_run.outputs.clarifications.append(clarification)
-                            new_clarifications_raised = True
-                            logger().info(
-                                f"Tool '{tool.name}' raised clarification: "
-                                f"{clarification.user_guidance}"
-                            )
-            except Exception as e:  # noqa: BLE001
-                logger().warning(
-                    f"Error checking ready status for tool {tool.name} (ID: {step.tool_id}): {e}",
-                    exc_info=True,
-                )
-
-        if new_clarifications_raised:
-            # Only change state if it's not already needing clarification
-            if plan_run.state != PlanRunState.NEED_CLARIFICATION:
-                self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
-            else:
-                # Save the plan run even if state didn't change, to persist new clarifications
-                self.storage.save_plan_run(plan_run)
+        # Perform initial readiness check
+        self._check_remaining_tool_readiness(plan, plan_run)
 
         # If the readiness check resulted in needing clarification, return immediately
         if plan_run.state == PlanRunState.NEED_CLARIFICATION:
-            logger().debug("Returning plan run early due to readiness check clarifications.")
-            return plan_run
+           logger().debug("Returning plan run early due to readiness check clarifications.")
+           return plan_run
 
         # if the run has execution context associated, but none is set then use it
         if not is_execution_context_set():
@@ -704,6 +653,13 @@ class Portia:
                 )
 
             if self._raise_clarifications(plan_run, last_executed_step_output, plan):
+                # If execution raised a clarification, re-check readiness of subsequent tools
+                logger().debug(
+                    "Re-checking tool readiness after execution clarification.",
+                    plan=str(plan.id),
+                    plan_run=str(plan_run.id),
+                )
+                self._check_remaining_tool_readiness(plan, plan_run, start_index=index + 1)
                 return plan_run
 
             # persist at the end of each step
@@ -1020,6 +976,80 @@ class Portia:
             plan_run.outputs.step_outputs[step.output] = step_output
 
         self.storage.save_plan_run(plan_run)
+
+    def _check_remaining_tool_readiness(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        start_index: int | None = None,
+    ) -> bool:
+        """Check the ready status of tools in remaining steps and update plan_run if needed.
+
+        Args:
+            plan: The plan containing the steps.
+            plan_run: The current plan run.
+            start_index: The step index to start checking from. Defaults to the plan run's
+                current step index.
+
+        Returns:
+            True if new clarifications were raised, False otherwise.
+        """
+        checked_tool_ids = set()
+        new_clarifications_raised = False
+        check_from_index = start_index if start_index is not None else plan_run.current_step_index
+        end_user = self.initialize_end_user(plan_run.end_user_id)
+
+        for step_index in range(check_from_index, len(plan.steps)):
+            step = plan.steps[step_index]
+            if not step.tool_id or step.tool_id in checked_tool_ids:
+                continue
+
+            tool = self._get_tool_for_step(step, plan_run)
+            if not tool:
+                continue  # Should not happen if tool_id is set, but defensive check
+
+            checked_tool_ids.add(step.tool_id)
+            logger().debug(f"Checking readiness for tool: {tool.name} (ID: {step.tool_id})")
+            try:
+                ready_response = tool.ready(
+                    ToolRunContext(
+                        execution_context=plan_run.execution_context,
+                        end_user=end_user,
+                        plan_run_id=plan_run.id,
+                        config=self.config,
+                        # Pass only clarifications relevant to this *specific* step/tool if available,
+                        # otherwise, pass none for the general readiness check.
+                        clarifications=plan_run.get_clarifications_for_step(step_index),
+                    ),
+                )
+                if not ready_response.ready:
+                    existing_clarification_ids = {c.id for c in plan_run.outputs.clarifications}
+                    for clarification in ready_response.clarifications:
+                        if clarification.id not in existing_clarification_ids:
+                            clarification.step = (
+                                step_index  # Assign step index for context, even if tool-level
+                            )
+                            plan_run.outputs.clarifications.append(clarification)
+                            new_clarifications_raised = True
+                            logger().info(
+                                f"Tool '{tool.name}' raised clarification: "
+                                f"{clarification.user_guidance}"
+                            )
+            except Exception as e:  # noqa: BLE001
+                logger().warning(
+                    f"Error checking ready status for tool {tool.name} (ID: {step.tool_id}): {e}",
+                    exc_info=True,
+                )
+
+        if new_clarifications_raised:
+            # Only change state if it's not already needing clarification by *this* check
+            # (it might already be NEED_CLARIFICATION due to execution)
+            if plan_run.state != PlanRunState.NEED_CLARIFICATION:
+                self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
+            else:
+                # Save the plan run even if state didn't change, to persist new clarifications
+                self.storage.save_plan_run(plan_run)
+        return new_clarifications_raised
 
     @staticmethod
     def _log_models(config: Config) -> None:

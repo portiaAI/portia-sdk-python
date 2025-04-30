@@ -1,4 +1,7 @@
 """Tests for pull auth forward changes."""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, HttpUrl
 
@@ -8,9 +11,11 @@ from portia.execution_agents.output import LocalOutput, Output
 from portia.plan import PlanBuilder, Step
 from portia.plan_run import PlanRun, PlanRunState
 from portia.portia import Portia
-from portia.prefixed_uuid import PlanRunUUID
 from portia.tool import ReadyResponse, Tool, ToolRunContext, _ArgsSchemaPlaceholder
 from tests.utils import get_test_config
+
+if TYPE_CHECKING:
+    from portia.prefixed_uuid import PlanRunUUID
 
 
 class ReadyTool(Tool):
@@ -22,12 +27,18 @@ class ReadyTool(Tool):
     args_schema: type[BaseModel] = _ArgsSchemaPlaceholder
     output_schema: tuple[str, str] = ("ReadyResponse", "A response from the tool")
 
-    is_ready: bool = False
+    is_ready: bool | list[bool] = False
     auth_url: str = "https://fake.portiaai.test/auth"
 
     def _get_clarifications(self, plan_run_id: PlanRunUUID) -> list[Clarification]:
         """Generate clarifications for the ready check."""
-        if self.is_ready:
+        is_ready = (
+            self.is_ready
+            if isinstance(self.is_ready, bool)
+            else self.is_ready.pop(0) if isinstance(self.is_ready, list) and len(self.is_ready) > 0
+            else False
+        )
+        if is_ready:
             return []
         return [  # pyright: ignore[reportReturnType]
             ActionClarification(
@@ -147,14 +158,13 @@ class CustomPortia(Portia):
 
 def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() -> None:
     """Test that all remaining steps have their tool ready status checked on any interruption."""
-    ready_tool = ReadyTool()
-    is_ready_tool = ReadyTool(id="is_ready_tool", is_ready=True)
-
-    portia = CustomPortia(config=get_test_config(), tools=[ready_tool, is_ready_tool])
+    ready_tool = ReadyTool(is_ready=True)
+    ready_once_tool = ReadyTool(id="ready_once_tool", is_ready=[True, False])
+    portia = CustomPortia(config=get_test_config(), tools=[ready_tool, ready_once_tool])
     plan = (
         PlanBuilder()
-        .step("raise_clarification", is_ready_tool.id)
         .step("raise_clarification", ready_tool.id)
+        .step("2", ready_once_tool.id)
         .build()
     )
     plan_run = portia.create_plan_run(plan, end_user="123")
