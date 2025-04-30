@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Bandit
         run: |
-          bandit -r . -x tests -ll --severity-level medium -o bandit-report.txt
+          bandit -r . -x tests --severity-level medium -o bandit-report.txt
 
       - name: Upload Bandit Report
         if: always()
