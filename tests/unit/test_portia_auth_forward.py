@@ -56,6 +56,7 @@ def test_portia_resume_tool_requires_clarification() -> None:
     portia = Portia(config=get_test_config(), tools=[ready_tool])
     plan = PlanBuilder().step("", ready_tool.id).build()
     plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = portia.resume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -64,7 +65,7 @@ def test_portia_resume_tool_requires_clarification() -> None:
     assert isinstance(outstanding_clarification, ActionClarification)
     assert outstanding_clarification.resolved is False
     assert outstanding_clarification.plan_run_id == plan_run.id
-    assert outstanding_clarification.action_url == "https://fake.portiaai.test/auth"
+    assert str(outstanding_clarification.action_url) == "https://fake.portiaai.test/auth"
 
 
 def test_portia_resume_multiple_instances_of_same_tool() -> None:
@@ -76,6 +77,7 @@ def test_portia_resume_multiple_instances_of_same_tool() -> None:
     portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool])
     plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool.id).build()
     plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = portia.resume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -84,7 +86,7 @@ def test_portia_resume_multiple_instances_of_same_tool() -> None:
     assert isinstance(outstanding_clarification, ActionClarification)
     assert outstanding_clarification.resolved is False
     assert outstanding_clarification.plan_run_id == plan_run.id
-    assert outstanding_clarification.action_url == "https://fake.portiaai.test/auth"
+    assert str(outstanding_clarification.action_url) == "https://fake.portiaai.test/auth"
 
 
 def test_portia_resume_multiple_tools_require_clarification() -> None:
@@ -94,6 +96,7 @@ def test_portia_resume_multiple_tools_require_clarification() -> None:
     portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool_2])
     plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
     plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = portia.resume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -101,11 +104,11 @@ def test_portia_resume_multiple_tools_require_clarification() -> None:
     outstanding_clarifications = output_plan_run.get_outstanding_clarifications()
     assert isinstance(outstanding_clarifications[0], ActionClarification)
     assert outstanding_clarifications[0].plan_run_id == plan_run.id
-    assert outstanding_clarifications[0].action_url == "https://fake.portiaai.test/auth"
+    assert str(outstanding_clarifications[0].action_url) == "https://fake.portiaai.test/auth"
     assert outstanding_clarifications[0].resolved is False
     assert isinstance(outstanding_clarifications[1], ActionClarification)
     assert outstanding_clarifications[1].plan_run_id == plan_run.id
-    assert outstanding_clarifications[1].action_url == "https://fake.portiaai.test/auth2"
+    assert str(outstanding_clarifications[1].action_url) == "https://fake.portiaai.test/auth2"
     assert outstanding_clarifications[1].resolved is False
 
 
@@ -155,6 +158,7 @@ def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() ->
         .build()
     )
     plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = portia.resume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -166,5 +170,5 @@ def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() ->
     assert outstanding_clarifications[0].resolved is False
     assert isinstance(outstanding_clarifications[1], ActionClarification)
     assert outstanding_clarifications[1].plan_run_id == plan_run.id
-    assert outstanding_clarifications[1].action_url == ready_tool.auth_url
+    assert str(outstanding_clarifications[1].action_url) == ready_tool.auth_url
     assert outstanding_clarifications[1].resolved is False
