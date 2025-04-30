@@ -140,5 +140,6 @@ class ToolCallWrapper(Tool):
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             self._storage.save_tool_call(record)
             # persist changes to the end_user
+            print("saving end user", ctx.end_user)
             self._storage.save_end_user(ctx.end_user)
         return output
