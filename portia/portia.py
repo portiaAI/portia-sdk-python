@@ -193,8 +193,8 @@ class Portia:
             PlanRun: The run resulting from executing the query.
 
         """
-        plan_input_list = list(plan_run_inputs.keys()) if plan_run_inputs else None
-        plan = self.plan(query, tools, example_plans, end_user, plan_input_list)
+        plan_inputs = list(plan_run_inputs.keys()) if plan_run_inputs else None
+        plan = self.plan(query, tools, example_plans, end_user, plan_inputs)
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user, plan_run_inputs)
         return self.resume(plan_run)
@@ -418,7 +418,6 @@ class Portia:
                 if not any(plan_input.name == input_obj.name for plan_input in plan.inputs):
                     logger().warning(f"Ignoring unknown plan input: {input_obj.name}")
 
-            # Save the updated plan run
             self.storage.save_plan_run(plan_run)
 
     def execute_plan_run_and_handle_clarifications(

@@ -1384,48 +1384,6 @@ def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
     assert plan_run.outputs.final_output.get_value() == 3
 
 
-def test_portia_run_plan_missing_required_inputs(portia: Portia) -> None:
-    """Test that run_plan raises error when required inputs are missing."""
-    # Create a plan with inputs
-    required_input = PlanInput(name="$required", description="Required input")
-
-    plan = Plan(
-        plan_context=PlanContext(query="Plan requiring inputs", tool_ids=["add_tool"]),
-        steps=[
-            Step(
-                task="Use the required input",
-                tool_id="add_tool",
-                inputs=[
-                    Variable(name="$required", description="Required value"),
-                ],
-                output="$result",
-            ),
-        ],
-        inputs=[required_input],
-    )
-
-    # Try to run the plan without providing required inputs
-    with pytest.raises(
-        ValueError, match="Inputs are required for this plan but have not been specified"
-    ):
-        portia.run_plan(plan)
-
-
-def test_portia_run_plan_with_extra_inputs(portia: Portia) -> None:
-    """Test that run_plan logs warning when extra inputs are provided."""
-    # Create a plan with no inputs
-    plan = Plan(
-        plan_context=PlanContext(query="Plan with no inputs", tool_ids=["add_tool"]),
-        steps=[],
-        inputs=[],  # No inputs required
-    )
-
-    # Run with input that isn't in the plan's inputs
-    extra_input = PlanInput(name="$extra", description="Extra unused input")
-    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: "value"})
-    assert plan_run.plan_run_inputs == {}
-
-
 def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
     """Test that run_plan raises error when required inputs are missing."""
     required_input1 = PlanInput(name="$required1", description="Required input 1")
@@ -1455,7 +1413,7 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
     with pytest.raises(ValueError):  # noqa: PT011
         portia.run_plan(plan, plan_run_inputs={required_input1: "value"})
 
-    # Should work if we provide only the required input
+    # Should work if we provide both required inputs
     with mock.patch.object(portia, "resume") as mock_resume:
         portia.run_plan(
             plan, plan_run_inputs={required_input1: "value 1", required_input2: "value 2"}
@@ -1463,7 +1421,22 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
         mock_resume.assert_called_once()
 
 
-def test_portia_run_plan_with_unknown_inputs(portia: Portia) -> None:
+def test_portia_run_plan_with_extra_input_when_expecting_none(portia: Portia) -> None:
+    """Test that run_plan logs warning when extra inputs are provided."""
+    # Create a plan with no inputs
+    plan = Plan(
+        plan_context=PlanContext(query="Plan with no inputs", tool_ids=["add_tool"]),
+        steps=[],
+        inputs=[],  # No inputs required
+    )
+
+    # Run with input that isn't in the plan's inputs
+    extra_input = PlanInput(name="$extra", description="Extra unused input")
+    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: "value"})
+    assert plan_run.plan_run_inputs == {}
+
+
+def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
     """Test that run_plan ignores unknown inputs."""
     expected_input = PlanInput(name="$expected", description="Expected input")
 

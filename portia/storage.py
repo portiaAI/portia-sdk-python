@@ -860,10 +860,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
             response = self.client.get(
                 url=f"/api/v0/plans/{plan_id}/",
             )
-            self.check_response(response)
         except Exception as e:
             raise StorageError(e) from e
         else:
+            self.check_response(response)
             response_json = response.json()
             return Plan.from_response(response_json)
 

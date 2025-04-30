@@ -34,20 +34,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
         examples: list[Plan] | None = None,
         plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
-        """Generate a plan or error using an LLM from a query and a list of tools.
-
-        Args:
-            query (str): The query to generate a plan for.
-            tool_list (list[Tool]): List of available tools.
-            end_user (EndUser): The end user making the request.
-            examples (list[Plan] | None): Optional example plans.
-            plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
-                the inputs required for the plan.
-
-        Returns:
-            StepsOrError: The generated steps or an error.
-
-        """
+        """Generate a plan or error using an LLM from a query and a list of tools."""
         prompt = render_prompt_insert_defaults(
             query,
             tool_list,

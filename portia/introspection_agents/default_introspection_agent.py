@@ -45,7 +45,7 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
             [
                 SystemMessage(
                     content=(
-                        """
+"""
 You are a highly skilled reviewer who reviews in flight plan execution. Your job is to evaluate
 the condition for the current step. Your outcome is fed to another orchestrator that controls
 the execution of the remaining steps.

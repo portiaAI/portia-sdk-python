@@ -21,20 +21,7 @@ def render_prompt_insert_defaults(
     examples: list[Plan] | None = None,
     plan_inputs: list[PlanInput] | None = None,
 ) -> str:
-    """Render the prompt for the PlanningAgent with defaults inserted if not provided.
-
-    Args:
-        query (str): The query to generate a plan for.
-        tool_list (list[Tool]): List of available tools.
-        end_user (EndUser): The end user making the request.
-        examples (list[Plan] | None): Optional example plans.
-        plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
-            the inputs required for the plan.
-
-    Returns:
-        str: The rendered prompt.
-
-    """
+    """Render the prompt for the PlanningAgent with defaults inserted if not provided."""
     system_context = default_query_system_context()
     non_default_examples_provided = True
 

@@ -60,5 +60,4 @@ class MemoryExtractionStep:
                     description=input_variable.description,
                 )
             )
-
         return {"step_inputs": step_inputs}
