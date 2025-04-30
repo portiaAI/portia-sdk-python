@@ -40,9 +40,6 @@ def safe_eval(node: Any) -> Any:  # noqa: ANN401
             return allowed_operators[op_type](operand)
     elif isinstance(node, ast.Num):
         return node.n
-    elif isinstance(node, ast.Constant):  # For Python 3.8+
-        if isinstance(node.value, (int, float)):
-            return node.value
     raise ValueError("Unsafe or unsupported expression")
 
 
@@ -50,9 +47,7 @@ def safe_evaluate(expression: str) -> float:
     """Use ast.safe_eval to evaluate expression."""
     parsed = ast.parse(expression.strip(), mode="eval")
     result = safe_eval(parsed)
-    if isinstance(result, (float, int)):
-        return float(result)
-    raise ValueError("unexpected result from calculation.")
+    return float(result)
 
 
 class CalculatorToolSchema(BaseModel):
