@@ -55,6 +55,8 @@ from portia.execution_context import (
 )
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
+    COMPLETED_OUTPUT,
+    SKIPPED_OUTPUT,
     BaseIntrospectionAgent,
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
@@ -254,9 +256,8 @@ class Portia:
                     end_user,
                     example_plans,
                 )
-            else:
-                logger().error(f"Error in planning - {outcome.error}")
-                raise PlanError(outcome.error)
+            logger().error(f"Error in planning - {outcome.error}")
+            raise PlanError(outcome.error)
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
@@ -270,9 +271,7 @@ class Portia:
             f"Plan created with {len(plan.steps)} steps",
             plan=str(plan.id),
         )
-        logger().debug(
-            "Plan: " + plan.model_dump_json(indent=4),
-        )
+        logger().debug(plan.pretty_print())
 
         return plan
 
@@ -576,7 +575,7 @@ class Portia:
             step = plan.steps[plan_run.current_step_index]
             next_tool = self._get_tool_for_step(step, plan_run)
             if next_tool:
-                tool_ready = next_tool.ready(
+                ready_response = next_tool.ready(
                     ToolRunContext(
                         execution_context=plan_run.execution_context,
                         end_user=self.initialize_end_user(plan_run.end_user_id),
@@ -585,8 +584,8 @@ class Portia:
                         clarifications=current_step_clarifications,
                     ),
                 )
-                logger().debug(f"Tool state for {next_tool.name} is ready={tool_ready}")
-                if tool_ready:
+                logger().debug(f"Tool state for {next_tool.name} is ready={ready_response.ready}")
+                if ready_response.ready:
                     for clarification in current_step_clarifications:
                         if clarification.category is ClarificationCategory.ACTION:
                             clarification.resolved = True
@@ -827,21 +826,18 @@ class Portia:
             f"Reason: {pre_step_outcome.reason}",
         )
 
-        if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
-            logger().error(*log_message)
-        else:
-            logger().info(*log_message)
+        logger().info(*log_message)
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
                 output = LocalOutput(
-                    value=PreStepIntrospectionOutcome.SKIP,
+                    value=SKIPPED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
             case PreStepIntrospectionOutcome.COMPLETE:
                 output = LocalOutput(
-                    value=PreStepIntrospectionOutcome.COMPLETE,
+                    value=COMPLETED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
@@ -852,14 +848,6 @@ class Portia:
                         last_executed_step_output,
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
-            case PreStepIntrospectionOutcome.FAIL:
-                failed_output = LocalOutput(
-                    value=PreStepIntrospectionOutcome.FAIL,
-                    summary=pre_step_outcome.reason,
-                )
-                self._set_step_output(failed_output, plan_run, step)
-                plan_run.outputs.final_output = failed_output
-                self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         return (plan_run, pre_step_outcome)
 
     def _get_planning_agent(self) -> BasePlanningAgent:
@@ -1023,7 +1011,7 @@ class Portia:
             ) from PlanError(original_error)
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
-        return DefaultIntrospectionAgent(self.config)
+        return DefaultIntrospectionAgent(self.config, self.storage)
 
     def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> None:
         """Set the output for a step."""

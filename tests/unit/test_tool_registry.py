@@ -360,10 +360,10 @@ def test_generate_pydantic_model_from_json_schema() -> None:
                     "zip": {"type": "string", "description": "The zip of the user"},
                 },
                 "description": "The address of the user",
-                "required": ["city", "zip"],
+                "required": ["city", "zip", "street"],
             },
         },
-        "required": ["name", "age"],
+        "required": ["name", "age", "is_active", "pets", "address"],
     }
     model = generate_pydantic_model_from_json_schema("TestModel", json_schema)
     assert model.model_fields["name"].annotation is str
@@ -376,16 +376,16 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert model.model_fields["height"].default == 185.2
     assert model.model_fields["height"].description == "The height of the user"
     assert model.model_fields["is_active"].annotation is bool
-    assert model.model_fields["is_active"].default is None
+    assert model.model_fields["is_active"].default is PydanticUndefined
     assert model.model_fields["is_active"].description == "Whether the user is active"
     assert model.model_fields["pets"].annotation == list[str]
-    assert model.model_fields["pets"].default is None
+    assert model.model_fields["pets"].default is PydanticUndefined
     assert model.model_fields["pets"].description == "The pets of the user"
     address_type = model.model_fields["address"].annotation
     assert isinstance(address_type, type)
     assert issubclass(address_type, BaseModel)
     assert address_type.model_fields["street"].annotation is str
-    assert address_type.model_fields["street"].default is None
+    assert address_type.model_fields["street"].default is PydanticUndefined
     assert address_type.model_fields["street"].description == "The street of the user"
     assert address_type.model_fields["city"].annotation is str
     assert address_type.model_fields["city"].default is PydanticUndefined
@@ -393,7 +393,7 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert address_type.model_fields["zip"].annotation is str
     assert address_type.model_fields["zip"].default is PydanticUndefined
     assert address_type.model_fields["zip"].description == "The zip of the user"
-    assert model.model_fields["address"].default is None
+    assert model.model_fields["address"].default is PydanticUndefined
     assert model.model_fields["address"].description == "The address of the user"
 
 
@@ -426,7 +426,7 @@ def test_generate_pydantic_model_from_json_schema_union_types() -> None:
                 "title": "Additional Company Numbers",
             },
         },
-        "required": ["company_number"],
+        "required": ["company_number", "additional_company_numbers"],
     }
     model = generate_pydantic_model_from_json_schema("TestUnionModel", json_schema)
     assert model.model_fields["collaborators"].annotation == Union[list[int], None]
@@ -438,7 +438,7 @@ def test_generate_pydantic_model_from_json_schema_union_types() -> None:
     assert model.model_fields["company_number"].default is PydanticUndefined
     assert model.model_fields["company_number"].description == "Company number to search"
     assert model.model_fields["additional_company_numbers"].annotation == list[Union[str, int]]
-    assert model.model_fields["additional_company_numbers"].default is None
+    assert model.model_fields["additional_company_numbers"].default is PydanticUndefined
     assert (
         model.model_fields["additional_company_numbers"].description
         == "Additional company numbers to search"
@@ -486,3 +486,47 @@ def test_generate_pydantic_model_from_json_schema_not_single_type_or_union_field
     }
     model = generate_pydantic_model_from_json_schema("TestNullSchema", json_schema)
     assert model.model_fields["unknown"].annotation is Any
+
+
+def test_generate_pydantic_model_from_json_schema_handles_omissible_fields() -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check it handles fields that are not required in the JSON schema, but that are not nullable.
+    """
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "The name of the customer"},
+            # Email is not nullable, but is not required in the JSON schema
+            # so it MUST be ommitted from the serialized output if it is None
+            "email": {
+                "type": "string",
+                "format": "email",
+                "description": "The email of the customer",
+            },
+            # Phone is nullable, but is not required in the JSON schema
+            # In this case, we do not omit the field from the serialized output
+            "phone": {
+                "oneOf": [
+                    {"type": "string", "description": "The phone number of the customer"},
+                    {"type": "null"},
+                ],
+                "description": "The phone number of the customer",
+            },
+        },
+        "required": ["name"],
+        "additionalProperties": False,
+        "$schema": "http://json-schema.org/draft-07/schema#",
+    }
+    model = generate_pydantic_model_from_json_schema("TestOmissibleFields", json_schema)
+    assert model.model_fields["name"].annotation is str
+    assert model.model_fields["name"].default is PydanticUndefined
+    assert model.model_fields["email"].annotation == str | None
+    assert model.model_fields["email"].default is None
+    assert model.model_fields["phone"].annotation == str | None
+    assert model.model_fields["phone"].default is None
+    deserialized = model.model_validate({"name": "John"})
+    assert deserialized.name == "John"  # pyright: ignore[reportAttributeAccessIssue]
+    assert deserialized.email is None  # pyright: ignore[reportAttributeAccessIssue]
+    assert deserialized.phone is None  # pyright: ignore[reportAttributeAccessIssue]
+    assert deserialized.model_dump() == {"name": "John", "phone": None}

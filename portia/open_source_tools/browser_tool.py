@@ -258,10 +258,10 @@ class BrowserTool(Tool[str]):
 
             # Main task
             task_to_complete = (
-                f"Go to {url} and complete the following task: {task}. If the user is not already "
-                "logged in and at any point the user needs to login to complete the task, please "
-                "return human_login_required=True, and the url of the sign in page as well as what "
-                "the user should do to sign in"
+                f"Go to {url} and complete the following task: {task}. The user may already be "
+                "logged in. If the user is NOT already logged in and at any point login is "
+                "required to complete the task, please return human_login_required=True, and the "
+                "url of the sign in page as well as what the user should do to sign in"
             )
             task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
             if task_result.human_login_required:
@@ -617,7 +617,7 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(
                 ctx.execution_context.additional_data["bb_session_id"],
             )
-            return HttpUrl(live_view_link.debugger_fullscreen_url)
+            return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
 
         def setup_browser(self, ctx: ToolRunContext) -> Browser:
             """Set up a Browser instance connected to BrowserBase.

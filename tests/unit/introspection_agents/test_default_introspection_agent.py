@@ -19,6 +19,7 @@ from portia.model import GenerativeModel, Message
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState
 from portia.prefixed_uuid import PlanUUID
+from portia.storage import InMemoryStorage
 from tests.utils import get_test_config
 
 
@@ -36,7 +37,7 @@ def introspection_agent(mock_introspection_model: MagicMock) -> DefaultIntrospec
             introspection_model=mock_introspection_model,
         ),
     )
-    return DefaultIntrospectionAgent(config=mock_config)
+    return DefaultIntrospectionAgent(config=mock_config, agent_memory=InMemoryStorage())
 
 
 @pytest.fixture
@@ -90,6 +91,9 @@ def mock_plan_run() -> PlanRun:
             },
             final_output=None,
         ),
+        plan_run_inputs={
+            "$plan_run_input": "plan_run_input_value",
+        },
     )
 
 
@@ -112,9 +116,11 @@ def test_base_introspection_agent_initialization() -> None:
             )
 
     config = get_test_config()
-    agent = TestIntrospectionAgent(config)
+    agent_memory = InMemoryStorage()
+    agent = TestIntrospectionAgent(config, agent_memory)
 
     assert agent.config == config
+    assert agent.agent_memory == agent_memory
 
     empty_plan = Plan(
         plan_context=PlanContext(query="test", tool_ids=[]),
@@ -148,7 +154,7 @@ def test_base_introspection_agent_abstract_method_raises_error() -> None:
             return super().pre_step_introspection(plan, plan_run)  # type: ignore  # noqa: PGH003
 
     config = get_test_config()
-    agent = IncompleteIntrospectionAgent(config)
+    agent = IncompleteIntrospectionAgent(config, InMemoryStorage())
 
     empty_plan = Plan(
         plan_context=PlanContext(query="test", tool_ids=[]),
@@ -205,27 +211,6 @@ def test_pre_step_introspection_skip(
     assert result.reason == "Condition is false."
 
 
-def test_pre_step_introspection_fail(
-    introspection_agent: DefaultIntrospectionAgent,
-    mock_plan: Plan,
-    mock_plan_run: PlanRun,
-    mock_introspection_model: MagicMock,
-) -> None:
-    """Test pre_step_introspection returns FAIL when missing required data."""
-    mock_introspection_model.get_structured_response.return_value = PreStepIntrospection(
-        outcome=PreStepIntrospectionOutcome.FAIL,
-        reason="Missing required data.",
-    )
-
-    result = introspection_agent.pre_step_introspection(
-        plan=mock_plan,
-        plan_run=mock_plan_run,
-    )
-
-    assert result.outcome == PreStepIntrospectionOutcome.FAIL
-    assert result.reason == "Missing required data."
-
-
 def test_pre_step_introspection_stop(
     introspection_agent: DefaultIntrospectionAgent,
     mock_plan: Plan,
@@ -277,3 +262,34 @@ def test_pre_step_introspection_passes_correct_data(
 
         assert result.outcome == PreStepIntrospectionOutcome.CONTINUE
         assert result.reason == "Test reason"
+
+
+def test_retrieves_outputs_from_memory_correctly(
+    introspection_agent: DefaultIntrospectionAgent,
+    mock_introspection_model: MagicMock,
+    mock_plan: Plan,
+    mock_plan_run: PlanRun,
+) -> None:
+    """Test pre_step_introspection returns CONTINUE when conditions are met."""
+    stored_output = introspection_agent.agent_memory.save_plan_run_output(
+        "$result1",
+        mock_plan_run.outputs.step_outputs["$result1"],
+        mock_plan_run.id,
+    )
+    mock_plan_run.outputs.step_outputs["$result1"] = stored_output
+
+    mock_introspection_model.get_structured_response.return_value = PreStepIntrospection(
+        outcome=PreStepIntrospectionOutcome.CONTINUE,
+        reason="All conditions are met.",
+    )
+    result = introspection_agent.pre_step_introspection(
+        plan=mock_plan,
+        plan_run=mock_plan_run,
+    )
+
+    assert result.outcome == PreStepIntrospectionOutcome.CONTINUE
+    assert result.reason == "All conditions are met."
+    assert (
+        "Task 1 result"
+        in mock_introspection_model.get_structured_response.call_args[1]["messages"][1].content
+    )

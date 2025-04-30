@@ -124,6 +124,16 @@ def test_in_memory_storage() -> None:
         plan_run.id,
     )
     assert saved_output_2 == saved_output_1
+    # Check with an output that's too large
+    with (
+        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        pytest.raises(StorageError),
+    ):
+        storage.save_plan_run_output(
+            "large_output",
+            LocalOutput(value="large value"),
+            plan_run.id,
+        )
 
     # This just logs, but check it doesn't cause any issues
     tool_call = get_test_tool_call(plan_run)
@@ -152,6 +162,18 @@ def test_disk_storage(tmp_path: Path) -> None:
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
     storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
     assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+
+    # Check with an output that's too large
+    with (
+        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        pytest.raises(StorageError),
+    ):
+        storage.save_plan_run_output(
+            "large_output",
+            LocalOutput(value="large value"),
+            plan_run.id,
+        )
+
     # This just logs, but check it doesn't cause any issues
     tool_call = get_test_tool_call(plan_run)
     storage.save_tool_call(tool_call)
@@ -656,6 +678,17 @@ def test_portia_cloud_agent_memory_errors() -> None:
         mock_read_cache.assert_called_once_with(f"{plan_run.id}/test_output.json", LocalOutput)
         mock_get.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        )
+
+        # Check with an output that's too large
+    with (
+        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        pytest.raises(StorageError),
+    ):
+        agent_memory.save_plan_run_output(
+            "large_output",
+            LocalOutput(value="large value"),
+            plan_run.id,
         )
 
 

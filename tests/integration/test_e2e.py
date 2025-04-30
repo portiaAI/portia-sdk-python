@@ -494,10 +494,17 @@ def test_portia_run_query_with_example_registry() -> None:
 
 def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
     """Test that running a query requiring cloud tools fails but points user to sign up."""
-    config = Config.from_default(portia_api_key=None, storage_class=StorageClass.MEMORY)
+    config = Config.from_default(
+        portia_api_key=None,
+        storage_class=StorageClass.MEMORY,
+        default_log_level=LogLevel.DEBUG,
+    )
 
     portia = Portia(config=config)
-    query = "Send an email to John Doe using the Gmail tool"
+    query = (
+        "Send an email to John Doe (john.doe@example.com) using the Gmail tool. Only use the Gmail "
+        "tool and fail if you can't use it."
+    )
 
     with pytest.raises(PlanError) as e:
         portia.plan(query)

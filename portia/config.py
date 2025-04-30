@@ -570,7 +570,10 @@ class Config(BaseModel):
         if self.models.default_model is None:
             raise InvalidConfigError(
                 "llm_provider or default_model",
-                "Either llm_provider or default_model must be set",
+                "Either llm_provider must be set, default model must be set, or an API key must be "
+                "provided to allow for automatic model selection. If you are expecting to use an "
+                "external LLM provider (e.g. OpenAI / Anthropic etc), make sure you have provided "
+                "an API key for that provider.",
             )
         if (
             self.models.planning_model is None
@@ -870,6 +873,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     elif llm_provider_from_api_keys:
         llm_provider = llm_provider_from_api_keys
     else:
+        warnings.warn("No API keys found for any LLM provider", stacklevel=2, category=UserWarning)
         llm_provider = None
 
     # Handle deprecated llm_model_name keyword argument

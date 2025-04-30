@@ -1,5 +1,7 @@
 """Simple Example."""
 
+from dotenv import load_dotenv
+
 from portia import (
     Config,
     LogLevel,
@@ -11,6 +13,8 @@ from portia import (
 from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
 from portia.plan import PlanInput
+
+load_dotenv()
 
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from portia.execution_agents.output import Output
     from portia.plan import Step
     from portia.plan_run import PlanRun
+    from portia.storage import AgentMemory
     from portia.tool import Tool, ToolRunContext
 
 
@@ -33,12 +34,13 @@ class BaseExecutionAgent:
     performance.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         step: Step,
         plan_run: PlanRun,
         config: Config,
         end_user: EndUser,
+        agent_memory: AgentMemory,
         tool: Tool | None = None,
     ) -> None:
         """Initialize the base agent with the given args.
@@ -53,6 +55,7 @@ class BaseExecutionAgent:
             plan_run (PlanRun): The run that contains the step and related data.
             config (Config): The configuration settings for the agent.
             end_user (EndUser): The end user for the execution.
+            agent_memory (AgentMemory): The agent memory for persisting outputs.
             tool (Tool | None): An optional tool associated with the agent (default is None).
 
         """
@@ -61,6 +64,7 @@ class BaseExecutionAgent:
         self.config = config
         self.plan_run = plan_run
         self.end_user = end_user
+        self.agent_memory = agent_memory
 
     @abstractmethod
     def execute_sync(self) -> Output:

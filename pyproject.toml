@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.3.0"
+version = "0.3.1"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
@@ -66,6 +66,7 @@ ollama = ["langchain-ollama"]
 # Tools that require extra dependencies
 tools-browser-local = ["playwright", "browser-use"]
 tools-browser-browserbase = ["playwright", "browser-use", "browserbase"]
+tools-pdf-reader = ["mistralai"]
 
 # All group - add all dependencies from above
 all = [
