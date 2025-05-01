@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import time
 from importlib.metadata import version
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from portia.clarification import (
     Clarification,
@@ -87,7 +87,7 @@ if TYPE_CHECKING:
 
 class ExecutionHooks:
     """Hooks that can be used to modify or add extra functionality to the run of a plan.
-    
+
     Hooks include:
     - clarification_handler: Used to handle clarifications that arise during the run of a plan.
     - before_first_tool_call: Called before the first tool call in a plan run.
@@ -97,25 +97,26 @@ class ExecutionHooks:
     """
 
     def __init__(
-        self, 
+        self,
         clarification_handler: ClarificationHandler | None = None,
-        before_first_tool_call: callable | None = None,
-        before_tool_call: callable | None = None,
-        after_tool_call: callable | None = None,
-        after_last_tool_call: callable | None = None,
+        before_first_tool_call: Callable | None = None,
+        before_tool_call: Callable | None = None,
+        after_tool_call: Callable | None = None,
+        after_last_tool_call: Callable | None = None,
     ) -> None:
         """Initialize ExecutionHooks with default values.
-        
+
         Args:
             clarification_handler (ClarificationHandler | None): Handler for clarifications.
-            before_first_tool_call (callable | None): Hook called before the first tool call in a plan run.
-                Function signature: (plan: Plan, plan_run: PlanRun) -> None
-            before_tool_call (callable | None): Hook called before each tool call.
+            before_first_tool_call (Callable | None): Hook called before the first tool call
+                in a plan run. Function signature: (plan: Plan, plan_run: PlanRun) -> None
+            before_tool_call (Callable | None): Hook called before each tool call.
                 Function signature: (plan: Plan, plan_run: PlanRun, step: Step) -> None
-            after_tool_call (callable | None): Hook called after each tool call.
-                Function signature: (plan: Plan, plan_run: PlanRun, step: Step, output: Output) -> None
-            after_last_tool_call (callable | None): Hook called after the last tool call in a plan run.
-                Function signature: (plan: Plan, plan_run: PlanRun) -> None
+            after_tool_call (Callable | None): Hook called after each tool call.
+                Function signature: (plan: Plan, plan_run: PlanRun, step: Step, output) -> None
+            after_last_tool_call (Callable | None): Hook called after the last tool call
+                in a plan run. Function signature: (plan: Plan, plan_run: PlanRun) -> None
+
         """
         self.clarification_handler = clarification_handler
         self.before_first_tool_call = before_first_tool_call
@@ -640,11 +641,11 @@ class Portia:
                 plan=str(plan.id),
                 plan_run=str(plan_run.id),
             )
-            
+
             # Call the before_tool_call hook if it exists
             if self.execution_hooks.before_tool_call:
                 self.execution_hooks.before_tool_call(plan, plan_run, step)
-                
+
             # we pass read only copies of the state to the agent so that the portia remains
             # responsible for handling the output of the agent and updating the state.
             agent = self._get_agent_for_step(
@@ -680,10 +681,12 @@ class Portia:
                 logger().info(
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
-                
+
                 # Call the after_tool_call hook if it exists
                 if self.execution_hooks.after_tool_call:
-                    self.execution_hooks.after_tool_call(plan, plan_run, step, last_executed_step_output)
+                    self.execution_hooks.after_tool_call(
+                        plan, plan_run, step, last_executed_step_output
+                    )
 
             if self._raise_clarifications(plan_run, last_executed_step_output, plan):
                 return plan_run
@@ -700,11 +703,11 @@ class Portia:
                 plan_run,
                 last_executed_step_output,
             )
-            
+
         # Call the after_last_tool_call hook if it exists
         if self.execution_hooks.after_last_tool_call:
             self.execution_hooks.after_last_tool_call(plan, plan_run)
-            
+
         self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
         self._log_final_output(plan_run, plan)
         return plan_run
