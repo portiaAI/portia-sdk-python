@@ -6,7 +6,7 @@ in completing tasks.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
@@ -70,6 +70,29 @@ class ToolArgument(BaseModel):
         description="Whether the value is a valid type and or format for the given argument.",
     )
     explanation: str = Field(description="Explanation of the source for the value of the argument.")
+
+
+class ToolCallHooks:
+    """Hooks that can be used to modify or add extra functionality to tool calls.
+
+    Hooks include:
+    - before_tool_call: Called before a tool call.
+    - after_tool_call: Called after a tool call.
+    """
+
+    def __init__(
+        self,
+        before_tool_call: Callable[[Any], None] | None = None,
+        after_tool_call: Callable[[Any, Any], None] | None = None,
+    ) -> None:
+        """Initialize ToolCallHooks with default values.
+
+        Args:
+            before_tool_call: Hook called before a tool call.
+            after_tool_call: Hook called after a tool call.
+        """
+        self.before_tool_call = before_tool_call
+        self.after_tool_call = after_tool_call
 
 
 class ToolInputs(BaseModel):
@@ -513,6 +536,9 @@ class DefaultExecutionAgent(BaseExecutionAgent):
      3. If any of the arguments are assumed, it will request a clarification.
      4. If the arguments are correct, it will call the tool and return the result to the user.
      5. If the tool fails, it will try again at least 3 times.
+        
+    Attributes:
+        tool_call_hooks: Hooks for tool calls.
 
     Also, if the agent is being called a second time, it will just jump to step 4.
 
@@ -528,19 +554,22 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         agent_memory: AgentMemory,
         end_user: EndUser,
         tool: Tool | None = None,
+        tool_call_hooks: ToolCallHooks | None = None,
     ) -> None:
         """Initialize the agent.
 
         Args:
-            step (Step): The current step in the task plan.
-            plan_run (PlanRun): The run that defines the task execution process.
-            config (Config): The configuration settings for the agent.
-            agent_memory (AgentMemory): The agent memory to be used for the task.
-            end_user (EndUser): The end user for this execution
-            tool (Tool | None): The tool to be used for the task (optional).
+            step: The current step in the task plan.
+            plan_run: The run that defines the task execution process.
+            config: The configuration settings for the agent.
+            agent_memory: The agent memory to be used for the task.
+            end_user: The end user for this execution
+            tool: The tool to be used for the task (optional).
+            tool_call_hooks: Hooks for tool calls (optional).
 
         """
         super().__init__(step, plan_run, config, end_user, agent_memory, tool)
+        self.tool_call_hooks = tool_call_hooks or ToolCallHooks()
         self.verified_args: VerifiedToolInputs | None = None
         self.new_clarifications: list[Clarification] = []
 
@@ -631,7 +660,30 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 ctx=tool_run_ctx,
             ),
         ]
-        tool_node = ToolNode(tools)
+        
+        # Create a custom tool node that uses our hooks
+        class HookedToolNode(ToolNode):
+            """A ToolNode that calls hooks before and after tool execution."""
+            
+            def __init__(self, tools, hooks):
+                super().__init__(tools)
+                self.hooks = hooks
+                
+            def invoke(self, state):
+                # Call before_tool_call hook if it exists
+                if self.hooks.before_tool_call:
+                    self.hooks.before_tool_call(state)
+                    
+                # Call the original invoke method
+                result = super().invoke(state)
+                
+                # Call after_tool_call hook if it exists
+                if self.hooks.after_tool_call:
+                    self.hooks.after_tool_call(state, result)
+                    
+                return result
+                
+        tool_node = HookedToolNode(tools, self.tool_call_hooks)
 
         graph = StateGraph(ExecutionState)
         """
