@@ -54,12 +54,12 @@ class LocalDataValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
 
     value: Serializable | None = Field(
         default=None,
-        description="The output of the tool.",
+        description="The value.",
     )
 
     summary: str | None = Field(
         default=None,
-        description="Textual summary of the output of the tool. Not all tools generate summaries.",
+        description="Textual summary of the value.",
     )
 
     def get_value(self) -> Serializable | None:

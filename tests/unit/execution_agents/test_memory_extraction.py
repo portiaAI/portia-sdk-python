@@ -103,7 +103,7 @@ def test_memory_extraction_step_with_plan_run_inputs() -> None:
     """Test MemoryExtractionStep with inputs from plan_run_inputs."""
     (_, plan_run) = get_test_plan_run()
     plan_run.plan_run_inputs = {
-        "$plan_run_input": "plan_run_input_value",
+        "$plan_run_input": LocalDataValue(value="plan_run_input_value"),
     }
 
     agent = BaseExecutionAgent(

@@ -128,6 +128,7 @@ __all__ = [
     "LLMModel",
     "LLMProvider",
     "LLMTool",
+    "LocalDataValue",
     "LogLevel",
     "McpToolRegistry",
     "Message",

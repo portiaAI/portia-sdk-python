@@ -213,7 +213,10 @@ def test_portia_cloud_storage() -> None:
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
         end_user_id="test123",
-        plan_run_inputs={"param1": "test", "param2": 456},
+        plan_run_inputs={
+            "param1": LocalDataValue(value="test"),
+            "param2": LocalDataValue(value=456),
+        },
     )
     tool_call = get_test_tool_call(plan_run)
 

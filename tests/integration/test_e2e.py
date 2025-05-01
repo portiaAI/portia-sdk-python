@@ -18,6 +18,7 @@ from portia.config import (
     StorageClass,
 )
 from portia.errors import PlanError, ToolHardError, ToolSoftError
+from portia.execution_agents.output import LocalDataValue
 from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step, Variable
@@ -575,7 +576,7 @@ def test_plan_input_with_schema_validation() -> None:
         name="$numbers", description="two numbers to add together", value_schema=AdditionNumbers
     )
 
-    plan_inputs = {numbers_input: AdditionNumbers(num_a=5, num_b=7)}
+    plan_inputs = {numbers_input: LocalDataValue(value=AdditionNumbers(num_a=5, num_b=7))}
 
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
@@ -594,8 +595,8 @@ def test_plan_input_with_schema_validation() -> None:
 
     # Check that plan inputs were stored correctly
     assert "$numbers" in plan_run.plan_run_inputs
-    assert plan_run.plan_run_inputs["$numbers"].num_a == 5
-    assert plan_run.plan_run_inputs["$numbers"].num_b == 7
+    assert plan_run.plan_run_inputs["$numbers"].get_value().num_a == 5
+    assert plan_run.plan_run_inputs["$numbers"].get_value().num_b == 7
 
     # Try with invalid input - this should fail validation
     invalid_inputs = {
