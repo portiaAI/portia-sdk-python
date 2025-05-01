@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from portia.storage import AgentMemory
 
 
-class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class BaseOutput(BaseModel):
     """Base interface for concrete output classes to implement."""
 
     @abstractmethod
@@ -46,7 +46,7 @@ class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return the summary of the output."""
 
 
-class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class LocalOutput(BaseOutput):
     """Output that is stored locally."""
 
     model_config = ConfigDict(extra="forbid")
@@ -133,7 +133,7 @@ class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return str(value)  # Fallback for other types
 
 
-class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class AgentMemoryOutput(BaseOutput):
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")

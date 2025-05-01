@@ -152,7 +152,7 @@ def process_output(  # noqa: C901
         if "ToolHardError" in message.content and tool:
             raise ToolFailedError(tool.id, str(message.content))
         if clarifications and len(clarifications) > 0:
-            return LocalOutput[list[Clarification]](
+            return LocalOutput(
                 value=clarifications,
             )
         if isinstance(message, ToolMessage):
