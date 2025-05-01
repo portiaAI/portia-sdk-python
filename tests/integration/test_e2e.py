@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
@@ -19,9 +20,10 @@ from portia.config import (
 from portia.errors import PlanError, ToolHardError, ToolSoftError
 from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
-from portia.plan import Plan, PlanContext, Step, Variable
+from portia.plan import Plan, PlanBuilder, PlanContext, Step, Variable
 from portia.plan_run import PlanRunState
 from portia.portia import ExecutionHooks, Portia
+from portia.tool import Tool
 from portia.tool_registry import ToolRegistry
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarificationHandler
 
@@ -560,3 +562,85 @@ def test_portia_plan_steps_inputs_dependencies(
     ), "Fourth step inputs should have summary input"
     assert plan.steps[3].tool_id == "file_writer_tool", "Fourth step should be file_writer_tool"
     assert "100" in str(plan.steps[3].condition), "Fourth step condition does not contain 100"
+
+
+def test_run_plan_with_large_step_input() -> None:
+    """Test running a plan with a large step input."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        storage_class=StorageClass.MEMORY,
+        llm_provider=LLMProvider.ANTHROPIC,
+    )
+
+    class StoryToolSchema(BaseModel):
+        """Input for StoryTool."""
+
+    class StoryTool(Tool):
+        """A tool that returns the first chapter of War and Peace."""
+
+        id: str = "story_tool"
+        name: str = "Story Tool"
+        description: str = "Returns the first chapter of War and Peace"
+        args_schema: type[BaseModel] = StoryToolSchema
+        output_schema: tuple[str, str] = ("str", "str: The first chapter of War and Peace")
+
+        def run(self, _: ToolRunContext) -> str:
+            """Return the first chapter of War and Peace."""
+            path = Path(__file__).parent / "data" / "war_and_peace_ch1.txt"
+            with path.open() as f:
+                return f.read()
+
+    class EmailToolSchema(BaseModel):
+        """Input for EmailTool."""
+
+        recipient: str = Field(..., description="The email address of the recipient")
+        subject: str = Field(..., description="The subject line of the email")
+        body: str = Field(..., description="The content of the email")
+
+    email_tool_called = False
+
+    class EmailTool(Tool):
+        """A tool that mocks sending an email."""
+
+        id: str = "email_tool"
+        name: str = "Email Tool"
+        description: str = "Sends an email to a recipient"
+        args_schema: type[BaseModel] = EmailToolSchema
+        output_schema: tuple[str, str] = ("str", "str: Confirmation message for the sent email")
+
+        def run(self, _: ToolRunContext, recipient: str, subject: str, body: str) -> str:
+            """Mock sending an email and return a confirmation message."""
+            # Check first and last line of the chapter are in the body
+            nonlocal email_tool_called
+            email_tool_called = True
+            assert "Well, Prince, so Genoa and Lucca" in body
+            assert "I'll start my apprenticeship as old maid" in body
+            return f"Email sent to {recipient} with subject '{subject}'"
+
+    plan = (
+        PlanBuilder(
+            "Send an email to robbie@portialabs.ai titles 'Story' containing the first "
+            "chapter of War and Peace"
+        )
+        .step(
+            task="Get the first chapter of War and Peace",
+            tool_id=StoryTool().id,
+            output="$story",
+        )
+        .step(
+            task="Send an email to robbie@portialabs.ai titles 'Story' containing the first "
+            "chapter of War and Peace",
+            tool_id=EmailTool().id,
+            output="$result",
+            inputs=[
+                Variable(name="$story", description="The first chapter of War and Peace"),
+            ],
+        )
+        .build()
+    )
+
+    portia = Portia(config=config, tools=ToolRegistry([StoryTool(), EmailTool()]))
+    plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert email_tool_called
