@@ -26,6 +26,8 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
+from browser_use.browser.views import BrowserState
+from browser_use.browser.context import BrowserContext
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
@@ -139,7 +141,6 @@ class BrowserInfrastructureOption(Enum):
     LOCAL = "local"
     REMOTE = "remote"
 
-
 class BrowserTool(Tool[str]):
     """General purpose browser tool. Customizable to user requirements.
 
@@ -206,6 +207,8 @@ class BrowserTool(Tool[str]):
     )
 
     custom_infrastructure_provider: BrowserInfrastructureProvider | None = Field(default=None)
+    browser: Browser | None = Field(default=None)
+    playwright_browser: Any | None = Field(default=None)
 
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
@@ -242,21 +245,54 @@ class BrowserTool(Tool[str]):
                     require_confirmation=True,
                 )
 
+            async def on_response(response):
+                if "range?timezone" in response.url:
+                    try:
+                        body = await response.json()
+                        print(f"Intercepted response from {response.url}: {body}")
+                    except Exception as e:
+                        print(f"Failed to parse JSON from {response.url}: {e}")
+
+            async def register_dne_callback(
+                agent_history,
+            ) -> None:
+                """Register a callback to print the page title when the task is done."""
+                browser = self.browser
+                print("got here, it was:", browser.playwright_browser.contexts[0].pages[-1].title)
+
+            async def register_step_callback(
+                browser_state: BrowserState, *kwargs: Any
+            ) -> None:
+                """Register a callback to print the page title when the task is done."""
+                if not self.playwright_browser:
+                    self.playwright_browser = self.browser.playwright_browser
+                    if self.playwright_browser:
+                        context = self.playwright_browser.contexts[0]
+                        context.on("page", lambda page: print("got here MONKEY new page opened:", page.title))
+
             async def run_agent_task(
                 task_description: str,
                 output_model: type[BrowserTaskOutput],
             ) -> BrowserTaskOutput:
                 """Run a browser agent task with the given configuration."""
-                browser = self.infrastructure_provider.setup_browser(ctx)
+                self.browser = self.infrastructure_provider.setup_browser(ctx)
                 agent = Agent(
                     task=task_description,
                     llm=llm,
-                    browser=browser,
+                    browser=self.browser,
                     controller=Controller(output_model=output_model),
+                    register_done_callback=register_dne_callback,
+                    register_new_step_callback=register_step_callback,
                 )
+                self.playwright_browser = await self.browser.get_playwright_browser()
+                if self.playwright_browser:
+                    context = self.playwright_browser.contexts[0]
+                    for context in self.playwright_browser.contexts:
+                        for page in context.pages:
+                            page.on("response", on_response)
+                    context.on("page", lambda page: page.on("response", on_response))
                 result = await agent.run()
                 final_result = output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
-                #print("got here, it was:", browser.playwright_browser.contexts[0].pages[0].title)
                 return final_result
 
             # Main task
@@ -401,9 +437,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
+                _force_keep_browser_alive=True,
             ),
         )
-        p = browser.playwright_browser.contexts[0].pages[0]
         return browser
 
     def construct_auth_clarification_url(
