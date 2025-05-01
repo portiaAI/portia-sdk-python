@@ -9,19 +9,19 @@ import json
 from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, Union
+from typing import TYPE_CHECKING, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import deprecated
 
-from portia.common import SERIALIZABLE_TYPE_VAR, Serializable
+from portia.common import Serializable
 from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
     from portia.storage import AgentMemory
 
 
-class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class BaseOutput(BaseModel):
     """Base interface for concrete output classes to implement."""
 
     @abstractmethod
@@ -46,8 +46,7 @@ class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     def get_summary(self) -> str | None:
         """Return the summary of the output."""
 
-
-class LocalDataValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class LocalDataValue(BaseOutput):
     """Output that is stored locally."""
 
     model_config = ConfigDict(extra="forbid")
@@ -134,7 +133,11 @@ class LocalDataValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return str(value)  # Fallback for other types
 
 
+<<<<<<< HEAD
 class AgentMemoryValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+=======
+class AgentMemoryValue(BaseOutput):
+>>>>>>> main
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")

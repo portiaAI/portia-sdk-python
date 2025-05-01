@@ -37,7 +37,6 @@ class MemoryExtractionStep:
 
         """
         potential_inputs = self.agent.plan_run.get_potential_step_inputs()
-
         step_inputs = [
             StepInput(
                 name=input_variable.name,

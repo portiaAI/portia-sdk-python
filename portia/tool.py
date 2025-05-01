@@ -207,10 +207,10 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         # handle clarifications cleanly
         if is_clarification(output):
             clarifications = output if isinstance(output, list) else [output]
-            return LocalDataValue[list[Clarification]](
+            return LocalDataValue(
                 value=clarifications,
             )
-        return LocalDataValue[SERIALIZABLE_TYPE_VAR](value=output)  # type: ignore  # noqa: PGH003
+        return LocalDataValue(value=output)  # type: ignore  # noqa: PGH003
 
     def _run_with_artifacts(
         self,
