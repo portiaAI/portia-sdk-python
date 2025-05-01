@@ -137,7 +137,12 @@ def _get_arg_value_with_templating(step_inputs: list[StepInput], arg: Any) -> An
     """Return the value of an argument, handling any templating required."""
     # Directly apply templating in strings
     if isinstance(arg, str):
-        if any(f"{{{{{step_input.name}}}}}" in arg for step_input in step_inputs):
+        if any(
+            # Allow with or without spaces
+            f"{{{{{step_input.name}}}}}" in arg or f"{{{{{ step_input.name }}}}}" in arg
+            for step_input in step_inputs
+        ):
+            print(f"Templating {arg}")
             return _template_inputs_into_arg_value(arg, step_inputs)
         return arg
 
@@ -195,12 +200,13 @@ class ParserModel:
                 "Your responses must clearly explain the source of each argument "
                 "(e.g., context, past messages, clarifications). "
                 "Avoid assumptions or fabricated information. "
-                "If any of the inputs is a large string, rather than repeating it, you can provide "
-                "the name in curly braces and it will be templated in before the tool is called. "
-                "For example, if you wish to use an input called '$large_input_value', "
-                "you can enter '{{ '{{' }}$large_input_value{{ '}}' }}'  (i.e. input name inside "
-                "double curly braces) and the value will be templated in before the tool is "
-                "called.",
+                "If any of the inputs is a large string and you want to use it verbatim, rather "
+                "than repeating it, you should provide the name in curly braces and it will be "
+                "templated in before the tool is called. "
+                "For example, if you wish to use an input called '$large_input_value' verbatim, "
+                "you should enter '{{ '{{' }}$large_input_value{{ '}}' }}' (double curly braces "
+                "and include the $ in the name) and the value will be templated in before the tool "
+                "is called.",
                 # Use jinja2 to allow for the literal curly braces
                 template_format="jinja2",
             ),
