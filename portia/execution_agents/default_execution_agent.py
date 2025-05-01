@@ -137,7 +137,11 @@ def _get_arg_value_with_templating(step_inputs: list[StepInput], arg: Any) -> An
     """Return the value of an argument, handling any templating required."""
     # Directly apply templating in strings
     if isinstance(arg, str):
-        if any(f"{{{{{step_input.name}}}}}" in arg for step_input in step_inputs):
+        if any(
+            # Allow with or without spaces
+            f"{{{{{step_input.name}}}}}" in arg or f"{{{{ {step_input.name} }}}}" in arg
+            for step_input in step_inputs
+        ):
             return _template_inputs_into_arg_value(arg, step_inputs)
         return arg
 
@@ -195,12 +199,14 @@ class ParserModel:
                 "Your responses must clearly explain the source of each argument "
                 "(e.g., context, past messages, clarifications). "
                 "Avoid assumptions or fabricated information. "
-                "If any of the inputs is a large string, rather than repeating it, you can provide "
-                "the name in curly braces and it will be templated in before the tool is called. "
-                "For example, if you wish to use an input called '$large_input_value', "
-                "you can enter '{{ '{{' }}$large_input_value{{ '}}' }}'  (i.e. input name inside "
-                "double curly braces) and the value will be templated in before the tool is "
-                "called.",
+                "If any of the inputs is a large string and you want to use it verbatim, rather "
+                "than repeating it, you should provide the name in curly braces and it will be "
+                "templated in before the tool is called. "
+                "For example, if you wish to use an input called '$large_input_value' verbatim, "
+                "you should enter '{{ '{{' }}$large_input_value{{ '}}' }}' (double curly braces "
+                "and include the $ in the name) and the value will be templated in before the tool "
+                "is called.  You should definitely use this templating for any input values over "
+                "1000 words that you want to use verbatim.",
                 # Use jinja2 to allow for the literal curly braces
                 template_format="jinja2",
             ),
@@ -498,8 +504,11 @@ class ToolCallingModel:
                 "If any values are too large to be provided to you in full, they will be provided "
                 "in curly braces with a value to be templated in (e.g. "
                 "'{{ '{{' }}$large_output_value{{ '}}' }}'). "
-                "This is fine - please keep these templated values inside double curly braces as "
-                "they will be templated in before the tool is called.\n",
+                "This is fine - please keep these templated values inside double curly braces and "
+                "DO NOT REMOVE the leading $ on the name - for example, keep it as "
+                "'{{ '{{' }}$large_output_value{{ '}}' }}' and not "
+                "'{{ '{{' }}large_output_value{{ '}}' }}'. These values will then be templated in "
+                "before the tool is called.\n",
                 # Use jinja2 to allow for the literal curly braces
                 template_format="jinja2",
             ),
