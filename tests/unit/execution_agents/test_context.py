@@ -8,7 +8,7 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification, InputClarification
 from portia.end_user import EndUser
 from portia.execution_agents.context import StepInput, build_context
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.execution_context import ExecutionContext, get_execution_context
 from portia.plan import Variable
 from portia.tool import ToolRunContext
@@ -32,10 +32,10 @@ def inputs() -> list[Variable]:
 def outputs() -> dict[str, Output]:
     """Return a dictionary of outputs for pytest fixtures."""
     return {
-        "$email_body": LocalOutput(value="The body of the email"),
-        "$email_title": LocalOutput(value="Example email"),
-        "$email_address": LocalOutput(value="test@example.com"),
-        "$london_weather": LocalOutput(value="rainy"),
+        "$email_body": LocalDataValue(value="The body of the email"),
+        "$email_title": LocalDataValue(value="Example email"),
+        "$email_address": LocalDataValue(value="test@example.com"),
+        "$london_weather": LocalDataValue(value="rainy"),
     }
 
 

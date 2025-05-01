@@ -11,7 +11,7 @@ import pytest
 
 from portia.end_user import EndUser
 from portia.errors import StorageError
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
+from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
 from portia.plan import Plan, PlanContext, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
@@ -113,10 +113,12 @@ def test_in_memory_storage() -> None:
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
     saved_output_1 = storage.save_plan_run_output(
         "test name",
-        LocalOutput(value="test value"),
+        LocalDataValue(value="test value"),
         plan_run.id,
     )
-    assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+    assert storage.get_plan_run_output("test name", plan_run.id) == LocalDataValue(
+        value="test value"
+    )
     # Check that we ignore outputs that are already in agent memory
     saved_output_2 = storage.save_plan_run_output(
         "test name",
@@ -131,7 +133,7 @@ def test_in_memory_storage() -> None:
     ):
         storage.save_plan_run_output(
             "large_output",
-            LocalOutput(value="large value"),
+            LocalDataValue(value="large value"),
             plan_run.id,
         )
 
@@ -160,8 +162,10 @@ def test_disk_storage(tmp_path: Path) -> None:
     all_runs = storage.get_plan_runs()
     assert all_runs.results == [plan_run]
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
-    storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
-    assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+    storage.save_plan_run_output("test name", LocalDataValue(value="test value"), plan_run.id)
+    assert storage.get_plan_run_output("test name", plan_run.id) == LocalDataValue(
+        value="test value"
+    )
 
     # Check with an output that's too large
     with (
@@ -170,7 +174,7 @@ def test_disk_storage(tmp_path: Path) -> None:
     ):
         storage.save_plan_run_output(
             "large_output",
-            LocalOutput(value="large value"),
+            LocalDataValue(value="large value"),
             plan_run.id,
         )
 
@@ -496,7 +500,7 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalOutput(value="test value", summary="test summary")
+    output = LocalDataValue(value="test value", summary="test summary")
     mock_success_response = MagicMock()
     mock_success_response.is_success = True
 
@@ -522,7 +526,7 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
                 "summary": output.get_summary(),
             },
         )
-        assert isinstance(result, AgentMemoryOutput)
+        assert isinstance(result, AgentMemoryValue)
         assert result.output_name == "test_output"
         assert result.plan_run_id == plan_run.id
         assert result.summary == output.get_summary()
@@ -591,7 +595,7 @@ def test_portia_cloud_agent_memory_local_cache_expiry() -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalOutput(value="test value", summary="test summary")
+    output = LocalDataValue(value="test value", summary="test summary")
     mock_success_response = MagicMock()
     mock_success_response.is_success = True
 
@@ -630,7 +634,7 @@ def test_portia_cloud_agent_memory_errors() -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalOutput(value="test value", summary="test summary")
+    output = LocalDataValue(value="test value", summary="test summary")
 
     mock_exception = RuntimeError("An error occurred.")
     with (
@@ -663,7 +667,7 @@ def test_portia_cloud_agent_memory_errors() -> None:
         with pytest.raises(StorageError):
             agent_memory.get_plan_run_output("test_output", plan_run.id)
 
-        mock_read_cache.assert_called_once_with(f"{plan_run.id}/test_output.json", LocalOutput)
+        mock_read_cache.assert_called_once_with(f"{plan_run.id}/test_output.json", LocalDataValue)
         mock_get.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         )
@@ -675,7 +679,7 @@ def test_portia_cloud_agent_memory_errors() -> None:
     ):
         agent_memory.save_plan_run_output(
             "large_output",
-            LocalOutput(value="large value"),
+            LocalDataValue(value="large value"),
             plan_run.id,
         )
 

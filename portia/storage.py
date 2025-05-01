@@ -40,8 +40,8 @@ from portia.cloud import PortiaCloudClient
 from portia.end_user import EndUser
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
 from portia.execution_agents.output import (
-    AgentMemoryOutput,
-    LocalOutput,
+    AgentMemoryValue,
+    LocalDataValue,
     Output,
 )
 from portia.execution_context import ExecutionContext
@@ -283,7 +283,7 @@ class AgentMemory(Protocol):
         """
 
     @abstractmethod
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from agent memory.
 
         Args:
@@ -343,7 +343,7 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
 
     plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
-    outputs: defaultdict[PlanRunUUID, dict[str, LocalOutput]]
+    outputs: defaultdict[PlanRunUUID, dict[str, LocalDataValue]]
     end_users: dict[str, EndUser]
 
     def __init__(self) -> None:
@@ -451,20 +451,20 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             logger().warning(
                 f"Storing Output {output} with no summary",
             )
-        if not isinstance(output, LocalOutput):
+        if not isinstance(output, LocalDataValue):
             logger().warning(
                 f"Storing output that is already in agent memory: {output}",
             )
             return output
 
         self.outputs[plan_run_id][output_name] = output
-        return AgentMemoryOutput(
+        return AgentMemoryValue(
             output_name=output_name,
             plan_run_id=plan_run_id,
             summary=output.get_summary() or "",
         )
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from memory.
 
         Args:
@@ -670,13 +670,13 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         self._check_size(output_name, output)
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
-        return AgentMemoryOutput(
+        return AgentMemoryValue(
             output_name=output_name,
             plan_run_id=plan_run_id,
             summary=output.get_summary() or "",
         )
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from agent memory on disk.
 
         Args:
@@ -692,7 +692,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
 
         """
         file_name = f"{plan_run_id}/{output_name}.json"
-        return self._read(file_name, LocalOutput)
+        return self._read(file_name, LocalDataValue)
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Log the tool call."""
@@ -1045,12 +1045,12 @@ class PortiaCloudStorage(Storage, AgentMemory):
             self.check_response(response)
 
             # Save to local cache
-            if isinstance(output, LocalOutput):
+            if isinstance(output, LocalDataValue):
                 cache_file_path = f"{plan_run_id}/{output_name}.json"
                 self._write_to_cache(cache_file_path, output)
                 logger().debug(f"Saved output to local cache: {cache_file_path}")
 
-            return AgentMemoryOutput(
+            return AgentMemoryValue(
                 output_name=output_name,
                 plan_run_id=plan_run_id,
                 summary=output.get_summary() or "",
@@ -1058,7 +1058,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         except Exception as e:
             raise StorageError(e) from e
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from Portia Cloud.
 
         Args:
@@ -1075,7 +1075,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         # Try to get from local cache first
         cache_file_path = f"{plan_run_id}/{output_name}.json"
         try:
-            return self._read_from_cache(cache_file_path, LocalOutput)
+            return self._read_from_cache(cache_file_path, LocalDataValue)
         except (FileNotFoundError, ValidationError):
             # If not in cache, fetch from Portia Cloud
             logger().debug(
@@ -1099,7 +1099,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 value_response.raise_for_status()
 
             # Create the output object
-            output = LocalOutput(
+            output = LocalDataValue(
                 summary=summary,
                 value=value_response.text,
             )
