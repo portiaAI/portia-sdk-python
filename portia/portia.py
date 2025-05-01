@@ -24,7 +24,7 @@ from __future__ import annotations
 import time
 from importlib.metadata import version
 from typing import TYPE_CHECKING
-
+from pydantic import BaseModel
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -171,6 +171,7 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -190,7 +191,7 @@ class Portia:
         """
         plan = self.plan(query, tools, example_plans, end_user)
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user)
+        plan_run = self.create_plan_run(plan, end_user, structured_output_schema)
         return self.resume(plan_run)
 
     def plan(
@@ -268,6 +269,7 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
@@ -287,7 +289,7 @@ class Portia:
             self.storage.save_plan(plan)
 
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user)
+        plan_run = self.create_plan_run(plan, end_user, structured_output_schema)
         return self.resume(plan_run)
 
     def resume(
@@ -536,6 +538,7 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Create a PlanRun from a Plan.
 
@@ -553,6 +556,7 @@ class Portia:
             state=PlanRunState.NOT_STARTED,
             execution_context=get_execution_context(),
             end_user_id=end_user.external_id,
+            structured_output_schema=structured_output_schema,
         )
         self.storage.save_plan_run(plan_run)
         return plan_run
@@ -795,14 +799,18 @@ class Portia:
             value=step_output.get_value(),
             summary=None,
         )
-
         try:
             summarizer = FinalOutputSummarizer(config=self.config)
-            summary = summarizer.create_summary(
+            output = summarizer.create_summary(
                 plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan=ReadOnlyPlan.from_plan(plan),
             )
-            final_output.summary = summary
+            if isinstance(output, BaseModel) and plan_run.structured_output_schema:
+                unsumarrized_output = plan_run.structured_output_schema(**output.model_dump())
+                final_output.value = unsumarrized_output
+                final_output.summary = output.summary
+            else:
+                final_output.summary = output
 
         except Exception as e:  # noqa: BLE001
             logger().warning(f"Error summarising run: {e}")
