@@ -965,10 +965,7 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
         # Verify result
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step1_result" in plan_run.outputs.step_outputs
-        assert (
-            plan_run.outputs.step_outputs["$step1_result"].get_value()
-            == SKIPPED_OUTPUT
-        )
+        assert plan_run.outputs.step_outputs["$step1_result"].get_value() == SKIPPED_OUTPUT
         assert "$step2_result" in plan_run.outputs.step_outputs
         assert plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
         assert plan_run.outputs.final_output is not None
@@ -1031,10 +1028,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         # Verify result based on our simulated outcomes
         assert plan_run.state == PlanRunState.COMPLETE
         assert "$step2_result" in plan_run.outputs.step_outputs
-        assert (
-            plan_run.outputs.step_outputs["$step2_result"].get_value()
-            == COMPLETED_OUTPUT
-        )
+        assert plan_run.outputs.step_outputs["$step2_result"].get_value() == COMPLETED_OUTPUT
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.get_summary() == "Execution completed early"
 
@@ -1077,18 +1071,13 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
         assert outcome.reason == "Stopping execution"
 
         # Verify plan_run was updated correctly
-        assert (
-            updated_plan_run.outputs.step_outputs["$test_output"].get_value()
-            == COMPLETED_OUTPUT
-        )
+        assert updated_plan_run.outputs.step_outputs["$test_output"].get_value() == COMPLETED_OUTPUT
         assert (
             updated_plan_run.outputs.step_outputs["$test_output"].get_summary()
             == "Stopping execution"
         )
         assert updated_plan_run.outputs.final_output == mock_final_output
         assert updated_plan_run.state == PlanRunState.COMPLETE
-
-
 
 
 def test_handle_introspection_outcome_skip(portia: Portia) -> None:
@@ -1123,10 +1112,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     assert outcome.outcome == PreStepIntrospectionOutcome.SKIP
     assert outcome.reason == "Skipping step"
 
-    assert (
-        updated_plan_run.outputs.step_outputs["$test_output"].get_value()
-        == SKIPPED_OUTPUT
-    )
+    assert updated_plan_run.outputs.step_outputs["$test_output"].get_value() == SKIPPED_OUTPUT
     assert updated_plan_run.outputs.step_outputs["$test_output"].get_summary() == "Skipping step"
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS  # State should remain IN_PROGRESS
 
@@ -1245,14 +1231,8 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
 
         assert result_plan_run.outputs.step_outputs["$step1_result"].get_value() == "Step 1 result"
         assert result_plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
-        assert (
-            result_plan_run.outputs.step_outputs["$step3_result"].get_value()
-            == SKIPPED_OUTPUT
-        )
-        assert (
-            result_plan_run.outputs.step_outputs["$step4_result"].get_value()
-            == SKIPPED_OUTPUT
-        )
+        assert result_plan_run.outputs.step_outputs["$step3_result"].get_value() == SKIPPED_OUTPUT
+        assert result_plan_run.outputs.step_outputs["$step4_result"].get_value() == SKIPPED_OUTPUT
         assert result_plan_run.outputs.final_output is not None
         assert result_plan_run.outputs.final_output.get_value() == "Step 2 result"
         assert result_plan_run.outputs.final_output.get_summary() == expected_summary
