@@ -157,7 +157,7 @@ class PlanRun(BaseModel):
             if clarification.step == step
         ]
 
-    def get_potential_step_inputs(self) -> dict[str, LocalDataValue]:
+    def get_potential_step_inputs(self) -> dict[str, Output]:
         """Return a dictionary of potential step inputs for future steps."""
         return self.outputs.step_outputs | self.plan_run_inputs
 

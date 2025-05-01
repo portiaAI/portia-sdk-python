@@ -48,7 +48,7 @@ from portia.errors import (
     ToolNotFoundError,
     ToolRetryError,
 )
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalDataValue, Output
 
 # Execution context
 from portia.execution_context import (

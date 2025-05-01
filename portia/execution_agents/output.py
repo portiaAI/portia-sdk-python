@@ -46,6 +46,7 @@ class BaseOutput(BaseModel):
     def get_summary(self) -> str | None:
         """Return the summary of the output."""
 
+
 class LocalDataValue(BaseOutput):
     """Output that is stored locally."""
 
@@ -133,11 +134,7 @@ class LocalDataValue(BaseOutput):
         return str(value)  # Fallback for other types
 
 
-<<<<<<< HEAD
-class AgentMemoryValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
-=======
 class AgentMemoryValue(BaseOutput):
->>>>>>> main
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")
