@@ -45,33 +45,51 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
             [
                 SystemMessage(
                     content=(
-                        "You are a highly skilled reviewer who reviews in flight plan execution."
-                        "Your job is to examine the state of a plan execution (PlanRun) and "
-                        "decide what action should be taken next."
-                        "You should use the current_step_index field to identify the current step "
-                        "in the plan, and the PlanRun state to know what has happened so far."
-                        "The actions that can be taken are:"
-                        " - COMPLETE -> complete execution and return the result so far."
-                        " - SKIP -> skip the current step execution."
-                        " - FAIL -> stop and fail execution entirely."
-                        " - CONTINUE -> Continue execution for the current step."
-                        "You should choose an outcome based on the following logic in order:\n"
-                        " - If the overarching goal of the plan "
-                        "has already been met return COMPLETE.\n"
-                        " - If the current step has a condition that is false you return SKIP.\n"
-                        " - If you cannot evaluate the condition"
-                        " because it's impossible to evaluate return FAIL.\n"
-                        " - If you cannot evaluate the condition because some data had been skipped"
-                        "  in previous steps then return SKIP.\n"
-                        " - Otherwise return CONTINUE.\n"
-                        "Return the outcome and reason in the given format.\n"
+"""
+You are a highly skilled reviewer who reviews in flight plan execution. Your job is to evaluate
+the condition for the current step. Your outcome is fed to another orchestrator that controls
+the execution of the remaining steps.
+
+IMPORTANT GUIDLINES:
+- Pay close attention to the steps giving and its tasks, there is no alternative flows or other
+steps other than what's been giving to you for this plan execution.
+- Do not assume data, you should evaluate the condition ONLY based on data given.
+- Do not assume if the condition is false it will affect other remaining steps. Step A will affect
+step B ONLY if Step A output is included in the inputs list for Step B or
+mentioned in the condition attribute for step B.
+- Steps CAN NOT get executed on partial information. A step will only be executed if
+all inputs are present and its condition is true (if the step has condition).
+- Your outcome will not affect any future plan runs.
+
+Provide an outcome from the following list (ordered by preference):
+  1- COMPLETE -> stops the execution and does not execute remaining steps.
+   - Choose COMPLETE if all remaining steps depend on the current step's output.
+   - Choose COMPLETE if the condition of this step is the same for all remaining steps.
+  2- SKIP -> ONLY skips the current step and continue executing next steps.
+  3- CONTINUE -> continue execution for the current step.
+
+You should evaluate the condition and provide the outcome based on the following criteria IN ORDER:
+ 1- If condition is false and all remaining steps depend on the output of this step
+ then return COMPLETE.
+ 2- If condition is false and all remaining steps have the same condition return COMPLETE.
+ 3- If condition is false you return SKIP. But favour COMPLETE whenever possible
+ (e.g if it is the last step).
+ 4- If you cannot evaluate the condition because some data had been skipped
+  in previous steps then return SKIP.
+ 5- Otherwise return CONTINUE.
+
+Return the outcome and reason in the given format.
+"""
                     ),
                 ),
                 HumanMessagePromptTemplate.from_template(
                     "Today's date is {current_date} and today is {current_day_of_week}.\n"
                     "Review the following plan + current PlanRun.\n"
-                    "Current Plan: {plan}\n"
-                    "Current PlanRun: {plan_run}\n"
+                    "The condition to evaluate is: {condition}.\n"
+                    "We are at step {current_step_idex} out of {total_steps_count} in total.\n"
+                    "The original query: {query}\n"
+                    "All Plan Steps: \n{plan}\n"
+                    "Previous Step Outputs: \n{prev_step_outputs}\n"
                     "If any relevant outputs are stored in agent memory, they have been extracted "
                     "and included here: {memory_outputs}\n",
                 ),
@@ -101,9 +119,19 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
                 for m in self.prompt.format_messages(
                     current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                     current_day_of_week=datetime.now(UTC).strftime("%A"),
-                    plan_run=plan_run.model_dump_json(),
-                    plan=plan.model_dump_json(),
+                    prev_step_outputs=plan_run.outputs.model_dump_json(),
                     memory_outputs=memory_outputs,
+                    query=plan.plan_context.query,
+                    condition=plan.steps[plan_run.current_step_index].condition,
+                    current_step_idex=plan_run.current_step_index + 1,
+                    total_steps_count=len(plan.steps),
+                    plan=self._get_plan_steps_pretty(plan),
                 )
             ],
+        )
+
+    def _get_plan_steps_pretty(self, plan: Plan) -> str:
+        """Get the pretty print representation of the plan steps."""
+        return "\n".join(
+            [f"Step {i+1}: {step.pretty_print()}" for i, step in enumerate(plan.steps)]
         )

@@ -54,6 +54,8 @@ from portia.execution_context import (
 )
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
+    COMPLETED_OUTPUT,
+    SKIPPED_OUTPUT,
     BaseIntrospectionAgent,
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
@@ -742,21 +744,18 @@ class Portia:
             f"Reason: {pre_step_outcome.reason}",
         )
 
-        if pre_step_outcome.outcome == PreStepIntrospectionOutcome.FAIL:
-            logger().error(*log_message)
-        else:
-            logger().info(*log_message)
+        logger().info(*log_message)
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
                 output = LocalOutput(
-                    value=PreStepIntrospectionOutcome.SKIP,
+                    value=SKIPPED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
             case PreStepIntrospectionOutcome.COMPLETE:
                 output = LocalOutput(
-                    value=PreStepIntrospectionOutcome.COMPLETE,
+                    value=COMPLETED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
@@ -767,14 +766,6 @@ class Portia:
                         last_executed_step_output,
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
-            case PreStepIntrospectionOutcome.FAIL:
-                failed_output = LocalOutput(
-                    value=PreStepIntrospectionOutcome.FAIL,
-                    summary=pre_step_outcome.reason,
-                )
-                self._set_step_output(failed_output, plan_run, step)
-                plan_run.outputs.final_output = failed_output
-                self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         return (plan_run, pre_step_outcome)
 
     def _get_planning_agent(self) -> BasePlanningAgent:
