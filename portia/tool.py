@@ -49,7 +49,7 @@ from portia.config import Config
 from portia.end_user import EndUser
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.execution_utils import is_clarification
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
@@ -207,10 +207,10 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         # handle clarifications cleanly
         if is_clarification(output):
             clarifications = output if isinstance(output, list) else [output]
-            return LocalOutput[list[Clarification]](
+            return LocalDataValue[list[Clarification]](
                 value=clarifications,
             )
-        return LocalOutput[SERIALIZABLE_TYPE_VAR](value=output)  # type: ignore  # noqa: PGH003
+        return LocalDataValue[SERIALIZABLE_TYPE_VAR](value=output)  # type: ignore  # noqa: PGH003
 
     def _run_with_artifacts(
         self,
@@ -422,7 +422,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolHardError: If a hard error is encountered in the response.
 
         """
-        output = LocalOutput.model_validate(response["output"])
+        output = LocalDataValue.model_validate(response["output"])
         output_value = output.get_value()
 
         # Handle Tool Errors
@@ -436,7 +436,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             clarification = output_value[0]
             match clarification["category"]:
                 case ClarificationCategory.ACTION:
-                    return LocalOutput(
+                    return LocalDataValue(
                         value=ActionClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -445,7 +445,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.INPUT:
-                    return LocalOutput(
+                    return LocalDataValue(
                         value=InputClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -454,7 +454,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.MULTIPLE_CHOICE:
-                    return LocalOutput(
+                    return LocalDataValue(
                         value=MultipleChoiceClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
@@ -464,7 +464,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         ),
                     )
                 case ClarificationCategory.VALUE_CONFIRMATION:
-                    return LocalOutput(
+                    return LocalDataValue(
                         value=ValueConfirmationClarification(
                             plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),

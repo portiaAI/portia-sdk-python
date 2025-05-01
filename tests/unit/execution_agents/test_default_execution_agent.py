@@ -28,7 +28,7 @@ from portia.execution_agents.default_execution_agent import (
     VerifierModel,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.model import LangChainGenerativeModel
 from portia.plan import Step
 from portia.storage import InMemoryStorage
@@ -348,17 +348,17 @@ def test_verifier_model_schema_validation() -> None:
 
     required_field1 = next(arg for arg in result_inputs.args if arg.name == "required_field1")
     required_field2 = next(arg for arg in result_inputs.args if arg.name == "required_field2")
-    assert required_field1.schema_invalid, (
-        "required_field1 should be marked as missing when validation fails"
-    )
-    assert required_field2.schema_invalid, (
-        "required_field2 should be marked as missing when validation fails"
-    )
+    assert (
+        required_field1.schema_invalid
+    ), "required_field1 should be marked as missing when validation fails"
+    assert (
+        required_field2.schema_invalid
+    ), "required_field2 should be marked as missing when validation fails"
 
     optional_field = next(arg for arg in result_inputs.args if arg.name == "optional_field")
-    assert not optional_field.schema_invalid, (
-        "optional_field should not be marked as missing when validation fails"
-    )
+    assert (
+        not optional_field.schema_invalid
+    ), "optional_field should not be marked as missing when validation fails"
 
 
 def test_tool_calling_model_no_hallucinations() -> None:
@@ -523,7 +523,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         return {
             "messages": ToolMessage(
                 content="Sent email",
-                artifact=LocalOutput(value="Sent email with id: 0"),
+                artifact=LocalDataValue(value="Sent email with id: 0"),
                 tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
             ),
         }
@@ -581,7 +581,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
         return {
             "messages": ToolMessage(
                 content="Sent email",
-                artifact=LocalOutput(value="Sent email with id: 0"),
+                artifact=LocalDataValue(value="Sent email with id: 0"),
                 tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
             ),
         }

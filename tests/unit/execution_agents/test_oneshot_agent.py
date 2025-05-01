@@ -13,7 +13,7 @@ from portia.errors import InvalidAgentError
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.storage import InMemoryStorage
 from tests.utils import AdditionTool, get_test_config, get_test_plan_run
 
@@ -66,7 +66,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         return {
             "messages": ToolMessage(
                 content="Sent email",
-                artifact=LocalOutput(value="Sent email with id: 0"),
+                artifact=LocalDataValue(value="Sent email with id: 0"),
                 tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
             ),
         }

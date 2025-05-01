@@ -14,7 +14,7 @@ from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, LogLevel, StorageClass
 from portia.end_user import EndUser
 from portia.errors import ToolHardError, ToolSoftError
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.execution_context import ExecutionContext, empty_context
 from portia.model import GenerativeModel, LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
@@ -73,7 +73,7 @@ def get_test_plan_run() -> tuple[Plan, PlanRun]:
     )
     plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
     plan_run.outputs.step_outputs = {
-        "$a": LocalOutput(value="3"),
+        "$a": LocalDataValue(value="3"),
     }
     return plan, plan_run
 

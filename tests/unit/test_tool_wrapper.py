@@ -5,7 +5,7 @@ import pytest
 from portia.clarification import Clarification
 from portia.end_user import EndUser
 from portia.errors import ToolHardError
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
@@ -126,4 +126,4 @@ def test_tool_call_wrapper_run_returns_none(mock_storage: MockStorage) -> None:
     ctx = get_test_tool_context()
     wrapper.run(ctx)
     assert mock_storage.records[-1].output
-    assert mock_storage.records[-1].output == LocalOutput(value=None).model_dump(mode="json")
+    assert mock_storage.records[-1].output == LocalDataValue(value=None).model_dump(mode="json")

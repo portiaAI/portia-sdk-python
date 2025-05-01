@@ -13,7 +13,7 @@ from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -152,16 +152,16 @@ def process_output(  # noqa: C901
         if "ToolHardError" in message.content and tool:
             raise ToolFailedError(tool.id, str(message.content))
         if clarifications and len(clarifications) > 0:
-            return LocalOutput[list[Clarification]](
+            return LocalDataValue[list[Clarification]](
                 value=clarifications,
             )
         if isinstance(message, ToolMessage):
             if message.artifact and isinstance(message.artifact, Output):
                 output_values.append(message.artifact)
             elif message.artifact:
-                output_values.append(LocalOutput(value=message.artifact))
+                output_values.append(LocalDataValue(value=message.artifact))
             else:
-                output_values.append(LocalOutput(value=message.content))
+                output_values.append(LocalDataValue(value=message.content))
 
     if len(output_values) == 0:
         raise InvalidAgentOutputError(str([message.content for message in messages]))
@@ -169,7 +169,7 @@ def process_output(  # noqa: C901
     # if there's only one output return just the value
     if len(output_values) == 1:
         output = output_values[0]
-        return LocalOutput(
+        return LocalDataValue(
             value=output.get_value(),
             summary=output.get_summary() or output.serialize_value(),
         )
@@ -181,4 +181,4 @@ def process_output(  # noqa: C901
         values.append(output.get_value())
         summaries.append(output.get_summary() or output.serialize_value())
 
-    return LocalOutput(value=values, summary=", ".join(summaries))
+    return LocalDataValue(value=values, summary=", ".join(summaries))
