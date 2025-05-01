@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from portia.clarification import InputClarification
 from portia.end_user import EndUser
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
+from portia.execution_agents.context import StepInput
 from portia.execution_agents.default_execution_agent import (
     MAX_RETRIES,
     DefaultExecutionAgent,
@@ -30,7 +31,7 @@ from portia.execution_agents.default_execution_agent import (
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.model import LangChainGenerativeModel
-from portia.plan import Step
+from portia.plan import Step, Variable
 from portia.storage import InMemoryStorage
 from portia.tool import Tool
 from tests.utils import (
@@ -253,6 +254,135 @@ def test_parser_model_with_invalid_args() -> None:
     assert number_arg.value == 43
 
 
+def test_parser_model_schema_validation_success_with_templating() -> None:
+    """Test that schema validation is skipped when template variables are present."""
+
+    class ComplexSchema(BaseModel):
+        """Schema with complex types to test template variables."""
+
+        email_list: list[str] = Field(..., description="List of email addresses")
+        config_dict: dict[str, str] = Field(..., description="Configuration dictionary")
+
+    tool_inputs = ToolInputs(
+        args=[
+            ToolArgument(
+                name="email_list",
+                value=[
+                    "{{$user_email}}",
+                    "default@example.com",
+                ],  # Template single email into a list
+                valid=True,
+                explanation="List containing user email from template variable",
+            ),
+            ToolArgument(
+                name="config_dict",
+                value={"config": "{{$user_config}}"},  # Template dictionary variable
+                valid=True,
+                explanation="Configuration dictionary from template variable",
+            ),
+        ],
+    )
+    mock_model = get_mock_base_chat_model(response=tool_inputs)
+
+    agent = SimpleNamespace()
+    agent.step = Step(
+        task="DESCRIPTION_STRING",
+        inputs=[
+            Variable(name="$user_email", description="User's email"),
+            Variable(name="$user_config", description="User's configuration"),
+        ],
+        output="$out",
+    )
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=ComplexSchema.model_json_schema,
+        args_schema=ComplexSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
+
+    parser_model = ParserModel(
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
+        agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
+    )
+
+    parser_model.invoke(
+        {
+            "messages": [],
+            "step_inputs": [
+                StepInput(name="$user_email", value="user@example.com", description="User's email"),
+                StepInput(
+                    name="$user_config",
+                    value={"api_key": "abc123", "timeout": "30"},
+                    description="User's configuration",
+                ),
+            ],
+        }
+    )
+
+    assert len(parser_model.previous_errors) == 0
+    assert parser_model.retries == 0
+
+
+def test_parser_model_schema_validation_failure_with_templating() -> None:
+    """Test that the parser model validates args schema and raises errors with invalid values."""
+
+    class EmailSchema(BaseModel):
+        email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+    tool_inputs = ToolInputs(
+        args=[
+            ToolArgument(
+                name="email",
+                # Using a templated variable with invalid format
+                value="{{$user_email_invalid}}",
+                valid=True,
+                explanation="Invalid email format even with templating",
+            ),
+        ],
+    )
+    mock_model = get_mock_base_chat_model(response=tool_inputs)
+
+    agent = SimpleNamespace()
+    agent.step = Step(
+        task="DESCRIPTION_STRING",
+        inputs=[Variable(name="$user_email_invalid", description="User's invalid email")],
+        output="$out",
+    )
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_json_schema=EmailSchema.model_json_schema,
+        args_schema=EmailSchema,
+        description="TOOL_DESCRIPTION",
+    )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
+
+    parser_model = ParserModel(
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
+        agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
+    )
+
+    # Provide step inputs with invalid email format
+    parser_model.invoke(
+        {
+            "messages": [],
+            "step_inputs": [
+                StepInput(
+                    name="$user_email_invalid", value="not-an-email", description="User's email"
+                ),
+            ],
+        }
+    )
+
+    assert len(parser_model.previous_errors) == MAX_RETRIES + 1
+    assert any("validation error" in error.lower() for error in parser_model.previous_errors)
+    assert parser_model.retries == MAX_RETRIES + 1
+
+
 def test_verifier_model() -> None:
     """Test the verifier model."""
     tool_inputs = ToolInputs(
@@ -361,13 +491,71 @@ def test_verifier_model_schema_validation() -> None:
     ), "optional_field should not be marked as missing when validation fails"
 
 
+def test_verifier_model_validates_schema_with_templating() -> None:
+    """Test that verifier model validates arguments against schema."""
+
+    class EmailSchema(BaseModel):
+        email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+    verified_tool_inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="email", value="{{$invalid_email}}", made_up=False),
+        ],
+    )
+    mock_model = get_mock_base_chat_model(response=verified_tool_inputs)
+
+    agent = SimpleNamespace()
+    agent.step = Step(
+        task="DESCRIPTION_STRING",
+        inputs=[Variable(name="$invalid_email", description="User's email that is invalid")],
+        output="$out",
+    )
+    agent.tool = SimpleNamespace(
+        id="TOOL_ID",
+        name="TOOL_NAME",
+        args_schema=EmailSchema,
+        args_json_schema=EmailSchema.model_json_schema,
+        description="TOOL_DESCRIPTION",
+    )
+    agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
+
+    verifier_model = VerifierModel(
+        model=LangChainGenerativeModel(client=mock_model, model_name="test"),
+        agent=agent,  # type: ignore  # noqa: PGH003
+        tool_context=get_test_tool_context(),
+    )
+
+    result = verifier_model.invoke(
+        {
+            "messages": [AIMessage(content=verified_tool_inputs.model_dump_json(indent=2))],
+            "step_inputs": [
+                StepInput(
+                    name="$invalid_email", value="not-valid@email", description="User's email"
+                ),
+            ],
+        },
+    )
+
+    output_args = VerifiedToolInputs.model_validate_json(result["messages"][0])
+    assert output_args.args[0].schema_invalid is True
+
+
 def test_tool_calling_model_no_hallucinations() -> None:
     """Test the tool calling model."""
     verified_tool_inputs = VerifiedToolInputs(
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=False)],
     )
     mock_model = get_mock_generative_model(
-        SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),
+        SimpleNamespace(
+            tool_calls=[
+                {
+                    "name": "add_tool",
+                    "args": {
+                        "arg1": "value1",
+                    },
+                }
+            ]
+        ),
     )
 
     (_, plan_run) = get_test_plan_run()
@@ -406,7 +594,16 @@ def test_tool_calling_model_with_hallucinations() -> None:
         args=[VerifiedToolArgument(name="content", value="CONTENT_STRING", made_up=True)],
     )
     mock_model = get_mock_generative_model(
-        SimpleNamespace(tool_calls=[{"name": "add_tool", "args": "CALL_ARGS"}]),
+        SimpleNamespace(
+            tool_calls=[
+                {
+                    "name": "add_tool",
+                    "args": {
+                        "arg1": "value1",
+                    },
+                }
+            ]
+        ),
     )
 
     (_, plan_run) = get_test_plan_run()
@@ -459,6 +656,92 @@ def test_tool_calling_model_with_hallucinations() -> None:
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+
+
+def test_tool_calling_model_templates_inputs() -> None:
+    """Test that the tool calling model correctly templates inputs into arguments."""
+    templated_response = AIMessage(content="")
+    templated_response.tool_calls = [
+        {
+            "name": "test_tool",
+            "type": "tool_call",
+            "id": "call_123",
+            "args": {
+                "$templated_arg": "{{$input_value}}",  # This should be templated
+                "$normal_arg": "normal value",  # This should remain unchanged
+            },
+        },
+    ]
+
+    (_, plan_run) = get_test_plan_run()
+    mock_model = get_mock_generative_model(templated_response)
+    step_inputs = [
+        StepInput(name="$input_value", value="templated value", description="Input value"),
+    ]
+    verified_tool_inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="$templated_arg", value="{{$input_value}}", made_up=False),
+            VerifiedToolArgument(name="$normal_arg", value="normal value", made_up=False),
+        ],
+    )
+
+    agent = SimpleNamespace(
+        verified_args=verified_tool_inputs,
+        step=Step(
+            task="TASK_STRING",
+            inputs=[Variable(name="$input_value", description="Input value")],
+            output="$out",
+        ),
+    )
+    agent.plan_run = plan_run
+    tool_calling_model = ToolCallingModel(
+        model=mock_model,
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+
+    result = tool_calling_model.invoke({"messages": [], "step_inputs": step_inputs})
+
+    result_message = result["messages"][0]
+    assert len(result_message.tool_calls) == 1
+    tool_call = result_message.tool_calls[0]
+
+    assert tool_call["args"]["$templated_arg"] == "templated value"
+    assert tool_call["args"]["$normal_arg"] == "normal value"
+
+
+def test_tool_calling_model_handles_missing_args_gracefully() -> None:
+    """Test that the tool calling model handles missing args gracefully."""
+    invalid_response = AIMessage(content="")
+    invalid_response.tool_calls = [  # pyright: ignore[reportAttributeAccessIssue]
+        {
+            "name": "test_tool",
+            "type": "tool_call",
+            "id": "call_123",
+            # args field is missing
+        },
+    ]
+
+    (_, plan_run) = get_test_plan_run()
+    mock_model = get_mock_generative_model(invalid_response)
+    verified_tool_inputs = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="arg1", value="value1", made_up=False),
+        ],
+    )
+    agent = SimpleNamespace(
+        verified_args=verified_tool_inputs,
+        step=Step(task="TASK_STRING", inputs=[], output="$out"),
+    )
+    agent.plan_run = plan_run
+    tool_calling_model = ToolCallingModel(
+        model=mock_model,
+        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
+        agent=agent,  # type: ignore  # noqa: PGH003
+    )
+
+    with pytest.raises(InvalidPlanRunStateError):
+        tool_calling_model.invoke({"messages": [], "step_inputs": []})
 
 
 def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -828,6 +1111,7 @@ def test_optional_args_with_none_values() -> None:
         VerifiedToolInputs(
             args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=True)],
         ),
+        [],
     )
     assert updated_tool_inputs.args[0].made_up is False
 
@@ -836,6 +1120,7 @@ def test_optional_args_with_none_values() -> None:
         VerifiedToolInputs(
             args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=False)],
         ),
+        [],
     )
     assert updated_tool_inputs.args[0].made_up is False
 
