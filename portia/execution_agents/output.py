@@ -12,6 +12,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Generic, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from typing_extensions import deprecated
 
 from portia.common import SERIALIZABLE_TYPE_VAR, Serializable
 from portia.prefixed_uuid import PlanRunUUID
@@ -46,7 +47,7 @@ class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return the summary of the output."""
 
 
-class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class LocalDataValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output that is stored locally."""
 
     model_config = ConfigDict(extra="forbid")
@@ -133,7 +134,7 @@ class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return str(value)  # Fallback for other types
 
 
-class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class AgentMemoryValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")
@@ -164,4 +165,20 @@ class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return self.summary
 
 
-Output = Union[LocalOutput, AgentMemoryOutput]
+Output = Union[LocalDataValue, AgentMemoryValue]
+
+
+@deprecated(
+    "LocalOutput is deprecated and will be removed in the 0.4 release - "
+    "use LocalDataValue instead"
+)
+class LocalOutput(LocalDataValue):
+    """Alias of LocalDataValue kept for backwards compatibility."""
+
+
+@deprecated(
+    "AgentMemoryOutput is deprecated and will be removed in the 0.4 release - "
+    "use AgentMemoryValue instead"
+)
+class AgentMemoryOutput(AgentMemoryValue):
+    """Alias of AgentMemoryValue kept for backwards compatibility."""

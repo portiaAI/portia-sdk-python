@@ -5,7 +5,7 @@ from __future__ import annotations
 from langchain_core.messages import AIMessage, ToolMessage
 
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.plan import Step
 from tests.utils import (
@@ -24,7 +24,7 @@ def test_summarizer_model_normal_output() -> None:
         content="Tool output content",
         tool_call_id="123",
         name=tool.name,
-        artifact=LocalOutput(value="Tool output value"),
+        artifact=LocalDataValue(value="Tool output value"),
     )
 
     summarizer_model = StepSummarizer(
@@ -89,7 +89,7 @@ def test_summarizer_model_large_output() -> None:
         content="Test " * 1000,
         tool_call_id="123",
         name="test_tool",
-        artifact=LocalOutput(value="Test " * 1000),
+        artifact=LocalDataValue(value="Test " * 1000),
     )
 
     summarizer_model = StepSummarizer(
@@ -134,7 +134,7 @@ def test_summarizer_model_error_handling() -> None:
         content="Tool output content",
         tool_call_id="123",
         name="test_tool",
-        artifact=LocalOutput(value="Tool output value"),
+        artifact=LocalDataValue(value="Tool output value"),
     )
 
     summarizer_model = StepSummarizer(

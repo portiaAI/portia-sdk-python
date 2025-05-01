@@ -46,7 +46,7 @@ from portia.errors import (
 )
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.execution_context import (
     execution_context,
@@ -704,7 +704,7 @@ class Portia:
             try:
                 last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                error_output = LocalOutput(value=str(e))
+                error_output = LocalDataValue(value=str(e))
                 self._set_step_output(error_output, plan_run, step)
                 plan_run.outputs.final_output = error_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
@@ -829,13 +829,13 @@ class Portia:
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
-                output = LocalOutput(
+                output = LocalDataValue(
                     value=SKIPPED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
             case PreStepIntrospectionOutcome.COMPLETE:
-                output = LocalOutput(
+                output = LocalDataValue(
                     value=COMPLETED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
@@ -872,7 +872,7 @@ class Portia:
             step_output (Output): The output of the last step.
 
         """
-        final_output = LocalOutput(
+        final_output = LocalDataValue(
             value=step_output.get_value(),
             summary=None,
         )
@@ -1021,7 +1021,7 @@ class Portia:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
         if (
-            isinstance(step_output, LocalOutput)
+            isinstance(step_output, LocalDataValue)
             and self.config.exceeds_output_threshold(
                 step_output.serialize_value(),
             )

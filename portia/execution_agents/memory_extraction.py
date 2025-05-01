@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any
 from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.output import Output
+from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
+from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
