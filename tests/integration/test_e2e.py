@@ -572,9 +572,7 @@ def test_plan_input_with_schema_validation() -> None:
         num_a: int = Field(description="First number to add")
         num_b: int = Field(description="Second number to add")
 
-    numbers_input = PlanInput(
-        name="$numbers", description="two numbers to add together", value_schema=AdditionNumbers
-    )
+    numbers_input = PlanInput(name="$numbers", description="two numbers to add together")
 
     plan_inputs = {numbers_input: LocalDataValue(value=AdditionNumbers(num_a=5, num_b=7))}
 

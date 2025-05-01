@@ -358,7 +358,7 @@ class Portia:
 
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
 
-    def _process_plan_input_values(  # noqa: C901
+    def _process_plan_input_values(
         self,
         plan: Plan,
         plan_run: PlanRun,
@@ -373,7 +373,6 @@ class Portia:
 
         Raises:
             ValueError: If required plan inputs are missing.
-            ValidationError: If input values don't match the specified schema.
 
         """
         if plan.inputs and not plan_run_inputs:
@@ -399,21 +398,9 @@ class Portia:
 
             for plan_input in plan.inputs:
                 if plan_input.name in input_values_by_name:
-                    value = input_values_by_name[plan_input.name]
-
-                    # Validate against schema if present
-                    if plan_input.value_schema is not None:
-                        try:
-                            validated_value = plan_input.value_schema.model_validate(
-                                value.get_value()
-                            )
-                            value = LocalDataValue(value=validated_value)
-                        except Exception as e:
-                            raise ValueError(
-                                f"Received invalid value for input '{plan_input.name}': {e!s}"
-                            ) from e
-
-                    plan_run.plan_run_inputs[plan_input.name] = value
+                    plan_run.plan_run_inputs[plan_input.name] = input_values_by_name[
+                        plan_input.name
+                    ]
 
             # Check for unknown inputs
             for input_obj in plan_run_inputs:
@@ -635,7 +622,6 @@ class Portia:
             execution_context=get_execution_context(),
             end_user_id=end_user.external_id,
         )
-        # Process plan input values if provided
         self._process_plan_input_values(plan, plan_run, plan_run_inputs)
         self.storage.save_plan_run(plan_run)
         return plan_run

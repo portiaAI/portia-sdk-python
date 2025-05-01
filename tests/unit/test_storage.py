@@ -242,8 +242,8 @@ def test_portia_cloud_storage() -> None:
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
                 "inputs": [
-                    {"name": "key1", "description": "Test input 1", "value_schema": None},
-                    {"name": "key2", "description": "Test input 2", "value_schema": None},
+                    {"name": "key1", "description": "Test input 1"},
+                    {"name": "key2", "description": "Test input 2"},
                 ],
             },
         )

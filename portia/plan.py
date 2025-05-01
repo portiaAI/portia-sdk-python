@@ -124,22 +124,19 @@ class PlanBuilder:
         self,
         name: str,
         description: str,
-        value_schema: type[BaseModel] | None = None,
     ) -> PlanBuilder:
         """Add an input variable to the plan.
 
         Args:
             name (str): The name of the input.
             description (str): The description of the input.
-            value_schema (type[BaseModel] | None): Optional Pydantic model for validating
-                the input value.
 
         Returns:
             PlanBuilder: The builder instance with the new plan input added.
 
         """
         self.plan_inputs.append(
-            PlanInput(name=name, description=description, value_schema=value_schema),
+            PlanInput(name=name, description=description),
         )
         return self
 
@@ -229,8 +226,6 @@ class PlanInput(BaseModel):
     Args:
         name (str): The name of the input, e.g. $api_key.
         description (str): A description of the input.
-        value_schema (type[BaseModel] | None): Optional Pydantic model for validating
-            the input value.
 
     """
 
@@ -243,10 +238,6 @@ class PlanInput(BaseModel):
     description: str = Field(
         description="A description of the input.",
     )
-    value_schema: type[BaseModel] | None = Field(
-        default=None,
-        description="Optional Pydantic model for validating the input value.",
-    )
 
     def pretty_print(self) -> str:
         """Return the pretty print representation of the plan input.
@@ -256,19 +247,6 @@ class PlanInput(BaseModel):
 
         """
         return f"{self.name}: ({self.description})"
-
-    @field_serializer("value_schema")
-    def serialize_value_schema(self, value: type[BaseModel] | None) -> str | None:
-        """Serialize the value_schema by returning its class name.
-
-        Args:
-            value (type[BaseModel] | None): The schema class
-
-        Returns:
-            str | None: The class name of the schema or None.
-
-        """
-        return value.__name__ if value else None
 
     def __hash__(self) -> int:
         """Make PlanInput hashable by using name and description as the hash key."""

@@ -1,7 +1,7 @@
 """Plan tests."""
 
 import pytest
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
 
 from portia.plan import (
     Plan,
@@ -149,22 +149,14 @@ def test_pretty_print() -> None:
     assert isinstance(output, str)
 
 
-def test_plan_builder_with_schema_plan_input() -> None:
-    """Test that plan builder can create plans with schema-validated inputs."""
-
-    class PersonSchema(BaseModel):
-        """Test schema for a person."""
-
-        name: str = Field(description="Person's name")
-        age: int = Field(description="Person's age")
-
+def test_plan_builder_with_plan_input() -> None:
+    """Test that plan builder can create plans with plan inputs."""
     plan = (
         PlanBuilder("Process a person's information")
         .step("Process person", "person_processor")
         .plan_input(
             name="$person",
             description="Person's information",
-            value_schema=PersonSchema,
         )
         .build()
     )
@@ -172,7 +164,6 @@ def test_plan_builder_with_schema_plan_input() -> None:
     assert len(plan.inputs) == 1
     assert plan.inputs[0].name == "$person"
     assert plan.inputs[0].description == "Person's information"
-    assert plan.inputs[0].value_schema == PersonSchema
 
 
 def test_plan_inputs_must_be_unique() -> None:

@@ -58,6 +58,7 @@ def test_run_initialization() -> None:
     assert plan_run.outputs.step_outputs == {}
     assert len(plan_run.plan_run_inputs) == 1
     assert plan_run.plan_run_inputs["$input1"].get_value() == "test_input_value"
+    assert plan_run.get_potential_step_inputs() == plan_run_inputs
 
 
 def test_run_get_outstanding_clarifications(
