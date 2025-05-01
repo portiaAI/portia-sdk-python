@@ -47,7 +47,7 @@ class BaseOutput(BaseModel):
         """Return the summary of the output."""
 
 
-class LocalDataValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class LocalDataValue(BaseOutput):
     """Output that is stored locally."""
 
     model_config = ConfigDict(extra="forbid")
@@ -134,7 +134,7 @@ class LocalDataValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return str(value)  # Fallback for other types
 
 
-class AgentMemoryValue(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class AgentMemoryValue(BaseOutput):
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")
