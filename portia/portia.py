@@ -883,8 +883,7 @@ class Portia:
                 cls = OneShotAgent
             case ExecutionAgentType.DEFAULT:
                 cls = DefaultExecutionAgent
-        if isinstance(tool, LLMTool):
-            cls = OneShotAgent
+        cls = OneShotAgent if isinstance(tool, LLMTool) else cls
         return cls(
             step,
             plan_run,
