@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.context import StepInput
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
+from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
 from portia.logger import logger
 
 if TYPE_CHECKING:
@@ -46,9 +46,9 @@ class MemoryExtractionStep:
             previous_output = previous_outputs.get(step_input.name)
 
             match previous_output:
-                case LocalOutput():
+                case LocalDataValue():
                     output_value = previous_output.value
-                case AgentMemoryOutput():
+                case AgentMemoryValue():
                     output_value = self.agent.agent_memory.get_plan_run_output(
                         previous_output.output_name,
                         self.agent.plan_run.id,

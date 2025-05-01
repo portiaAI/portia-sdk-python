@@ -14,7 +14,7 @@ from portia.config import LLMModel
 from portia.end_user import EndUser
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.context import StepInput
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.prefixed_uuid import PlanRunUUID
 from portia.storage import InMemoryStorage
 from tests.utils import get_test_config, get_test_plan_run, get_test_tool_context
@@ -78,5 +78,5 @@ def test_output_serialize() -> None:
     ]
 
     for tc in tcs:
-        output = LocalOutput(value=tc[0]).serialize_value()
+        output = LocalDataValue(value=tc[0]).serialize_value()
         assert output == tc[1]

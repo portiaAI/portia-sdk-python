@@ -5,7 +5,7 @@ from unittest import mock
 import pytest
 
 from portia.config import Config, GenerativeModelsConfig
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -48,8 +48,8 @@ def test_summarizer_agent_execute_sync(
     ]
 
     plan_run.outputs.step_outputs = {
-        "$london_weather": LocalOutput(value="Sunny and warm"),
-        "$activities": LocalOutput(value="Visit Hyde Park and have a picnic"),
+        "$london_weather": LocalDataValue(value="Sunny and warm"),
+        "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
     }
 
     # Mock LLM response
@@ -145,8 +145,8 @@ def test_build_tasks_and_outputs_context(
     ]
 
     plan_run.outputs.step_outputs = {
-        "$london_weather": LocalOutput(value="Sunny and warm"),
-        "$activities": LocalOutput(value="Visit Hyde Park and have a picnic"),
+        "$london_weather": LocalDataValue(value="Sunny and warm"),
+        "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
     }
 
     summarizer = FinalOutputSummarizer(config=summarizer_config)
@@ -206,7 +206,7 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
 
     # Only provide output for first step
     plan_run.outputs.step_outputs = {
-        "$london_weather": LocalOutput(value="Sunny and warm"),
+        "$london_weather": LocalDataValue(value="Sunny and warm"),
     }
 
     summarizer = FinalOutputSummarizer(config=get_test_config())
@@ -246,12 +246,12 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
     ]
 
     plan_run.outputs.step_outputs = {
-        "$regular_output": LocalOutput(value="Regular result", summary="Not used"),
-        "$skipped_output": LocalOutput(
+        "$regular_output": LocalDataValue(value="Regular result", summary="Not used"),
+        "$skipped_output": LocalDataValue(
             value=SKIPPED_OUTPUT,
             summary="This task was skipped as it was unnecessary",
         ),
-        "$complete_output": LocalOutput(
+        "$complete_output": LocalDataValue(
             value=COMPLETED_OUTPUT,
             summary="The plan execution was completed early",
         ),

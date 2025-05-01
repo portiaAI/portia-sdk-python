@@ -16,7 +16,7 @@ from portia.execution_agents.execution_utils import (
     process_output,
     tool_call_or_end,
 )
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import AdditionTool, get_test_config
 
@@ -149,8 +149,8 @@ def test_process_output_with_invalid_message() -> None:
 
 def test_process_output_with_output_artifacts() -> None:
     """Test process_output with outpu artifacts."""
-    message = ToolMessage(tool_call_id="1", content="", artifact=LocalOutput(value="test"))
-    message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalOutput(value="bar"))
+    message = ToolMessage(tool_call_id="1", content="", artifact=LocalDataValue(value="test"))
+    message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalDataValue(value="bar"))
 
     result = process_output([message, message2], clarifications=[])
 
@@ -182,7 +182,9 @@ def test_process_output_with_content() -> None:
 def test_process_output_summary_matches_serialized_value() -> None:
     """Test process_output summary matches serialized value."""
     dict_value = {"key1": "value1", "key2": "value2"}
-    message = ToolMessage(tool_call_id="1", content="test", artifact=LocalOutput(value=dict_value))
+    message = ToolMessage(
+        tool_call_id="1", content="test", artifact=LocalDataValue(value=dict_value)
+    )
 
     result = process_output([message], clarifications=[])
 
@@ -198,7 +200,7 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     message = ToolMessage(
         tool_call_id="1",
         content="test",
-        artifact=LocalOutput(value=dict_value, summary=provided_summary),
+        artifact=LocalDataValue(value=dict_value, summary=provided_summary),
     )
 
     result = process_output([message], clarifications=[])

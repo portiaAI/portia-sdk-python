@@ -17,7 +17,7 @@ from portia.introspection_agents.introspection_agent import (
 from portia.model import Message
 from portia.plan import Plan
 from portia.plan_run import PlanRun
-from portia.storage import AgentMemory, AgentMemoryOutput
+from portia.storage import AgentMemory, AgentMemoryValue
 
 
 class DefaultIntrospectionAgent(BaseIntrospectionAgent):
@@ -45,7 +45,7 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
             [
                 SystemMessage(
                     content=(
-"""
+                        """
 You are a highly skilled reviewer who reviews in flight plan execution. Your job is to evaluate
 the condition for the current step. Your outcome is fed to another orchestrator that controls
 the execution of the remaining steps.
@@ -107,7 +107,7 @@ Return the outcome and reason in the given format.
         memory_outputs = [
             self.agent_memory.get_plan_run_output(output.output_name, plan_run.id)
             for output in plan_run.outputs.step_outputs.values()
-            if isinstance(output, AgentMemoryOutput)
+            if isinstance(output, AgentMemoryValue)
             and introspection_condition
             and output.output_name in introspection_condition
         ]
