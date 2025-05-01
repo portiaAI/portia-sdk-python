@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.context import StepInput
+from portia.execution_agents.output import Output
 
 if TYPE_CHECKING:
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
@@ -37,17 +38,18 @@ class MemoryExtractionStep:
 
         """
         step_inputs = []
-        previous_outputs = self.agent.plan_run.outputs.step_outputs
-        plan_run_inputs = self.agent.plan_run.plan_run_inputs
+        potential_inputs = (
+            self.agent.plan_run.outputs.step_outputs | self.agent.plan_run.plan_run_inputs
+        )
 
         for input_variable in self.agent.step.inputs:
-            input_value = None
-
-            if input_variable.name in previous_outputs:
-                previous_output = previous_outputs.get(input_variable.name)
-                input_value = previous_output.full_value(self.agent.agent_memory)  # pyright: ignore[reportOptionalMemberAccess]
-            elif input_variable.name in plan_run_inputs:
-                input_value = plan_run_inputs.get(input_variable.name)
+            if input_variable.name in potential_inputs:
+                potential_input = potential_inputs[input_variable.name]
+                input_value = (
+                    potential_input.full_value(self.agent.agent_memory)
+                    if isinstance(potential_input, Output)
+                    else potential_input
+                )
             else:
                 raise InvalidPlanRunStateError(
                     f"Received unknown step input: {input_variable.name}"
