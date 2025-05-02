@@ -147,11 +147,22 @@ def test_in_memory_storage() -> None:
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
 
-    end_user = EndUser(external_id="123")
+    end_user = EndUser(
+        external_id="123",
+        additional_data={"favorite_sport": "football"},
+    )
 
     assert storage.get_end_user("123") is None
     assert storage.save_end_user(end_user) == end_user
-    assert storage.get_end_user("123") is not None
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    end_user.additional_data["day"] = "monday"
+    assert storage.save_end_user(end_user) == end_user
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    assert user.get_additional_data("day") == "monday"
 
 
 def test_disk_storage(tmp_path: Path) -> None:
@@ -188,11 +199,22 @@ def test_disk_storage(tmp_path: Path) -> None:
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
 
-    end_user = EndUser(external_id="123")
+    end_user = EndUser(
+        external_id="123",
+        additional_data={"favorite_sport": "football"},
+    )
 
     assert storage.get_end_user("123") is None
     assert storage.save_end_user(end_user) == end_user
-    assert storage.get_end_user("123") is not None
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    end_user.additional_data["day"] = "monday"
+    assert storage.save_end_user(end_user) == end_user
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    assert user.get_additional_data("day") == "monday"
 
 
 def test_portia_cloud_storage() -> None:
