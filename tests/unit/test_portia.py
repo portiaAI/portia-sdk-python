@@ -1303,8 +1303,8 @@ def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMo
         plan_run = portia.run(
             query="Add the two numbers together",
             plan_run_inputs={
-                num_a_input: LocalDataValue(value=1),
-                num_b_input: LocalDataValue(value=2),
+                num_a_input: 1,
+                num_b_input: 2,
             },
         )
 
@@ -1370,7 +1370,7 @@ def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
         inputs=[num_a_input, num_b_input],
     )
 
-    plan_run_inputs = {num_a_input: LocalDataValue(value=1), num_b_input: LocalDataValue(value=2)}
+    plan_run_inputs = {num_a_input: 1, num_b_input: 2}
 
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalDataValue(value=3)
@@ -1414,15 +1414,15 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
 
     # Should fail with just one of the two required
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_run_inputs={required_input1: LocalDataValue(value="value")})
+        portia.run_plan(plan, plan_run_inputs={required_input1: "value"})
 
     # Should work if we provide both required inputs
     with mock.patch.object(portia, "resume") as mock_resume:
         portia.run_plan(
             plan,
             plan_run_inputs={
-                required_input1: LocalDataValue(value="value 1"),
-                required_input2: LocalDataValue(value="value 2"),
+                required_input1: "value 1",
+                required_input2: "value 2",
             },
         )
         mock_resume.assert_called_once()
@@ -1439,7 +1439,7 @@ def test_portia_run_plan_with_extra_input_when_expecting_none(portia: Portia) ->
 
     # Run with input that isn't in the plan's inputs
     extra_input = PlanInput(name="$extra", description="Extra unused input")
-    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: LocalDataValue(value="value")})
+    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: "value"})
     assert plan_run.plan_run_inputs == {}
 
 
@@ -1469,8 +1469,8 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
         plan_run = portia.run_plan(
             plan,
             plan_run_inputs={
-                expected_input: LocalDataValue(value="expected_value"),
-                unknown_input: LocalDataValue(value="unknown_value"),
+                expected_input: "expected_value",
+                unknown_input: "unknown_value",
             },
         )
 

@@ -30,6 +30,7 @@ from portia.clarification import (
     ClarificationCategory,
 )
 from portia.cloud import PortiaCloudClient
+from portia.common import Serializable
 from portia.config import (
     Config,
     ExecutionAgentType,
@@ -173,7 +174,7 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
-        plan_run_inputs: dict[PlanInput, LocalDataValue] | None = None,
+        plan_run_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -186,7 +187,7 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
-            plan_run_inputs (dict[PlanInput, LocalDataValue] | None): Optional dictionary mapping
+            plan_run_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
                 PlanInput objects to their values.
 
         Returns:
@@ -279,14 +280,14 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
-        plan_run_inputs: dict[PlanInput, LocalDataValue] | None = None,
+        plan_run_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
         Args:
             plan (Plan): The plan to run.
             end_user (str | EndUser | None = None): The end user to use.
-            plan_run_inputs (dict[PlanInput, LocalDataValue] | None): Optional dictionary mapping
+            plan_run_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
                 PlanInput objects to their values.
 
         Returns:
@@ -362,14 +363,14 @@ class Portia:
         self,
         plan: Plan,
         plan_run: PlanRun,
-        plan_run_inputs: dict[PlanInput, LocalDataValue] | None,
+        plan_run_inputs: dict[PlanInput, Serializable] | None,
     ) -> None:
         """Process plan input values and add them to the plan run.
 
         Args:
             plan (Plan): The plan containing required inputs.
             plan_run (PlanRun): The plan run to update with input values.
-            plan_run_inputs (dict[PlanInput, LocalDataValue] | None): Values for plan inputs.
+            plan_run_inputs (dict[PlanInput, Serializable] | None): Values for plan inputs.
 
         Raises:
             ValueError: If required plan inputs are missing.
@@ -398,9 +399,9 @@ class Portia:
 
             for plan_input in plan.inputs:
                 if plan_input.name in input_values_by_name:
-                    plan_run.plan_run_inputs[plan_input.name] = input_values_by_name[
-                        plan_input.name
-                    ]
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=input_values_by_name[plan_input.name]
+                    )
 
             # Check for unknown inputs
             for input_obj in plan_run_inputs:
@@ -601,14 +602,14 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
-        plan_run_inputs: dict[PlanInput, LocalDataValue] | None = None,
+        plan_run_inputs: dict[PlanInput, Serializable] | None = None,
     ) -> PlanRun:
         """Create a PlanRun from a Plan.
 
         Args:
             plan (Plan): The plan to create a plan run from.
             end_user (str | EndUser | None = None): The end user this plan run is for.
-            plan_run_inputs (dict[PlanInput, LocalDataValue] | None = None): The plan inputs for the
+            plan_run_inputs (dict[PlanInput, Serializable] | None = None): The plan inputs for the
               plan run with their values.
 
         Returns:
