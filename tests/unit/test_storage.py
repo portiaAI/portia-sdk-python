@@ -275,7 +275,16 @@ def test_portia_cloud_storage() -> None:
                 "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
-                "plan_run_inputs": plan_run.plan_run_inputs,
+                "plan_run_inputs": {
+                    "param1": {
+                        "value": "test",
+                        "summary": None,
+                    },
+                    "param2": {
+                        "value": "456",
+                        "summary": None,
+                    },
+                },
             },
         )
 
