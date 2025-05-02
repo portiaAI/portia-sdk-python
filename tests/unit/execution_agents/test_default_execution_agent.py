@@ -31,7 +31,8 @@ from portia.execution_agents.default_execution_agent import (
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.model import LangChainGenerativeModel
-from portia.plan import Step, Variable
+from portia.plan import ReadOnlyStep, Step, Variable
+from portia.plan_run import ReadOnlyPlanRun
 from portia.storage import InMemoryStorage
 from portia.tool import Tool
 from tests.utils import (
@@ -69,14 +70,16 @@ def test_parser_model() -> None:
     )
     mock_model = get_mock_base_chat_model(response=tool_inputs)
 
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_json_schema=_TestToolSchema.model_json_schema,
-        args_schema=_TestToolSchema,
-        description="TOOL_DESCRIPTION",
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_json_schema=_TestToolSchema.model_json_schema,
+            args_schema=_TestToolSchema,
+            description="TOOL_DESCRIPTION",
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
@@ -107,14 +110,16 @@ def test_parser_model_with_retries() -> None:
     )
     mock_invoker = get_mock_base_chat_model(response=tool_inputs)
 
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_json_schema=_TestToolSchema.model_json_schema,
-        args_schema=_TestToolSchema,
-        description="TOOL_DESCRIPTION",
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_json_schema=_TestToolSchema.model_json_schema,
+            args_schema=_TestToolSchema,
+            description="TOOL_DESCRIPTION",
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
@@ -136,14 +141,16 @@ def test_parser_model_with_retries_invalid_structured_response() -> None:
         response="NOT_A_PYDANTIC_MODEL_INSTANCE",
     )
 
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_json_schema=_TestToolSchema.model_json_schema,
-        args_schema=_TestToolSchema,
-        description="TOOL_DESCRIPTION",
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_json_schema=_TestToolSchema.model_json_schema,
+            args_schema=_TestToolSchema,
+            description="TOOL_DESCRIPTION",
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
@@ -213,14 +220,16 @@ def test_parser_model_with_invalid_args() -> None:
         content: str
         number: int
 
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_json_schema=TestSchema.model_json_schema,
-        args_schema=TestSchema,
-        description="TOOL_DESCRIPTION",
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_json_schema=TestSchema.model_json_schema,
+            args_schema=TestSchema,
+            description="TOOL_DESCRIPTION",
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
@@ -284,21 +293,23 @@ def test_parser_model_schema_validation_success_with_templating() -> None:
     )
     mock_model = get_mock_base_chat_model(response=tool_inputs)
 
-    agent = SimpleNamespace()
-    agent.step = Step(
-        task="DESCRIPTION_STRING",
-        inputs=[
-            Variable(name="$user_email", description="User's email"),
-            Variable(name="$user_config", description="User's configuration"),
-        ],
-        output="$out",
-    )
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_json_schema=ComplexSchema.model_json_schema,
-        args_schema=ComplexSchema,
-        description="TOOL_DESCRIPTION",
+    agent = SimpleNamespace(
+        step=Step(
+            task="DESCRIPTION_STRING",
+            inputs=[
+                Variable(name="$user_email", description="User's email"),
+                Variable(name="$user_config", description="User's configuration"),
+            ],
+            output="$out",
+        ),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_json_schema=ComplexSchema.model_json_schema,
+            args_schema=ComplexSchema,
+            description="TOOL_DESCRIPTION",
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
@@ -345,18 +356,20 @@ def test_parser_model_schema_validation_failure_with_templating() -> None:
     )
     mock_model = get_mock_base_chat_model(response=tool_inputs)
 
-    agent = SimpleNamespace()
-    agent.step = Step(
-        task="DESCRIPTION_STRING",
-        inputs=[Variable(name="$user_email_invalid", description="User's invalid email")],
-        output="$out",
-    )
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_json_schema=EmailSchema.model_json_schema,
-        args_schema=EmailSchema,
-        description="TOOL_DESCRIPTION",
+    agent = SimpleNamespace(
+        step=Step(
+            task="DESCRIPTION_STRING",
+            inputs=[Variable(name="$user_email_invalid", description="User's invalid email")],
+            output="$out",
+        ),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_json_schema=EmailSchema.model_json_schema,
+            args_schema=EmailSchema,
+            description="TOOL_DESCRIPTION",
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
@@ -400,14 +413,16 @@ def test_verifier_model() -> None:
     )
     mock_model = get_mock_base_chat_model(response=verified_tool_inputs)
 
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_schema=_TestToolSchema,
-        description="TOOL_DESCRIPTION",
-        args_json_schema=_TestToolSchema.model_json_schema,
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_schema=_TestToolSchema,
+            description="TOOL_DESCRIPTION",
+            args_json_schema=_TestToolSchema.model_json_schema,
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
     verifier_model = VerifierModel(
@@ -451,14 +466,16 @@ def test_verifier_model_schema_validation() -> None:
     )
     mock_model = get_mock_base_chat_model(response=verified_tool_inputs)
 
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_schema=TestSchema,
-        description="TOOL_DESCRIPTION",
-        args_json_schema=_TestToolSchema.model_json_schema,
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_schema=TestSchema,
+            description="TOOL_DESCRIPTION",
+            args_json_schema=_TestToolSchema.model_json_schema,
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
     verifier_model = VerifierModel(
@@ -504,18 +521,20 @@ def test_verifier_model_validates_schema_with_templating() -> None:
     )
     mock_model = get_mock_base_chat_model(response=verified_tool_inputs)
 
-    agent = SimpleNamespace()
-    agent.step = Step(
-        task="DESCRIPTION_STRING",
-        inputs=[Variable(name="$invalid_email", description="User's email that is invalid")],
-        output="$out",
-    )
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_schema=EmailSchema,
-        args_json_schema=EmailSchema.model_json_schema,
-        description="TOOL_DESCRIPTION",
+    agent = SimpleNamespace(
+        step=Step(
+            task="DESCRIPTION_STRING",
+            inputs=[Variable(name="$invalid_email", description="User's email that is invalid")],
+            output="$out",
+        ),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_schema=EmailSchema,
+            args_json_schema=EmailSchema.model_json_schema,
+            description="TOOL_DESCRIPTION",
+        ),
+        new_clarifications=[],
     )
     agent.get_system_context = mock.MagicMock(return_value="CONTEXT_STRING")
 
@@ -559,9 +578,14 @@ def test_tool_calling_model_no_hallucinations() -> None:
     )
 
     (_, plan_run) = get_test_plan_run()
+    mock_before_tool_call = mock.MagicMock(return_value=None)
+    mock_execution_hooks = mock.MagicMock()
+    mock_execution_hooks.before_tool_call = mock_before_tool_call
     agent = SimpleNamespace(
         verified_args=verified_tool_inputs,
         clarifications=[],
+        execution_hooks=mock_execution_hooks,
+        new_clarifications=[],
     )
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.plan_run = plan_run
@@ -586,6 +610,12 @@ def test_tool_calling_model_no_hallucinations() -> None:
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    mock_before_tool_call.assert_called_once_with(
+        agent.tool,
+        {"arg1": "value1"},
+        ReadOnlyPlanRun.from_plan_run(agent.plan_run),
+        ReadOnlyStep.from_step(agent.step),
+    )
 
 
 def test_tool_calling_model_with_hallucinations() -> None:
@@ -632,6 +662,8 @@ def test_tool_calling_model_with_hallucinations() -> None:
         get_last_resolved_clarification=lambda arg_name: clarification
         if arg_name == "content"
         else None,
+        new_clarifications=[],
+        execution_hooks=None,
     )
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.plan_run = plan_run
@@ -692,6 +724,8 @@ def test_tool_calling_model_templates_inputs() -> None:
             inputs=[Variable(name="$input_value", description="Input value")],
             output="$out",
         ),
+        new_clarifications=[],
+        execution_hooks=None,
     )
     agent.plan_run = plan_run
     tool_calling_model = ToolCallingModel(
@@ -732,6 +766,7 @@ def test_tool_calling_model_handles_missing_args_gracefully() -> None:
     agent = SimpleNamespace(
         verified_args=verified_tool_inputs,
         step=Step(task="TASK_STRING", inputs=[], output="$out"),
+        new_clarifications=[],
     )
     agent.plan_run = plan_run
     tool_calling_model = ToolCallingModel(
@@ -889,9 +924,12 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_default_execution_agent_edge_cases() -> None:
     """Tests edge cases are handled."""
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.tool = None
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=None,
+        verified_args=None,
+        new_clarifications=[],
+    )
     parser_model = ParserModel(
         model=get_mock_generative_model(get_mock_base_chat_model()),
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -900,7 +938,6 @@ def test_default_execution_agent_edge_cases() -> None:
     with pytest.raises(InvalidPlanRunStateError):
         parser_model.invoke({"messages": [], "step_inputs": []})
 
-    agent.verified_args = None
     tool_calling_model = ToolCallingModel(
         model=get_mock_generative_model(get_mock_base_chat_model()),
         tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
@@ -1127,8 +1164,11 @@ def test_optional_args_with_none_values() -> None:
 
 def test_verifier_model_edge_cases() -> None:
     """Tests edge cases are handled."""
-    agent = SimpleNamespace()
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
+    agent = SimpleNamespace(
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=None,
+        new_clarifications=[],
+    )
     verifier_model = VerifierModel(
         model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
         agent=agent,  # type: ignore  # noqa: PGH003
@@ -1136,6 +1176,89 @@ def test_verifier_model_edge_cases() -> None:
     )
 
     # Check error with no tool specified
-    agent.tool = None
     with pytest.raises(InvalidPlanRunStateError):
         verifier_model.invoke({"messages": [], "step_inputs": []})
+
+
+def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that before_tool_call can interrupt execution by returning a clarification."""
+    model_response = AIMessage(content="")
+    model_response.tool_calls = [
+        {
+            "name": "Send_Email_Tool",
+            "type": "tool_call",
+            "id": "call_3z9rYHY6Rui7rTW0O7N7Wz51",
+            "args": {
+                "recipients": ["test@example.com"],
+                "email_title": "Hi",
+                "email_body": "Hi",
+            },
+        },
+    ]
+    mock_model = get_mock_generative_model(response=model_response)
+    monkeypatch.setattr("portia.config.Config.get_execution_model", lambda self: mock_model)  # noqa: ARG005
+
+    tool_node_called = False
+
+    def tool_call(self, input, config):  # noqa: A002, ANN001, ANN202, ARG001
+        nonlocal tool_node_called
+        tool_node_called = True
+        return {
+            "messages": ToolMessage(
+                content="Added numbers",
+                artifact=LocalDataValue(value=3),
+                tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
+            ),
+        }
+
+    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+
+    return_clarification = True
+
+    def before_tool_call(tool, args, plan_run, step) -> InputClarification | None:  # noqa: ANN001, ARG001
+        nonlocal return_clarification
+        if return_clarification:
+            return InputClarification(
+                plan_run_id=plan_run.id,
+                user_guidance="Need clarification",
+                step=plan_run.current_step_index,
+                argument_name="num1",
+            )
+        return None
+
+    (plan, plan_run) = get_test_plan_run()
+
+    mock_execution_hooks = mock.MagicMock()
+    mock_execution_hooks.before_tool_call = before_tool_call
+
+    # First execution - should return clarification
+    agent = DefaultExecutionAgent(
+        step=plan.steps[0],
+        plan_run=plan_run,
+        config=get_test_config(),
+        end_user=EndUser(external_id="123"),
+        tool=AdditionTool(),
+        agent_memory=InMemoryStorage(),
+        execution_hooks=mock_execution_hooks,
+    )
+    agent.verified_args = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="email_address", value="test@example.com", made_up=False),
+        ],
+    )
+    output = agent.execute_sync()
+
+    assert tool_node_called is False
+    assert len(output.get_value()) == 1  # pyright: ignore[reportArgumentType]
+    output_value = output.get_value()[0]  # pyright: ignore[reportOptionalSubscript]
+    assert isinstance(output_value, InputClarification)
+    assert output_value.user_guidance == "Need clarification"
+
+    # Second execution - should call the tool
+    return_clarification = False
+    tool_node_called = False
+    agent.new_clarifications = []
+    output = agent.execute_sync()
+
+    assert tool_node_called is True
+    assert output.get_value() == 3

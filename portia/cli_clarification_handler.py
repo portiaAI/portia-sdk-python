@@ -101,5 +101,5 @@ class CLIClarificationHandler(ClarificationHandler):
         """Handle a custom clarification."""
         click.echo(click.style(clarification.user_guidance, fg=87))
         click.echo(click.style(f"Additional data: {json.dumps(clarification.data)}", fg=87))
-        user_input = click.prompt(click.style("\nPlease enter a value:\n", fg=87))
+        user_input = click.prompt(click.style("\nPlease enter a value", fg=87))
         return on_resolution(clarification, user_input)
