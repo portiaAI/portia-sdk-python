@@ -511,7 +511,7 @@ if BROWSERBASE_AVAILABLE:
 
             self.bb = Browserbase(api_key=api_key)
 
-        def get_context_id(self, bb: Browserbase) -> str:
+        def get_context_id(self, ctx: ToolRunContext, bb: Browserbase) -> str:
             """Get the Browserbase context id.
 
             Creates a new context in the BrowserBase project. This method can be overridden in
@@ -525,7 +525,16 @@ if BROWSERBASE_AVAILABLE:
                 str: The ID of the created or retrieved context.
 
             """
-            return bb.contexts.create(project_id=self.project_id).id  # type: ignore reportArgumentType
+            if ctx.end_user.get_additional_data("bb_context_id"):
+                print(
+                    f"context id already exists: {ctx.end_user.get_additional_data('bb_context_id')}, end user: {ctx.end_user.external_id}"
+                )
+                return ctx.end_user.get_additional_data("bb_context_id")
+
+            fresh_context = bb.contexts.create(project_id=self.project_id)
+            ctx.end_user.set_additional_data("bb_context_id", fresh_context.id)
+            print(f"created new context: {fresh_context.id}, end user: {ctx.end_user.external_id}")
+            return fresh_context.id
 
         def create_session(self, bb_context_id: str) -> SessionCreateResponse:
             """Create a new BrowserBase session with the given context ID.
@@ -571,7 +580,7 @@ if BROWSERBASE_AVAILABLE:
             """
             context_id = context.execution_context.additional_data.get(
                 "bb_context_id",
-                self.get_context_id(bb),
+                self.get_context_id(context, bb),
             )
             context.execution_context.additional_data["bb_context_id"] = context_id
 
