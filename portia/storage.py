@@ -981,7 +981,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                         outputs=PlanRunOutputs.model_validate(plan_run["outputs"]),
                         plan_run_inputs={
                             key: LocalDataValue.model_validate(value)
-                            for key, value in response_json["plan_run_inputs"].items()
+                            for key, value in plan_run["plan_run_inputs"].items()
                         },
                     )
                     for plan_run in response_json["results"]
