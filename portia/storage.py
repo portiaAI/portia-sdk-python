@@ -491,6 +491,12 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             end_user (EndUser): The EndUser object to save.
 
         """
+        existing_end_user = self.get_end_user(end_user.external_id)
+        if existing_end_user:
+            end_user.additional_data = {
+                **existing_end_user.additional_data,
+                **end_user.additional_data,
+            }
         self.end_users[end_user.external_id] = end_user
         return end_user
 
@@ -705,6 +711,12 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             end_user (EndUser): The EndUser object to save.
 
         """
+        existing_end_user = self.get_end_user(end_user.external_id)
+        if existing_end_user:
+            end_user.additional_data = {
+                **existing_end_user.additional_data,
+                **end_user.additional_data,
+            }
         self._write(f"{end_user.external_id}.json", end_user)
         return end_user
 
