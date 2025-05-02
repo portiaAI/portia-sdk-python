@@ -68,7 +68,7 @@ IMPORTANT GUIDLINES:
   1. Task field: Write only the task description without conditions.
   2. Condition field: Write the condition in concise natural language.
 - Do not use the condition field for non-conditional steps.
-- If plan inputs are provided, make sure to use them appropriately in your steps.
+- If plan inputs are provided, make sure you specify them as inputs to the appropriate steps.
                     """,
                 ),
                 Message(role="user", content=prompt),

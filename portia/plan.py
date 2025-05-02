@@ -196,18 +196,18 @@ class Variable(BaseModel):
     """A reference to an output of a step.
 
     Args:
-        name (str): The name of the output to reference, e.g. $best_offers.
-        description (str): A description of the output.
+        name (str): The name of the output or plan input to reference, e.g. $best_offers.
+        description (str): A description of the output or plan input.
 
     """
 
     model_config = ConfigDict(extra="ignore")
 
     name: str = Field(
-        description="The name of the output to reference, e.g. $best_offers.",
+        description="The name of the output or plan input to reference, e.g. $best_offers.",
     )
     description: str = Field(
-        description="A description of the output.",
+        description="A description of the output or plan input.",
     )
 
     def pretty_print(self) -> str:
@@ -267,7 +267,8 @@ class Step(BaseModel):
 
     Args:
         task (str): The task that needs to be completed by this step.
-        inputs (list[Vairable]): The input to the step, as an output of a previous step.
+        inputs (list[Variable]): The input to the step, as a reference to an output of a previous
+          step or a plan input
         tool_id (str | None): The ID of the tool used in this step, if applicable.
         output (str): The unique output ID for the result of this step.
 
@@ -280,7 +281,9 @@ class Step(BaseModel):
     )
     inputs: list[Variable] = Field(
         default=[],
-        description=("The input to the step, as a reference to an output of a previous step."),
+        description=(
+            "The input to the step, as a reference to an output of a previous step or a plan input."
+        ),
     )
     tool_id: str | None = Field(
         default=None,
