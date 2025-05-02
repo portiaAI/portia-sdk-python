@@ -205,8 +205,9 @@ class ParserModel:
                 "For example, if you wish to use an input called '$large_input_value' verbatim, "
                 "you should enter '{{ '{{' }}$large_input_value{{ '}}' }}' (double curly braces "
                 "and include the $ in the name) and the value will be templated in before the tool "
-                "is called.  You should definitely use this templating for any input values over "
-                "1000 words that you want to use verbatim.",
+                "is called. If there is a $ in the variable name, MAKE SURE you keep it. You "
+                "should definitely use this templating for any input values over 1000 words that "
+                "you want to use verbatim.",
                 # Use jinja2 to allow for the literal curly braces
                 template_format="jinja2",
             ),
