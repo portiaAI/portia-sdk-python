@@ -35,11 +35,18 @@ from portia.introspection_agents.introspection_agent import (
 from portia.model import GenerativeModel
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
-from portia.plan import Plan, PlanContext, ReadOnlyPlan, Step
+from portia.plan import (
+    Plan,
+    PlanContext,
+    PlanInput,
+    PlanUUID,
+    ReadOnlyPlan,
+    Step,
+    Variable,
+)
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
-from portia.prefixed_uuid import PlanUUID
 from portia.tool import ReadyResponse, Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
@@ -799,7 +806,7 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         result = portia.run_plan(plan)
 
-        mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user())
+        mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user(), None)
 
         mock_resume.assert_called_once_with(mock_plan_run)
 
@@ -832,8 +839,7 @@ def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock
         result = portia.run_plan(plan)
 
         mockcreate_plan_run.assert_called_once_with(
-            plan,
-            EndUser(external_id="portia:default_user"),
+            plan, EndUser(external_id="portia:default_user"), None
         )
 
         mock_resume.assert_called_once_with(mock_plan_run)
@@ -1261,3 +1267,214 @@ def test_portia_initialize_end_user(portia: Portia) -> None:
     storage_end_user = portia.storage.get_end_user(end_user.external_id)
     assert storage_end_user
     assert storage_end_user.name == "Bob Smith"
+
+
+def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that Portia.run handles plan inputs correctly."""
+    num_a_input = PlanInput(name="$num_a", description="Number A")
+    num_b_input = PlanInput(name="$num_b", description="Number B")
+
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[
+            Step(
+                task="Add the inputs",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$num_a", description="Number A"),
+                    Variable(name="$num_b", description="Number B"),
+                ],
+                output="$output",
+            ),
+        ],
+        error=None,
+    )
+    mock_step_agent = mock.MagicMock()
+    mock_step_agent.execute_sync.return_value = LocalDataValue(value=3)
+    mock_summarizer_agent = mock.MagicMock()
+    mock_summarizer_agent.create_summary.side_effect = "Summary"
+
+    with (
+        mock.patch(
+            "portia.portia.FinalOutputSummarizer",
+            return_value=mock_summarizer_agent,
+        ),
+        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+    ):
+        plan_run = portia.run(
+            query="Add the two numbers together",
+            plan_run_inputs={
+                num_a_input: LocalDataValue(value=1),
+                num_b_input: LocalDataValue(value=2),
+            },
+        )
+
+    planning_model.get_structured_response.assert_called_once()
+    assert "$num_a" in planning_model.get_structured_response.call_args[1]["messages"][1].content
+    assert "$num_b" in planning_model.get_structured_response.call_args[1]["messages"][1].content
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == 3
+
+
+def test_portia_plan_with_plan_inputs(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that Portia.plan handles plan inputs correctly."""
+    num_a_input = PlanInput(name="$num_a", description="Number A")
+    num_b_input = PlanInput(name="$num_b", description="Number B")
+
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[
+            Step(
+                task="Do something with the user ID",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$num_a", description="Number A"),
+                    Variable(name="$num_b", description="Number B"),
+                ],
+                output="$output",
+            ),
+        ],
+        error=None,
+    )
+
+    plan = portia.plan(
+        query="Use these inputs to do something",
+        plan_inputs=[num_a_input, num_b_input],
+        tools=[AdditionTool()],
+    )
+
+    assert len(plan.inputs) == 2
+    assert any(input_.name == "$num_a" for input_ in plan.inputs)
+    assert any(input_.name == "$num_b" for input_ in plan.inputs)
+    assert len(plan.steps) == 1
+    assert any(input_.name == "$num_a" for input_ in plan.steps[0].inputs)
+    assert any(input_.name == "$num_b" for input_ in plan.steps[0].inputs)
+
+
+def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
+    """Test that run_plan correctly handles plan inputs."""
+    num_a_input = PlanInput(name="$num_a", description="First number to add")
+    num_b_input = PlanInput(name="$num_b", description="Second number to add")
+
+    plan = Plan(
+        plan_context=PlanContext(query="Add two numbers", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Add numbers",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$num_a", description="First number"),
+                    Variable(name="$num_b", description="Second number"),
+                ],
+                output="$result",
+            ),
+        ],
+        inputs=[num_a_input, num_b_input],
+    )
+
+    plan_run_inputs = {num_a_input: LocalDataValue(value=1), num_b_input: LocalDataValue(value=2)}
+
+    mock_agent = MagicMock()
+    mock_agent.execute_sync.return_value = LocalDataValue(value=3)
+
+    # Mock the get_agent_for_step method to return our mock agent
+    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+        plan_run = portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
+
+    assert plan_run.plan_id == plan.id
+    assert len(plan_run.plan_run_inputs) == 2
+    assert plan_run.plan_run_inputs["$num_a"].get_value() == 1
+    assert plan_run.plan_run_inputs["$num_b"].get_value() == 2
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == 3
+
+
+def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
+    """Test that run_plan raises error when required inputs are missing."""
+    required_input1 = PlanInput(name="$required1", description="Required input 1")
+    required_input2 = PlanInput(name="$required2", description="Required input 2")
+
+    plan = Plan(
+        plan_context=PlanContext(query="Plan requiring inputs", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Use the required input",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$required1", description="Required value"),
+                    Variable(name="$required2", description="Required value"),
+                ],
+                output="$result",
+            ),
+        ],
+        inputs=[required_input1, required_input2],
+    )
+
+    # Try to run the plan without providing required inputs
+    with pytest.raises(ValueError):  # noqa: PT011
+        portia.run_plan(plan, plan_run_inputs={})
+
+    # Should fail with just one of the two required
+    with pytest.raises(ValueError):  # noqa: PT011
+        portia.run_plan(plan, plan_run_inputs={required_input1: LocalDataValue(value="value")})
+
+    # Should work if we provide both required inputs
+    with mock.patch.object(portia, "resume") as mock_resume:
+        portia.run_plan(
+            plan,
+            plan_run_inputs={
+                required_input1: LocalDataValue(value="value 1"),
+                required_input2: LocalDataValue(value="value 2"),
+            },
+        )
+        mock_resume.assert_called_once()
+
+
+def test_portia_run_plan_with_extra_input_when_expecting_none(portia: Portia) -> None:
+    """Test that run_plan logs warning when extra inputs are provided."""
+    # Create a plan with no inputs
+    plan = Plan(
+        plan_context=PlanContext(query="Plan with no inputs", tool_ids=["add_tool"]),
+        steps=[],
+        inputs=[],  # No inputs required
+    )
+
+    # Run with input that isn't in the plan's inputs
+    extra_input = PlanInput(name="$extra", description="Extra unused input")
+    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: LocalDataValue(value="value")})
+    assert plan_run.plan_run_inputs == {}
+
+
+def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
+    """Test that run_plan ignores unknown inputs."""
+    expected_input = PlanInput(name="$expected", description="Expected input")
+
+    plan = Plan(
+        plan_context=PlanContext(query="Plan with specific input", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Use the expected input",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$expected", description="Expected value"),
+                ],
+                output="$result",
+            ),
+        ],
+        inputs=[expected_input],
+    )
+
+    unknown_input = PlanInput(name="$unknown", description="Unknown input")
+
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+        plan_run = portia.run_plan(
+            plan,
+            plan_run_inputs={
+                expected_input: LocalDataValue(value="expected_value"),
+                unknown_input: LocalDataValue(value="unknown_value"),
+            },
+        )
+
+        assert "$expected" in plan_run.plan_run_inputs
+        assert plan_run.plan_run_inputs["$expected"].get_value() == "expected_value"
+        assert "$unknown" not in plan_run.plan_run_inputs
+        mock_resume.assert_called_once()

@@ -23,7 +23,7 @@ from portia.clarification import (
     ClarificationListType,
 )
 from portia.common import PortiaEnum
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.execution_context import ExecutionContext, empty_context
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
 
@@ -88,6 +88,7 @@ class PlanRun(BaseModel):
         state (PlanRunState): The current state of the PlanRun.
         execution_context (ExecutionContext): Execution context for the PlanRun.
         outputs (PlanRunOutputs): Outputs of the PlanRun including clarifications.
+        plan_run_inputs (dict[str, LocalDataValue]): Dict mapping plan input names to their values.
 
     """
 
@@ -120,6 +121,10 @@ class PlanRun(BaseModel):
         default=PlanRunOutputs(),
         description="Outputs of the run including clarifications.",
     )
+    plan_run_inputs: dict[str, LocalDataValue] = Field(
+        default={},
+        description="Dict mapping plan input names to their values.",
+    )
 
     def get_outstanding_clarifications(self) -> ClarificationListType:
         """Return all outstanding clarifications.
@@ -151,6 +156,10 @@ class PlanRun(BaseModel):
             for clarification in self.outputs.clarifications
             if clarification.step == step
         ]
+
+    def get_potential_step_inputs(self) -> dict[str, Output]:
+        """Return a dictionary of potential step inputs for future steps."""
+        return self.outputs.step_outputs | self.plan_run_inputs
 
     def __str__(self) -> str:
         """Return the string representation of the PlanRun.
@@ -194,4 +203,5 @@ class ReadOnlyPlanRun(PlanRun):
             state=plan_run.state,
             end_user_id=plan_run.end_user_id,
             execution_context=plan_run.execution_context,
+            plan_run_inputs=plan_run.plan_run_inputs,
         )

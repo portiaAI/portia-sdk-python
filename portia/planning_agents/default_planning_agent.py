@@ -13,7 +13,7 @@ from portia.planning_agents.context import render_prompt_insert_defaults
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.end_user import EndUser
-    from portia.plan import Plan, Step
+    from portia.plan import Plan, PlanInput, Step
     from portia.tool import Tool
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
         tool_list: list[Tool],
         end_user: EndUser,
         examples: list[Plan] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
         prompt = render_prompt_insert_defaults(
@@ -39,6 +40,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
             tool_list,
             end_user,
             examples,
+            plan_inputs,
         )
         response = self.model.get_structured_response(
             schema=StepsOrError,
@@ -66,6 +68,7 @@ IMPORTANT GUIDLINES:
   1. Task field: Write only the task description without conditions.
   2. Condition field: Write the condition in concise natural language.
 - Do not use the condition field for non-conditional steps.
+- If plan inputs are provided, make sure you specify them as inputs to the appropriate steps.
                     """,
                 ),
                 Message(role="user", content=prompt),

@@ -90,6 +90,7 @@ Return the outcome and reason in the given format.
                     "The original query: {query}\n"
                     "All Plan Steps: \n{plan}\n"
                     "Previous Step Outputs: \n{prev_step_outputs}\n"
+                    "Plan Run Inputs: \n{plan_run_inputs}\n"
                     "If any relevant outputs are stored in agent memory, they have been extracted "
                     "and included here: {memory_outputs}\n",
                 ),
@@ -120,6 +121,7 @@ Return the outcome and reason in the given format.
                     current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                     current_day_of_week=datetime.now(UTC).strftime("%A"),
                     prev_step_outputs=plan_run.outputs.model_dump_json(),
+                    plan_run_inputs=plan_run.plan_run_inputs,
                     memory_outputs=memory_outputs,
                     query=plan.plan_context.query,
                     condition=plan.steps[plan_run.current_step_index].condition,
