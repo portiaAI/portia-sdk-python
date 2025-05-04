@@ -523,7 +523,7 @@ if BROWSERBASE_AVAILABLE:
 
         def step_complete(self, ctx: ToolRunContext) -> None:
             """Call when the step is complete closes the session to persist context."""
-            if ctx.execution_context.additional_data["bb_session_id"]:
+            if ctx.execution_context.additional_data.get("bb_session_id"):
                 self.bb.sessions.update(
                     ctx.execution_context.additional_data["bb_session_id"],
                     project_id=self.project_id,  # type: ignore reportArgumentType

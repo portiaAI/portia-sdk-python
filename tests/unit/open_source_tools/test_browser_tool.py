@@ -370,19 +370,36 @@ def test_browserbase_provider_init_missing_project_id() -> None:
         BrowserInfrastructureProviderBrowserBase()
 
 
-def test_browserbase_provider_get_context_id(
+def test_browserbase_provider_get_context_id_existing(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
-    """Test getting context ID."""
+    """Test getting context ID when already present in end_user additional data."""
+    mock_ctx = MagicMock()
+    mock_ctx.end_user.get_additional_data.return_value = "existing_context_id"
+
+    context_id = mock_browserbase_provider.get_context_id(mock_ctx, mock_browserbase_provider.bb)
+
+    # Should not create a new context if already present
+    mock_browserbase_provider.bb.contexts.create.assert_not_called()  # type: ignore reportFunctionMemberAccess
+    assert context_id == "existing_context_id"
+
+
+def test_browserbase_provider_get_context_id_new(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test getting context ID when not present in end_user additional data."""
+    mock_ctx = MagicMock()
+    mock_ctx.end_user.get_additional_data.return_value = None
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
     mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
 
-    context_id = mock_browserbase_provider.get_context_id(
-        mock_context, mock_browserbase_provider.bb
-    )
+    context_id = mock_browserbase_provider.get_context_id(mock_ctx, mock_browserbase_provider.bb)
 
     mock_browserbase_provider.bb.contexts.create.assert_called_once_with(project_id="test_project")  # type: ignore reportFunctionMemberAccess
+    mock_ctx.end_user.set_additional_data.assert_called_once_with(
+        "bb_context_id", "test_context_id"
+    )
     assert context_id == "test_context_id"
 
 
@@ -547,3 +564,31 @@ def test_browser_tool_for_url_init_subdomain_handling() -> None:
     assert tool.url == url
     assert tool.id == "browser_tool_for_url_sub_example_com"
     assert tool.name == "Browser Tool for sub_example_com"
+
+
+def test_browserbase_provider_step_complete_with_session(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test step_complete calls sessions.update when session_id is present."""
+    mock_ctx = MagicMock()
+    mock_ctx.execution_context.additional_data = {"bb_session_id": "session123"}
+
+    mock_browserbase_provider.step_complete(mock_ctx)
+
+    mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # type: ignore reportFunctionMemberAccess
+        "session123",
+        project_id="test_project",
+        status="REQUEST_RELEASE",
+    )
+
+
+def test_browserbase_provider_step_complete_without_session(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test step_complete does nothing when session_id is missing."""
+    mock_ctx = MagicMock()
+    mock_ctx.execution_context.additional_data = {}
+
+    mock_browserbase_provider.step_complete(mock_ctx)
+
+    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # type: ignore reportFunctionMemberAccess
