@@ -81,6 +81,9 @@ class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
         """Construct the auth clarification for testing."""
         return HttpUrl(sign_in_url)
 
+    def step_complete(self, _: ToolRunContext) -> None:  # type: ignore reportIncompatibleMethodOverride
+        """Call when the step is complete to e.g release the session."""
+
 
 @pytest.fixture
 def mock_browser_infrastructure_provider() -> BrowserInfrastructureProvider:
@@ -375,7 +378,9 @@ def test_browserbase_provider_get_context_id(
     mock_context.id = "test_context_id"
     mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
 
-    context_id = mock_browserbase_provider.get_context_id(mock_browserbase_provider.bb)
+    context_id = mock_browserbase_provider.get_context_id(
+        mock_context, mock_browserbase_provider.bb
+    )
 
     mock_browserbase_provider.bb.contexts.create.assert_called_once_with(project_id="test_project")  # type: ignore reportFunctionMemberAccess
     assert context_id == "test_context_id"
