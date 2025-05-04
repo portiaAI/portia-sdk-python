@@ -181,7 +181,8 @@ class BrowserTool(Tool[str]):
         default=(
             "General purpose browser tool. Can be used to navigate to a URL and "
             "complete tasks. Should only be used if the task requires a browser "
-            "and you are sure of the URL. Do not break the task into multiple browser tool steps!"
+            "and you are sure of the URL. Do not break the task into multiple browser tool steps - "
+            "each new browser tool run will create a new session!"
         ),
     )
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
@@ -266,6 +267,8 @@ class BrowserTool(Tool[str]):
             task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
             if task_result.human_login_required:
                 return handle_login_requirement(task_result)
+
+            self.infrastructure_provider.step_complete(ctx)
             return task_result.task_output  # type: ignore reportCallIssue
 
         try:
@@ -363,6 +366,10 @@ class BrowserInfrastructureProvider(ABC):
     def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:
         """Construct the URL for the auth clarification."""
 
+    @abstractmethod
+    def step_complete(self, ctx: ToolRunContext) -> None:
+        """Called when a step is complete."""
+
 
 class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
     """Browser infrastructure provider for local browser instances."""
@@ -447,6 +454,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
+    def step_complete(self, ctx: ToolRunContext) -> None:
+        pass
+
     def get_extra_chromium_args(self) -> list[str] | None:
         """Get the extra Chromium arguments.
 
@@ -510,6 +520,18 @@ if BROWSERBASE_AVAILABLE:
                 raise ToolHardError("BROWSERBASE_PROJECT_ID is not set")
 
             self.bb = Browserbase(api_key=api_key)
+
+        def step_complete(self, ctx: ToolRunContext) -> None:
+            if ctx.execution_context.additional_data["bb_session_id"]:
+                self.bb.sessions.update(
+                    ctx.execution_context.additional_data["bb_session_id"],
+                    project_id=self.project_id,
+                    status="REQUEST_RELEASE",
+                )
+            """
+            if ctx.end_user.get_additional_data("bb_context_id"):
+                self.bb.contexts.update(ctx.end_user.get_additional_data("bb_context_id"))
+            """
 
         def get_context_id(self, ctx: ToolRunContext, bb: Browserbase) -> str:
             """Get the Browserbase context id.

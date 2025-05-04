@@ -912,6 +912,7 @@ class Portia:
                 )
 
             plan_run.outputs.clarifications = plan_run.outputs.clarifications + new_clarifications
+            print(f"plan run was {plan_run.model_dump_json(indent=4)}")
             self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
             return True
         return False
