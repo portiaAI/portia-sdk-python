@@ -67,6 +67,7 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
+from portia.prefixed_uuid import PlanUUID
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
@@ -277,14 +278,14 @@ class Portia:
 
     def run_plan(
         self,
-        plan: Plan,
+        plan: Plan | PlanUUID,
         end_user: str | EndUser | None = None,
         plan_run_inputs: dict[PlanInput, LocalDataValue] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
         Args:
-            plan (Plan): The plan to run.
+            plan (Plan | PlanUUID): The plan to run, or the ID of the plan to load from storage.
             end_user (str | EndUser | None = None): The end user to use.
             plan_run_inputs (dict[PlanInput, LocalDataValue] | None): Optional dictionary mapping
                 PlanInput objects to their values.
@@ -296,9 +297,13 @@ class Portia:
         # ensure we have the plan in storage.
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
         try:
-            self.storage.get_plan(plan.id)
+            plan_id = plan if isinstance(plan, PlanUUID) else plan.id
+            plan = self.storage.get_plan(plan_id)
         except (PlanNotFoundError, StorageError):
-            self.storage.save_plan(plan)
+            if isinstance(plan, Plan):
+                self.storage.save_plan(plan)
+            else:
+                raise PlanNotFoundError(plan) from None
 
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user, plan_run_inputs)

@@ -24,7 +24,12 @@ from portia.config import (
     StorageClass,
 )
 from portia.end_user import EndUser
-from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
+from portia.errors import (
+    InvalidPlanRunStateError,
+    PlanError,
+    PlanNotFoundError,
+    PlanRunNotFoundError,
+)
 from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -1478,3 +1483,33 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
         assert plan_run.plan_run_inputs["$expected"].get_value() == "expected_value"
         assert "$unknown" not in plan_run.plan_run_inputs
         mock_resume.assert_called_once()
+
+
+def test_portia_run_plan_with_plan_uuid(portia: Portia) -> None:
+    """Test that run_plan can retrieve a plan from storage using PlanUUID."""
+    plan = Plan(
+        plan_context=PlanContext(query="example query", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Simple task",
+                tool_id="add_tool",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+    )
+
+    # Save the plan to storage
+    portia.storage.save_plan(plan)
+
+    # Mock the resume method to verify it gets called with the correct plan run
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+
+        plan_run = portia.run_plan(plan.id)
+
+        assert plan_run.plan_id == plan.id
+        mock_resume.assert_called_once()
+
+    with pytest.raises(PlanNotFoundError):
+        portia.run_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
