@@ -115,7 +115,7 @@ def test_next_state_after_tool_call_no_error() -> None:
     result = agent.next_state_after_tool_call(agent.config, state, agent.tool)
 
     assert result == END
-    assert execution_hooks.after_tool_call.call_count == 1
+    assert execution_hooks.after_tool_call.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
 def test_next_state_after_tool_call_with_summarize() -> None:
