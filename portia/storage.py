@@ -491,6 +491,12 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             end_user (EndUser): The EndUser object to save.
 
         """
+        existing_end_user = self.get_end_user(end_user.external_id)
+        if existing_end_user:
+            end_user.additional_data = {
+                **existing_end_user.additional_data,
+                **end_user.additional_data,
+            }
         self.end_users[end_user.external_id] = end_user
         return end_user
 
@@ -705,6 +711,12 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             end_user (EndUser): The EndUser object to save.
 
         """
+        existing_end_user = self.get_end_user(end_user.external_id)
+        if existing_end_user:
+            end_user.additional_data = {
+                **existing_end_user.additional_data,
+                **end_user.additional_data,
+            }
         self._write(f"{end_user.external_id}.json", end_user)
         return end_user
 
@@ -835,6 +847,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "query": plan.plan_context.query,
                     "tool_ids": plan.plan_context.tool_ids,
                     "steps": [step.model_dump(mode="json") for step in plan.steps],
+                    "inputs": [input_.model_dump(mode="json") for input_ in plan.inputs],
                 },
             )
         except Exception as e:
@@ -886,6 +899,9 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
+                    "plan_run_inputs": {
+                        k: v.model_dump(mode="json") for k, v in plan_run.plan_run_inputs.items()
+                    },
                 },
             )
         except Exception as e:
@@ -925,6 +941,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     response_json["execution_context"],
                 ),
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
+                plan_run_inputs={
+                    key: LocalDataValue.model_validate(value)
+                    for key, value in response_json["plan_run_inputs"].items()
+                },
             )
 
     def get_plan_runs(
@@ -971,6 +991,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
                             plan_run["execution_context"],
                         ),
                         outputs=PlanRunOutputs.model_validate(plan_run["outputs"]),
+                        plan_run_inputs={
+                            key: LocalDataValue.model_validate(value)
+                            for key, value in plan_run["plan_run_inputs"].items()
+                        },
                     )
                     for plan_run in response_json["results"]
                 ],

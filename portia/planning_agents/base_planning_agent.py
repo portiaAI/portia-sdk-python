@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.plan import Plan, Step
+from portia.plan import Plan, PlanInput, Step
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -52,6 +52,7 @@ class BasePlanningAgent(ABC):
         tool_list: list[Tool],
         end_user: EndUser,
         examples: list[Plan] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
         """Generate a list of steps for the given query.
 
@@ -63,6 +64,8 @@ class BasePlanningAgent(ABC):
             tool_list (list[Tool]): A list of tools available for the plan.
             end_user (EndUser): The end user for this plan
             examples (list[Plan] | None): Optional list of example plans to guide the PlanningAgent.
+            plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
+                the inputs required for the plan.
 
         Returns:
             StepsOrError: A StepsOrError instance containing either the generated steps or an error.

@@ -90,7 +90,7 @@ class ExecutionHooks(BaseModel):
         step: The step being executed
 
     Returns:
-        Optional[Clarification]: A clarification to raise, or None to proceed with the tool call
+        Clarification | None: A clarification to raise, or None to proceed with the tool call
     """
 
     after_tool_call: Callable[[Tool, Any, PlanRun, Step], None] | None = None
@@ -108,7 +108,10 @@ class ExecutionHooks(BaseModel):
 
 
 def cli_user_verify_before_tool_call(
-    tool: Tool, args: dict[str, Any], plan_run: PlanRun, step: Step  # noqa: ARG001
+    tool: Tool,
+    args: dict[str, Any],
+    plan_run: PlanRun,
+    step: Step,  # noqa: ARG001
 ) -> Clarification | None:
     """Raise a clarification to check the user is happy with the tool call before proceeding."""
     user_verify_clarification = CustomClarification(

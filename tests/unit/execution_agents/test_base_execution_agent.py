@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import MagicMock
 
 from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
@@ -18,6 +19,7 @@ from portia.execution_agents.base_execution_agent import MAX_RETRIES, BaseExecut
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import AgentNode
 from portia.execution_agents.output import LocalDataValue
+from portia.execution_hooks import ExecutionHooks
 from portia.prefixed_uuid import PlanRunUUID
 from portia.storage import InMemoryStorage
 from tests.utils import AdditionTool, get_test_config, get_test_plan_run, get_test_tool_context
@@ -87,6 +89,9 @@ def test_output_serialize() -> None:
 
 def test_next_state_after_tool_call_no_error() -> None:
     """Test next state when tool call succeeds."""
+    execution_hooks = ExecutionHooks(
+        after_tool_call=MagicMock(),
+    )
     plan, plan_run = get_test_plan_run()
     agent = BaseExecutionAgent(
         plan.steps[0],
@@ -94,7 +99,8 @@ def test_next_state_after_tool_call_no_error() -> None:
         get_test_config(),
         EndUser(external_id="test"),
         InMemoryStorage(),
-        None,
+        AdditionTool(),
+        execution_hooks,
     )
 
     messages: list[ToolMessage] = [
@@ -106,9 +112,10 @@ def test_next_state_after_tool_call_no_error() -> None:
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
 
-    result = agent.next_state_after_tool_call(agent.config, state)
+    result = agent.next_state_after_tool_call(agent.config, state, agent.tool)
 
     assert result == END
+    assert execution_hooks.after_tool_call.call_count == 1
 
 
 def test_next_state_after_tool_call_with_summarize() -> None:
