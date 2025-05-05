@@ -24,7 +24,7 @@ import sys
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Type
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 NotSet: Any = PydanticUndefined
 
 BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase", raise_error=False)
+
+T = TypeVar("T")
 
 
 class BrowserToolForUrlSchema(BaseModel):
@@ -88,14 +90,14 @@ class BrowserToolSchema(BaseModel):
     )
 
 
-class BrowserTaskOutput(BaseModel):
+class BrowserTaskOutput(BaseModel, Generic[T]):
     """Output schema for browser task execution.
 
     This class represents the response from executing a browser task,
     including both the task result and any authentication requirements.
 
     Attributes:
-        task_output (str): The result or output from executing the requested task.
+        task_output (T): The result or output from executing the requested task.
         human_login_required (bool): Indicates if manual user authentication is needed.
             Defaults to False.
         login_url (str, optional): The URL where the user needs to go to authenticate.
@@ -105,7 +107,7 @@ class BrowserTaskOutput(BaseModel):
 
     """
 
-    task_output: str | None = Field(
+    task_output: T | None = Field(
         default=None,
         description="The output from the task. `None` if authentication is required.",
     )
@@ -207,6 +209,11 @@ class BrowserTool(Tool[str]):
 
     custom_infrastructure_provider: BrowserInfrastructureProvider | None = Field(default=None)
 
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        description="Optional structured output schema for the browser tool's task output.",
+    )
+
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -241,12 +248,12 @@ class BrowserTool(Tool[str]):
                     plan_run_id=ctx.plan_run_id,
                     require_confirmation=True,
                 )
+            output_model = BrowserTaskOutput[self.structured_output_schema if self.structured_output_schema else str]
 
             async def run_agent_task(
                 task_description: str,
-                output_model: type[BrowserTaskOutput],
-            ) -> BrowserTaskOutput:
-                """Run a browser agent task with the given configuration."""
+                output_model: type[BaseModel],
+            ) -> BaseModel:
                 agent = Agent(
                     task=task_description,
                     llm=llm,
@@ -263,7 +270,8 @@ class BrowserTool(Tool[str]):
                 "required to complete the task, please return human_login_required=True, and the "
                 "url of the sign in page as well as what the user should do to sign in"
             )
-            task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
+
+            task_result = await run_agent_task(task_to_complete, output_model)
             if task_result.human_login_required:
                 return handle_login_requirement(task_result)
             return task_result.task_output  # type: ignore reportCallIssue
