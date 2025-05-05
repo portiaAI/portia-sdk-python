@@ -8,9 +8,7 @@ from portia import (
     Portia,
 )
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
-from portia.execution_agents.output import LocalDataValue
 from portia.model import LLMProvider
-from portia.plan import PlanInput
 
 load_dotenv()
 portia = Portia(
@@ -82,21 +80,3 @@ plan_run = portia.run(
     "email it to me, then just take the first 100 words, then email it to me, then summarise it, then email it to me. My email is robbie@portialabs.ai. "
     "For the titleemail titles, use 'email 1' then 2, then 3 etc. and for the bodies, just include the content mentioned above."
 )
-
-
-portia = Portia(Config.from_default(large_output_threshold_tokens=10000))
-
-# Specify the inputs you will use in the plan
-plan_input = PlanInput(name="$city", description="The city to get the temperature for")
-plan = portia.plan("Get the temperature for the provided city", plan_inputs=[plan_input])
-
-# Specify the values for those inputs when you run the plan
-plan_run_inputs = {plan_input: "London"}
-plan_run = portia.run("Get the temperature for the provided city", plan_run_inputs=plan_run_inputs)
-
-plan_run_inputs = {
-    PlanInput(name="$city", description="The city to get the temperature for"): LocalDataValue(
-        value="Lisbon"
-    ),
-}
-plan_run = portia.run("Get the temperature for the provided city", plan_run_inputs=plan_run_inputs)
