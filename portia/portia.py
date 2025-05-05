@@ -660,36 +660,36 @@ class Portia:
             step = plan.steps[index]
             plan_run.current_step_index = index
 
-            # Handle the introspection outcome
-            (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
-                introspection_agent=introspection_agent,
-                plan=plan,
-                plan_run=plan_run,
-                last_executed_step_output=last_executed_step_output,
-            )
-            if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
-                continue
-            if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
-                self._log_final_output(plan_run, plan)
-                return plan_run
-
-            logger().info(
-                f"Executing step {index}: {step.task}",
-                plan=str(plan.id),
-                plan_run=str(plan_run.id),
-            )
-            # we pass read only copies of the state to the agent so that the portia remains
-            # responsible for handling the output of the agent and updating the state.
-            agent = self._get_agent_for_step(
-                step=ReadOnlyStep.from_step(step),
-                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
-            )
-            logger().debug(
-                f"Using agent: {type(agent).__name__}",
-                plan=str(plan.id),
-                plan_run=str(plan_run.id),
-            )
             try:
+                # Handle the introspection outcome
+                (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
+                    introspection_agent=introspection_agent,
+                    plan=plan,
+                    plan_run=plan_run,
+                    last_executed_step_output=last_executed_step_output,
+                )
+                if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
+                    continue
+                if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
+                    self._log_final_output(plan_run, plan)
+                    return plan_run
+
+                logger().info(
+                    f"Executing step {index}: {step.task}",
+                    plan=str(plan.id),
+                    plan_run=str(plan_run.id),
+                )
+                # we pass read only copies of the state to the agent so that the portia remains
+                # responsible for handling the output of the agent and updating the state.
+                agent = self._get_agent_for_step(
+                    step=ReadOnlyStep.from_step(step),
+                    plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+                )
+                logger().debug(
+                    f"Using agent: {type(agent).__name__}",
+                    plan=str(plan.id),
+                    plan_run=str(plan_run.id),
+                )
                 last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
                 error_output = LocalDataValue(value=str(e))

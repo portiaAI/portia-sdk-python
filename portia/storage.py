@@ -812,6 +812,18 @@ class PortiaCloudStorage(Storage, AgentMemory):
             StorageError: If the response from the Portia API indicates an error.
 
         """
+        if response.status_code == httpx.codes.REQUEST_ENTITY_TOO_LARGE:
+            raise StorageError(
+                "Error from Portia Cloud - request too large: "
+                f"{response.request.content[:1000]}...(truncated). "
+                "Please contact hello@portialabs.ai to discuss your usecase."
+            )
+        if sys.getsizeof(response.request.content) > self.MAX_OUTPUT_BYTES:
+            raise StorageError(
+                "Attempted to send a request to Portia Cloud that is too large: "
+                f"{response.request.content[:1000]}...(truncated). "
+                "Please contact hello@portialabs.ai to discuss your usecase.",
+            )
         if not response.is_success:
             error_str = str(response.content)
             logger().error(f"Error from Portia Cloud: {error_str}")

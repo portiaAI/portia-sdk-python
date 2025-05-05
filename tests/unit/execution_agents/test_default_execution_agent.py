@@ -667,7 +667,8 @@ def test_tool_calling_model_templates_inputs() -> None:
             "type": "tool_call",
             "id": "call_123",
             "args": {
-                "$templated_arg": "{{$input_value}}",  # This should be templated
+                # Both cases (with and without $ at the start) should be templated
+                "$templated_arg": "1. {{$input_value}} 2. {{input_value}}",
                 "$normal_arg": "normal value",  # This should remain unchanged
             },
         },
@@ -706,7 +707,7 @@ def test_tool_calling_model_templates_inputs() -> None:
     assert len(result_message.tool_calls) == 1
     tool_call = result_message.tool_calls[0]
 
-    assert tool_call["args"]["$templated_arg"] == "templated value"
+    assert tool_call["args"]["$templated_arg"] == "1. templated value 2. templated value"
     assert tool_call["args"]["$normal_arg"] == "normal value"
 
 
