@@ -200,6 +200,7 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples.
 
@@ -210,6 +211,8 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query.
 
         Returns:
             Plan: The plan for executing the query.
@@ -255,6 +258,7 @@ class Portia:
                 tool_ids=[tool.id for tool in tools],
             ),
             steps=outcome.steps,
+            structured_output_schema=structured_output_schema
         )
         self.storage.save_plan(plan)
         logger().info(
@@ -269,7 +273,6 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
-        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
@@ -289,7 +292,7 @@ class Portia:
             self.storage.save_plan(plan)
 
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user, structured_output_schema)
+        plan_run = self.create_plan_run(plan, end_user)
         return self.resume(plan_run)
 
     def resume(
@@ -538,7 +541,6 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
-        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Create a PlanRun from a Plan.
 
@@ -555,8 +557,7 @@ class Portia:
             plan_id=plan.id,
             state=PlanRunState.NOT_STARTED,
             execution_context=get_execution_context(),
-            end_user_id=end_user.external_id,
-            structured_output_schema=structured_output_schema,
+            end_user_id=end_user.external_id
         )
         self.storage.save_plan_run(plan_run)
         return plan_run
@@ -808,9 +809,9 @@ class Portia:
             if isinstance(output, BaseModel) and plan_run.structured_output_schema:
                 unsumarrized_output = plan_run.structured_output_schema(**output.model_dump())
                 final_output.value = unsumarrized_output
-                final_output.summary = output.summary
+                final_output.summary = output.summary # type: ignore[reportAttributeAccessIssue]
             else:
-                final_output.summary = output
+                final_output.summary = output # type: ignore[reportAttributeAccessIssue]
 
         except Exception as e:  # noqa: BLE001
             logger().warning(f"Error summarising run: {e}")

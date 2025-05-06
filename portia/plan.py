@@ -335,6 +335,10 @@ class Plan(BaseModel):
     )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        description="The optional structured output schema for the query.",
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the plan.

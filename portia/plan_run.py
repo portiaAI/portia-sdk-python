@@ -121,12 +121,6 @@ class PlanRun(BaseModel):
         description="Outputs of the run including clarifications.",
     )
 
-    structured_output_schema: type[BaseModel] | None = Field(
-        default=None,
-        exclude=True,
-        description="The schema of the structured output of the plan run.",
-    )
-
     def get_outstanding_clarifications(self) -> ClarificationListType:
         """Return all outstanding clarifications.
 
