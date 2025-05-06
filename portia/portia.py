@@ -24,6 +24,7 @@ from __future__ import annotations
 import time
 from importlib.metadata import version
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from portia.clarification import (
     Clarification,
@@ -278,14 +279,15 @@ class Portia:
 
     def run_plan(
         self,
-        plan: Plan | PlanUUID,
+        plan: Plan | PlanUUID | UUID,
         end_user: str | EndUser | None = None,
         plan_run_inputs: dict[PlanInput, LocalDataValue] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
         Args:
-            plan (Plan | PlanUUID): The plan to run, or the ID of the plan to load from storage.
+            plan (Plan | PlanUUID | UUID): The plan to run, or the ID of the plan to load from
+              storage.
             end_user (str | EndUser | None = None): The end user to use.
             plan_run_inputs (dict[PlanInput, LocalDataValue] | None): Optional dictionary mapping
                 PlanInput objects to their values.
@@ -296,14 +298,20 @@ class Portia:
         """
         # ensure we have the plan in storage.
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
+        plan_id = (
+            plan
+            if isinstance(plan, PlanUUID)
+            else PlanUUID(uuid=plan)
+            if isinstance(plan, UUID)
+            else plan.id
+        )
         try:
-            plan_id = plan if isinstance(plan, PlanUUID) else plan.id
             plan = self.storage.get_plan(plan_id)
         except (PlanNotFoundError, StorageError):
             if isinstance(plan, Plan):
                 self.storage.save_plan(plan)
             else:
-                raise PlanNotFoundError(plan) from None
+                raise PlanNotFoundError(plan_id) from None
 
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user, plan_run_inputs)

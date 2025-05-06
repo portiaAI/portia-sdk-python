@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import HttpUrl, SecretStr
@@ -1513,3 +1513,33 @@ def test_portia_run_plan_with_plan_uuid(portia: Portia) -> None:
 
     with pytest.raises(PlanNotFoundError):
         portia.run_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
+
+
+def test_portia_run_plan_with_uuid(portia: Portia) -> None:
+    """Test that run_plan can retrieve a plan from storage using UUID."""
+    plan = Plan(
+        plan_context=PlanContext(query="example query", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Simple task",
+                tool_id="add_tool",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+    )
+
+    # Save the plan to storage
+    portia.storage.save_plan(plan)
+
+    # Mock the resume method to verify it gets called with the correct plan run
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+
+        plan_run = portia.run_plan(plan.id)
+
+        assert plan_run.plan_id == plan.id
+        mock_resume.assert_called_once()
+
+    with pytest.raises(PlanNotFoundError):
+        portia.run_plan(UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05"))
