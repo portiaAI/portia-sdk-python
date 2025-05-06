@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from langchain_core.messages import BaseMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
-from portia.clarification import Clarification
+from portia.clarification import Clarification, InputClarification
 from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
 from portia.execution_agents.output import LocalDataValue, Output
 
@@ -125,6 +125,7 @@ def process_output(  # noqa: C901
     messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
+    step: int | None = None,
 ) -> Output:
     """Process the output of the agent.
 
@@ -151,11 +152,21 @@ def process_output(  # noqa: C901
             raise ToolRetryError(tool.id, str(message.content))
         if "ToolHardError" in message.content and tool:
             raise ToolFailedError(tool.id, str(message.content))
+
         if clarifications and len(clarifications) > 0:
             return LocalDataValue(
                 value=clarifications,
             )
         if isinstance(message, ToolMessage):
+            try:
+                clarification = InputClarification.model_validate_json(message.content)
+                clarification.step = step
+                return LocalDataValue(
+                    value=[clarification],
+                )
+            except Exception:
+                pass
+
             if message.artifact and isinstance(message.artifact, Output):
                 output_values.append(message.artifact)
             elif message.artifact:
