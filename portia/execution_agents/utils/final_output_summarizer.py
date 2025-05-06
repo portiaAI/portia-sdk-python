@@ -99,7 +99,7 @@ class FinalOutputSummarizer:
         context = self._build_tasks_and_outputs_context(plan, plan_run)
         if plan_run.structured_output_schema:
             class SchemaWithSummary(plan_run.structured_output_schema):
-                summary: str
+                _summary: str # _ to not conflict with user defined fields
             
             response = model.get_structured_response(
                 [Message(content=self.summarizer_and_structured_output_prompt + context, role="user")],

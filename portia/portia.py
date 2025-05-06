@@ -806,12 +806,14 @@ class Portia:
                 plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan=ReadOnlyPlan.from_plan(plan),
             )
-            if isinstance(output, BaseModel) and plan_run.structured_output_schema:
+            if isinstance(output, BaseModel) and plan_run.structured_output_schema and hasattr(output, "_summary"):
                 unsumarrized_output = plan_run.structured_output_schema(**output.model_dump())
                 final_output.value = unsumarrized_output
-                final_output.summary = output.summary # type: ignore[reportAttributeAccessIssue]
+                final_output.summary = output._summary # type: ignore[reportAttributeAccessIssue]
+            elif isinstance(output, str):
+                final_output.summary = output
             else:
-                final_output.summary = output # type: ignore[reportAttributeAccessIssue]
+                raise ValueError(f"Unexpected output type: {type(output)}")
 
         except Exception as e:  # noqa: BLE001
             logger().warning(f"Error summarising run: {e}")
