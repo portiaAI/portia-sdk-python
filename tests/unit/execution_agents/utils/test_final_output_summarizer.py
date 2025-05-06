@@ -75,7 +75,7 @@ def test_summarizer_agent_execute_sync(
         "Output: Visit Hyde Park and have a picnic\n"
         "----------"
     )
-    expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + expected_context
+    expected_prompt = FinalOutputSummarizer.summarizer_only_prompt + expected_context
     mock_summarizer_model.get_response.assert_called_once_with(
         [Message(content=expected_prompt, role="user")],
     )
@@ -102,7 +102,7 @@ def test_summarizer_agent_empty_plan_run(
 
     # Verify empty context case
     assert output == "Empty summary"
-    expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + ("Query: Empty query\n----------")
+    expected_prompt = FinalOutputSummarizer.summarizer_only_prompt + ("Query: Empty query\n----------")
     mock_summarizer_model.get_response.assert_called_once_with(
         [Message(content=expected_prompt, role="user")],
     )
