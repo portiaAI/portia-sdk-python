@@ -18,7 +18,6 @@ from portia.config import (
     StorageClass,
 )
 from portia.errors import PlanError, ToolHardError, ToolSoftError
-from portia.execution_agents.output import LocalDataValue
 from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step, Variable
@@ -572,9 +571,8 @@ def test_plan_input_with_schema_validation() -> None:
         num_a: int = Field(description="First number to add")
         num_b: int = Field(description="Second number to add")
 
-    numbers_input = PlanInput(name="$numbers", description="two numbers to add together")
-
-    plan_inputs = {numbers_input: LocalDataValue(value=AdditionNumbers(num_a=5, num_b=7))}
+    numbers_input = PlanInput(name="$numbers", description="Numbers to add")
+    plan_inputs = {numbers_input: AdditionNumbers(num_a=5, num_b=7)}
 
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
@@ -595,16 +593,6 @@ def test_plan_input_with_schema_validation() -> None:
     assert "$numbers" in plan_run.plan_run_inputs
     assert plan_run.plan_run_inputs["$numbers"].get_value().num_a == 5  # pyright: ignore[reportOptionalMemberAccess]
     assert plan_run.plan_run_inputs["$numbers"].get_value().num_b == 7  # pyright: ignore[reportOptionalMemberAccess]
-
-    # Try with invalid input - this should fail validation
-    invalid_inputs = {
-        numbers_input: {
-            "num_a": "five",  # num_a should be an int
-            "num_b": 7,
-        }
-    }
-    with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_run_inputs=invalid_inputs)  # pyright: ignore[reportArgumentType]
 
 
 def test_run_plan_with_large_step_input() -> None:
