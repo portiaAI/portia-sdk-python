@@ -569,11 +569,12 @@ if validate_extras_dependencies("mistralai", raise_error=False):
 
 
 if validate_extras_dependencies("google", raise_error=False):
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     if TYPE_CHECKING:
-        from google.generativeai.types.generation_types import GenerationConfigDict
+        from google.genai.types import GenerationConfigDict
 
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""
@@ -600,7 +601,7 @@ if validate_extras_dependencies("google", raise_error=False):
 
             """
             # Configure genai with the api key
-            genai.configure(api_key=api_key.get_secret_value())  # pyright: ignore[reportPrivateImportUsage]
+            client = genai.Client(api_key=api_key.get_secret_value())
 
             generation_config: GenerationConfigDict = {}
             if temperature is not None:
