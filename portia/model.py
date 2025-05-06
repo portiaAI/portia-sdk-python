@@ -601,12 +601,10 @@ if validate_extras_dependencies("google", raise_error=False):
 
             """
             # Configure genai with the api key
-            client = genai.Client(api_key=api_key.get_secret_value())
+            genai_client = genai.Client(api_key=api_key.get_secret_value())
 
-            generation_config: GenerationConfigDict = {}
             if temperature is not None:
                 kwargs["temperature"] = temperature
-                generation_config["temperature"] = temperature
 
             client = ChatGoogleGenerativeAI(
                 model=model_name,
@@ -615,11 +613,9 @@ if validate_extras_dependencies("google", raise_error=False):
                 **kwargs,
             )
             super().__init__(client, model_name)
-            self._instructor_client = instructor.from_gemini(
-                client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
-                    model_name=model_name,
-                    generation_config=generation_config,
-                ),
+
+            self._instructor_client = instructor.from_genai(
+                client=genai_client,
                 mode=instructor.Mode.GEMINI_JSON,
                 use_async=False,
             )
