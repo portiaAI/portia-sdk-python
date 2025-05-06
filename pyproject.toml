@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.3.1"
+version = "0.4.0"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
