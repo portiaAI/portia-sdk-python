@@ -171,7 +171,6 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
-        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -191,7 +190,7 @@ class Portia:
         """
         plan = self.plan(query, tools, example_plans, end_user)
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user, structured_output_schema)
+        plan_run = self.create_plan_run(plan, end_user)
         return self.resume(plan_run)
 
     def plan(
@@ -557,7 +556,8 @@ class Portia:
             plan_id=plan.id,
             state=PlanRunState.NOT_STARTED,
             execution_context=get_execution_context(),
-            end_user_id=end_user.external_id
+            end_user_id=end_user.external_id,
+            structured_output_schema=plan.structured_output_schema,
         )
         self.storage.save_plan_run(plan_run)
         return plan_run

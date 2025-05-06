@@ -98,8 +98,7 @@ class FinalOutputSummarizer:
         model = self.config.get_summarizer_model()
         context = self._build_tasks_and_outputs_context(plan, plan_run)
         if plan_run.structured_output_schema:
-            schema_copy = deepcopy(plan_run.structured_output_schema)
-            class SchemaWithSummary(schema_copy):
+            class SchemaWithSummary(plan_run.structured_output_schema):
                 summary: str
             
             response = model.get_structured_response(
