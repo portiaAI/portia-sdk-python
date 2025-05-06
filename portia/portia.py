@@ -30,7 +30,6 @@ from portia.clarification import (
     ClarificationCategory,
 )
 from portia.cloud import PortiaCloudClient
-from portia.common import Serializable
 from portia.config import (
     Config,
     ExecutionAgentType,
@@ -83,6 +82,7 @@ from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.clarification_handler import ClarificationHandler
+    from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
     from portia.tool import Tool

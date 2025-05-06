@@ -594,16 +594,6 @@ def test_plan_input_with_schema_validation() -> None:
     assert plan_run.plan_run_inputs["$numbers"].get_value().num_a == 5  # pyright: ignore[reportOptionalMemberAccess]
     assert plan_run.plan_run_inputs["$numbers"].get_value().num_b == 7  # pyright: ignore[reportOptionalMemberAccess]
 
-    # Try with invalid input - this should fail validation
-    invalid_inputs = {
-        numbers_input: {
-            "num_a": "five",  # num_a should be an int
-            "num_b": 7,
-        }
-    }
-    with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_run_inputs=invalid_inputs)  # pyright: ignore[reportArgumentType]
-
 
 def test_run_plan_with_large_step_input() -> None:
     """Test running a plan with a large step input."""

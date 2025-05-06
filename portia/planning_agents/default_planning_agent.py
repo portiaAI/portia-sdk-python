@@ -69,6 +69,7 @@ IMPORTANT GUIDLINES:
   2. Condition field: Write the condition in concise natural language.
 - Do not use the condition field for non-conditional steps.
 - If plan inputs are provided, make sure you specify them as inputs to the appropriate steps.
+- Only use plan inputs if they are provided - DO NOT make any up
                     """,
                 ),
                 Message(role="user", content=prompt),
