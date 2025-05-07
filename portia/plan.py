@@ -20,8 +20,10 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+
 from portia.prefixed_uuid import PlanUUID
 
 

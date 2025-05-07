@@ -4,18 +4,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel, Field
+
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
     SKIPPED_OUTPUT,
 )
 from portia.model import Message
-from pydantic import BaseModel, Field
-from portia.execution_agents.output import LocalDataValue
+
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.plan import Plan
     from portia.plan_run import PlanRun
-    
+
+
 class FinalOutputSummarizer:
     """Utility class responsible for summarizing the run outputs for final output's summary.
 
@@ -43,6 +45,7 @@ class FinalOutputSummarizer:
         "The output should also include the structured output of the plan run as specified to "
         "the output schema."
     )
+
     def __init__(self, config: Config) -> None:
         """Initialize the summarizer agent.
 
@@ -97,14 +100,18 @@ class FinalOutputSummarizer:
         model = self.config.get_summarizer_model()
         context = self._build_tasks_and_outputs_context(plan, plan_run)
         if plan_run.structured_output_schema:
+
             class SchemaWithSummary(plan_run.structured_output_schema):
                 fo_summary: str = Field(description="The summary of the plan output")
-            
-            response = model.get_structured_response(
-                [Message(content=self.summarizer_and_structured_output_prompt + context, role="user")],
+
+            return model.get_structured_response(
+                [
+                    Message(
+                        content=self.summarizer_and_structured_output_prompt + context, role="user"
+                    )
+                ],
                 SchemaWithSummary,
             )
-            return response
         response = model.get_response(
             [Message(content=self.summarizer_only_prompt + context, role="user")],
         )

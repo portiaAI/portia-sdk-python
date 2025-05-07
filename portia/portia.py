@@ -24,7 +24,9 @@ from __future__ import annotations
 import time
 from importlib.metadata import version
 from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
+
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -257,7 +259,7 @@ class Portia:
                 tool_ids=[tool.id for tool in tools],
             ),
             steps=outcome.steps,
-            structured_output_schema=structured_output_schema
+            structured_output_schema=structured_output_schema,
         )
         self.storage.save_plan(plan)
         logger().info(
@@ -806,14 +808,16 @@ class Portia:
                 plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan=ReadOnlyPlan.from_plan(plan),
             )
-            if isinstance(output, BaseModel) and plan_run.structured_output_schema and hasattr(output, "fo_summary"):
+            if (
+                isinstance(output, BaseModel)
+                and plan_run.structured_output_schema
+                and hasattr(output, "fo_summary")
+            ):
                 unsumarrized_output = plan_run.structured_output_schema(**output.model_dump())
                 final_output.value = unsumarrized_output
-                final_output.summary = output.fo_summary # type: ignore[reportAttributeAccessIssue]
+                final_output.summary = output.fo_summary  # type: ignore[reportAttributeAccessIssue]
             elif isinstance(output, str):
                 final_output.summary = output
-            else:
-                raise ValueError(f"Unexpected output type: {type(output)}")
 
         except Exception as e:  # noqa: BLE001
             logger().warning(f"Error summarising run: {e}")

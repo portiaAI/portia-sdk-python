@@ -3,6 +3,7 @@
 from unittest import mock
 
 import pytest
+from pydantic import BaseModel
 
 from portia.config import Config, GenerativeModelsConfig
 from portia.execution_agents.output import LocalDataValue
@@ -14,7 +15,7 @@ from portia.introspection_agents.introspection_agent import (
 from portia.model import GenerativeModel, Message
 from portia.plan import Step
 from tests.utils import get_test_config, get_test_plan_run
-from pydantic import BaseModel
+
 
 @pytest.fixture
 def mock_summarizer_model() -> mock.MagicMock:
@@ -102,7 +103,9 @@ def test_summarizer_agent_empty_plan_run(
 
     # Verify empty context case
     assert output == "Empty summary"
-    expected_prompt = FinalOutputSummarizer.summarizer_only_prompt + ("Query: Empty query\n----------")
+    expected_prompt = FinalOutputSummarizer.summarizer_only_prompt + (
+        "Query: Empty query\n----------"
+    )
     mock_summarizer_model.get_response.assert_called_once_with(
         [Message(content=expected_prompt, role="user")],
     )
@@ -301,16 +304,17 @@ def test_summarizer_agent_handles_structured_output_with_fo_summary(
         "$london_weather": LocalDataValue(value="Sunny and warm"),
         "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
     }
+
     class TestStructuredOutput(BaseModel):
         mock_field: str
-        
+
     plan_run.structured_output_schema = TestStructuredOutput
-    
+
     # Create a mock response that matches the structure we expect
     class SchemaWithSummary(TestStructuredOutput):
         fo_summary: str
-        
-    mock_response = SchemaWithSummary(mock_field='mock_value', fo_summary='mock_summary')
+
+    mock_response = SchemaWithSummary(mock_field="mock_value", fo_summary="mock_summary")
     mock_summarizer_model.get_structured_response.return_value = mock_response
 
     summarizer = FinalOutputSummarizer(config=summarizer_config)
@@ -331,7 +335,9 @@ def test_summarizer_agent_handles_structured_output_with_fo_summary(
         "Output: Visit Hyde Park and have a picnic\n"
         "----------"
     )
-    expected_prompt = FinalOutputSummarizer.summarizer_and_structured_output_prompt + expected_context
+    expected_prompt = (
+        FinalOutputSummarizer.summarizer_and_structured_output_prompt + expected_context
+    )
     mock_summarizer_model.get_structured_response.assert_called_once_with(
         [Message(content=expected_prompt, role="user")],
         mock.ANY,  # Use mock.ANY since we can't predict the exact dynamic class
