@@ -181,7 +181,8 @@ class BrowserTool(Tool[str]):
         default=(
             "General purpose browser tool. Can be used to navigate to a URL and "
             "complete tasks. Should only be used if the task requires a browser "
-            "and you are sure of the URL. Do not break the task into multiple browser tool steps!"
+            "and you are sure of the URL. Do not break the task into multiple browser tool steps - "
+            "each new browser tool run will create a new session!"
         ),
     )
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
@@ -261,11 +262,13 @@ class BrowserTool(Tool[str]):
                 f"Go to {url} and complete the following task: {task}. The user may already be "
                 "logged in. If the user is NOT already logged in and at any point login is "
                 "required to complete the task, please return human_login_required=True, and the "
-                "url of the sign in page as well as what the user should do to sign in"
+                "url of the sign in page as well as what the user should do to sign in."
             )
             task_result = await run_agent_task(task_to_complete, BrowserTaskOutput)
             if task_result.human_login_required:
                 return handle_login_requirement(task_result)
+
+            self.infrastructure_provider.step_complete(ctx)
             return task_result.task_output  # type: ignore reportCallIssue
 
         try:
@@ -363,6 +366,10 @@ class BrowserInfrastructureProvider(ABC):
     def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:
         """Construct the URL for the auth clarification."""
 
+    @abstractmethod
+    def step_complete(self, ctx: ToolRunContext) -> None:
+        """Call when the step is complete to e.g release the session."""
+
 
 class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
     """Browser infrastructure provider for local browser instances."""
@@ -447,6 +454,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
+    def step_complete(self, ctx: ToolRunContext) -> None:
+        """Call when the step is complete to e.g release the session."""
+
     def get_extra_chromium_args(self) -> list[str] | None:
         """Get the extra Chromium arguments.
 
@@ -511,7 +521,16 @@ if BROWSERBASE_AVAILABLE:
 
             self.bb = Browserbase(api_key=api_key)
 
-        def get_context_id(self, bb: Browserbase) -> str:
+        def step_complete(self, ctx: ToolRunContext) -> None:
+            """Call when the step is complete closes the session to persist context."""
+            if ctx.execution_context.additional_data.get("bb_session_id"):
+                self.bb.sessions.update(
+                    ctx.execution_context.additional_data["bb_session_id"],
+                    project_id=self.project_id,  # type: ignore reportArgumentType
+                    status="REQUEST_RELEASE",
+                )
+
+        def get_context_id(self, ctx: ToolRunContext, bb: Browserbase) -> str:
             """Get the Browserbase context id.
 
             Creates a new context in the BrowserBase project. This method can be overridden in
@@ -519,13 +538,24 @@ if BROWSERBASE_AVAILABLE:
             for a specific user.
 
             Args:
+                ctx (ToolRunContext): The tool run context containing execution information.
                 bb (Browserbase): The Browserbase client instance.
 
             Returns:
                 str: The ID of the created or retrieved context.
 
             """
-            return bb.contexts.create(project_id=self.project_id).id  # type: ignore reportArgumentType
+            if ctx.end_user.get_additional_data("bb_context_id"):
+                logger.debug(
+                    "Reusing existing context id: "  # noqa: G004
+                    f"{ctx.end_user.get_additional_data('bb_context_id')}, "
+                    f"end user: {ctx.end_user.external_id}"
+                )
+                return ctx.end_user.get_additional_data("bb_context_id")  # type: ignore reportReturnType
+
+            fresh_context = bb.contexts.create(project_id=self.project_id)  # type: ignore reportArgumentType
+            ctx.end_user.set_additional_data("bb_context_id", fresh_context.id)
+            return fresh_context.id
 
         def create_session(self, bb_context_id: str) -> SessionCreateResponse:
             """Create a new BrowserBase session with the given context ID.
@@ -571,7 +601,7 @@ if BROWSERBASE_AVAILABLE:
             """
             context_id = context.execution_context.additional_data.get(
                 "bb_context_id",
-                self.get_context_id(bb),
+                self.get_context_id(context, bb),
             )
             context.execution_context.additional_data["bb_context_id"] = context_id
 

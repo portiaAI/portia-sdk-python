@@ -3,7 +3,16 @@
 import pytest
 from pydantic import ValidationError
 
-from portia.plan import Plan, PlanContext, PlanUUID, ReadOnlyPlan, Step, Variable
+from portia.plan import (
+    Plan,
+    PlanBuilder,
+    PlanContext,
+    PlanInput,
+    PlanUUID,
+    ReadOnlyPlan,
+    Step,
+    Variable,
+)
 from tests.utils import get_test_plan_run
 
 
@@ -11,7 +20,8 @@ def test_plan_serialization() -> None:
     """Test plan can be serialized to string."""
     plan, _ = get_test_plan_run()
     assert str(plan) == (
-        f"PlanModel(id={plan.id!r},plan_context={plan.plan_context!r}, steps={plan.steps!r}"
+        f"PlanModel(id={plan.id!r},plan_context={plan.plan_context!r}, steps={plan.steps!r}, "
+        f"inputs={plan.inputs!r}"
     )
     # check we can also serialize to JSON
     plan.model_dump_json()
@@ -133,6 +143,55 @@ def test_pretty_print() -> None:
                 condition="x > 10",
             ),
         ],
+        inputs=[PlanInput(name="$input", description="test input")],
     )
     output = plan.pretty_print()
     assert isinstance(output, str)
+
+
+def test_plan_builder_with_plan_input() -> None:
+    """Test that plan builder can create plans with plan inputs."""
+    plan = (
+        PlanBuilder("Process a person's information")
+        .step("Process person", "person_processor")
+        .plan_input(
+            name="$person",
+            description="Person's information",
+        )
+        .build()
+    )
+
+    assert len(plan.inputs) == 1
+    assert plan.inputs[0].name == "$person"
+    assert plan.inputs[0].description == "Person's information"
+
+
+def test_plan_inputs_must_be_unique() -> None:
+    """Test that plan inputs must have unique names."""
+    with pytest.raises(ValidationError, match="Plan input names must be unique"):
+        Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[Step(task="test task", output="$output")],
+            inputs=[
+                PlanInput(name="$duplicate", description="First input"),
+                PlanInput(name="$duplicate", description="Second input with same name"),
+            ],
+        )
+
+
+def test_plan_input_equality() -> None:
+    """Test equality comparison of PlanInput objects."""
+    original_input = PlanInput(name="$test", description="Test input")
+
+    identical_input = PlanInput(name="$test", description="Test input")
+    assert original_input == identical_input
+
+    different_descr_input = PlanInput(name="$test", description="Different description")
+    assert original_input != different_descr_input
+
+    different_name_input = PlanInput(name="$different", description="Test input")
+    assert original_input != different_name_input
+
+    # Test inequality with different types
+    assert original_input != "not a plan input"
+    assert original_input != 42

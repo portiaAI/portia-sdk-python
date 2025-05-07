@@ -10,7 +10,7 @@ import pytest
 
 from portia.end_user import EndUser
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, Step, Variable
+from portia.plan import Plan, PlanContext, PlanInput, Step, Variable
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
 from portia.planning_agents.context import (
     render_prompt_insert_defaults,
@@ -65,6 +65,7 @@ def test_base_classes() -> None:
             tool_list: list[Tool],
             end_user: EndUser,
             examples: list[Plan] | None = None,
+            plan_inputs: list[PlanInput] | None = None,  # noqa: ARG002
         ) -> StepsOrError:
             return super().generate_steps_or_error(query, tool_list, end_user, examples)  # type: ignore  # noqa: PGH003
 
@@ -98,6 +99,7 @@ def test_generate_steps_or_error_failure(mock_config: Config) -> None:
 
 def test_render_prompt() -> None:
     """Test render prompt."""
+    plan_input = PlanInput(name="$plan_input", description="Plan input description")
     plans = [
         Plan(
             plan_context=PlanContext(
@@ -112,6 +114,7 @@ def test_render_prompt() -> None:
                     output="$plan_output1",
                 ),
             ],
+            inputs=[plan_input],
         ),
     ]
     rendered_prompt = render_prompt_insert_defaults(
@@ -119,6 +122,7 @@ def test_render_prompt() -> None:
         tool_list=[AdditionTool()],
         examples=plans,
         end_user=EndUser(external_id="123"),
+        plan_inputs=[plan_input],
     )
     overall_pattern = re.compile(
         r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?",
@@ -146,6 +150,12 @@ def test_render_prompt() -> None:
     assert "plan_tool1a" in response_match
     assert "$plan_input1" in response_match
     assert "$plan_output1" in response_match
+
+    assert "$plan_input" in example_match
+    assert "Plan input description" in rendered_prompt
+    assert "<PlanInputs>" in rendered_prompt
+    assert '<PlanInput name="$plan_input">' in rendered_prompt
+    assert "Plan input description" in rendered_prompt
 
     assert "Use this tool to add two numbers together" in tools_content
     assert "add_tool" in tools_content
@@ -225,3 +235,45 @@ def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
     assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)
     assert len(result.steps) == 2
     assert result.error is None
+
+
+def test_generate_steps_with_plan_inputs(mock_config: Config) -> None:
+    """Test plan generation with plan inputs."""
+    plan_inputs = [
+        PlanInput(
+            name="$username",
+            description="Username for the service",
+        ),
+        PlanInput(
+            name="$user_id",
+            description="ID of the user",
+        ),
+    ]
+
+    mock_response = StepsOrError(
+        steps=[
+            Step(
+                task="Process user addition",
+                tool_id="add_tool",
+                inputs=[Variable(name="$user_id", description="ID of the user")],
+                output="$output",
+            ),
+        ],
+        error=None,
+    )
+    mock_model = get_mock_generative_model(response=mock_response)
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+
+    result = planning_agent.generate_steps_or_error(
+        query="Process user addition",
+        tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
+        plan_inputs=plan_inputs,
+    )
+    assert result.error is None
+
+    assert mock_model._client.invoke.called  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+    prompt_text = mock_model._client.invoke.call_args[0][0][1].content  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+    assert "$user_id" in prompt_text
+    assert "ID of the user" in prompt_text

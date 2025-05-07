@@ -44,6 +44,7 @@ class PlanBuilder:
 
     query: str
     steps: list[Step]
+    plan_inputs: list[PlanInput]
 
     def __init__(self, query: str | None = None) -> None:
         """Initialize the builder with the plan query.
@@ -54,6 +55,7 @@ class PlanBuilder:
         """
         self.query = query if query is not None else ""
         self.steps = []
+        self.plan_inputs = []
 
     def step(
         self,
@@ -120,6 +122,26 @@ class PlanBuilder:
         )
         return self
 
+    def plan_input(
+        self,
+        name: str,
+        description: str,
+    ) -> PlanBuilder:
+        """Add an input variable to the plan.
+
+        Args:
+            name (str): The name of the input.
+            description (str): The description of the input.
+
+        Returns:
+            PlanBuilder: The builder instance with the new plan input added.
+
+        """
+        self.plan_inputs.append(
+            PlanInput(name=name, description=description),
+        )
+        return self
+
     def condition(
         self,
         condition: str,
@@ -151,6 +173,7 @@ class PlanBuilder:
         return Plan(
             plan_context=PlanContext(query=self.query, tool_ids=tool_ids),
             steps=self.steps,
+            inputs=self.plan_inputs,
         )
 
     def _get_step_index_or_raise(self, step_index: int | None) -> int:
@@ -175,18 +198,18 @@ class Variable(BaseModel):
     """A reference to an output of a step.
 
     Args:
-        name (str): The name of the output to reference, e.g. $best_offers.
-        description (str): A description of the output.
+        name (str): The name of the output or plan input to reference, e.g. $best_offers.
+        description (str): A description of the output or plan input.
 
     """
 
     model_config = ConfigDict(extra="ignore")
 
     name: str = Field(
-        description="The name of the output to reference, e.g. $best_offers.",
+        description="The name of the output or plan input to reference, e.g. $best_offers.",
     )
     description: str = Field(
-        description="A description of the output.",
+        description="A description of the output or plan input.",
     )
 
     def pretty_print(self) -> str:
@@ -199,6 +222,45 @@ class Variable(BaseModel):
         return f"{self.name}: ({self.description})"
 
 
+class PlanInput(BaseModel):
+    """An input to a plan.
+
+    Args:
+        name (str): The name of the input, e.g. $api_key.
+        description (str): A description of the input.
+
+    """
+
+    # Use frozen=True to allow this to be a dictionary key
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    name: str = Field(
+        description="The name of the input",
+    )
+    description: str = Field(
+        description="A description of the input.",
+    )
+
+    def pretty_print(self) -> str:
+        """Return the pretty print representation of the plan input.
+
+        Returns:
+            str: A pretty print representation of the input's name, and description.
+
+        """
+        return f"{self.name}: ({self.description})"
+
+    def __hash__(self) -> int:
+        """Make PlanInput hashable by using name and description as the hash key."""
+        return hash((self.name, self.description))
+
+    def __eq__(self, other: object) -> bool:
+        """Compare PlanInput objects for equality based on name."""
+        if not isinstance(other, PlanInput):
+            return False
+        return self.name == other.name and self.description == other.description
+
+
 class Step(BaseModel):
     """A step in a PlanRun.
 
@@ -207,7 +269,8 @@ class Step(BaseModel):
 
     Args:
         task (str): The task that needs to be completed by this step.
-        inputs (list[Vairable]): The input to the step, as an output of a previous step.
+        inputs (list[Variable]): The input to the step, as a reference to an output of a previous
+          step or a plan input
         tool_id (str | None): The ID of the tool used in this step, if applicable.
         output (str): The unique output ID for the result of this step.
 
@@ -220,7 +283,9 @@ class Step(BaseModel):
     )
     inputs: list[Variable] = Field(
         default=[],
-        description=("The input to the step, as a reference to an output of a previous step."),
+        description=(
+            "The input to the step, as a reference to an output of a previous step or a plan input."
+        ),
     )
     tool_id: str | None = Field(
         default=None,
@@ -327,6 +392,7 @@ class Plan(BaseModel):
         id (PlanUUID): A unique ID for the plan.
         plan_context (PlanContext): The context for when the plan was created.
         steps (list[Step]): The set of steps that make up the plan.
+        inputs (list[PlanInput]): The inputs required by the plan.
 
     """
 
@@ -337,6 +403,10 @@ class Plan(BaseModel):
     )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
+    inputs: list[PlanInput] = Field(
+        default=[],
+        description="The inputs required by the plan.",
+    )
     structured_output_schema: type[BaseModel] | None = Field(
         default=None,
         exclude=True,
@@ -353,7 +423,8 @@ class Plan(BaseModel):
         return (
             f"PlanModel(id={self.id!r},"
             f"plan_context={self.plan_context!r}, "
-            f"steps={self.steps!r}"
+            f"steps={self.steps!r}, "
+            f"inputs={self.inputs!r}"
         )
 
     @classmethod
@@ -374,6 +445,7 @@ class Plan(BaseModel):
                 tool_ids=response_json["tool_ids"],
             ),
             steps=[Step.model_validate(step) for step in response_json["steps"]],
+            inputs=[PlanInput.model_validate(input_) for input_ in response_json.get("inputs", [])],
         )
 
     def pretty_print(self) -> str:
@@ -388,9 +460,17 @@ class Plan(BaseModel):
             tool for tool in self.plan_context.tool_ids if not tool.startswith("portia:")
         ]
         tools_summary = f"{len(portia_tools)} portia tools, {len(other_tools)} other tools"
+
+        inputs_section = ""
+        if self.inputs:
+            inputs_section = (
+                "Inputs:\n" + "\n".join([input_.pretty_print() for input_ in self.inputs]) + "\n"
+            )
+
         return (
             f"Task: {self.plan_context.query}\n"
             f"Tools Available Summary: {tools_summary}\n"
+            f"{inputs_section}"
             f"Steps:\n" + "\n".join([step.pretty_print() for step in self.steps])
         )
 
@@ -407,6 +487,12 @@ class Plan(BaseModel):
         outputs = [step.output + (step.condition or "") for step in self.steps]
         if len(outputs) != len(set(outputs)):
             raise ValueError("Outputs + conditions must be unique")
+
+        # Validate plan input names are unique
+        input_names = [input_.name for input_ in self.inputs]
+        if len(input_names) != len(set(input_names)):
+            raise ValueError("Plan input names must be unique")
+
         return self
 
 
@@ -434,5 +520,6 @@ class ReadOnlyPlan(Plan):
             id=plan.id,
             plan_context=plan.plan_context,
             steps=plan.steps,
+            inputs=plan.inputs,
             structured_output_schema=plan.structured_output_schema,
         )

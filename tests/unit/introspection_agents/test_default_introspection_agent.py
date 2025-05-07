@@ -91,6 +91,11 @@ def mock_plan_run() -> PlanRun:
             },
             final_output=None,
         ),
+        plan_run_inputs={
+            "$plan_run_input": LocalDataValue(
+                value="plan_run_input_value", summary="plan_run_input_summary"
+            ),
+        },
     )
 
 

@@ -20,7 +20,7 @@ from portia.config import (
 from portia.errors import PlanError, ToolHardError, ToolSoftError
 from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
-from portia.plan import Plan, PlanBuilder, PlanContext, Step, Variable
+from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step, Variable
 from portia.plan_run import PlanRunState
 from portia.portia import ExecutionHooks, Portia
 from portia.tool import Tool
@@ -562,6 +562,37 @@ def test_portia_plan_steps_inputs_dependencies(
     ), "Fourth step inputs should have summary input"
     assert plan.steps[3].tool_id == "file_writer_tool", "Fourth step should be file_writer_tool"
     assert "100" in str(plan.steps[3].condition), "Fourth step condition does not contain 100"
+
+
+def test_plan_input_with_schema_validation() -> None:
+    """Test running a plan with schema-validated plan inputs."""
+
+    class AdditionNumbers(BaseModel):
+        num_a: int = Field(description="First number to add")
+        num_b: int = Field(description="Second number to add")
+
+    numbers_input = PlanInput(name="$numbers", description="Numbers to add")
+    plan_inputs = {numbers_input: AdditionNumbers(num_a=5, num_b=7)}
+
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        storage_class=StorageClass.MEMORY,
+    )
+    portia = Portia(config=config, tools=ToolRegistry([AdditionTool()]))
+    plan = portia.plan(
+        "Use the addition tool to add together the two provided numbers",
+        plan_inputs=[numbers_input],
+    )
+    plan_run = portia.run_plan(plan, plan_run_inputs=plan_inputs)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == 12  # 5 + 7 = 12
+
+    # Check that plan inputs were stored correctly
+    assert "$numbers" in plan_run.plan_run_inputs
+    assert plan_run.plan_run_inputs["$numbers"].get_value().num_a == 5  # pyright: ignore[reportOptionalMemberAccess]
+    assert plan_run.plan_run_inputs["$numbers"].get_value().num_b == 7  # pyright: ignore[reportOptionalMemberAccess]
 
 
 def test_run_plan_with_large_step_input() -> None:
