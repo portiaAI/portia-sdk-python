@@ -615,7 +615,7 @@ def test_portia_sets_final_output_with_structured_summary(portia: Portia) -> Non
     expected_output = WeatherOutputWithSummary(
         temperature="Sunny and warm",
         activities=["Visit Hyde Park", "Have a picnic"],
-        fo_summary="Weather is sunny and warm in London, visit to Hyde Park for a picnic"
+        fo_summary="Weather is sunny and warm in London, visit to Hyde Park for a picnic",
     )
 
     # Set the structured output schema on the plan run
@@ -637,7 +637,10 @@ def test_portia_sets_final_output_with_structured_summary(portia: Portia) -> Non
         assert isinstance(output_value, WeatherOutput)
         assert output_value.temperature == "Sunny and warm"
         assert output_value.activities == ["Visit Hyde Park", "Have a picnic"]
-        assert output.get_summary() == "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
+        assert (
+            output.get_summary()
+            == "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
+        )
 
         # Verify create_summary was called with correct args
         mock_summarizer.create_summary.assert_called_once()
