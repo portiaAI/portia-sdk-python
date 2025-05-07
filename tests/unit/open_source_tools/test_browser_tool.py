@@ -571,7 +571,8 @@ def test_browserbase_provider_step_complete_with_session(
 ) -> None:
     """Test step_complete calls sessions.update when session_id is present."""
     mock_ctx = MagicMock()
-    mock_ctx.end_user.additional_data = {"bb_session_id": "session123"}
+    end_user = EndUser(external_id="123", additional_data={"bb_session_id": "session123"})
+    mock_ctx.end_user = end_user
 
     mock_browserbase_provider.step_complete(mock_ctx)
 
@@ -587,7 +588,8 @@ def test_browserbase_provider_step_complete_without_session(
 ) -> None:
     """Test step_complete does nothing when session_id is missing."""
     mock_ctx = MagicMock()
-    mock_ctx.end_user.additional_data = {}
+    end_user = EndUser(external_id="123", additional_data={})
+    mock_ctx.end_user = end_user
 
     mock_browserbase_provider.step_complete(mock_ctx)
 

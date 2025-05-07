@@ -17,7 +17,7 @@ def mock_tool_run_context(mock_model: MagicMock) -> ToolRunContext:
     mock_config = MagicMock(spec=Config)
     mock_config.get_default_model.return_value = mock_model
     mock_config.get_generative_model.return_value = mock_model
-    return ToolRunContesxt.model_construct(
+    return ToolRunContext.model_construct(
         plan_run_id=PlanRunUUID(uuid=uuid.uuid4()),
         config=mock_config,
         clarifications=[],
