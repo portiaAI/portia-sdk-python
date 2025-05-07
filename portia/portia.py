@@ -172,7 +172,7 @@ class Portia:
 
         return self.storage.save_end_user(end_user)
 
-    def run(
+    def run(  # noqa: PLR0913
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
@@ -194,13 +194,17 @@ class Portia:
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
                 PlanInput objects to their values.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query.
 
         Returns:
             PlanRun: The run resulting from executing the query.
 
         """
         plan_inputs = list(plan_run_inputs.keys()) if plan_run_inputs else None
-        plan = self.plan(query, tools, example_plans, end_user, plan_inputs, structured_output_schema)
+        plan = self.plan(
+            query, tools, example_plans, end_user, plan_inputs, structured_output_schema
+        )
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user, plan_run_inputs)
         return self.resume(plan_run)
@@ -300,6 +304,8 @@ class Portia:
             end_user (str | EndUser | None = None): The end user to use.
             plan_run_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
                 PlanInput objects to their values.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query.
 
         Returns:
             PlanRun: The resulting PlanRun object.
