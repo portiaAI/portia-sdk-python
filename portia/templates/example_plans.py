@@ -8,8 +8,8 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
             tool_ids=[
                 "search_tool",
-                "portia::google_gmail::send_email_tool",
-                "portia::provider::other_tool",
+                "portia:google:gmail:send_email",
+                "portia:provider::other_tool",
                 "weather_tool",
             ],
         ),
@@ -68,7 +68,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="Comparison of the weather in the two cities",
                     ),
                 ],
-                tool_id="portia::google_gmail::send_email_tool",
+                tool_id="portia:google:gmail:send_email",
                 output="$email_sent",
             ),
         ],
@@ -79,8 +79,8 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
             "send the result to hello@portialabs.ai",
             tool_ids=[
                 "weather_tool",
-                "portia::google_gmail::send_email_tool",
-                "portia::provider::other_tool",
+                "portia:google:gmail:send_email",
+                "portia:provider::other_tool",
             ],
         ),
         steps=[
@@ -118,7 +118,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="Sum of the weather in London and Cairo",
                     ),
                 ],
-                tool_id="portia::google_gmail::send_email_tool",
+                tool_id="portia:google:gmail:send_email",
                 output="$email_sent",
                 condition="if $london_weather is hotter than 10C",
             ),
@@ -130,20 +130,20 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
               10:00 and 17:00\n- Schedule a 30 minute meeting with hello@jo.co at a time \
               that works for me",
             tool_ids=[
-                "portia::google_calendar::get_availability",
-                "portia::google_calendar::create_event",
+                "portia:google:gcalendar:check_availability",
+                "portia:google:gcalendar:create_event",
             ],
         ),
         steps=[
             Step(
                 task="Get the availability of john@jo.co from Google Calendar tomorrow \
                     between 10:00 and 17:00",
-                tool_id="portia::google_calendar::get_availability",
+                tool_id="portia:google:gcalendar:check_availability",
                 output="$availability",
             ),
             Step(
                 task="Schedule a 30 minute meeting with hello@jo.co at a time that works for me",
-                tool_id="portia::google_calendar::create_event",
+                tool_id="portia:google:gcalendar:create_event",
                 inputs=[
                     Variable(
                         name="$availability",
@@ -158,16 +158,16 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
         plan_context=PlanContext(
             query="Get the latest messages on the Dev channel and send a summary to nathan",
             tool_ids=[
-                "portia::slack::bot::list_conversation_ids",
-                "portia::slack::bot::conversation_history",
-                "portia::slack::bot::list_user_ids",
-                "portia::slack::bot::send_message",
+                "portia:slack:bot:list_conversation_ids",
+                "portia:slack:bot:conversation_history",
+                "portia:slack:bot:list_user_ids",
+                "portia:slack:bot:send_message",
             ],
         ),
         steps=[
             Step(
                 task="Get the id of the Dev channel",
-                tool_id="portia::slack::bot::list_conversation_ids",
+                tool_id="portia:slack:bot:list_conversation_ids",
                 output="$conversation_ids",
             ),
             Step(
@@ -178,12 +178,12 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The id of the Dev channel",
                     ),
                 ],
-                tool_id="portia::slack::bot::conversation_history",
+                tool_id="portia:slack:bot:conversation_history",
                 output="$conversation_history",
             ),
             Step(
                 task="get the user id of nathan",
-                tool_id="portia::slack::bot::list_user_ids",
+                tool_id="portia:slack:bot:list_user_ids",
                 output="$nathan_user_id",
             ),
             Step(
@@ -198,7 +198,7 @@ DEFAULT_EXAMPLE_PLANS: list[Plan] = [
                         description="The user id of nathan",
                     ),
                 ],
-                tool_id="portia::slack::bot::send_message",
+                tool_id="portia:slack:bot:send_message",
                 output="$message_sent",
             ),
         ],
