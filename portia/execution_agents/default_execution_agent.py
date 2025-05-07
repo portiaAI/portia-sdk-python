@@ -26,13 +26,14 @@ from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
-    next_state_after_tool_call,
     process_output,
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.model import GenerativeModel, Message
+from portia.plan import ReadOnlyStep, Step
+from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
     from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
+    from portia.execution_hooks import ExecutionHooks
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.storage import AgentMemory
@@ -574,6 +576,23 @@ class ToolCallingModel:
             ),
         )
         result = self._template_in_required_inputs(response, state["step_inputs"])
+
+        if (
+            self.agent.execution_hooks
+            and self.agent.execution_hooks.before_tool_call
+            and self.agent.tool
+        ):
+            for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
+                clarification = self.agent.execution_hooks.before_tool_call(
+                    self.agent.tool,
+                    tool_call.get("args"),
+                    ReadOnlyPlanRun.from_plan_run(self.agent.plan_run),
+                    ReadOnlyStep.from_step(self.agent.step),
+                )
+                if clarification:
+                    self.agent.new_clarifications.append(clarification)
+                    return {"messages": []}
+
         return {"messages": [result]}
 
     def _template_in_required_inputs(
@@ -618,6 +637,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         agent_memory: AgentMemory,
         end_user: EndUser,
         tool: Tool | None = None,
+        execution_hooks: ExecutionHooks | None = None,
     ) -> None:
         """Initialize the agent.
 
@@ -628,11 +648,11 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             agent_memory (AgentMemory): The agent memory to be used for the task.
             end_user (EndUser): The end user for this execution
             tool (Tool | None): The tool to be used for the task (optional).
+            execution_hooks (ExecutionHooks | None): The execution hooks for the agent.
 
         """
-        super().__init__(step, plan_run, config, end_user, agent_memory, tool)
+        super().__init__(step, plan_run, config, end_user, agent_memory, tool, execution_hooks)
         self.verified_args: VerifiedToolInputs | None = None
-        self.new_clarifications: list[Clarification] = []
 
     def clarifications_or_continue(
         self,
@@ -775,7 +795,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         )
         graph.add_conditional_edges(
             AgentNode.TOOLS,
-            lambda state: next_state_after_tool_call(self.config, state, self.tool),
+            lambda state: self.next_state_after_tool_call(self.config, state, self.tool),
         )
         graph.add_conditional_edges(
             AgentNode.TOOL_AGENT,

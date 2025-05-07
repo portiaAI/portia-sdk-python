@@ -998,11 +998,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save a tool call to Portia Cloud.
 
+        This method attempts to save the tool call to Portia Cloud but will not raise exceptions
+        if the request fails. Instead, it logs the error and continues execution.
+
         Args:
             tool_call (ToolCallRecord): The ToolCallRecord object to save to the cloud.
-
-        Raises:
-            StorageError: If the request to Portia Cloud fails.
 
         """
         try:
@@ -1019,10 +1019,14 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "latency_seconds": tool_call.latency_seconds,
                 },
             )
-        except Exception as e:
-            raise StorageError(e) from e
+        except Exception as e: # noqa: BLE001
+            logger().error(f"Error saving tool call to Portia Cloud: {e}")
         else:
-            self.check_response(response)
+            # Don't raise an error if the response is not successful, just log it
+            if not response.is_success:
+                logger().error(
+                    f"Error from Portia Cloud when saving tool call: {response.content!s}"
+                )
             log_tool_call(tool_call)
 
     def save_plan_run_output(

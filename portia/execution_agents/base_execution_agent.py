@@ -6,16 +6,22 @@ The BaseAgent class is the base class that all agents must extend.
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
+
+from langchain_core.messages import ToolMessage
+from langgraph.graph import END, MessagesState
 
 from portia.execution_agents.context import StepInput, build_context
+from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
+from portia.plan import ReadOnlyStep, Step
+from portia.plan_run import PlanRun, ReadOnlyPlanRun
 
 if TYPE_CHECKING:
+    from portia.clarification import Clarification
     from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
-    from portia.plan import Step
-    from portia.plan_run import PlanRun
+    from portia.execution_hooks import ExecutionHooks
     from portia.storage import AgentMemory
     from portia.tool import Tool, ToolRunContext
 
@@ -42,6 +48,7 @@ class BaseExecutionAgent:
         end_user: EndUser,
         agent_memory: AgentMemory,
         tool: Tool | None = None,
+        execution_hooks: ExecutionHooks | None = None,
     ) -> None:
         """Initialize the base agent with the given args.
 
@@ -57,6 +64,7 @@ class BaseExecutionAgent:
             end_user (EndUser): The end user for the execution.
             agent_memory (AgentMemory): The agent memory for persisting outputs.
             tool (Tool | None): An optional tool associated with the agent (default is None).
+            execution_hooks: Optional hooks for extending execution functionality.
 
         """
         self.step = step
@@ -65,6 +73,8 @@ class BaseExecutionAgent:
         self.plan_run = plan_run
         self.end_user = end_user
         self.agent_memory = agent_memory
+        self.execution_hooks = execution_hooks
+        self.new_clarifications: list[Clarification] = []
 
     @abstractmethod
     def execute_sync(self) -> Output:
@@ -97,3 +107,65 @@ class BaseExecutionAgent:
             self.plan_run,
             step_inputs,
         )
+
+    def next_state_after_tool_call(
+        self,
+        config: Config,
+        state: MessagesState,
+        tool: Tool | None = None,
+    ) -> Literal[AgentNode.TOOL_AGENT, AgentNode.SUMMARIZER, END]:  # type: ignore  # noqa: PGH003
+        """Determine the next state after a tool call.
+
+        This function checks the state after a tool call to determine if the run
+        should proceed to the tool agent again, to the summarizer, or end.
+
+        Args:
+            config (Config): The configuration for the run.
+            state (MessagesState): The current state of the messages.
+            tool (Tool | None): The tool involved in the call, if any.
+
+        Returns:
+            Literal[AgentNode.TOOL_AGENT, AgentNode.SUMMARIZER, END]: The next state to transition
+              to.
+
+        Raises:
+            ToolRetryError: If the tool has an error and the maximum retry limit has not been
+              reached.
+
+        """
+        messages = state["messages"]
+        last_message = messages[-1]
+        errors = [msg for msg in messages if "ToolSoftError" in msg.content]
+
+        if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
+            return AgentNode.TOOL_AGENT
+
+        for message in messages:
+            if not isinstance(message, ToolMessage):
+                continue
+
+            if tool and self.execution_hooks and self.execution_hooks.after_tool_call:
+                clarification = self.execution_hooks.after_tool_call(
+                    tool,
+                    message.content,
+                    ReadOnlyPlanRun.from_plan_run(self.plan_run),
+                    ReadOnlyStep.from_step(self.step),
+                )
+                if clarification:
+                    self.new_clarifications.append(clarification)
+                    return END
+
+        if (
+            "ToolSoftError" not in last_message.content
+            and tool
+            and (
+                getattr(tool, "should_summarize", False)
+                # If the value is larger than the threshold value, always summarise them as they are
+                # too big to store the full value locally
+                or config.exceeds_output_threshold(last_message.content)
+            )
+            and isinstance(last_message, ToolMessage)
+            and not is_clarification(last_message.artifact)
+        ):
+            return AgentNode.SUMMARIZER
+        return END
