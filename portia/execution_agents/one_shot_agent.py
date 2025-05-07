@@ -18,22 +18,22 @@ from langchain_core.prompts import (
     SystemMessagePromptTemplate,
 )
 
-from portia.clarification import Clarification
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
+
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import _get_arg_value_with_templating
 from portia.execution_agents.execution_utils import (
     AgentNode,
-    next_state_after_tool_call,
     process_output,
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.execution_context import get_execution_context
 from portia.open_source_tools.clarification_tool import ClarificationTool
 from portia.tool import ToolRunContext
 from portia.execution_agents.context import StepInput  # noqa: TC001
+from portia.plan import Step, ReadOnlyStep
+from portia.plan_run import PlanRun, ReadOnlyPlanRun
 
 
 if TYPE_CHECKING:
@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
+    from portia.execution_hooks import ExecutionHooks
     from portia.model import GenerativeModel
     from portia.plan import Step
     from portia.plan_run import PlanRun
@@ -198,7 +199,6 @@ class OneShotToolCallingModel:
             clarification_tool_args=self.clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
         )
-
         tools = [
             *self.tools,
             self.clarification_tool.to_langchain_with_artifact(self.tool_context),
@@ -206,6 +206,22 @@ class OneShotToolCallingModel:
         model = self.model.to_langchain().bind_tools(tools)
         response = model.invoke(formatted_messages)
         result = self._template_in_required_inputs(response, state["step_inputs"])
+
+        if (
+            self.agent.execution_hooks
+            and self.agent.execution_hooks.before_tool_call
+            and self.agent.tool
+        ):
+            for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
+                clarification = self.agent.execution_hooks.before_tool_call(
+                    self.agent.tool,
+                    tool_call.get("args"),
+                    ReadOnlyPlanRun.from_plan_run(self.agent.plan_run),
+                    ReadOnlyStep.from_step(self.agent.step),
+                )
+                if clarification:
+                    self.agent.new_clarifications.append(clarification)
+                    return {"messages": []}
         return {"messages": [result]}
 
     def _template_in_required_inputs(
@@ -232,14 +248,6 @@ class OneShotAgent(BaseExecutionAgent):
     2. Calls the tool with unverified arguments.
     3. Retries tool calls up to 4 times.
 
-    Args:
-        step (Step): The current step in the task plan.
-        plan_run (PlanRun): The run that defines the task execution process.
-        config (Config): The configuration settings for the agent.
-        agent_memory (AgentMemory): The agent memory for persisting outputs.
-        end_user (EndUser): The end user for the execution.
-        tool (Tool | None): The tool to be used for the task (optional).
-
     Methods:
         execute_sync(): Executes the core logic of the agent's task, using the provided tool
 
@@ -253,6 +261,7 @@ class OneShotAgent(BaseExecutionAgent):
         agent_memory: AgentMemory,
         end_user: EndUser,
         tool: Tool | None = None,
+        execution_hooks: ExecutionHooks | None = None,
     ) -> None:
         """Initialize the OneShotAgent.
 
@@ -263,10 +272,10 @@ class OneShotAgent(BaseExecutionAgent):
             agent_memory (AgentMemory): The agent memory for persisting outputs.
             end_user (EndUser): The end user for the execution.
             tool (Tool | None): The tool to be used for the task (optional).
+            execution_hooks (ExecutionHooks | None): The execution hooks for the agent.
 
         """
-        super().__init__(step, plan_run, config, end_user, agent_memory, tool)
-        self.new_clarifications: list[Clarification] = []
+        super().__init__(step, plan_run, config, end_user, agent_memory, tool, execution_hooks)
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.
@@ -281,7 +290,6 @@ class OneShotAgent(BaseExecutionAgent):
             raise InvalidAgentError("No tool available")
 
         tool_run_ctx = ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=self.end_user,
             plan_run_id=self.plan_run.id,
             config=self.config,
@@ -325,7 +333,7 @@ class OneShotAgent(BaseExecutionAgent):
         )
         graph.add_conditional_edges(
             AgentNode.TOOLS,
-            lambda state: next_state_after_tool_call(self.config, state, self.tool),
+            lambda state: self.next_state_after_tool_call(self.config, state, self.tool),
         )
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
