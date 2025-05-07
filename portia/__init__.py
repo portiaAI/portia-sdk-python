@@ -106,7 +106,6 @@ __all__ = [
     "DefaultToolRegistry",
     "DuplicateToolError",
     "ExecutionAgentType",
-    "ExecutionContext",
     "ExecutionHooks",
     "FileReaderTool",
     "FileWriterTool",
