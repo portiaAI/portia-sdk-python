@@ -1020,7 +1020,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 },
             )
         except Exception as e: # noqa: BLE001
-            logger().error(f"Error saving tool call to Portia Cloud (Not raising): {e}")
+            logger().error(f"Error saving tool call to Portia Cloud: {e}")
         else:
             # Don't raise an error if the response is not successful, just log it
             if not response.is_success:
