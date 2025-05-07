@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from portia.config import StorageClass, default_config
 from portia.plan import Plan, PlanContext, Step
-from portia.plan_run import PlanRun, PlanRunState
-from portia.portia import Portia
+from portia.plan_run import PlanRun
 from portia.tool import Tool, ToolRunContext
-from portia.tool_registry import ToolRegistry
 
 
 class ExecutionContextTrackerTool(Tool):
