@@ -48,8 +48,12 @@ from portia.errors import (
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import (
+    LocalDataValue,
+    Output,
+)
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
+from portia.execution_hooks import ExecutionHooks
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -69,7 +73,7 @@ from portia.storage import (
     InMemoryStorage,
     PortiaCloudStorage,
 )
-from portia.tool import ToolRunContext
+from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import (
     DefaultToolRegistry,
     PortiaToolRegistry,
@@ -78,23 +82,9 @@ from portia.tool_registry import (
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.clarification_handler import ClarificationHandler
     from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
-    from portia.tool import Tool
-
-
-class ExecutionHooks:
-    """Hooks that can be used to modify or add extra functionality to the run of a plan.
-
-    Currently, the only hook is a clarification handler which can be used to handle clarifications
-    that arise during the run of a plan.
-    """
-
-    def __init__(self, clarification_handler: ClarificationHandler | None = None) -> None:
-        """Initialize ExecutionHooks with default values."""
-        self.clarification_handler = clarification_handler
 
 
 class Portia:
@@ -627,7 +617,7 @@ class Portia:
         self.storage.save_plan_run(plan_run)
         return plan_run
 
-    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:
+    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:  # noqa: C901, PLR0912
         """Execute the run steps, updating the run state as needed.
 
         Args:
@@ -655,6 +645,11 @@ class Portia:
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
+        if self.execution_hooks.before_first_step_execution:
+            self.execution_hooks.before_first_step_execution(
+                ReadOnlyPlan.from_plan(plan), ReadOnlyPlanRun.from_plan_run(plan_run)
+            )
+
         last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
         introspection_agent = self._get_introspection_agent()
         for index in range(plan_run.current_step_index, len(plan.steps)):
@@ -672,6 +667,13 @@ class Portia:
                 continue
             if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
                 self._log_final_output(plan_run, plan)
+                if self.execution_hooks.after_last_step_execution and plan_run.outputs.final_output:
+                    self.execution_hooks.after_last_step_execution(
+                        ReadOnlyPlan.from_plan(plan),
+                        ReadOnlyPlanRun.from_plan_run(plan_run),
+                        plan_run.outputs.final_output,
+                    )
+
                 return plan_run
 
             logger().info(
@@ -679,6 +681,14 @@ class Portia:
                 plan=str(plan.id),
                 plan_run=str(plan_run.id),
             )
+
+            if self.execution_hooks.before_step_execution:
+                self.execution_hooks.before_step_execution(
+                    ReadOnlyPlan.from_plan(plan),
+                    ReadOnlyPlanRun.from_plan_run(plan_run),
+                    ReadOnlyStep.from_step(step),
+                )
+
             # we pass read only copies of the state to the agent so that the portia remains
             # responsible for handling the output of the agent and updating the state.
             agent = self._get_agent_for_step(
@@ -708,6 +718,22 @@ class Portia:
                     plan=str(plan.id),
                     plan_run=str(plan_run.id),
                 )
+
+                if self.execution_hooks.after_step_execution:
+                    self.execution_hooks.after_step_execution(
+                        ReadOnlyPlan.from_plan(plan),
+                        ReadOnlyPlanRun.from_plan_run(plan_run),
+                        ReadOnlyStep.from_step(step),
+                        error_output,
+                    )
+
+                if self.execution_hooks.after_last_step_execution:
+                    self.execution_hooks.after_last_step_execution(
+                        ReadOnlyPlan.from_plan(plan),
+                        ReadOnlyPlanRun.from_plan_run(plan_run),
+                        plan_run.outputs.final_output,
+                    )
+
                 return plan_run
             else:
                 self._set_step_output(last_executed_step_output, plan_run, step)
@@ -715,7 +741,16 @@ class Portia:
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
 
+            if self.execution_hooks.after_step_execution:
+                self.execution_hooks.after_step_execution(
+                    ReadOnlyPlan.from_plan(plan),
+                    ReadOnlyPlanRun.from_plan_run(plan_run),
+                    ReadOnlyStep.from_step(step),
+                    last_executed_step_output,
+                )
+
             if self._raise_clarifications(plan_run, last_executed_step_output, plan):
+                # No after_last_step_execution call here as the plan run will be resumed later
                 return plan_run
 
             # persist at the end of each step
@@ -732,6 +767,14 @@ class Portia:
             )
         self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
         self._log_final_output(plan_run, plan)
+
+        if self.execution_hooks.after_last_step_execution and plan_run.outputs.final_output:
+            self.execution_hooks.after_last_step_execution(
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
+                plan_run.outputs.final_output,
+            )
+
         return plan_run
 
     def _log_final_output(self, plan_run: PlanRun, plan: Plan) -> None:
@@ -903,10 +946,10 @@ class Portia:
             for clarification in new_clarifications:
                 clarification.step = plan_run.current_step_index
                 logger().info(
-                    f"Clarification requested - category: {clarification.category}, "
-                    f"user_guidance: {clarification.user_guidance}.",
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
+                    "Clarification requested - category: %s, user_guidance: %r.",
+                    clarification.category,
+                    clarification.user_guidance,
+                    extra={"plan": str(plan.id), "plan_run": str(plan_run.id)},
                 )
                 logger().debug(
                     f"Clarification requested: {clarification.model_dump_json(indent=4)}",
@@ -961,6 +1004,7 @@ class Portia:
             self.storage,
             self.initialize_end_user(plan_run.end_user_id),
             tool,
+            execution_hooks=self.execution_hooks,
         )
 
     def _log_replan_with_portia_cloud_tools(
