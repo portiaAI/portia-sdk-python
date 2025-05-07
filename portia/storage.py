@@ -1024,9 +1024,8 @@ class PortiaCloudStorage(Storage, AgentMemory):
         else:
             # Don't raise an error if the response is not successful, just log it
             if not response.is_success:
-                error_str = str(response.content)
                 logger().error(
-                    f"Error from Portia Cloud when saving tool call (Not raising): {error_str}"
+                    f"Error from Portia Cloud when saving tool call: {str(response.content)}"
                 )
             log_tool_call(tool_call)
 
