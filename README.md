@@ -142,6 +142,6 @@ Head on over to our <a href="https://github.com/portiaAI/portia-sdk-python/blob/
 # ⭐ Support
 You can support our work best by leaving a star!
 
-![star](https://github.com/user-attachments/assets/616455c3-6c8a-4fb4-92f7-3da6f90c4eff)
+![star](https://github.com/user-attachments/assets/8df5e1d9-a0d4-40b4-9c51-945841744050)
 
 We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
