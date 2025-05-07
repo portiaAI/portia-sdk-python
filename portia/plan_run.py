@@ -24,7 +24,6 @@ from portia.clarification import (
 )
 from portia.common import PortiaEnum
 from portia.execution_agents.output import LocalDataValue, Output
-from portia.execution_context import ExecutionContext, empty_context
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
 
 
@@ -86,7 +85,6 @@ class PlanRun(BaseModel):
         plan_id (PlanUUID): The ID of the Plan this run uses.
         current_step_index (int): The current step that is being executed.
         state (PlanRunState): The current state of the PlanRun.
-        execution_context (ExecutionContext): Execution context for the PlanRun.
         outputs (PlanRunOutputs): Outputs of the PlanRun including clarifications.
         plan_run_inputs (dict[str, LocalDataValue]): Dict mapping plan input names to their values.
 
@@ -108,10 +106,6 @@ class PlanRun(BaseModel):
     state: PlanRunState = Field(
         default=PlanRunState.NOT_STARTED,
         description="The current state of the PlanRun.",
-    )
-    execution_context: ExecutionContext = Field(
-        default=empty_context(),
-        description="Execution Context for the PlanRun.",
     )
     end_user_id: str = Field(
         ...,
@@ -202,6 +196,5 @@ class ReadOnlyPlanRun(PlanRun):
             outputs=plan_run.outputs,
             state=plan_run.state,
             end_user_id=plan_run.end_user_id,
-            execution_context=plan_run.execution_context,
             plan_run_inputs=plan_run.plan_run_inputs,
         )

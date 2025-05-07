@@ -9,7 +9,6 @@ from portia import (
     PlanRunState,
     Portia,
     example_tool_registry,
-    execution_context,
 )
 from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
@@ -29,7 +28,6 @@ plan_run = portia.run(
 )
 
 # We can also provide additional data about the end user to the process
-
 plan_run = portia.run(
     "Please tell me a joke that is customized to my favorite sport",
     end_user=EndUser(
@@ -60,10 +58,6 @@ if plan_run.state == PlanRunState.NEED_CLARIFICATION:
             clarification=c,
             response=new_value,
         )
-
-# Execute again with the same execution context
-with execution_context(context=plan_run.execution_context):
-    portia.resume(plan_run)
 
 # You can also pass in a clarification handler to manage clarifications
 portia = Portia(
