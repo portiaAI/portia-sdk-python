@@ -195,7 +195,9 @@ class Portia:
             plan_run_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
                 PlanInput objects to their values.
             structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query.
+                for the query. This is passed on to plan runs created from this plan but will be
+                not be stored with the plan itself if using cloud storage and must be re-attached
+                to the plan run if using cloud storage.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -230,7 +232,9 @@ class Portia:
             plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
               the inputs required for the plan.
             structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query.
+                for the query. This is passed on to plan runs created from this plan but will be
+                not be stored with the plan itself if using cloud storage and must be re-attached
+                to the plan run if using cloud storage.
 
         Returns:
             Plan: The plan for executing the query.
@@ -305,7 +309,7 @@ class Portia:
             plan_run_inputs (dict[PlanInput, Serializable] | None): Optional dictionary mapping
                 PlanInput objects to their values.
             structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query.
+                for the plan run. This is passed on to plan runs created from this plan but will be
 
         Returns:
             PlanRun: The resulting PlanRun object.
