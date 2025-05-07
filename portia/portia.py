@@ -692,6 +692,7 @@ class Portia:
                 )
                 last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
+                logger().error(f"Error executing step {index}: {e}")
                 error_output = LocalDataValue(value=str(e))
                 self._set_step_output(error_output, plan_run, step)
                 plan_run.outputs.final_output = error_output
