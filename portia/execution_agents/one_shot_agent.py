@@ -34,7 +34,6 @@ from portia.plan_run import PlanRun, ReadOnlyPlanRun
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
-    from portia.clarification import Clarification
     from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output

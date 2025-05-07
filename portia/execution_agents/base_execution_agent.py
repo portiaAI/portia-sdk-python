@@ -11,13 +11,13 @@ from typing import TYPE_CHECKING, Literal
 from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
 
-from portia.clarification import Clarification
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
 from portia.plan import ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 
 if TYPE_CHECKING:
+    from portia.clarification import Clarification
     from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output

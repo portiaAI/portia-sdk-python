@@ -93,7 +93,7 @@ class ExecutionHooks(BaseModel):
         Clarification | None: A clarification to raise, or None to proceed with the tool call
     """
 
-    after_tool_call: Callable[[Tool, Any, PlanRun, Step], None] | None = None
+    after_tool_call: Callable[[Tool, Any, PlanRun, Step], Clarification | None] | None = None
     """Called after the tool is called.
 
     Args:

@@ -6,7 +6,7 @@
      - you need to ensure that all the information for carrying out the step will be provided in the combination of the task description and the inputs.
      - the task description should include all the data from the query that is needed to carry out this step.
      - DO NOT specify information in the step description that is already being passed in by an input
-     - MAKE SURE inputs are ONLY referencing variables from previous steps or plan inputs, IT SHOULD NOT contain any other data.
+     - MAKE SURE inputs are ONLY referencing variables from previous steps or the provided plan inputs, IT SHOULD NOT contain any other data and plan inputs should ONLY be used if they are provided.
      - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
      - give a name to the variable for the output of the step if it is successful.
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.

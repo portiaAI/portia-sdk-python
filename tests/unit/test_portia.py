@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import HttpUrl, SecretStr
@@ -24,7 +24,12 @@ from portia.config import (
     StorageClass,
 )
 from portia.end_user import EndUser
-from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
+from portia.errors import (
+    InvalidPlanRunStateError,
+    PlanError,
+    PlanNotFoundError,
+    PlanRunNotFoundError,
+)
 from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -1058,6 +1063,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
 
 def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     """Test the actual implementation of _handle_introspection_outcome for COMPLETE outcome."""
+    # Create a plan with conditions
     step = Step(task="Test step", inputs=[], output="$test_output", condition="some_condition")
     plan = Plan(
         plan_context=PlanContext(query="test query", tool_ids=[]),
@@ -1319,8 +1325,8 @@ def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMo
         plan_run = portia.run(
             query="Add the two numbers together",
             plan_run_inputs={
-                num_a_input: LocalDataValue(value=1),
-                num_b_input: LocalDataValue(value=2),
+                num_a_input: 1,
+                num_b_input: 2,
             },
         )
 
@@ -1386,7 +1392,7 @@ def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
         inputs=[num_a_input, num_b_input],
     )
 
-    plan_run_inputs = {num_a_input: LocalDataValue(value=1), num_b_input: LocalDataValue(value=2)}
+    plan_run_inputs = {num_a_input: 1, num_b_input: 2}
 
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalDataValue(value=3)
@@ -1430,15 +1436,15 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
 
     # Should fail with just one of the two required
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_run_inputs={required_input1: LocalDataValue(value="value")})
+        portia.run_plan(plan, plan_run_inputs={required_input1: "value"})
 
     # Should work if we provide both required inputs
     with mock.patch.object(portia, "resume") as mock_resume:
         portia.run_plan(
             plan,
             plan_run_inputs={
-                required_input1: LocalDataValue(value="value 1"),
-                required_input2: LocalDataValue(value="value 2"),
+                required_input1: "value 1",
+                required_input2: "value 2",
             },
         )
         mock_resume.assert_called_once()
@@ -1455,7 +1461,7 @@ def test_portia_run_plan_with_extra_input_when_expecting_none(portia: Portia) ->
 
     # Run with input that isn't in the plan's inputs
     extra_input = PlanInput(name="$extra", description="Extra unused input")
-    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: LocalDataValue(value="value")})
+    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: "value"})
     assert plan_run.plan_run_inputs == {}
 
 
@@ -1485,8 +1491,8 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
         plan_run = portia.run_plan(
             plan,
             plan_run_inputs={
-                expected_input: LocalDataValue(value="expected_value"),
-                unknown_input: LocalDataValue(value="unknown_value"),
+                expected_input: "expected_value",
+                unknown_input: "unknown_value",
             },
         )
 
@@ -1494,6 +1500,66 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
         assert plan_run.plan_run_inputs["$expected"].get_value() == "expected_value"
         assert "$unknown" not in plan_run.plan_run_inputs
         mock_resume.assert_called_once()
+
+
+def test_portia_run_plan_with_plan_uuid(portia: Portia) -> None:
+    """Test that run_plan can retrieve a plan from storage using PlanUUID."""
+    plan = Plan(
+        plan_context=PlanContext(query="example query", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Simple task",
+                tool_id="add_tool",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+    )
+
+    # Save the plan to storage
+    portia.storage.save_plan(plan)
+
+    # Mock the resume method to verify it gets called with the correct plan run
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+
+        plan_run = portia.run_plan(plan.id)
+
+        assert plan_run.plan_id == plan.id
+        mock_resume.assert_called_once()
+
+    with pytest.raises(PlanNotFoundError):
+        portia.run_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
+
+
+def test_portia_run_plan_with_uuid(portia: Portia) -> None:
+    """Test that run_plan can retrieve a plan from storage using UUID."""
+    plan = Plan(
+        plan_context=PlanContext(query="example query", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Simple task",
+                tool_id="add_tool",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+    )
+
+    # Save the plan to storage
+    portia.storage.save_plan(plan)
+
+    # Mock the resume method to verify it gets called with the correct plan run
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+
+        plan_run = portia.run_plan(plan.id)
+
+        assert plan_run.plan_id == plan.id
+        mock_resume.assert_called_once()
+
+    with pytest.raises(PlanNotFoundError):
+        portia.run_plan(UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05"))
 
 
 def test_portia_execution_step_hooks(portia: Portia, planning_model: MagicMock) -> None:
