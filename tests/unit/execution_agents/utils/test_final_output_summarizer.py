@@ -285,7 +285,7 @@ def test_summarizer_agent_handles_structured_output_with_fo_summary(
     summarizer_config: Config,
     mock_summarizer_model: mock.MagicMock,
 ) -> None:
-    """Test that the summarizer agent correctly executes and returns a summary."""
+    """Test that the summarizer agent correctly executes and returns a structured output."""
     # Set up test data
     (plan, plan_run) = get_test_plan_run()
     plan.plan_context.query = "What's the weather in London and what can I do?"
