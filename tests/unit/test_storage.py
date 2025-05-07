@@ -335,9 +335,8 @@ def test_portia_cloud_storage() -> None:
     with (
         patch.object(storage.client, "post", return_value=mock_response) as mock_post,
     ):
-        # Test save_tool_call failure
-        with pytest.raises(StorageError, match="An error occurred."):
-            storage.save_tool_call(tool_call)
+        # Test save_tool_call - should not raise an exception
+        storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
             url="/api/v0/tool-calls/",
@@ -488,11 +487,9 @@ def test_portia_cloud_storage_errors() -> None:
 
     with (
         patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
-        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
-        with pytest.raises(StorageError):
-            storage.save_tool_call(tool_call)
+        # Test save_tool_call - should not raise an exception
+        storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
             url="/api/v0/tool-calls/",
@@ -513,7 +510,7 @@ def test_portia_cloud_storage_errors() -> None:
         patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
         patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
+        # Test save_end_user failure
         with pytest.raises(StorageError):
             storage.save_end_user(end_user)
 
@@ -526,7 +523,7 @@ def test_portia_cloud_storage_errors() -> None:
         patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
         patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
+        # Test get_end_user failure
         with pytest.raises(StorageError):
             storage.get_end_user(end_user.external_id)
 
