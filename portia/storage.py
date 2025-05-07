@@ -44,7 +44,6 @@ from portia.execution_agents.output import (
     LocalDataValue,
     Output,
 )
-from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanUUID
 from portia.plan_run import (
@@ -895,7 +894,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 json={
                     "current_step_index": plan_run.current_step_index,
                     "state": plan_run.state,
-                    "execution_context": plan_run.execution_context.model_dump(mode="json"),
                     "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
@@ -937,9 +935,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 end_user_id=response_json["end_user"],
                 current_step_index=response_json["current_step_index"],
                 state=PlanRunState(response_json["state"]),
-                execution_context=ExecutionContext.model_validate(
-                    response_json["execution_context"],
-                ),
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
                 plan_run_inputs={
                     key: LocalDataValue.model_validate(value)
@@ -987,9 +982,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                         current_step_index=plan_run["current_step_index"],
                         end_user_id=plan_run["end_user"],
                         state=PlanRunState(plan_run["state"]),
-                        execution_context=ExecutionContext.model_validate(
-                            plan_run["execution_context"],
-                        ),
                         outputs=PlanRunOutputs.model_validate(plan_run["outputs"]),
                         plan_run_inputs={
                             key: LocalDataValue.model_validate(value)
@@ -1020,7 +1012,6 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "tool_name": tool_call.tool_name,
                     "step": tool_call.step,
                     "end_user_id": tool_call.end_user_id or "",
-                    "additional_data": tool_call.additional_data,
                     "input": tool_call.input,
                     "output": tool_call.output,
                     "status": tool_call.status,

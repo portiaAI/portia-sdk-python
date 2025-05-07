@@ -50,12 +50,6 @@ from portia.errors import (
 )
 from portia.execution_agents.output import LocalDataValue, Output
 
-# Execution context
-from portia.execution_context import (
-    ExecutionContext,
-    execution_context,
-)
-
 # Logging
 from portia.logger import logger
 
@@ -163,7 +157,6 @@ __all__ = [
     "WeatherTool",
     "default_config",
     "example_tool_registry",
-    "execution_context",
     "logger",
     "open_source_tool_registry",
 ]
