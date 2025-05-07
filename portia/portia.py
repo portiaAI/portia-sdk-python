@@ -806,10 +806,10 @@ class Portia:
                 plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan=ReadOnlyPlan.from_plan(plan),
             )
-            if isinstance(output, BaseModel) and plan_run.structured_output_schema and hasattr(output, "_summary"):
+            if isinstance(output, BaseModel) and plan_run.structured_output_schema and hasattr(output, "fo_summary"):
                 unsumarrized_output = plan_run.structured_output_schema(**output.model_dump())
                 final_output.value = unsumarrized_output
-                final_output.summary = output._summary # type: ignore[reportAttributeAccessIssue]
+                final_output.summary = output.fo_summary # type: ignore[reportAttributeAccessIssue]
             elif isinstance(output, str):
                 final_output.summary = output
             else:

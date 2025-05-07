@@ -9,14 +9,13 @@ from portia.introspection_agents.introspection_agent import (
     SKIPPED_OUTPUT,
 )
 from portia.model import Message
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from portia.execution_agents.output import LocalDataValue
 if TYPE_CHECKING:
     from portia.config import Config
     from portia.plan import Plan
     from portia.plan_run import PlanRun
     
-from copy import deepcopy
 class FinalOutputSummarizer:
     """Utility class responsible for summarizing the run outputs for final output's summary.
 
@@ -99,7 +98,7 @@ class FinalOutputSummarizer:
         context = self._build_tasks_and_outputs_context(plan, plan_run)
         if plan_run.structured_output_schema:
             class SchemaWithSummary(plan_run.structured_output_schema):
-                _summary: str # _ to not conflict with user defined fields
+                fo_summary: str = Field(description="The summary of the plan output")
             
             response = model.get_structured_response(
                 [Message(content=self.summarizer_and_structured_output_prompt + context, role="user")],
