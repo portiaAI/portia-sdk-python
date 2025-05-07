@@ -194,7 +194,6 @@ class OneShotAgent(BaseExecutionAgent):
 
         """
         super().__init__(step, plan_run, config, end_user, agent_memory, tool, execution_hooks)
-        self.new_clarifications: list[Clarification] = []
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.

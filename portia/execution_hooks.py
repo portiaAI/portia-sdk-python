@@ -21,11 +21,11 @@ class ExecutionHooks(BaseModel):
 
     Hooks can be registered for various execution events:
     - clarification_handler: A handler for clarifications raised during execution
-    - before_execution_step: Called before executing each step
-    - after_execution_step: Called after executing each step. When there's an error, this is
+    - before_step_execution: Called before executing each step
+    - after_step_execution: Called after executing each step. When there's an error, this is
         called with the error as the output value.
-    - before_first_execution_step: Called before executing the first step
-    - after_last_execution_step: Called after executing the last step of the plan run. This is not
+    - before_first_step_execution: Called before executing the first step
+    - after_last_step_execution: Called after executing the last step of the plan run. This is not
         called if a clarification is raised, as it is expected that the plan will be resumed after
         the clarification is handled.
     - before_tool_call: Called before the tool is called
@@ -37,7 +37,7 @@ class ExecutionHooks(BaseModel):
     clarification_handler: ClarificationHandler | None = None
     """Handler for clarifications raised during execution."""
 
-    before_execution_step: Callable[[Plan, PlanRun, Step], None] | None = None
+    before_step_execution: Callable[[Plan, PlanRun, Step], None] | None = None
     """Called before executing each step.
 
     Args:
@@ -46,7 +46,7 @@ class ExecutionHooks(BaseModel):
         step: The step about to be executed
     """
 
-    after_execution_step: Callable[[Plan, PlanRun, Step, Output], None] | None = None
+    after_step_execution: Callable[[Plan, PlanRun, Step, Output], None] | None = None
     """Called after executing each step.
 
     When there's an error, this is called with the error as the output value.
@@ -58,7 +58,7 @@ class ExecutionHooks(BaseModel):
         output: The output from the step execution
     """
 
-    before_first_execution_step: Callable[[Plan, PlanRun], None] | None = None
+    before_first_step_execution: Callable[[Plan, PlanRun], None] | None = None
     """Called before executing the first step.
 
     Args:
@@ -66,7 +66,7 @@ class ExecutionHooks(BaseModel):
         plan_run: The current plan run
     """
 
-    after_last_execution_step: Callable[[Plan, PlanRun, Output], None] | None = None
+    after_last_step_execution: Callable[[Plan, PlanRun, Output], None] | None = None
     """Called after executing the last step of the plan run.
 
     This is not called if a clarification is raised, as it is expected that the plan
@@ -101,6 +101,10 @@ class ExecutionHooks(BaseModel):
         output: The output returned from the tool call
         plan_run: The current plan run
         step: The step being executed
+
+    Returns:
+        Clarification | None: A clarification to raise, or None to proceed. If a clarification
+          is raised, when we later resume the plan, the same step will be executed again
     """
 
 

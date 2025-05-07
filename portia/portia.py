@@ -644,8 +644,8 @@ class Portia:
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
-        if self.execution_hooks.before_first_execution_step:
-            self.execution_hooks.before_first_execution_step(
+        if self.execution_hooks.before_first_step_execution:
+            self.execution_hooks.before_first_step_execution(
                 ReadOnlyPlan.from_plan(plan), ReadOnlyPlanRun.from_plan_run(plan_run)
             )
 
@@ -666,8 +666,8 @@ class Portia:
                 continue
             if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
                 self._log_final_output(plan_run, plan)
-                if self.execution_hooks.after_last_execution_step and plan_run.outputs.final_output:
-                    self.execution_hooks.after_last_execution_step(
+                if self.execution_hooks.after_last_step_execution and plan_run.outputs.final_output:
+                    self.execution_hooks.after_last_step_execution(
                         ReadOnlyPlan.from_plan(plan),
                         ReadOnlyPlanRun.from_plan_run(plan_run),
                         plan_run.outputs.final_output,
@@ -681,8 +681,8 @@ class Portia:
                 plan_run=str(plan_run.id),
             )
 
-            if self.execution_hooks.before_execution_step:
-                self.execution_hooks.before_execution_step(
+            if self.execution_hooks.before_step_execution:
+                self.execution_hooks.before_step_execution(
                     ReadOnlyPlan.from_plan(plan),
                     ReadOnlyPlanRun.from_plan_run(plan_run),
                     ReadOnlyStep.from_step(step),
@@ -718,16 +718,16 @@ class Portia:
                     plan_run=str(plan_run.id),
                 )
 
-                if self.execution_hooks.after_execution_step:
-                    self.execution_hooks.after_execution_step(
+                if self.execution_hooks.after_step_execution:
+                    self.execution_hooks.after_step_execution(
                         ReadOnlyPlan.from_plan(plan),
                         ReadOnlyPlanRun.from_plan_run(plan_run),
                         ReadOnlyStep.from_step(step),
                         error_output,
                     )
 
-                if self.execution_hooks.after_last_execution_step:
-                    self.execution_hooks.after_last_execution_step(
+                if self.execution_hooks.after_last_step_execution:
+                    self.execution_hooks.after_last_step_execution(
                         ReadOnlyPlan.from_plan(plan),
                         ReadOnlyPlanRun.from_plan_run(plan_run),
                         plan_run.outputs.final_output,
@@ -740,8 +740,8 @@ class Portia:
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
 
-            if self.execution_hooks.after_execution_step:
-                self.execution_hooks.after_execution_step(
+            if self.execution_hooks.after_step_execution:
+                self.execution_hooks.after_step_execution(
                     ReadOnlyPlan.from_plan(plan),
                     ReadOnlyPlanRun.from_plan_run(plan_run),
                     ReadOnlyStep.from_step(step),
@@ -749,7 +749,7 @@ class Portia:
                 )
 
             if self._raise_clarifications(plan_run, last_executed_step_output, plan):
-                # No after_last_execution_step call here as the plan run will be resumed later
+                # No after_last_step_execution call here as the plan run will be resumed later
                 return plan_run
 
             # persist at the end of each step
@@ -767,8 +767,8 @@ class Portia:
         self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
         self._log_final_output(plan_run, plan)
 
-        if self.execution_hooks.after_last_execution_step and plan_run.outputs.final_output:
-            self.execution_hooks.after_last_execution_step(
+        if self.execution_hooks.after_last_step_execution and plan_run.outputs.final_output:
+            self.execution_hooks.after_last_step_execution(
                 ReadOnlyPlan.from_plan(plan),
                 ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan_run.outputs.final_output,

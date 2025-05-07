@@ -856,8 +856,8 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
         tools=[ClarificationTool()],
         execution_hooks=ExecutionHooks(
             clarification_handler=clarification_handler,
-            after_execution_step=MagicMock(),
-            after_last_execution_step=MagicMock(),
+            after_step_execution=MagicMock(),
+            after_last_step_execution=MagicMock(),
         ),
     )
     planning_model.get_structured_response.return_value = StepsOrError(
@@ -902,8 +902,8 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
             clarification_handler.received_clarification.user_guidance
             == "Handle this clarification"
         )
-        assert portia.execution_hooks.after_execution_step.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-        assert portia.execution_hooks.after_last_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        assert portia.execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        assert portia.execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
 def test_portia_error_clarification(portia: Portia, planning_model: MagicMock) -> None:
@@ -988,7 +988,7 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
 def test_portia_run_with_introspection_complete(portia: Portia, planning_model: MagicMock) -> None:
     """Test run with introspection agent returning COMPLETE outcome."""
     portia.execution_hooks = ExecutionHooks(
-        after_last_execution_step=MagicMock(),
+        after_last_step_execution=MagicMock(),
     )
 
     # Setup mock plan and response
@@ -1050,8 +1050,8 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         assert plan_run.outputs.step_outputs["$step2_result"].get_value() == COMPLETED_OUTPUT
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.get_summary() == "Execution completed early"
-        assert portia.execution_hooks.after_last_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-        portia.execution_hooks.after_last_execution_step.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        assert portia.execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        portia.execution_hooks.after_last_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
             mock.ANY, ReadOnlyPlanRun.from_plan_run(plan_run), final_output
         )
 
@@ -1499,10 +1499,10 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
 def test_portia_execution_step_hooks(portia: Portia, planning_model: MagicMock) -> None:
     """Test that all execution step hooks are called in correct order with right arguments."""
     execution_hooks = ExecutionHooks(
-        before_first_execution_step=MagicMock(),
-        before_execution_step=MagicMock(),
-        after_execution_step=MagicMock(),
-        after_last_execution_step=MagicMock(),
+        before_first_step_execution=MagicMock(),
+        before_step_execution=MagicMock(),
+        after_step_execution=MagicMock(),
+        after_last_step_execution=MagicMock(),
     )
     portia.execution_hooks = execution_hooks
 
@@ -1531,31 +1531,31 @@ def test_portia_execution_step_hooks(portia: Portia, planning_model: MagicMock) 
 
     assert plan_run.state == PlanRunState.COMPLETE
 
-    assert execution_hooks.before_first_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.before_execution_step.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.after_execution_step.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.after_last_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_first_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
     plan = portia.storage.get_plan(plan_run.plan_id)
-    execution_hooks.before_first_execution_step.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    execution_hooks.before_first_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY
     )
 
-    execution_hooks.before_execution_step.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    execution_hooks.before_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step1)
     )
-    execution_hooks.before_execution_step.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    execution_hooks.before_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step2)
     )
 
-    execution_hooks.after_execution_step.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    execution_hooks.after_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step1), step_1_result
     )
-    execution_hooks.after_execution_step.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    execution_hooks.after_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step2), step_2_result
     )
 
-    execution_hooks.after_last_execution_step.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    execution_hooks.after_last_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY, step_2_result
     )
 
@@ -1563,10 +1563,10 @@ def test_portia_execution_step_hooks(portia: Portia, planning_model: MagicMock) 
 def test_portia_execution_step_hooks_with_error(portia: Portia, planning_model: MagicMock) -> None:
     """Test that execution hooks are called correctly when an error occurs."""
     execution_hooks = ExecutionHooks(
-        before_first_execution_step=MagicMock(),
-        before_execution_step=MagicMock(),
-        after_execution_step=MagicMock(),
-        after_last_execution_step=MagicMock(),
+        before_first_step_execution=MagicMock(),
+        before_step_execution=MagicMock(),
+        after_step_execution=MagicMock(),
+        after_last_step_execution=MagicMock(),
     )
     portia.execution_hooks = execution_hooks
 
@@ -1581,7 +1581,7 @@ def test_portia_execution_step_hooks_with_error(portia: Portia, planning_model: 
         plan_run = portia.run("Test execution hooks with error")
     assert plan_run.state == PlanRunState.FAILED
 
-    assert execution_hooks.before_first_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.before_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.after_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.after_last_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_first_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]

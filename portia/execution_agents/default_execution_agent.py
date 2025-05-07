@@ -654,7 +654,6 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         """
         super().__init__(step, plan_run, config, end_user, agent_memory, tool, execution_hooks)
         self.verified_args: VerifiedToolInputs | None = None
-        self.new_clarifications: list[Clarification] = []
 
     def clarifications_or_continue(
         self,

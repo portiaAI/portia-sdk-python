@@ -486,10 +486,10 @@ def test_portia_run_query_with_conditional_steps() -> None:
 def test_portia_run_query_with_example_registry_and_hooks() -> None:
     """Test we can run a query using the example registry."""
     execution_hooks = ExecutionHooks(
-        before_first_execution_step=MagicMock(return_value=None),
-        before_execution_step=MagicMock(return_value=None),
-        after_execution_step=MagicMock(return_value=None),
-        after_last_execution_step=MagicMock(return_value=None),
+        before_first_step_execution=MagicMock(return_value=None),
+        before_step_execution=MagicMock(return_value=None),
+        after_step_execution=MagicMock(return_value=None),
+        after_last_step_execution=MagicMock(return_value=None),
         before_tool_call=MagicMock(return_value=None),
         after_tool_call=MagicMock(return_value=None),
     )
@@ -501,10 +501,10 @@ def test_portia_run_query_with_example_registry_and_hooks() -> None:
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
-    assert execution_hooks.before_first_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.before_execution_step.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.after_execution_step.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
-    assert execution_hooks.after_last_execution_step.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_first_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
     assert execution_hooks.before_tool_call.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
     assert execution_hooks.after_tool_call.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 

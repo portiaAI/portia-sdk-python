@@ -30,6 +30,7 @@ from portia.execution_agents.default_execution_agent import (
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_hooks import ExecutionHooks
 from portia.model import LangChainGenerativeModel
 from portia.plan import ReadOnlyStep, Step, Variable
 from portia.plan_run import ReadOnlyPlanRun
@@ -579,21 +580,21 @@ def test_tool_calling_model_no_hallucinations() -> None:
 
     (_, plan_run) = get_test_plan_run()
     mock_before_tool_call = mock.MagicMock(return_value=None)
-    mock_execution_hooks = mock.MagicMock()
-    mock_execution_hooks.before_tool_call = mock_before_tool_call
     agent = SimpleNamespace(
+        plan_run=plan_run,
+        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        tool=SimpleNamespace(
+            id="TOOL_ID",
+            name="TOOL_NAME",
+            args_json_schema=_TestToolSchema,
+            description="TOOL_DESCRIPTION",
+        ),
         verified_args=verified_tool_inputs,
         clarifications=[],
-        execution_hooks=mock_execution_hooks,
+        execution_hooks=ExecutionHooks(
+            before_tool_call=mock_before_tool_call,
+        ),
         new_clarifications=[],
-    )
-    agent.step = Step(task="DESCRIPTION_STRING", output="$out")
-    agent.plan_run = plan_run
-    agent.tool = SimpleNamespace(
-        id="TOOL_ID",
-        name="TOOL_NAME",
-        args_json_schema=_TestToolSchema,
-        description="TOOL_DESCRIPTION",
     )
     tool_calling_model = ToolCallingModel(
         model=mock_model,
@@ -848,6 +849,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
+    mock_after_tool_call = mock.MagicMock(return_value=None)
     (plan, plan_run) = get_test_plan_run()
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
@@ -856,11 +858,20 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         config=get_test_config(),
         tool=tool,
         agent_memory=InMemoryStorage(),
+        execution_hooks=ExecutionHooks(
+            after_tool_call=mock_after_tool_call,
+        ),
     )
 
     output = agent.execute_sync()
     assert isinstance(output, Output)
     assert output.get_value() == "Sent email with id: 0"
+    mock_after_tool_call.assert_called_once_with(
+        agent.tool,
+        "Sent email",
+        ReadOnlyPlanRun.from_plan_run(agent.plan_run),
+        ReadOnlyStep.from_step(agent.step),
+    )
 
 
 def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1228,9 +1239,6 @@ def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) ->
 
     (plan, plan_run) = get_test_plan_run()
 
-    mock_execution_hooks = mock.MagicMock()
-    mock_execution_hooks.before_tool_call = before_tool_call
-
     # First execution - should return clarification
     agent = DefaultExecutionAgent(
         step=plan.steps[0],
@@ -1239,7 +1247,9 @@ def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) ->
         end_user=EndUser(external_id="123"),
         tool=AdditionTool(),
         agent_memory=InMemoryStorage(),
-        execution_hooks=mock_execution_hooks,
+        execution_hooks=ExecutionHooks(
+            before_tool_call=before_tool_call,
+        ),
     )
     agent.verified_args = VerifiedToolInputs(
         args=[
@@ -1255,6 +1265,89 @@ def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) ->
     assert output_value.user_guidance == "Need clarification"
 
     # Second execution - should call the tool
+    return_clarification = False
+    tool_node_called = False
+    agent.new_clarifications = []
+    output = agent.execute_sync()
+
+    assert tool_node_called is True
+    assert output.get_value() == 3
+
+
+def test_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that after_tool_call can interrupt execution by returning a clarification."""
+    model_response = AIMessage(content="")
+    model_response.tool_calls = [
+        {
+            "name": "Send_Email_Tool",
+            "type": "tool_call",
+            "id": "call_3z9rYHY6Rui7rTW0O7N7Wz51",
+            "args": {
+                "recipients": ["test@example.com"],
+                "email_title": "Hi",
+                "email_body": "Hi",
+            },
+        },
+    ]
+    mock_model = get_mock_generative_model(response=model_response)
+    monkeypatch.setattr("portia.config.Config.get_execution_model", lambda self: mock_model)  # noqa: ARG005
+
+    tool_node_called = False
+
+    def tool_call(self, input, config):  # noqa: A002, ANN001, ANN202, ARG001
+        nonlocal tool_node_called
+        tool_node_called = True
+        return {
+            "messages": ToolMessage(
+                content="Added numbers",
+                artifact=LocalDataValue(value=3),
+                tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
+            ),
+        }
+
+    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+
+    return_clarification = True
+
+    def after_tool_call(tool, output, plan_run, step) -> InputClarification | None:  # noqa: ANN001, ARG001
+        nonlocal return_clarification
+        if return_clarification:
+            return InputClarification(
+                plan_run_id=plan_run.id,
+                user_guidance="Need clarification after tool call",
+                step=plan_run.current_step_index,
+                argument_name="result",
+            )
+        return None
+
+    (plan, plan_run) = get_test_plan_run()
+
+    # First execution - should return clarification after tool call
+    agent = DefaultExecutionAgent(
+        step=plan.steps[0],
+        plan_run=plan_run,
+        config=get_test_config(),
+        end_user=EndUser(external_id="123"),
+        tool=AdditionTool(),
+        agent_memory=InMemoryStorage(),
+        execution_hooks=ExecutionHooks(
+            after_tool_call=after_tool_call,
+        ),
+    )
+    agent.verified_args = VerifiedToolInputs(
+        args=[
+            VerifiedToolArgument(name="email_address", value="test@example.com", made_up=False),
+        ],
+    )
+    output = agent.execute_sync()
+
+    assert tool_node_called is True
+    assert len(output.get_value()) == 1  # pyright: ignore[reportArgumentType]
+    output_value = output.get_value()[0]  # pyright: ignore[reportOptionalSubscript]
+    assert isinstance(output_value, InputClarification)
+    assert output_value.user_guidance == "Need clarification after tool call"
+
+    # Second execution - should complete without clarification
     return_clarification = False
     tool_node_called = False
     agent.new_clarifications = []

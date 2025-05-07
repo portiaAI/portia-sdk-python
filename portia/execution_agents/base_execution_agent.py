@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Literal
 from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
 
+from portia.clarification import Clarification
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
 from portia.plan import ReadOnlyStep, Step
@@ -73,6 +74,7 @@ class BaseExecutionAgent:
         self.end_user = end_user
         self.agent_memory = agent_memory
         self.execution_hooks = execution_hooks
+        self.new_clarifications: list[Clarification] = []
 
     @abstractmethod
     def execute_sync(self) -> Output:
@@ -143,12 +145,15 @@ class BaseExecutionAgent:
                 continue
 
             if tool and self.execution_hooks and self.execution_hooks.after_tool_call:
-                self.execution_hooks.after_tool_call(
+                clarification = self.execution_hooks.after_tool_call(
                     tool,
                     message.content,
                     ReadOnlyPlanRun.from_plan_run(self.plan_run),
                     ReadOnlyStep.from_step(self.step),
                 )
+                if clarification:
+                    self.new_clarifications.append(clarification)
+                    return END
 
         if (
             "ToolSoftError" not in last_message.content
