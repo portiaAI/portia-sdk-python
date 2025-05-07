@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 import instructor
 import tiktoken
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
     from openai.types.chat import ChatCompletionMessageParam
 
+JsonSchema = dict[str, Any]
 
 class Message(BaseModel):
     """Portia LLM message class."""
@@ -98,7 +99,7 @@ class GenerativeModel(ABC):
     """Base class for all generative model clients."""
 
     provider: LLMProvider
-
+    _structured_response_method: str | None = None
     def __init__(self, model_name: str) -> None:
         """Initialize the model.
 
@@ -120,12 +121,56 @@ class GenerativeModel(ABC):
 
         """
 
-    @abstractmethod
-    def get_structured_response(
+    @overload
+    def with_structured_output(
         self,
         messages: list[Message],
         schema: type[BaseModelT],
     ) -> BaseModelT:
+        ...
+    @overload
+    def with_structured_output(
+        self,
+        messages: list[Message],
+        schema: JsonSchema,
+    ) -> JsonSchema:
+        ...
+    def with_structured_output(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT] | JsonSchema,
+        **kwargs: Any,
+    ) -> BaseModelT | JsonSchema:
+        """Get a structured response from the model, given a Pydantic model or JSON schema.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+            schema (type[BaseModelT] | JsonSchema): The Pydantic model or JSON schema to use for the response.
+            **kwargs: Additional keyword arguments to pass to the model.
+        Returns:
+            BaseModelT | JsonSchema: The structured response from the model.
+        """
+        if isinstance(schema, type) and issubclass(schema, BaseModel):
+            if schema.__name__ == "StepsOrError":
+                try:
+                    return self.get_structured_response_instructor(messages, schema)
+                except NotImplementedError:
+                    pass
+            json_schema = schema.model_json_schema()
+            if self._structured_response_method:
+                response = self.get_structured_response(messages, json_schema, method=self._structured_response_method, **kwargs)
+            else:
+                response = self.get_structured_response(messages, json_schema, **kwargs)
+            return schema.model_validate(response)
+        return self.get_structured_response(messages, schema, **kwargs)
+
+    @abstractmethod
+    def get_structured_response(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT] | JsonSchema,
+        **kwargs: Any,
+    ) -> JsonSchema:
         """Get a structured response from the model, given a Pydantic model.
 
         Args:
@@ -136,6 +181,14 @@ class GenerativeModel(ABC):
             BaseModelT: The structured response from the model.
 
         """
+
+    def get_structured_response_instructor(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+    ) -> BaseModelT:
+        """Get structured response using instructor."""
+        raise NotImplementedError("get_structured_response_instructor must be implemented")
 
     def __str__(self) -> str:
         """Get the string representation of the model."""
@@ -154,7 +207,7 @@ class LangChainGenerativeModel(GenerativeModel):
     """Base class for LangChain-based models."""
 
     provider: LLMProvider = LLMProvider.CUSTOM
-
+    
     def __init__(self, client: BaseChatModel, model_name: str) -> None:
         """Initialize with LangChain client.
 
@@ -179,9 +232,9 @@ class LangChainGenerativeModel(GenerativeModel):
     def get_structured_response(
         self,
         messages: list[Message],
-        schema: type[BaseModelT],
+        schema: type[BaseModelT] | JsonSchema,
         **kwargs: Any,
-    ) -> BaseModelT:
+    ) -> JsonSchema:
         """Get structured response using LangChain model.
 
         Args:
@@ -193,19 +246,21 @@ class LangChainGenerativeModel(GenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
+        if isinstance(schema, type) and issubclass(schema, BaseModel):
+            schema = schema.model_json_schema()
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = structured_client.invoke(langchain_messages)
-        if isinstance(response, schema):
+        if isinstance(response, dict):
             return response
-        return schema.model_validate(response)
+        return response.model_dump()
 
 
 class OpenAIGenerativeModel(LangChainGenerativeModel):
     """OpenAI model implementation."""
 
     provider: LLMProvider = LLMProvider.OPENAI
-
+    _structured_response_method: str | None = "function_calling"
     def __init__(
         self,
         *,
@@ -252,32 +307,6 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         )
         self._seed = seed
 
-    def get_structured_response(
-        self,
-        messages: list[Message],
-        schema: type[BaseModelT],
-        **kwargs: Any,
-    ) -> BaseModelT:
-        """Call the model in structured output mode targeting the given Pydantic model.
-
-        Args:
-            messages (list[Message]): The list of messages to send to the model.
-            schema (type[BaseModelT]): The Pydantic model to use for the response.
-            **kwargs: Additional keyword arguments to pass to the model.
-
-        Returns:
-            BaseModelT: The structured response from the model.
-
-        """
-        if schema.__name__ == "StepsOrError":
-            return self.get_structured_response_instructor(messages, schema)
-        return super().get_structured_response(
-            messages,
-            schema,
-            method="function_calling",
-            **kwargs,
-        )
-
     def get_structured_response_instructor(
         self,
         messages: list[Message],
@@ -297,7 +326,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
     """Azure OpenAI model implementation."""
 
     provider: LLMProvider = LLMProvider.AZURE_OPENAI
-
+    _structured_response_method: str | None = "function_calling"
     def __init__(  # noqa: PLR0913
         self,
         *,
@@ -353,32 +382,6 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             mode=instructor.Mode.JSON,
         )
         self._seed = seed
-
-    def get_structured_response(
-        self,
-        messages: list[Message],
-        schema: type[BaseModelT],
-        **kwargs: Any,
-    ) -> BaseModelT:
-        """Call the model in structured output mode targeting the given Pydantic model.
-
-        Args:
-            messages (list[Message]): The list of messages to send to the model.
-            schema (type[BaseModelT]): The Pydantic model to use for the response.
-            **kwargs: Additional keyword arguments to pass to the model.
-
-        Returns:
-            BaseModelT: The structured response from the model.
-
-        """
-        if schema.__name__ == "StepsOrError":
-            return self.get_structured_response_instructor(messages, schema)
-        return super().get_structured_response(
-            messages,
-            schema,
-            method="function_calling",
-            **kwargs,
-        )
 
     def get_structured_response_instructor(
         self,
@@ -442,9 +445,9 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     def get_structured_response(
         self,
         messages: list[Message],
-        schema: type[BaseModelT],
+        schema: type[BaseModelT] | JsonSchema,
         **kwargs: Any,
-    ) -> BaseModelT:
+    ) -> JsonSchema:
         """Call the model in structured output mode targeting the given Pydantic model.
 
         Args:
@@ -456,10 +459,13 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
-            return self.get_structured_response_instructor(messages, schema)
+        if isinstance(schema, type) and issubclass(schema, BaseModel):
+            json_schema = schema.model_json_schema()
+        else:
+            json_schema = schema
+        
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._client.with_structured_output(json_schema, include_raw=True, **kwargs)
         raw_response = structured_client.invoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
@@ -469,11 +475,14 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             len(tiktoken.get_encoding("gpt2").encode(raw_response["raw"].model_dump_json()))
             > self._output_instructor_threshold
         ):
-            return self.get_structured_response_instructor(messages, schema)
+            if not isinstance(schema, type) or not issubclass(schema, BaseModel):
+                raise ValueError("Schema must be a Pydantic model.")
+            response = self.get_structured_response_instructor(messages, schema)
+            return response.model_dump()
         response = raw_response["parsed"]
-        if isinstance(response, schema):
-            return response
-        return schema.model_validate(response)
+        if isinstance(response, BaseModel):
+            return response.model_dump()
+        return response
 
     def get_structured_response_instructor(
         self,
@@ -498,7 +507,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
         """MistralAI model implementation."""
 
         provider: LLMProvider = LLMProvider.MISTRALAI
-
+        _structured_response_method: str | None = "function_calling"
         def __init__(
             self,
             *,
@@ -528,31 +537,6 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 use_async=False,
             )
 
-        def get_structured_response(
-            self,
-            messages: list[Message],
-            schema: type[BaseModelT],
-            **kwargs: Any,
-        ) -> BaseModelT:
-            """Call the model in structured output mode targeting the given Pydantic model.
-
-            Args:
-                messages (list[Message]): The list of messages to send to the model.
-                schema (type[BaseModelT]): The Pydantic model to use for the response.
-                **kwargs: Additional keyword arguments to pass to the model.
-
-            Returns:
-                BaseModelT: The structured response from the model.
-
-            """
-            if schema.__name__ == "StepsOrError":
-                return self.get_structured_response_instructor(messages, schema)
-            return super().get_structured_response(
-                messages,
-                schema,
-                method="function_calling",
-                **kwargs,
-            )
 
         def get_structured_response_instructor(
             self,
@@ -626,9 +610,9 @@ if validate_extras_dependencies("google", raise_error=False):
         def get_structured_response(
             self,
             messages: list[Message],
-            schema: type[BaseModelT],
-            **_: Any,
-        ) -> BaseModelT:
+            schema: type[BaseModelT] | JsonSchema,
+            **kwargs: Any,
+        ) -> JsonSchema:
             """Get structured response from Google Generative AI model using instructor.
 
             NB. We use the instructor library to get the structured response, because the Google
@@ -647,10 +631,16 @@ if validate_extras_dependencies("google", raise_error=False):
 
             """
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-            return self._instructor_client.messages.create(
+            if isinstance(schema, type) and issubclass(schema, BaseModel):
+                schema = schema.model_json_schema()
+            response = self._instructor_client.messages.create(
                 messages=instructor_messages,
                 response_model=schema,
+                **kwargs,
             )
+            if isinstance(response, dict):
+                return response
+            return response.model_dump()
 
 
 if validate_extras_dependencies("ollama", raise_error=False):
@@ -684,9 +674,9 @@ if validate_extras_dependencies("ollama", raise_error=False):
         def get_structured_response(
             self,
             messages: list[Message],
-            schema: type[BaseModelT],
+            schema: type[BaseModelT] | JsonSchema,
             **kwargs: Any,  # noqa: ARG002
-        ) -> BaseModelT:
+        ) -> JsonSchema:
             """Get structured response from Ollama model using instructor.
 
             Args:
@@ -698,6 +688,8 @@ if validate_extras_dependencies("ollama", raise_error=False):
                 BaseModelT: The structured response from the model.
 
             """
+            if isinstance(schema, type) and issubclass(schema, BaseModel):
+                schema = schema.model_json_schema()
             client = instructor.from_openai(
                 OpenAI(
                     base_url=self.base_url,
@@ -705,12 +697,15 @@ if validate_extras_dependencies("ollama", raise_error=False):
                 ),
                 mode=instructor.Mode.JSON,
             )
-            return client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=self.model_name,
                 messages=[map_message_to_instructor(message) for message in messages],
                 response_model=schema,
                 max_retries=2,
             )
+            if isinstance(response, dict):
+                return response
+            return response.model_dump()
 
 
 def map_message_to_instructor(message: Message) -> ChatCompletionMessageParam:
