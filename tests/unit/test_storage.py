@@ -294,7 +294,6 @@ def test_portia_cloud_storage() -> None:
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
                 "end_user": plan_run.end_user_id,
-                "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
                 "plan_run_inputs": {
@@ -443,7 +442,6 @@ def test_portia_cloud_storage_errors() -> None:
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
                 "end_user": plan_run.end_user_id,
-                "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
                 "plan_run_inputs": plan_run.plan_run_inputs,
