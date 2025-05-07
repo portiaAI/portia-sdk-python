@@ -179,6 +179,7 @@ class Portia:
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
         plan_run_inputs: dict[PlanInput, Serializable] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -199,7 +200,7 @@ class Portia:
 
         """
         plan_inputs = list(plan_run_inputs.keys()) if plan_run_inputs else None
-        plan = self.plan(query, tools, example_plans, end_user, plan_inputs)
+        plan = self.plan(query, tools, example_plans, end_user, plan_inputs, structured_output_schema)
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user, plan_run_inputs)
         return self.resume(plan_run)
@@ -289,6 +290,7 @@ class Portia:
         plan: Plan | PlanUUID | UUID,
         end_user: str | EndUser | None = None,
         plan_run_inputs: dict[PlanInput, Serializable] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
@@ -321,6 +323,7 @@ class Portia:
                 raise PlanNotFoundError(plan_id) from None
 
         end_user = self.initialize_end_user(end_user)
+        plan.structured_output_schema = structured_output_schema
         plan_run = self.create_plan_run(plan, end_user, plan_run_inputs)
         return self.resume(plan_run)
 
