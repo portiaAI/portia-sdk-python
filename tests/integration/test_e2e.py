@@ -18,7 +18,6 @@ from portia.config import (
     StorageClass,
 )
 from portia.errors import PlanError, ToolHardError, ToolSoftError
-from portia.execution_agents.output import LocalDataValue
 from portia.model import LLMProvider
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step, Variable
@@ -483,16 +482,30 @@ def test_portia_run_query_with_conditional_steps() -> None:
     assert "3" not in str(plan_run.outputs.final_output.get_value())
 
 
-def test_portia_run_query_with_example_registry() -> None:
+def test_portia_run_query_with_example_registry_and_hooks() -> None:
     """Test we can run a query using the example registry."""
+    execution_hooks = ExecutionHooks(
+        before_first_step_execution=MagicMock(return_value=None),
+        before_step_execution=MagicMock(return_value=None),
+        after_step_execution=MagicMock(return_value=None),
+        after_last_step_execution=MagicMock(return_value=None),
+        before_tool_call=MagicMock(return_value=None),
+        after_tool_call=MagicMock(return_value=None),
+    )
     config = Config.from_default()
 
-    portia = Portia(config=config, tools=open_source_tool_registry)
+    portia = Portia(config=config, tools=open_source_tool_registry, execution_hooks=execution_hooks)
     query = """Add 1 + 2 together and then write me a haiku about the answer.
     You can use the LLM tool to generate a haiku."""
 
     plan_run = portia.run(query)
     assert plan_run.state == PlanRunState.COMPLETE
+    assert execution_hooks.before_first_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_tool_call.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_tool_call.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
 def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
@@ -572,9 +585,8 @@ def test_plan_input_with_schema_validation() -> None:
         num_a: int = Field(description="First number to add")
         num_b: int = Field(description="Second number to add")
 
-    numbers_input = PlanInput(name="$numbers", description="two numbers to add together")
-
-    plan_inputs = {numbers_input: LocalDataValue(value=AdditionNumbers(num_a=5, num_b=7))}
+    numbers_input = PlanInput(name="$numbers", description="Numbers to add")
+    plan_inputs = {numbers_input: AdditionNumbers(num_a=5, num_b=7)}
 
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,

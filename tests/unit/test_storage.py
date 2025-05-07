@@ -149,11 +149,22 @@ def test_in_memory_storage() -> None:
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
 
-    end_user = EndUser(external_id="123")
+    end_user = EndUser(
+        external_id="123",
+        additional_data={"favorite_sport": "football"},
+    )
 
     assert storage.get_end_user("123") is None
     assert storage.save_end_user(end_user) == end_user
-    assert storage.get_end_user("123") is not None
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    end_user.additional_data["day"] = "monday"
+    assert storage.save_end_user(end_user) == end_user
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    assert user.get_additional_data("day") == "monday"
 
 
 def test_disk_storage(tmp_path: Path) -> None:
@@ -190,11 +201,22 @@ def test_disk_storage(tmp_path: Path) -> None:
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
 
-    end_user = EndUser(external_id="123")
+    end_user = EndUser(
+        external_id="123",
+        additional_data={"favorite_sport": "football"},
+    )
 
     assert storage.get_end_user("123") is None
     assert storage.save_end_user(end_user) == end_user
-    assert storage.get_end_user("123") is not None
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    end_user.additional_data["day"] = "monday"
+    assert storage.save_end_user(end_user) == end_user
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    assert user.get_additional_data("day") == "monday"
 
 
 def test_portia_cloud_storage() -> None:
@@ -274,7 +296,6 @@ def test_portia_cloud_storage() -> None:
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
                 "end_user": plan_run.end_user_id,
-                "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
                 "plan_run_inputs": {
@@ -315,9 +336,8 @@ def test_portia_cloud_storage() -> None:
     with (
         patch.object(storage.client, "post", return_value=mock_response) as mock_post,
     ):
-        # Test save_tool_call failure
-        with pytest.raises(StorageError, match="An error occurred."):
-            storage.save_tool_call(tool_call)
+        # Test save_tool_call - should not raise an exception
+        storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
             url="/api/v0/tool-calls/",
@@ -326,7 +346,6 @@ def test_portia_cloud_storage() -> None:
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
-                "additional_data": tool_call.additional_data,
                 "input": tool_call.input,
                 "output": tool_call.output,
                 "status": tool_call.status,
@@ -423,7 +442,6 @@ def test_portia_cloud_storage_errors() -> None:
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
                 "end_user": plan_run.end_user_id,
-                "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
                 "plan_run_inputs": plan_run.plan_run_inputs,
@@ -468,11 +486,9 @@ def test_portia_cloud_storage_errors() -> None:
 
     with (
         patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
-        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
-        with pytest.raises(StorageError):
-            storage.save_tool_call(tool_call)
+        # Test save_tool_call - should not raise an exception
+        storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
             url="/api/v0/tool-calls/",
@@ -481,7 +497,6 @@ def test_portia_cloud_storage_errors() -> None:
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
-                "additional_data": tool_call.additional_data,
                 "input": tool_call.input,
                 "output": tool_call.output,
                 "status": tool_call.status,
@@ -493,7 +508,7 @@ def test_portia_cloud_storage_errors() -> None:
         patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
         patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
+        # Test save_end_user failure
         with pytest.raises(StorageError):
             storage.save_end_user(end_user)
 
@@ -506,7 +521,7 @@ def test_portia_cloud_storage_errors() -> None:
         patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
         patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
+        # Test get_end_user failure
         with pytest.raises(StorageError):
             storage.get_end_user(end_user.external_id)
 

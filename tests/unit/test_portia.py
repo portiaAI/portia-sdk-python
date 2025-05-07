@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import HttpUrl, SecretStr
@@ -24,7 +24,12 @@ from portia.config import (
     StorageClass,
 )
 from portia.end_user import EndUser
-from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
+from portia.errors import (
+    InvalidPlanRunStateError,
+    PlanError,
+    PlanNotFoundError,
+    PlanRunNotFoundError,
+)
 from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -41,6 +46,7 @@ from portia.plan import (
     PlanInput,
     PlanUUID,
     ReadOnlyPlan,
+    ReadOnlyStep,
     Step,
     Variable,
 )
@@ -853,7 +859,11 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
     portia = Portia(
         config=get_test_config(models=GenerativeModelsConfig(planning_model=planning_model)),
         tools=[ClarificationTool()],
-        execution_hooks=ExecutionHooks(clarification_handler=clarification_handler),
+        execution_hooks=ExecutionHooks(
+            clarification_handler=clarification_handler,
+            after_step_execution=MagicMock(),
+            after_last_step_execution=MagicMock(),
+        ),
     )
     planning_model.get_structured_response.return_value = StepsOrError(
         steps=[
@@ -897,6 +907,8 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
             clarification_handler.received_clarification.user_guidance
             == "Handle this clarification"
         )
+        assert portia.execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        assert portia.execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
 def test_portia_error_clarification(portia: Portia, planning_model: MagicMock) -> None:
@@ -980,6 +992,10 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
 
 def test_portia_run_with_introspection_complete(portia: Portia, planning_model: MagicMock) -> None:
     """Test run with introspection agent returning COMPLETE outcome."""
+    portia.execution_hooks = ExecutionHooks(
+        after_last_step_execution=MagicMock(),
+    )
+
     # Setup mock plan and response
     step1 = Step(task="Step 1", inputs=[], output="$step1_result")
     step2 = Step(task="Step 2", inputs=[], output="$step2_result", condition="some_condition")
@@ -999,6 +1015,11 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         reason="Remaining steps cannot be executed",
     )
 
+    final_output = LocalDataValue(
+        value="Step 1 result",
+        summary="Execution completed early",
+    )
+
     def custom_handle_introspection(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
         plan_run: PlanRun = kwargs.get("plan_run")  # type: ignore  # noqa: PGH003
 
@@ -1007,10 +1028,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
                 value=COMPLETED_OUTPUT,
                 summary="Remaining steps cannot be executed",
             )
-            plan_run.outputs.final_output = LocalDataValue(
-                value="Step 1 result",
-                summary="Execution completed early",
-            )
+            plan_run.outputs.final_output = final_output
             plan_run.state = PlanRunState.COMPLETE
 
             return (plan_run, mock_introspection_complete)
@@ -1037,6 +1055,10 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         assert plan_run.outputs.step_outputs["$step2_result"].get_value() == COMPLETED_OUTPUT
         assert plan_run.outputs.final_output is not None
         assert plan_run.outputs.final_output.get_summary() == "Execution completed early"
+        assert portia.execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        portia.execution_hooks.after_last_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+            mock.ANY, ReadOnlyPlanRun.from_plan_run(plan_run), final_output
+        )
 
 
 def test_handle_introspection_outcome_complete(portia: Portia) -> None:
@@ -1303,8 +1325,8 @@ def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMo
         plan_run = portia.run(
             query="Add the two numbers together",
             plan_run_inputs={
-                num_a_input: LocalDataValue(value=1),
-                num_b_input: LocalDataValue(value=2),
+                num_a_input: 1,
+                num_b_input: 2,
             },
         )
 
@@ -1370,7 +1392,7 @@ def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
         inputs=[num_a_input, num_b_input],
     )
 
-    plan_run_inputs = {num_a_input: LocalDataValue(value=1), num_b_input: LocalDataValue(value=2)}
+    plan_run_inputs = {num_a_input: 1, num_b_input: 2}
 
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalDataValue(value=3)
@@ -1414,15 +1436,15 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
 
     # Should fail with just one of the two required
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_run_inputs={required_input1: LocalDataValue(value="value")})
+        portia.run_plan(plan, plan_run_inputs={required_input1: "value"})
 
     # Should work if we provide both required inputs
     with mock.patch.object(portia, "resume") as mock_resume:
         portia.run_plan(
             plan,
             plan_run_inputs={
-                required_input1: LocalDataValue(value="value 1"),
-                required_input2: LocalDataValue(value="value 2"),
+                required_input1: "value 1",
+                required_input2: "value 2",
             },
         )
         mock_resume.assert_called_once()
@@ -1439,7 +1461,7 @@ def test_portia_run_plan_with_extra_input_when_expecting_none(portia: Portia) ->
 
     # Run with input that isn't in the plan's inputs
     extra_input = PlanInput(name="$extra", description="Extra unused input")
-    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: LocalDataValue(value="value")})
+    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: "value"})
     assert plan_run.plan_run_inputs == {}
 
 
@@ -1469,8 +1491,8 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
         plan_run = portia.run_plan(
             plan,
             plan_run_inputs={
-                expected_input: LocalDataValue(value="expected_value"),
-                unknown_input: LocalDataValue(value="unknown_value"),
+                expected_input: "expected_value",
+                unknown_input: "unknown_value",
             },
         )
 
@@ -1478,3 +1500,154 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
         assert plan_run.plan_run_inputs["$expected"].get_value() == "expected_value"
         assert "$unknown" not in plan_run.plan_run_inputs
         mock_resume.assert_called_once()
+
+
+def test_portia_run_plan_with_plan_uuid(portia: Portia) -> None:
+    """Test that run_plan can retrieve a plan from storage using PlanUUID."""
+    plan = Plan(
+        plan_context=PlanContext(query="example query", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Simple task",
+                tool_id="add_tool",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+    )
+
+    # Save the plan to storage
+    portia.storage.save_plan(plan)
+
+    # Mock the resume method to verify it gets called with the correct plan run
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+
+        plan_run = portia.run_plan(plan.id)
+
+        assert plan_run.plan_id == plan.id
+        mock_resume.assert_called_once()
+
+    with pytest.raises(PlanNotFoundError):
+        portia.run_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
+
+
+def test_portia_run_plan_with_uuid(portia: Portia) -> None:
+    """Test that run_plan can retrieve a plan from storage using UUID."""
+    plan = Plan(
+        plan_context=PlanContext(query="example query", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Simple task",
+                tool_id="add_tool",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+    )
+
+    # Save the plan to storage
+    portia.storage.save_plan(plan)
+
+    # Mock the resume method to verify it gets called with the correct plan run
+    with mock.patch.object(portia, "resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+
+        plan_run = portia.run_plan(plan.id)
+
+        assert plan_run.plan_id == plan.id
+        mock_resume.assert_called_once()
+
+    with pytest.raises(PlanNotFoundError):
+        portia.run_plan(UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05"))
+
+
+def test_portia_execution_step_hooks(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that all execution step hooks are called in correct order with right arguments."""
+    execution_hooks = ExecutionHooks(
+        before_first_step_execution=MagicMock(),
+        before_step_execution=MagicMock(),
+        after_step_execution=MagicMock(),
+        after_last_step_execution=MagicMock(),
+    )
+    portia.execution_hooks = execution_hooks
+
+    # Create a plan with two steps
+    step1 = Step(task="Step 1", tool_id="add_tool", output="$step1_result")
+    step2 = Step(task="Step 2", tool_id="add_tool", output="$step2_result")
+    planning_model.get_structured_response.return_value = StepsOrError(
+        steps=[step1, step2], error=None
+    )
+
+    mock_agent = MagicMock()
+    step_1_result = LocalDataValue(value="Step 1 result")
+    step_2_result = LocalDataValue(value="Step 2 result")
+    mock_agent.execute_sync.side_effect = [step_1_result, step_2_result]
+    mock_summarizer_agent = mock.MagicMock()
+    mock_summarizer_agent.create_summary.return_value = None
+
+    with (
+        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch(
+            "portia.portia.FinalOutputSummarizer",
+            return_value=mock_summarizer_agent,
+        ),
+    ):
+        plan_run = portia.run("Test execution hooks")
+
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    assert execution_hooks.before_first_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+
+    plan = portia.storage.get_plan(plan_run.plan_id)
+    execution_hooks.before_first_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        ReadOnlyPlan.from_plan(plan), mock.ANY
+    )
+
+    execution_hooks.before_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step1)
+    )
+    execution_hooks.before_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step2)
+    )
+
+    execution_hooks.after_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step1), step_1_result
+    )
+    execution_hooks.after_step_execution.assert_any_call(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        ReadOnlyPlan.from_plan(plan), mock.ANY, ReadOnlyStep.from_step(step2), step_2_result
+    )
+
+    execution_hooks.after_last_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        ReadOnlyPlan.from_plan(plan), mock.ANY, step_2_result
+    )
+
+
+def test_portia_execution_step_hooks_with_error(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that execution hooks are called correctly when an error occurs."""
+    execution_hooks = ExecutionHooks(
+        before_first_step_execution=MagicMock(),
+        before_step_execution=MagicMock(),
+        after_step_execution=MagicMock(),
+        after_last_step_execution=MagicMock(),
+    )
+    portia.execution_hooks = execution_hooks
+
+    step1 = Step(task="Step 1", tool_id="add_tool", output="$step1_result")
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[step1], error=None)
+
+    # Mock the first agent to raise an error
+    mock_agent = MagicMock()
+    mock_agent.execute_sync.side_effect = ValueError("Test execution error")
+
+    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+        plan_run = portia.run("Test execution hooks with error")
+    assert plan_run.state == PlanRunState.FAILED
+
+    assert execution_hooks.before_first_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.before_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+    assert execution_hooks.after_last_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]

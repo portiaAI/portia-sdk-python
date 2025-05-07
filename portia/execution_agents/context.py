@@ -180,13 +180,6 @@ def generate_context_from_run_context(context: ToolRunContext) -> list[str]:
             "----------",
         ],
     )
-    for key, value in context.execution_context.additional_data.items():
-        execution_context.extend(
-            [
-                f"context_key_name: {key} context_key_value: {value}",
-                "----------",
-            ],
-        )
     return execution_context
 
 
