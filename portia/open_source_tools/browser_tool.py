@@ -523,9 +523,10 @@ if BROWSERBASE_AVAILABLE:
 
         def step_complete(self, ctx: ToolRunContext) -> None:
             """Call when the step is complete closes the session to persist context."""
-            if ctx.execution_context.additional_data.get("bb_session_id"):
+            session_id = ctx.end_user.get_additional_data("bb_session_id")
+            if session_id:
                 self.bb.sessions.update(
-                    ctx.execution_context.additional_data["bb_session_id"],
+                    session_id,
                     project_id=self.project_id,  # type: ignore reportArgumentType
                     status="REQUEST_RELEASE",
                 )
@@ -599,25 +600,20 @@ if BROWSERBASE_AVAILABLE:
                 str: The session connection URL that can be used to connect to the browser.
 
             """
-            context_id = context.execution_context.additional_data.get(
-                "bb_context_id",
-                self.get_context_id(context, bb),
-            )
-            context.execution_context.additional_data["bb_context_id"] = context_id
+            context_id = context.end_user.get_additional_data(
+                "bb_context_id"
+            ) or self.get_context_id(context, bb)
 
-            session_id = context.execution_context.additional_data.get("bb_session_id", None)
-            session_connect_url = context.execution_context.additional_data.get(
-                "bb_session_connect_url",
-                None,
-            )
+            context.end_user.set_additional_data("bb_context_id", context_id)
+
+            session_id = context.end_user.get_additional_data("bb_session_id")
+            session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
 
             if not session_id or not session_connect_url:
                 session = self.create_session(context_id)
                 session_connect_url = session.connect_url
-                context.execution_context.additional_data["bb_session_id"] = session_id = session.id
-                context.execution_context.additional_data["bb_session_connect_url"] = (
-                    session_connect_url
-                )
+                context.end_user.set_additional_data("bb_session_id", session.id)
+                context.end_user.set_additional_data("bb_session_connect_url", session_connect_url)
 
             return session_connect_url
 
@@ -642,11 +638,10 @@ if BROWSERBASE_AVAILABLE:
                 ToolHardError: If no session ID is found in the context.
 
             """
-            if not ctx.execution_context.additional_data.get("bb_session_id"):
+            session_id = ctx.end_user.get_additional_data("bb_session_id")
+            if not session_id:
                 raise ToolHardError("Session ID not found")
-            live_view_link = self.bb.sessions.debug(
-                ctx.execution_context.additional_data["bb_session_id"],
-            )
+            live_view_link = self.bb.sessions.debug(session_id)
             return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
 
         def setup_browser(self, ctx: ToolRunContext) -> Browser:

@@ -32,7 +32,6 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.execution_context import get_execution_context
 from portia.model import GenerativeModel, Message
 from portia.tool import ToolRunContext
 
@@ -708,7 +707,6 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
 
         tool_run_ctx = ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=self.end_user,
             plan_run_id=self.plan_run.id,
             config=self.config,
