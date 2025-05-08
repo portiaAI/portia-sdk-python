@@ -1291,11 +1291,32 @@ def test_portia_initialize_end_user(portia: Portia) -> None:
     assert storage_end_user.name == "Bob Smith"
 
 
-def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMock) -> None:
-    """Test that Portia.run handles plan inputs correctly."""
-    num_a_input = PlanInput(name="$num_a", description="Number A")
-    num_b_input = PlanInput(name="$num_b", description="Number B")
-
+@pytest.mark.parametrize(
+    "plan_run_inputs",
+    [
+        [
+            PlanInput(name="$num_a", description="Number A", value=1),
+            PlanInput(name="$num_b", value=2),
+        ],
+        [
+            {"name": "$num_a", "description": "Number A", "value": 1},
+            {"name": "$num_b", "value": 2},
+        ],
+        {
+            "$num_a": 1,
+            "$num_b": 2,
+        },
+        [
+            {"incorrect_key": "$num_a", "error": "Error"},
+        ],
+    ],
+)
+def test_portia_run_with_plan_run_inputs(
+    portia: Portia,
+    planning_model: MagicMock,
+    plan_run_inputs,
+) -> None:
+    """Test that Portia.run handles plan inputs correctly in different formats."""
     planning_model.get_structured_response.return_value = StepsOrError(
         steps=[
             Step(
@@ -1303,7 +1324,7 @@ def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMo
                 tool_id="add_tool",
                 inputs=[
                     Variable(name="$num_a", description="Number A"),
-                    Variable(name="$num_b", description="Number B"),
+                    Variable(name="$num_b", description=""),
                 ],
                 output="$output",
             ),
@@ -1315,6 +1336,14 @@ def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMo
     mock_summarizer_agent = mock.MagicMock()
     mock_summarizer_agent.create_summary.side_effect = "Summary"
 
+    if isinstance(plan_run_inputs, list) and "error" in plan_run_inputs[0]:
+        with pytest.raises(ValueError):
+            portia.run(
+                query="Add the two numbers together",
+                plan_run_inputs=plan_run_inputs,
+            )
+        return
+
     with (
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
@@ -1324,10 +1353,7 @@ def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMo
     ):
         plan_run = portia.run(
             query="Add the two numbers together",
-            plan_run_inputs={
-                num_a_input: 1,
-                num_b_input: 2,
-            },
+            plan_run_inputs=plan_run_inputs,
         )
 
     planning_model.get_structured_response.assert_called_once()
@@ -1337,11 +1363,29 @@ def test_portia_run_with_plan_run_inputs(portia: Portia, planning_model: MagicMo
     assert plan_run.outputs.final_output.get_value() == 3
 
 
-def test_portia_plan_with_plan_inputs(portia: Portia, planning_model: MagicMock) -> None:
-    """Test that Portia.plan handles plan inputs correctly."""
-    num_a_input = PlanInput(name="$num_a", description="Number A")
-    num_b_input = PlanInput(name="$num_b", description="Number B")
-
+@pytest.mark.parametrize(
+    "plan_inputs",
+    [
+        [
+            PlanInput(name="$num_a", description="Number A"),
+            PlanInput(name="$num_b", description="Number B"),
+        ],
+        [
+            {"name": "$num_a", "description": "Number A"},
+            {"name": "$num_b"},
+        ],
+        ["$num_a", "$num_b"],
+        [
+            {"incorrect_key": "$num_a", "error": "Error"},
+        ],
+    ],
+)
+def test_portia_plan_with_plan_inputs(
+    portia: Portia,
+    planning_model: MagicMock,
+    plan_inputs,
+) -> None:
+    """Test that Portia.plan handles plan inputs correctly in different formats."""
     planning_model.get_structured_response.return_value = StepsOrError(
         steps=[
             Step(
@@ -1357,25 +1401,51 @@ def test_portia_plan_with_plan_inputs(portia: Portia, planning_model: MagicMock)
         error=None,
     )
 
+    if "error" in plan_inputs[0]:
+        with pytest.raises(ValueError):
+            portia.plan(
+                query="Use these inputs to do something",
+                plan_inputs=plan_inputs,
+                tools=[AdditionTool()],
+            )
+        return
+
     plan = portia.plan(
         query="Use these inputs to do something",
-        plan_inputs=[num_a_input, num_b_input],
+        plan_inputs=plan_inputs,
         tools=[AdditionTool()],
     )
 
-    assert len(plan.inputs) == 2
-    assert any(input_.name == "$num_a" for input_ in plan.inputs)
-    assert any(input_.name == "$num_b" for input_ in plan.inputs)
+    assert len(plan.plan_inputs) == 2
+    assert any(input_.name == "$num_a" for input_ in plan.plan_inputs)
+    assert any(input_.name == "$num_b" for input_ in plan.plan_inputs)
     assert len(plan.steps) == 1
     assert any(input_.name == "$num_a" for input_ in plan.steps[0].inputs)
     assert any(input_.name == "$num_b" for input_ in plan.steps[0].inputs)
 
 
-def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
-    """Test that run_plan correctly handles plan inputs."""
-    num_a_input = PlanInput(name="$num_a", description="First number to add")
-    num_b_input = PlanInput(name="$num_b", description="Second number to add")
-
+@pytest.mark.parametrize(
+    "plan_run_inputs",
+    [
+        [
+            PlanInput(name="$num_a", description="First number to add", value=1),
+            PlanInput(name="$num_b", description="Second number to add", value=2),
+        ],
+        [
+            {"name": "$num_a", "description": "First number to add", "value": 1},
+            {"name": "$num_b", "description": "Second number to add", "value": 2},
+        ],
+        {
+            "$num_a": 1,
+            "$num_b": 2,
+        },
+        [
+            {"incorrect_key": "$num_a", "error": "Error"},
+        ],
+    ],
+)
+def test_portia_run_plan_with_plan_run_inputs(portia: Portia, plan_run_inputs) -> None:
+    """Test that run_plan correctly handles plan inputs in different formats."""
     plan = Plan(
         plan_context=PlanContext(query="Add two numbers", tool_ids=["add_tool"]),
         steps=[
@@ -1389,13 +1459,19 @@ def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
                 output="$result",
             ),
         ],
-        inputs=[num_a_input, num_b_input],
+        plan_inputs=[
+            PlanInput(name="$num_a", description="First number to add"),
+            PlanInput(name="$num_b", description="Second number to add"),
+        ],
     )
-
-    plan_run_inputs = {num_a_input: 1, num_b_input: 2}
 
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalDataValue(value=3)
+
+    if isinstance(plan_run_inputs, list) and "error" in plan_run_inputs[0]:
+        with pytest.raises(ValueError):
+            portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
+        return
 
     # Mock the get_agent_for_step method to return our mock agent
     with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
@@ -1411,8 +1487,8 @@ def test_portia_run_plan_with_plan_run_inputs(portia: Portia) -> None:
 
 def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
     """Test that run_plan raises error when required inputs are missing."""
-    required_input1 = PlanInput(name="$required1", description="Required input 1")
-    required_input2 = PlanInput(name="$required2", description="Required input 2")
+    required_input1 = PlanInput(name="$required1", description="Required input 1", value="value 1")
+    required_input2 = PlanInput(name="$required2", description="Required input 2", value="value 2")
 
     plan = Plan(
         plan_context=PlanContext(query="Plan requiring inputs", tool_ids=["add_tool"]),
@@ -1427,25 +1503,22 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
                 output="$result",
             ),
         ],
-        inputs=[required_input1, required_input2],
+        plan_inputs=[required_input1, required_input2],
     )
 
     # Try to run the plan without providing required inputs
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_run_inputs={})
+        portia.run_plan(plan, plan_run_inputs=[])
 
     # Should fail with just one of the two required
     with pytest.raises(ValueError):  # noqa: PT011
-        portia.run_plan(plan, plan_run_inputs={required_input1: "value"})
+        portia.run_plan(plan, plan_run_inputs=[required_input1])
 
     # Should work if we provide both required inputs
     with mock.patch.object(portia, "resume") as mock_resume:
         portia.run_plan(
             plan,
-            plan_run_inputs={
-                required_input1: "value 1",
-                required_input2: "value 2",
-            },
+            plan_run_inputs=[required_input1, required_input2],
         )
         mock_resume.assert_called_once()
 
@@ -1456,18 +1529,20 @@ def test_portia_run_plan_with_extra_input_when_expecting_none(portia: Portia) ->
     plan = Plan(
         plan_context=PlanContext(query="Plan with no inputs", tool_ids=["add_tool"]),
         steps=[],
-        inputs=[],  # No inputs required
+        plan_inputs=[],  # No inputs required
     )
 
     # Run with input that isn't in the plan's inputs
-    extra_input = PlanInput(name="$extra", description="Extra unused input")
-    plan_run = portia.run_plan(plan, plan_run_inputs={extra_input: "value"})
+    extra_input = PlanInput(name="$extra", description="Extra unused input", value="value")
+    plan_run = portia.run_plan(plan, plan_run_inputs=[extra_input])
     assert plan_run.plan_run_inputs == {}
 
 
 def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
     """Test that run_plan ignores unknown inputs."""
-    expected_input = PlanInput(name="$expected", description="Expected input")
+    expected_input = PlanInput(
+        name="$expected", description="Expected input", value="expected_value"
+    )
 
     plan = Plan(
         plan_context=PlanContext(query="Plan with specific input", tool_ids=["add_tool"]),
@@ -1481,24 +1556,20 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
                 output="$result",
             ),
         ],
-        inputs=[expected_input],
+        plan_inputs=[expected_input],
     )
 
-    unknown_input = PlanInput(name="$unknown", description="Unknown input")
+    unknown_input = PlanInput(name="$unknown", description="Unknown input", value="unknown_value")
 
     with mock.patch.object(portia, "resume") as mock_resume:
         mock_resume.side_effect = lambda x: x
         plan_run = portia.run_plan(
             plan,
-            plan_run_inputs={
-                expected_input: "expected_value",
-                unknown_input: "unknown_value",
-            },
+            plan_run_inputs=[expected_input, unknown_input],
         )
 
-        assert "$expected" in plan_run.plan_run_inputs
+        assert len(plan_run.plan_run_inputs) == 1
         assert plan_run.plan_run_inputs["$expected"].get_value() == "expected_value"
-        assert "$unknown" not in plan_run.plan_run_inputs
         mock_resume.assert_called_once()
 
 

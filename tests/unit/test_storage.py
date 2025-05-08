@@ -226,7 +226,7 @@ def test_portia_cloud_storage() -> None:
         id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
-        inputs=[
+        plan_inputs=[
             PlanInput(name="key1", description="Test input 1"),
             PlanInput(name="key2", description="Test input 2"),
         ],
@@ -263,9 +263,9 @@ def test_portia_cloud_storage() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
-                "inputs": [
-                    {"name": "key1", "description": "Test input 1"},
-                    {"name": "key2", "description": "Test input 2"},
+                "plan_inputs": [
+                    {"name": "key1", "description": "Test input 1", "value": None},
+                    {"name": "key2", "description": "Test input 2", "value": None},
                 ],
             },
         )
@@ -411,7 +411,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
-                "inputs": [],
+                "plan_inputs": [],
             },
         )
     with (

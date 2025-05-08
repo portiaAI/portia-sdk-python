@@ -846,7 +846,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "query": plan.plan_context.query,
                     "tool_ids": plan.plan_context.tool_ids,
                     "steps": [step.model_dump(mode="json") for step in plan.steps],
-                    "inputs": [input_.model_dump(mode="json") for input_ in plan.inputs],
+                    "plan_inputs": [
+                        # TODO (RH): Remove this once backend is updated to make description optional
+                        {**input_.model_dump(mode="json"), "description": input_.description or ""}
+                        for input_ in plan.plan_inputs
+                    ],
                 },
             )
         except Exception as e:
@@ -1019,7 +1023,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "latency_seconds": tool_call.latency_seconds,
                 },
             )
-        except Exception as e: # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             logger().error(f"Error saving tool call to Portia Cloud: {e}")
         else:
             # Don't raise an error if the response is not successful, just log it
