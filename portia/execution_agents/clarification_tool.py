@@ -16,19 +16,21 @@ class ClarificationToolSchema(BaseModel):
     )
 
 
-class ClarificationTool(Tool[Clarification]):
-    """Raises a clarification if we are unsure of an argument."""
+class ClarificationTool(Tool[str]):
+    """Raises a clarification if the agent is unsure of an argument."""
 
     id: str = "clarification_tool"
     name: str = "Clarification tool"
     description: str = "Raises a clarification if we are unsure of an argument."
     args_schema: type[BaseModel] = ClarificationToolSchema
     output_schema: tuple[str, str] = ("str", "Model dump of the clarification to raise")
+    step: int
 
     def run(self, ctx: ToolRunContext, argument_name: str) -> Clarification:
-        """Run the FileReaderTool."""
+        """Run the ClarificationTool."""
         return InputClarification(
             argument_name=argument_name,
             user_guidance=f"Missing Argument: {argument_name}",
             plan_run_id=ctx.plan_run_id,
+            step=self.step,
         ).model_dump_json()

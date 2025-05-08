@@ -13,23 +13,22 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from langchain_core.messages import BaseMessage
 from langchain_core.prompts import (
     SystemMessagePromptTemplate,
 )
 
-from portia.errors import InvalidAgentError, InvalidPlanRunStateError
+from portia.errors import InvalidAgentError
 
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-from portia.execution_agents.default_execution_agent import _get_arg_value_with_templating
 from portia.execution_agents.execution_utils import (
     AgentNode,
+    template_in_required_inputs,
     process_output,
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.open_source_tools.clarification_tool import ClarificationTool
+from portia.execution_agents.clarification_tool import ClarificationTool
 from portia.tool import ToolRunContext
 from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.plan import Step, ReadOnlyStep
@@ -77,36 +76,19 @@ class OneShotToolCallingModel:
 
     """
 
-    tool_calling_prompt = ChatPromptTemplate.from_messages(
-        [
-            HumanMessagePromptTemplate.from_template(
-                [
-                    "query:",
-                    "{query}",
-                    "context:",
-                    "{context}",
-                    "Use the provided tool. You should provide arguments that match the tool's "
-                    "schema using the information contained in the query and context."
-                    "Important! Make sure to take into account previous clarifications in the "
-                    "context which are from the user and may change the query"
-                    "Make sure you don't repeat past errors: {past_errors}",
-                ],
-            ),
-        ],
-    )
-
     arg_parser_prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessagePromptTemplate.from_template(
-                "You are a highly capable assistant tasked with calling tools based on the provided "
-                "inputs. "
+                "You are a highly capable assistant tasked with calling tools based on the "
+                "provided inputs. "
                 "While you are not aware of current events, you excel at reasoning "
                 "and adhering to instructions. "
-                "You should think through and clearly explain the source of each argument "
-                "(e.g., context, past messages, clarifications) before calling the tool. "
+                # @@@ DELETE IF NOT NEEDED
+                #                "You should think through and clearly explain the source of each argument "
+                #                "(e.g., context, past messages, clarifications) before calling the tool. "
                 "Avoid assumptions or fabricated information. "
                 "If you are unsure of an argument to use for the tool, you can use the "
-                "clarification tool to clarify what the argument should be.\n"
+                "clarification tool to clarify what the argument should be. "
                 "If any of the inputs is a large string and you want to use it verbatim, rather "
                 "than repeating it, you should provide the name in curly braces to the tool call"
                 " and it will be templated in before the tool is called. "
@@ -146,8 +128,9 @@ class OneShotToolCallingModel:
                 "- Ensure arguments align with the tool's schema and intended use."
                 "- If you are unsure of an argument to use for the tool, you can use the "
                 "clarification tool to clarify what the argument should be.\n\n"
-                "You must return an explanation for the arguments you choose, followed by the tool "
-                "call."
+                # @@@ DELETE IF NOT NEEDED
+                #                "You must return an explanation for the arguments you choose, followed by the tool "
+                #                "call."
             ),
         ],
     )
@@ -158,7 +141,6 @@ class OneShotToolCallingModel:
         tools: list[StructuredTool],
         agent: OneShotAgent,
         tool_context: ToolRunContext,
-        clarification_tool: Tool,
     ) -> None:
         """Initialize the OneShotToolCallingModel.
 
@@ -172,7 +154,6 @@ class OneShotToolCallingModel:
         self.model = model
         self.agent = agent
         self.tools = tools
-        self.clarification_tool = clarification_tool
         self.tool_context = tool_context
 
     def invoke(self, state: ExecutionState) -> dict[str, Any]:
@@ -188,24 +169,21 @@ class OneShotToolCallingModel:
             dict[str, Any]: A dictionary containing the model's generated response.
 
         """
+        model = self.model.to_langchain().bind_tools(self.tools)
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
+        clarification_tool = ClarificationTool(step=self.agent.plan_run.current_step_index)
         formatted_messages = self.arg_parser_prompt.format_messages(
             context=self.agent.get_system_context(self.tool_context, state["step_inputs"]),
             task=self.agent.step.task,
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
             tool_description=self.agent.tool.description,
-            clarification_tool_args=self.clarification_tool.args_json_schema(),
+            clarification_tool_args=clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
         )
-        tools = [
-            *self.tools,
-            self.clarification_tool.to_langchain_with_artifact(self.tool_context),
-        ]
-        model = self.model.to_langchain().bind_tools(tools)
         response = model.invoke(formatted_messages)
-        result = self._template_in_required_inputs(response, state["step_inputs"])
+        result = template_in_required_inputs(response, state["step_inputs"])
 
         if (
             self.agent.execution_hooks
@@ -223,21 +201,6 @@ class OneShotToolCallingModel:
                     self.agent.new_clarifications.append(clarification)
                     return {"messages": []}
         return {"messages": [result]}
-
-    def _template_in_required_inputs(
-        self,
-        response: BaseMessage,
-        step_inputs: list[StepInput],
-    ) -> BaseMessage:
-        """Template any required inputs into the tool calls."""
-        for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
-            if not isinstance(tool_call.get("args"), dict):
-                raise InvalidPlanRunStateError("Tool call missing args field")
-
-            for arg_name, arg_value in tool_call.get("args").items():
-                tool_call["args"][arg_name] = _get_arg_value_with_templating(step_inputs, arg_value)
-
-        return response
 
 
 class OneShotAgent(BaseExecutionAgent):
@@ -295,20 +258,16 @@ class OneShotAgent(BaseExecutionAgent):
             config=self.config,
             clarifications=self.plan_run.get_clarifications_for_step(),
         )
-        clarification_tool = ClarificationTool()
 
         model = self.config.get_execution_model()
+        clarification_tool = ClarificationTool(step=self.plan_run.current_step_index)
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=tool_run_ctx,
-            )
+            ),
+            clarification_tool.to_langchain_with_artifact(ctx=tool_run_ctx),
         ]
-        tool_node = ToolNode(
-            [
-                *tools,
-                clarification_tool.to_langchain_with_artifact(ctx=tool_run_ctx),
-            ],
-        )
+        tool_node = ToolNode(tools)
 
         graph = StateGraph(ExecutionState)
         graph.add_node(AgentNode.MEMORY_EXTRACTION, MemoryExtractionStep(self).invoke)
@@ -316,7 +275,7 @@ class OneShotAgent(BaseExecutionAgent):
 
         graph.add_node(
             AgentNode.TOOL_AGENT,
-            OneShotToolCallingModel(model, tools, self, tool_run_ctx, clarification_tool).invoke,
+            OneShotToolCallingModel(model, tools, self, tool_run_ctx).invoke,
         )
         graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.TOOL_AGENT)
 
@@ -340,9 +299,4 @@ class OneShotAgent(BaseExecutionAgent):
         app = graph.compile()
         invocation_result = app.invoke({"messages": [], "step_inputs": []})
 
-        return process_output(
-            invocation_result["messages"],
-            self.tool,
-            self.new_clarifications,
-            self.plan_run.current_step_index,
-        )
+        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
