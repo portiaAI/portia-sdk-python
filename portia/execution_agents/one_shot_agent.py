@@ -17,7 +17,7 @@ from langchain_core.prompts import (
     SystemMessagePromptTemplate,
 )
 
-from portia.errors import InvalidAgentError, InvalidPlanRunStateError
+from portia.errors import InvalidAgentError
 
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.execution_utils import (
@@ -164,7 +164,7 @@ class OneShotToolCallingModel:
 
         """
         if not self.agent.tool:
-            raise InvalidPlanRunStateError("Parser model has no tool")
+            raise InvalidAgentError("Parser model has no tool")
 
         model = self.model.to_langchain().bind_tools(self.tools)
         messages = state["messages"]

@@ -14,13 +14,14 @@ from portia.end_user import EndUser
 from portia.errors import InvalidAgentError
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
-from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.execution_hooks import ExecutionHooks
 from portia.plan import ReadOnlyStep, Variable
 from portia.plan_run import ReadOnlyPlanRun
 from portia.prefixed_uuid import PlanRunUUID
 from portia.storage import InMemoryStorage
+from portia.tool import ToolRunContext
 from tests.utils import (
     AdditionTool,
     get_mock_generative_model,
@@ -403,3 +404,27 @@ def test_oneshot_agent_templates_values(monkeypatch: pytest.MonkeyPatch) -> None
     assert tool_args["email_title"] == "Hello John Doe"
     assert tool_args["email_body"] == "Dear John Doe,\n\nThis is a test email."
     assert output.get_value() == "Email sent successfully"
+
+
+def test_oneshot_agent_fails_without_tool() -> None:
+    """Test that the oneshot agent correctly templates values before calling the tool."""
+    (plan, plan_run) = get_test_plan_run()
+    agent = OneShotAgent(
+        step=plan.steps[0],
+        plan_run=plan_run,
+        end_user=EndUser(external_id="123"),
+        config=get_test_config(),
+        agent_memory=InMemoryStorage(),
+    )
+    tool_context = ToolRunContext(
+        end_user=agent.end_user,
+        plan_run_id=agent.plan_run.id,
+        config=agent.config,
+        clarifications=agent.plan_run.get_clarifications_for_step(),
+    )
+    tool_calling_model = OneShotToolCallingModel(
+        get_test_config().get_execution_model(), [], agent, tool_context
+    )
+
+    with pytest.raises(InvalidAgentError):
+        tool_calling_model.invoke({"messages": [], "step_inputs": []})
