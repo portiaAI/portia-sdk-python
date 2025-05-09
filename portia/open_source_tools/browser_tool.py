@@ -24,7 +24,7 @@ import sys
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Type
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -171,6 +171,8 @@ class BrowserTool(Tool[str]):
         custom_infrastructure_provider (BrowserInfrastructureProvider, optional): A custom
             infrastructure provider to use. If not provided, the infrastructure provider will be
             resolved from the `infrastructure_option` argument.
+        structured_output_schema (BaseModel, optional): A Pydantic model to use for structured
+            output. If not provided, the tool will return a string.
 
     """
 
@@ -249,7 +251,9 @@ class BrowserTool(Tool[str]):
                     plan_run_id=ctx.plan_run_id,
                     require_confirmation=True,
                 )
-            output_model = BrowserTaskOutput[self.structured_output_schema if self.structured_output_schema else str]
+
+            output_schema = self.structured_output_schema if self.structured_output_schema else str
+            output_model = BrowserTaskOutput[output_schema]
 
             async def run_agent_task(
                 task_description: str,
@@ -273,8 +277,8 @@ class BrowserTool(Tool[str]):
             )
 
             task_result = await run_agent_task(task_to_complete, output_model)
-            if task_result.human_login_required:
-                return handle_login_requirement(task_result)
+            if task_result.human_login_required:  # type: ignore reportCallIssue
+                return handle_login_requirement(task_result)  # type: ignore reportCallIssue
 
             self.infrastructure_provider.step_complete(ctx)
             return task_result.task_output  # type: ignore reportCallIssue

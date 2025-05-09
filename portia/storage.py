@@ -1029,7 +1029,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "latency_seconds": tool_call.latency_seconds,
                 },
             )
-        except Exception as e: # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             logger().error(f"Error saving tool call to Portia Cloud: {e}")
         else:
             # Don't raise an error if the response is not successful, just log it
