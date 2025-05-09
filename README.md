@@ -9,12 +9,14 @@ Play around, break things and tell us how you're getting on in our <a href="http
 
 If you want to dive straight in with an example, dive into one of our examples in our **[Examples Repo (↗)](https://github.com/portiaAI/portia-agent-examples)**.
 
+<p align="center"><strong>🌟 Star Portia AI to stay updated on new releases!</strong></p>
+
 ## Why Portia AI
 | Problem | Portia's answer |
 | ------- | --------------- |
-| **Planning:** Many use cases require visibility into the LLM’s reasoning, particularly for complex tasks requiring multiple steps and tools. LLMs also struggle picking the right tools as their tool set grows: a recurring limitation for production deployments | **Multi-agent plans:** Our open source, multi-shot prompter guides your LLM to produce a [`Plan`](https://docs.portialabs.ai/generate-plan) in response to a prompt, weaving the relevant tools, inputs and outputs for every step. |
-| **Execution:** Tracking an LLM’s progress mid-task is difficult, making it harder to intervene when guidance is needed. This is especially critical for enforcing company policies or correcting hallucinations (hello, missing arguments in tool calls!) | **Stateful PlanRuns:** Portia will spin up a multi-agent [`PlanRun`](https://docs.portialabs.ai/execute-workflow) to execute on generated plans and track their state throughout execution. Using our [`Clarification`](https://docs.portialabs.ai/manage-clarifications) abstraction you can define points where you want to take control of run execution e.g. to resolve missing information or multiple choice decisions. Portia serialises the run state, and you can manage its storage / retrieval yourself or use our cloud offering for simplicity. |
-| **Authentication:** Existing solutions often disrupt the user experience with cumbersome authentication flows or require pre-emptive, full access to every tool—an approach that doesn’t scale for multi-agent assistants. | **Extensible, authenticated tool calling:** Bring your own tools on our extensible [`Tool`](https://docs.portialabs.ai/extend-tool-definitions) abstraction, or use our growing plug and play authenticated [tool library](https://docs.portialabs.ai/run-portia-tools), which will include a number of popular SaaS providers over time (Google, Zendesk, Hubspot, Github etc.). All Portia tools feature just-in-time authentication with token refresh, offering security without compromising on user experience. |
+| **Planning:** Many use cases require visibility into the LLM's reasoning, particularly for complex tasks requiring multiple steps and tools. LLMs also struggle picking the right tools as their tool set grows: a recurring limitation for production deployments | **Multi-agent plans:** Our open source, multi-shot prompter guides your LLM to produce a [`Plan`](https://docs.portialabs.ai/generate-plan) in response to a prompt, weaving the relevant tools, inputs and outputs for every step. |
+| **Execution:** Tracking an LLM's progress mid-task is difficult, making it harder to intervene when guidance is needed. This is especially critical for enforcing company policies or correcting hallucinations (hello, missing arguments in tool calls!) | **Stateful PlanRuns:** Portia will spin up a multi-agent [`PlanRun`](https://docs.portialabs.ai/execute-workflow) to execute on generated plans and track their state throughout execution. Using our [`Clarification`](https://docs.portialabs.ai/manage-clarifications) abstraction you can define points where you want to take control of run execution e.g. to resolve missing information or multiple choice decisions. Portia serialises the run state, and you can manage its storage / retrieval yourself or use our cloud offering for simplicity. |
+| **Authentication:** Existing solutions often disrupt the user experience with cumbersome authentication flows or require pre-emptive, full access to every tool—an approach that doesn't scale for multi-agent assistants. | **Extensible, authenticated tool calling:** Bring your own tools on our extensible [`Tool`](https://docs.portialabs.ai/extend-tool-definitions) abstraction, or use our growing plug and play authenticated [tool library](https://docs.portialabs.ai/run-portia-tools), which will include a number of popular SaaS providers over time (Google, Zendesk, Hubspot, Github etc.). All Portia tools feature just-in-time authentication with token refresh, offering security without compromising on user experience. |
 
 
 ## Quickstart
@@ -139,7 +141,9 @@ print(plan_run.model_dump_json(indent=2))
 ## Contribution guidelines
 Head on over to our <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a> for details.
 
-## Support
-We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
+# ⭐ Support
+You can support our work best by leaving a star!
 
-We also particularly appreciate github stars. If you've liked what you've seen, please give us a star <a href="https://github.com/portiaAI/portia-sdk-python" target="_blank">at the top of the page</a>.
+![star](https://github.com/user-attachments/assets/8df5e1d9-a0d4-40b4-9c51-945841744050)
+
+We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.

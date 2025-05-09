@@ -59,7 +59,9 @@ IMPORTANT GUIDLINES:
  step, DO NOT guess what that step will produce - instead, specify the previous step's output as an
  input for this step and allow this to be handled when we execute the plan.
 - If you can't come up with a plan provide a descriptive error instead - DO NOT
- create plan with zero steps.
+ create a plan with zero steps. When returning an error, return only only the JSON object with
+ the error message filled in - DO NOT include text (explaining the error or otherwise) outside of
+ the JSON object.
 - For EVERY tool that requires an id as an input, make sure to check
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides
@@ -69,6 +71,7 @@ IMPORTANT GUIDLINES:
   2. Condition field: Write the condition in concise natural language.
 - Do not use the condition field for non-conditional steps.
 - If plan inputs are provided, make sure you specify them as inputs to the appropriate steps.
+- Only use plan inputs if they are provided - DO NOT make any up
                     """,
                 ),
                 Message(role="user", content=prompt),

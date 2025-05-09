@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import BaseMessage, ToolMessage
+from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import Clarification
@@ -16,7 +16,8 @@ from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryErr
 from portia.execution_agents.output import LocalDataValue, Output
 
 if TYPE_CHECKING:
-    from portia.config import Config
+    from langchain_core.messages import BaseMessage
+
     from portia.tool import Tool
 
 
@@ -47,50 +48,6 @@ class AgentNode(str, Enum):
 MAX_RETRIES = 4
 
 
-def next_state_after_tool_call(
-    config: Config,
-    state: MessagesState,
-    tool: Tool | None = None,
-) -> Literal[AgentNode.TOOL_AGENT, AgentNode.SUMMARIZER, END]:  # type: ignore  # noqa: PGH003
-    """Determine the next state after a tool call.
-
-    This function checks the state after a tool call to determine if the run
-    should proceed to the tool agent again, to the summarizer, or end.
-
-    Args:
-        config (Config): The configuration for the run.
-        state (MessagesState): The current state of the messages.
-        tool (Tool | None): The tool involved in the call, if any.
-
-    Returns:
-        Literal[AgentNode.TOOL_AGENT, AgentNode.SUMMARIZER, END]: The next state to transition to.
-
-    Raises:
-        ToolRetryError: If the tool has an error and the maximum retry limit has not been reached.
-
-    """
-    messages = state["messages"]
-    last_message = messages[-1]
-    errors = [msg for msg in messages if "ToolSoftError" in msg.content]
-
-    if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
-        return AgentNode.TOOL_AGENT
-    if (
-        "ToolSoftError" not in last_message.content
-        and tool
-        and (
-            getattr(tool, "should_summarize", False)
-            # If the value is larger than the threshold value, always summarise them as they are
-            # too big to store the full value locally
-            or config.exceeds_output_threshold(last_message.content)
-        )
-        and isinstance(last_message, ToolMessage)
-        and not is_clarification(last_message.artifact)
-    ):
-        return AgentNode.SUMMARIZER
-    return END
-
-
 def is_clarification(artifact: Any) -> bool:  # noqa: ANN401
     """Check if the artifact is a clarification or list of clarifications."""
     return isinstance(artifact, Clarification) or (
@@ -115,8 +72,8 @@ def tool_call_or_end(
         Literal[AgentNode.TOOLS, END]: The next state to transition to.
 
     """
-    last_message = state["messages"][-1]
-    if hasattr(last_message, "tool_calls"):
+    messages = state["messages"]
+    if len(messages) > 0 and hasattr(messages[-1], "tool_calls"):
         return AgentNode.TOOLS
     return END
 
@@ -145,16 +102,15 @@ def process_output(  # noqa: C901
         InvalidAgentOutputError: If the output from the agent is invalid.
 
     """
+    if clarifications and len(clarifications) > 0:
+        return LocalDataValue(value=clarifications)
+
     output_values: list[Output] = []
     for message in messages:
         if "ToolSoftError" in message.content and tool:
             raise ToolRetryError(tool.id, str(message.content))
         if "ToolHardError" in message.content and tool:
             raise ToolFailedError(tool.id, str(message.content))
-        if clarifications and len(clarifications) > 0:
-            return LocalDataValue(
-                value=clarifications,
-            )
         if isinstance(message, ToolMessage):
             if message.artifact and isinstance(message.artifact, Output):
                 output_values.append(message.artifact)
