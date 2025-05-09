@@ -138,6 +138,7 @@ def test_remote_tool_hard_error_from_server(httpx_mock: HTTPXMock) -> None:
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
 
@@ -176,6 +177,7 @@ def test_remote_tool_soft_error(httpx_mock: HTTPXMock) -> None:
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
     assert (
@@ -213,6 +215,7 @@ def test_remote_tool_bad_response(httpx_mock: HTTPXMock) -> None:
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
 
@@ -251,6 +254,7 @@ def test_remote_tool_hard_error(httpx_mock: HTTPXMock) -> None:
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
     assert (
@@ -385,6 +389,7 @@ def test_remote_tool_action_clarifications(httpx_mock: HTTPXMock) -> None:
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
 
@@ -435,6 +440,7 @@ def test_remote_tool_input_clarifications(httpx_mock: HTTPXMock) -> None:
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
     assert (
@@ -485,6 +491,7 @@ def test_remote_tool_mc_clarifications(httpx_mock: HTTPXMock) -> None:
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
     assert (
@@ -534,6 +541,7 @@ def test_remote_tool_value_confirm_clarifications(httpx_mock: HTTPXMock) -> None
         "execution_context": {
             "end_user_id": ctx.end_user.external_id,
             "plan_run_id": str(ctx.plan_run_id),
+            "additional_data": ctx.end_user.additional_data,
         },
     }
 

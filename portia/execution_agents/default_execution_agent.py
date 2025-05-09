@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from jinja2 import Template
-from langchain_core.messages import BaseMessage
 from langchain_core.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -26,7 +24,9 @@ from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
+    get_arg_value_with_templating,
     process_output,
+    template_in_required_inputs,
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
@@ -38,7 +38,6 @@ from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
-    from langchain_core.messages import BaseMessage
 
     from portia.config import Config
     from portia.end_user import EndUser
@@ -135,44 +134,6 @@ class VerifiedToolInputs(BaseModel):
     """
 
     args: list[VerifiedToolArgument] = Field(description="Arguments for the tool.")
-
-
-def _get_arg_value_with_templating(step_inputs: list[StepInput], arg: Any) -> Any:  # noqa: ANN401
-    """Return the value of an argument, handling any templating required."""
-    # Directly apply templating in strings
-    if isinstance(arg, str):
-        if any(
-            # Allow with or without spaces
-            f"{{{{{step_input.name}}}}}" in arg or f"{{{{ {step_input.name} }}}}" in arg
-            for step_input in step_inputs
-        ):
-            return _template_inputs_into_arg_value(arg, step_inputs)
-        return arg
-
-    # Recursively handle lists and dicts
-    if isinstance(arg, list):
-        return [_get_arg_value_with_templating(step_inputs, item) for item in arg]
-    if isinstance(arg, dict):
-        return {k: _get_arg_value_with_templating(step_inputs, v) for k, v in arg.items()}
-
-    # We don't yet support templating for other types
-    return arg
-
-
-def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]) -> str:
-    """Template inputs into an argument value."""
-    template_args = {}
-    for step_input in step_inputs:
-        input_name = step_input.name
-
-        # jinja can't handle inputs that start with $, so remove any leading $
-        # this also handles the case where the parser accidentlly misses off the $ in templating,
-        # which does happen (e.g. it uses {{input_name}} instead of {{$input_name}}
-        input_name = input_name.lstrip("$")
-        arg_value = arg_value.replace(step_input.name, input_name)
-        template_args[input_name] = step_input.value
-
-    return Template(arg_value).render(**template_args)
 
 
 class ParserModel:
@@ -320,9 +281,7 @@ class ParserModel:
         else:
             test_args = {}
             for arg in tool_inputs.args:
-                test_args[arg.name] = _get_arg_value_with_templating(
-                    state["step_inputs"], arg.value
-                )
+                test_args[arg.name] = get_arg_value_with_templating(state["step_inputs"], arg.value)
                 if not arg.valid:
                     errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
 
@@ -478,7 +437,7 @@ class VerifierModel:
         try:
             if self.agent.tool:
                 for arg_name, arg_value in arg_dict.items():
-                    arg_dict[arg_name] = _get_arg_value_with_templating(step_inputs, arg_value)
+                    arg_dict[arg_name] = get_arg_value_with_templating(step_inputs, arg_value)
                 self.agent.tool.args_schema.model_validate(arg_dict)
         except ValidationError as e:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
@@ -586,7 +545,7 @@ class ToolCallingModel:
                 past_errors=past_errors,
             ),
         )
-        result = self._template_in_required_inputs(response, state["step_inputs"])
+        result = template_in_required_inputs(response, state["step_inputs"])
 
         if (
             self.agent.execution_hooks
@@ -605,21 +564,6 @@ class ToolCallingModel:
                     return {"messages": []}
 
         return {"messages": [result]}
-
-    def _template_in_required_inputs(
-        self,
-        response: BaseMessage,
-        step_inputs: list[StepInput],
-    ) -> BaseMessage:
-        """Template any required inputs into the tool calls."""
-        for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
-            if not isinstance(tool_call.get("args"), dict):
-                raise InvalidPlanRunStateError("Tool call missing args field")
-
-            for arg_name, arg_value in tool_call.get("args").items():
-                tool_call["args"][arg_name] = _get_arg_value_with_templating(step_inputs, arg_value)
-
-        return response
 
 
 class DefaultExecutionAgent(BaseExecutionAgent):
