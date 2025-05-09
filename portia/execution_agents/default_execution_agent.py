@@ -60,22 +60,25 @@ class ToolArgument(BaseModel):
 
     Attributes:
         name (str): The name of the argument, as requested by the tool.
+        explanation (str): Explanation of the source for the value of the argument.
         value (Any | None): The value of the argument, as provided in the goal or context.
         valid (bool): Whether the value is a valid type and/or format for the given argument.
-        explanation (str): Explanation of the source for the value of the argument.
 
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
+    explanation: str = Field(
+        description="Explanation of the source for the value of the argument. "
+        "For large arguments, includes templating was or wasn't used.",
+    )
     value: Any | None = Field(
         description="Value of the argument, as provided by in the goal or context.",
     )
     valid: bool = Field(
         description="Whether the value is a valid type and or format for the given argument.",
     )
-    explanation: str = Field(description="Explanation of the source for the value of the argument.")
 
 
 class ToolInputs(BaseModel):
@@ -165,12 +168,11 @@ class ParserModel:
                 "than repeating it, you should provide the name in curly braces and it will be "
                 "templated in before the tool is called. "
                 "For example, if you wish to use an input called '$large_input_value' verbatim, "
-                "you should enter '{{ '{{' }}$large_input_value{{ '}}' }}' (double curly braces "
+                "you should enter '{{{{$large_input_value}}}}' (double curly braces "
                 "and include the $ in the name) and the value will be templated in before the tool "
-                "is called.  You should definitely use this templating for any input values over "
-                "1000 words that you want to use verbatim.",
-                # Use jinja2 to allow for the literal curly braces
-                template_format="jinja2",
+                "is called. If there is a $ in the variable name, MAKE SURE you keep it. You "
+                "should definitely use this templating for any input values over 1000 words that "
+                "you want to use verbatim.",
             ),
             HumanMessagePromptTemplate.from_template(
                 "Context for user input and past steps:\n{context}\n"
@@ -197,13 +199,26 @@ class ParserModel:
                 "the value field\n"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
+                "- If any of the inputs is a large string and you want to use it verbatim, rather "
+                "than repeating it, you should provide the name in curly braces and it will be "
+                "templated in before the tool is called. For example, if you wish to use an input "
+                "called '$large_input_value' verbatim, you should enter "
+                "'{{{{$large_input_value}}}}' "
+                "(double curly braces and include the $ in the name) and the value will be "
+                "templated in before the tool is called.  You should definitely use this "
+                "templating for any input values over 1000 words that you want to use verbatim.\n"
+                "- If you use templating, MAKE SURE to keep a $ at the start of the name if there "
+                "is one and MAKE SURE to use two curly braces (not one or three) to open and close "
+                "the templating.\n"
+                "- Generate the fields in the order they appear in the classes below."
                 "class ToolInputs:\n"
                 "  args: List[ToolArgument]  # List of tool arguments.\n\n"
                 "class ToolArgument:\n"
                 "  name: str  # Name of the argument requested by the tool.\n"
+                "  explanation: str  # Explanation of the source for the value of the argument. "
+                "For large arguments, include why you did or didn't use templating.\n"
                 "  value: Any | None  # Value of the argument from the goal or context.\n"
-                "  valid: bool  # Whether the value is valid for the argument.\n"
-                "  explanation: str  # Explanation of the source for the value of the argument.\n\n",  # noqa: E501
+                "  valid: bool  # Whether the value is valid for the argument.\n\n",
             ),
         ],
     )
@@ -323,7 +338,7 @@ class VerifierModel:
                 " information that is there (then made_up should be FALSE). "
                 "\n- Arguments where the value comes from a clarification should be marked as FALSE"
                 "\n- Some large inputs may be provided as a template variable (e.g. "
-                "'{{ '{{' }}$large_input_value{{ '}}' }}'). This is fine and the value will be "
+                "'{{{{$large_input_value}}}}'). This is fine and the value will be "
                 "templated in before the tool is called.\n"
                 "The output must conform to the following schema:\n\n"
                 "class VerifiedToolArgument:\n"
@@ -334,8 +349,6 @@ class VerifierModel:
                 "class VerifiedToolInputs:\n"
                 "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
                 "Please ensure the output matches the VerifiedToolInputs schema.",
-                # Use jinja2 to allow for the literal curly braces
-                template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
                 "You will need to achieve the following goal: {task}\n"
@@ -463,14 +476,12 @@ class ToolCallingModel:
                 "arguments. You don't know current events. "
                 "If any values are too large to be provided to you in full, they will be provided "
                 "in curly braces with a value to be templated in (e.g. "
-                "'{{ '{{' }}$large_output_value{{ '}}' }}'). "
+                "'{{{{$large_output_value}}}}'). "
                 "This is fine - please keep these templated values inside double curly braces and "
                 "DO NOT REMOVE the leading $ on the name - for example, keep it as "
-                "'{{ '{{' }}$large_output_value{{ '}}' }}' and not "
-                "'{{ '{{' }}large_output_value{{ '}}' }}'. These values will then be templated in "
+                "'{{{{$large_output_value}}}}' and not "
+                "'{{{{large_output_value}}}}'. These values will then be templated in "
                 "before the tool is called.\n",
-                # Use jinja2 to allow for the literal curly braces
-                template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
                 "context:\n{verified_args}\n"

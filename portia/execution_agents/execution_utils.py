@@ -114,11 +114,11 @@ def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]
     for step_input in step_inputs:
         input_name = step_input.name
 
-        # jinja can't handle inputs that start with $, so remove the leading $ if needed
-        if step_input.name in arg_value and step_input.name.startswith("$"):
-            input_name = input_name.lstrip("$")
-            arg_value = arg_value.replace(step_input.name, input_name)
-
+        # jinja can't handle inputs that start with $, so remove any leading $
+        # this also handles the case where the parser accidentlly misses off the $ in templating,
+        # which does happen (e.g. it uses {{input_name}} instead of {{$input_name}}
+        input_name = input_name.lstrip("$")
+        arg_value = arg_value.replace(step_input.name, input_name)
         template_args[input_name] = step_input.value
 
     return Template(arg_value).render(**template_args)

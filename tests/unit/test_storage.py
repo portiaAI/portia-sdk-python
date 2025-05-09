@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
+import httpx
 import pytest
 
 from portia.end_user import EndUser
@@ -18,6 +19,7 @@ from portia.execution_agents.output import (
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
+    MAX_STORAGE_OBJECT_BYTES,
     AdditionalStorage,
     DiskFileStorage,
     InMemoryStorage,
@@ -131,7 +133,7 @@ def test_in_memory_storage() -> None:
     assert saved_output_2 == saved_output_1
     # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         storage.save_plan_run_output(
@@ -183,7 +185,7 @@ def test_disk_storage(tmp_path: Path) -> None:
 
     # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         storage.save_plan_run_output(
@@ -714,14 +716,47 @@ def test_portia_cloud_agent_memory_errors() -> None:
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         )
 
-        # Check with an output that's too large
+    # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         agent_memory.save_plan_run_output(
             "large_output",
             LocalDataValue(value="large value"),
+            plan_run.id,
+        )
+
+    # Test for 413 REQUEST_ENTITY_TOO_LARGE response status
+    mock_response = MagicMock()
+    mock_response.status_code = httpx.codes.REQUEST_ENTITY_TOO_LARGE
+    mock_response.request = MagicMock()
+    mock_response.request.content = b"Some content that's too large"
+
+    with (
+        patch.object(agent_memory.form_client, "put", return_value=mock_response),
+        pytest.raises(StorageError),
+    ):
+        agent_memory.save_plan_run_output(
+            "too_large_output",
+            LocalDataValue(value="too large value"),
+            plan_run.id,
+        )
+
+    # Test for response.request.content > MAX_STORAGE_OBJECT_BYTES
+    mock_response = MagicMock()
+    mock_response.status_code = httpx.codes.OK
+    mock_response.request = MagicMock()
+    mock_response.request.content = b"Some large content"
+
+    with (
+        patch.object(agent_memory.form_client, "put", return_value=mock_response),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
+        pytest.raises(StorageError),
+    ):
+        agent_memory.save_plan_run_output(
+            "over_size_limit",
+            LocalDataValue(value="value that creates a large request"),
             plan_run.id,
         )
 
