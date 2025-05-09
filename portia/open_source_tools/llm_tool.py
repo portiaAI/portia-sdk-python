@@ -22,9 +22,9 @@ class LLMToolSchema(BaseModel):
     )
     input_data: list[str] = Field(
         default_factory=list,
-        description="Any relevant data that should be used to complete the task. Important: This "
-        "should include all relevant data in their entirety, from the first to the last character "
-        "(i.e. NOT a summary).",
+        description="A list of strings containing relevant data that should be used to complete "
+        "the task. Important: This should include all relevant data in their entirety, from the "
+        "first to the last character (i.e. NOT a summary).",
     )
 
 
