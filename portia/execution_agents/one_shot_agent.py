@@ -29,6 +29,7 @@ from portia.execution_agents.execution_utils import (
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.execution_agents.clarification_tool import ClarificationTool
+from portia.logger import logger
 from portia.tool import ToolRunContext
 from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.plan import Step, ReadOnlyStep
@@ -83,9 +84,6 @@ class OneShotToolCallingModel:
                 "provided inputs. "
                 "While you are not aware of current events, you excel at reasoning "
                 "and adhering to instructions. "
-                # @@@ DELETE IF NOT NEEDED
-                #                "You should think through and clearly explain the source of each argument "
-                #                "(e.g., context, past messages, clarifications) before calling the tool. "
                 "Avoid assumptions or fabricated information. "
                 "If you are unsure of an argument to use for the tool, you can use the "
                 "clarification tool to clarify what the argument should be. "
@@ -183,6 +181,12 @@ class OneShotToolCallingModel:
             previous_errors=",".join(past_errors),
         )
         response = model.invoke(formatted_messages)
+        retries = 0 
+        while response.response_metadata["finish_reason"] == "MALFORMED_FUNCTION_CALL" and retries < 4:
+            logger().warning(f"Malformed function call, retrying... (attempt {retries + 1} of 4)")
+            model = self.model.to_langchain().bind_tools(self.tools)
+            response = model.invoke(formatted_messages)
+            retries += 1
         result = template_in_required_inputs(response, state["step_inputs"])
 
         if (
@@ -272,12 +276,12 @@ class OneShotAgent(BaseExecutionAgent):
         graph = StateGraph(ExecutionState)
         graph.add_node(AgentNode.MEMORY_EXTRACTION, MemoryExtractionStep(self).invoke)
         graph.add_edge(START, AgentNode.MEMORY_EXTRACTION)
+        graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.TOOL_AGENT)
 
         graph.add_node(
             AgentNode.TOOL_AGENT,
             OneShotToolCallingModel(model, tools, self, tool_run_ctx).invoke,
         )
-        graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.TOOL_AGENT)
 
         graph.add_node(AgentNode.TOOLS, tool_node)
         graph.add_node(
