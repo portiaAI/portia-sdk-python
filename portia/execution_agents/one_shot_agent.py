@@ -83,9 +83,6 @@ class OneShotToolCallingModel:
                 "provided inputs. "
                 "While you are not aware of current events, you excel at reasoning "
                 "and adhering to instructions. "
-                # @@@ DELETE IF NOT NEEDED
-                #                "You should think through and clearly explain the source of each argument "
-                #                "(e.g., context, past messages, clarifications) before calling the tool. "
                 "Avoid assumptions or fabricated information. "
                 "If you are unsure of an argument to use for the tool, you can use the "
                 "clarification tool to clarify what the argument should be. "
@@ -128,9 +125,6 @@ class OneShotToolCallingModel:
                 "- Ensure arguments align with the tool's schema and intended use."
                 "- If you are unsure of an argument to use for the tool, you can use the "
                 "clarification tool to clarify what the argument should be.\n\n"
-                # @@@ DELETE IF NOT NEEDED
-                #                "You must return an explanation for the arguments you choose, followed by the tool "
-                #                "call."
             ),
         ],
     )

@@ -7,10 +7,18 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import InputClarification
-from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
+from portia.errors import (
+    InvalidAgentOutputError,
+    InvalidPlanRunStateError,
+    ToolFailedError,
+    ToolRetryError,
+)
+from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
     AgentNode,
+    get_arg_value_with_templating,
     process_output,
+    template_in_required_inputs,
     tool_call_or_end,
 )
 from portia.execution_agents.output import LocalDataValue, Output
@@ -101,6 +109,21 @@ def test_process_output_with_content() -> None:
     assert result.get_value() == "test"
 
 
+def test_process_output_with_clarification() -> None:
+    """Test process_output with a clarification."""
+    clarification = InputClarification(
+        argument_name="test",
+        user_guidance="test",
+        plan_run_id=PlanRunUUID(),
+    )
+    message = ToolMessage(tool_call_id="1", content=clarification.model_dump_json())
+
+    result = process_output([message], clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.get_value() == [clarification]
+
+
 def test_process_output_summary_matches_serialized_value() -> None:
     """Test process_output summary matches serialized value."""
     dict_value = {"key1": "value1", "key2": "value2"}
@@ -130,3 +153,77 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     assert isinstance(result, Output)
     assert result.get_value() == dict_value
     assert result.get_summary() == provided_summary
+
+
+def test_get_arg_value_with_templating_no_templating() -> None:
+    """Test get_arg_value_with_templating with an arg that needs no templating."""
+    result = get_arg_value_with_templating([], "simple string")
+    assert result == "simple string"
+
+
+def test_get_arg_value_with_templating_string_with_templating() -> None:
+    """Test get_arg_value_with_templating with a string arg that needs 2 values templated in."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$age", value="30", description="User's age"),
+    ]
+    arg = "Hello {{$name}}, you are {{$age}} years old"
+
+    result = get_arg_value_with_templating(step_inputs, arg)
+    assert result == "Hello John, you are 30 years old"
+
+
+def test_get_arg_value_with_templating_list_with_templating() -> None:
+    """Test get_arg_value_with_templating with a list of strings arg that needs a value templated in."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+    ]
+    arg = ["Hello {{$name}}", "Goodbye {{$name}}"]
+
+    result = get_arg_value_with_templating(step_inputs, arg)
+    assert result == ["Hello John", "Goodbye John"]
+
+
+def test_get_arg_value_with_templating_dict_with_templating() -> None:
+    """Test get_arg_value_with_templating with a dict of strings arg that needs a value templated in."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+    ]
+    arg = {"greeting": "Hello {{$name}}", "farewell": "Goodbye {{$name}}"}
+
+    result = get_arg_value_with_templating(step_inputs, arg)
+    assert result == {"greeting": "Hello John", "farewell": "Goodbye John"}
+
+
+def test_template_in_required_inputs_multiple_args() -> None:
+    """Test template_in_required_inputs with two different args that need templating."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$age", value="30", description="User's age"),
+    ]
+    message = AIMessage(content="")
+    message.tool_calls = [
+        {
+            "name": "test_tool",
+            "type": "tool_call",
+            "id": "call_123",
+            "args": {"greeting": "Hello {{$name}}", "age_info": "You are {{$age}} years old"},
+        }
+    ]
+
+    result = template_in_required_inputs(message, step_inputs)
+
+    assert result.tool_calls[0]["args"]["greeting"] == "Hello John"
+    assert result.tool_calls[0]["args"]["age_info"] == "You are 30 years old"
+
+
+def test_template_in_required_inputs_missing_args() -> None:
+    """Test template_in_required_inputs with error case of a tool_call with no args field."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+    ]
+    message = AIMessage(content="")
+    message.tool_calls = [{"name": "test_tool", "type": "tool_call", "id": "call_123"}]
+
+    with pytest.raises(InvalidPlanRunStateError, match="Tool call missing args field"):
+        template_in_required_inputs(message, step_inputs)

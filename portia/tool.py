@@ -118,16 +118,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     id: str = Field(description="ID of the tool")
     name: str = Field(description="Name of the tool")
     description: str = Field(description="Purpose of the tool and usage")
-    args_schema: type[BaseModel] = Field(
-        default_factory=lambda _: _ArgsSchemaPlaceholder
-    )
+    args_schema: type[BaseModel] = Field(default_factory=lambda _: _ArgsSchemaPlaceholder)
     output_schema: tuple[str, str] = Field(
         ...,
         description="Output schema of the tool",
-        examples=[
-            "(TYPE, DESCRIPTION)",
-            "(json, json with API response, single object)",
-        ],
+        examples=["(TYPE, DESCRIPTION)", "(json, json with API response, single object)"],
     )
     should_summarize: bool = Field(
         default=False,
@@ -434,11 +429,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             if "ToolHardError" in output_value:
                 raise ToolHardError(output_value)
         # Handle Clarifications
-        if (
-            isinstance(output_value, list)
-            and output_value
-            and "category" in output_value[0]
-        ):
+        if isinstance(output_value, list) and output_value and "category" in output_value[0]:
             clarification = output_value[0]
             match clarification["category"]:
                 case ClarificationCategory.ACTION:
@@ -598,9 +589,7 @@ class PortiaMcpTool(Tool[str]):
         logger().debug(f"Calling tool {self.name} with arguments {kwargs}")
         return asyncio.run(self.call_remote_mcp_tool(self.name, kwargs))
 
-    async def call_remote_mcp_tool(
-        self, name: str, arguments: dict | None = None
-    ) -> str:
+    async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
         """Call a tool using the MCP session."""
         async with get_mcp_session(self.mcp_client_config) as session:
             tool_result = await session.call_tool(name, arguments)
