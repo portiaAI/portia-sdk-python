@@ -181,12 +181,12 @@ class OneShotToolCallingModel:
             previous_errors=",".join(past_errors),
         )
         response = model.invoke(formatted_messages)
-        retries = 0 
-        while response.response_metadata["finish_reason"] == "MALFORMED_FUNCTION_CALL" and retries < 4:
-            logger().warning(f"Malformed function call, retrying... (attempt {retries + 1} of 4)")
-            model = self.model.to_langchain().bind_tools(self.tools)
-            response = model.invoke(formatted_messages)
-            retries += 1
+        # retries = 0 
+        # while response.response_metadata["finish_reason"] == "MALFORMED_FUNCTION_CALL" and retries < 4:
+        #     logger().warning(f"Malformed function call, retrying... (attempt {retries + 1} of 4)")
+        #     model = self.model.to_langchain().bind_tools(self.tools)
+        #     response = model.invoke(formatted_messages)
+        #     retries += 1
         result = template_in_required_inputs(response, state["step_inputs"])
 
         if (
