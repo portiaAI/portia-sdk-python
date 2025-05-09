@@ -539,9 +539,9 @@ class Portia:
             return plan_run
 
         plan = self.storage.get_plan(plan_run.plan_id)
-        plan_run = self.storage.get_plan_run(plan_run.id)
-        current_step_clarifications = plan_run.get_clarifications_for_step()
         while plan_run.state != PlanRunState.READY_TO_RESUME:
+            plan_run = self.storage.get_plan_run(plan_run.id)
+            current_step_clarifications = plan_run.get_clarifications_for_step()
             if tries >= max_retries:
                 raise InvalidPlanRunStateError("Run is not ready to resume after max retries")
 
