@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel, Field
+
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
     SKIPPED_OUTPUT,
@@ -24,13 +26,24 @@ class FinalOutputSummarizer:
 
     """
 
-    SUMMARIZE_TASK = (
+    summarizer_only_prompt = (
         "Summarize all tasks and outputs that answers the query given. Make sure the "
         "summary is including all the previous tasks and outputs and biased towards "
         "the last step output of the plan. Your summary "
         "should be concise and to the point with maximum 500 characters. Do not "
         "include 'Summary:' in the beginning of the summary. Do not make up information "
         "not used in the context.\n"
+    )
+
+    summarizer_and_structured_output_prompt = (
+        "Summarize all tasks and outputs that answers the query given. Make sure the "
+        "summary is including all the previous tasks and outputs and biased towards "
+        "the last step output of the plan. Your summary "
+        "should be concise and to the point with maximum 500 characters. Do not "
+        "include 'Summary:' in the beginning of the summary. Do not make up information "
+        "not used in the context.\n"
+        "The output should also include the structured output of the plan run as specified to "
+        "the output schema."
     )
 
     def __init__(self, config: Config) -> None:
@@ -73,7 +86,7 @@ class FinalOutputSummarizer:
                 context.append("----------")
         return "\n".join(context)
 
-    def create_summary(self, plan: Plan, plan_run: PlanRun) -> str | None:
+    def create_summary(self, plan: Plan, plan_run: PlanRun) -> str | BaseModel | None:
         """Execute the summarizer llm and return the summary as a string.
 
         Args:
@@ -81,12 +94,25 @@ class FinalOutputSummarizer:
             plan_run (PlanRun): The run to summarize.
 
         Returns:
-            str | None: The generated summary or None if generation fails.
+            str | BaseModel | None: The generated summary or None if generation fails.
 
         """
         model = self.config.get_summarizer_model()
         context = self._build_tasks_and_outputs_context(plan, plan_run)
+        if plan_run.structured_output_schema:
+
+            class SchemaWithSummary(plan_run.structured_output_schema):
+                fo_summary: str = Field(description="The summary of the plan output")
+
+            return model.get_structured_response(
+                [
+                    Message(
+                        content=self.summarizer_and_structured_output_prompt + context, role="user"
+                    )
+                ],
+                SchemaWithSummary,
+            )
         response = model.get_response(
-            [Message(content=self.SUMMARIZE_TASK + context, role="user")],
+            [Message(content=self.summarizer_only_prompt + context, role="user")],
         )
         return str(response.content) if response.content else None

@@ -20,6 +20,8 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
+from typing import Self
+
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from portia.prefixed_uuid import PlanUUID
@@ -405,6 +407,11 @@ class Plan(BaseModel):
         default=[],
         description="The inputs required by the plan.",
     )
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        exclude=True,
+        description="The optional structured output schema for the query.",
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the plan.
@@ -468,7 +475,7 @@ class Plan(BaseModel):
         )
 
     @model_validator(mode="after")
-    def validate_plan(self) -> Plan:
+    def validate_plan(self) -> Self:
         """Validate the plan.
 
         Checks that all outputs + conditions are unique.
@@ -514,4 +521,5 @@ class ReadOnlyPlan(Plan):
             plan_context=plan.plan_context,
             steps=plan.steps,
             inputs=plan.inputs,
+            structured_output_schema=plan.structured_output_schema,
         )
