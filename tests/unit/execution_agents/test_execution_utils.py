@@ -174,7 +174,7 @@ def test_get_arg_value_with_templating_string_with_templating() -> None:
 
 
 def test_get_arg_value_with_templating_list_with_templating() -> None:
-    """Test get_arg_value_with_templating with a list of strings arg that needs a value templated in."""
+    """Test get_arg_value_with_templating with a list of strings that needs a value templated in."""
     step_inputs = [
         StepInput(name="$name", value="John", description="User's name"),
     ]
@@ -185,7 +185,7 @@ def test_get_arg_value_with_templating_list_with_templating() -> None:
 
 
 def test_get_arg_value_with_templating_dict_with_templating() -> None:
-    """Test get_arg_value_with_templating with a dict of strings arg that needs a value templated in."""
+    """Test get_arg_value_with_templating with a dict of strings that needs a value templated in."""
     step_inputs = [
         StepInput(name="$name", value="John", description="User's name"),
     ]
@@ -213,8 +213,8 @@ def test_template_in_required_inputs_multiple_args() -> None:
 
     result = template_in_required_inputs(message, step_inputs)
 
-    assert result.tool_calls[0]["args"]["greeting"] == "Hello John"
-    assert result.tool_calls[0]["args"]["age_info"] == "You are 30 years old"
+    assert result.tool_calls[0]["args"]["greeting"] == "Hello John"  # pyright: ignore[reportAttributeAccessIssue]
+    assert result.tool_calls[0]["args"]["age_info"] == "You are 30 years old"  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_template_in_required_inputs_missing_args() -> None:
@@ -223,7 +223,7 @@ def test_template_in_required_inputs_missing_args() -> None:
         StepInput(name="$name", value="John", description="User's name"),
     ]
     message = AIMessage(content="")
-    message.tool_calls = [{"name": "test_tool", "type": "tool_call", "id": "call_123"}]
+    message.tool_calls = [{"name": "test_tool", "type": "tool_call", "id": "call_123"}]  # pyright: ignore[reportAttributeAccessIssue]
 
     with pytest.raises(InvalidPlanRunStateError, match="Tool call missing args field"):
         template_in_required_inputs(message, step_inputs)

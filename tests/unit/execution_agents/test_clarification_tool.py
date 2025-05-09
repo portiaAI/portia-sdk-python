@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from portia.clarification import Clarification, ClarificationCategory, InputClarification
+from portia.clarification import ClarificationCategory, InputClarification
 from portia.end_user import EndUser
 from portia.execution_agents.clarification_tool import ClarificationTool
 from portia.prefixed_uuid import PlanRunUUID

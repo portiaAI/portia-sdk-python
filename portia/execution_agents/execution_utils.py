@@ -20,12 +20,12 @@ from portia.errors import (
     ToolFailedError,
     ToolRetryError,
 )
-from portia.execution_agents.context import StepInput
 from portia.execution_agents.output import LocalDataValue, Output
 
 if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
 
+    from portia.execution_agents.context import StepInput
     from portia.tool import Tool
 
 
@@ -174,7 +174,7 @@ def process_output(  # noqa: C901
             raise ToolFailedError(tool.id, str(message.content))
         if isinstance(message, ToolMessage):
             try:
-                clarification = InputClarification.model_validate_json(message.content)
+                clarification = InputClarification.model_validate_json(message.content)  # pyright: ignore[reportArgumentType]
                 return LocalDataValue(value=[clarification])
             except ValidationError:
                 pass

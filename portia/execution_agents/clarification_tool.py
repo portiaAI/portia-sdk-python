@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from portia.clarification import Clarification, InputClarification
+from portia.clarification import InputClarification
 from portia.tool import Tool, ToolRunContext
 
 
@@ -26,7 +26,7 @@ class ClarificationTool(Tool[str]):
     output_schema: tuple[str, str] = ("str", "Model dump of the clarification to raise")
     step: int
 
-    def run(self, ctx: ToolRunContext, argument_name: str) -> Clarification:
+    def run(self, ctx: ToolRunContext, argument_name: str) -> str:
         """Run the ClarificationTool."""
         return InputClarification(
             argument_name=argument_name,
