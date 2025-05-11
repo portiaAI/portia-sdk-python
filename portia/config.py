@@ -467,7 +467,7 @@ class Config(BaseModel):
         self.feature_flags = {
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
-            FEATURE_FLAG_AGENT_MEMORY_ENABLED: False,
+            FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             **self.feature_flags,
         }
         return self
