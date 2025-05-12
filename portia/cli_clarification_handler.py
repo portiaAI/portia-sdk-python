@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 class CLIClarificationHandler(ClarificationHandler):
-    """Handles clarifications by obtaining user input from the CLI."""
+    """Handles clarifications by obtaining user input from the CLI"""
 
     def handle_action_clarification(
         self,
