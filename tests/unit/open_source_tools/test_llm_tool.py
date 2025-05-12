@@ -99,7 +99,7 @@ def test_task_data_validator_with_list() -> None:
 
 def test_task_data_validator_with_dict() -> None:
     """Test that task_data validator correctly handles dictionary input."""
-    schema = LLMToolSchema(task="Test task", task_data={"key": "value"})
+    schema = LLMToolSchema(task="Test task", task_data={"key": "value"}) # type: ignore reportArgumentType
     assert schema.task_data == ["{'key': 'value'}"]
 
 

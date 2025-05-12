@@ -95,7 +95,11 @@ class LLMTool(Tool[str]):
             "tasks"
         )
 
-        task_data_str = "\n".join(task_data_list)
+        task_data_str = (
+            "\n".join(task_data_list)
+            if isinstance(task_data_list, list)
+            else str(task_data_list)
+        )
 
         task_str = task
         if task_data_str:
