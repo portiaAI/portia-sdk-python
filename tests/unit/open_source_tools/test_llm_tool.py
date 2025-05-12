@@ -39,10 +39,11 @@ def test_llm_tool_plan_run(
 
 def test_llm_tool_schema_valid_input() -> None:
     """Test that the LLMToolSchema correctly validates the input."""
-    schema_data = {"task": "Solve a math problem", "input_data": ["1 + 1 = 2"]}
+    schema_data = {"task": "Solve a math problem", "task_data": ["1 + 1 = 2"]}
     schema = LLMToolSchema(**schema_data)
 
     assert schema.task == "Solve a math problem"
+    assert schema.task_data == ["1 + 1 = 2"]
 
 
 def test_llm_tool_schema_missing_task() -> None:
@@ -82,3 +83,38 @@ def test_llm_tool_run_with_context(
     assert task in called_with[1].content
     # Assert the result is the expected response
     assert result == "Test response content"
+
+
+def test_task_data_validator_with_string() -> None:
+    """Test that task_data validator correctly handles string input."""
+    schema = LLMToolSchema(task="Test task", task_data="String data")
+    assert schema.task_data == ["String data"]
+
+
+def test_task_data_validator_with_list() -> None:
+    """Test that task_data validator correctly handles list input."""
+    schema = LLMToolSchema(task="Test task", task_data=["Item 1", "Item 2"])
+    assert schema.task_data == ["Item 1", "Item 2"]
+
+
+def test_task_data_validator_with_dict() -> None:
+    """Test that task_data validator correctly handles dictionary input."""
+    schema = LLMToolSchema(task="Test task", task_data={"key": "value"})
+    assert schema.task_data == ["{'key': 'value'}"]
+
+
+def test_task_data_validator_with_none() -> None:
+    """Test that task_data validator correctly handles None input."""
+    schema = LLMToolSchema(task="Test task", task_data=None)
+    assert schema.task_data == []
+
+
+def test_task_data_validator_with_complex_objects() -> None:
+    """Test that task_data validator correctly handles complex objects."""
+    class TestObject:
+        def __str__(self) -> str:
+            return "TestObject"
+
+    schema = LLMToolSchema(task="Test task", task_data=[TestObject(), {"nested": "value"}])
+    assert schema.task_data == ["TestObject", "{'nested': 'value'}"]
+

@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import Any, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from portia.model import GenerativeModel, Message
 from portia.tool import Tool, ToolRunContext
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 class LLMToolSchema(BaseModel):
@@ -20,12 +17,27 @@ class LLMToolSchema(BaseModel):
         ...,
         description="The task to be completed by the LLM tool",
     )
-    input_data: list[str] = Field(
-        default_factory=list,
-        description="A list of strings containing relevant data that should be used to complete "
-        "the task. Important: This should include all relevant data in their entirety, from the "
-        "first to the last character (i.e. NOT a summary).",
+    task_data: list[Any] | str | None = Field(
+        default=None,
+        description="Task data that should be used to complete the task. "
+        "Can be a string, a list of strings, "
+        "or a list of objects that will be converted to strings. "
+        "Important: This should include all relevant data in their entirety, "
+        "from the first to the last character (i.e. NOT a summary).",
     )
+
+    @field_validator("task_data", mode="before")
+    def validate_task_data(cls, v) -> list[str]:  # noqa: ANN001, N805
+        """Convert task_data to appropriate format."""
+        if v is None:
+            return []
+
+        if isinstance(v, str):
+            return [v]
+
+        if isinstance(v, list):
+            return [str(item) for item in v]
+        return [str(v)]
 
 
 class LLMTool(Tool[str]):
@@ -69,8 +81,11 @@ class LLMTool(Tool[str]):
         "the model will be resolved from the config.",
     )
 
-    def run(self, ctx: ToolRunContext, task: str, input_data: Sequence[str] = ()) -> str:
+    def run(self, ctx: ToolRunContext, task: str, task_data: list[Any] | str | None = None) -> str:
         """Run the LLMTool."""
+        # Use the schema validator to handle the task_data conversion
+        task_data_list = LLMToolSchema(task=task, task_data=task_data).task_data
+
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
 
         # Define system and user messages
@@ -79,10 +94,12 @@ class LLMTool(Tool[str]):
             "run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
-        input_data_str = "\n".join(input_data)
+
+        task_data_str = "\n".join(task_data_list)
+
         task_str = task
-        if input_data_str:
-            task_str += f"\nInput data: {input_data_str}"
+        if task_data_str:
+            task_str += f"\nTask data: {task_data_str}"
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
         content = task_str if not len(context.split("\n")) > 1 else f"{context}\n\n{task_str}"
