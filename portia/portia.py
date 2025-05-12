@@ -115,6 +115,8 @@ class Portia:
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
         logger().info(f"Starting Portia v{version('portia-sdk-python')}")
+        if self.config.portia_api_key and self.config.portia_api_endpoint:
+            logger().info(f"Using Portia cloud API endpoint: {self.config.portia_api_endpoint}")
         self._log_models(self.config)
         self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
         if not self.config.has_api_key("portia_api_key"):
