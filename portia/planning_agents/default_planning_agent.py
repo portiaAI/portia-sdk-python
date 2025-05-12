@@ -62,14 +62,14 @@ IMPORTANT GUIDLINES:
  create a plan with zero steps. When returning an error, return only only the JSON object with
  the error message filled in - DO NOT include text (explaining the error or otherwise) outside of
  the JSON object.
+- Information provided in the EndUser block will also be provided at execution so you do not need to
+ add inputs for this information. However if information about the EndUser is not available now
+ it will NOT be available later and you should return an error. For example if a plan requires
+ using EndUser.Email but no email is provided please return an error.
 - For EVERY tool that requires an id as an input, make sure to check
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides
  the user IDs before making the tool call that  requires the user ID.
-- Information provided in the EndUser block will also be provided at execution so you do not need to
- add inputs for this information. However if the information is not available now do not assume it
- will be later. For example if a plan requires using EndUser.Email but no email is provided please
- return an error.
 - For conditional steps:
   1. Task field: Write only the task description without conditions.
   2. Condition field: Write the condition in concise natural language.
