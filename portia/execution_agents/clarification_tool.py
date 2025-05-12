@@ -12,7 +12,10 @@ class ClarificationToolSchema(BaseModel):
     """Schema defining the inputs for the ClarificationTool."""
 
     argument_name: str = Field(
-        description="The name of the argument that a value is needed for.",
+        description=(
+            "The name of the argument that a value is needed for. This must match the "
+            "argument name for the tool call exactly."
+        ),
     )
 
 
