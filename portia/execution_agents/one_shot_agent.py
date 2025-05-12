@@ -98,14 +98,14 @@ class OneShotToolCallingModel:
                 template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
-                "Context for user input and past steps:\n{context}\n"
-                "Task: {task}\n"
-                "The system has a tool available named '{tool_name}'.\n"
-                "Argument schema for the tool:\n{tool_args}\n"
-                "Description of the tool: {tool_description}\n"
+                "Context for user input and past steps:\n{{ context }}\n"
+                "Task: {{ task }}\n"
+                "The system has a tool available named '{{ tool_name }}'.\n"
+                "Argument schema for the tool:\n{{ tool_args }}\n"
+                "Description of the tool: {{ tool_description }}\n"
                 "{% if use_clarification_tool %}\n"
                 "You also have a clarification tool available with "
-                "argument schema:\n{clarification_tool_args}\n"
+                "argument schema:\n{{ clarification_tool_args }}\n"
                 "{% endif %}"
                 "\n\n----------\n\n"
                 "The following section contains previous errors. "
@@ -114,7 +114,7 @@ class OneShotToolCallingModel:
                 "If a value cannot be extracted from the context, you can leave it blank. "
                 "Do not assume a default value that meets the type expectation or is a common testing value. "  # noqa: E501
                 "Here are the previous errors:\n"
-                "{previous_errors}\n"
+                "{{ previous_errors }}\n"
                 "\n\n----------\n\n"
                 "Please call the tool to achieve the above task, following the guidelines below:\n"
                 "- If a tool needs to be called many times, you can repeat the argument\n"
