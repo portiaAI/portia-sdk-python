@@ -1315,6 +1315,7 @@ def test_portia_initialize_end_user(portia: Portia) -> None:
         [
             {"incorrect_key": "$num_a", "error": "Error"},
         ],
+        "error",
     ],
 )
 def test_portia_run_with_plan_run_inputs(
@@ -1342,7 +1343,7 @@ def test_portia_run_with_plan_run_inputs(
     mock_summarizer_agent = mock.MagicMock()
     mock_summarizer_agent.create_summary.side_effect = "Summary"
 
-    if (
+    if plan_run_inputs == "error" or (
         isinstance(plan_run_inputs, list)
         and isinstance(plan_run_inputs[0], dict)
         and "error" in plan_run_inputs[0]
@@ -1388,6 +1389,7 @@ def test_portia_run_with_plan_run_inputs(
         [
             {"incorrect_key": "$num_a", "error": "Error"},
         ],
+        "error",
     ],
 )
 def test_portia_plan_with_plan_inputs(
@@ -1411,7 +1413,11 @@ def test_portia_plan_with_plan_inputs(
         error=None,
     )
 
-    if isinstance(plan_inputs[0], dict) and "error" in plan_inputs[0]:
+    if plan_inputs == "error" or (
+        isinstance(plan_inputs, list)
+        and isinstance(plan_inputs[0], dict)
+        and "error" in plan_inputs[0]
+    ):
         with pytest.raises(ValueError):  # noqa: PT011
             portia.plan(
                 query="Use these inputs to do something",
@@ -1452,6 +1458,7 @@ def test_portia_plan_with_plan_inputs(
         [
             {"incorrect_key": "$num_a", "error": "Error"},
         ],
+        "error",
     ],
 )
 def test_portia_run_plan_with_plan_run_inputs(
@@ -1481,7 +1488,7 @@ def test_portia_run_plan_with_plan_run_inputs(
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalDataValue(value=3)
 
-    if (
+    if plan_run_inputs == "error" or (
         isinstance(plan_run_inputs, list)
         and isinstance(plan_run_inputs[0], dict)
         and "error" in plan_run_inputs[0]

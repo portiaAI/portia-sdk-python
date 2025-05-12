@@ -230,8 +230,7 @@ class PlanInput(BaseModel):
 
     """
 
-    # Use frozen=True to allow this to be a dictionary key
-    model_config = ConfigDict(extra="ignore", frozen=True)
+    model_config = ConfigDict(extra="ignore")
 
     name: str = Field(
         description="The name of the input",
@@ -257,16 +256,6 @@ class PlanInput(BaseModel):
 
         """
         return f"{self.name}: ({self.description or 'No description'})"
-
-    def __hash__(self) -> int:
-        """Make PlanInput hashable by using name and description as the hash key."""
-        return hash((self.name, self.description))
-
-    def __eq__(self, other: object) -> bool:
-        """Compare PlanInput objects for equality based on name."""
-        if not isinstance(other, PlanInput):
-            return False
-        return self.name == other.name and self.description == other.description
 
 
 class Step(BaseModel):

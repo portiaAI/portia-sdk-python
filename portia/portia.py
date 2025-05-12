@@ -220,7 +220,7 @@ class Portia:
             for key, value in plan_run_inputs.items():
                 to_return.append(PlanInput(name=key, value=value))
             return to_return
-        return None
+        raise ValueError("Invalid plan run inputs received")
 
     def plan(
         self,
@@ -325,7 +325,7 @@ class Portia:
                 else:
                     to_return.append(plan_input)
             return to_return
-        return None
+        raise ValueError("Invalid plan inputs received")
 
     def run_plan(
         self,
