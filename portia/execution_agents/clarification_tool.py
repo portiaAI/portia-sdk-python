@@ -21,7 +21,10 @@ class ClarificationTool(Tool[str]):
 
     id: str = "clarification_tool"
     name: str = "Clarification tool"
-    description: str = "Raises a clarification if we are unsure of an argument."
+    description: str = (
+        "Raises a clarification if you do not have enough information to provide a "
+        "value for an argument."
+    )
     args_schema: type[BaseModel] = ClarificationToolSchema
     output_schema: tuple[str, str] = ("str", "Model dump of the clarification to raise")
     step: int
