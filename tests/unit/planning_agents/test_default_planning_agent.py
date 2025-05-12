@@ -175,18 +175,10 @@ def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
                 inputs=[],
                 output="$result",
             ),
-            Step(
-                task="Calculate sum2",
-                tool_id="no_tool_2",
-                inputs=[],
-                output="$result2",
-            ),
         ],
         error=None,
     )
-    mock_model = get_mock_generative_model(
-        response=mock_response,
-    )
+    mock_model = get_mock_generative_model(response=mock_response)
     mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
@@ -195,8 +187,62 @@ def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
         end_user=EndUser(external_id="123"),
     )
 
-    assert result.error == "Missing tools no_tool_1, no_tool_2 from the provided tool_list"
-    assert result.steps == mock_response.steps
+    assert result.error is not None
+    assert "Attempt 1" in result.error
+    assert "Attempt 2" in result.error
+    assert "Attempt 3" in result.error
+    assert "Missing tools no_tool_1 from the provided tool_list" in result.error
+    assert result.steps == []
+    assert mock_model._client.invoke.call_count == 3  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_generate_steps_or_error_invalid_input_with_retry(mock_config: Config) -> None:
+    """Test handling of invalid input in generated steps."""
+    query = "Calculate something"
+    plan_inputs = [
+        PlanInput(
+            name="$valid_input",
+            description="A valid input",
+        ),
+    ]
+
+    mock_response1 = StepsOrError(
+        steps=[
+            Step(
+                task="Calculate sum",
+                tool_id="add_tool",
+                inputs=[Variable(name="$invalid_input", description="An invalid input")],
+                output="$result",
+            ),
+        ],
+        error=None,
+    )
+    mock_response2 = StepsOrError(
+        steps=[
+            Step(
+                task="Calculate sum",
+                tool_id="add_tool",
+                inputs=[Variable(name="$valid_input", description="A valid input")],
+                output="$result",
+            ),
+        ],
+        error=None,
+    )
+
+    mock_model = get_mock_generative_model(response=mock_response1)
+    mock_model._client.invoke.side_effect = [mock_response1, mock_response2]  # noqa: SLF001 #type:ignore[reportAttributeAccessIssue]
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = planning_agent.generate_steps_or_error(
+        query=query,
+        tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
+        plan_inputs=plan_inputs,
+    )
+
+    assert result.error is None
+    assert result.steps == mock_response2.steps
+    assert mock_model._client.invoke.call_count == 2  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
