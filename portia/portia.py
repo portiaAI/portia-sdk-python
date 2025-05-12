@@ -31,7 +31,6 @@ from portia.clarification import (
     ClarificationCategory,
 )
 from portia.cloud import PortiaCloudClient
-from portia.common import Serializable
 from portia.config import (
     Config,
     ExecutionAgentType,
@@ -83,6 +82,7 @@ from portia.tool_registry import (
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
+    from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
 
@@ -175,9 +175,9 @@ class Portia:
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
-                Optional dictionary mapping PlanInput objects to their values. This can be a list
-                of Planinput objects, a list of dicts with keys "name", "description" (optional)
-                and "value", or a dict of plan run input name to value.
+                Provides input values for the run. This can be a list of PlanInput objects, a list
+                of dicts with keys "name", "description" (optional) and "value", or a dict of
+                plan run input name to value.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -239,11 +239,11 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
-              the inputs required for the plan. This can be a list of Planinput objects, a list of
-              dicts with keys "name" and "description" (optional), or a list of plan run input
-              names. If a value is provided with a PlanInput object or in a dictionary, it will be
-              ignored as values are only used when running the plan.
+            plan_inputs (list[PlanInput] | None): Optional list of inputs required for the plan.
+              This can be a list of Planinput objects, a list of dicts with keys "name" and
+              "description" (optional), or a list of plan run input names. If a value is provided
+              with a PlanInput object or in a dictionary, it will be ignored as values are only
+              used when running the plan.
 
         Returns:
             Plan: The plan for executing the query.
@@ -343,9 +343,9 @@ class Portia:
               storage.
             end_user (str | EndUser | None = None): The end user to use.
             plan_run_inputs (list[PlanInput] | list[dict[str, Serializable]] | dict[str, Serializable] | None):
-              Optional dictionary mapping PlanInput objects to their values. This can be a list of
-              Planinput objects, a list of dicts with keys "name", "description" (optional) and
-              "value", or a dict of plan run input name to value.
+              Provides input values for the run. This can be a list of PlanInput objects, a list
+              of dicts with keys "name", "description" (optional) and "value", or a dict of
+              plan run input name to value.
 
         Returns:
             PlanRun: The resulting PlanRun object.

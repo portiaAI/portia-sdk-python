@@ -1,10 +1,13 @@
 """Tests for portia classes."""
 
+from __future__ import annotations
+
 import os
 import tempfile
 import threading
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest import mock
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
@@ -62,6 +65,9 @@ from tests.utils import (
     get_test_config,
     get_test_plan_run,
 )
+
+if TYPE_CHECKING:
+    from portia.common import Serializable
 
 
 @pytest.fixture
@@ -1314,7 +1320,7 @@ def test_portia_initialize_end_user(portia: Portia) -> None:
 def test_portia_run_with_plan_run_inputs(
     portia: Portia,
     planning_model: MagicMock,
-    plan_run_inputs,
+    plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str],
 ) -> None:
     """Test that Portia.run handles plan inputs correctly in different formats."""
     planning_model.get_structured_response.return_value = StepsOrError(
@@ -1336,8 +1342,12 @@ def test_portia_run_with_plan_run_inputs(
     mock_summarizer_agent = mock.MagicMock()
     mock_summarizer_agent.create_summary.side_effect = "Summary"
 
-    if isinstance(plan_run_inputs, list) and "error" in plan_run_inputs[0]:
-        with pytest.raises(ValueError):
+    if (
+        isinstance(plan_run_inputs, list)
+        and isinstance(plan_run_inputs[0], dict)
+        and "error" in plan_run_inputs[0]
+    ):
+        with pytest.raises(ValueError):  # noqa: PT011
             portia.run(
                 query="Add the two numbers together",
                 plan_run_inputs=plan_run_inputs,
@@ -1383,7 +1393,7 @@ def test_portia_run_with_plan_run_inputs(
 def test_portia_plan_with_plan_inputs(
     portia: Portia,
     planning_model: MagicMock,
-    plan_inputs,
+    plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str],
 ) -> None:
     """Test that Portia.plan handles plan inputs correctly in different formats."""
     planning_model.get_structured_response.return_value = StepsOrError(
@@ -1401,8 +1411,8 @@ def test_portia_plan_with_plan_inputs(
         error=None,
     )
 
-    if "error" in plan_inputs[0]:
-        with pytest.raises(ValueError):
+    if isinstance(plan_inputs[0], dict) and "error" in plan_inputs[0]:
+        with pytest.raises(ValueError):  # noqa: PT011
             portia.plan(
                 query="Use these inputs to do something",
                 plan_inputs=plan_inputs,
@@ -1444,7 +1454,10 @@ def test_portia_plan_with_plan_inputs(
         ],
     ],
 )
-def test_portia_run_plan_with_plan_run_inputs(portia: Portia, plan_run_inputs) -> None:
+def test_portia_run_plan_with_plan_run_inputs(
+    portia: Portia,
+    plan_run_inputs: list[PlanInput] | list[dict[str, Serializable]] | dict[str, Serializable],
+) -> None:
     """Test that run_plan correctly handles plan inputs in different formats."""
     plan = Plan(
         plan_context=PlanContext(query="Add two numbers", tool_ids=["add_tool"]),
@@ -1468,8 +1481,12 @@ def test_portia_run_plan_with_plan_run_inputs(portia: Portia, plan_run_inputs) -
     mock_agent = MagicMock()
     mock_agent.execute_sync.return_value = LocalDataValue(value=3)
 
-    if isinstance(plan_run_inputs, list) and "error" in plan_run_inputs[0]:
-        with pytest.raises(ValueError):
+    if (
+        isinstance(plan_run_inputs, list)
+        and isinstance(plan_run_inputs[0], dict)
+        and "error" in plan_run_inputs[0]
+    ):
+        with pytest.raises(ValueError):  # noqa: PT011
             portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
         return
 

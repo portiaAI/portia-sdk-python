@@ -242,7 +242,10 @@ class PlanInput(BaseModel):
         default=None,
     )
     value: Serializable | None = Field(
-        description="The value of the input.",
+        description=(
+            "The value of the input. This is only used when running a plan and isn't used during "
+            "planning."
+        ),
         default=None,
     )
 
