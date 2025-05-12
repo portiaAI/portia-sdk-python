@@ -66,6 +66,10 @@ IMPORTANT GUIDLINES:
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides
  the user IDs before making the tool call that  requires the user ID.
+- Information provided in the EndUser block will also be provided at execution so you do not need to
+ add inputs for this information. However if the information is not available now do not assume it
+ will be later. For example if a plan requires using EndUser.Email but no email is provided please
+ return an error.
 - For conditional steps:
   1. Task field: Write only the task description without conditions.
   2. Condition field: Write the condition in concise natural language.
