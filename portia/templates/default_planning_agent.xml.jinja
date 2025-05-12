@@ -59,6 +59,15 @@
 </PlanInputs>
 {% endif %}
 
+{% if previous_errors %}
+<PreviousErrors>{% for error in previous_errprs %}
+    <PreviousError>
+        Encountered following error with the plan steps below: {{error.error}}
+        Steps: {{error.steps}}
+    </PreviousError>{% endfor %}
+</PreviousErrors>
+{% endif %}
+
 <Request>
     <Tools>
         {{tools | map(attribute='id') | list}}
