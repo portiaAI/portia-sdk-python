@@ -106,7 +106,7 @@ def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock
             planning_model=planning_model,
             default_model=default_model,
         ),
-        portia_api_endpoint="https://api.porita.dev",
+        portia_api_endpoint="https://api.portialabs.ai",
         portia_api_key="test-api-key",
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
