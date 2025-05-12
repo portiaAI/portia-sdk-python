@@ -17,6 +17,7 @@ from langchain_core.prompts import (
     SystemMessagePromptTemplate,
 )
 
+from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED
 from portia.errors import InvalidAgentError
 
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
@@ -84,27 +85,28 @@ class OneShotToolCallingModel:
                 "While you are not aware of current events, you excel at reasoning "
                 "and adhering to instructions. "
                 "Avoid assumptions or fabricated information. "
-                "If you are unsure of an argument to use for the tool, you can use the "
-                "clarification tool to clarify what the argument should be. "
-                "If any of the inputs is a large string and you want to use it verbatim, rather "
-                "than repeating it, you should provide the name in curly braces to the tool call"
-                " and it will be templated in before the tool is called. "
+                "{% if use_clarification_tool %}If you are unsure of an argument to use for the "
+                "tool, you can use the clarification tool to clarify what the argument should be. "
+                "{% endif %}If any of the inputs is a large string and you want to use it "
+                "verbatim, rather than repeating it, you should provide the name in curly braces "
+                "to the tool call and it will be templated in before the tool is called. "
                 "For example, if you wish to use an input called '$large_input_value' verbatim, "
                 "you should enter '{{ '{{' }}$large_input_value{{ '}}' }}' (double curly braces "
                 "and include the $ in the name) and the value will be templated in before the tool "
                 "is called.  You should definitely use this templating for any input values over "
                 "1000 words that you want to use verbatim.",
-                # Use jinja2 to allow for the literal curly braces
                 template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
-                "Context for user input and past steps:\n{context}\n"
-                "Task: {task}\n"
-                "The system has a tool available named '{tool_name}'.\n"
-                "Argument schema for the tool:\n{tool_args}\n"
-                "Description of the tool: {tool_description}\n"
-                "You also have a clarification tool available with argument schema:"
-                "\n{clarification_tool_args}\n"
+                "Context for user input and past steps:\n{{ context }}\n"
+                "Task: {{ task }}\n"
+                "The system has a tool available named '{{ tool_name }}'.\n"
+                "Argument schema for the tool:\n{{ tool_args }}\n"
+                "Description of the tool: {{ tool_description }}\n"
+                "{% if use_clarification_tool %}\n"
+                "You also have a clarification tool available with "
+                "argument schema:\n{{ clarification_tool_args }}\n"
+                "{% endif %}"
                 "\n\n----------\n\n"
                 "The following section contains previous errors. "
                 "Ensure your response avoids these errors. "
@@ -112,7 +114,7 @@ class OneShotToolCallingModel:
                 "If a value cannot be extracted from the context, you can leave it blank. "
                 "Do not assume a default value that meets the type expectation or is a common testing value. "  # noqa: E501
                 "Here are the previous errors:\n"
-                "{previous_errors}\n"
+                "{{ previous_errors }}\n"
                 "\n\n----------\n\n"
                 "Please call the tool to achieve the above task, following the guidelines below:\n"
                 "- If a tool needs to be called many times, you can repeat the argument\n"
@@ -123,8 +125,10 @@ class OneShotToolCallingModel:
                 "the input'): you must put the exact value the tool should be called with in "
                 "the value field\n"
                 "- Ensure arguments align with the tool's schema and intended use."
-                "- If you are unsure of an argument to use for the tool, you can use the "
-                "clarification tool to clarify what the argument should be.\n\n"
+                "{% if use_clarification_tool %}- If you are unsure of an argument to use for the "
+                "tool, you can use the clarification tool to clarify what the argument should be.\n"
+                "{% endif %}",
+                template_format="jinja2",
             ),
         ],
     )
@@ -176,6 +180,9 @@ class OneShotToolCallingModel:
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
             tool_description=self.agent.tool.description,
+            use_clarification_tool=self.agent.config.feature_flags[
+                FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED
+            ],
             clarification_tool_args=clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
         )
@@ -257,13 +264,14 @@ class OneShotAgent(BaseExecutionAgent):
         )
 
         model = self.config.get_execution_model()
-        clarification_tool = ClarificationTool(step=self.plan_run.current_step_index)
         tools = [
             self.tool.to_langchain_with_artifact(
                 ctx=tool_run_ctx,
             ),
-            clarification_tool.to_langchain_with_artifact(ctx=tool_run_ctx),
         ]
+        clarification_tool = ClarificationTool(step=self.plan_run.current_step_index)
+        if self.config.feature_flags[FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED]:
+            tools.append(clarification_tool.to_langchain_with_artifact(ctx=tool_run_ctx))
         tool_node = ToolNode(tools)
 
         graph = StateGraph(ExecutionState)

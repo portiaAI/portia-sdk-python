@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from portia.clarification import InputClarification
+from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED
 from portia.end_user import EndUser
 from portia.errors import InvalidAgentError
 from portia.execution_agents.context import StepInput
@@ -325,7 +326,9 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
         step=plan.steps[0],
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
-        config=get_test_config(),
+        config=get_test_config(
+            feature_flags={FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED: True}
+        ),
         agent_memory=InMemoryStorage(),
         tool=AdditionTool(),
     )
@@ -406,8 +409,8 @@ def test_oneshot_agent_templates_values(monkeypatch: pytest.MonkeyPatch) -> None
     assert output.get_value() == "Email sent successfully"
 
 
-def test_oneshot_agent_fails_without_tool() -> None:
-    """Test that the oneshot agent correctly templates values before calling the tool."""
+def test_oneshot_model_fails_without_tool() -> None:
+    """Test that the oneshot model fails without a tool."""
     (plan, plan_run) = get_test_plan_run()
     agent = OneShotAgent(
         step=plan.steps[0],
