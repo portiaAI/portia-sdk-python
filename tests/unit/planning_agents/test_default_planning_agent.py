@@ -114,7 +114,7 @@ def test_render_prompt() -> None:
                     output="$plan_output1",
                 ),
             ],
-            inputs=[plan_input],
+            plan_inputs=[plan_input],
         ),
     ]
     rendered_prompt = render_prompt_insert_defaults(

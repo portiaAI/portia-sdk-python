@@ -51,7 +51,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
 You are an outstanding task planner who can leverage many tools at their disposal. Your job is
 to provide a detailed plan of action in the form of a set of steps to respond to a user's prompt.
 
-IMPORTANT GUIDLINES:
+IMPORTANT GUIDELINES:
 - When using multiple tools, pay attention to the  tools to make sure the chain of steps works,
  but DO NOT provide any examples or assumptions  in the task descriptions.
 - If you are missing information do not  make up placeholder variables like example@example.com.
@@ -59,8 +59,8 @@ IMPORTANT GUIDLINES:
  step, DO NOT guess what that step will produce - instead, specify the previous step's output as an
  input for this step and allow this to be handled when we execute the plan.
 - If you can't come up with a plan provide a descriptive error instead - DO NOT
- create a plan with zero steps. When returning an error, return only only the JSON object with
- the error message filled in - DO NOT include text (explaining the error or otherwise) outside of
+ create a plan with zero steps. When returning an error, return only the JSON object with
+ the error message filled in - DO NOT include text (explaining the error or otherwise) outside
  the JSON object.
 - Information provided in the EndUser block will also be provided at execution so you do not need to
  add inputs for this information. However if information about the EndUser is not available now
