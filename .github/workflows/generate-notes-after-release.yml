@@ -1,0 +1,49 @@
+name: append release notes to changelog and sync to docs after release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  generate-release-notes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Append release notes to CHANGELOG.md
+        run: |
+          echo -e "## ${{ github.event.release.tag_name }} - ${{ github.event.release.published_at }}\n\n${{ github.event.release.body }}\n\n$(cat CHANGELOG.md)" > CHANGELOG.md
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "Update CHANGELOG.md for release ${{ github.event.release.tag_name }}"
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout Docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: portiaAI/docs
+          token: ${{ secrets.DOCS_REPO_PAT }}
+          path: docs-repo
+
+      - name: Copy generated docs
+        run: |
+          cp CHANGELOG.md docs-repo/docs/CHANGELOG.md
+
+      - name: Commit and push changes
+        run: |
+          cd docs-repo
+          git add docs/CHANGELOG.md
+          git commit -m "Sync SDK changelog for release ${{ github.event.release.tag_name }}" || echo "No changes to commit"
+          git push origin main
