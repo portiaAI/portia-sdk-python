@@ -85,36 +85,28 @@ def test_llm_tool_run_with_context(
     assert result == "Test response content"
 
 
-def test_task_data_validator_with_string() -> None:
-    """Test that task_data validator correctly handles string input."""
-    schema = LLMToolSchema(task="Test task", task_data="String data")
-    assert schema.task_data == ["String data"]
+def test_process_task_data_with_string() -> None:
+    """Test that process_task_data correctly handles string input."""
+    result = LLMTool.process_task_data("String data")
+    assert result == "String data"
 
 
-def test_task_data_validator_with_list() -> None:
-    """Test that task_data validator correctly handles list input."""
-    schema = LLMToolSchema(task="Test task", task_data=["Item 1", "Item 2"])
-    assert schema.task_data == ["Item 1", "Item 2"]
+def test_process_task_data_with_list() -> None:
+    """Test that process_task_data correctly handles list input."""
+    result = LLMTool.process_task_data(["Item 1", "Item 2"])
+    assert result == "Item 1\nItem 2"
+
+def test_process_task_data_with_none() -> None:
+    """Test that process_task_data correctly handles None input."""
+    result = LLMTool.process_task_data(None)
+    assert result == ""
 
 
-def test_task_data_validator_with_dict() -> None:
-    """Test that task_data validator correctly handles dictionary input."""
-    schema = LLMToolSchema(task="Test task", task_data={"key": "value"}) # type: ignore reportArgumentType
-    assert schema.task_data == ["{'key': 'value'}"]
-
-
-def test_task_data_validator_with_none() -> None:
-    """Test that task_data validator correctly handles None input."""
-    schema = LLMToolSchema(task="Test task", task_data=None)
-    assert schema.task_data == []
-
-
-def test_task_data_validator_with_complex_objects() -> None:
-    """Test that task_data validator correctly handles complex objects."""
+def test_process_task_data_with_complex_objects() -> None:
+    """Test that process_task_data correctly handles complex objects."""
     class TestObject:
         def __str__(self) -> str:
             return "TestObject"
 
-    schema = LLMToolSchema(task="Test task", task_data=[TestObject(), {"nested": "value"}])
-    assert schema.task_data == ["TestObject", "{'nested': 'value'}"]
-
+    result = LLMTool.process_task_data([TestObject(), {"nested": "value"}])
+    assert result == "TestObject\n{'nested': 'value'}"

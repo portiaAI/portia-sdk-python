@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from portia.model import GenerativeModel, Message
 from portia.tool import Tool, ToolRunContext
@@ -25,19 +25,6 @@ class LLMToolSchema(BaseModel):
         "Important: This should include all relevant data in their entirety, "
         "from the first to the last character (i.e. NOT a summary).",
     )
-
-    @field_validator("task_data", mode="before")
-    def validate_task_data(cls, v) -> list[str]:  # noqa: ANN001, N805
-        """Convert task_data to appropriate format."""
-        if v is None:
-            return []
-
-        if isinstance(v, str):
-            return [v]
-
-        if isinstance(v, list):
-            return [str(item) for item in v]
-        return [str(v)]
 
 
 class LLMTool(Tool[str]):
@@ -81,25 +68,36 @@ class LLMTool(Tool[str]):
         "the model will be resolved from the config.",
     )
 
+    @staticmethod
+    def process_task_data(task_data: list[Any] | str | None) -> str:
+        """Process task_data into a string, handling different input types.
+
+        Args:
+            task_data: Data that can be a None, a string or a list of objects.
+
+        Returns:
+            A string representation of the data, with list items joined by newlines.
+
+        """
+        if task_data is None:
+            return ""
+
+        if isinstance(task_data, str):
+            return task_data
+
+        return "\n".join(str(item) for item in task_data)
+
     def run(self, ctx: ToolRunContext, task: str, task_data: list[Any] | str | None = None) -> str:
         """Run the LLMTool."""
-        # Use the schema validator to handle the task_data conversion
-        task_data_list = LLMToolSchema(task=task, task_data=task_data).task_data
-
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
 
-        # Define system and user messages
         context = (
             "Additional context for the LLM tool to use to complete the task, provided by the "
             "run information and results of other tool calls. Use this to resolve any "
             "tasks"
         )
 
-        task_data_str = (
-            "\n".join(task_data_list)
-            if isinstance(task_data_list, list)
-            else str(task_data_list)
-        )
+        task_data_str = self.process_task_data(task_data)
 
         task_str = task
         if task_data_str:
