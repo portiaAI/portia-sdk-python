@@ -51,6 +51,6 @@ portia = Portia(
 
 # Simple Example
 plan_run = portia.run(
-    "Send an email to Robbie at robbie@portilabs.ai telling him how fantastic he is, "
-    "then get the weather in London",
+    "Find my most recent 2 emails",
+    end_user="Robbie-dogfood",
 )

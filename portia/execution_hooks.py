@@ -127,7 +127,7 @@ def clarify_on_all_tool_calls(
             )
         )
     """
-    return _clarify_on_tool_call_hook(tool, args, plan_run, step, tool_id=None)
+    return _clarify_on_tool_call_hook(tool, args, plan_run, step, tool_ids=None)
 
 
 def clarify_on_tool_call(
