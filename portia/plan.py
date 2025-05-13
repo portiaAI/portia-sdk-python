@@ -439,7 +439,7 @@ class Plan(BaseModel):
             ),
             steps=[Step.model_validate(step) for step in response_json["steps"]],
             plan_inputs=[
-                PlanInput.model_validate(input_) for input_ in response_json.get("inputs", [])
+                PlanInput.model_validate(input_) for input_ in response_json.get("plan_inputs", [])
             ],
         )
 
