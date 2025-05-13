@@ -120,10 +120,10 @@ class Formatter:
 
     def _sanitize_message_(self, msg: str) -> str:
         """Sanitize a message to be used in a log record."""
-        # doubles opening curly braces in a string { -> {{
-        msg = re.sub(r"(?<!\{)\{(?!\{)", "{{", msg)
-        # doubles closing curly braces in a string } -> }}
-        msg = re.sub(r"(?<!\})\}(?!\})", "}}", msg)
+        # doubles any single opening curly braces in a string { -> {{
+        msg = re.sub(r"\{", "{{", msg)
+        # doubles any single closing curly braces in a string } -> }}
+        msg = re.sub(r"\}", "}}", msg)
         # escapes < and > in a string
         msg = msg.replace("<", r"\<").replace(">", r"\>")
 
