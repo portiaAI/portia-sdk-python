@@ -715,7 +715,7 @@ class Portia:
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
-        if self.execution_hooks.before_first_step_execution:
+        if self.execution_hooks.before_first_step_execution and plan_run.current_step_index == 0:
             self.execution_hooks.before_first_step_execution(
                 ReadOnlyPlan.from_plan(plan), ReadOnlyPlanRun.from_plan_run(plan_run)
             )
