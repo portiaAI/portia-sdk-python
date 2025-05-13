@@ -1,0 +1,20 @@
+# .github/release.yml
+
+changelog:
+  exclude:
+    labels:
+      - do not merge
+      - question
+      - wontfix
+      - invalid
+    authors:
+  categories:
+    - title: Bug fixes 🛠
+      labels:
+        - bugs
+    - title: Exciting New Features 🎉
+      labels:
+        - enhancement
+    - title: Other Changes
+      labels:
+        - "*"
