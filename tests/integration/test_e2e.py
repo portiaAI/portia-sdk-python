@@ -594,7 +594,6 @@ def test_plan_inputs() -> None:
 
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
-        storage_class=StorageClass.MEMORY,
     )
     portia = Portia(config=config, tools=ToolRegistry([AdditionTool()]))
     plan = portia.plan(
