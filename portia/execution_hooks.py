@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Callable
 
 import click
@@ -111,13 +112,52 @@ class ExecutionHooks(BaseModel):
 # Example execution hooks
 
 
-def cli_user_verify_before_tool_call(
+def clarify_on_all_tool_calls(
+    tool: Tool,
+    args: dict[str, Any],
+    plan_run: PlanRun,
+    step: Step,
+) -> Clarification | None:
+    """Raise a clarification to check the user is happy with all tool calls before proceeding.
+
+    Example usage:
+        portia = Portia(
+            execution_hooks=ExecutionHooks(
+                before_tool_call=clarify_on_all_tool_calls,
+            )
+        )
+    """
+    return _clarify_on_tool_call_hook(tool, args, plan_run, step, tool_id=None)
+
+
+def clarify_on_tool_call(
+    tool_id: str | list[str],
+) -> Callable[[Tool, dict[str, Any], PlanRun, Step], Clarification | None]:
+    """Return a hook that raises a clarification before calls to the specified tool.
+
+    Example usage:
+        portia = Portia(
+            execution_hooks=ExecutionHooks(
+                before_tool_call=clarify_on_tool_call("my_tool_id"),
+            )
+        )
+    """
+    if isinstance(tool_id, str):
+        tool_id = [tool_id]
+    return partial(_clarify_on_tool_call_hook, tool_ids=tool_id)
+
+
+def _clarify_on_tool_call_hook(
     tool: Tool,
     args: dict[str, Any],
     plan_run: PlanRun,
     step: Step,  # noqa: ARG001
+    tool_ids: list[str] | None,
 ) -> Clarification | None:
-    """Raise a clarification to check the user is happy with the tool call before proceeding."""
+    """Raise a clarification to check the user is happy with all tool calls before proceeding."""
+    if tool_ids and tool.id not in tool_ids:
+        return None
+
     user_verify_clarification = CustomClarification(
         name="user_verify",
         plan_run_id=plan_run.id,
