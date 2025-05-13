@@ -612,8 +612,14 @@ if BROWSERBASE_AVAILABLE:
             if not session_id or not session_connect_url:
                 session = self.create_session(context_id)
                 session_connect_url = session.connect_url
-                context.end_user.set_additional_data("bb_session_id", session.id)
+                session_id = session.id
+                context.end_user.set_additional_data("bb_session_id", session_id)
                 context.end_user.set_additional_data("bb_session_connect_url", session_connect_url)
+
+            logger.info(
+                "Browser tool debug link: %s",
+                self.bb.sessions.debug(session_id).debugger_fullscreen_url,
+            )
 
             return session_connect_url
 
