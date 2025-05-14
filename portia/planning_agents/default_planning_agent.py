@@ -69,8 +69,8 @@ IMPORTANT GUIDELINES:
  error or otherwise) outside the JSON object.
 - Information provided in the EndUser block will also be provided at execution so you do not need to
  add inputs for this information. However if information about the EndUser is not available now
- it will NOT be available later and you should return an error. For example if a plan requires
- using EndUser.Email but no email is provided please return an error.
+ it will also NOT be available later and you should return an error if it is required and there is
+ no other way to retrieve the information.
 - For EVERY tool that requires an id as an input, make sure to check
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides
