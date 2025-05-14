@@ -331,7 +331,7 @@ class VerifierModel:
                 "on the rules below.\n - An argument is made up if we cannot tell where the value "
                 "came from in the goal or context.\n- You should verify that the explanations are "
                 "grounded in the goal or context before trusting them."
-                "\n- If an argument is marked as invalid it is likely wrong."
+                "\n- If an argument is marked as invalid it is likely made up."
                 "\n- We really care if the value of an argument is not in the context, a handled "
                 "clarification or goal at all (then made_up should be TRUE), but it is ok if "
                 "it is there but in a different format, or if it can be reasonably derived from the"
