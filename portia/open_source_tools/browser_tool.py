@@ -531,7 +531,8 @@ if BROWSERBASE_AVAILABLE:
                     project_id=self.project_id,  # type: ignore reportArgumentType
                     status="REQUEST_RELEASE",
                 )
-                ctx.end_user.remove_additional_data("bb_session_id")
+                ctx.end_user.set_additional_data("bb_session_id", "")
+                ctx.end_user.set_additional_data("bb_session_connect_url", "")
 
         def get_context_id(self, ctx: ToolRunContext, bb: Browserbase) -> str:
             """Get the Browserbase context id.
@@ -608,8 +609,12 @@ if BROWSERBASE_AVAILABLE:
 
             context.end_user.set_additional_data("bb_context_id", context_id)
 
-            session_id = context.end_user.get_additional_data("bb_session_id")
-            session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
+            if context.clarifications:
+                session_id = context.end_user.get_additional_data("bb_session_id")
+                session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
+            else:
+                session_id = None
+                session_connect_url = None
 
             if not session_id or not session_connect_url:
                 session = self.create_session(context_id)
