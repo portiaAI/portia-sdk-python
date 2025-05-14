@@ -50,10 +50,15 @@ jobs:
       - name: Install UV
         run: pip install uv
 
-      - name: Install dependencies
+      - name: Install dependencies to SteelThread
+        working-directory: ./platform/steel_thread
+        run: |
+          uv add "portia-sdk-python @ file://../../portia-sdk-python"
+
+      - name: Install dependencies to Evals
         working-directory: ./platform/evals
         run: |
-          uv pip install --system -e ../../portia-sdk-python
+          uv add "portia-sdk-python @ file://../../portia-sdk-python"
 
       - name: Check tool IDs
         working-directory: ./platform/evals
