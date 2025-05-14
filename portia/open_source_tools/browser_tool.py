@@ -181,8 +181,9 @@ class BrowserTool(Tool[str]):
         default=(
             "General purpose browser tool. Can be used to navigate to a URL and "
             "complete tasks. Should only be used if the task requires a browser "
-            "and you are sure of the URL. Do not break the task into multiple browser tool steps - "
-            "each new browser tool run will create a new session!"
+            "and you are sure of the URL. This tool handles a full end to end task. "
+            "DO NOT break a single task into multiple browser tool steps as each step is run "
+            "in an independent new session!"
         ),
     )
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
