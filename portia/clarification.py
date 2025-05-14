@@ -35,6 +35,7 @@ class ClarificationCategory(PortiaEnum):
     INPUT = "Input"
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
+    USER_VERIFICATION = "User Verification"
     CUSTOM = "Custom"
 
 
@@ -197,6 +198,24 @@ class ValueConfirmationClarification(Clarification):
     )
     category: ClarificationCategory = Field(
         default=ClarificationCategory.VALUE_CONFIRMATION,
+        description="The category of this clarification",
+    )
+
+
+class UserVerificationClarification(Clarification):
+    """User verification clarification.
+
+    Represents a clarification where the user is presented with a value and must confirm or deny it.
+    The clarification should be created with the response field already set, and the user indicates
+    acceptance by setting the resolved flag to `True`.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification, 'Value Confirmation'.
+
+    """
+
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.USER_VERIFICATION,
         description="The category of this clarification",
     )
 

@@ -8,7 +8,12 @@ from typing import Any, Callable
 import click
 from pydantic import BaseModel, ConfigDict
 
-from portia.clarification import Clarification, ClarificationCategory, CustomClarification
+from portia.clarification import (
+    Clarification,
+    ClarificationCategory,
+    CustomClarification,
+    UserVerificationClarification,
+)
 from portia.clarification_handler import ClarificationHandler
 from portia.errors import ToolHardError
 from portia.execution_agents.output import Output
@@ -86,7 +91,8 @@ class ExecutionHooks(BaseModel):
 
     Args:
         tool: The tool about to be called
-        args: The args for the tool call
+        args: The args for the tool call. These are mutable and so can be modified in place as 
+          required.
         plan_run: The current plan run
         step: The step being executed
 
@@ -182,6 +188,37 @@ def _clarify_on_tool_call_hook(
     if str(previously_raised_clarification.response).lower() not in ["y", "yes", "Y", "YES", "Yes"]:
         raise ToolHardError("User rejected tool call to {tool.name} with args {args}")
 
+    return None
+
+
+def _clarify_before_redunds(
+    tool: Tool,
+    args: dict[str, Any],
+    plan_run: PlanRun,
+    step: Step,
+) -> Clarification | None:
+    # Only raise a clarification for the refund tool
+    if tool.id == "refund_tool":
+        return None
+
+    # Find if the clarification if we already raised it
+    previous_clarification = plan_run.get_clarification_for_step(
+        ClarificationCategory.USER_VERIFICATION
+    )
+
+    # If we haven't raised it, or it has been resolved, raise a clarification
+    if not previous_clarification or not previous_clarification.resolved:
+        return UserVerificationClarification(
+            plan_run_id=plan_run.id,
+            user_guidance=f"Are you happy to proceed with the call to {tool.name} with args {args}? "
+            "Enter 'y' or 'yes' to proceed",
+        )
+
+    # If the user didn't verify the tool call, error out
+    if str(previous_clarification.response).lower() not in ["y", "yes", "Y", "YES", "Yes"]:
+        raise ToolHardError("User rejected tool call to {tool.name} with args {args}")
+
+    # If the user did verify the tool call, continue to the call
     return None
 
 
