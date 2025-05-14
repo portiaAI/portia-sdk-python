@@ -5,6 +5,9 @@ name: Run Evals for portia-sdk-python
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
   pull_request_target:
     branches:
       - main
@@ -77,13 +80,13 @@ jobs:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=anthropic/claude-3-5-sonnet-latest --threshold_file=query_planner/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk" --slice_name main  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py query-planner eval --model=anthropic/claude-3-5-sonnet-latest --threshold_file=query_planner/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk" --slice_name main  --max_concurrency 32)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -99,13 +102,13 @@ jobs:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=anthropic/claude-3-5-sonnet-latest --threshold_file=execution/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --model=anthropic/claude-3-5-sonnet-latest --threshold_file=execution/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk"  --max_concurrency 32)
           echo $EVAL_OUTPUT
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
@@ -123,13 +126,13 @@ jobs:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py introspection eval --slice_name=main --model=anthropic/claude-3-5-sonnet-latest --threshold_file=introspection/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 2 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=pr,env=local,repo=sdk"  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py introspection eval --slice_name=main --model=anthropic/claude-3-5-sonnet-latest --threshold_file=introspection/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 2 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk"  --max_concurrency 32)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -146,7 +149,7 @@ jobs:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
           LANGCHAIN_API_KEY: ${{ secrets.LANGCHAIN_API_KEY }}
-          LANGCHAIN_PROJECT: ${{ secrets.LANGCHAIN_PROJECT }}
+          LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_execution.outputs.eval_name }}
@@ -154,10 +157,8 @@ jobs:
           INTROSPECTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_introspection.outputs.eval_name }}
         run: |
           uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
-          cat analysis/notebook_output.md
           # Removes style blocks that GitHub won't render properly
           sed -i '/<style[^>]*>/,/<\/style>/d' analysis/notebook_output.md
-          cat analysis/notebook_output.md
           cat analysis/notebook_output.md >> $GITHUB_STEP_SUMMARY
 
       - name: Check for evaluation failures
