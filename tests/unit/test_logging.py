@@ -10,6 +10,7 @@ from portia.logger import (
     Formatter,
     LoggerInterface,
     LoggerManager,
+    SafeLogger,
     logger,
     logger_manager,
 )
@@ -146,3 +147,57 @@ def test_logger() -> None:
     logger_manager.set_logger(mock_logger)
 
     assert logger() == mock_logger
+
+
+def test_safe_logger_successful_logs() -> None:
+    """Test SafeLogger successfully passes through logs to child logger."""
+    mock_logger = Mock(spec=LoggerInterface)
+    safe_logger = SafeLogger(mock_logger)
+
+    # Test each log level
+    safe_logger.debug("debug message", "arg1", kwarg1="value1")  # noqa: PLE1205
+    safe_logger.info("info message", "arg1", kwarg1="value1")  # noqa: PLE1205
+    safe_logger.warning("warning message", "arg1", kwarg1="value1")  # noqa: PLE1205
+    safe_logger.error("error message", "arg1", kwarg1="value1")  # noqa: PLE1205
+    safe_logger.critical("critical message", "arg1", kwarg1="value1")  # noqa: PLE1205
+
+    # Verify each method was called with correct arguments
+    mock_logger.debug.assert_called_once_with("debug message", "arg1", kwarg1="value1")
+    mock_logger.info.assert_called_once_with("info message", "arg1", kwarg1="value1")
+    mock_logger.warning.assert_called_once_with("warning message", "arg1", kwarg1="value1")
+    mock_logger.error.assert_called_once_with("error message", "arg1", kwarg1="value1")
+    mock_logger.critical.assert_called_once_with("critical message", "arg1", kwarg1="value1")
+
+
+def test_safe_logger_error_handling() -> None:
+    """Test SafeLogger catches and logs exceptions from child logger."""
+    mock_logger = Mock(spec=LoggerInterface)
+    safe_logger = SafeLogger(mock_logger)
+
+    # Make each method raise an exception
+    mock_logger.debug.side_effect = Exception("debug error")
+    mock_logger.info.side_effect = Exception("info error")
+    mock_logger.warning.side_effect = Exception("warning error")
+    mock_logger.critical.side_effect = Exception("critical error")
+    # Test error log separately as all the other methods call the error log on exception
+    mock_logger.error.side_effect = None
+
+    safe_logger.debug("debug message")
+    safe_logger.info("info message")
+    safe_logger.warning("warning message")
+    safe_logger.critical("critical message")
+
+    mock_logger.error.side_effect = [Exception("error error"), None]
+    safe_logger.error("error message")
+
+    assert mock_logger.debug.call_count == 1  # Original call + error log
+    assert mock_logger.info.call_count == 1
+    assert mock_logger.warning.call_count == 1
+    assert mock_logger.critical.call_count == 1
+    assert mock_logger.error.call_count == 6
+
+    mock_logger.error.assert_any_call("Failed to log: debug error")
+    mock_logger.error.assert_any_call("Failed to log: info error")
+    mock_logger.error.assert_any_call("Failed to log: warning error")
+    mock_logger.error.assert_any_call("Failed to log: error error")
+    mock_logger.error.assert_any_call("Failed to log: critical error")

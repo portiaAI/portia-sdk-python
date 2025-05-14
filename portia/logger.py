@@ -120,10 +120,10 @@ class Formatter:
 
     def _sanitize_message_(self, msg: str) -> str:
         """Sanitize a message to be used in a log record."""
-        # doubles any single opening curly braces in a string { -> {{
-        msg = re.sub(r"\{", "{{", msg)
-        # doubles any single closing curly braces in a string } -> }}
-        msg = re.sub(r"\}", "}}", msg)
+        # doubles opening curly braces in a string { -> {{
+        msg = re.sub(r"(?<!\{)\{(?!\{)", "{{", msg)
+        # doubles closing curly braces in a string } -> }}
+        msg = re.sub(r"(?<!\})\}(?!\})", "}}", msg)
         # escapes < and > in a string
         msg = msg.replace("<", r"\<").replace(">", r"\>")
 
@@ -153,6 +153,50 @@ class Formatter:
             truncated_lines.extend(lines[-tail_lines:])
             msg = "\n".join(truncated_lines)
         return msg
+
+
+class SafeLogger(LoggerInterface):
+    """A logger that catches exceptions and logs them to the child logger."""
+
+    def __init__(self, child_logger: LoggerInterface) -> None:
+        """Initialize the SafeLogger."""
+        super().__init__()
+        self.child_logger = child_logger
+
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Wrap the child logger's debug method to catch exceptions."""
+        try:
+            self.child_logger.debug(msg, *args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
+
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Wrap the child logger's info method to catch exceptions."""
+        try:
+            self.child_logger.info(msg, *args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
+
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Wrap the child logger's warning method to catch exceptions."""
+        try:
+            self.child_logger.warning(msg, *args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
+
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Wrap the child logger's error method to catch exceptions."""
+        try:
+            self.child_logger.error(msg, *args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
+
+    def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Wrap the child logger's critical method to catch exceptions."""
+        try:
+            self.child_logger.critical(msg, *args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
 
 
 class LoggerManager:
@@ -193,7 +237,7 @@ class LoggerManager:
             serialize=False,
             catch=True,
         )
-        self._logger: LoggerInterface = custom_logger or default_logger  # type: ignore  # noqa: PGH003
+        self._logger: LoggerInterface = custom_logger or SafeLogger(default_logger)  # type: ignore  # noqa: PGH003
         self.custom_logger = False
 
     @property
