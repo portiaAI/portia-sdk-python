@@ -308,8 +308,7 @@ class Step(BaseModel):
         """
         message = (
             f"- {self.task}\n"
-            f"    Inputs: {', '
-                           .join([in_variable.pretty_print() for in_variable in self.inputs])}\n"
+            f"    Inputs: {', '.join([var.pretty_print() for var in self.inputs])}\n"
             f"    Tool ID: {self.tool_id}\n"
             f"    Output: {self.output}\n"
         )
