@@ -14,7 +14,7 @@ class EndUser(BaseModel):
     email: str = Field(default="", description="The email address of the end user.")
     phone_number: str = Field(default="", description="The phone number of the end user.")
 
-    additional_data: dict[str, str] = Field(
+    additional_data: dict[str, str | None] = Field(
         default={},
         description="Any additional data about the user.",
     )
@@ -25,7 +25,7 @@ class EndUser(BaseModel):
 
     def remove_additional_data(self, key_name: str) -> None:
         """Set a field in the additional data blob."""
-        del self.additional_data[key_name]
+        self.additional_data[key_name] = None
 
     def get_additional_data(self, key_name: str) -> str | None:
         """Get a field from the additional data blob."""
