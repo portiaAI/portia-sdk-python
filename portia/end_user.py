@@ -23,6 +23,10 @@ class EndUser(BaseModel):
         """Set a field in the additional data blob."""
         self.additional_data[key_name] = key_value
 
+    def remove_additional_data(self, key_name: str) -> None:
+        """Set a field in the additional data blob."""
+        del self.additional_data[key_name]
+
     def get_additional_data(self, key_name: str) -> str | None:
         """Get a field from the additional data blob."""
         if key_name in self.additional_data:

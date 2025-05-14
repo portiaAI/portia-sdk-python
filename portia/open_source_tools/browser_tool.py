@@ -530,6 +530,7 @@ if BROWSERBASE_AVAILABLE:
                     project_id=self.project_id,  # type: ignore reportArgumentType
                     status="REQUEST_RELEASE",
                 )
+                ctx.end_user.remove_additional_data("bb_session_id")
 
         def get_context_id(self, ctx: ToolRunContext, bb: Browserbase) -> str:
             """Get the Browserbase context id.
