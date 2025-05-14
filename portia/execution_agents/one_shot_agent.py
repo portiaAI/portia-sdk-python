@@ -28,7 +28,7 @@ from portia.tool import ToolRunContext
 from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.plan import Step, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-
+from portia.telemetry.views import ToolCallTelemetryEvent
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -130,6 +130,9 @@ class OneShotToolCallingModel:
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
         context = self.agent.get_system_context(self.tool_context, state["step_inputs"])
+        self.agent.telemetry.capture(ToolCallTelemetryEvent(
+            tool_id=self.agent.tool.id if self.agent.tool else None,
+        ))
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 query=self.agent.step.task,

@@ -55,6 +55,8 @@ from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
 from portia.tool import ReadyResponse, Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
+from portia.telemetry.telemetry_service import BaseProductTelemetry
+from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -63,6 +65,11 @@ from tests.utils import (
     get_test_plan_run,
 )
 
+
+@pytest.fixture
+def telemetry() -> MagicMock:
+    """Fixture to create ProductTelemetry mock."""
+    return MagicMock(spec=BaseProductTelemetry)
 
 @pytest.fixture
 def planning_model() -> MagicMock:
@@ -77,7 +84,7 @@ def default_model() -> MagicMock:
 
 
 @pytest.fixture
-def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
+def portia(planning_model: MagicMock, default_model: MagicMock, telemetry: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
         models=GenerativeModelsConfig(
@@ -86,11 +93,14 @@ def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
         ),
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
-    return Portia(config=config, tools=tool_registry)
+    return Portia(config=config, tools=tool_registry, telemetry=telemetry)
 
 
 @pytest.fixture
-def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock) -> Portia:
+def portia_with_agent_memory(
+    planning_model: MagicMock,
+    default_model: MagicMock,
+    telemetry: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
         # Set a small threshold value so all outputs are stored in agent memory
@@ -102,7 +112,7 @@ def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock
         ),
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
-    return Portia(config=config, tools=tool_registry)
+    return Portia(config=config, tools=tool_registry, telemetry=telemetry)
 
 
 def test_portia_local_default_config_with_api_keys() -> None:
@@ -166,7 +176,7 @@ def test_portia_local_default_config_without_api_keys() -> None:
         )
 
 
-def test_portia_run_query(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_run_query(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
     """Test running a query."""
     query = "example query"
 
@@ -176,20 +186,31 @@ def test_portia_run_query(portia: Portia, planning_model: MagicMock) -> None:
     )
 
     plan_run = portia.run(query)
+    telemetry.capture.assert_called_once_with(PortiaFunctionCallTelemetryEvent(
+        function_name="portia_run",
+        function_args={
+            "tools": None,
+            "example_plans_provided": False,
+            "end_user_provided": False,
+            "plan_run_inputs_provided": False},
+        name="portia_function_call"))
 
     assert plan_run.state == PlanRunState.COMPLETE
 
 
-def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
+def test_portia_run_query_tool_list(planning_model: MagicMock, telemetry: MagicMock) -> None:
     """Test running a query."""
     query = "example query"
+    addition_tool = AdditionTool()
+    clarification_tool = ClarificationTool()
     portia = Portia(
         config=get_test_config(
             models=GenerativeModelsConfig(
                 planning_model=planning_model,
             ),
         ),
-        tools=[AdditionTool(), ClarificationTool()],
+        tools=[addition_tool, clarification_tool],
+        telemetry=telemetry
     )
 
     planning_model.get_structured_response.return_value = StepsOrError(
@@ -198,6 +219,14 @@ def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
     )
     plan_run = portia.run(query)
 
+    telemetry.capture.assert_called_once_with(PortiaFunctionCallTelemetryEvent(
+        function_name="portia_run",
+        function_args={
+            "tools": [addition_tool.id, clarification_tool.id],
+            "example_plans_provided": False,
+            "end_user_provided": False,
+            "plan_run_inputs_provided": False},
+        name="portia_function_call"))
     assert plan_run.state == PlanRunState.COMPLETE
 
 
