@@ -12,7 +12,7 @@
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
      - Additional information about the caller is provided in the EndUser section. You can use this if the query refers to the end user, i.e. Send me an email.
      - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
-    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create a plan with zero steps. When returning an error, return only only the JSON object with the error message filled in - DO NOT include text (explaining the error or otherwise) outside of the JSON object.
+    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create a plan with zero steps. When returning an error, return only the JSON object with the error message filled in plus an empty list of steps - DO NOT include text (explaining the error or otherwise) outside the JSON object.
     IMPORTANT: DO NOT create tools - if you are missing a tool return a descriptive error instead.
     {% if plan_inputs %}IMPORTANT: Values for plan inputs will be provided when the plan is executed, so make sure to use them in your steps appropriately.{% endif %}
 </Instructions>
@@ -45,10 +45,18 @@
 </Tools>
 
 <EndUser>
+    {% if end_user.email %}
     <EndUser.Email>{{ end_user.email }}</EndUser.Email>
+    {% endif %}
+    {% if end_user.name %}
     <EndUser.Name>{{ end_user.name }}</EndUser.Name>
+    {% endif %}
+    {% if end_user.phone_number %}
     <EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>
+    {% endif %}
+    {% if end_user.additional_data %}
     <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
+    {% endif %}
 </EndUser>
 
 {% if plan_inputs %}
@@ -57,6 +65,15 @@
         {{input.description}}
     </PlanInput>{% endfor %}
 </PlanInputs>
+{% endif %}
+
+{% if previous_errors %}
+<PreviousErrors>{% for error in previous_errprs %}
+    <PreviousError>
+        Encountered following error with the plan steps below: {{error.error}}
+        Steps: {{error.steps}}
+    </PreviousError>{% endfor %}
+</PreviousErrors>
 {% endif %}
 
 <Request>

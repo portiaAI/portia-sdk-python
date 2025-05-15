@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -28,6 +28,8 @@ from portia.tool_registry import ToolRegistry
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarificationHandler
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from portia.tool import ToolRunContext
 
 
@@ -578,24 +580,27 @@ def test_portia_plan_steps_inputs_dependencies(
     assert "100" in str(plan.steps[3].condition), "Fourth step condition does not contain 100"
 
 
-def test_plan_input_with_schema_validation() -> None:
-    """Test running a plan with schema-validated plan inputs."""
+def test_plan_inputs() -> None:
+    """Test running a plan with plan inputs."""
 
     class AdditionNumbers(BaseModel):
         num_a: int = Field(description="First number to add")
         num_b: int = Field(description="Second number to add")
 
-    numbers_input = PlanInput(name="$numbers", description="Numbers to add")
-    plan_inputs = {numbers_input: AdditionNumbers(num_a=5, num_b=7)}
+    numbers_input = PlanInput(
+        name="$numbers",
+        description="Numbers to add",
+        value=AdditionNumbers(num_a=5, num_b=7),
+    )
+    plan_inputs = [numbers_input]
 
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
-        storage_class=StorageClass.MEMORY,
     )
     portia = Portia(config=config, tools=ToolRegistry([AdditionTool()]))
     plan = portia.plan(
         "Use the addition tool to add together the two provided numbers",
-        plan_inputs=[numbers_input],
+        plan_inputs=plan_inputs,
     )
     plan_run = portia.run_plan(plan, plan_run_inputs=plan_inputs)
 

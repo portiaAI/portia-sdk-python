@@ -21,6 +21,7 @@ from portia.open_source_tools.browser_tool import (
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
 )
+from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import assert_clarification_equality_without_uuid, get_test_tool_context
 
 
@@ -450,25 +451,6 @@ def test_browserbase_provider_get_or_create_session_new(
     assert context.end_user.get_additional_data("bb_context_id") == "test_context_id"
 
 
-def test_browserbase_provider_get_or_create_session_existing(
-    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
-) -> None:
-    """Test getting existing session."""
-    context = get_test_tool_context()
-    context.end_user.additional_data = {
-        "bb_context_id": "existing_context_id",
-        "bb_session_id": "existing_session_id",
-        "bb_session_connect_url": "existing_connect_url",
-    }
-
-    connect_url = mock_browserbase_provider.get_or_create_session(
-        context, mock_browserbase_provider.bb
-    )
-
-    assert connect_url == "existing_connect_url"
-    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # type: ignore reportFunctionMemberAccess
-
-
 def test_browserbase_provider_construct_auth_clarification_url(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
@@ -696,3 +678,52 @@ def test_browserbase_provider_step_complete_without_session(
     mock_browserbase_provider.step_complete(mock_ctx)
 
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # type: ignore reportFunctionMemberAccess
+
+
+def test_browserbase_provider_get_or_create_session_with_clarifications(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test getting or creating a session when clarifications exist."""
+    context = get_test_tool_context()
+    context.clarifications = [
+        ActionClarification(
+            user_guidance="Test guidance",
+            plan_run_id=PlanRunUUID(),
+            action_url=HttpUrl("https://example.com"),
+        )
+    ]
+    context.end_user.additional_data = {
+        "bb_session_id": "existing_session_id",
+        "bb_session_connect_url": "existing_connect_url",
+    }
+
+    connect_url = mock_browserbase_provider.get_or_create_session(
+        context, mock_browserbase_provider.bb
+    )
+
+    assert connect_url == "existing_connect_url"
+    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # type: ignore reportFunctionMemberAccess
+
+
+def test_browserbase_provider_get_or_create_session_without_clarifications(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test getting or creating a session when no clarifications exist."""
+    context = get_test_tool_context()
+    context.clarifications = []
+
+    mock_session = MagicMock()
+    mock_session.id = "test_session_id"
+    mock_session.connect_url = "test_connect_url"
+
+    mock_context = MagicMock()
+    mock_context.id = "test_context_id"
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
+
+    connect_url = mock_browserbase_provider.get_or_create_session(
+        context, mock_browserbase_provider.bb
+    )
+
+    assert connect_url == "test_connect_url"
+    mock_browserbase_provider.bb.sessions.create.assert_called_once()  # type: ignore reportFunctionMemberAccess

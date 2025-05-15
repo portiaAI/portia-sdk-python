@@ -855,7 +855,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "query": plan.plan_context.query,
                     "tool_ids": plan.plan_context.tool_ids,
                     "steps": [step.model_dump(mode="json") for step in plan.steps],
-                    "inputs": [input_.model_dump(mode="json") for input_ in plan.inputs],
+                    "plan_inputs": [
+                        # TODO (RH): Remove this once backend is updated to make description optional  # noqa: E501, FIX002, TD003
+                        {**input_.model_dump(mode="json"), "description": input_.description or ""}
+                        for input_ in plan.plan_inputs
+                    ],
                 },
             )
         except Exception as e:

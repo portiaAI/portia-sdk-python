@@ -21,7 +21,7 @@ def test_plan_serialization() -> None:
     plan, _ = get_test_plan_run()
     assert str(plan) == (
         f"PlanModel(id={plan.id!r},plan_context={plan.plan_context!r}, steps={plan.steps!r}, "
-        f"inputs={plan.inputs!r}"
+        f"inputs={plan.plan_inputs!r}"
     )
     # check we can also serialize to JSON
     plan.model_dump_json()
@@ -73,7 +73,7 @@ def test_read_only_plan_preserves_data() -> None:
     assert read_only.plan_context.query == original_plan.plan_context.query
     assert read_only.plan_context.tool_ids == original_plan.plan_context.tool_ids
     assert len(read_only.steps) == len(original_plan.steps)
-    for ro_step, orig_step in zip(read_only.steps, original_plan.steps):
+    for ro_step, orig_step in zip(read_only.steps, original_plan.steps, strict=False):
         assert ro_step.task == orig_step.task
         assert ro_step.output == orig_step.output
 
@@ -143,7 +143,7 @@ def test_pretty_print() -> None:
                 condition="x > 10",
             ),
         ],
-        inputs=[PlanInput(name="$input", description="test input")],
+        plan_inputs=[PlanInput(name="$input", description="test input")],
     )
     output = plan.pretty_print()
     assert isinstance(output, str)
@@ -161,9 +161,9 @@ def test_plan_builder_with_plan_input() -> None:
         .build()
     )
 
-    assert len(plan.inputs) == 1
-    assert plan.inputs[0].name == "$person"
-    assert plan.inputs[0].description == "Person's information"
+    assert len(plan.plan_inputs) == 1
+    assert plan.plan_inputs[0].name == "$person"
+    assert plan.plan_inputs[0].description == "Person's information"
 
 
 def test_plan_inputs_must_be_unique() -> None:
@@ -172,7 +172,7 @@ def test_plan_inputs_must_be_unique() -> None:
         Plan(
             plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
             steps=[Step(task="test task", output="$output")],
-            inputs=[
+            plan_inputs=[
                 PlanInput(name="$duplicate", description="First input"),
                 PlanInput(name="$duplicate", description="Second input with same name"),
             ],

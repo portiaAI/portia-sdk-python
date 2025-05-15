@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-alpha'
+      - 'v[0-9]+.[0-9]+.[0-9]+a[0-9]+'
 
 permissions:
   contents: read
@@ -17,13 +17,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Install Poetry
-        run: pipx install poetry
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Extract version from tag
         id: get_tag_version
@@ -35,7 +30,7 @@ jobs:
       - name: Get version from pyproject.toml
         id: get_project_version
         run: |
-          PROJECT_VERSION=$(poetry version -s)
+          PROJECT_VERSION=$(uv version --short)
           echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Verify versions match
@@ -49,9 +44,8 @@ jobs:
       - name: Build and publish to PyPI
         id: pypi_publish
         run: |
-          poetry config pypi-token.pypi ${{ secrets.POETRY_PYPI_TOKEN_PYPI }}
-          poetry build
-          poetry publish --no-interaction
+          uv build
+          uv publish --token ${{ secrets.POETRY_PYPI_TOKEN_PYPI }}
         
       - name: Notify Slack on success
         if: success()

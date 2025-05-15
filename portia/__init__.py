@@ -73,7 +73,7 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanContext, PlanUUID, Step
+from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, Step
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
@@ -130,6 +130,7 @@ __all__ = [
     "Plan",
     "PlanContext",
     "PlanError",
+    "PlanInput",
     "PlanNotFoundError",
     "PlanRun",
     "PlanRunNotFoundError",
