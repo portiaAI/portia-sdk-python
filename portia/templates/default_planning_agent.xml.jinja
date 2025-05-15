@@ -45,10 +45,18 @@
 </Tools>
 
 <EndUser>
+    {% if end_user.email %}
     <EndUser.Email>{{ end_user.email }}</EndUser.Email>
+    {% endif %}
+    {% if end_user.name %}
     <EndUser.Name>{{ end_user.name }}</EndUser.Name>
+    {% endif %}
+    {% if end_user.phone_number %}
     <EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>
+    {% endif %}
+    {% if end_user.additional_data %}
     <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
+    {% endif %}
 </EndUser>
 
 {% if plan_inputs %}

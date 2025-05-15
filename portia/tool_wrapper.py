@@ -26,6 +26,9 @@ if TYPE_CHECKING:
     from portia.plan_run import PlanRun
 
 
+MAX_OUTPUT_LOG_LENGTH = 1000
+
+
 class ToolCallWrapper(Tool):
     """Tool Wrapper that records calls to its child tool and sends them to the AdditionalStorage.
 
@@ -103,8 +106,14 @@ class ToolCallWrapper(Tool):
             end_user_id=ctx.end_user.external_id,
             status=ToolCallStatus.IN_PROGRESS,
         )
+        input_str = repr(record.input)
+        truncated_input = (
+            input_str[:MAX_OUTPUT_LOG_LENGTH] + "...[truncated - only first 1000 characters shown]"
+            if len(input_str) > MAX_OUTPUT_LOG_LENGTH
+            else input_str
+        )
         logger().info(
-            f"Invoking {record.tool_name} with args: {record.input}",
+            f"Invoking {record.tool_name!s} with args: {truncated_input}",
         )
         start_time = datetime.now(tz=UTC)
         try:

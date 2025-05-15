@@ -181,8 +181,9 @@ class BrowserTool(Tool[str]):
         default=(
             "General purpose browser tool. Can be used to navigate to a URL and "
             "complete tasks. Should only be used if the task requires a browser "
-            "and you are sure of the URL. Do not break the task into multiple browser tool steps - "
-            "each new browser tool run will create a new session!"
+            "and you are sure of the URL. This tool handles a full end to end task. "
+            "DO NOT break a single task into multiple browser tool steps as each step is run "
+            "in an independent new session!"
         ),
     )
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
@@ -530,6 +531,8 @@ if BROWSERBASE_AVAILABLE:
                     project_id=self.project_id,  # type: ignore reportArgumentType
                     status="REQUEST_RELEASE",
                 )
+                ctx.end_user.set_additional_data("bb_session_id", "")
+                ctx.end_user.set_additional_data("bb_session_connect_url", "")
 
         def get_context_id(self, ctx: ToolRunContext, bb: Browserbase) -> str:
             """Get the Browserbase context id.
@@ -606,8 +609,12 @@ if BROWSERBASE_AVAILABLE:
 
             context.end_user.set_additional_data("bb_context_id", context_id)
 
-            session_id = context.end_user.get_additional_data("bb_session_id")
-            session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
+            if context.clarifications:
+                session_id = context.end_user.get_additional_data("bb_session_id")
+                session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
+            else:
+                session_id = None
+                session_connect_url = None
 
             if not session_id or not session_connect_url:
                 session = self.create_session(context_id)
