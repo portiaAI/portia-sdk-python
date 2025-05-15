@@ -142,7 +142,7 @@ class BrowserInfrastructureOption(Enum):
     REMOTE = "remote"
 
 
-class BrowserTool(Tool[str]):
+class BrowserTool(Tool[str | BaseModel]):
     """General purpose browser tool. Customizable to user requirements.
 
     This tool is designed to be used for tasks that require a browser. If authentication is
@@ -228,12 +228,17 @@ class BrowserTool(Tool[str]):
             return BrowserInfrastructureProviderBrowserBase()
         return BrowserInfrastructureProviderLocal()
 
-    def run(self, ctx: ToolRunContext, url: str, task: str) -> str | ActionClarification:
+    def run(
+        self,
+        ctx: ToolRunContext,
+        url: str,
+        task: str,
+    ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
-        async def run_browser_tasks() -> str | ActionClarification:
+        async def run_browser_tasks() -> str | BaseModel | ActionClarification:
             def handle_login_requirement(
                 result: BrowserTaskOutput,
             ) -> ActionClarification:
@@ -362,7 +367,7 @@ class BrowserToolForUrl(BrowserTool):
             infrastructure_option=infrastructure_option,
         )
 
-    def run(self, ctx: ToolRunContext, task: str) -> str | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
+    def run(self, ctx: ToolRunContext, task: str) -> str | BaseModel | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
         """Run the BrowserToolForUrl."""
         return super().run(ctx, self.url, task)  # pragma: no cover
 
