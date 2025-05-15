@@ -8,8 +8,7 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification, InputClarification
 from portia.end_user import EndUser
 from portia.execution_agents.context import StepInput, build_context
-from portia.execution_agents.output import LocalOutput, Output
-from portia.execution_context import ExecutionContext, get_execution_context
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.plan import Variable
 from portia.tool import ToolRunContext
 from tests.utils import get_test_config, get_test_plan_run
@@ -32,10 +31,10 @@ def inputs() -> list[Variable]:
 def outputs() -> dict[str, Output]:
     """Return a dictionary of outputs for pytest fixtures."""
     return {
-        "$email_body": LocalOutput(value="The body of the email"),
-        "$email_title": LocalOutput(value="Example email"),
-        "$email_address": LocalOutput(value="test@example.com"),
-        "$london_weather": LocalOutput(value="rainy"),
+        "$email_body": LocalDataValue(value="The body of the email"),
+        "$email_title": LocalDataValue(value="Example email"),
+        "$email_address": LocalDataValue(value="test@example.com"),
+        "$london_weather": LocalDataValue(value="rainy"),
     }
 
 
@@ -45,7 +44,6 @@ def test_context_empty() -> None:
     plan_run.outputs.step_outputs = {}
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
@@ -67,7 +65,6 @@ def test_context_execution_context() -> None:
 
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
@@ -92,7 +89,6 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
     plan_run.outputs.step_outputs = outputs
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
@@ -143,7 +139,6 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
     plan_run.outputs.clarifications = clarifications
     context = build_context(
         ToolRunContext(
-            execution_context=ExecutionContext(additional_data={"exec_context": "true"}),
             end_user=EndUser(
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
@@ -208,8 +203,6 @@ end_user_email:
 end_user_phone:
 end_user_attributes:{{"email": "hello@world.com"}}
 ----------
-context_key_name: exec_context context_key_value: true
-----------
 System Context:
 Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""
     )
@@ -241,7 +234,6 @@ def test_context_inputs_outputs_clarifications(
     plan_run.outputs.clarifications = clarifications
     context = build_context(
         ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=EndUser(external_id="123"),
             plan_run_id=plan_run.id,
             config=get_test_config(),

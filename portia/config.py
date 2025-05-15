@@ -245,6 +245,9 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
+FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED = (
+    "feature_flag_one_shot_agent_clarifications_enabled"
+)
 
 
 E = TypeVar("E", bound=Enum)
@@ -467,7 +470,8 @@ class Config(BaseModel):
         self.feature_flags = {
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
-            FEATURE_FLAG_AGENT_MEMORY_ENABLED: False,
+            FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
+            FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED: False,
             **self.feature_flags,
         }
         return self

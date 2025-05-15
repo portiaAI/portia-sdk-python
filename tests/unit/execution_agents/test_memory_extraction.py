@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from portia.end_user import EndUser
 from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.plan import Step, Variable
 from portia.storage import InMemoryStorage
 from tests.utils import get_test_config, get_test_plan_run
@@ -41,11 +39,11 @@ def test_memory_extraction_step_with_inputs() -> None:
     storage = InMemoryStorage()
     saved_output = storage.save_plan_run_output(
         "$memory_output",
-        LocalOutput(value="memory_value"),
+        LocalDataValue(value="memory_value"),
         plan_run.id,
     )
     plan_run.outputs.step_outputs = {
-        "$local_output": LocalOutput(value="local_value"),
+        "$local_output": LocalDataValue(value="local_value"),
         "$memory_output": saved_output,
     }
 
@@ -101,18 +99,19 @@ def test_memory_extraction_step_errors_with_missing_input() -> None:
         memory_extraction_step.invoke({})
 
 
-def test_memory_extraction_step_handles_unknown_output_type() -> None:
-    """Test MemoryExtractionStep handles unknown output types gracefully."""
+def test_memory_extraction_step_with_plan_run_inputs() -> None:
+    """Test MemoryExtractionStep with inputs from plan_run_inputs."""
     (_, plan_run) = get_test_plan_run()
-    plan_run.outputs.step_outputs = {
-        "$unexpected_input": SimpleNamespace(value="Unexpected input value"),  # pyright: ignore[reportAttributeAccessIssue]
+    plan_run.plan_run_inputs = {
+        "$plan_run_input": LocalDataValue(value="plan_run_input_value"),
     }
+
     agent = BaseExecutionAgent(
         step=Step(
             task="DESCRIPTION_STRING",
             output="$out",
             inputs=[
-                Variable(name="$unexpected_input", description="Unexpected input description"),
+                Variable(name="$plan_run_input", description="Plan run input description"),
             ],
         ),
         plan_run=plan_run,
@@ -123,6 +122,9 @@ def test_memory_extraction_step_handles_unknown_output_type() -> None:
     )
 
     memory_extraction_step = MemoryExtractionStep(agent=agent)
-    result = memory_extraction_step.invoke({})
+    result = memory_extraction_step.invoke({"messages": [], "step_inputs": []})
 
-    assert len(result["step_inputs"]) == 0
+    assert len(result["step_inputs"]) == 1
+    assert result["step_inputs"][0].name == "$plan_run_input"
+    assert result["step_inputs"][0].value == "plan_run_input_value"
+    assert result["step_inputs"][0].description == "Plan run input description"

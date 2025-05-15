@@ -17,13 +17,16 @@ from pydantic import ConfigDict
 
 from portia.clarification import Clarification
 from portia.common import combine_args_kwargs
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import ReadyResponse, Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from portia.plan_run import PlanRun
+
+
+MAX_OUTPUT_LOG_LENGTH = 1000
 
 
 class ToolCallWrapper(Tool):
@@ -101,11 +104,16 @@ class ToolCallWrapper(Tool):
             plan_run_id=self._plan_run.id,
             step=self._plan_run.current_step_index,
             end_user_id=ctx.end_user.external_id,
-            additional_data=ctx.execution_context.additional_data,
             status=ToolCallStatus.IN_PROGRESS,
         )
+        input_str = repr(record.input)
+        truncated_input = (
+            input_str[:MAX_OUTPUT_LOG_LENGTH] + "...[truncated - only first 1000 characters shown]"
+            if len(input_str) > MAX_OUTPUT_LOG_LENGTH
+            else input_str
+        )
         logger().info(
-            f"Invoking {record.tool_name} with args: {record.input}",
+            f"Invoking {record.tool_name!s} with args: {truncated_input}",
         )
         start_time = datetime.now(tz=UTC)
         try:
@@ -124,7 +132,7 @@ class ToolCallWrapper(Tool):
                 record.status = ToolCallStatus.NEED_CLARIFICATION
                 record.output = output.model_dump(mode="json")
             elif output is None:
-                record.output = LocalOutput(value=output).model_dump(mode="json")
+                record.output = LocalDataValue(value=output).model_dump(mode="json")
                 record.status = ToolCallStatus.SUCCESS
             else:
                 record.output = output

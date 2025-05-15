@@ -48,13 +48,7 @@ from portia.errors import (
     ToolNotFoundError,
     ToolRetryError,
 )
-from portia.execution_agents.output import Output
-
-# Execution context
-from portia.execution_context import (
-    ExecutionContext,
-    execution_context,
-)
+from portia.execution_agents.output import LocalDataValue, Output
 
 # Logging
 from portia.logger import logger
@@ -79,7 +73,7 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanContext, Step
+from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, Step
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
@@ -112,7 +106,6 @@ __all__ = [
     "DefaultToolRegistry",
     "DuplicateToolError",
     "ExecutionAgentType",
-    "ExecutionContext",
     "ExecutionHooks",
     "FileReaderTool",
     "FileWriterTool",
@@ -128,6 +121,7 @@ __all__ = [
     "LLMModel",
     "LLMProvider",
     "LLMTool",
+    "LocalDataValue",
     "LogLevel",
     "McpToolRegistry",
     "Message",
@@ -136,10 +130,12 @@ __all__ = [
     "Plan",
     "PlanContext",
     "PlanError",
+    "PlanInput",
     "PlanNotFoundError",
     "PlanRun",
     "PlanRunNotFoundError",
     "PlanRunState",
+    "PlanUUID",
     "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
@@ -161,7 +157,6 @@ __all__ = [
     "WeatherTool",
     "default_config",
     "example_tool_registry",
-    "execution_context",
     "logger",
     "open_source_tool_registry",
 ]

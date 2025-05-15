@@ -9,18 +9,19 @@ import json
 from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, Union
+from typing import TYPE_CHECKING, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from typing_extensions import deprecated
 
-from portia.common import SERIALIZABLE_TYPE_VAR, Serializable
+from portia.common import Serializable
 from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
     from portia.storage import AgentMemory
 
 
-class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class BaseOutput(BaseModel):
     """Base interface for concrete output classes to implement."""
 
     @abstractmethod
@@ -46,19 +47,20 @@ class BaseOutput(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return the summary of the output."""
 
 
-class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class LocalDataValue(BaseOutput):
     """Output that is stored locally."""
 
     model_config = ConfigDict(extra="forbid")
 
     value: Serializable | None = Field(
         default=None,
-        description="The output of the tool.",
+        description="The value, often the output from the tool",
     )
 
     summary: str | None = Field(
         default=None,
-        description="Textual summary of the output of the tool. Not all tools generate summaries.",
+        description="Textual summary of the value. Note that not all tools generate summaries and "
+        "plan inputs also do not need summaries.",
     )
 
     def get_value(self) -> Serializable | None:
@@ -133,7 +135,7 @@ class LocalOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return str(value)  # Fallback for other types
 
 
-class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
+class AgentMemoryValue(BaseOutput):
     """Output that is stored in agent memory."""
 
     model_config = ConfigDict(extra="forbid")
@@ -164,4 +166,20 @@ class AgentMemoryOutput(BaseOutput, Generic[SERIALIZABLE_TYPE_VAR]):
         return self.summary
 
 
-Output = Union[LocalOutput, AgentMemoryOutput]
+Output = Union[LocalDataValue, AgentMemoryValue]
+
+
+@deprecated(
+    "LocalOutput is deprecated and will be removed in the 0.4 release - "
+    "use LocalDataValue instead"
+)
+class LocalOutput(LocalDataValue):
+    """Alias of LocalDataValue kept for backwards compatibility."""
+
+
+@deprecated(
+    "AgentMemoryOutput is deprecated and will be removed in the 0.4 release - "
+    "use AgentMemoryValue instead"
+)
+class AgentMemoryOutput(AgentMemoryValue):
+    """Alias of AgentMemoryValue kept for backwards compatibility."""

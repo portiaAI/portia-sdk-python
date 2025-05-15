@@ -24,6 +24,7 @@ from __future__ import annotations
 import time
 from importlib.metadata import version
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from portia.clarification import (
     Clarification,
@@ -42,16 +43,17 @@ from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
     PlanNotFoundError,
+    StorageError,
 )
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
-from portia.execution_agents.output import LocalOutput, Output
-from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
-from portia.execution_context import (
-    execution_context,
-    get_execution_context,
-    is_execution_context_set,
+from portia.execution_agents.output import (
+    LocalDataValue,
+    Output,
 )
+from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
+from portia.execution_hooks import ExecutionHooks
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -62,15 +64,16 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, ReadOnlyPlan, ReadOnlyStep, Step
+from portia.plan import Plan, PlanContext, PlanInput, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
+from portia.prefixed_uuid import PlanUUID
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
     PortiaCloudStorage,
 )
-from portia.tool import ToolRunContext
+from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import (
     DefaultToolRegistry,
     PortiaToolRegistry,
@@ -79,22 +82,9 @@ from portia.tool_registry import (
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.clarification_handler import ClarificationHandler
+    from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
-    from portia.tool import Tool
-
-
-class ExecutionHooks:
-    """Hooks that can be used to modify or add extra functionality to the run of a plan.
-
-    Currently, the only hook is a clarification handler which can be used to handle clarifications
-    that arise during the run of a plan.
-    """
-
-    def __init__(self, clarification_handler: ClarificationHandler | None = None) -> None:
-        """Initialize ExecutionHooks with default values."""
-        self.clarification_handler = clarification_handler
 
 
 class Portia:
@@ -125,6 +115,8 @@ class Portia:
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
         logger().info(f"Starting Portia v{version('portia-sdk-python')}")
+        if self.config.portia_api_key and self.config.portia_api_endpoint:
+            logger().info(f"Using Portia cloud API endpoint: {self.config.portia_api_endpoint}")
         self._log_models(self.config)
         self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
         if not self.config.has_api_key("portia_api_key"):
@@ -171,6 +163,7 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -183,15 +176,53 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
+            plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
+                Provides input values for the run. This can be a list of PlanInput objects, a list
+                of dicts with keys "name", "description" (optional) and "value", or a dict of
+                plan run input name to value.
 
         Returns:
             PlanRun: The run resulting from executing the query.
 
         """
-        plan = self.plan(query, tools, example_plans, end_user)
+        coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
+        plan = self.plan(query, tools, example_plans, end_user, coerced_plan_run_inputs)
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user)
+        plan_run = self.create_plan_run(plan, end_user, coerced_plan_run_inputs)
         return self.resume(plan_run)
+
+    def _coerce_plan_run_inputs(
+        self,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None,
+    ) -> list[PlanInput] | None:
+        """Coerce plan inputs from any input type into a list of PlanInputs we use internally."""
+        if plan_run_inputs is None:
+            return None
+        if isinstance(plan_run_inputs, list):
+            to_return = []
+            for plan_run_input in plan_run_inputs:
+                if isinstance(plan_run_input, dict):
+                    if "name" not in plan_run_input or "value" not in plan_run_input:
+                        raise ValueError("Plan input must have a name and value")
+                    to_return.append(
+                        PlanInput(
+                            name=plan_run_input["name"],
+                            description=plan_run_input.get("description", None),
+                            value=plan_run_input["value"],
+                        )
+                    )
+                else:
+                    to_return.append(plan_run_input)
+            return to_return
+        if isinstance(plan_run_inputs, dict):
+            to_return = []
+            for key, value in plan_run_inputs.items():
+                to_return.append(PlanInput(name=key, value=value))
+            return to_return
+        raise ValueError("Invalid plan run inputs received")
 
     def plan(
         self,
@@ -199,6 +230,7 @@ class Portia:
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
+        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples.
 
@@ -209,6 +241,11 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
+            plan_inputs (list[PlanInput] | None): Optional list of inputs required for the plan.
+              This can be a list of Planinput objects, a list of dicts with keys "name" and
+              "description" (optional), or a list of plan run input names. If a value is provided
+              with a PlanInput object or in a dictionary, it will be ignored as values are only
+              used when running the plan.
 
         Returns:
             Plan: The plan for executing the query.
@@ -229,11 +266,13 @@ class Portia:
         end_user = self.initialize_end_user(end_user)
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
+        coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
         outcome = planning_agent.generate_steps_or_error(
             query=query,
             tool_list=tools,
             end_user=end_user,
             examples=example_plans,
+            plan_inputs=coerced_plan_inputs,
         )
         if outcome.error:
             if (
@@ -254,6 +293,7 @@ class Portia:
                 tool_ids=[tool.id for tool in tools],
             ),
             steps=outcome.steps,
+            plan_inputs=coerced_plan_inputs or [],
         )
         self.storage.save_plan(plan)
         logger().info(
@@ -264,30 +304,75 @@ class Portia:
 
         return plan
 
+    def _coerce_plan_inputs(
+        self, plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None
+    ) -> list[PlanInput] | None:
+        """Coerce plan inputs from any input type into a list of PlanInputs we use internally."""
+        if plan_inputs is None:
+            return None
+        if isinstance(plan_inputs, list):
+            to_return = []
+            for plan_input in plan_inputs:
+                if isinstance(plan_input, dict):
+                    if "name" not in plan_input:
+                        raise ValueError("Plan input must have a name and description")
+                    to_return.append(
+                        PlanInput(
+                            name=plan_input["name"],
+                            description=plan_input.get("description", None),
+                        )
+                    )
+                elif isinstance(plan_input, str):
+                    to_return.append(PlanInput(name=plan_input))
+                else:
+                    to_return.append(plan_input)
+            return to_return
+        raise ValueError("Invalid plan inputs received")
+
     def run_plan(
         self,
-        plan: Plan,
+        plan: Plan | PlanUUID | UUID,
         end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None = None,
     ) -> PlanRun:
         """Run a plan.
 
         Args:
-            plan (Plan): The plan to run.
+            plan (Plan | PlanUUID | UUID): The plan to run, or the ID of the plan to load from
+              storage.
             end_user (str | EndUser | None = None): The end user to use.
+            plan_run_inputs (list[PlanInput] | list[dict[str, Serializable]] | dict[str, Serializable] | None):
+              Provides input values for the run. This can be a list of PlanInput objects, a list
+              of dicts with keys "name", "description" (optional) and "value", or a dict of
+              plan run input name to value.
 
         Returns:
             PlanRun: The resulting PlanRun object.
 
-        """
+        """  # noqa: E501
         # ensure we have the plan in storage.
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
+        plan_id = (
+            plan
+            if isinstance(plan, PlanUUID)
+            else PlanUUID(uuid=plan)
+            if isinstance(plan, UUID)
+            else plan.id
+        )
         try:
-            self.storage.get_plan(plan.id)
-        except PlanNotFoundError:
-            self.storage.save_plan(plan)
+            plan = self.storage.get_plan(plan_id)
+        except (PlanNotFoundError, StorageError):
+            if isinstance(plan, Plan):
+                self.storage.save_plan(plan)
+            else:
+                raise PlanNotFoundError(plan_id) from None
 
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user)
+        coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
+        plan_run = self.create_plan_run(plan, end_user, coerced_plan_run_inputs)
         return self.resume(plan_run)
 
     def resume(
@@ -337,12 +422,56 @@ class Portia:
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
-        # if the run has execution context associated, but none is set then use it
-        if not is_execution_context_set():
-            with execution_context(plan_run.execution_context):
-                return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
-
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
+
+    def _process_plan_input_values(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        plan_run_inputs: list[PlanInput] | None = None,
+    ) -> None:
+        """Process plan input values and add them to the plan run.
+
+        Args:
+            plan (Plan): The plan containing required inputs.
+            plan_run (PlanRun): The plan run to update with input values.
+            plan_run_inputs (list[PlanInput] | None): Values for plan inputs.
+
+        Raises:
+            ValueError: If required plan inputs are missing.
+
+        """
+        if plan.plan_inputs and not plan_run_inputs:
+            raise ValueError("Inputs are required for this plan but have not been specified")
+        if plan_run_inputs and not plan.plan_inputs:
+            logger().warning(
+                "Inputs are not required for this plan but plan inputs were provided",
+            )
+
+        if plan_run_inputs and plan.plan_inputs:
+            input_values_by_name = {input_obj.name: input_obj for input_obj in plan_run_inputs}
+
+            # Validate all required inputs are provided
+            missing_inputs = [
+                input_obj.name
+                for input_obj in plan.plan_inputs
+                if input_obj.name not in input_values_by_name
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+
+            for plan_input in plan.plan_inputs:
+                if plan_input.name in input_values_by_name:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=input_values_by_name[plan_input.name].value
+                    )
+
+            # Check for unknown inputs
+            for input_obj in plan_run_inputs:
+                if not any(plan_input.name == input_obj.name for plan_input in plan.plan_inputs):
+                    logger().warning(f"Ignoring unknown plan input: {input_obj.name}")
+
+            self.storage.save_plan_run(plan_run)
 
     def execute_plan_run_and_handle_clarifications(
         self,
@@ -354,7 +483,6 @@ class Portia:
             PlanRunState.COMPLETE,
             PlanRunState.FAILED,
         ]:
-            plan_run.execution_context = get_execution_context()
             plan_run = self._execute_plan_run(plan, plan_run)
 
             # If we don't have a clarification handler, return the plan run even if a clarification
@@ -481,9 +609,9 @@ class Portia:
             return plan_run
 
         plan = self.storage.get_plan(plan_run.plan_id)
-        plan_run = self.storage.get_plan_run(plan_run.id)
-        current_step_clarifications = plan_run.get_clarifications_for_step()
         while plan_run.state != PlanRunState.READY_TO_RESUME:
+            plan_run = self.storage.get_plan_run(plan_run.id)
+            current_step_clarifications = plan_run.get_clarifications_for_step()
             if tries >= max_retries:
                 raise InvalidPlanRunStateError("Run is not ready to resume after max retries")
 
@@ -500,7 +628,6 @@ class Portia:
             if next_tool:
                 ready_response = next_tool.ready(
                     ToolRunContext(
-                        execution_context=plan_run.execution_context,
                         end_user=self.initialize_end_user(plan_run.end_user_id),
                         plan_run_id=plan_run.id,
                         config=self.config,
@@ -536,12 +663,15 @@ class Portia:
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput] | None = None,
     ) -> PlanRun:
         """Create a PlanRun from a Plan.
 
         Args:
             plan (Plan): The plan to create a plan run from.
             end_user (str | EndUser | None = None): The end user this plan run is for.
+            plan_run_inputs (list[PlanInput] | None = None): The plan inputs for the
+              plan run with their values.
 
         Returns:
             PlanRun: The created PlanRun object.
@@ -551,13 +681,13 @@ class Portia:
         plan_run = PlanRun(
             plan_id=plan.id,
             state=PlanRunState.NOT_STARTED,
-            execution_context=get_execution_context(),
             end_user_id=end_user.external_id,
         )
+        self._process_plan_input_values(plan, plan_run, plan_run_inputs)
         self.storage.save_plan_run(plan_run)
         return plan_run
 
-    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:
+    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
         """Execute the run steps, updating the run state as needed.
 
         Args:
@@ -585,45 +715,68 @@ class Portia:
             f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
         )
 
+        if self.execution_hooks.before_first_step_execution and plan_run.current_step_index == 0:
+            self.execution_hooks.before_first_step_execution(
+                ReadOnlyPlan.from_plan(plan), ReadOnlyPlanRun.from_plan_run(plan_run)
+            )
+
         last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
         introspection_agent = self._get_introspection_agent()
         for index in range(plan_run.current_step_index, len(plan.steps)):
             step = plan.steps[index]
             plan_run.current_step_index = index
 
-            # Handle the introspection outcome
-            (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
-                introspection_agent=introspection_agent,
-                plan=plan,
-                plan_run=plan_run,
-                last_executed_step_output=last_executed_step_output,
-            )
-            if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
-                continue
-            if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
-                self._log_final_output(plan_run, plan)
-                return plan_run
-
-            logger().info(
-                f"Executing step {index}: {step.task}",
-                plan=str(plan.id),
-                plan_run=str(plan_run.id),
-            )
-            # we pass read only copies of the state to the agent so that the portia remains
-            # responsible for handling the output of the agent and updating the state.
-            agent = self._get_agent_for_step(
-                step=ReadOnlyStep.from_step(step),
-                plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
-            )
-            logger().debug(
-                f"Using agent: {type(agent).__name__}",
-                plan=str(plan.id),
-                plan_run=str(plan_run.id),
-            )
             try:
+                # Handle the introspection outcome
+                (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
+                    introspection_agent=introspection_agent,
+                    plan=plan,
+                    plan_run=plan_run,
+                    last_executed_step_output=last_executed_step_output,
+                )
+                if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
+                    continue
+                if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
+                    self._log_final_output(plan_run, plan)
+                    if (
+                        self.execution_hooks.after_last_step_execution
+                        and plan_run.outputs.final_output
+                    ):
+                        self.execution_hooks.after_last_step_execution(
+                            ReadOnlyPlan.from_plan(plan),
+                            ReadOnlyPlanRun.from_plan_run(plan_run),
+                            plan_run.outputs.final_output,
+                        )
+                    return plan_run
+
+                logger().info(
+                    f"Executing step {index}: {step.task}",
+                    plan=str(plan.id),
+                    plan_run=str(plan_run.id),
+                )
+
+                if self.execution_hooks.before_step_execution:
+                    self.execution_hooks.before_step_execution(
+                        ReadOnlyPlan.from_plan(plan),
+                        ReadOnlyPlanRun.from_plan_run(plan_run),
+                        ReadOnlyStep.from_step(step),
+                    )
+
+                # we pass read only copies of the state to the agent so that the portia remains
+                # responsible for handling the output of the agent and updating the state.
+                agent = self._get_agent_for_step(
+                    step=ReadOnlyStep.from_step(step),
+                    plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+                )
+                logger().debug(
+                    f"Using agent: {type(agent).__name__}",
+                    plan=str(plan.id),
+                    plan_run=str(plan_run.id),
+                )
                 last_executed_step_output = agent.execute_sync()
             except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                error_output = LocalOutput(value=str(e))
+                logger().error(f"Error executing step {index}: {e}")
+                error_output = LocalDataValue(value=str(e))
                 self._set_step_output(error_output, plan_run, step)
                 plan_run.outputs.final_output = error_output
                 self._set_plan_run_state(plan_run, PlanRunState.FAILED)
@@ -638,6 +791,22 @@ class Portia:
                     plan=str(plan.id),
                     plan_run=str(plan_run.id),
                 )
+
+                if self.execution_hooks.after_step_execution:
+                    self.execution_hooks.after_step_execution(
+                        ReadOnlyPlan.from_plan(plan),
+                        ReadOnlyPlanRun.from_plan_run(plan_run),
+                        ReadOnlyStep.from_step(step),
+                        error_output,
+                    )
+
+                if self.execution_hooks.after_last_step_execution:
+                    self.execution_hooks.after_last_step_execution(
+                        ReadOnlyPlan.from_plan(plan),
+                        ReadOnlyPlanRun.from_plan_run(plan_run),
+                        plan_run.outputs.final_output,
+                    )
+
                 return plan_run
             else:
                 self._set_step_output(last_executed_step_output, plan_run, step)
@@ -645,7 +814,16 @@ class Portia:
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
 
+            if self.execution_hooks.after_step_execution:
+                self.execution_hooks.after_step_execution(
+                    ReadOnlyPlan.from_plan(plan),
+                    ReadOnlyPlanRun.from_plan_run(plan_run),
+                    ReadOnlyStep.from_step(step),
+                    last_executed_step_output,
+                )
+
             if self._raise_clarifications(plan_run, last_executed_step_output, plan):
+                # No after_last_step_execution call here as the plan run will be resumed later
                 return plan_run
 
             # persist at the end of each step
@@ -662,6 +840,14 @@ class Portia:
             )
         self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
         self._log_final_output(plan_run, plan)
+
+        if self.execution_hooks.after_last_step_execution and plan_run.outputs.final_output:
+            self.execution_hooks.after_last_step_execution(
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
+                plan_run.outputs.final_output,
+            )
+
         return plan_run
 
     def _log_final_output(self, plan_run: PlanRun, plan: Plan) -> None:
@@ -748,13 +934,13 @@ class Portia:
 
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
-                output = LocalOutput(
+                output = LocalDataValue(
                     value=SKIPPED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
                 self._set_step_output(output, plan_run, step)
             case PreStepIntrospectionOutcome.COMPLETE:
-                output = LocalOutput(
+                output = LocalDataValue(
                     value=COMPLETED_OUTPUT,
                     summary=pre_step_outcome.reason,
                 )
@@ -791,7 +977,7 @@ class Portia:
             step_output (Output): The output of the last step.
 
         """
-        final_output = LocalOutput(
+        final_output = LocalDataValue(
             value=step_output.get_value(),
             summary=None,
         )
@@ -833,10 +1019,10 @@ class Portia:
             for clarification in new_clarifications:
                 clarification.step = plan_run.current_step_index
                 logger().info(
-                    f"Clarification requested - category: {clarification.category}, "
-                    f"user_guidance: {clarification.user_guidance}.",
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
+                    "Clarification requested - category: %s, user_guidance: %r.",
+                    clarification.category,
+                    clarification.user_guidance,
+                    extra={"plan": str(plan.id), "plan_run": str(plan_run.id)},
                 )
                 logger().debug(
                     f"Clarification requested: {clarification.model_dump_json(indent=4)}",
@@ -883,6 +1069,7 @@ class Portia:
                 cls = OneShotAgent
             case ExecutionAgentType.DEFAULT:
                 cls = DefaultExecutionAgent
+        cls = OneShotAgent if isinstance(tool, LLMTool) else cls
         return cls(
             step,
             plan_run,
@@ -890,6 +1077,7 @@ class Portia:
             self.storage,
             self.initialize_end_user(plan_run.end_user_id),
             tool,
+            execution_hooks=self.execution_hooks,
         )
 
     def _log_replan_with_portia_cloud_tools(
@@ -940,7 +1128,7 @@ class Portia:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
         if (
-            isinstance(step_output, LocalOutput)
+            isinstance(step_output, LocalDataValue)
             and self.config.exceeds_output_threshold(
                 step_output.serialize_value(),
             )

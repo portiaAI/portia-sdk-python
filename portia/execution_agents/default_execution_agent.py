@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import SystemMessage
-from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
+)
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -21,14 +24,16 @@ from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
-    next_state_after_tool_call,
+    get_arg_value_with_templating,
     process_output,
+    template_in_required_inputs,
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.execution_context import get_execution_context
 from portia.model import GenerativeModel, Message
+from portia.plan import ReadOnlyStep, Step
+from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -37,6 +42,7 @@ if TYPE_CHECKING:
     from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
+    from portia.execution_hooks import ExecutionHooks
     from portia.plan import Step
     from portia.plan_run import PlanRun
     from portia.storage import AgentMemory
@@ -54,22 +60,25 @@ class ToolArgument(BaseModel):
 
     Attributes:
         name (str): The name of the argument, as requested by the tool.
+        explanation (str): Explanation of the source for the value of the argument.
         value (Any | None): The value of the argument, as provided in the goal or context.
         valid (bool): Whether the value is a valid type and/or format for the given argument.
-        explanation (str): Explanation of the source for the value of the argument.
 
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
+    explanation: str = Field(
+        description="Explanation of the source for the value of the argument. "
+        "For large arguments, includes templating was or wasn't used.",
+    )
     value: Any | None = Field(
         description="Value of the argument, as provided by in the goal or context.",
     )
     valid: bool = Field(
         description="Whether the value is a valid type and or format for the given argument.",
     )
-    explanation: str = Field(description="Explanation of the source for the value of the argument.")
 
 
 class ToolInputs(BaseModel):
@@ -147,16 +156,23 @@ class ParserModel:
 
     arg_parser_prompt = ChatPromptTemplate.from_messages(
         [
-            SystemMessage(
-                content=(
-                    "You are a highly capable assistant tasked with generating valid arguments for "
-                    "tools based on provided input. "
-                    "While you are not aware of current events, you excel at reasoning "
-                    "and adhering to instructions. "
-                    "Your responses must clearly explain the source of each argument "
-                    "(e.g., context, past messages, clarifications). "
-                    "Avoid assumptions or fabricated information."
-                ),
+            SystemMessagePromptTemplate.from_template(
+                "You are a highly capable assistant tasked with generating valid arguments for "
+                "tools based on provided input. "
+                "While you are not aware of current events, you excel at reasoning "
+                "and adhering to instructions. "
+                "Your responses must clearly explain the source of each argument "
+                "(e.g., context, past messages, clarifications). "
+                "Avoid assumptions or fabricated information. "
+                "If any of the inputs is a large string and you want to use it verbatim, rather "
+                "than repeating it, you should provide the name in curly braces and it will be "
+                "templated in before the tool is called. "
+                "For example, if you wish to use an input called '$large_input_value' verbatim, "
+                "you should enter '{{{{$large_input_value}}}}' (double curly braces "
+                "and include the $ in the name) and the value will be templated in before the tool "
+                "is called. If there is a $ in the variable name, MAKE SURE you keep it. You "
+                "should definitely use this templating for any input values over 1000 words that "
+                "you want to use verbatim.",
             ),
             HumanMessagePromptTemplate.from_template(
                 "Context for user input and past steps:\n{context}\n"
@@ -183,13 +199,26 @@ class ParserModel:
                 "the value field\n"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
+                "- If any of the inputs is a large string and you want to use it verbatim, rather "
+                "than repeating it, you should provide the name in curly braces and it will be "
+                "templated in before the tool is called. For example, if you wish to use an input "
+                "called '$large_input_value' verbatim, you should enter "
+                "'{{{{$large_input_value}}}}' "
+                "(double curly braces and include the $ in the name) and the value will be "
+                "templated in before the tool is called.  You should definitely use this "
+                "templating for any input values over 1000 words that you want to use verbatim.\n"
+                "- If you use templating, MAKE SURE to keep a $ at the start of the name if there "
+                "is one and MAKE SURE to use two curly braces (not one or three) to open and close "
+                "the templating.\n"
+                "- Generate the fields in the order they appear in the classes below."
                 "class ToolInputs:\n"
                 "  args: List[ToolArgument]  # List of tool arguments.\n\n"
                 "class ToolArgument:\n"
                 "  name: str  # Name of the argument requested by the tool.\n"
+                "  explanation: str  # Explanation of the source for the value of the argument. "
+                "For large arguments, include why you did or didn't use templating.\n"
                 "  value: Any | None  # Value of the argument from the goal or context.\n"
-                "  valid: bool  # Whether the value is valid for the argument.\n"
-                "  explanation: str  # Explanation of the source for the value of the argument.\n\n",  # noqa: E501
+                "  valid: bool  # Whether the value is valid for the argument.\n\n",
             ),
         ],
     )
@@ -252,7 +281,7 @@ class ParserModel:
         else:
             test_args = {}
             for arg in tool_inputs.args:
-                test_args[arg.name] = arg.value
+                test_args[arg.name] = get_arg_value_with_templating(state["step_inputs"], arg.value)
                 if not arg.valid:
                     errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
 
@@ -296,19 +325,22 @@ class VerifierModel:
 
     arg_verifier_prompt = ChatPromptTemplate.from_messages(
         [
-            SystemMessage(
-                content="You are an expert reviewer. Your task is to validate and label arguments "
+            SystemMessagePromptTemplate.from_template(
+                "You are an expert reviewer. Your task is to validate and label arguments "
                 "provided. You must return the made_up field based "
                 "on the rules below.\n - An argument is made up if we cannot tell where the value "
                 "came from in the goal or context.\n- You should verify that the explanations are "
                 "grounded in the goal or context before trusting them."
-                "\n- If an argument is marked as invalid it is likely wrong."
+                "\n- If an argument is marked as invalid it is likely made up."
                 "\n- We really care if the value of an argument is not in the context, a handled "
                 "clarification or goal at all (then made_up should be TRUE), but it is ok if "
                 "it is there but in a different format, or if it can be reasonably derived from the"
                 " information that is there (then made_up should be FALSE). "
                 "\n- Arguments where the value comes from a clarification should be marked as FALSE"
-                "\nThe output must conform to the following schema:\n\n"
+                "\n- Some large inputs may be provided as a template variable (e.g. "
+                "'{{{{$large_input_value}}}}'). This is fine and the value will be "
+                "templated in before the tool is called.\n"
+                "The output must conform to the following schema:\n\n"
                 "class VerifiedToolArgument:\n"
                 "  name: str  # Name of the argument requested by the tool.\n"
                 "  value: Any | None  # Value of the argument from the goal or context. "
@@ -382,16 +414,19 @@ class VerifierModel:
         response = VerifiedToolInputs.model_validate(response)
 
         # Validate the arguments against the tool's schema
-        response = self._validate_args_against_schema(response)
+        response = self._validate_args_against_schema(response, state["step_inputs"])
         self.agent.verified_args = response
 
         return {"messages": [response.model_dump_json(indent=2)]}
 
-    def _validate_args_against_schema(self, tool_inputs: VerifiedToolInputs) -> VerifiedToolInputs:
+    def _validate_args_against_schema(
+        self, tool_inputs: VerifiedToolInputs, step_inputs: list[StepInput]
+    ) -> VerifiedToolInputs:
         """Validate tool arguments against the tool's schema and mark invalid ones as made up.
 
         Args:
             tool_inputs (VerifiedToolInputs): The tool_inputs to validate against the tool schema.
+            step_inputs (list[StepInput]): The step inputs to use for templating.
 
         Returns:
             Updated VerifiedToolInputs with invalid args marked with schema_invalid=True.
@@ -401,6 +436,8 @@ class VerifierModel:
 
         try:
             if self.agent.tool:
+                for arg_name, arg_value in arg_dict.items():
+                    arg_dict[arg_name] = get_arg_value_with_templating(step_inputs, arg_value)
                 self.agent.tool.args_schema.model_validate(arg_dict)
         except ValidationError as e:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
@@ -434,14 +471,23 @@ class ToolCallingModel:
 
     tool_calling_prompt = ChatPromptTemplate.from_messages(
         [
-            SystemMessage(
-                content="You are very powerful assistant, but don't know current events.",
+            SystemMessagePromptTemplate.from_template(
+                "You are very powerful assistant that calls tools with the provided "
+                "arguments. You don't know current events. "
+                "If any values are too large to be provided to you in full, they will be provided "
+                "in curly braces with a value to be templated in (e.g. "
+                "'{{{{$large_output_value}}}}'). "
+                "This is fine - please keep these templated values inside double curly braces and "
+                "DO NOT REMOVE the leading $ on the name - for example, keep it as "
+                "'{{{{$large_output_value}}}}' and not "
+                "'{{{{large_output_value}}}}'. These values will then be templated in "
+                "before the tool is called.\n",
             ),
             HumanMessagePromptTemplate.from_template(
                 "context:\n{verified_args}\n"
-                "Make sure you don't repeat past errors: {past_errors}\n"
                 "Use the provided tool with the arguments in the context, as "
-                "long as they are valid.\n",
+                "long as they are valid.\n"
+                "Make sure you don't repeat past errors: {past_errors}\n",
             ),
         ],
     )
@@ -499,7 +545,25 @@ class ToolCallingModel:
                 past_errors=past_errors,
             ),
         )
-        return {"messages": [response]}
+        result = template_in_required_inputs(response, state["step_inputs"])
+
+        if (
+            self.agent.execution_hooks
+            and self.agent.execution_hooks.before_tool_call
+            and self.agent.tool
+        ):
+            for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
+                clarification = self.agent.execution_hooks.before_tool_call(
+                    self.agent.tool,
+                    tool_call.get("args"),
+                    ReadOnlyPlanRun.from_plan_run(self.agent.plan_run),
+                    ReadOnlyStep.from_step(self.agent.step),
+                )
+                if clarification:
+                    self.agent.new_clarifications.append(clarification)
+                    return {"messages": []}
+
+        return {"messages": [result]}
 
 
 class DefaultExecutionAgent(BaseExecutionAgent):
@@ -528,6 +592,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         agent_memory: AgentMemory,
         end_user: EndUser,
         tool: Tool | None = None,
+        execution_hooks: ExecutionHooks | None = None,
     ) -> None:
         """Initialize the agent.
 
@@ -538,11 +603,11 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             agent_memory (AgentMemory): The agent memory to be used for the task.
             end_user (EndUser): The end user for this execution
             tool (Tool | None): The tool to be used for the task (optional).
+            execution_hooks (ExecutionHooks | None): The execution hooks for the agent.
 
         """
-        super().__init__(step, plan_run, config, end_user, agent_memory, tool)
+        super().__init__(step, plan_run, config, end_user, agent_memory, tool, execution_hooks)
         self.verified_args: VerifiedToolInputs | None = None
-        self.new_clarifications: list[Clarification] = []
 
     def clarifications_or_continue(
         self,
@@ -617,7 +682,6 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
 
         tool_run_ctx = ToolRunContext(
-            execution_context=get_execution_context(),
             end_user=self.end_user,
             plan_run_id=self.plan_run.id,
             config=self.config,
@@ -686,7 +750,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         )
         graph.add_conditional_edges(
             AgentNode.TOOLS,
-            lambda state: next_state_after_tool_call(self.config, state, self.tool),
+            lambda state: self.next_state_after_tool_call(self.config, state, self.tool),
         )
         graph.add_conditional_edges(
             AgentNode.TOOL_AGENT,

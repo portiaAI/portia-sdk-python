@@ -1,19 +1,20 @@
 <Instructions>
     Enumerate the steps you plan on taking to answer the query.
-    IMPORTANT: Ensure you use the tool id exactly as it is defined in <Tools> below (including whether it has a portia:: prefix or not)
+    IMPORTANT: Ensure you use the tool id exactly as it is defined in <Tools> below (including whether it has a portia: prefix or not)
     Each step should:
-     - include a description, plus any outputs from previous steps that will be required for this step should be specified as inputs for this step
+     - include a description, plus any outputs from previous steps or plan inputs that will be required for this step should be specified as inputs for this step.
      - you need to ensure that all the information for carrying out the step will be provided in the combination of the task description and the inputs.
      - the task description should include all the data from the query that is needed to carry out this step.
      - DO NOT specify information in the step description that is already being passed in by an input
-     - MAKE SURE inputs are ONLY referencing variables from previous steps, IT SHOULD NOT contain any other data.
+     - MAKE SURE inputs are ONLY referencing variables from previous steps or the provided plan inputs, IT SHOULD NOT contain any other data and plan inputs should ONLY be used if they are provided.
      - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
      - give a name to the variable for the output of the step if it is successful.
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
      - Additional information about the caller is provided in the EndUser section. You can use this if the query refers to the end user, i.e. Send me an email.
      - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
-    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create plan with zero steps.
+    IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create a plan with zero steps. When returning an error, return only the JSON object with the error message filled in plus an empty list of steps - DO NOT include text (explaining the error or otherwise) outside the JSON object.
     IMPORTANT: DO NOT create tools - if you are missing a tool return a descriptive error instead.
+    {% if plan_inputs %}IMPORTANT: Values for plan inputs will be provided when the plan is executed, so make sure to use them in your steps appropriately.{% endif %}
 </Instructions>
 
 <Examples>{% for example in examples %}
@@ -44,11 +45,36 @@
 </Tools>
 
 <EndUser>
+    {% if end_user.email %}
     <EndUser.Email>{{ end_user.email }}</EndUser.Email>
+    {% endif %}
+    {% if end_user.name %}
     <EndUser.Name>{{ end_user.name }}</EndUser.Name>
+    {% endif %}
+    {% if end_user.phone_number %}
     <EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>
+    {% endif %}
+    {% if end_user.additional_data %}
     <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
+    {% endif %}
 </EndUser>
+
+{% if plan_inputs %}
+<PlanInputs>{% for input in plan_inputs %}
+    <PlanInput name="{{input.name}}">
+        {{input.description}}
+    </PlanInput>{% endfor %}
+</PlanInputs>
+{% endif %}
+
+{% if previous_errors %}
+<PreviousErrors>{% for error in previous_errprs %}
+    <PreviousError>
+        Encountered following error with the plan steps below: {{error.error}}
+        Steps: {{error.steps}}
+    </PreviousError>{% endfor %}
+</PreviousErrors>
+{% endif %}
 
 <Request>
     <Tools>

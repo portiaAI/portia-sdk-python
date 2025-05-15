@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from portia.clarification import Clarification, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanUUID, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, ReadOnlyPlanRun
 from portia.prefixed_uuid import PlanRunUUID
@@ -34,7 +34,7 @@ def plan_run(mock_clarification: InputClarification) -> PlanRun:
         end_user_id="test123",
         outputs=PlanRunOutputs(
             clarifications=[mock_clarification],
-            step_outputs={"step1": LocalOutput(value="Test output")},
+            step_outputs={"step1": LocalDataValue(value="Test output")},
         ),
     )
 
@@ -42,9 +42,11 @@ def plan_run(mock_clarification: InputClarification) -> PlanRun:
 def test_run_initialization() -> None:
     """Test initialization of PlanRun instance."""
     plan_id = PlanUUID()
+    plan_run_inputs = {"$input1": LocalDataValue(value="test_input_value")}
     plan_run = PlanRun(
         plan_id=plan_id,
         end_user_id="test123",
+        plan_run_inputs=plan_run_inputs,
     )
 
     assert plan_run.id is not None
@@ -54,6 +56,9 @@ def test_run_initialization() -> None:
     assert plan_run.outputs.clarifications == []
     assert plan_run.state == PlanRunState.NOT_STARTED
     assert plan_run.outputs.step_outputs == {}
+    assert len(plan_run.plan_run_inputs) == 1
+    assert plan_run.plan_run_inputs["$input1"].get_value() == "test_input_value"
+    assert plan_run.get_potential_step_inputs() == plan_run_inputs
 
 
 def test_run_get_outstanding_clarifications(
@@ -115,6 +120,7 @@ def test_run_serialization() -> None:
         id=plan_run_id,
         plan_id=PlanUUID(),
         end_user_id="test123",
+        plan_run_inputs={"$test_input": LocalDataValue(value="input_value")},
         outputs=PlanRunOutputs(
             clarifications=[
                 InputClarification(
@@ -126,10 +132,10 @@ def test_run_serialization() -> None:
                 ),
             ],
             step_outputs={
-                "1": LocalOutput(value=ToolHardError("this is a tool hard error")),
-                "2": LocalOutput(value=ToolSoftError("this is a tool soft error")),
+                "1": LocalDataValue(value=ToolHardError("this is a tool hard error")),
+                "2": LocalDataValue(value=ToolSoftError("this is a tool soft error")),
             },
-            final_output=LocalOutput(value="This is the end"),
+            final_output=LocalDataValue(value="This is the end"),
         ),
     )
     assert str(plan_run) == (
@@ -144,3 +150,5 @@ def test_run_serialization() -> None:
     parsed_plan_run = PlanRun.model_validate_json(json_str)
     # ensure clarification types are maintained
     assert isinstance(parsed_plan_run.outputs.clarifications[0], InputClarification)
+    # ensure plan inputs are maintained
+    assert parsed_plan_run.plan_run_inputs["$test_input"].get_value() == "input_value"

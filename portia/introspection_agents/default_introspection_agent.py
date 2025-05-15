@@ -17,7 +17,7 @@ from portia.introspection_agents.introspection_agent import (
 from portia.model import Message
 from portia.plan import Plan
 from portia.plan_run import PlanRun
-from portia.storage import AgentMemory, AgentMemoryOutput
+from portia.storage import AgentMemory, AgentMemoryValue
 
 
 class DefaultIntrospectionAgent(BaseIntrospectionAgent):
@@ -45,12 +45,12 @@ class DefaultIntrospectionAgent(BaseIntrospectionAgent):
             [
                 SystemMessage(
                     content=(
-"""
+                        """
 You are a highly skilled reviewer who reviews in flight plan execution. Your job is to evaluate
 the condition for the current step. Your outcome is fed to another orchestrator that controls
 the execution of the remaining steps.
 
-IMPORTANT GUIDLINES:
+IMPORTANT GUIDELINES:
 - Pay close attention to the steps giving and its tasks, there is no alternative flows or other
 steps other than what's been giving to you for this plan execution.
 - Do not assume data, you should evaluate the condition ONLY based on data given.
@@ -90,6 +90,7 @@ Return the outcome and reason in the given format.
                     "The original query: {query}\n"
                     "All Plan Steps: \n{plan}\n"
                     "Previous Step Outputs: \n{prev_step_outputs}\n"
+                    "Plan Run Inputs: \n{plan_run_inputs}\n"
                     "If any relevant outputs are stored in agent memory, they have been extracted "
                     "and included here: {memory_outputs}\n",
                 ),
@@ -107,7 +108,7 @@ Return the outcome and reason in the given format.
         memory_outputs = [
             self.agent_memory.get_plan_run_output(output.output_name, plan_run.id)
             for output in plan_run.outputs.step_outputs.values()
-            if isinstance(output, AgentMemoryOutput)
+            if isinstance(output, AgentMemoryValue)
             and introspection_condition
             and output.output_name in introspection_condition
         ]
@@ -120,6 +121,7 @@ Return the outcome and reason in the given format.
                     current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                     current_day_of_week=datetime.now(UTC).strftime("%A"),
                     prev_step_outputs=plan_run.outputs.model_dump_json(),
+                    plan_run_inputs=plan_run.plan_run_inputs,
                     memory_outputs=memory_outputs,
                     query=plan.plan_context.query,
                     condition=plan.steps[plan_run.current_step_index].condition,

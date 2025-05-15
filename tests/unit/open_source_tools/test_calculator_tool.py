@@ -37,6 +37,7 @@ def test_run_valid_expressions(calculator_tool: CalculatorTool) -> None:
     assert calculator_tool.run(context, "300 - 14") == 286
     assert calculator_tool.run(context, "3 x 2") == 6
     assert calculator_tool.run(context, "What is the sum of 17.42 and 16.72") == 34.14
+    assert calculator_tool.run(context, "-5 + 10") == 5
 
 
 def test_run_invalid_expressions(calculator_tool: CalculatorTool) -> None:

@@ -9,8 +9,6 @@ from typing import TYPE_CHECKING, Any
 
 from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.context import StepInput
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
-from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
@@ -38,33 +36,21 @@ class MemoryExtractionStep:
             dict[str, Any]: The LangGraph state update to step_inputs
 
         """
-        step_inputs = []
-        previous_outputs = self.agent.plan_run.outputs.step_outputs
-        for step_input in self.agent.step.inputs:
-            if step_input.name not in previous_outputs:
-                raise InvalidPlanRunStateError("Received unknown step input: %s", step_input.name)
-            previous_output = previous_outputs.get(step_input.name)
+        potential_inputs = self.agent.plan_run.get_potential_step_inputs()
+        step_inputs = [
+            StepInput(
+                name=input_variable.name,
+                value=potential_inputs[input_variable.name].full_value(self.agent.agent_memory),
+                description=input_variable.description,
+            )
+            for input_variable in self.agent.step.inputs
+            if input_variable.name in potential_inputs
+        ]
 
-            match previous_output:
-                case LocalOutput():
-                    output_value = previous_output.value
-                case AgentMemoryOutput():
-                    output_value = self.agent.agent_memory.get_plan_run_output(
-                        previous_output.output_name,
-                        self.agent.plan_run.id,
-                    ).value
-                case _:
-                    logger().warning(
-                        "Received unknown output type: %s",
-                        previous_output,
-                    )
-                    continue
-
-            step_inputs.append(
-                StepInput(
-                    name=step_input.name,
-                    value=output_value,
-                    description=step_input.description,
-                ),
+        if len(step_inputs) != len(self.agent.step.inputs):
+            expected_inputs = {input_.name for input_ in self.agent.step.inputs}
+            known_inputs = {input_.name for input_ in step_inputs}
+            raise InvalidPlanRunStateError(
+                f"Received unknown step input(s): {expected_inputs - known_inputs}"
             )
         return {"step_inputs": step_inputs}

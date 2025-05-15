@@ -13,6 +13,7 @@ from portia.storage import AgentMemory
 SKIPPED_OUTPUT = "Tool execution skipped"
 COMPLETED_OUTPUT = "Tool execution skipped and completed the plan run"
 
+
 class PreStepIntrospectionOutcome(PortiaEnum):
     """The Outcome of the introspection."""
 

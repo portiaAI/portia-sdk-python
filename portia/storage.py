@@ -40,11 +40,10 @@ from portia.cloud import PortiaCloudClient
 from portia.end_user import EndUser
 from portia.errors import PlanNotFoundError, PlanRunNotFoundError, StorageError
 from portia.execution_agents.output import (
-    AgentMemoryOutput,
-    LocalOutput,
+    AgentMemoryValue,
+    LocalDataValue,
     Output,
 )
-from portia.execution_context import ExecutionContext
 from portia.logger import logger
 from portia.plan import Plan, PlanUUID
 from portia.plan_run import (
@@ -258,8 +257,6 @@ class Storage(PlanStorage, RunStorage, AdditionalStorage):
 class AgentMemory(Protocol):
     """Abstract base class for storing items in agent memory."""
 
-    MAX_OUTPUT_BYTES = 32_000_000
-
     @abstractmethod
     def save_plan_run_output(
         self,
@@ -283,7 +280,7 @@ class AgentMemory(Protocol):
         """
 
     @abstractmethod
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from agent memory.
 
         Args:
@@ -298,12 +295,16 @@ class AgentMemory(Protocol):
 
         """
 
-    def _check_size(self: AgentMemory, output_name: str, output: Output) -> None:
-        """Raise an error if the output is too large to store."""
-        if sys.getsizeof(output) > self.MAX_OUTPUT_BYTES:
-            raise StorageError(
-                f"Attempted to save an agent output that is too large: {output_name}",
-            )
+
+MAX_STORAGE_OBJECT_BYTES = 32_000_000
+
+
+def _check_size(obj_name: str, obj: object) -> None:
+    """Raise an error if an object is too large to store in storage."""
+    if sys.getsizeof(obj) > MAX_STORAGE_OBJECT_BYTES:
+        raise StorageError(
+            f"Attempted to save an object that is too large: {obj_name}",
+        )
 
 
 def log_tool_call(tool_call: ToolCallRecord) -> None:
@@ -343,7 +344,7 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
 
     plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
-    outputs: defaultdict[PlanRunUUID, dict[str, LocalOutput]]
+    outputs: defaultdict[PlanRunUUID, dict[str, LocalDataValue]]
     end_users: dict[str, EndUser]
 
     def __init__(self) -> None:
@@ -446,25 +447,25 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        self._check_size(output_name, output)
+        _check_size(output_name, output)
         if output.get_summary() is None:
             logger().warning(
                 f"Storing Output {output} with no summary",
             )
-        if not isinstance(output, LocalOutput):
+        if not isinstance(output, LocalDataValue):
             logger().warning(
                 f"Storing output that is already in agent memory: {output}",
             )
             return output
 
         self.outputs[plan_run_id][output_name] = output
-        return AgentMemoryOutput(
+        return AgentMemoryValue(
             output_name=output_name,
             plan_run_id=plan_run_id,
             summary=output.get_summary() or "",
         )
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from memory.
 
         Args:
@@ -491,6 +492,12 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             end_user (EndUser): The EndUser object to save.
 
         """
+        existing_end_user = self.get_end_user(end_user.external_id)
+        if existing_end_user:
+            end_user.additional_data = {
+                **existing_end_user.additional_data,
+                **end_user.additional_data,
+            }
         self.end_users[end_user.external_id] = end_user
         return end_user
 
@@ -667,16 +674,16 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        self._check_size(output_name, output)
+        _check_size(output_name, output)
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
-        return AgentMemoryOutput(
+        return AgentMemoryValue(
             output_name=output_name,
             plan_run_id=plan_run_id,
             summary=output.get_summary() or "",
         )
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from agent memory on disk.
 
         Args:
@@ -692,7 +699,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
 
         """
         file_name = f"{plan_run_id}/{output_name}.json"
-        return self._read(file_name, LocalOutput)
+        return self._read(file_name, LocalDataValue)
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Log the tool call."""
@@ -705,6 +712,12 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             end_user (EndUser): The EndUser object to save.
 
         """
+        existing_end_user = self.get_end_user(end_user.external_id)
+        if existing_end_user:
+            end_user.additional_data = {
+                **existing_end_user.additional_data,
+                **end_user.additional_data,
+            }
         self._write(f"{end_user.external_id}.json", end_user)
         return end_user
 
@@ -812,6 +825,13 @@ class PortiaCloudStorage(Storage, AgentMemory):
             StorageError: If the response from the Portia API indicates an error.
 
         """
+        if response.status_code == httpx.codes.REQUEST_ENTITY_TOO_LARGE:
+            raise StorageError(
+                "Error from Portia Cloud - request too large: "
+                f"{response.request.content[:1000]}...(truncated). "
+                "Please contact hello@portialabs.ai to discuss your usecase."
+            )
+
         if not response.is_success:
             error_str = str(response.content)
             logger().error(f"Error from Portia Cloud: {error_str}")
@@ -835,6 +855,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "query": plan.plan_context.query,
                     "tool_ids": plan.plan_context.tool_ids,
                     "steps": [step.model_dump(mode="json") for step in plan.steps],
+                    "plan_inputs": [
+                        # TODO (RH): Remove this once backend is updated to make description optional  # noqa: E501, FIX002, TD003
+                        {**input_.model_dump(mode="json"), "description": input_.description or ""}
+                        for input_ in plan.plan_inputs
+                    ],
                 },
             )
         except Exception as e:
@@ -882,10 +907,12 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 json={
                     "current_step_index": plan_run.current_step_index,
                     "state": plan_run.state,
-                    "execution_context": plan_run.execution_context.model_dump(mode="json"),
                     "end_user": plan_run.end_user_id,
                     "outputs": plan_run.outputs.model_dump(mode="json"),
                     "plan_id": str(plan_run.plan_id),
+                    "plan_run_inputs": {
+                        k: v.model_dump(mode="json") for k, v in plan_run.plan_run_inputs.items()
+                    },
                 },
             )
         except Exception as e:
@@ -921,10 +948,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 end_user_id=response_json["end_user"],
                 current_step_index=response_json["current_step_index"],
                 state=PlanRunState(response_json["state"]),
-                execution_context=ExecutionContext.model_validate(
-                    response_json["execution_context"],
-                ),
                 outputs=PlanRunOutputs.model_validate(response_json["outputs"]),
+                plan_run_inputs={
+                    key: LocalDataValue.model_validate(value)
+                    for key, value in response_json["plan_run_inputs"].items()
+                },
             )
 
     def get_plan_runs(
@@ -967,10 +995,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
                         current_step_index=plan_run["current_step_index"],
                         end_user_id=plan_run["end_user"],
                         state=PlanRunState(plan_run["state"]),
-                        execution_context=ExecutionContext.model_validate(
-                            plan_run["execution_context"],
-                        ),
                         outputs=PlanRunOutputs.model_validate(plan_run["outputs"]),
+                        plan_run_inputs={
+                            key: LocalDataValue.model_validate(value)
+                            for key, value in plan_run["plan_run_inputs"].items()
+                        },
                     )
                     for plan_run in response_json["results"]
                 ],
@@ -982,14 +1011,15 @@ class PortiaCloudStorage(Storage, AgentMemory):
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save a tool call to Portia Cloud.
 
+        This method attempts to save the tool call to Portia Cloud but will not raise exceptions
+        if the request fails. Instead, it logs the error and continues execution.
+
         Args:
             tool_call (ToolCallRecord): The ToolCallRecord object to save to the cloud.
 
-        Raises:
-            StorageError: If the request to Portia Cloud fails.
-
         """
         try:
+            _check_size(f"{tool_call.tool_name} output", tool_call.output)
             response = self.client.post(
                 url="/api/v0/tool-calls/",
                 json={
@@ -997,17 +1027,20 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "tool_name": tool_call.tool_name,
                     "step": tool_call.step,
                     "end_user_id": tool_call.end_user_id or "",
-                    "additional_data": tool_call.additional_data,
                     "input": tool_call.input,
                     "output": tool_call.output,
                     "status": tool_call.status,
                     "latency_seconds": tool_call.latency_seconds,
                 },
             )
-        except Exception as e:
-            raise StorageError(e) from e
+        except Exception as e:  # noqa: BLE001
+            logger().error(f"Error saving tool call to Portia Cloud: {e}")
         else:
-            self.check_response(response)
+            # Don't raise an error if the response is not successful, just log it
+            if not response.is_success:
+                logger().error(
+                    f"Error from Portia Cloud when saving tool call: {response.content!s}"
+                )
             log_tool_call(tool_call)
 
     def save_plan_run_output(
@@ -1028,7 +1061,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            self._check_size(output_name, output)
+            _check_size(output_name, output)
 
             response = self.form_client.put(
                 url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
@@ -1045,12 +1078,12 @@ class PortiaCloudStorage(Storage, AgentMemory):
             self.check_response(response)
 
             # Save to local cache
-            if isinstance(output, LocalOutput):
+            if isinstance(output, LocalDataValue):
                 cache_file_path = f"{plan_run_id}/{output_name}.json"
                 self._write_to_cache(cache_file_path, output)
                 logger().debug(f"Saved output to local cache: {cache_file_path}")
 
-            return AgentMemoryOutput(
+            return AgentMemoryValue(
                 output_name=output_name,
                 plan_run_id=plan_run_id,
                 summary=output.get_summary() or "",
@@ -1058,7 +1091,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         except Exception as e:
             raise StorageError(e) from e
 
-    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalOutput:
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
         """Retrieve an Output from Portia Cloud.
 
         Args:
@@ -1075,7 +1108,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         # Try to get from local cache first
         cache_file_path = f"{plan_run_id}/{output_name}.json"
         try:
-            return self._read_from_cache(cache_file_path, LocalOutput)
+            return self._read_from_cache(cache_file_path, LocalDataValue)
         except (FileNotFoundError, ValidationError):
             # If not in cache, fetch from Portia Cloud
             logger().debug(
@@ -1099,7 +1132,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 value_response.raise_for_status()
 
             # Create the output object
-            output = LocalOutput(
+            output = LocalDataValue(
                 summary=summary,
                 value=value_response.text,
             )

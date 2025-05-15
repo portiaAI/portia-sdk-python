@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portia-sdk-python"
-version = "0.3.1"
+version = "0.3.5"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = ["Hello <hello@portialabs.ai>"]
 readme = "README.md"
@@ -40,7 +40,7 @@ langsmith = {version = "^0.3.15", python = ">=3.11,<4.0"}
 google-generativeai = {version = "^0.8.4", optional = true, python = ">=3.11,<4.0"}
 langchain-google-genai = {version = "^2.0.10", optional = true, python = ">=3.11,<4.0"}
 playwright = { version = "^1.49.0", optional = true }
-browser-use = { version = "^0.1.40", optional = true, python = ">=3.11,<4.0" }
+browser-use = { version = "0.1.40", optional = true, python = ">=3.11,<4.0" }
 tiktoken = "^0.9.0"
 jsonref = "^1.1.0"
 browserbase = { version = "^1.2.0", optional = true }

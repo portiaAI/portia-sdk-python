@@ -8,7 +8,6 @@ from portia import (
     PlanRunState,
     Portia,
     example_tool_registry,
-    execution_context,
 )
 from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
@@ -27,7 +26,6 @@ plan_run = portia.run(
 )
 
 # We can also provide additional data about the end user to the process
-
 plan_run = portia.run(
     "Please tell me a joke that is customized to my favorite sport",
     end_user=EndUser(
@@ -59,10 +57,6 @@ if plan_run.state == PlanRunState.NEED_CLARIFICATION:
             response=new_value,
         )
 
-# Execute again with the same execution context
-with execution_context(context=plan_run.execution_context):
-    portia.resume(plan_run)
-
 # You can also pass in a clarification handler to manage clarifications
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),
@@ -71,4 +65,9 @@ portia = Portia(
 )
 plan_run = portia.run(
     "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
+)
+
+# You can pass inputs into a plan
+plan_run = portia.run(
+    "Get the temperature for the provided city", plan_run_inputs={"$city": "Lisbon"}
 )

@@ -7,14 +7,19 @@ from typing import TYPE_CHECKING
 from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
+import httpx
 import pytest
 
 from portia.end_user import EndUser
 from portia.errors import StorageError
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
-from portia.plan import Plan, PlanContext, PlanUUID
+from portia.execution_agents.output import (
+    AgentMemoryValue,
+    LocalDataValue,
+)
+from portia.plan import Plan, PlanContext, PlanInput, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
+    MAX_STORAGE_OBJECT_BYTES,
     AdditionalStorage,
     DiskFileStorage,
     InMemoryStorage,
@@ -113,10 +118,12 @@ def test_in_memory_storage() -> None:
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
     saved_output_1 = storage.save_plan_run_output(
         "test name",
-        LocalOutput(value="test value"),
+        LocalDataValue(value="test value"),
         plan_run.id,
     )
-    assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+    assert storage.get_plan_run_output("test name", plan_run.id) == LocalDataValue(
+        value="test value"
+    )
     # Check that we ignore outputs that are already in agent memory
     saved_output_2 = storage.save_plan_run_output(
         "test name",
@@ -126,12 +133,12 @@ def test_in_memory_storage() -> None:
     assert saved_output_2 == saved_output_1
     # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         storage.save_plan_run_output(
             "large_output",
-            LocalOutput(value="large value"),
+            LocalDataValue(value="large value"),
             plan_run.id,
         )
 
@@ -142,11 +149,22 @@ def test_in_memory_storage() -> None:
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
 
-    end_user = EndUser(external_id="123")
+    end_user = EndUser(
+        external_id="123",
+        additional_data={"favorite_sport": "football"},
+    )
 
     assert storage.get_end_user("123") is None
     assert storage.save_end_user(end_user) == end_user
-    assert storage.get_end_user("123") is not None
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    end_user.additional_data["day"] = "monday"
+    assert storage.save_end_user(end_user) == end_user
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    assert user.get_additional_data("day") == "monday"
 
 
 def test_disk_storage(tmp_path: Path) -> None:
@@ -160,17 +178,19 @@ def test_disk_storage(tmp_path: Path) -> None:
     all_runs = storage.get_plan_runs()
     assert all_runs.results == [plan_run]
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
-    storage.save_plan_run_output("test name", LocalOutput(value="test value"), plan_run.id)
-    assert storage.get_plan_run_output("test name", plan_run.id) == LocalOutput(value="test value")
+    storage.save_plan_run_output("test name", LocalDataValue(value="test value"), plan_run.id)
+    assert storage.get_plan_run_output("test name", plan_run.id) == LocalDataValue(
+        value="test value"
+    )
 
     # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         storage.save_plan_run_output(
             "large_output",
-            LocalOutput(value="large value"),
+            LocalDataValue(value="large value"),
             plan_run.id,
         )
 
@@ -181,11 +201,22 @@ def test_disk_storage(tmp_path: Path) -> None:
     tool_call.output = "a" * 100000
     storage.save_tool_call(tool_call)
 
-    end_user = EndUser(external_id="123")
+    end_user = EndUser(
+        external_id="123",
+        additional_data={"favorite_sport": "football"},
+    )
 
     assert storage.get_end_user("123") is None
     assert storage.save_end_user(end_user) == end_user
-    assert storage.get_end_user("123") is not None
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    end_user.additional_data["day"] = "monday"
+    assert storage.save_end_user(end_user) == end_user
+    user = storage.get_end_user("123")
+    assert user is not None
+    assert user.get_additional_data("favorite_sport") == "football"
+    assert user.get_additional_data("day") == "monday"
 
 
 def test_portia_cloud_storage() -> None:
@@ -197,11 +228,19 @@ def test_portia_cloud_storage() -> None:
         id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
+        plan_inputs=[
+            PlanInput(name="key1", description="Test input 1"),
+            PlanInput(name="key2", description="Test input 2"),
+        ],
     )
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
         plan_id=plan.id,
         end_user_id="test123",
+        plan_run_inputs={
+            "param1": LocalDataValue(value="test"),
+            "param2": LocalDataValue(value=456),
+        },
     )
     tool_call = get_test_tool_call(plan_run)
 
@@ -226,6 +265,10 @@ def test_portia_cloud_storage() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
+                "plan_inputs": [
+                    {"name": "key1", "description": "Test input 1", "value": None},
+                    {"name": "key2", "description": "Test input 2", "value": None},
+                ],
             },
         )
 
@@ -253,9 +296,18 @@ def test_portia_cloud_storage() -> None:
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
                 "end_user": plan_run.end_user_id,
-                "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
+                "plan_run_inputs": {
+                    "param1": {
+                        "value": "test",
+                        "summary": None,
+                    },
+                    "param2": {
+                        "value": "456",
+                        "summary": None,
+                    },
+                },
             },
         )
 
@@ -284,9 +336,8 @@ def test_portia_cloud_storage() -> None:
     with (
         patch.object(storage.client, "post", return_value=mock_response) as mock_post,
     ):
-        # Test save_tool_call failure
-        with pytest.raises(StorageError, match="An error occurred."):
-            storage.save_tool_call(tool_call)
+        # Test save_tool_call - should not raise an exception
+        storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
             url="/api/v0/tool-calls/",
@@ -295,7 +346,6 @@ def test_portia_cloud_storage() -> None:
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
-                "additional_data": tool_call.additional_data,
                 "input": tool_call.input,
                 "output": tool_call.output,
                 "status": tool_call.status,
@@ -363,6 +413,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
+                "plan_inputs": [],
             },
         )
     with (
@@ -391,9 +442,9 @@ def test_portia_cloud_storage_errors() -> None:
                 "current_step_index": plan_run.current_step_index,
                 "state": plan_run.state,
                 "end_user": plan_run.end_user_id,
-                "execution_context": plan_run.execution_context.model_dump(mode="json"),
                 "outputs": plan_run.outputs.model_dump(mode="json"),
                 "plan_id": str(plan_run.plan_id),
+                "plan_run_inputs": plan_run.plan_run_inputs,
             },
         )
 
@@ -435,11 +486,9 @@ def test_portia_cloud_storage_errors() -> None:
 
     with (
         patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
-        patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
-        with pytest.raises(StorageError):
-            storage.save_tool_call(tool_call)
+        # Test save_tool_call - should not raise an exception
+        storage.save_tool_call(tool_call)
 
         mock_post.assert_called_once_with(
             url="/api/v0/tool-calls/",
@@ -448,7 +497,6 @@ def test_portia_cloud_storage_errors() -> None:
                 "tool_name": tool_call.tool_name,
                 "step": tool_call.step,
                 "end_user_id": tool_call.end_user_id or "",
-                "additional_data": tool_call.additional_data,
                 "input": tool_call.input,
                 "output": tool_call.output,
                 "status": tool_call.status,
@@ -460,7 +508,7 @@ def test_portia_cloud_storage_errors() -> None:
         patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
         patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
+        # Test save_end_user failure
         with pytest.raises(StorageError):
             storage.save_end_user(end_user)
 
@@ -473,7 +521,7 @@ def test_portia_cloud_storage_errors() -> None:
         patch.object(storage.client, "put", side_effect=mock_exception) as mock_put,
         patch.object(storage.client, "get", side_effect=mock_exception) as mock_get,
     ):
-        # Test get_run failure
+        # Test get_end_user failure
         with pytest.raises(StorageError):
             storage.get_end_user(end_user.external_id)
 
@@ -496,7 +544,7 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalOutput(value="test value", summary="test summary")
+    output = LocalDataValue(value="test value", summary="test summary")
     mock_success_response = MagicMock()
     mock_success_response.is_success = True
 
@@ -522,7 +570,7 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
                 "summary": output.get_summary(),
             },
         )
-        assert isinstance(result, AgentMemoryOutput)
+        assert isinstance(result, AgentMemoryValue)
         assert result.output_name == "test_output"
         assert result.plan_run_id == plan_run.id
         assert result.summary == output.get_summary()
@@ -591,7 +639,7 @@ def test_portia_cloud_agent_memory_local_cache_expiry() -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalOutput(value="test value", summary="test summary")
+    output = LocalDataValue(value="test value", summary="test summary")
     mock_success_response = MagicMock()
     mock_success_response.is_success = True
 
@@ -630,7 +678,7 @@ def test_portia_cloud_agent_memory_errors() -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalOutput(value="test value", summary="test summary")
+    output = LocalDataValue(value="test value", summary="test summary")
 
     mock_exception = RuntimeError("An error occurred.")
     with (
@@ -663,19 +711,52 @@ def test_portia_cloud_agent_memory_errors() -> None:
         with pytest.raises(StorageError):
             agent_memory.get_plan_run_output("test_output", plan_run.id)
 
-        mock_read_cache.assert_called_once_with(f"{plan_run.id}/test_output.json", LocalOutput)
+        mock_read_cache.assert_called_once_with(f"{plan_run.id}/test_output.json", LocalDataValue)
         mock_get.assert_called_once_with(
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         )
 
-        # Check with an output that's too large
+    # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         agent_memory.save_plan_run_output(
             "large_output",
-            LocalOutput(value="large value"),
+            LocalDataValue(value="large value"),
+            plan_run.id,
+        )
+
+    # Test for 413 REQUEST_ENTITY_TOO_LARGE response status
+    mock_response = MagicMock()
+    mock_response.status_code = httpx.codes.REQUEST_ENTITY_TOO_LARGE
+    mock_response.request = MagicMock()
+    mock_response.request.content = b"Some content that's too large"
+
+    with (
+        patch.object(agent_memory.form_client, "put", return_value=mock_response),
+        pytest.raises(StorageError),
+    ):
+        agent_memory.save_plan_run_output(
+            "too_large_output",
+            LocalDataValue(value="too large value"),
+            plan_run.id,
+        )
+
+    # Test for response.request.content > MAX_STORAGE_OBJECT_BYTES
+    mock_response = MagicMock()
+    mock_response.status_code = httpx.codes.OK
+    mock_response.request = MagicMock()
+    mock_response.request.content = b"Some large content"
+
+    with (
+        patch.object(agent_memory.form_client, "put", return_value=mock_response),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
+        pytest.raises(StorageError),
+    ):
+        agent_memory.save_plan_run_output(
+            "over_size_limit",
+            LocalDataValue(value="value that creates a large request"),
             plan_run.id,
         )
 

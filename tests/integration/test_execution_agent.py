@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanBuilder
 from portia.plan_run import PlanRun
 from portia.storage import InMemoryStorage
@@ -124,5 +124,5 @@ def test_execution_agent_with_long_tool_description(model: str) -> None:
     output = agent.execute_sync()
 
     # Assert Output
-    assert isinstance(output, LocalOutput)
+    assert isinstance(output, LocalDataValue)
     assert output.value == {"result": 42}

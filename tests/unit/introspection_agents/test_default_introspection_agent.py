@@ -8,7 +8,7 @@ import pytest
 from langchain_core.messages import HumanMessage
 
 from portia.config import GenerativeModelsConfig
-from portia.execution_agents.output import LocalOutput
+from portia.execution_agents.output import LocalDataValue
 from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
@@ -87,10 +87,15 @@ def mock_plan_run() -> PlanRun:
         end_user_id="123",
         outputs=PlanRunOutputs(
             step_outputs={
-                "$result1": LocalOutput(value="Task 1 result", summary="Task 1 summary"),
+                "$result1": LocalDataValue(value="Task 1 result", summary="Task 1 summary"),
             },
             final_output=None,
         ),
+        plan_run_inputs={
+            "$plan_run_input": LocalDataValue(
+                value="plan_run_input_value", summary="plan_run_input_summary"
+            ),
+        },
     )
 
 

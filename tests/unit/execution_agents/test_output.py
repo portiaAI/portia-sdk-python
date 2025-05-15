@@ -13,7 +13,7 @@ from pydantic import HttpUrl
 
 from portia.clarification import ActionClarification
 from portia.config import LLMModel
-from portia.execution_agents.output import AgentMemoryOutput, LocalOutput
+from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
 from portia.prefixed_uuid import PlanRunUUID
 from portia.storage import AgentMemory
 
@@ -69,13 +69,13 @@ clarification = ActionClarification(
 )
 def test_output_serialize(input_value: Any, expected: Any) -> None:  # noqa: ANN401
     """Test output serialize."""
-    output = LocalOutput(value=input_value).serialize_value()
+    output = LocalDataValue(value=input_value).serialize_value()
     assert output == expected
 
 
 def test_local_output() -> None:
     """Test value is held locally."""
-    output = LocalOutput(value="test value")
+    output = LocalDataValue(value="test value")
     assert output.get_value() == "test value"
 
     mock_agent_memory = MagicMock(spec=AgentMemory)
@@ -85,7 +85,7 @@ def test_local_output() -> None:
 
 def test_agent_memory_output() -> None:
     """Test value is stored in agent memory."""
-    output = AgentMemoryOutput(
+    output = AgentMemoryValue(
         output_name="test_value",
         plan_run_id=PlanRunUUID(),
         summary="test summary",
@@ -95,7 +95,7 @@ def test_agent_memory_output() -> None:
     assert output.serialize_value() == "test summary"
 
     mock_agent_memory = MagicMock()
-    mock_agent_memory.get_plan_run_output.return_value = LocalOutput(value="retrieved value")
+    mock_agent_memory.get_plan_run_output.return_value = LocalDataValue(value="retrieved value")
 
     result = output.full_value(mock_agent_memory)
     assert result == "retrieved value"

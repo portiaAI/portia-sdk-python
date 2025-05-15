@@ -7,93 +7,23 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.clarification import InputClarification
-from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
-from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
+from portia.errors import (
+    InvalidAgentOutputError,
+    InvalidPlanRunStateError,
+    ToolFailedError,
+    ToolRetryError,
+)
+from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
-    MAX_RETRIES,
     AgentNode,
-    next_state_after_tool_call,
+    get_arg_value_with_templating,
     process_output,
+    template_in_required_inputs,
     tool_call_or_end,
 )
-from portia.execution_agents.output import LocalOutput, Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.prefixed_uuid import PlanRunUUID
-from tests.utils import AdditionTool, get_test_config
-
-
-def test_next_state_after_tool_call_no_error() -> None:
-    """Test next state when tool call succeeds."""
-    messages: list[ToolMessage] = [
-        ToolMessage(
-            content="Success message",
-            tool_call_id="123",
-            name="test_tool",
-        ),
-    ]
-    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
-
-    result = next_state_after_tool_call(get_test_config(), state)
-
-    assert result == END
-
-
-def test_next_state_after_tool_call_with_summarize() -> None:
-    """Test next state when tool call succeeds and should summarize."""
-    tool = AdditionTool()
-    tool.should_summarize = True
-
-    messages: list[ToolMessage] = [
-        ToolMessage(
-            content="Success message",
-            tool_call_id="123",
-            name="test_tool",
-        ),
-    ]
-    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
-
-    result = next_state_after_tool_call(get_test_config(), state, tool)
-
-    assert result == AgentNode.SUMMARIZER
-
-
-def test_next_state_after_tool_call_with_large_output() -> None:
-    """Test next state when tool call succeeds and should summarize."""
-    tool = AdditionTool()
-    messages: list[ToolMessage] = [
-        ToolMessage(
-            content="Test" * 1000,
-            tool_call_id="123",
-            name="test_tool",
-        ),
-    ]
-    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
-
-    config = get_test_config(
-        # Set a small threshold value so all outputs are stored in agent memory
-        feature_flags={FEATURE_FLAG_AGENT_MEMORY_ENABLED: True},
-        large_output_threshold_tokens=10,
-    )
-    result = next_state_after_tool_call(config, state, tool)
-    assert result == AgentNode.SUMMARIZER
-
-
-def test_next_state_after_tool_call_with_error_retry() -> None:
-    """Test next state when tool call fails and max retries reached."""
-    for i in range(1, MAX_RETRIES + 1):
-        messages: list[ToolMessage] = [
-            ToolMessage(
-                content=f"ToolSoftError: Error {j}",
-                tool_call_id=str(j),
-                name="test_tool",
-            )
-            for j in range(1, i + 1)
-        ]
-        state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
-
-        result = next_state_after_tool_call(get_test_config(), state)
-
-        expected_state = END if i == MAX_RETRIES else AgentNode.TOOL_AGENT
-        assert result == expected_state, f"Failed at retry {i}"
+from tests.utils import AdditionTool
 
 
 def test_tool_call_or_end() -> None:
@@ -149,8 +79,8 @@ def test_process_output_with_invalid_message() -> None:
 
 def test_process_output_with_output_artifacts() -> None:
     """Test process_output with outpu artifacts."""
-    message = ToolMessage(tool_call_id="1", content="", artifact=LocalOutput(value="test"))
-    message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalOutput(value="bar"))
+    message = ToolMessage(tool_call_id="1", content="", artifact=LocalDataValue(value="test"))
+    message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalDataValue(value="bar"))
 
     result = process_output([message, message2], clarifications=[])
 
@@ -179,10 +109,27 @@ def test_process_output_with_content() -> None:
     assert result.get_value() == "test"
 
 
+def test_process_output_with_clarification() -> None:
+    """Test process_output with a clarification."""
+    clarification = InputClarification(
+        argument_name="test",
+        user_guidance="test",
+        plan_run_id=PlanRunUUID(),
+    )
+    message = ToolMessage(tool_call_id="1", content=clarification.model_dump_json())
+
+    result = process_output([message], clarifications=[])
+
+    assert isinstance(result, Output)
+    assert result.get_value() == [clarification]
+
+
 def test_process_output_summary_matches_serialized_value() -> None:
     """Test process_output summary matches serialized value."""
     dict_value = {"key1": "value1", "key2": "value2"}
-    message = ToolMessage(tool_call_id="1", content="test", artifact=LocalOutput(value=dict_value))
+    message = ToolMessage(
+        tool_call_id="1", content="test", artifact=LocalDataValue(value=dict_value)
+    )
 
     result = process_output([message], clarifications=[])
 
@@ -198,7 +145,7 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     message = ToolMessage(
         tool_call_id="1",
         content="test",
-        artifact=LocalOutput(value=dict_value, summary=provided_summary),
+        artifact=LocalDataValue(value=dict_value, summary=provided_summary),
     )
 
     result = process_output([message], clarifications=[])
@@ -208,64 +155,75 @@ def test_process_output_summary_not_updated_if_provided() -> None:
     assert result.get_summary() == provided_summary
 
 
-def test_next_state_after_tool_call_with_clarification_artifact() -> None:
-    """Test next state when tool call succeeds with clarification artifact."""
-    tool = AdditionTool()
-    tool.should_summarize = True
+def test_get_arg_value_with_templating_no_templating() -> None:
+    """Test get_arg_value_with_templating with an arg that needs no templating."""
+    result = get_arg_value_with_templating([], "simple string")
+    assert result == "simple string"
 
-    clarification = InputClarification(
-        argument_name="test",
-        user_guidance="test",
-        plan_run_id=PlanRunUUID(),
-    )
 
-    messages: list[ToolMessage] = [
-        ToolMessage(
-            content="Success message",
-            tool_call_id="123",
-            name="test_tool",
-            artifact=clarification,
-        ),
+def test_get_arg_value_with_templating_string_with_templating() -> None:
+    """Test get_arg_value_with_templating with a string arg that needs 2 values templated in."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$age", value="30", description="User's age"),
     ]
-    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
+    arg = "Hello {{$name}}, you are {{$age}} years old"
 
-    result = next_state_after_tool_call(get_test_config(), state, tool)
-
-    # Should return END even though tool.should_summarize is True
-    # because the message contains a clarification artifact
-    assert result == END
+    result = get_arg_value_with_templating(step_inputs, arg)
+    assert result == "Hello John, you are 30 years old"
 
 
-def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
-    """Test next state when tool call succeeds with a list of clarifications as artifact."""
-    tool = AdditionTool()
-    tool.should_summarize = True
+def test_get_arg_value_with_templating_list_with_templating() -> None:
+    """Test get_arg_value_with_templating with a list of strings that needs a value templated in."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+    ]
+    arg = ["Hello {{$name}}", "Goodbye {{$name}}"]
 
-    clarifications = [
-        InputClarification(
-            argument_name="test1",
-            user_guidance="guidance1",
-            plan_run_id=PlanRunUUID(),
-        ),
-        InputClarification(
-            argument_name="test2",
-            user_guidance="guidance2",
-            plan_run_id=PlanRunUUID(),
-        ),
+    result = get_arg_value_with_templating(step_inputs, arg)
+    assert result == ["Hello John", "Goodbye John"]
+
+
+def test_get_arg_value_with_templating_dict_with_templating() -> None:
+    """Test get_arg_value_with_templating with a dict of strings that needs a value templated in."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+    ]
+    arg = {"greeting": "Hello {{$name}}", "farewell": "Goodbye {{$name}}"}
+
+    result = get_arg_value_with_templating(step_inputs, arg)
+    assert result == {"greeting": "Hello John", "farewell": "Goodbye John"}
+
+
+def test_template_in_required_inputs_multiple_args() -> None:
+    """Test template_in_required_inputs with two different args that need templating."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$age", value="30", description="User's age"),
+    ]
+    message = AIMessage(content="")
+    message.tool_calls = [
+        {
+            "name": "test_tool",
+            "type": "tool_call",
+            "id": "call_123",
+            "args": {"greeting": "Hello {{$name}}", "age_info": "You are {{$age}} years old"},
+        }
     ]
 
-    messages: list[ToolMessage] = [
-        ToolMessage(
-            content="Success message",
-            tool_call_id="123",
-            name="test_tool",
-            artifact=clarifications,
-        ),
+    result = template_in_required_inputs(message, step_inputs)
+
+    assert result.tool_calls[0]["args"]["greeting"] == "Hello John"  # pyright: ignore[reportAttributeAccessIssue]
+    assert result.tool_calls[0]["args"]["age_info"] == "You are 30 years old"  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_template_in_required_inputs_missing_args() -> None:
+    """Test template_in_required_inputs with error case of a tool_call with no args field."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
     ]
-    state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
+    message = AIMessage(content="")
+    message.tool_calls = [{"name": "test_tool", "type": "tool_call", "id": "call_123"}]  # pyright: ignore[reportAttributeAccessIssue]
 
-    result = next_state_after_tool_call(get_test_config(), state, tool)
-
-    # Should return END even though tool.should_summarize is True
-    # because the message contains a list of clarifications as artifact
-    assert result == END
+    with pytest.raises(InvalidPlanRunStateError, match="Tool call missing args field"):
+        template_in_required_inputs(message, step_inputs)

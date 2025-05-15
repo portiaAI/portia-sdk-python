@@ -21,6 +21,7 @@ from portia.open_source_tools.browser_tool import (
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
 )
+from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import assert_clarification_equality_without_uuid, get_test_tool_context
 
 
@@ -80,6 +81,9 @@ class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
     def construct_auth_clarification_url(self, _: ToolRunContext, sign_in_url: str) -> HttpUrl:  # type: ignore reportIncompatibleMethodOverride
         """Construct the auth clarification for testing."""
         return HttpUrl(sign_in_url)
+
+    def step_complete(self, _: ToolRunContext) -> None:  # type: ignore reportIncompatibleMethodOverride
+        """Call when the step is complete to e.g release the session."""
 
 
 @pytest.fixture
@@ -367,17 +371,36 @@ def test_browserbase_provider_init_missing_project_id() -> None:
         BrowserInfrastructureProviderBrowserBase()
 
 
-def test_browserbase_provider_get_context_id(
+def test_browserbase_provider_get_context_id_existing(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
-    """Test getting context ID."""
+    """Test getting context ID when already present in end_user additional data."""
+    mock_ctx = MagicMock()
+    mock_ctx.end_user.get_additional_data.return_value = "existing_context_id"
+
+    context_id = mock_browserbase_provider.get_context_id(mock_ctx, mock_browserbase_provider.bb)
+
+    # Should not create a new context if already present
+    mock_browserbase_provider.bb.contexts.create.assert_not_called()  # type: ignore reportFunctionMemberAccess
+    assert context_id == "existing_context_id"
+
+
+def test_browserbase_provider_get_context_id_new(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test getting context ID when not present in end_user additional data."""
+    mock_ctx = MagicMock()
+    mock_ctx.end_user.get_additional_data.return_value = None
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
     mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
 
-    context_id = mock_browserbase_provider.get_context_id(mock_browserbase_provider.bb)
+    context_id = mock_browserbase_provider.get_context_id(mock_ctx, mock_browserbase_provider.bb)
 
     mock_browserbase_provider.bb.contexts.create.assert_called_once_with(project_id="test_project")  # type: ignore reportFunctionMemberAccess
+    mock_ctx.end_user.set_additional_data.assert_called_once_with(
+        "bb_context_id", "test_context_id"
+    )
     assert context_id == "test_context_id"
 
 
@@ -423,28 +446,9 @@ def test_browserbase_provider_get_or_create_session_new(
     )
 
     assert connect_url == "test_connect_url"
-    assert context.execution_context.additional_data["bb_session_id"] == "test_session_id"
-    assert context.execution_context.additional_data["bb_session_connect_url"] == "test_connect_url"
-    assert context.execution_context.additional_data["bb_context_id"] == "test_context_id"
-
-
-def test_browserbase_provider_get_or_create_session_existing(
-    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
-) -> None:
-    """Test getting existing session."""
-    context = get_test_tool_context()
-    context.execution_context.additional_data = {
-        "bb_context_id": "existing_context_id",
-        "bb_session_id": "existing_session_id",
-        "bb_session_connect_url": "existing_connect_url",
-    }
-
-    connect_url = mock_browserbase_provider.get_or_create_session(
-        context, mock_browserbase_provider.bb
-    )
-
-    assert connect_url == "existing_connect_url"
-    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # type: ignore reportFunctionMemberAccess
+    assert context.end_user.get_additional_data("bb_session_id") == "test_session_id"
+    assert context.end_user.get_additional_data("bb_session_connect_url") == "test_connect_url"
+    assert context.end_user.get_additional_data("bb_context_id") == "test_context_id"
 
 
 def test_browserbase_provider_construct_auth_clarification_url(
@@ -452,7 +456,7 @@ def test_browserbase_provider_construct_auth_clarification_url(
 ) -> None:
     """Test constructing auth clarification URL."""
     context = get_test_tool_context()
-    context.execution_context.additional_data["bb_session_id"] = "test_session_id"
+    context.end_user.set_additional_data("bb_session_id", "test_session_id")
 
     mock_debug = MagicMock()
     mock_debug.pages = [MagicMock(debugger_fullscreen_url="https://debug.example.com")]
@@ -542,3 +546,82 @@ def test_browser_tool_for_url_init_subdomain_handling() -> None:
     assert tool.url == url
     assert tool.id == "browser_tool_for_url_sub_example_com"
     assert tool.name == "Browser Tool for sub_example_com"
+
+
+def test_browserbase_provider_step_complete_with_session(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test step_complete calls sessions.update when session_id is present."""
+    mock_ctx = MagicMock()
+    end_user = EndUser(external_id="123", additional_data={"bb_session_id": "session123"})
+    mock_ctx.end_user = end_user
+
+    mock_browserbase_provider.step_complete(mock_ctx)
+
+    mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # type: ignore reportFunctionMemberAccess
+        "session123",
+        project_id="test_project",
+        status="REQUEST_RELEASE",
+    )
+
+
+def test_browserbase_provider_step_complete_without_session(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test step_complete does nothing when session_id is missing."""
+    mock_ctx = MagicMock()
+    end_user = EndUser(external_id="123", additional_data={})
+    mock_ctx.end_user = end_user
+
+    mock_browserbase_provider.step_complete(mock_ctx)
+
+    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # type: ignore reportFunctionMemberAccess
+
+
+def test_browserbase_provider_get_or_create_session_with_clarifications(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test getting or creating a session when clarifications exist."""
+    context = get_test_tool_context()
+    context.clarifications = [
+        ActionClarification(
+            user_guidance="Test guidance",
+            plan_run_id=PlanRunUUID(),
+            action_url=HttpUrl("https://example.com"),
+        )
+    ]
+    context.end_user.additional_data = {
+        "bb_session_id": "existing_session_id",
+        "bb_session_connect_url": "existing_connect_url",
+    }
+
+    connect_url = mock_browserbase_provider.get_or_create_session(
+        context, mock_browserbase_provider.bb
+    )
+
+    assert connect_url == "existing_connect_url"
+    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # type: ignore reportFunctionMemberAccess
+
+
+def test_browserbase_provider_get_or_create_session_without_clarifications(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test getting or creating a session when no clarifications exist."""
+    context = get_test_tool_context()
+    context.clarifications = []
+
+    mock_session = MagicMock()
+    mock_session.id = "test_session_id"
+    mock_session.connect_url = "test_connect_url"
+
+    mock_context = MagicMock()
+    mock_context.id = "test_context_id"
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
+
+    connect_url = mock_browserbase_provider.get_or_create_session(
+        context, mock_browserbase_provider.bb
+    )
+
+    assert connect_url == "test_connect_url"
+    mock_browserbase_provider.bb.sessions.create.assert_called_once()  # type: ignore reportFunctionMemberAccess
