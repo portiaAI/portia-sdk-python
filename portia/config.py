@@ -623,7 +623,7 @@ class Config(BaseModel):
         ):
             try:
                 model_getter()
-            except Exception as e:  # noqa: PERF203
+            except Exception as e:
                 raise InvalidConfigError(
                     f"models.{model_getter.__name__}",
                     "All models must be instantiable",

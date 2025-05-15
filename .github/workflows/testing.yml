@@ -21,8 +21,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: install poetry
-        run: pipx install poetry
+      - name: install uv
+        run: pipx install uv
 
       # https://github.com/pydantic/ollama-action
       - uses: pydantic/ollama-action@v3
@@ -32,17 +32,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "poetry"
+          cache: "uv"
 
       - name: install dependencies
-        run: poetry install --all-extras
+        run: uv sync --all-extras
 
       - name: unit_tests + coverage
         env:
           PORTIA_API_ENDPOINT: "https://api.porita.dev"
         run: |
           set -o pipefail
-          poetry run pytest tests/unit
+          uv run pytest tests/unit
 
       - name: tests + coverage
         env:
@@ -54,4 +54,4 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           set -o pipefail
-          poetry run pytest -n 8 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          uv run pytest -n 8 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt

@@ -13,7 +13,7 @@ Portia implements a three-agent architecture to ensure robust and reliable execu
 ## Developing
 
 You can run linting in the codebase by running the following commands, but only do this if asked:
-* poetry run pyright
-* poetry run ruff check --fix
+* uv run pyright
+* uv run ruff check --fix
 
-If this doesn't work, you may need to install poetry with pip install poetry
+If this doesn't work, you may need to install uv with pip install uv

@@ -31,8 +31,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Poetry
-        run: pipx install poetry
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Fetch tags
         run: git fetch --tags
@@ -40,7 +40,7 @@ jobs:
       - name: Get version from pyproject.toml
         id: get_version
         run: |
-          VERSION=$(poetry version --short)
+          VERSION=$(uv version --short)
           echo "Version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
@@ -69,5 +69,5 @@ jobs:
         if: env.tag_exists != 'true'
         run: |
           export POETRY_PYPI_TOKEN_PYPI=${{secrets.POETRY_PYPI_TOKEN_PYPI}}
-          poetry build
-          poetry publish -n
+          uv build
+          uv publish --token ${{ secrets.POETRY_PYPI_TOKEN_PYPI }}

@@ -96,6 +96,7 @@ def test_process_task_data_with_list() -> None:
     result = LLMTool.process_task_data(["Item 1", "Item 2"])
     assert result == "Item 1\nItem 2"
 
+
 def test_process_task_data_with_none() -> None:
     """Test that process_task_data correctly handles None input."""
     result = LLMTool.process_task_data(None)
@@ -104,6 +105,7 @@ def test_process_task_data_with_none() -> None:
 
 def test_process_task_data_with_complex_objects() -> None:
     """Test that process_task_data correctly handles complex objects."""
+
     class TestObject:
         def __str__(self) -> str:
             return "TestObject"

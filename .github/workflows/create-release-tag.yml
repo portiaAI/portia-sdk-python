@@ -21,14 +21,13 @@ jobs:
         with:
           python-version: '3.x'
   
-      - name: Install Poetry
+      - name: Install uv
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-
+          curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Get version from pyproject.toml
         id: get_version
         run: |
-          VERSION=$(poetry version -s)
+          VERSION=$(uv version --short)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create tag
