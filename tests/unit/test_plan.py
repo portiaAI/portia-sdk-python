@@ -73,7 +73,7 @@ def test_read_only_plan_preserves_data() -> None:
     assert read_only.plan_context.query == original_plan.plan_context.query
     assert read_only.plan_context.tool_ids == original_plan.plan_context.tool_ids
     assert len(read_only.steps) == len(original_plan.steps)
-    for ro_step, orig_step in zip(read_only.steps, original_plan.steps):
+    for ro_step, orig_step in zip(read_only.steps, original_plan.steps, strict=False):
         assert ro_step.task == orig_step.task
         assert ro_step.output == orig_step.output
 

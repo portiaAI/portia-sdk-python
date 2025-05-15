@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import mcp
@@ -429,15 +429,15 @@ def test_generate_pydantic_model_from_json_schema_union_types() -> None:
         "required": ["company_number", "additional_company_numbers"],
     }
     model = generate_pydantic_model_from_json_schema("TestUnionModel", json_schema)
-    assert model.model_fields["collaborators"].annotation == Union[list[int], None]
+    assert model.model_fields["collaborators"].annotation == list[int] | None
     assert model.model_fields["collaborators"].default is None
     assert (
         model.model_fields["collaborators"].description == "Array of user IDs to CC on the ticket"
     )
-    assert model.model_fields["company_number"].annotation == Union[str, int]
+    assert model.model_fields["company_number"].annotation == str | int
     assert model.model_fields["company_number"].default is PydanticUndefined
     assert model.model_fields["company_number"].description == "Company number to search"
-    assert model.model_fields["additional_company_numbers"].annotation == list[Union[str, int]]
+    assert model.model_fields["additional_company_numbers"].annotation == list[str | int]
     assert model.model_fields["additional_company_numbers"].default is PydanticUndefined
     assert (
         model.model_fields["additional_company_numbers"].description

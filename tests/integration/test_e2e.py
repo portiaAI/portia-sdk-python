@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -28,6 +28,8 @@ from portia.tool_registry import ToolRegistry
 from tests.utils import AdditionTool, ClarificationTool, ErrorTool, TestClarificationHandler
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from portia.tool import ToolRunContext
 
 

@@ -25,20 +25,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
 
-      - name: Install Poetry
+      - name: Install uv
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+          curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Get current version
         id: current_version
         run: |
-          CURRENT_VERSION=$(poetry version -s)
+          CURRENT_VERSION=$(uv version --short)
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Bump version
@@ -75,7 +70,7 @@ jobs:
           git checkout -b release/v${{ steps.bump_version.outputs.new_version }}
           
           # Update version in release branch
-          poetry version ${{ steps.bump_version.outputs.new_version }}
+          uv version ${{ steps.bump_version.outputs.new_version }}
           
           git add pyproject.toml
           git commit -m "Bump version to v${{ steps.bump_version.outputs.new_version }}"
