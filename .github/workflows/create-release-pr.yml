@@ -40,7 +40,7 @@ jobs:
         id: bump_version
         run: |
           # Remove potential alpha suffix from current version
-          BASE_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | sed 's/-alpha//')
+          BASE_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | sed 's/a[0-9]\+$//')
           
           # Bump version according to input
           case "${{ inputs.bump_type }}" in
@@ -57,7 +57,7 @@ jobs:
           
           # Add alpha suffix if requested
           if [ "${{ inputs.release_type }}" = "alpha" ]; then
-            NEW_VERSION="${NEW_VERSION}-alpha"
+            NEW_VERSION="${NEW_VERSION}a0"
           fi
           
           # Set output for next steps
