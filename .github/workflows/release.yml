@@ -26,11 +26,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.12"
-
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 

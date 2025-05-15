@@ -29,11 +29,6 @@ jobs:
         with:
           model: qwen2.5:0.5b
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "uv"
-
       - name: install dependencies
         run: uv sync --all-extras
 
