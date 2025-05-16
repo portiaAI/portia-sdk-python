@@ -122,6 +122,7 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
             user_guidance="email cc list",
             response="bob@bla.com",
             step=0,
+            source="Test execution agents context",
         ),
         InputClarification(
             plan_run_id=plan_run.id,
@@ -129,11 +130,13 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
             user_guidance="email cc list",
             response="bob@bla.com",
             step=1,
+            source="Test execution agents context",
         ),
         ActionClarification(
             plan_run_id=plan_run.id,
             action_url=HttpUrl("http://example.com"),
             user_guidance="click on the link",
+            source="Test execution agents context",
         ),
     ]
     plan_run.outputs.clarifications = clarifications
@@ -221,12 +224,14 @@ def test_context_inputs_outputs_clarifications(
             user_guidance="email cc list",
             response="bob@bla.com",
             step=0,
+            source="Test execution agents context",
         ),
         ActionClarification(
             plan_run_id=plan_run.id,
             action_url=HttpUrl("http://example.com"),
             user_guidance="click on the link",
             step=1,
+            source="Test execution agents context",
         ),
     ]
     plan.steps[0].inputs = inputs

@@ -439,6 +439,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
+                            source="Portia remote tool",
                         ),
                     )
                 case ClarificationCategory.INPUT:
@@ -448,6 +449,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
+                            source="Portia remote tool",
                         ),
                     )
                 case ClarificationCategory.MULTIPLE_CHOICE:
@@ -458,6 +460,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
                             options=clarification["options"],
+                            source="Portia remote tool",
                         ),
                     )
                 case ClarificationCategory.VALUE_CONFIRMATION:
@@ -467,6 +470,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
+                            source="Portia remote tool",
                         ),
                     )
         return output

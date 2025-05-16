@@ -29,6 +29,7 @@ def test_action_clarification_ser() -> None:
         plan_run_id=PlanRunUUID(),
         user_guidance="test",
         action_url=HttpUrl("https://example.com"),
+        source="Test clarification",
     )
     clarification_model = clarification.model_dump()
     assert clarification_model["action_url"] == "https://example.com/"
@@ -40,6 +41,7 @@ def test_clarification_uuid_assign() -> None:
         plan_run_id=PlanRunUUID(),
         user_guidance="test",
         action_url=HttpUrl("https://example.com"),
+        source="Test clarification",
     )
     assert isinstance(clarification.id, ClarificationUUID)
 
@@ -54,6 +56,7 @@ def test_value_multi_choice_validation() -> None:
             options=["yes"],
             resolved=True,
             response="No",
+            source="Test clarification",
         )
 
     MultipleChoiceClarification(
@@ -63,6 +66,7 @@ def test_value_multi_choice_validation() -> None:
         options=["yes"],
         resolved=True,
         response="yes",
+        source="Test clarification",
     )
 
 
@@ -75,6 +79,7 @@ def test_custom_clarification_deserialize(tmp_path: Path) -> None:
         user_guidance="Please provide data",
         name="My Clarification",
         data={"email": {"test": "hello@example.com"}},
+        source="Test clarification",
     )
 
     storage = DiskFileStorage(storage_dir=str(tmp_path))
@@ -93,6 +98,7 @@ def test_user_verification_clarification() -> None:
     clarification = UserVerificationClarification(
         plan_run_id=PlanRunUUID(),
         user_guidance="Please verify this information",
+        source="Test clarification",
     )
 
     # Verify category is set correctly

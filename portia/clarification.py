@@ -78,6 +78,9 @@ class Clarification(BaseModel, ABC):
         default=False,
         description="Whether this clarification has been resolved.",
     )
+    source: str = Field(
+        description="The source of the clarification.",
+    )
 
 
 class ActionClarification(Clarification):

@@ -645,6 +645,7 @@ def test_tool_calling_model_with_hallucinations() -> None:
         response="CLARIFICATION_RESPONSE",
         argument_name="content",
         resolved=True,
+        source="Test tool calling model with hallucinations",
     )
 
     failed_clarification = InputClarification(
@@ -653,6 +654,7 @@ def test_tool_calling_model_with_hallucinations() -> None:
         response="FAILED",
         argument_name="content",
         resolved=True,
+        source="Test tool calling model with hallucinations",
     )
 
     plan_run.outputs.clarifications = [clarification]
@@ -969,6 +971,7 @@ def test_get_last_resolved_clarification() -> None:
         user_guidance="FAILED",
         resolved=True,
         step=0,
+        source="Test get last resolved clarification",
     )
     resolved_clarification2 = InputClarification(
         plan_run_id=plan_run.id,
@@ -977,6 +980,7 @@ def test_get_last_resolved_clarification() -> None:
         user_guidance="SUCCESS",
         resolved=True,
         step=0,
+        source="Test get last resolved clarification",
     )
     unresolved_clarification = InputClarification(
         plan_run_id=plan_run.id,
@@ -985,6 +989,7 @@ def test_get_last_resolved_clarification() -> None:
         user_guidance="",
         resolved=False,
         step=0,
+        source="Test get last resolved clarification",
     )
     plan_run.outputs.clarifications = [
         resolved_clarification1,
@@ -1011,6 +1016,7 @@ def test_clarifications_or_continue() -> None:
         response="2",
         user_guidance="",
         resolved=True,
+        source="Test clarifications or continue",
     )
 
     agent = DefaultExecutionAgent(
@@ -1050,6 +1056,7 @@ def test_clarifications_or_continue() -> None:
         user_guidance="",
         resolved=True,
         step=0,
+        source="Test clarifications or continue",
     )
 
     (plan, plan_run) = get_test_plan_run()
@@ -1235,6 +1242,7 @@ def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) ->
                 user_guidance="Need clarification",
                 step=plan_run.current_step_index,
                 argument_name="num1",
+                source="Test before tool call with clarification",
             )
         return None
 
@@ -1318,6 +1326,7 @@ def test_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) -> 
                 user_guidance="Need clarification after tool call",
                 step=plan_run.current_step_index,
                 argument_name="result",
+                source="Test after tool call with clarification",
             )
         return None
 

@@ -173,6 +173,7 @@ def test_oneshot_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyP
                 user_guidance="Need clarification before tool call",
                 step=plan_run.current_step_index,
                 argument_name="num1",
+                source="Test oneshot agent",
             )
         return None
 
@@ -251,6 +252,7 @@ def test_oneshot_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPa
                 user_guidance="Need clarification after tool call",
                 step=plan_run.current_step_index,
                 argument_name="result",
+                source="Test oneshot agent",
             )
         return None
 
@@ -314,6 +316,7 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
                     user_guidance="Missing Argument: missing_arg",
                     step=0,
                     argument_name="missing_arg",
+                    source="Test oneshot agent",
                 ).model_dump_json(),
                 tool_call_id="call_123",
             ),

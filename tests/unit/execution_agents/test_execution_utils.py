@@ -45,6 +45,7 @@ def test_process_output_with_clarifications() -> None:
             argument_name="test",
             user_guidance="test",
             plan_run_id=PlanRunUUID(),
+            source="Test process output with clarifications",
         ),
     ]
     message = HumanMessage(content="test")
@@ -115,6 +116,7 @@ def test_process_output_with_clarification() -> None:
         argument_name="test",
         user_guidance="test",
         plan_run_id=PlanRunUUID(),
+        source="Test process output with clarification",
     )
     message = ToolMessage(tool_call_id="1", content=clarification.model_dump_json())
 

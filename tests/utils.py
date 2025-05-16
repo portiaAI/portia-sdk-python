@@ -170,6 +170,7 @@ class ClarificationTool(Tool):
                 plan_run_id=ctx.plan_run_id,
                 user_guidance=user_guidance,
                 argument_name="raise_clarification",
+                source="Test clarification tool",
             )
         return None
 

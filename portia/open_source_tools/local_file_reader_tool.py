@@ -67,6 +67,7 @@ class FileReaderTool(Tool[str]):
                     f"Pick one to continue:\n{alt_file_paths}"
                 ),
                 options=alt_file_paths,
+                source="File reader tool",
             )
 
         raise ToolHardError(f"No file found on disk with the path {filename}.")

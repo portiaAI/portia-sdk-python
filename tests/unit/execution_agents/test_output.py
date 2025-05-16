@@ -40,6 +40,7 @@ clarification = ActionClarification(
     plan_run_id=PlanRunUUID(),
     user_guidance="",
     action_url=HttpUrl("https://example.com"),
+    source="Test execution agents output",
 )
 
 

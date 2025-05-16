@@ -328,6 +328,7 @@ def test_portia_run_query_with_multiple_clarifications(
                     plan_run_id=ctx.plan_run_id,
                     argument_name="a",
                     user_guidance="please try again",
+                    source="MyAdditionTool test tool",
                 )
             return a + b
 
@@ -399,6 +400,7 @@ def test_portia_run_query_with_multiple_async_clarifications(
                     plan_run_id=ctx.plan_run_id,
                     user_guidance="please try again",
                     action_url=HttpUrl("https://www.test.com"),
+                    source="MyAdditionTool test tool",
                 )
             resolved = False
             return a + b
