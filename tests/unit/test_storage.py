@@ -91,6 +91,9 @@ def test_storage_base_classes() -> None:
         storage.get_plan(plan.id)
 
     with pytest.raises(NotImplementedError):
+        storage.plan_exists(plan.id)
+
+    with pytest.raises(NotImplementedError):
         storage.save_plan_run(plan_run)
 
     with pytest.raises(NotImplementedError):
