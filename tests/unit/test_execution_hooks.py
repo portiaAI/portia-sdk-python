@@ -7,7 +7,11 @@ import pytest
 from portia.clarification import ClarificationCategory, CustomClarification
 from portia.errors import ToolHardError
 from portia.execution_agents.output import LocalDataValue
-from portia.execution_hooks import clarify_on_all_tool_calls, clarify_on_tool_call, log_step_outputs
+from portia.execution_hooks import (
+    clarify_on_all_tool_calls,
+    clarify_on_tool_calls,
+    log_step_outputs,
+)
 from portia.plan import Step
 from tests.utils import AdditionTool, get_test_plan_run
 
@@ -118,14 +122,14 @@ def test_log_step_outputs() -> None:
 def test_clarify_on_tool_call_first_call(
     tool_id: str | list[str], tool_to_test: str, *, should_raise: bool
 ) -> None:
-    """Test clarify_on_tool_call on first call with different tool IDs."""
+    """Test clarify_on_tool_calls on first call with different tool IDs."""
     tool = AdditionTool()
     tool.id = tool_to_test
     args = {"a": 1, "b": 2}
     plan, plan_run = get_test_plan_run()
     step = plan.steps[0]
 
-    hook = clarify_on_tool_call(tool_id)
+    hook = clarify_on_tool_calls(tool_id)
     result = hook(tool, args, plan_run, step)
 
     if should_raise:
@@ -137,7 +141,7 @@ def test_clarify_on_tool_call_first_call(
 
 
 def test_clarify_on_tool_call_with_previous_yes_response() -> None:
-    """Test clarify_on_tool_call with a previous 'yes' response."""
+    """Test clarify_on_tool_calls with a previous 'yes' response."""
     tool = AdditionTool()
     tool.id = "test_tool"
     args = {"a": 1, "b": 2}
@@ -157,13 +161,13 @@ def test_clarify_on_tool_call_with_previous_yes_response() -> None:
     )
     plan_run.outputs.clarifications = [prev_clarification]
 
-    hook = clarify_on_tool_call("test_tool")
+    hook = clarify_on_tool_calls("test_tool")
     result = hook(tool, args, plan_run, step)
     assert result is None
 
 
 def test_clarify_on_tool_call_with_previous_no_response() -> None:
-    """Test clarify_on_tool_call with a previous 'no' response."""
+    """Test clarify_on_tool_calls with a previous 'no' response."""
     tool = AdditionTool()
     tool.id = "test_tool"
     args = {"a": 1, "b": 2}
@@ -183,6 +187,6 @@ def test_clarify_on_tool_call_with_previous_no_response() -> None:
     )
     plan_run.outputs.clarifications = [prev_clarification]
 
-    hook = clarify_on_tool_call("test_tool")
+    hook = clarify_on_tool_calls("test_tool")
     with pytest.raises(ToolHardError):
         hook(tool, args, plan_run, step)

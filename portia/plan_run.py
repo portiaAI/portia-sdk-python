@@ -156,7 +156,7 @@ class PlanRun(BaseModel):
     def get_clarification_for_step(
         self, category: ClarificationCategory, step: int | None = None
     ) -> Clarification | None:
-        """Return a clarification for the given step and category.
+        """Return a clarification of the given category for the given step if it exists.
 
         Args:
             step (int | None): the step to get a clarification for. Defaults to current step.

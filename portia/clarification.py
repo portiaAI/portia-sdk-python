@@ -205,12 +205,10 @@ class ValueConfirmationClarification(Clarification):
 class UserVerificationClarification(Clarification):
     """User verification clarification.
 
-    Represents a clarification where the user is presented with a value and must confirm or deny it.
-    The clarification should be created with the response field already set, and the user indicates
-    acceptance by setting the resolved flag to `True`.
+    Represents a clarification where the user some information that they must verify.
 
     Attributes:
-        category (ClarificationCategory): The category for this clarification, 'Value Confirmation'.
+        category (ClarificationCategory): The category for this clarification, 'User Verification'.
 
     """
 
