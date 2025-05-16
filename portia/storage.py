@@ -73,6 +73,8 @@ class PlanStorage(ABC):
             Save a plan.
         get_plan(self, plan_id: PlanUUID) -> Plan:
             Get a plan by ID.
+        plan_exists(self, plan_id: PlanUUID) -> bool:
+            Check if a plan exists without raising an error.
 
     """
 
@@ -104,6 +106,22 @@ class PlanStorage(ABC):
 
         """
         raise NotImplementedError("get_plan is not implemented")
+
+    @abstractmethod
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists without raising an error.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("plan_exists is not implemented")
 
     def get_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 10) -> list[Plan]:
         """Get similar plans to the query.
@@ -380,6 +398,18 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             return self.plans[plan_id]
         raise PlanNotFoundError(plan_id)
 
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists in memory.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        return plan_id in self.plans
+
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Add run to dict.
 
@@ -599,6 +629,18 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             return self._read(f"{plan_id}.json", Plan)
         except (ValidationError, FileNotFoundError) as e:
             raise PlanNotFoundError(plan_id) from e
+
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists on disk.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        return Path(self.storage_dir, f"{plan_id}.json").exists()
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun object to the storage.
@@ -889,6 +931,25 @@ class PortiaCloudStorage(Storage, AgentMemory):
             self.check_response(response)
             response_json = response.json()
             return Plan.from_response(response_json)
+
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists in Portia Cloud.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        try:
+            response = self.client.get(
+                url=f"/api/v0/plans/{plan_id}/",
+            )
+        except Exception:  # noqa: BLE001
+            return False
+        else:
+            return response.is_success
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun to Portia Cloud.

@@ -48,6 +48,9 @@ def test_storage_base_classes() -> None:
         def get_plan(self, plan_id: PlanUUID) -> Plan:
             return super().get_plan(plan_id)  # type: ignore  # noqa: PGH003
 
+        def plan_exists(self, plan_id: PlanUUID) -> bool:
+            return super().plan_exists(plan_id)  # type: ignore  # noqa: PGH003
+
         def save_plan_run(self, plan_run: PlanRun) -> None:
             return super().save_plan_run(plan_run)  # type: ignore  # noqa: PGH003
 
@@ -86,6 +89,9 @@ def test_storage_base_classes() -> None:
 
     with pytest.raises(NotImplementedError):
         storage.get_plan(plan.id)
+
+    with pytest.raises(NotImplementedError):
+        storage.plan_exists(plan.id)
 
     with pytest.raises(NotImplementedError):
         storage.save_plan_run(plan_run)
@@ -803,3 +809,74 @@ def test_similar_plans_error(httpx_mock: HTTPXMock) -> None:
     )
     with pytest.raises(StorageError):
         storage.get_similar_plans("Test query")
+
+
+def test_plan_exists_in_memory_storage() -> None:
+    """Test plan_exists method with InMemoryStorage."""
+    storage = InMemoryStorage()
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test non-existent plan
+    assert not storage.plan_exists(plan.id)
+
+    # Save plan and test again
+    storage.save_plan(plan)
+    assert storage.plan_exists(plan.id)
+
+    # Test with different plan ID
+    different_plan_id = PlanUUID()
+    assert not storage.plan_exists(different_plan_id)
+
+
+def test_plan_exists_disk_storage(tmp_path: Path) -> None:
+    """Test plan_exists method with DiskFileStorage."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test non-existent plan
+    assert not storage.plan_exists(plan.id)
+
+    # Save plan and test again
+    storage.save_plan(plan)
+    assert storage.plan_exists(plan.id)
+
+    # Test with different plan ID
+    different_plan_id = PlanUUID()
+    assert not storage.plan_exists(different_plan_id)
+
+
+def test_plan_exists_portia_cloud_storage() -> None:
+    """Test plan_exists method with PortiaCloudStorage."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test when plan exists
+    mock_success_response = MagicMock()
+    mock_success_response.is_success = True
+    with patch.object(storage.client, "get", return_value=mock_success_response) as mock_get:
+        assert storage.plan_exists(plan.id)
+        mock_get.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/")
+
+    # Test when plan doesn't exist
+    mock_failure_response = MagicMock()
+    mock_failure_response.is_success = False
+    with patch.object(storage.client, "get", return_value=mock_failure_response) as mock_get:
+        different_plan_id = PlanUUID()
+        assert not storage.plan_exists(different_plan_id)
+        mock_get.assert_called_once_with(url=f"/api/v0/plans/{different_plan_id}/")
+
+    # Test when API call fails
+    with patch.object(storage.client, "get", side_effect=Exception("API Error")) as mock_get:
+        assert not storage.plan_exists(plan.id)
+        mock_get.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/")
