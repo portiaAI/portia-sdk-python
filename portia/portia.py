@@ -799,7 +799,7 @@ class Portia:
         Args:
             plan (Plan): The plan to create a plan run from.
             end_user (str | EndUser | None = None): The end user this plan run is for.
-            plan_run_inputs (dict[PlanInput, Serializable] | None = None): The plan inputs for the
+            plan_run_inputs (list[PlanInput] | None = None): The plan inputs for the
               plan run with their values.
 
         Returns:
