@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import importlib.util
 from enum import Enum
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
