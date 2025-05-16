@@ -62,6 +62,7 @@ def test_output_serialize() -> None:
         plan_run_id=PlanRunUUID(),
         user_guidance="",
         action_url=HttpUrl("https://example.com"),
+        source="Test base execution agent",
     )
 
     tcs: list[tuple[Any, Any]] = [
@@ -228,6 +229,7 @@ def test_next_state_after_tool_call_with_clarification_artifact() -> None:
         argument_name="test",
         user_guidance="test",
         plan_run_id=PlanRunUUID(),
+        source="Test base execution agent",
     )
 
     messages: list[ToolMessage] = [
@@ -267,11 +269,13 @@ def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
             argument_name="test1",
             user_guidance="guidance1",
             plan_run_id=PlanRunUUID(),
+            source="Test base execution agent",
         ),
         InputClarification(
             argument_name="test2",
             user_guidance="guidance2",
             plan_run_id=PlanRunUUID(),
+            source="Test base execution agent",
         ),
     ]
 

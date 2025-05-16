@@ -426,6 +426,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
         user_guidance="",
         action_url=HttpUrl("https://unresolved.step1.com"),
         step=1,
+        source="Test wait for ready tool",
     )
     plan_run = PlanRun(
         plan_id=plan.id,
@@ -440,6 +441,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
                     action_url=HttpUrl("https://resolved.step0.com"),
                     resolved=True,
                     step=0,
+                    source="Test wait for ready tool",
                 ),
                 ActionClarification(
                     plan_run_id=PlanRunUUID(),
@@ -447,6 +449,7 @@ def test_portia_wait_for_ready_tool(portia: Portia) -> None:
                     action_url=HttpUrl("https://resolved.step1.com"),
                     resolved=True,
                     step=1,
+                    source="Test wait for ready tool",
                 ),
                 unresolved_action,
             ],
@@ -736,6 +739,7 @@ def test_portia_resolve_clarification_error(portia: Portia) -> None:
         user_guidance="",
         argument_name="",
         plan_run_id=plan_run2.id,
+        source="Test resolve clarification error",
     )
     portia.storage.save_plan(plan)
     portia.storage.save_plan_run(plan_run)
@@ -755,6 +759,7 @@ def test_portia_resolve_clarification(portia: Portia) -> None:
         user_guidance="",
         argument_name="",
         plan_run_id=plan_run.id,
+        source="Test resolve clarification",
     )
     plan_run.outputs.clarifications = [clarification]
     portia.storage.save_plan(plan)
@@ -903,6 +908,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
                     plan_run_id=plan_run.id,
                     user_guidance="Handle this clarification",
                     argument_name="raise_clarification",
+                    source="Test portia handle clarification",
                 ),
             ),
             LocalDataValue(value="I caught the clarification"),
@@ -933,6 +939,7 @@ def test_portia_error_clarification(portia: Portia, planning_model: MagicMock) -
             plan_run_id=plan_run.id,
             user_guidance="Handle this clarification",
             argument_name="raise_clarification",
+            source="Test portia error clarification",
         ),
         error=ValueError("test error"),
     )
@@ -955,6 +962,7 @@ def test_portia_error_clarification_with_plan_run(
             plan_run_id=plan_run.id,
             user_guidance="Handle this clarification",
             argument_name="raise_clarification",
+            source="Test portia error clarification with plan run",
         ),
         error=ValueError("test error"),
         plan_run=plan_run,
@@ -1786,15 +1794,12 @@ def test_portia_execution_step_hooks_with_skip(portia: Portia, planning_model: M
     ):
         plan_run = portia.run("Test execution hooks with skip")
 
-    # Verify run completed successfully
     assert plan_run.state == PlanRunState.COMPLETE
 
-    # Verify that step 1 was skipped and step 2 was executed
     assert "$step1_result" not in plan_run.outputs.step_outputs
     assert "$step2_result" in plan_run.outputs.step_outputs
     assert plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
 
-    # Verify that after_step_execution was only called for step 2
     assert execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
     execution_hooks.after_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         mock.ANY, mock.ANY, ReadOnlyStep.from_step(step2), step_2_result

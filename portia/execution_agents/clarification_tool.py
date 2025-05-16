@@ -39,4 +39,5 @@ class ClarificationTool(Tool[str]):
             user_guidance=f"Missing Argument: {argument_name}",
             plan_run_id=ctx.plan_run_id,
             step=self.step,
+            source="Clarification tool",
         ).model_dump_json()
