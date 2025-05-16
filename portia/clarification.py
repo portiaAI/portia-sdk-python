@@ -9,7 +9,7 @@ and value confirmations.
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Self, Union
+from typing import Any, Self
 
 from pydantic import (
     BaseModel,
@@ -227,14 +227,15 @@ class CustomClarification(Clarification):
 
 
 """Type that encompasses all possible clarification types."""
-ClarificationType = Union[
-    Clarification,
-    InputClarification,
-    ActionClarification,
-    MultipleChoiceClarification,
-    ValueConfirmationClarification,
-    CustomClarification,
-]
+ClarificationType = (
+    Clarification
+    | InputClarification
+    | ActionClarification
+    | MultipleChoiceClarification
+    | ValueConfirmationClarification
+    | CustomClarification
+)
+
 
 """A list of clarifications of any type."""
 ClarificationListType = list[ClarificationType]

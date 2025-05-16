@@ -245,6 +245,9 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
+FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED = (
+    "feature_flag_one_shot_agent_clarifications_enabled"
+)
 
 
 E = TypeVar("E", bound=Enum)
@@ -468,6 +471,7 @@ class Config(BaseModel):
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
+            FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED: False,
             **self.feature_flags,
         }
         return self
@@ -619,7 +623,7 @@ class Config(BaseModel):
         ):
             try:
                 model_getter()
-            except Exception as e:  # noqa: PERF203
+            except Exception as e:
                 raise InvalidConfigError(
                     f"models.{model_getter.__name__}",
                     "All models must be instantiable",

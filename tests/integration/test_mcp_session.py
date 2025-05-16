@@ -26,7 +26,7 @@ async def test_mcp_session_stdio() -> None:
     async with get_mcp_session(
         StdioMcpClientConfig(
             server_name="test_server",
-            command="poetry",
+            command="uv",
             args=["run", "python", str(SERVER_FILE_PATH.absolute()), "stdio"],
         ),
     ) as session:
@@ -38,7 +38,7 @@ async def test_mcp_session_stdio() -> None:
 @pytest.fixture
 def sse_background_server() -> Iterator[None]:
     """Start the MCP server in the background."""
-    process = subprocess.Popen(["poetry", "run", "python", str(SERVER_FILE_PATH.absolute()), "sse"])  # noqa: S607, S603
+    process = subprocess.Popen(["uv", "run", "python", str(SERVER_FILE_PATH.absolute()), "sse"])  # noqa: S607, S603
     try:
         # Wait for server to start
         time.sleep(3)
