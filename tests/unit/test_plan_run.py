@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from portia.clarification import Clarification, InputClarification
+from portia.clarification import Clarification, ClarificationCategory, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanUUID, ReadOnlyStep, Step
@@ -152,3 +152,37 @@ def test_run_serialization() -> None:
     assert isinstance(parsed_plan_run.outputs.clarifications[0], InputClarification)
     # ensure plan inputs are maintained
     assert parsed_plan_run.plan_run_inputs["$test_input"].get_value() == "input_value"
+
+
+def test_get_clarification_for_step_with_matching_clarification(plan_run: PlanRun) -> None:
+    """Test get_clarification_for_step when there is a matching clarification."""
+    # Create a clarification for step 1
+    clarification = InputClarification(
+        plan_run_id=plan_run.id,
+        step=1,
+        argument_name="test_arg",
+        user_guidance="test guidance",
+        resolved=False,
+    )
+    plan_run.outputs.clarifications = [clarification]
+
+    # Get clarification for step 1
+    result = plan_run.get_clarification_for_step(ClarificationCategory.INPUT)
+    assert result == clarification
+
+
+def test_get_clarification_for_step_without_matching_clarification(plan_run: PlanRun) -> None:
+    """Test get_clarification_for_step when there is no matching clarification."""
+    # Create a clarification for step 2
+    clarification = InputClarification(
+        plan_run_id=plan_run.id,
+        step=2,
+        argument_name="test_arg",
+        user_guidance="test guidance",
+        resolved=False,
+    )
+    plan_run.outputs.clarifications = [clarification]
+
+    # Try to get clarification for step 1
+    result = plan_run.get_clarification_for_step(ClarificationCategory.INPUT)
+    assert result is None
