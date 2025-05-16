@@ -34,6 +34,8 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     Note: This tests mocks almost everything, but allows us to make sure things
     are running in order and being called correctly and passed out correctly.
     """
+    # Add mock for telemetry capture
+    mock_telemetry = mock.MagicMock()
 
     def memory_extraction_step(self, _) -> dict[str, Any]:  # noqa: ANN001, ARG001
         return {
@@ -85,14 +87,21 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
         end_user=EndUser(external_id="123"),
         config=get_test_config(),
         agent_memory=InMemoryStorage(),
-        tool=AdditionTool(),
+        tool=tool,
         execution_hooks=ExecutionHooks(
             before_tool_call=mock_before_tool_call,
             after_tool_call=mock_after_tool_call,
         ),
     )
+    agent.telemetry = mock_telemetry
 
     output = agent.execute_sync()
+
+    # Verify telemetry was captured with correct tool ID
+    mock_telemetry.capture.assert_called_once()
+    call_args = mock_telemetry.capture.call_args[0][0]
+    assert call_args.tool_id == tool.id
+
     assert isinstance(output, Output)
     assert output.get_value() == "Sent email with id: 0"
     mock_before_tool_call.assert_called_once_with(
