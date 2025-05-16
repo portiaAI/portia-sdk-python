@@ -25,16 +25,16 @@ jobs:
       - name: Install Pyright
         run: npm install -g pyright
 
-        # Install Poetry
-      - name: Install Poetry
+      # Install uv
+      - name: Install uv
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+          curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Install dependencies using Poetry
+      # Install dependencies using uv
       - name: Install dependencies
-        run: poetry install --no-interaction --all-extras
+        run: uv sync --all-extras
 
       # Run Pyright
       - name: Run Pyright
-        run: poetry run pyright
+        run: uv run pyright
