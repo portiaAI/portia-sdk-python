@@ -1,45 +1,65 @@
+"""Portia telemetry views."""
+
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from typing import Any
 
 
 @dataclass
 class BaseTelemetryEvent(ABC):
-	@property
-	@abstractmethod
-	def name(self) -> str:
-		pass
+    """Base class for all telemetry events.
 
-	@property
-	def properties(self) -> dict[str, Any]:
-		return {k: v for k, v in asdict(self).items() if k != 'name'}
+    This abstract class defines the interface that all telemetry events must implement.
+    It provides a common structure for event name and properties.
+    """
 
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Get the name of the telemetry event.
 
-@dataclass
-class RegisteredFunction:
-	name: str
-	params: dict[str, Any]
+        Returns:
+            str: The name of the telemetry event.
 
+        """
 
-@dataclass
-class ControllerRegisteredFunctionsTelemetryEvent(BaseTelemetryEvent):
-	registered_functions: list[RegisteredFunction]
-	name: str = 'controller_registered_functions'
-	
-@dataclass
-class TestTelemetryEvent(BaseTelemetryEvent):
-	something: str
-	name: str = 'test'
+    @property
+    def properties(self) -> dict[str, Any]:
+        """Get the properties of the telemetry event.
+
+        Returns:
+            dict[str, Any]: A dictionary containing all properties of the event,
+                           excluding the 'name' property.
+
+        """
+        return {k: v for k, v in asdict(self).items() if k != "name"}
+
 
 @dataclass
 class PortiaFunctionCallTelemetryEvent(BaseTelemetryEvent):
-	function_name: str
-	function_args: dict[str, Any]
-	name: str = 'portia_function_call'
+    """Telemetry event for tracking Portia function calls.
+
+    Attributes:
+        function_name: The name of the function being called.
+        function_call_details: Additional details about the function call.
+
+    """
+
+    function_name: str
+    function_call_details: dict[str, Any]
+    name: str = "portia_function_call"  # type: ignore reportIncompatibleMethodOverride
+
 
 @dataclass
 class ToolCallTelemetryEvent(BaseTelemetryEvent):
-	tool_id: str | None
-	name: str = 'tool_call'
+    """Telemetry event for tracking tool calls.
+
+    Attributes:
+        tool_id: The identifier of the tool being called, if any.
+
+    """
+
+    tool_id: str | None
+    name: str = "tool_call"  # type: ignore reportIncompatibleMethodOverride

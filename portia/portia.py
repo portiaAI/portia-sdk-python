@@ -101,7 +101,7 @@ class Portia:
         config: Config | None = None,
         tools: ToolRegistry | list[Tool] | None = None,
         execution_hooks: ExecutionHooks | None = None,
-        telemetry: BaseProductTelemetry | None = None
+        telemetry: BaseProductTelemetry | None = None,
     ) -> None:
         """Initialize storage and tools.
 
@@ -186,18 +186,21 @@ class Portia:
             PlanRun: The run resulting from executing the query.
 
         """
-        self.telemetry.capture(PortiaFunctionCallTelemetryEvent(
-            function_name="portia_run", function_args={
-                "tools": (
-                    ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
-                    if tools
-                    else None
-                ),
-                "example_plans_provided": example_plans is not None,
-                "end_user_provided": end_user is not None,
-                "plan_run_inputs_provided": plan_run_inputs is not None
-            }
-        ))
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_run",
+                function_call_details={
+                    "tools": (
+                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
+                        if tools
+                        else None
+                    ),
+                    "example_plans_provided": example_plans is not None,
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
         plan_inputs = list(plan_run_inputs.keys()) if plan_run_inputs else None
         plan = self._plan(query, tools, example_plans, end_user, plan_inputs)
         end_user = self.initialize_end_user(end_user)
@@ -231,18 +234,21 @@ class Portia:
             PlanError: If there is an error while generating the plan.
 
         """
-        self.telemetry.capture(PortiaFunctionCallTelemetryEvent(
-            function_name="portia_plan", function_args={
-                "tools": (
-                    ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
-                    if tools
-                    else None
-                ),
-                "example_plans_provided": example_plans is not None,
-                "end_user_provided": end_user is not None,
-                "plan_inputs_provided": plan_inputs is not None
-            }
-        ))
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_plan",
+                function_call_details={
+                    "tools": (
+                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
+                        if tools
+                        else None
+                    ),
+                    "example_plans_provided": example_plans is not None,
+                    "end_user_provided": end_user is not None,
+                    "plan_inputs_provided": plan_inputs is not None,
+                },
+            )
+        )
         return self._plan(query, tools, example_plans, end_user, plan_inputs)
 
     def _plan(
@@ -340,13 +346,16 @@ class Portia:
             PlanRun: The resulting PlanRun object.
 
         """
-        self.telemetry.capture(PortiaFunctionCallTelemetryEvent(
-            function_name="portia_run_plan", function_args={
-                "plan_type": type(plan).__name__,
-                "end_user_provided": end_user is not None,
-                "plan_run_inputs_provided": plan_run_inputs is not None
-            }
-        ))
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_run_plan",
+                function_call_details={
+                    "plan_type": type(plan).__name__,
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
         # ensure we have the plan in storage.
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
         plan_id = (
@@ -394,12 +403,15 @@ class Portia:
             InvalidPlanRunStateError: If the plan run is not in a valid state to be resumed.
 
         """
-        self.telemetry.capture(PortiaFunctionCallTelemetryEvent(
-            function_name="portia_resume", function_args={
-                "plan_run_provided": plan_run is not None,
-                "plan_run_id_provided": plan_run_id is not None
-            }
-        ))
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_resume",
+                function_call_details={
+                    "plan_run_provided": plan_run is not None,
+                    "plan_run_id_provided": plan_run_id is not None,
+                },
+            )
+        )
         return self._resume(plan_run, plan_run_id)
 
     def _resume(
@@ -551,12 +563,15 @@ class Portia:
             PlanRun: The updated PlanRun.
 
         """
-        self.telemetry.capture(PortiaFunctionCallTelemetryEvent(
-            function_name="portia_resolve_clarification", function_args={
-                "clarification_category": clarification.category.value,
-                "plan_run_provided": plan_run is not None
-            }
-        ))
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_resolve_clarification",
+                function_call_details={
+                    "clarification_category": clarification.category.value,
+                    "plan_run_provided": plan_run is not None,
+                },
+            )
+        )
         if plan_run is None:
             plan_run = self.storage.get_plan_run(clarification.plan_run_id)
 
@@ -625,9 +640,11 @@ class Portia:
             InvalidRunStateError: If the run cannot be waited for.
 
         """
-        self.telemetry.capture(PortiaFunctionCallTelemetryEvent(
-            function_name="portia_wait_for_ready", function_args={}
-        ))
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_wait_for_ready", function_call_details={}
+            )
+        )
         start_time = time.time()
         tries = 0
         if plan_run.state not in [
@@ -715,12 +732,15 @@ class Portia:
             PlanRun: The created PlanRun object.
 
         """
-        self.telemetry.capture(PortiaFunctionCallTelemetryEvent(
-            function_name="portia_create_plan_run", function_args={
-                "end_user_provided": end_user is not None,
-                "plan_run_inputs_provided": plan_run_inputs is not None
-            }
-        ))
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_create_plan_run",
+                function_call_details={
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
         return self._create_plan_run(plan, end_user, plan_run_inputs)
 
     def _create_plan_run(

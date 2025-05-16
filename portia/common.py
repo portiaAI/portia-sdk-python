@@ -98,6 +98,7 @@ def validate_extras_dependencies(extra_group: str, *, raise_error: bool = True) 
 
 T = TypeVar("T")
 
+
 def singleton(cls: type[T]) -> Callable[..., T]:
     """Create a decorator for a singleton instance of a class.
 
@@ -118,5 +119,5 @@ def singleton(cls: type[T]) -> Callable[..., T]:
     def reset() -> None:
         instance[0] = None
 
-    wrapper.reset = reset
+    wrapper.reset = reset  # type: ignore reportFunctionMemberAccess
     return wrapper

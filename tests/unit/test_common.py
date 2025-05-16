@@ -168,7 +168,7 @@ def test_singleton() -> None:
     assert instance1.value == 1  # Value should not change on second instantiation
 
     # Test reset functionality
-    TestClass.reset()
+    TestClass.reset()  # type: ignore reportFunctionMemberAccess
     instance3 = TestClass(3)
     assert instance3 is not instance1
     assert instance3.value == 3
