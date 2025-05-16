@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import importlib.util
 from enum import Enum
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 Serializable = Any
 SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
@@ -94,3 +97,30 @@ def validate_extras_dependencies(extra_group: str, *, raise_error: bool = True) 
             )
         return False
     return True
+
+
+T = TypeVar("T")
+
+
+def singleton(cls: type[T]) -> Callable[..., T]:
+    """Create a decorator for a singleton instance of a class.
+
+    Args:
+        cls: The class to make a singleton.
+
+    Returns:
+        A wrapper function that ensures only one instance of the class exists.
+
+    """
+    instance: list[T | None] = [None]
+
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        if instance[0] is None:
+            instance[0] = cls(*args, **kwargs)
+        return instance[0]
+
+    def reset() -> None:
+        instance[0] = None
+
+    wrapper.reset = reset  # type: ignore reportFunctionMemberAccess
+    return wrapper
