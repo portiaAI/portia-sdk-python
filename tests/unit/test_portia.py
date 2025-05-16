@@ -1786,15 +1786,12 @@ def test_portia_execution_step_hooks_with_skip(portia: Portia, planning_model: M
     ):
         plan_run = portia.run("Test execution hooks with skip")
 
-    # Verify run completed successfully
     assert plan_run.state == PlanRunState.COMPLETE
 
-    # Verify that step 1 was skipped and step 2 was executed
     assert "$step1_result" not in plan_run.outputs.step_outputs
     assert "$step2_result" in plan_run.outputs.step_outputs
     assert plan_run.outputs.step_outputs["$step2_result"].get_value() == "Step 2 result"
 
-    # Verify that after_step_execution was only called for step 2
     assert execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
     execution_hooks.after_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         mock.ANY, mock.ANY, ReadOnlyStep.from_step(step2), step_2_result
