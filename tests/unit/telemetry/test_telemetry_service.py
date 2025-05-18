@@ -86,58 +86,104 @@ class TestProductTelemetry:
     """Test suite for ProductTelemetry class."""
 
     @pytest.fixture
-    def telemetry(self) -> Any: # noqa: ANN401
+    def telemetry(self) -> Any:  # noqa: ANN401
         """Create a fresh ProductTelemetry instance for each test.
 
         Returns:
             A new ProductTelemetry instance.
 
         """
-        ProductTelemetry.reset() # type: ignore reportAccessAttributeIssue
+        ProductTelemetry.reset()  # type: ignore reportAccessAttributeIssue
         yield ProductTelemetry()
-        ProductTelemetry.reset() # type: ignore reportAccessAttributeIssue
+        ProductTelemetry.reset()  # type: ignore reportAccessAttributeIssue
 
-    def test_init_telemetry_disabled(self) -> None:
+    @pytest.fixture
+    def mock_logger(self) -> MagicMock:
+        """Mock logger for testing."""
+        logger = MagicMock()
+
+        logger.level = "DEBUG"
+        return logger
+
+    def test_init_telemetry_disabled(self, mock_logger: MagicMock) -> None:
         """Test initialization with telemetry disabled."""
-        ProductTelemetry.reset() # type: ignore reportAccessAttributeIssue
-        with patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "false"}, clear=True):
+        ProductTelemetry.reset()  # type: ignore reportAccessAttributeIssue
+        with (
+            patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "false"}, clear=True),
+            patch("portia.telemetry.telemetry_service.logger", mock_logger),
+        ):
             telemetry = ProductTelemetry()
-            assert telemetry._posthog_client is None # noqa: SLF001
+            mock_logger.debug.assert_called_once_with("Telemetry disabled")
+            assert telemetry._posthog_client is None  # noqa: SLF001
 
-    def test_init_telemetry_enabled(self) -> None:
+    def test_init_telemetry_enabled(self, mock_logger: MagicMock) -> None:
         """Test initialization with telemetry enabled."""
-        ProductTelemetry.reset() # type: ignore reportAccessAttributeIssue
-        with patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "true"}, clear=True):
+        ProductTelemetry.reset()  # type: ignore reportAccessAttributeIssue
+        with (
+            patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "true"}, clear=True),
+            patch("portia.telemetry.telemetry_service.logger", mock_logger),
+        ):
             telemetry = ProductTelemetry()
-            assert isinstance(telemetry._posthog_client, Posthog) # noqa: SLF001
+            mock_logger.info.assert_called_once()
+            assert "Portia anonymized telemetry enabled" in mock_logger.info.call_args[0][0]
+            assert isinstance(telemetry._posthog_client, Posthog)  # noqa: SLF001
 
-    def test_capture_when_disabled(self) -> None:
+    def test_capture_when_disabled(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is disabled."""
-        ProductTelemetry.reset() # type: ignore reportAccessAttributeIssue
-        with patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "false"}, clear=True):
+        ProductTelemetry.reset()  # type: ignore reportAccessAttributeIssue
+        with (
+            patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "false"}, clear=True),
+            patch("portia.telemetry.telemetry_service.logger", mock_logger),
+        ):
             telemetry = ProductTelemetry()
             event = TestTelemetryEvent("test_event", {})
             # Should not raise any exceptions
             telemetry.capture(event)
+            mock_logger.debug.assert_called_once_with("Telemetry disabled")
 
-    def test_capture_when_enabled(self) -> None:
+    def test_capture_when_enabled(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is enabled."""
-        ProductTelemetry.reset() # type: ignore reportAccessAttributeIssue
-        with patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "true"}, clear=True):
+        ProductTelemetry.reset()  # type: ignore reportAccessAttributeIssue
+        with (
+            patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "true"}, clear=True),
+            patch("portia.telemetry.telemetry_service.logger", mock_logger),
+        ):
             telemetry = ProductTelemetry()
             mock_client = MagicMock()
-            telemetry._posthog_client = mock_client # noqa: SLF001
+            telemetry._posthog_client = mock_client  # noqa: SLF001
 
             event = TestTelemetryEvent("test_event", {"key": "value"})
             telemetry.capture(event)
 
+            mock_logger.debug.assert_called_with("Telemetry event: test_event {'key': 'value'}")
             mock_client.capture.assert_called_once()
             args = mock_client.capture.call_args[0]
             assert args[1] == "test_event"
             assert args[2]["key"] == "value"
             assert args[2]["process_person_profile"] is True
 
-    def test_user_id_generation(self, telemetry: ProductTelemetry, tmp_path: Path) -> None: # type: ignore reportGeneralTypeIssues
+    def test_capture_when_enabled_with_exception(self, mock_logger: MagicMock) -> None:
+        """Test event capture when telemetry is enabled and PostHog client raises an exception."""
+        ProductTelemetry.reset()  # type: ignore reportAccessAttributeIssue
+        with (
+            patch.dict(os.environ, {"ANONYMIZED_TELEMETRY": "true"}, clear=True),
+            patch("portia.telemetry.telemetry_service.logger", mock_logger),
+        ):
+            telemetry = ProductTelemetry()
+            mock_client = MagicMock()
+            mock_client.capture.side_effect = Exception("PostHog API error")
+            telemetry._posthog_client = mock_client  # noqa: SLF001
+
+            event = TestTelemetryEvent("test_event", {"key": "value"})
+            # Should not raise the exception
+            telemetry.capture(event)
+
+            mock_logger.debug.assert_called_with("Telemetry event: test_event {'key': 'value'}")
+            mock_client.capture.assert_called_once()
+            mock_logger.exception.assert_called_once()
+            assert "Failed to send telemetry event" in mock_logger.exception.call_args[0][0]
+
+    def test_user_id_generation(self, telemetry: ProductTelemetry, tmp_path: Path) -> None:  # type: ignore reportGeneralTypeIssues
         """Test user ID generation and persistence.
 
         Args:
@@ -154,7 +200,7 @@ class TestProductTelemetry:
             user_id2 = telemetry.user_id
             assert user_id1 == user_id2
 
-    def test_user_id_error_handling(self, telemetry: ProductTelemetry) -> None: # type: ignore reportGeneralTypeIssues
+    def test_user_id_error_handling(self, telemetry: ProductTelemetry) -> None:  # type: ignore reportGeneralTypeIssues
         """Test user ID error handling with invalid path.
 
         Args:

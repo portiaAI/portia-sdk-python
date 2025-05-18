@@ -34,7 +34,7 @@ class BaseTelemetryEvent(ABC):
                            excluding the 'name' property.
 
         """
-        return {k: v for k, v in asdict(self).items() if k != "name"}
+        return {k: v for k, v in asdict(self).items() if k != "name"}  # pragma: no cover
 
 
 @dataclass

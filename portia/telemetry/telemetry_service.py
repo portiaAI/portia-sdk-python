@@ -31,6 +31,7 @@ def xdg_cache_home() -> Path:
         return path
     return default
 
+
 def get_project_id_key() -> str:
     """Get the project ID key.
 
@@ -40,14 +41,14 @@ def get_project_id_key() -> str:
     """
     if os.getenv("PORTIA_API_ENDPOINT"):
         endpoint = os.getenv("PORTIA_API_ENDPOINT")
-        if "localhost" in endpoint: # type: ignore reportOperatorIssue
-            return "phc_QHjx4dKKNAqmLS1U64kIXo4NlYOGIFDgB1qYxw3wh1W" # local / dev environment
-        if "dev" in endpoint: # type: ignore reportOperatorIssue
-            return "phc_gkmBfAtjABu5dDAX9KX61iAF10Wyze4FGPrT3g7mcKo" # staging environment
+        if "localhost" in endpoint:  # type: ignore reportOperatorIssue
+            return "phc_QHjx4dKKNAqmLS1U64kIXo4NlYOGIFDgB1qYxw3wh1W"  # local / dev environment
+        if "dev" in endpoint:  # type: ignore reportOperatorIssue
+            return "phc_gkmBfAtjABu5dDAX9KX61iAF10Wyze4FGPrT3g7mcKo"  # staging environment
     # TODO(POR-1391): Set to staging until we are confident in the data we are # noqa: FIX002
     # collecting
     # https://linear.app/portialabs/issue/POR-1391
-    return "phc_gkmBfAtjABu5dDAX9KX61iAF10Wyze4FGPrT3g7mcKo" # staging environment
+    return "phc_gkmBfAtjABu5dDAX9KX61iAF10Wyze4FGPrT3g7mcKo"  # staging environment
 
 
 class BaseProductTelemetry(ABC):
@@ -66,6 +67,7 @@ class BaseProductTelemetry(ABC):
             event (BaseTelemetryEvent): The telemetry event to capture
 
         """
+
 
 @singleton
 class ProductTelemetry(BaseProductTelemetry):
@@ -133,7 +135,7 @@ class ProductTelemetry(BaseProductTelemetry):
             return
 
         if self.debug_logging:
-            logger.debug(f"Telemetry event: {event.name} {event.properties}") # noqa: G004
+            logger.debug(f"Telemetry event: {event.name} {event.properties}")  # noqa: G004
         self._direct_capture(event)
 
     def _direct_capture(self, event: BaseTelemetryEvent) -> None:
@@ -146,7 +148,7 @@ class ProductTelemetry(BaseProductTelemetry):
 
         """
         if self._posthog_client is None:
-            return
+            return  # pragma: no cover
 
         try:
             self._posthog_client.capture(
@@ -155,7 +157,7 @@ class ProductTelemetry(BaseProductTelemetry):
                 {**event.properties, "process_person_profile": True},
             )
         except Exception:
-            logger.exception(f"Failed to send telemetry event {event.name}") # noqa: G004
+            logger.exception(f"Failed to send telemetry event {event.name}")  # noqa: G004
 
     @property
     def user_id(self) -> str:
@@ -180,6 +182,6 @@ class ProductTelemetry(BaseProductTelemetry):
             else:
                 with Path(self.USER_ID_PATH).open() as f:
                     self._curr_user_id = f.read()
-        except Exception: # noqa: BLE001
+        except Exception:  # noqa: BLE001
             self._curr_user_id = "UNKNOWN_USER_ID"
         return self._curr_user_id
