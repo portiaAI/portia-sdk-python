@@ -507,14 +507,15 @@ class Portia:
         plan_run: PlanRun,
     ) -> PlanRun:
         """Execute a plan run and handle any clarifications that are raised."""
-        while plan_run.state not in [
-            PlanRunState.COMPLETE,
-            PlanRunState.FAILED,
-        ]:
-            plan_run = self._execute_plan_run(plan, plan_run)
+        try:
+            while plan_run.state not in [
+                PlanRunState.COMPLETE,
+                PlanRunState.FAILED,
+            ]:
+                plan_run = self._execute_plan_run(plan, plan_run)
 
-            # If we don't have a clarification handler, return the plan run even if a clarification
-            # has been raised
+            # If we don't have a clarification handler, return the plan run
+            # even if a clarification has been raised
             if not self.execution_hooks.clarification_handler:
                 return plan_run
 
@@ -533,9 +534,16 @@ class Portia:
                 )
 
             if len(clarifications) > 0:
-                # If clarifications are handled synchronously, we'll go through this immediately.
-                # If they're handled asynchronously, we'll wait for the plan run to be ready.
+                # If clarifications are handled synchronously,
+                # we'll go through this immediately.
+                # If they're handled asynchronously,
+                # we'll wait for the plan run to be ready.
                 plan_run = self.wait_for_ready(plan_run)
+
+
+        except KeyboardInterrupt:
+            logger().info("Execution interrupted by user. Setting plan run state to FAILED.")
+            self._set_plan_run_state(plan_run, PlanRunState.FAILED)
 
         return plan_run
 
