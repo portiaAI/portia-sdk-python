@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
+
 from unittest.mock import MagicMock
 
 from langchain_core.language_models.chat_models import BaseChatModel
