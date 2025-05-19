@@ -47,16 +47,21 @@ class PlanBuilder:
     steps: list[Step]
     plan_inputs: list[PlanInput]
 
-    def __init__(self, query: str | None = None) -> None:
+    def __init__(
+        self, query: str | None = None, structured_output_schema: type[BaseModel] | None = None
+    ) -> None:
         """Initialize the builder with the plan query.
 
         Args:
             query (str): The original query given by the user.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query.
 
         """
         self.query = query if query is not None else ""
         self.steps = []
         self.plan_inputs = []
+        self.structured_output_schema = structured_output_schema
 
     def step(
         self,
@@ -175,6 +180,7 @@ class PlanBuilder:
             plan_context=PlanContext(query=self.query, tool_ids=tool_ids),
             steps=self.steps,
             plan_inputs=self.plan_inputs,
+            structured_output_schema=self.structured_output_schema,
         )
 
     def _get_step_index_or_raise(self, step_index: int | None) -> int:
