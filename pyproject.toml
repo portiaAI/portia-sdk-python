@@ -100,6 +100,9 @@ include = ["portia"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.pyright]
+ignore = ["scratch/*"]
+
 [tool.ruff]
 line-length=100
 

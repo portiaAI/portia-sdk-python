@@ -237,7 +237,7 @@ class Portia:
             return to_return
         raise ValueError("Invalid plan run inputs received")
 
-    def plan(
+    def plan(  # noqa: PLR0913
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
@@ -385,8 +385,14 @@ class Portia:
             else plan.id
         )
 
+        structured_output_schema = (
+            structured_output_schema
+            if structured_output_schema
+            else (plan.structured_output_schema if isinstance(plan, Plan) else None)
+        )
         if self.storage.plan_exists(plan_id):
             plan = self.storage.get_plan(plan_id)
+            plan.structured_output_schema = structured_output_schema
         elif isinstance(plan, Plan):
             self.storage.save_plan(plan)
         else:
@@ -394,7 +400,6 @@ class Portia:
 
         end_user = self.initialize_end_user(end_user)
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan.structured_output_schema = structured_output_schema
         plan_run = self.create_plan_run(plan, end_user, coerced_plan_run_inputs)
         return self.resume(plan_run)
 

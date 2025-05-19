@@ -474,7 +474,13 @@ class Plan(BaseModel):
             f"Task: {self.plan_context.query}\n"
             f"Tools Available Summary: {tools_summary}\n"
             f"{inputs_section}"
-            f"Steps:\n" + "\n".join([step.pretty_print() for step in self.steps])
+            f"Steps:\n"
+            + "\n".join([step.pretty_print() for step in self.steps])
+            + (
+                f"\nStructured Output Schema: {self.structured_output_schema.__name__}"
+                if self.structured_output_schema
+                else ""
+            )
         )
 
     @model_validator(mode="after")
