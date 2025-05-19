@@ -48,6 +48,7 @@ def test_clarify_before_tool_call_with_previous_yes_response() -> None:
         resolved=True,
         response="yes",
         step=0,
+        source="Test execution hooks",
     )
     plan_run.outputs.clarifications = [prev_clarification]
 
@@ -70,6 +71,7 @@ def test_clarify_before_tool_call_with_previous_no_response() -> None:
         resolved=True,
         response="no",
         step=0,
+        source="Test execution hooks",
     )
     plan_run.outputs.clarifications = [prev_clarification]
 
@@ -89,6 +91,7 @@ def test_clarify_before_tool_call_with_unresolved_clarification() -> None:
         user_guidance=f"Are you happy to proceed with the call to {tool.name} with args {args}? "
         "Enter 'y' or 'yes' to proceed",
         resolved=False,
+        source="Test execution hooks",
     )
     plan_run.outputs.clarifications = [prev_clarification]
 

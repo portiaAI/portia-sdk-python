@@ -21,6 +21,7 @@ def mock_clarification() -> InputClarification:
         user_guidance="test",
         resolved=False,
         argument_name="test",
+        source="Test plan run",
     )
 
 
@@ -129,6 +130,7 @@ def test_run_serialization() -> None:
                     argument_name="test",
                     user_guidance="help",
                     response="yes",
+                    source="Test plan run",
                 ),
             ],
             step_outputs={
@@ -163,6 +165,7 @@ def test_get_clarification_for_step_with_matching_clarification(plan_run: PlanRu
         argument_name="test_arg",
         user_guidance="test guidance",
         resolved=False,
+        source="Test plan run",
     )
     plan_run.outputs.clarifications = [clarification]
 
@@ -180,6 +183,7 @@ def test_get_clarification_for_step_without_matching_clarification(plan_run: Pla
         argument_name="test_arg",
         user_guidance="test guidance",
         resolved=False,
+        source="Test plan run",
     )
     plan_run.outputs.clarifications = [clarification]
 

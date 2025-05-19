@@ -202,6 +202,7 @@ def _clarify_on_tool_call_hook(
             plan_run_id=plan_run.id,
             user_guidance=f"Are you happy to proceed with the call to {tool.name} with args "
             f"{args}? Enter 'y' or 'yes' to proceed",
+            source="User verification tool hook",
         )
 
     if str(previous_clarification.response).lower() not in ["y", "yes", "Y", "YES", "Yes"]:
