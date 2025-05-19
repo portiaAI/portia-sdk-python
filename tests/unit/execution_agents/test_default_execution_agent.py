@@ -444,7 +444,7 @@ def test_verifier_model() -> None:
     assert "CONTEXT_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "DESCRIPTION_STRING" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_NAME" in messages[1].content  # type: ignore  # noqa: PGH003
-    assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    assert "TOOL_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" in messages[1].content  # type: ignore  # noqa: PGH003
     assert mock_model.with_structured_output.called
     assert mock_model.with_structured_output.call_args[0][0] == VerifiedToolInputs
