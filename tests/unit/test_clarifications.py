@@ -9,9 +9,11 @@ from pydantic import HttpUrl
 
 from portia.clarification import (
     ActionClarification,
+    ClarificationCategory,
     ClarificationUUID,
     CustomClarification,
     MultipleChoiceClarification,
+    UserVerificationClarification,
 )
 from portia.prefixed_uuid import PlanRunUUID
 from portia.storage import DiskFileStorage
@@ -84,3 +86,20 @@ def test_custom_clarification_deserialize(tmp_path: Path) -> None:
     retrieved = storage.get_plan_run(plan_run.id)
     assert isinstance(retrieved.outputs.clarifications[0], CustomClarification)
     assert retrieved.outputs.clarifications[0].data == {"email": {"test": "hello@example.com"}}
+
+
+def test_user_verification_clarification() -> None:
+    """Test user verification clarification creation and serialization."""
+    clarification = UserVerificationClarification(
+        plan_run_id=PlanRunUUID(),
+        user_guidance="Please verify this information",
+    )
+
+    # Verify category is set correctly
+    assert clarification.category == ClarificationCategory.USER_VERIFICATION
+
+    # Verify serialization
+    clarification_model = clarification.model_dump()
+    assert clarification_model["category"] == "User Verification"
+    assert clarification_model["user_guidance"] == "Please verify this information"
+    assert isinstance(clarification.id, ClarificationUUID)

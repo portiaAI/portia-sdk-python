@@ -3,18 +3,33 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
-import click
 from pydantic import BaseModel, ConfigDict
 
-from portia.clarification import Clarification, ClarificationCategory, CustomClarification
+from portia.clarification import (
+    Clarification,
+    ClarificationCategory,
+    UserVerificationClarification,
+)
 from portia.clarification_handler import ClarificationHandler
+from portia.common import PortiaEnum
 from portia.errors import ToolHardError
 from portia.execution_agents.output import Output
+from portia.logger import logger
 from portia.plan import Plan, Step
 from portia.plan_run import PlanRun
 from portia.tool import Tool
+
+
+class BeforeStepExecutionOutcome(PortiaEnum):
+    """The Outcome of the before step execution hook."""
+
+    # Continue with the step execution
+    CONTINUE = "CONTINUE"
+    # Skip the step execution
+    SKIP = "SKIP"
 
 
 class ExecutionHooks(BaseModel):
@@ -25,10 +40,10 @@ class ExecutionHooks(BaseModel):
     - before_step_execution: Called before executing each step
     - after_step_execution: Called after executing each step. When there's an error, this is
         called with the error as the output value.
-    - before_first_step_execution: Called before executing the first step
-    - after_last_step_execution: Called after executing the last step of the plan run. This is not
-        called if a clarification is raised, as it is expected that the plan will be resumed after
-        the clarification is handled.
+    - before_plan_run: Called before executing the first step of the plan run.
+    - after_plan_run: Called after executing the plan run. This is not called if a clarification
+        is raised, as it is expected that the plan will be resumed after the clarification is
+        handled.
     - before_tool_call: Called before the tool is called
     - after_tool_call: Called after the tool is called
     """
@@ -38,13 +53,17 @@ class ExecutionHooks(BaseModel):
     clarification_handler: ClarificationHandler | None = None
     """Handler for clarifications raised during execution."""
 
-    before_step_execution: Callable[[Plan, PlanRun, Step], None] | None = None
+    before_step_execution: Callable[[Plan, PlanRun, Step], BeforeStepExecutionOutcome] | None = None
     """Called before executing each step.
 
     Args:
         plan: The plan being executed
         plan_run: The current plan run
         step: The step about to be executed
+
+    Returns:
+        BeforeStepExecutionOutcome | None: Whether to continue with the step execution or skip it.
+            If None is returned, the default behaviour is to continue with the step execution.
     """
 
     after_step_execution: Callable[[Plan, PlanRun, Step, Output], None] | None = None
@@ -59,16 +78,16 @@ class ExecutionHooks(BaseModel):
         output: The output from the step execution
     """
 
-    before_first_step_execution: Callable[[Plan, PlanRun], None] | None = None
-    """Called before executing the first step.
+    before_plan_run: Callable[[Plan, PlanRun], None] | None = None
+    """Called before executing the first step of the plan run.
 
     Args:
         plan: The plan being executed
         plan_run: The current plan run
     """
 
-    after_last_step_execution: Callable[[Plan, PlanRun, Output], None] | None = None
-    """Called after executing the last step of the plan run.
+    after_plan_run: Callable[[Plan, PlanRun, Output], None] | None = None
+    """Called after executing the plan run.
 
     This is not called if a clarification is raised, as it is expected that the plan
     will be resumed after the clarification is handled.
@@ -86,7 +105,8 @@ class ExecutionHooks(BaseModel):
 
     Args:
         tool: The tool about to be called
-        args: The args for the tool call
+        args: The args for the tool call. These are mutable and so can be modified in place as
+          required.
         plan_run: The current plan run
         step: The step being executed
 
@@ -112,35 +132,79 @@ class ExecutionHooks(BaseModel):
 # Example execution hooks
 
 
-def cli_user_verify_before_tool_call(
+def clarify_on_all_tool_calls(
+    tool: Tool,
+    args: dict[str, Any],
+    plan_run: PlanRun,
+    step: Step,
+) -> Clarification | None:
+    """Raise a clarification to check the user is happy with all tool calls before proceeding.
+
+    Example usage:
+        portia = Portia(
+            execution_hooks=ExecutionHooks(
+                before_tool_call=clarify_on_all_tool_calls,
+            )
+        )
+    """
+    return _clarify_on_tool_call_hook(tool, args, plan_run, step, tool_ids=None)
+
+
+def clarify_on_tool_calls(
+    tool: str | Tool | list[str] | list[Tool],
+) -> Callable[[Tool, dict[str, Any], PlanRun, Step], Clarification | None]:
+    """Return a hook that raises a clarification before calls to the specified tool.
+
+    Args:
+        tool: The tool or tools to raise a clarification for before running
+
+    Example usage:
+        portia = Portia(
+            execution_hooks=ExecutionHooks(
+                before_tool_call=clarify_on_tool_calls("my_tool_id"),
+            )
+        )
+        # Or with Tool objects:
+        portia = Portia(
+            execution_hooks=ExecutionHooks(
+                before_tool_call=clarify_on_tool_calls([tool1, tool2]),
+            )
+        )
+
+    """
+    if isinstance(tool, Tool):
+        tool_ids = [tool.id]
+    elif isinstance(tool, str):
+        tool_ids = [tool]
+    else:
+        tool_ids = [t.id if isinstance(t, Tool) else t for t in tool]
+
+    return partial(_clarify_on_tool_call_hook, tool_ids=tool_ids)
+
+
+def _clarify_on_tool_call_hook(
     tool: Tool,
     args: dict[str, Any],
     plan_run: PlanRun,
     step: Step,  # noqa: ARG001
+    tool_ids: list[str] | None,
 ) -> Clarification | None:
-    """Raise a clarification to check the user is happy with the tool call before proceeding."""
-    user_verify_clarification = CustomClarification(
-        name="user_verify",
-        plan_run_id=plan_run.id,
-        user_guidance=f"Are you happy to proceed with the call to {tool.name}? "
-        "Enter 'y' or 'yes' to proceed",
-        data={"args": args},
+    """Raise a clarification to check the user is happy with all tool calls before proceeding."""
+    if tool_ids and tool.id not in tool_ids:
+        return None
+
+    previous_clarification = plan_run.get_clarification_for_step(
+        ClarificationCategory.USER_VERIFICATION
     )
 
-    previously_raised_clarification = next(
-        (
-            c
-            for c in plan_run.get_clarifications_for_step()
-            if c.user_guidance == user_verify_clarification.user_guidance
-            and c.category == ClarificationCategory.CUSTOM
-        ),
-        None,
-    )
+    if not previous_clarification or not previous_clarification.resolved:
+        return UserVerificationClarification(
+            plan_run_id=plan_run.id,
+            user_guidance=f"Are you happy to proceed with the call to {tool.name} with args "
+            f"{args}? Enter 'y' or 'yes' to proceed",
+        )
 
-    if not previously_raised_clarification or not previously_raised_clarification.resolved:
-        return user_verify_clarification
-
-    if str(previously_raised_clarification.response).lower() not in ["y", "yes", "Y", "YES", "Yes"]:
+    if str(previous_clarification.response).lower() not in ["y", "yes", "Y", "YES", "Yes"]:
         raise ToolHardError("User rejected tool call to {tool.name} with args {args}")
 
     return None
@@ -148,10 +212,6 @@ def cli_user_verify_before_tool_call(
 
 def log_step_outputs(plan: Plan, plan_run: PlanRun, step: Step, output: Output) -> None:  # noqa: ARG001
     """Log the output of a step in the plan."""
-    click.echo(
-        click.style(
-            f"Step with task {step.task} using tool {step.tool_id} "
-            f"completed with result: {output}",
-            fg=87,
-        )
+    logger().info(
+        f"Step with task {step.task} using tool {step.tool_id} completed with result: {output}"
     )
