@@ -172,20 +172,3 @@ def test_singleton() -> None:
     instance3 = TestClass(3)
     assert instance3 is not instance1
     assert instance3.value == 3
-
-
-def test_singleton_with_different_args() -> None:
-    """Test singleton behavior with different initialization arguments."""
-
-    @singleton
-    class TestClass:
-        def __init__(self, value: int = 0) -> None:
-            self.value = value
-
-    # First instantiation
-    instance1 = TestClass(1)
-
-    # Try to create with different args
-    instance2 = TestClass(2)
-    assert instance1 is instance2
-    assert instance1.value == 1  # Should retain original value

@@ -136,19 +136,6 @@ class ProductTelemetry(BaseProductTelemetry):
 
         if self.debug_logging:
             logger.debug(f"Telemetry event: {event.name} {event.properties}")  # noqa: G004
-        self._direct_capture(event)
-
-    def _direct_capture(self, event: BaseTelemetryEvent) -> None:
-        """Directly capture and send the event to PostHog.
-
-        This method is not thread-blocking as PostHog handles the transmission asynchronously.
-
-        Args:
-            event (BaseTelemetryEvent): The telemetry event to capture
-
-        """
-        if self._posthog_client is None:
-            return  # pragma: no cover
 
         try:
             self._posthog_client.capture(
