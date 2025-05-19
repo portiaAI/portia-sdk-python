@@ -10,7 +10,7 @@
      - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
      - give a name to the variable for the output of the step if it is successful.
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
-     - Additional information about the caller is provided in the EndUser section. You can use this if the query refers to the end user, i.e. Send me an email.
+     - Additional information about the caller can be provided in the EndUser section. You can use this if the query refers to the end user, i.e. Send me an email.
      - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
     IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create a plan with zero steps. When returning an error, return only the JSON object with the error message filled in plus an empty list of steps - DO NOT include text (explaining the error or otherwise) outside the JSON object.
     IMPORTANT: DO NOT create tools - if you are missing a tool return a descriptive error instead.
@@ -44,6 +44,7 @@
     </Tool>{% endfor %}
 </Tools>
 
+{% if end_user.email or end_user.name or end_user.phone_number or end_user.additional_data %}
 <EndUser>
     {% if end_user.email %}
     <EndUser.Email>{{ end_user.email }}</EndUser.Email>
@@ -58,6 +59,7 @@
     <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
     {% endif %}
 </EndUser>
+{% endif %}
 
 {% if plan_inputs %}
 <PlanInputs>{% for input in plan_inputs %}

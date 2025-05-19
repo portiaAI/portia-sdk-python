@@ -33,6 +33,7 @@ def test_action_clarification(mock_echo: MagicMock, cli_handler: CLIClarificatio
         plan_run_id=PlanRunUUID(),
         user_guidance="Please authenticate",
         action_url=HttpUrl("https://example.com/auth"),
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_action_clarification(clarification, on_resolution, on_error)
@@ -66,6 +67,7 @@ def test_action_clarification_with_confirmation(
         user_guidance="Please authenticate",
         action_url=HttpUrl("https://example.com/auth"),
         require_confirmation=True,
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_action_clarification(clarification, on_resolution, on_error)
@@ -103,6 +105,7 @@ def test_action_clarification_with_confirmation_rejected(
         user_guidance="Please authenticate",
         action_url=HttpUrl("https://example.com/auth"),
         require_confirmation=True,
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_action_clarification(clarification, on_resolution, on_error)
@@ -134,6 +137,7 @@ def test_input_clarification(mock_prompt: MagicMock, cli_handler: CLIClarificati
         plan_run_id=PlanRunUUID(),
         user_guidance="Enter your name",
         argument_name="name",
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_input_clarification(clarification, on_resolution, on_error)
@@ -164,6 +168,7 @@ def test_multiple_choice_clarification(
         user_guidance="Choose a color",
         argument_name="color",
         options=["option1", "option2", "option3"],
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_multiple_choice_clarification(clarification, on_resolution, on_error)
@@ -198,6 +203,7 @@ def test_value_confirmation_clarification_confirmed(
         plan_run_id=PlanRunUUID(),
         user_guidance="Confirm deletion?",
         argument_name="confirm_delete",
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_value_confirmation_clarification(clarification, on_resolution, on_error)
@@ -227,6 +233,7 @@ def test_value_confirmation_clarification_rejected(
         plan_run_id=PlanRunUUID(),
         user_guidance="Confirm deletion?",
         argument_name="confirm_delete",
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_value_confirmation_clarification(clarification, on_resolution, on_error)
@@ -258,6 +265,7 @@ def test_custom_clarification(
         user_guidance="Custom action needed",
         name="custom_action",
         data={"key1": "value1", "key2": "value2"},
+        source="Test cli clarification handler",
     )
 
     cli_handler.handle_custom_clarification(clarification, on_resolution, on_error)

@@ -32,6 +32,7 @@ def test_action_clarification() -> None:
         plan_run_id=PlanRunUUID(),
         user_guidance="test",
         action_url=HttpUrl("https://example.com"),
+        source="Test clarification handler",
     )
 
     # Test without implementation
@@ -58,6 +59,7 @@ def test_input_clarification() -> None:
         plan_run_id=PlanRunUUID(),
         user_guidance="test",
         argument_name="test",
+        source="Test clarification handler",
     )
 
     # Test without implementation
@@ -85,6 +87,7 @@ def test_multiple_choice_clarification() -> None:
         user_guidance="test",
         argument_name="test",
         options=["option1", "option2"],
+        source="Test clarification handler",
     )
 
     # Test without implementation
@@ -111,6 +114,7 @@ def test_value_confirmation_clarification() -> None:
         plan_run_id=PlanRunUUID(),
         user_guidance="test",
         argument_name="test",
+        source="Test clarification handler",
     )
 
     # Test without implementation
@@ -138,6 +142,7 @@ def test_custom_clarification_routing() -> None:
         user_guidance="test",
         name="test",
         data={"key": "value"},
+        source="Test clarification handler",
     )
 
     # Test without implementation
@@ -165,6 +170,7 @@ def test_invalid_clarification() -> None:
         category=ClarificationCategory.CUSTOM,
         plan_run_id=PlanRunUUID(),
         user_guidance="test",
+        source="Test clarification handler",
     )
 
     on_resolution = MagicMock()
