@@ -137,6 +137,7 @@ def test_browser_tool_auth_check(
                 action_url=HttpUrl("https://example.com/login"),
                 plan_run_id=context.plan_run_id,
                 require_confirmation=True,
+                source="Browser tool",
             ),
         )
 
@@ -690,6 +691,7 @@ def test_browserbase_provider_get_or_create_session_with_clarifications(
             user_guidance="Test guidance",
             plan_run_id=PlanRunUUID(),
             action_url=HttpUrl("https://example.com"),
+            source="Browser tool",
         )
     ]
     context.end_user.additional_data = {

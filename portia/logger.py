@@ -161,7 +161,11 @@ class SafeLogger(LoggerInterface):
     def __init__(self, child_logger: LoggerInterface) -> None:
         """Initialize the SafeLogger."""
         super().__init__()
-        self.child_logger = child_logger
+        self.child_logger = (
+            child_logger.opt(depth=1)
+            if isinstance(child_logger, type(default_logger))
+            else child_logger
+        )
 
     def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Wrap the child logger's debug method to catch exceptions."""

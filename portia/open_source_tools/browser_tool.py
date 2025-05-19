@@ -256,6 +256,7 @@ class BrowserTool(Tool[str | BaseModel]):
                     ),
                     plan_run_id=ctx.plan_run_id,
                     require_confirmation=True,
+                    source="Browser tool",
                 )
 
             output_schema = self.structured_output_schema if self.structured_output_schema else str
