@@ -242,6 +242,7 @@ class BrowserTool(Tool[str]):
                     ),
                     plan_run_id=ctx.plan_run_id,
                     require_confirmation=True,
+                    source="Browser tool",
                 )
 
             async def run_agent_task(

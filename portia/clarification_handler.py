@@ -37,10 +37,12 @@ class ClarificationHandler(ABC):  # noqa: B024
             clarification: The clarification object to handle
             on_resolution: Callback function that should be invoked once the clarification has been
                 handled, prompting the plan run to resume. This can either be called synchronously
-                in this function or called async after returning from this function.
+                in this function or called async after returning from this function. The callback
+                takes two arguments: the clarification object and the response to the clarification.
             on_error: Callback function that should be invoked if the clarification handling has
                 failed. This can either be called synchronously in this function or called async
-                after returning from this function.
+                after returning from this function. The callback takes two arguments: the
+                clarification object and the error.
 
         """
         match clarification:

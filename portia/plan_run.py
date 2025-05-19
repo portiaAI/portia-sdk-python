@@ -20,6 +20,8 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.clarification import (
+    Clarification,
+    ClarificationCategory,
     ClarificationListType,
 )
 from portia.common import PortiaEnum
@@ -156,6 +158,27 @@ class PlanRun(BaseModel):
             for clarification in self.outputs.clarifications
             if clarification.step == step
         ]
+
+    def get_clarification_for_step(
+        self, category: ClarificationCategory, step: int | None = None
+    ) -> Clarification | None:
+        """Return a clarification of the given category for the given step if it exists.
+
+        Args:
+            step (int | None): the step to get a clarification for. Defaults to current step.
+            category (ClarificationCategory | None): the category of the clarification to get.
+
+        """
+        if step is None:
+            step = self.current_step_index
+        return next(
+            (
+                clarification
+                for clarification in self.outputs.clarifications
+                if clarification.step == step and clarification.category == category
+            ),
+            None,
+        )
 
     def get_potential_step_inputs(self) -> dict[str, Output]:
         """Return a dictionary of potential step inputs for future steps."""
