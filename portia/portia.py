@@ -43,7 +43,6 @@ from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
     PlanNotFoundError,
-    StorageError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
@@ -362,13 +361,13 @@ class Portia:
             if isinstance(plan, UUID)
             else plan.id
         )
-        try:
+
+        if self.storage.plan_exists(plan_id):
             plan = self.storage.get_plan(plan_id)
-        except (PlanNotFoundError, StorageError):
-            if isinstance(plan, Plan):
-                self.storage.save_plan(plan)
-            else:
-                raise PlanNotFoundError(plan_id) from None
+        elif isinstance(plan, Plan):
+            self.storage.save_plan(plan)
+        else:
+            raise PlanNotFoundError(plan_id) from None
 
         end_user = self.initialize_end_user(end_user)
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
