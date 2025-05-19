@@ -12,26 +12,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Install Poetry
-        run: pipx install poetry
+      - name: Install uv
+        run: pipx install uv
 
       - name: Install dependencies
         run: |
-          poetry install --all-extras
+          uv sync
           # install license check via pip so it doesn't check itself
-          poetry run pip install licensecheck pipdeptree
+          uv pip install licensecheck pipdeptree
 
       - name: Check licenses
         run: |
           echo "Checking for disallowed licenses..."
           echo "::group::License Report"
           # Run license check and always show output
-          poetry run python -m licensecheck --zero | tee license_output.txt
+          uv run python -m licensecheck --zero | tee license_output.txt
           EXIT_CODE=${PIPESTATUS[0]}
 
           # If there are failures, extract incompatible packages and show their reverse dependencies
@@ -45,7 +40,7 @@ jobs:
               echo "$INCOMPATIBLE" | while read -r line; do
                 PKG=$(echo "$line" | awk '{print $3}')
                 echo -e "\nDependency tree for $PKG:"
-                poetry run pipdeptree --reverse --packages "$PKG"
+                uv run pipdeptree --reverse --packages "$PKG"
               done
             fi
             

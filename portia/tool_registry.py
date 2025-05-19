@@ -19,7 +19,7 @@ import asyncio
 import os
 import re
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Union, get_args, get_origin
 
 from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model, model_serializer
@@ -44,7 +44,7 @@ from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import httpx
     import mcp
@@ -358,7 +358,7 @@ class McpToolRegistry(ToolRegistry):
         server_name: str,
         url: str,
         headers: dict[str, Any] | None = None,
-        timeout: float = 5,
+        timeout: float = 5,  # noqa: ASYNC109
         sse_read_timeout: float = 60 * 5,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Async version)."""

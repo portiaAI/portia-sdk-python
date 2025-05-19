@@ -73,6 +73,8 @@ class PlanStorage(ABC):
             Save a plan.
         get_plan(self, plan_id: PlanUUID) -> Plan:
             Get a plan by ID.
+        plan_exists(self, plan_id: PlanUUID) -> bool:
+            Check if a plan exists without raising an error.
 
     """
 
@@ -104,6 +106,22 @@ class PlanStorage(ABC):
 
         """
         raise NotImplementedError("get_plan is not implemented")
+
+    @abstractmethod
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists without raising an error.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("plan_exists is not implemented")
 
     def get_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 10) -> list[Plan]:
         """Get similar plans to the query.
@@ -257,8 +275,6 @@ class Storage(PlanStorage, RunStorage, AdditionalStorage):
 class AgentMemory(Protocol):
     """Abstract base class for storing items in agent memory."""
 
-    MAX_OUTPUT_BYTES = 32_000_000
-
     @abstractmethod
     def save_plan_run_output(
         self,
@@ -297,12 +313,16 @@ class AgentMemory(Protocol):
 
         """
 
-    def _check_size(self: AgentMemory, output_name: str, output: Output) -> None:
-        """Raise an error if the output is too large to store."""
-        if sys.getsizeof(output) > self.MAX_OUTPUT_BYTES:
-            raise StorageError(
-                f"Attempted to save an agent output that is too large: {output_name}",
-            )
+
+MAX_STORAGE_OBJECT_BYTES = 32_000_000
+
+
+def _check_size(obj_name: str, obj: object) -> None:
+    """Raise an error if an object is too large to store in storage."""
+    if sys.getsizeof(obj) > MAX_STORAGE_OBJECT_BYTES:
+        raise StorageError(
+            f"Attempted to save an object that is too large: {obj_name}",
+        )
 
 
 def log_tool_call(tool_call: ToolCallRecord) -> None:
@@ -378,6 +398,18 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             return self.plans[plan_id]
         raise PlanNotFoundError(plan_id)
 
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists in memory.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        return plan_id in self.plans
+
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Add run to dict.
 
@@ -445,7 +477,7 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        self._check_size(output_name, output)
+        _check_size(output_name, output)
         if output.get_summary() is None:
             logger().warning(
                 f"Storing Output {output} with no summary",
@@ -598,6 +630,18 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         except (ValidationError, FileNotFoundError) as e:
             raise PlanNotFoundError(plan_id) from e
 
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists on disk.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        return Path(self.storage_dir, f"{plan_id}.json").exists()
+
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun object to the storage.
 
@@ -672,7 +716,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             plan_run_id (PlanRunUUID): The ID of the current plan run
 
         """
-        self._check_size(output_name, output)
+        _check_size(output_name, output)
         filename = f"{plan_run_id}/{output_name}.json"
         self._write(filename, output)
         return AgentMemoryValue(
@@ -823,6 +867,13 @@ class PortiaCloudStorage(Storage, AgentMemory):
             StorageError: If the response from the Portia API indicates an error.
 
         """
+        if response.status_code == httpx.codes.REQUEST_ENTITY_TOO_LARGE:
+            raise StorageError(
+                "Error from Portia Cloud - request too large: "
+                f"{response.request.content[:1000]}...(truncated). "
+                "Please contact hello@portialabs.ai to discuss your usecase."
+            )
+
         if not response.is_success:
             error_str = str(response.content)
             logger().error(f"Error from Portia Cloud: {error_str}")
@@ -846,7 +897,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "query": plan.plan_context.query,
                     "tool_ids": plan.plan_context.tool_ids,
                     "steps": [step.model_dump(mode="json") for step in plan.steps],
-                    "inputs": [input_.model_dump(mode="json") for input_ in plan.inputs],
+                    "plan_inputs": [
+                        {**input_.model_dump(mode="json"), "description": input_.description}
+                        for input_ in plan.plan_inputs
+                    ],
                 },
             )
         except Exception as e:
@@ -877,6 +931,25 @@ class PortiaCloudStorage(Storage, AgentMemory):
             self.check_response(response)
             response_json = response.json()
             return Plan.from_response(response_json)
+
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists in Portia Cloud.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        try:
+            response = self.client.get(
+                url=f"/api/v0/plans/{plan_id}/",
+            )
+        except Exception:  # noqa: BLE001
+            return False
+        else:
+            return response.is_success
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun to Portia Cloud.
@@ -1006,6 +1079,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
+            _check_size(f"{tool_call.tool_name} output", tool_call.output)
             response = self.client.post(
                 url="/api/v0/tool-calls/",
                 json={
@@ -1019,7 +1093,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                     "latency_seconds": tool_call.latency_seconds,
                 },
             )
-        except Exception as e: # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             logger().error(f"Error saving tool call to Portia Cloud: {e}")
         else:
             # Don't raise an error if the response is not successful, just log it
@@ -1047,7 +1121,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            self._check_size(output_name, output)
+            _check_size(output_name, output)
 
             response = self.form_client.put(
                 url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",

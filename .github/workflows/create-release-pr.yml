@@ -25,27 +25,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
 
-      - name: Install Poetry
+      - name: Install uv
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+          curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Get current version
         id: current_version
         run: |
-          CURRENT_VERSION=$(poetry version -s)
+          CURRENT_VERSION=$(uv version --short)
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Bump version
         id: bump_version
         run: |
           # Remove potential alpha suffix from current version
-          BASE_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | sed 's/-alpha//')
+          BASE_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | sed 's/a[0-9]\+$//')
           
           # Bump version according to input
           case "${{ inputs.bump_type }}" in
@@ -62,7 +57,7 @@ jobs:
           
           # Add alpha suffix if requested
           if [ "${{ inputs.release_type }}" = "alpha" ]; then
-            NEW_VERSION="${NEW_VERSION}-alpha"
+            NEW_VERSION="${NEW_VERSION}a0"
           fi
           
           # Set output for next steps
@@ -75,7 +70,7 @@ jobs:
           git checkout -b release/v${{ steps.bump_version.outputs.new_version }}
           
           # Update version in release branch
-          poetry version ${{ steps.bump_version.outputs.new_version }}
+          uv version ${{ steps.bump_version.outputs.new_version }}
           
           git add pyproject.toml
           git commit -m "Bump version to v${{ steps.bump_version.outputs.new_version }}"

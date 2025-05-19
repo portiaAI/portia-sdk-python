@@ -11,15 +11,17 @@ from portia.templates.render import render_template
 if TYPE_CHECKING:
     from portia.end_user import EndUser
     from portia.plan import Plan, PlanInput
+    from portia.planning_agents.base_planning_agent import StepsOrError
     from portia.tool import Tool
 
 
-def render_prompt_insert_defaults(
+def render_prompt_insert_defaults(  # noqa: PLR0913
     query: str,
     tool_list: list[Tool],
     end_user: EndUser,
     examples: list[Plan] | None = None,
     plan_inputs: list[PlanInput] | None = None,
+    previous_errors: list[StepsOrError] | None = None,
 ) -> str:
     """Render the prompt for the PlanningAgent with defaults inserted if not provided."""
     system_context = default_query_system_context()
@@ -46,6 +48,7 @@ def render_prompt_insert_defaults(
         system_context=system_context,
         non_default_examples_provided=non_default_examples_provided,
         plan_inputs=plan_input_dicts,
+        previous_errors=previous_errors,
     )
 
 

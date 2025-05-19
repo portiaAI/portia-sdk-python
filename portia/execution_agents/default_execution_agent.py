@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from jinja2 import Template
-from langchain_core.messages import BaseMessage
 from langchain_core.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -26,7 +24,9 @@ from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     MAX_RETRIES,
     AgentNode,
+    get_arg_value_with_templating,
     process_output,
+    template_in_required_inputs,
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
@@ -38,7 +38,6 @@ from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
-    from langchain_core.messages import BaseMessage
 
     from portia.config import Config
     from portia.end_user import EndUser
@@ -61,22 +60,25 @@ class ToolArgument(BaseModel):
 
     Attributes:
         name (str): The name of the argument, as requested by the tool.
+        explanation (str): Explanation of the source for the value of the argument.
         value (Any | None): The value of the argument, as provided in the goal or context.
         valid (bool): Whether the value is a valid type and/or format for the given argument.
-        explanation (str): Explanation of the source for the value of the argument.
 
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(description="Name of the argument, as requested by the tool.")
+    explanation: str = Field(
+        description="Explanation of the source for the value of the argument. "
+        "For large arguments, includes templating was or wasn't used.",
+    )
     value: Any | None = Field(
         description="Value of the argument, as provided by in the goal or context.",
     )
     valid: bool = Field(
         description="Whether the value is a valid type and or format for the given argument.",
     )
-    explanation: str = Field(description="Explanation of the source for the value of the argument.")
 
 
 class ToolInputs(BaseModel):
@@ -134,44 +136,6 @@ class VerifiedToolInputs(BaseModel):
     args: list[VerifiedToolArgument] = Field(description="Arguments for the tool.")
 
 
-def _get_arg_value_with_templating(step_inputs: list[StepInput], arg: Any) -> Any:  # noqa: ANN401
-    """Return the value of an argument, handling any templating required."""
-    # Directly apply templating in strings
-    if isinstance(arg, str):
-        if any(
-            # Allow with or without spaces
-            f"{{{{{step_input.name}}}}}" in arg or f"{{{{ {step_input.name} }}}}" in arg
-            for step_input in step_inputs
-        ):
-            return _template_inputs_into_arg_value(arg, step_inputs)
-        return arg
-
-    # Recursively handle lists and dicts
-    if isinstance(arg, list):
-        return [_get_arg_value_with_templating(step_inputs, item) for item in arg]
-    if isinstance(arg, dict):
-        return {k: _get_arg_value_with_templating(step_inputs, v) for k, v in arg.items()}
-
-    # We don't yet support templating for other types
-    return arg
-
-
-def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]) -> str:
-    """Template inputs into an argument value."""
-    template_args = {}
-    for step_input in step_inputs:
-        input_name = step_input.name
-
-        # jinja can't handle inputs that start with $, so remove the leading $ if needed
-        if step_input.name in arg_value and step_input.name.startswith("$"):
-            input_name = input_name.lstrip("$")
-            arg_value = arg_value.replace(step_input.name, input_name)
-
-        template_args[input_name] = step_input.value
-
-    return Template(arg_value).render(**template_args)
-
-
 class ParserModel:
     """Model to parse the arguments for a tool.
 
@@ -204,12 +168,11 @@ class ParserModel:
                 "than repeating it, you should provide the name in curly braces and it will be "
                 "templated in before the tool is called. "
                 "For example, if you wish to use an input called '$large_input_value' verbatim, "
-                "you should enter '{{ '{{' }}$large_input_value{{ '}}' }}' (double curly braces "
+                "you should enter '{{{{$large_input_value}}}}' (double curly braces "
                 "and include the $ in the name) and the value will be templated in before the tool "
-                "is called.  You should definitely use this templating for any input values over "
-                "1000 words that you want to use verbatim.",
-                # Use jinja2 to allow for the literal curly braces
-                template_format="jinja2",
+                "is called. If there is a $ in the variable name, MAKE SURE you keep it. You "
+                "should definitely use this templating for any input values over 1000 words that "
+                "you want to use verbatim.",
             ),
             HumanMessagePromptTemplate.from_template(
                 "Context for user input and past steps:\n{context}\n"
@@ -236,13 +199,26 @@ class ParserModel:
                 "the value field\n"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
+                "- If any of the inputs is a large string and you want to use it verbatim, rather "
+                "than repeating it, you should provide the name in curly braces and it will be "
+                "templated in before the tool is called. For example, if you wish to use an input "
+                "called '$large_input_value' verbatim, you should enter "
+                "'{{{{$large_input_value}}}}' "
+                "(double curly braces and include the $ in the name) and the value will be "
+                "templated in before the tool is called.  You should definitely use this "
+                "templating for any input values over 1000 words that you want to use verbatim.\n"
+                "- If you use templating, MAKE SURE to keep a $ at the start of the name if there "
+                "is one and MAKE SURE to use two curly braces (not one or three) to open and close "
+                "the templating.\n"
+                "- Generate the fields in the order they appear in the classes below."
                 "class ToolInputs:\n"
                 "  args: List[ToolArgument]  # List of tool arguments.\n\n"
                 "class ToolArgument:\n"
                 "  name: str  # Name of the argument requested by the tool.\n"
+                "  explanation: str  # Explanation of the source for the value of the argument. "
+                "For large arguments, include why you did or didn't use templating.\n"
                 "  value: Any | None  # Value of the argument from the goal or context.\n"
-                "  valid: bool  # Whether the value is valid for the argument.\n"
-                "  explanation: str  # Explanation of the source for the value of the argument.\n\n",  # noqa: E501
+                "  valid: bool  # Whether the value is valid for the argument.\n\n",
             ),
         ],
     )
@@ -305,9 +281,7 @@ class ParserModel:
         else:
             test_args = {}
             for arg in tool_inputs.args:
-                test_args[arg.name] = _get_arg_value_with_templating(
-                    state["step_inputs"], arg.value
-                )
+                test_args[arg.name] = get_arg_value_with_templating(state["step_inputs"], arg.value)
                 if not arg.valid:
                     errors.append(f"Error in argument {arg.name}: {arg.explanation}\n")
 
@@ -357,14 +331,14 @@ class VerifierModel:
                 "on the rules below.\n - An argument is made up if we cannot tell where the value "
                 "came from in the goal or context.\n- You should verify that the explanations are "
                 "grounded in the goal or context before trusting them."
-                "\n- If an argument is marked as invalid it is likely wrong."
+                "\n- If an argument is marked as invalid it is likely made up."
                 "\n- We really care if the value of an argument is not in the context, a handled "
                 "clarification or goal at all (then made_up should be TRUE), but it is ok if "
                 "it is there but in a different format, or if it can be reasonably derived from the"
                 " information that is there (then made_up should be FALSE). "
                 "\n- Arguments where the value comes from a clarification should be marked as FALSE"
                 "\n- Some large inputs may be provided as a template variable (e.g. "
-                "'{{ '{{' }}$large_input_value{{ '}}' }}'). This is fine and the value will be "
+                "'{{{{$large_input_value}}}}'). This is fine and the value will be "
                 "templated in before the tool is called.\n"
                 "The output must conform to the following schema:\n\n"
                 "class VerifiedToolArgument:\n"
@@ -375,8 +349,6 @@ class VerifierModel:
                 "class VerifiedToolInputs:\n"
                 "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
                 "Please ensure the output matches the VerifiedToolInputs schema.",
-                # Use jinja2 to allow for the literal curly braces
-                template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
                 "You will need to achieve the following goal: {task}\n"
@@ -465,7 +437,7 @@ class VerifierModel:
         try:
             if self.agent.tool:
                 for arg_name, arg_value in arg_dict.items():
-                    arg_dict[arg_name] = _get_arg_value_with_templating(step_inputs, arg_value)
+                    arg_dict[arg_name] = get_arg_value_with_templating(step_inputs, arg_value)
                 self.agent.tool.args_schema.model_validate(arg_dict)
         except ValidationError as e:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
@@ -504,14 +476,12 @@ class ToolCallingModel:
                 "arguments. You don't know current events. "
                 "If any values are too large to be provided to you in full, they will be provided "
                 "in curly braces with a value to be templated in (e.g. "
-                "'{{ '{{' }}$large_output_value{{ '}}' }}'). "
+                "'{{{{$large_output_value}}}}'). "
                 "This is fine - please keep these templated values inside double curly braces and "
                 "DO NOT REMOVE the leading $ on the name - for example, keep it as "
-                "'{{ '{{' }}$large_output_value{{ '}}' }}' and not "
-                "'{{ '{{' }}large_output_value{{ '}}' }}'. These values will then be templated in "
+                "'{{{{$large_output_value}}}}' and not "
+                "'{{{{large_output_value}}}}'. These values will then be templated in "
                 "before the tool is called.\n",
-                # Use jinja2 to allow for the literal curly braces
-                template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
                 "context:\n{verified_args}\n"
@@ -575,7 +545,7 @@ class ToolCallingModel:
                 past_errors=past_errors,
             ),
         )
-        result = self._template_in_required_inputs(response, state["step_inputs"])
+        result = template_in_required_inputs(response, state["step_inputs"])
 
         if (
             self.agent.execution_hooks
@@ -594,21 +564,6 @@ class ToolCallingModel:
                     return {"messages": []}
 
         return {"messages": [result]}
-
-    def _template_in_required_inputs(
-        self,
-        response: BaseMessage,
-        step_inputs: list[StepInput],
-    ) -> BaseMessage:
-        """Template any required inputs into the tool calls."""
-        for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
-            if not isinstance(tool_call.get("args"), dict):
-                raise InvalidPlanRunStateError("Tool call missing args field")
-
-            for arg_name, arg_value in tool_call.get("args").items():
-                tool_call["args"][arg_name] = _get_arg_value_with_templating(step_inputs, arg_value)
-
-        return response
 
 
 class DefaultExecutionAgent(BaseExecutionAgent):

@@ -15,7 +15,7 @@ Thank you for your interest in contributing to Portia SDK! We welcome contributi
 
 1. **Fork the Repository**: Start by forking the repository and cloning it locally.
 2. **Create a Branch**: Create a branch for your feature or bug fix. Use a descriptive name for your branch (e.g., `fix-typo`, `add-feature-x`).
-3. **Install the dependencies** We use Poetry to manage dependencies. Run ``poetry install --all-extras``
+3. **Install the dependencies** We use uv to manage dependencies. Run ``uv install --all-extras``
 4. **Make Your Changes**: Implement your changes in small, focused commits. Be sure to follow our linting rules and style guide.
 5. **Run Tests**: If your changes affect functionality, please test thoroughly 🌡️ Details on how run tests are in the **Tests** section below.
 6. **Lint Your Code**: We use [ruff](https://github.com/charliermarsh/ruff) for linting. Please ensure your code passes all linting checks. We prefer per-line disables for rules rather than global ignores, and please leave comments explaining why you disable any rules.
@@ -34,9 +34,9 @@ We write two types of tests:
 - Integration tests actually call LLM providers, are much slower but test the system works fully.
 
 To run tests:
-- Run all tests with `poetry run pytest`.
-- Run unit tests with `poetry run pytest tests/unit`.
-- Run integration tests with `poetry run pytest tests/integration`.
+- Run all tests with `uv run pytest`.
+- Run unit tests with `uv run pytest tests/unit`.
+- Run integration tests with `uv run pytest tests/integration`.
 
 We utilize [pytest-parallel](https://pypi.org/project/pytest-parallel/) to execute tests in parallel. You can add the `--workers=4` argument to the commands above to run in parallel. If you run into issues running this try setting `export NO_PROXY=true` first.
 

@@ -7,13 +7,15 @@ that handles clarifications via the command-line interface.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import click
 
 from portia.clarification_handler import ClarificationHandler
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from portia.clarification import (
         ActionClarification,
         Clarification,

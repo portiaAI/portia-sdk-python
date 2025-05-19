@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
+import httpx
 import pytest
 
 from portia.end_user import EndUser
@@ -18,6 +19,7 @@ from portia.execution_agents.output import (
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
 from portia.storage import (
+    MAX_STORAGE_OBJECT_BYTES,
     AdditionalStorage,
     DiskFileStorage,
     InMemoryStorage,
@@ -45,6 +47,9 @@ def test_storage_base_classes() -> None:
 
         def get_plan(self, plan_id: PlanUUID) -> Plan:
             return super().get_plan(plan_id)  # type: ignore  # noqa: PGH003
+
+        def plan_exists(self, plan_id: PlanUUID) -> bool:
+            return super().plan_exists(plan_id)  # type: ignore  # noqa: PGH003
 
         def save_plan_run(self, plan_run: PlanRun) -> None:
             return super().save_plan_run(plan_run)  # type: ignore  # noqa: PGH003
@@ -84,6 +89,9 @@ def test_storage_base_classes() -> None:
 
     with pytest.raises(NotImplementedError):
         storage.get_plan(plan.id)
+
+    with pytest.raises(NotImplementedError):
+        storage.plan_exists(plan.id)
 
     with pytest.raises(NotImplementedError):
         storage.save_plan_run(plan_run)
@@ -131,7 +139,7 @@ def test_in_memory_storage() -> None:
     assert saved_output_2 == saved_output_1
     # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         storage.save_plan_run_output(
@@ -183,7 +191,7 @@ def test_disk_storage(tmp_path: Path) -> None:
 
     # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         storage.save_plan_run_output(
@@ -226,7 +234,7 @@ def test_portia_cloud_storage() -> None:
         id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
         plan_context=PlanContext(query="", tool_ids=[]),
         steps=[],
-        inputs=[
+        plan_inputs=[
             PlanInput(name="key1", description="Test input 1"),
             PlanInput(name="key2", description="Test input 2"),
         ],
@@ -263,9 +271,9 @@ def test_portia_cloud_storage() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
-                "inputs": [
-                    {"name": "key1", "description": "Test input 1"},
-                    {"name": "key2", "description": "Test input 2"},
+                "plan_inputs": [
+                    {"name": "key1", "description": "Test input 1", "value": None},
+                    {"name": "key2", "description": "Test input 2", "value": None},
                 ],
             },
         )
@@ -411,7 +419,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "steps": [],
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
-                "inputs": [],
+                "plan_inputs": [],
             },
         )
     with (
@@ -714,14 +722,47 @@ def test_portia_cloud_agent_memory_errors() -> None:
             url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         )
 
-        # Check with an output that's too large
+    # Check with an output that's too large
     with (
-        patch("sys.getsizeof", return_value=InMemoryStorage.MAX_OUTPUT_BYTES + 1),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
         agent_memory.save_plan_run_output(
             "large_output",
             LocalDataValue(value="large value"),
+            plan_run.id,
+        )
+
+    # Test for 413 REQUEST_ENTITY_TOO_LARGE response status
+    mock_response = MagicMock()
+    mock_response.status_code = httpx.codes.REQUEST_ENTITY_TOO_LARGE
+    mock_response.request = MagicMock()
+    mock_response.request.content = b"Some content that's too large"
+
+    with (
+        patch.object(agent_memory.form_client, "put", return_value=mock_response),
+        pytest.raises(StorageError),
+    ):
+        agent_memory.save_plan_run_output(
+            "too_large_output",
+            LocalDataValue(value="too large value"),
+            plan_run.id,
+        )
+
+    # Test for response.request.content > MAX_STORAGE_OBJECT_BYTES
+    mock_response = MagicMock()
+    mock_response.status_code = httpx.codes.OK
+    mock_response.request = MagicMock()
+    mock_response.request.content = b"Some large content"
+
+    with (
+        patch.object(agent_memory.form_client, "put", return_value=mock_response),
+        patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
+        pytest.raises(StorageError),
+    ):
+        agent_memory.save_plan_run_output(
+            "over_size_limit",
+            LocalDataValue(value="value that creates a large request"),
             plan_run.id,
         )
 
@@ -768,3 +809,74 @@ def test_similar_plans_error(httpx_mock: HTTPXMock) -> None:
     )
     with pytest.raises(StorageError):
         storage.get_similar_plans("Test query")
+
+
+def test_plan_exists_in_memory_storage() -> None:
+    """Test plan_exists method with InMemoryStorage."""
+    storage = InMemoryStorage()
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test non-existent plan
+    assert not storage.plan_exists(plan.id)
+
+    # Save plan and test again
+    storage.save_plan(plan)
+    assert storage.plan_exists(plan.id)
+
+    # Test with different plan ID
+    different_plan_id = PlanUUID()
+    assert not storage.plan_exists(different_plan_id)
+
+
+def test_plan_exists_disk_storage(tmp_path: Path) -> None:
+    """Test plan_exists method with DiskFileStorage."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test non-existent plan
+    assert not storage.plan_exists(plan.id)
+
+    # Save plan and test again
+    storage.save_plan(plan)
+    assert storage.plan_exists(plan.id)
+
+    # Test with different plan ID
+    different_plan_id = PlanUUID()
+    assert not storage.plan_exists(different_plan_id)
+
+
+def test_plan_exists_portia_cloud_storage() -> None:
+    """Test plan_exists method with PortiaCloudStorage."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test when plan exists
+    mock_success_response = MagicMock()
+    mock_success_response.is_success = True
+    with patch.object(storage.client, "get", return_value=mock_success_response) as mock_get:
+        assert storage.plan_exists(plan.id)
+        mock_get.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/")
+
+    # Test when plan doesn't exist
+    mock_failure_response = MagicMock()
+    mock_failure_response.is_success = False
+    with patch.object(storage.client, "get", return_value=mock_failure_response) as mock_get:
+        different_plan_id = PlanUUID()
+        assert not storage.plan_exists(different_plan_id)
+        mock_get.assert_called_once_with(url=f"/api/v0/plans/{different_plan_id}/")
+
+    # Test when API call fails
+    with patch.object(storage.client, "get", side_effect=Exception("API Error")) as mock_get:
+        assert not storage.plan_exists(plan.id)
+        mock_get.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/")

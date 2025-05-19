@@ -7,7 +7,7 @@ clarifications that arise during the run of a plan.
 from __future__ import annotations
 
 from abc import ABC
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from portia.clarification import (
     ActionClarification,
@@ -17,6 +17,9 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class ClarificationHandler(ABC):  # noqa: B024

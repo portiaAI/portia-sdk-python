@@ -9,7 +9,7 @@ import json
 from abc import abstractmethod
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import deprecated
@@ -108,7 +108,7 @@ class LocalDataValue(BaseOutput):
                 ensure_ascii=False,
             )
 
-        if isinstance(value, (dict, tuple)):
+        if isinstance(value, (dict | tuple)):
             return json.dumps(value, ensure_ascii=False)  # Ensure proper JSON formatting
 
         if isinstance(value, set):
@@ -117,10 +117,10 @@ class LocalDataValue(BaseOutput):
                 ensure_ascii=False,
             )  # Convert set to list before serialization
 
-        if isinstance(value, (int, float, bool)):
+        if isinstance(value, (int | float | bool)):
             return json.dumps(value, ensure_ascii=False)  # Ensures booleans become "true"/"false"
 
-        if isinstance(value, (datetime, date)):
+        if isinstance(value, (datetime | date)):
             return value.isoformat()  # Convert date/time to ISO format
 
         if isinstance(value, Enum):
@@ -166,7 +166,7 @@ class AgentMemoryValue(BaseOutput):
         return self.summary
 
 
-Output = Union[LocalDataValue, AgentMemoryValue]
+Output = LocalDataValue | AgentMemoryValue
 
 
 @deprecated(

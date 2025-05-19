@@ -8,16 +8,24 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
+from jinja2 import Template
 from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
+from pydantic import ValidationError
 
-from portia.clarification import Clarification
-from portia.errors import InvalidAgentOutputError, ToolFailedError, ToolRetryError
+from portia.clarification import Clarification, InputClarification
+from portia.errors import (
+    InvalidAgentOutputError,
+    InvalidPlanRunStateError,
+    ToolFailedError,
+    ToolRetryError,
+)
 from portia.execution_agents.output import LocalDataValue, Output
 
 if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
 
+    from portia.execution_agents.context import StepInput
     from portia.tool import Tool
 
 
@@ -78,6 +86,59 @@ def tool_call_or_end(
     return END
 
 
+def get_arg_value_with_templating(step_inputs: list[StepInput], arg: Any) -> Any:  # noqa: ANN401
+    """Return the value of an argument, handling any templating required."""
+    # Directly apply templating in strings
+    if isinstance(arg, str):
+        if any(
+            # Allow with or without spaces
+            f"{{{{{step_input.name}}}}}" in arg or f"{{{{ {step_input.name} }}}}" in arg
+            for step_input in step_inputs
+        ):
+            return _template_inputs_into_arg_value(arg, step_inputs)
+        return arg
+
+    # Recursively handle lists and dicts
+    if isinstance(arg, list):
+        return [get_arg_value_with_templating(step_inputs, item) for item in arg]
+    if isinstance(arg, dict):
+        return {k: get_arg_value_with_templating(step_inputs, v) for k, v in arg.items()}
+
+    # We don't yet support templating for other types
+    return arg
+
+
+def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]) -> str:
+    """Template inputs into an argument value."""
+    template_args = {}
+    for step_input in step_inputs:
+        input_name = step_input.name
+
+        # jinja can't handle inputs that start with $, so remove any leading $
+        # this also handles the case where the parser accidentlly misses off the $ in templating,
+        # which does happen (e.g. it uses {{input_name}} instead of {{$input_name}}
+        input_name = input_name.lstrip("$")
+        arg_value = arg_value.replace(step_input.name, input_name)
+        template_args[input_name] = step_input.value
+
+    return Template(arg_value).render(**template_args)
+
+
+def template_in_required_inputs(
+    response: BaseMessage,
+    step_inputs: list[StepInput],
+) -> BaseMessage:
+    """Template any required inputs into the tool calls."""
+    for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
+        if not isinstance(tool_call.get("args"), dict):
+            raise InvalidPlanRunStateError("Tool call missing args field")
+
+        for arg_name, arg_value in tool_call.get("args").items():
+            tool_call["args"][arg_name] = get_arg_value_with_templating(step_inputs, arg_value)
+
+    return response
+
+
 def process_output(  # noqa: C901
     messages: list[BaseMessage],
     tool: Tool | None = None,
@@ -112,6 +173,12 @@ def process_output(  # noqa: C901
         if "ToolHardError" in message.content and tool:
             raise ToolFailedError(tool.id, str(message.content))
         if isinstance(message, ToolMessage):
+            try:
+                clarification = InputClarification.model_validate_json(message.content)  # pyright: ignore[reportArgumentType]
+                return LocalDataValue(value=[clarification])
+            except ValidationError:
+                pass
+
             if message.artifact and isinstance(message.artifact, Output):
                 output_values.append(message.artifact)
             elif message.artifact:

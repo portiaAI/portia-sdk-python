@@ -15,13 +15,12 @@ import sys
 from enum import Enum
 from functools import wraps
 from types import UnionType
-from typing import TYPE_CHECKING, Any, Callable, get_args
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 import click
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
-from typing_extensions import get_origin
 
 from portia.cli_clarification_handler import CLIClarificationHandler
 from portia.config import Config, GenerativeModelsConfig
@@ -31,6 +30,8 @@ from portia.portia import ExecutionHooks, Portia
 from portia.tool_registry import DefaultToolRegistry
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantic.fields import FieldInfo
 
 DEFAULT_FILE_PATH = ".portia"

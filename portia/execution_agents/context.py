@@ -137,11 +137,9 @@ def generate_clarification_context(clarifications: ClarificationListType, step: 
             if (
                 isinstance(
                     clarification,
-                    (
-                        InputClarification,
-                        MultipleChoiceClarification,
-                        ValueConfirmationClarification,
-                    ),
+                    InputClarification
+                    | MultipleChoiceClarification
+                    | ValueConfirmationClarification,
                 )
                 and clarification.step == step
             ):

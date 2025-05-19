@@ -24,6 +24,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
+from portia.common import Serializable
 from portia.prefixed_uuid import PlanUUID
 
 
@@ -173,7 +174,7 @@ class PlanBuilder:
         return Plan(
             plan_context=PlanContext(query=self.query, tool_ids=tool_ids),
             steps=self.steps,
-            inputs=self.plan_inputs,
+            plan_inputs=self.plan_inputs,
         )
 
     def _get_step_index_or_raise(self, step_index: int | None) -> int:
@@ -231,14 +232,22 @@ class PlanInput(BaseModel):
 
     """
 
-    # Use frozen=True to allow this to be a dictionary key
-    model_config = ConfigDict(extra="ignore", frozen=True)
+    model_config = ConfigDict(extra="ignore")
 
     name: str = Field(
         description="The name of the input",
     )
-    description: str = Field(
-        description="A description of the input.",
+    description: str | None = Field(
+        description="A description of the input. This is used during planning to help the planning "
+        "agent understand how to use the input.",
+        default=None,
+    )
+    value: Serializable | None = Field(
+        description=(
+            "The value of the input. This is only used when running a plan and isn't used during "
+            "planning."
+        ),
+        default=None,
     )
 
     def pretty_print(self) -> str:
@@ -248,17 +257,7 @@ class PlanInput(BaseModel):
             str: A pretty print representation of the input's name, and description.
 
         """
-        return f"{self.name}: ({self.description})"
-
-    def __hash__(self) -> int:
-        """Make PlanInput hashable by using name and description as the hash key."""
-        return hash((self.name, self.description))
-
-    def __eq__(self, other: object) -> bool:
-        """Compare PlanInput objects for equality based on name."""
-        if not isinstance(other, PlanInput):
-            return False
-        return self.name == other.name and self.description == other.description
+        return f"{self.name}: ({self.description or 'No description'})"
 
 
 class Step(BaseModel):
@@ -311,9 +310,9 @@ class Step(BaseModel):
         """
         message = (
             f"- {self.task}\n"
-            f"  Inputs: {', '.join([in_variable.pretty_print() for in_variable in self.inputs])}\n"
-            f"  Tool ID: {self.tool_id}\n"
-            f"  Output: {self.output}\n"
+            f"    Inputs: {', '.join([var.pretty_print() for var in self.inputs])}\n"
+            f"    Tool ID: {self.tool_id}\n"
+            f"    Output: {self.output}\n"
         )
         if self.condition:
             message += f"  Condition: {self.condition}\n"
@@ -403,7 +402,7 @@ class Plan(BaseModel):
     )
     plan_context: PlanContext = Field(description="The context for when the plan was created.")
     steps: list[Step] = Field(description="The set of steps to solve the query.")
-    inputs: list[PlanInput] = Field(
+    plan_inputs: list[PlanInput] = Field(
         default=[],
         description="The inputs required by the plan.",
     )
@@ -424,7 +423,7 @@ class Plan(BaseModel):
             f"PlanModel(id={self.id!r},"
             f"plan_context={self.plan_context!r}, "
             f"steps={self.steps!r}, "
-            f"inputs={self.inputs!r}"
+            f"inputs={self.plan_inputs!r}"
         )
 
     @classmethod
@@ -445,7 +444,9 @@ class Plan(BaseModel):
                 tool_ids=response_json["tool_ids"],
             ),
             steps=[Step.model_validate(step) for step in response_json["steps"]],
-            inputs=[PlanInput.model_validate(input_) for input_ in response_json.get("inputs", [])],
+            plan_inputs=[
+                PlanInput.model_validate(input_) for input_ in response_json.get("plan_inputs", [])
+            ],
         )
 
     def pretty_print(self) -> str:
@@ -462,9 +463,11 @@ class Plan(BaseModel):
         tools_summary = f"{len(portia_tools)} portia tools, {len(other_tools)} other tools"
 
         inputs_section = ""
-        if self.inputs:
+        if self.plan_inputs:
             inputs_section = (
-                "Inputs:\n" + "\n".join([input_.pretty_print() for input_ in self.inputs]) + "\n"
+                "Inputs:\n    "
+                + "\n    ".join([input_.pretty_print() for input_ in self.plan_inputs])
+                + "\n"
             )
 
         return (
@@ -489,7 +492,7 @@ class Plan(BaseModel):
             raise ValueError("Outputs + conditions must be unique")
 
         # Validate plan input names are unique
-        input_names = [input_.name for input_ in self.inputs]
+        input_names = [input_.name for input_ in self.plan_inputs]
         if len(input_names) != len(set(input_names)):
             raise ValueError("Plan input names must be unique")
 
@@ -520,6 +523,6 @@ class ReadOnlyPlan(Plan):
             id=plan.id,
             plan_context=plan.plan_context,
             steps=plan.steps,
-            inputs=plan.inputs,
+            plan_inputs=plan.plan_inputs,
             structured_output_schema=plan.structured_output_schema,
         )

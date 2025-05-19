@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Callable, override
+from typing import TYPE_CHECKING, Any, override
 from unittest.mock import MagicMock
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -22,7 +22,7 @@ from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator, Callable, Sequence
 
     from langchain_core.messages import BaseMessage
     from langchain_core.tools import BaseTool

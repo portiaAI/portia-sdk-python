@@ -73,7 +73,7 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanContext, PlanUUID, Step
+from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
@@ -106,7 +106,6 @@ __all__ = [
     "DefaultToolRegistry",
     "DuplicateToolError",
     "ExecutionAgentType",
-    "ExecutionContext",
     "ExecutionHooks",
     "FileReaderTool",
     "FileWriterTool",
@@ -129,8 +128,10 @@ __all__ = [
     "MultipleChoiceClarification",
     "Output",
     "Plan",
+    "PlanBuilder",
     "PlanContext",
     "PlanError",
+    "PlanInput",
     "PlanNotFoundError",
     "PlanRun",
     "PlanRunNotFoundError",
@@ -154,6 +155,7 @@ __all__ = [
     "ToolRetryError",
     "ToolRunContext",
     "ValueConfirmationClarification",
+    "Variable",
     "WeatherTool",
     "default_config",
     "example_tool_registry",
