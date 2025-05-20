@@ -313,7 +313,7 @@ def test_portia_set_run_state_to_fail_if_keyboard_interrupt_when_resume(
     plan_run.current_step_index = 1
 
     with mock.patch.object(
-        portia, "execute_plan_run_and_handle_clarifications", side_effect=KeyboardInterrupt
+        portia, "_execute_plan_run", side_effect=KeyboardInterrupt
     ):
         portia.resume(plan_run)
 
