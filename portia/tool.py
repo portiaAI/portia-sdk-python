@@ -19,7 +19,6 @@ import asyncio
 import json
 from abc import abstractmethod
 from functools import partial
-from turtle import circle
 from typing import Any, Generic, Self
 
 import httpx
