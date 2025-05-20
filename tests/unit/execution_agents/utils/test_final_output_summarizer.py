@@ -3,6 +3,7 @@
 from unittest import mock
 
 import pytest
+from pydantic import BaseModel
 
 from portia.config import Config, GenerativeModelsConfig
 from portia.execution_agents.output import LocalDataValue
@@ -75,7 +76,7 @@ def test_summarizer_agent_execute_sync(
         "Output: Visit Hyde Park and have a picnic\n"
         "----------"
     )
-    expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + expected_context
+    expected_prompt = FinalOutputSummarizer.summarizer_only_prompt + expected_context
     mock_summarizer_model.get_response.assert_called_once_with(
         [Message(content=expected_prompt, role="user")],
     )
@@ -102,7 +103,9 @@ def test_summarizer_agent_empty_plan_run(
 
     # Verify empty context case
     assert output == "Empty summary"
-    expected_prompt = FinalOutputSummarizer.SUMMARIZE_TASK + ("Query: Empty query\n----------")
+    expected_prompt = FinalOutputSummarizer.summarizer_only_prompt + (
+        "Query: Empty query\n----------"
+    )
     mock_summarizer_model.get_response.assert_called_once_with(
         [Message(content=expected_prompt, role="user")],
     )
@@ -275,4 +278,67 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
         "Task: Complete task\n"
         "Output: The plan execution was completed early\n"
         "----------"
+    )
+
+
+def test_summarizer_agent_handles_structured_output_with_fo_summary(
+    summarizer_config: Config,
+    mock_summarizer_model: mock.MagicMock,
+) -> None:
+    """Test that the summarizer agent correctly executes and returns a structured output."""
+    # Set up test data
+    (plan, plan_run) = get_test_plan_run()
+    plan.plan_context.query = "What's the weather in London and what can I do?"
+    plan.steps = [
+        Step(
+            task="Get weather in London",
+            output="$london_weather",
+        ),
+        Step(
+            task="Suggest activities based on weather",
+            output="$activities",
+        ),
+    ]
+
+    plan_run.outputs.step_outputs = {
+        "$london_weather": LocalDataValue(value="Sunny and warm"),
+        "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
+    }
+
+    class TestStructuredOutput(BaseModel):
+        mock_field: str
+
+    plan_run.structured_output_schema = TestStructuredOutput
+
+    # Create a mock response that matches the structure we expect
+    class SchemaWithSummary(TestStructuredOutput):
+        fo_summary: str
+
+    mock_response = SchemaWithSummary(mock_field="mock_value", fo_summary="mock_summary")
+    mock_summarizer_model.get_structured_response.return_value = mock_response
+
+    summarizer = FinalOutputSummarizer(config=summarizer_config)
+    output = summarizer.create_summary(plan=plan, plan_run=plan_run)
+
+    assert isinstance(output, SchemaWithSummary)
+    assert output.mock_field == mock_response.mock_field
+    assert output.fo_summary == mock_response.fo_summary
+
+    # Verify LLM was called with correct prompt
+    expected_context = (
+        "Query: What's the weather in London and what can I do?\n"
+        "----------\n"
+        "Task: Get weather in London\n"
+        "Output: Sunny and warm\n"
+        "----------\n"
+        "Task: Suggest activities based on weather\n"
+        "Output: Visit Hyde Park and have a picnic\n"
+        "----------"
+    )
+    expected_prompt = (
+        FinalOutputSummarizer.summarizer_and_structured_output_prompt + expected_context
+    )
+    mock_summarizer_model.get_structured_response.assert_called_once_with(
+        [Message(content=expected_prompt, role="user")],
+        mock.ANY,  # Use mock.ANY since we can't predict the exact dynamic class
     )

@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.3.7a0"
+version = "0.3.8"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -99,6 +99,9 @@ include = ["portia"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pyright]
+ignore = ["scratch/*"]
 
 [tool.ruff]
 line-length=100

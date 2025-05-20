@@ -119,6 +119,10 @@ class VerifiedToolArgument(BaseModel):
         "Should be false if the value was provided by the user, even if in a different format."
         "User provided values can be in the context, in the goal or the result of previous steps.",
     )
+    explanation: str | None = Field(
+        default=None,
+        description="The reason the value was judged to be made up or not.",
+    )
 
     schema_invalid: bool = Field(
         default=False,
@@ -332,7 +336,8 @@ class VerifierModel:
                 "on the rules below.\n - An argument is made up if we cannot tell where the value "
                 "came from in the goal or context.\n- You should verify that the explanations are "
                 "grounded in the goal or context before trusting them."
-                "\n- If an argument is marked as invalid it is likely made up."
+                "\n- If an argument is marked as invalid it is likely made up.\n- If an argument "
+                "is a placeholder (e.g. 'example@example.com') it is likely made up."
                 "\n- We really care if the value of an argument is not in the context, a handled "
                 "clarification or goal at all (then made_up should be TRUE), but it is ok if "
                 "it is there but in a different format, or if it can be reasonably derived from the"
@@ -346,6 +351,7 @@ class VerifierModel:
                 "  name: str  # Name of the argument requested by the tool.\n"
                 "  value: Any | None  # Value of the argument from the goal or context. "
                 "USE EXACTLY the type of the argument provided in the list of arguments provided.\n"
+                "  explanation: str # The reason the value was judged to be made up or not\n"
                 "  made_up: bool  # if the value is made_up based on the given rules.\n\n"
                 "class VerifiedToolInputs:\n"
                 "  args: List[VerifiedToolArgument]  # List of tool arguments.\n\n"
@@ -356,7 +362,8 @@ class VerifierModel:
                 "\n\n----------\n\n"
                 "Context for user input and past steps:"
                 "\n{context}\n"
-                "The system has a tool available named '{tool_name}'.\n"
+                "The system has a tool available named '{tool_name}' "
+                "with description: {tool_description}.\n"
                 "Argument schema for the tool:\n{tool_args}\n"
                 "\n\n----------\n\n"
                 "Label the following arguments as made up or not using the goal and context provided: {arguments}\n",  # noqa: E501
@@ -407,6 +414,7 @@ class VerifierModel:
             arguments=tool_args,
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
+            tool_description=self.agent.tool.description,
         )
         response = self.model.get_structured_response(
             messages=[Message.from_langchain(m) for m in formatted_messages],
@@ -642,6 +650,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                         argument_name=arg.name,
                         user_guidance=f"Missing Argument: {arg.name}",
                         step=self.plan_run.current_step_index,
+                        source="Default execution agent",
                     ),
                 )
         if self.new_clarifications:

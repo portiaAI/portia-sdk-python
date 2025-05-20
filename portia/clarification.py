@@ -35,6 +35,7 @@ class ClarificationCategory(PortiaEnum):
     INPUT = "Input"
     MULTIPLE_CHOICE = "Multiple Choice"
     VALUE_CONFIRMATION = "Value Confirmation"
+    USER_VERIFICATION = "User Verification"
     CUSTOM = "Custom"
 
 
@@ -76,6 +77,11 @@ class Clarification(BaseModel, ABC):
     resolved: bool = Field(
         default=False,
         description="Whether this clarification has been resolved.",
+    )
+    source: str | None = Field(
+        default=None,
+        description="The source of the clarification. This should be a string that identifies the "
+        "origin of the clarification, such as a tool name or agent name.",
     )
 
 
@@ -197,6 +203,22 @@ class ValueConfirmationClarification(Clarification):
     )
     category: ClarificationCategory = Field(
         default=ClarificationCategory.VALUE_CONFIRMATION,
+        description="The category of this clarification",
+    )
+
+
+class UserVerificationClarification(Clarification):
+    """User verification clarification.
+
+    Represents a clarification where the user some information that they must verify.
+
+    Attributes:
+        category (ClarificationCategory): The category for this clarification, 'User Verification'.
+
+    """
+
+    category: ClarificationCategory = Field(
+        default=ClarificationCategory.USER_VERIFICATION,
         description="The category of this clarification",
     )
 
