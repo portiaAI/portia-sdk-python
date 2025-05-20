@@ -92,7 +92,7 @@ class ReadyResponse(BaseModel):
     clarifications: ClarificationListType
 
 
-class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class Tool(BaseModel):
     """Abstract base class for a tool.
 
     This class serves as the blueprint for all tools. Child classes must implement the `run` method.
@@ -134,6 +134,14 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "Tools may not require a summary if they already produce a nice textual output.",
     )
 
+    def __init_subclass__(cls) -> None:
+        """Control subclass init to allow tools to either implement run or run_async."""
+        super().__init_subclass__()
+        run_is_overridden = cls.run is not Tool.run
+        run_async_is_overridden = cls.run_async is not Tool.run_async
+        if not (run_is_overridden or run_async_is_overridden):
+            raise TypeError(f"{cls.__name__} must override at least one of 'run' or 'run_async'")
+
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
         """Check whether the tool can be plan_run.
 
@@ -151,16 +159,16 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         return ReadyResponse(ready=True, clarifications=[])
 
-    @abstractmethod
     def run(
         self,
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
+    ) -> Any:  # noqa: ANN401
         """Run the tool.
 
-        This method must be implemented by subclasses to define the tool's specific behavior.
+        This method can be implemented by subclasses to define the tool's specific behavior.
+        At least one of run or run_async must be implemented.
 
         Args:
             ctx (ToolRunContext): Context of the tool execution
@@ -172,17 +180,18 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             or a clarification.
 
         """
+        raise NotImplementedError
 
     async def run_async(
         self,
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
+    ) -> Any:  # noqa: ANN401
         """Run the tool async.
 
-        This method can be implemented by subclasses but if not provided will
-        wrap the normal tool.run func.
+        This method can be implemented by subclasses to define an async run func.
+        At least one of run or run_async must be implemented.
 
         Args:
             ctx (ToolRunContext): Context of the tool execution
@@ -194,9 +203,9 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             or a clarification.
 
         """
-        return self.run(ctx, *args, **kwargs)
+        raise NotImplementedError
 
-    async def _run_async(
+    async def _run(
         self,
         ctx: ToolRunContext,
         *args: Any,
@@ -219,7 +228,15 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         """
         try:
-            output = await self.run_async(ctx, *args, **kwargs)
+            run_is_overridden = self.run is not Tool.run
+            run_async_is_overridden = self.run_async is not Tool.run_async
+            if run_is_overridden:
+                output = self.run(ctx, *args, **kwargs)
+            elif run_async_is_overridden:
+                output = await self.run_async(ctx, *args, **kwargs)
+            else:
+                # This shouldn't happen as we check in the init_subclasses method
+                raise NotImplementedError  # noqa: TRY301
         except Exception as e:
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
@@ -235,7 +252,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             )
         return LocalDataValue(value=output)  # type: ignore  # noqa: PGH003
 
-    async def _run_async_with_artifacts(
+    async def _run_with_artifacts(
         self,
         ctx: ToolRunContext,
         *args: Any,
@@ -256,7 +273,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             tuple[str, Output]: A tuple containing the output and the Output.
 
         """
-        intermediate_output = await self._run_async(ctx, *args, **kwargs)
+        intermediate_output = await self._run(ctx, *args, **kwargs)
         return (intermediate_output.get_value(), intermediate_output)  # type: ignore  # noqa: PGH003
 
     def _generate_tool_description(self) -> str:
@@ -346,7 +363,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             name=self.name.replace(" ", "_"),
             description=self._generate_tool_description(),
             args_schema=self.args_schema,
-            coroutine=partial(self._run_async, ctx),
+            coroutine=partial(self._run, ctx),
         )
 
     def to_langchain_with_artifact(self, ctx: ToolRunContext) -> StructuredTool:
@@ -369,7 +386,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             name=self.name.replace(" ", "_"),
             description=self._generate_tool_description(),
             args_schema=self.args_schema,
-            coroutine=partial(self._run_async_with_artifacts, ctx),
+            coroutine=partial(self._run_with_artifacts, ctx),
             return_direct=True,
             response_format="content_and_artifact",
         )
@@ -542,7 +559,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             else:
                 return ready
 
-    def run(
+    async def run_async(
         self,
         ctx: ToolRunContext,
         *args: Any,
@@ -637,12 +654,12 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         return ReadyResponse.model_validate(batch_ready_response.json())
 
 
-class PortiaMcpTool(Tool[str]):
+class PortiaMcpTool(Tool):
     """A Portia Tool wrapper for an MCP server-based tool."""
 
     mcp_client_config: McpClientConfig
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> str:
+    async def run_async(self, _: ToolRunContext, **kwargs: Any) -> str:
         """Invoke the tool by dispatching to the MCP server.
 
         Args:
@@ -654,14 +671,10 @@ class PortiaMcpTool(Tool[str]):
 
         """
         logger().debug(f"Calling tool {self.name} with arguments {kwargs}")
-        return asyncio.run(self.call_remote_mcp_tool(self.name, kwargs))
-
-    async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
-        """Call a tool using the MCP session."""
         async with get_mcp_session(self.mcp_client_config) as session:
-            tool_result = await session.call_tool(name, arguments)
+            tool_result = await session.call_tool(self.name, kwargs)
             if tool_result.isError:
                 raise ToolHardError(
-                    f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
+                    f"MCP tool {self.name} returned an error: {tool_result.model_dump_json()}",
                 )
             return tool_result.model_dump_json()

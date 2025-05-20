@@ -142,7 +142,7 @@ class BrowserInfrastructureOption(Enum):
     REMOTE = "remote"
 
 
-class BrowserTool(Tool[str | BaseModel]):
+class BrowserTool(Tool):
     """General purpose browser tool. Customizable to user requirements.
 
     This tool is designed to be used for tasks that require a browser. If authentication is
@@ -229,7 +229,7 @@ class BrowserTool(Tool[str | BaseModel]):
             return BrowserInfrastructureProviderBrowserBase()
         return BrowserInfrastructureProviderLocal()
 
-    def run(
+    async def run_async(
         self,
         ctx: ToolRunContext,
         url: str,
@@ -239,63 +239,45 @@ class BrowserTool(Tool[str | BaseModel]):
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
-        async def run_browser_tasks() -> str | BaseModel | ActionClarification:
-            def handle_login_requirement(
-                result: BrowserTaskOutput,
-            ) -> ActionClarification:
-                """Handle cases where login is required with an ActionClarification."""
-                if result.user_login_guidance is None or result.login_url is None:
-                    raise ToolHardError(
-                        "Expected user guidance and login URL if human login is required",
-                    )
-                return ActionClarification(
-                    user_guidance=result.user_login_guidance,
-                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
-                        ctx,
-                        result.login_url,
-                    ),
-                    plan_run_id=ctx.plan_run.id,
-                    require_confirmation=True,
-                    source="Browser tool",
+        output_schema = self.structured_output_schema if self.structured_output_schema else str
+        output_model = BrowserTaskOutput[output_schema]
+
+        # Main task
+        task_to_complete = (
+            f"Go to {url} and complete the following task: {task}. The user may already be "
+            "logged in. If the user is NOT already logged in and at any point login is "
+            "required to complete the task, please return human_login_required=True, and the "
+            "url of the sign in page as well as what the user should do to sign in."
+        )
+
+        agent = Agent(
+            task=task_to_complete,
+            llm=llm,
+            browser=self.infrastructure_provider.setup_browser(ctx),
+            controller=Controller(output_model=output_model),
+        )
+
+        result = await agent.run()
+        task_result = output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
+
+        if task_result.human_login_required:  # type: ignore reportCallIssue
+            if task_result.user_login_guidance is None or task_result.login_url is None:
+                raise ToolHardError(
+                    "Expected user guidance and login URL if human login is required",
                 )
-
-            output_schema = self.structured_output_schema if self.structured_output_schema else str
-            output_model = BrowserTaskOutput[output_schema]
-
-            async def run_agent_task(
-                task_description: str,
-                output_model: type[BaseModel],
-            ) -> BaseModel:
-                agent = Agent(
-                    task=task_description,
-                    llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx),
-                    controller=Controller(output_model=output_model),
-                )
-                result = await agent.run()
-                return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
-
-            # Main task
-            task_to_complete = (
-                f"Go to {url} and complete the following task: {task}. The user may already be "
-                "logged in. If the user is NOT already logged in and at any point login is "
-                "required to complete the task, please return human_login_required=True, and the "
-                "url of the sign in page as well as what the user should do to sign in."
+            return ActionClarification(
+                user_guidance=task_result.user_login_guidance,
+                action_url=self.infrastructure_provider.construct_auth_clarification_url(
+                    ctx,
+                    task_result.login_url,
+                ),
+                plan_run_id=ctx.plan_run.id,
+                require_confirmation=True,
+                source="Browser tool",
             )
 
-            task_result = await run_agent_task(task_to_complete, output_model)
-            if task_result.human_login_required:  # type: ignore reportCallIssue
-                return handle_login_requirement(task_result)  # type: ignore reportCallIssue
-
-            self.infrastructure_provider.step_complete(ctx)
-            return task_result.task_output  # type: ignore reportCallIssue
-
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:  # pragma: no cover
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(run_browser_tasks())
+        self.infrastructure_provider.step_complete(ctx)
+        return task_result.task_output  # type: ignore reportCallIssue
 
 
 class BrowserToolForUrl(BrowserTool):
@@ -369,9 +351,11 @@ class BrowserToolForUrl(BrowserTool):
             infrastructure_option=infrastructure_option,
         )
 
-    def run(self, ctx: ToolRunContext, task: str) -> str | BaseModel | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
+    async def run_async(
+        self, ctx: ToolRunContext, task: str
+    ) -> str | BaseModel | ActionClarification:
         """Run the BrowserToolForUrl."""
-        return super().run(ctx, self.url, task)  # pragma: no cover
+        return await super().run_async(ctx, self.url, task)
 
 
 class BrowserInfrastructureProvider(ABC):
