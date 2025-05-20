@@ -20,6 +20,8 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
+from typing import Self
+
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from portia.common import Serializable
@@ -45,16 +47,21 @@ class PlanBuilder:
     steps: list[Step]
     plan_inputs: list[PlanInput]
 
-    def __init__(self, query: str | None = None) -> None:
+    def __init__(
+        self, query: str | None = None, structured_output_schema: type[BaseModel] | None = None
+    ) -> None:
         """Initialize the builder with the plan query.
 
         Args:
             query (str): The original query given by the user.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query.
 
         """
         self.query = query if query is not None else ""
         self.steps = []
         self.plan_inputs = []
+        self.structured_output_schema = structured_output_schema
 
     def step(
         self,
@@ -173,6 +180,7 @@ class PlanBuilder:
             plan_context=PlanContext(query=self.query, tool_ids=tool_ids),
             steps=self.steps,
             plan_inputs=self.plan_inputs,
+            structured_output_schema=self.structured_output_schema,
         )
 
     def _get_step_index_or_raise(self, step_index: int | None) -> int:
@@ -404,6 +412,11 @@ class Plan(BaseModel):
         default=[],
         description="The inputs required by the plan.",
     )
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        exclude=True,
+        description="The optional structured output schema for the query.",
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the plan.
@@ -467,11 +480,17 @@ class Plan(BaseModel):
             f"Task: {self.plan_context.query}\n"
             f"Tools Available Summary: {tools_summary}\n"
             f"{inputs_section}"
-            f"Steps:\n" + "\n".join([step.pretty_print() for step in self.steps])
+            f"Steps:\n"
+            + "\n".join([step.pretty_print() for step in self.steps])
+            + (
+                f"\nStructured Output Schema: {self.structured_output_schema.__name__}"
+                if self.structured_output_schema
+                else ""
+            )
         )
 
     @model_validator(mode="after")
-    def validate_plan(self) -> Plan:
+    def validate_plan(self) -> Self:
         """Validate the plan.
 
         Checks that all outputs + conditions are unique.
@@ -517,4 +536,5 @@ class ReadOnlyPlan(Plan):
             plan_context=plan.plan_context,
             steps=plan.steps,
             plan_inputs=plan.plan_inputs,
+            structured_output_schema=plan.structured_output_schema,
         )

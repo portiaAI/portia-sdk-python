@@ -122,6 +122,12 @@ class PlanRun(BaseModel):
         description="Dict mapping plan input names to their values.",
     )
 
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        exclude=True,
+        description="The optional structured output schema for the plan run.",
+    )
+
     def get_outstanding_clarifications(self) -> ClarificationListType:
         """Return all outstanding clarifications.
 
@@ -220,4 +226,5 @@ class ReadOnlyPlanRun(PlanRun):
             state=plan_run.state,
             end_user_id=plan_run.end_user_id,
             plan_run_inputs=plan_run.plan_run_inputs,
+            structured_output_schema=plan_run.structured_output_schema,
         )

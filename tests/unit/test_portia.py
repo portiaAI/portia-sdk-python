@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
-from pydantic import HttpUrl, SecretStr
+from pydantic import BaseModel, HttpUrl, SecretStr
 
 from portia.clarification import (
     ActionClarification,
@@ -599,6 +599,73 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         assert output is not None
         assert output.get_value() == "Visit Hyde Park and have a picnic"
         assert output.get_summary() == expected_summary
+
+        # Verify create_summary was called with correct args
+        mock_summarizer.create_summary.assert_called_once()
+        call_args = mock_summarizer.create_summary.call_args[1]
+        assert isinstance(call_args["plan"], ReadOnlyPlan)
+        assert isinstance(call_args["plan_run"], ReadOnlyPlanRun)
+        assert call_args["plan"].id == plan.id
+        assert call_args["plan_run"].id == plan_run.id
+
+
+def test_portia_sets_final_output_with_structured_summary(portia: Portia) -> None:
+    """Test that final output is set with correct structured summary."""
+    (plan, plan_run) = get_test_plan_run()
+    plan.steps = [
+        Step(
+            task="Get weather in London",
+            output="$london_weather",
+        ),
+        Step(
+            task="Suggest activities based on weather",
+            output="$activities",
+        ),
+    ]
+
+    plan_run.outputs.step_outputs = {
+        "$london_weather": LocalDataValue(value="Sunny and warm"),
+        "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
+    }
+
+    # Define the structured output schema
+    class WeatherOutput(BaseModel):
+        temperature: str
+        activities: list[str]
+
+    # Create the expected structured output with summary
+    class WeatherOutputWithSummary(WeatherOutput):
+        fo_summary: str
+
+    expected_output = WeatherOutputWithSummary(
+        temperature="Sunny and warm",
+        activities=["Visit Hyde Park", "Have a picnic"],
+        fo_summary="Weather is sunny and warm in London, visit to Hyde Park for a picnic",
+    )
+
+    # Set the structured output schema on the plan run
+    plan_run.structured_output_schema = WeatherOutput
+
+    mock_summarizer = mock.MagicMock()
+    mock_summarizer.create_summary.return_value = expected_output
+
+    with mock.patch(
+        "portia.portia.FinalOutputSummarizer",
+        return_value=mock_summarizer,
+    ):
+        last_step_output = LocalDataValue(value=expected_output)
+        output = portia._get_final_output(plan, plan_run, last_step_output)  # noqa: SLF001
+
+        # Verify the final output
+        assert output is not None
+        output_value = output.get_value()
+        assert isinstance(output_value, WeatherOutput)
+        assert output_value.temperature == "Sunny and warm"
+        assert output_value.activities == ["Visit Hyde Park", "Have a picnic"]
+        assert (
+            output.get_summary()
+            == "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
+        )
 
         # Verify create_summary was called with correct args
         mock_summarizer.create_summary.assert_called_once()

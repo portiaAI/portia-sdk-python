@@ -26,6 +26,8 @@ from importlib.metadata import version
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from pydantic import BaseModel
+
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -156,13 +158,14 @@ class Portia:
 
         return self.storage.save_end_user(end_user)
 
-    def run(
+    def run(  # noqa: PLR0913
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -179,13 +182,24 @@ class Portia:
                 Provides input values for the run. This can be a list of PlanInput objects, a list
                 of dicts with keys "name", "description" (optional) and "value", or a dict of
                 plan run input name to value.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query. This is passed on to plan runs created from this plan but will not be
+                stored with the plan itself if using cloud storage and must be re-attached to the
+                plan run if using cloud storage.
 
         Returns:
             PlanRun: The run resulting from executing the query.
 
         """
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan = self.plan(query, tools, example_plans, end_user, coerced_plan_run_inputs)
+        plan = self.plan(
+            query,
+            tools,
+            example_plans,
+            end_user,
+            coerced_plan_run_inputs,
+            structured_output_schema,
+        )
         end_user = self.initialize_end_user(end_user)
         plan_run = self.create_plan_run(plan, end_user, coerced_plan_run_inputs)
         return self.resume(plan_run)
@@ -223,13 +237,14 @@ class Portia:
             return to_return
         raise ValueError("Invalid plan run inputs received")
 
-    def plan(
+    def plan(  # noqa: PLR0913
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
         example_plans: list[Plan] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples.
 
@@ -245,6 +260,10 @@ class Portia:
               "description" (optional), or a list of plan run input names. If a value is provided
               with a PlanInput object or in a dictionary, it will be ignored as values are only
               used when running the plan.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query. This is passed on to plan runs created from this plan but will be
+                not be stored with the plan itself if using cloud storage and must be re-attached
+                to the plan run if using cloud storage.
 
         Returns:
             Plan: The plan for executing the query.
@@ -293,6 +312,7 @@ class Portia:
             ),
             steps=outcome.steps,
             plan_inputs=coerced_plan_inputs or [],
+            structured_output_schema=structured_output_schema,
         )
         self.storage.save_plan(plan)
         logger().info(
@@ -336,6 +356,7 @@ class Portia:
         | list[dict[str, Serializable]]
         | dict[str, Serializable]
         | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a plan.
 
@@ -347,6 +368,8 @@ class Portia:
               Provides input values for the run. This can be a list of PlanInput objects, a list
               of dicts with keys "name", "description" (optional) and "value", or a dict of
               plan run input name to value.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the plan run. This is passed on to plan runs created from this plan but will be
 
         Returns:
             PlanRun: The resulting PlanRun object.
@@ -362,8 +385,14 @@ class Portia:
             else plan.id
         )
 
+        structured_output_schema = (
+            structured_output_schema
+            if structured_output_schema
+            else (plan.structured_output_schema if isinstance(plan, Plan) else None)
+        )
         if self.storage.plan_exists(plan_id):
             plan = self.storage.get_plan(plan_id)
+            plan.structured_output_schema = structured_output_schema
         elif isinstance(plan, Plan):
             self.storage.save_plan(plan)
         else:
@@ -492,8 +521,10 @@ class Portia:
             clarifications = plan_run.get_outstanding_clarifications()
             for clarification in clarifications:
                 logger().info(
-                    f"Clarification of type {clarification.category} requested by "
-                    "{clarification.source}"
+                    f"Clarification of type {clarification.category} requested"
+                    f"by '{clarification.source}'"
+                    if clarification.source
+                    else ""
                 )
                 self.execution_hooks.clarification_handler.handle(
                     clarification=clarification,
@@ -685,6 +716,7 @@ class Portia:
             plan_id=plan.id,
             state=PlanRunState.NOT_STARTED,
             end_user_id=end_user.external_id,
+            structured_output_schema=plan.structured_output_schema,
         )
         self._process_plan_input_values(plan, plan_run, plan_run_inputs)
         self.storage.save_plan_run(plan_run)
@@ -983,14 +1015,22 @@ class Portia:
             value=step_output.get_value(),
             summary=None,
         )
-
         try:
             summarizer = FinalOutputSummarizer(config=self.config)
-            summary = summarizer.create_summary(
+            output = summarizer.create_summary(
                 plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan=ReadOnlyPlan.from_plan(plan),
             )
-            final_output.summary = summary
+            if (
+                isinstance(output, BaseModel)
+                and plan_run.structured_output_schema
+                and hasattr(output, "fo_summary")
+            ):
+                unsumarrized_output = plan_run.structured_output_schema(**output.model_dump())
+                final_output.value = unsumarrized_output
+                final_output.summary = output.fo_summary  # type: ignore[reportAttributeAccessIssue]
+            elif isinstance(output, str):
+                final_output.summary = output
 
         except Exception as e:  # noqa: BLE001
             logger().warning(f"Error summarising run: {e}")
