@@ -122,6 +122,7 @@ class LLMModel(Enum):
 
     # OpenAI
     GPT_4_O = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o")
+    GPT_4_1 = Model(provider=LLMProvider.OPENAI, model_name="gpt-4.1")
     GPT_4_O_MINI = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
     GPT_3_5_TURBO = Model(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
     O_3_MINI = Model(provider=LLMProvider.OPENAI, model_name="o3-mini")
@@ -152,6 +153,7 @@ class LLMModel(Enum):
     # Azure OpenAI
     AZURE_GPT_4_O = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
     AZURE_GPT_4_O_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
+    AZURE_GPT_4_1 = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4.1")
     AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
 
     @property
@@ -294,24 +296,24 @@ DEFAULT_MODEL_KEY = "default_model_name"
 PROVIDER_DEFAULT_MODELS = {
     "planning_model": {
         LLMProvider.OPENAI: "openai/o3-mini",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-5-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
     "introspection_model": {
         LLMProvider.OPENAI: "openai/o3-mini",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-5-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
     "default_model": {
-        LLMProvider.OPENAI: "openai/gpt-4o",
+        LLMProvider.OPENAI: "openai/gpt-4.1",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
-        LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4o",
+        LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4.1",
     },
 }
 
