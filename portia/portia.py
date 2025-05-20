@@ -183,9 +183,9 @@ class Portia:
                 of dicts with keys "name", "description" (optional) and "value", or a dict of
                 plan run input name to value.
             structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query. This is passed on to plan runs created from this plan but will be
-                not be stored with the plan itself if using cloud storage and must be re-attached
-                to the plan run if using cloud storage.
+                for the query. This is passed on to plan runs created from this plan but will not be
+                stored with the plan itself if using cloud storage and must be re-attached to the
+                plan run if using cloud storage.
 
         Returns:
             PlanRun: The run resulting from executing the query.

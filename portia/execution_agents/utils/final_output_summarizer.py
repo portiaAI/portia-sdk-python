@@ -36,14 +36,9 @@ class FinalOutputSummarizer:
     )
 
     summarizer_and_structured_output_prompt = (
-        "Summarize all tasks and outputs that answers the query given. Make sure the "
-        "summary is including all the previous tasks and outputs and biased towards "
-        "the last step output of the plan. Your summary "
-        "should be concise and to the point with maximum 500 characters. Do not "
-        "include 'Summary:' in the beginning of the summary. Do not make up information "
-        "not used in the context.\n"
-        "The output should also include the structured output of the plan run as specified to "
-        "the output schema."
+        summarizer_only_prompt
+        + "The output should also include the structured output of the plan run as specified to "
+        "the output schema.\n"
     )
 
     def __init__(self, config: Config) -> None:
