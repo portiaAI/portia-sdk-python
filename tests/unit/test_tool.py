@@ -82,11 +82,12 @@ def test_handle(add_tool: AdditionTool) -> None:
     assert result == a + b
 
 
-def test_run_method_with_uncaught_error() -> None:
+@pytest.mark.asyncio
+async def test_run_method_with_uncaught_error() -> None:
     """Test the _run method wraps errors."""
     tool = ErrorTool()
     with pytest.raises(ToolSoftError):
-        tool._run(  # noqa: SLF001
+        await tool._run(  # noqa: SLF001
             ctx=get_test_tool_context(),
             error_str="this is an error",
             return_uncaught_error=True,
@@ -555,7 +556,8 @@ def test_remote_tool_value_confirm_clarifications(httpx_mock: HTTPXMock) -> None
     )
 
 
-def test_portia_mcp_tool_call() -> None:
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_call() -> None:
     """Test invoking a tool via MCP."""
     mock_session = MagicMock(spec=ClientSession)
     mock_session.call_tool.return_value = mcp.types.CallToolResult(
@@ -591,11 +593,12 @@ def test_portia_mcp_tool_call() -> None:
         "portia.tool.get_mcp_session",
         new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
-        tool_result = tool.run(get_test_tool_context(), a=1, b=2)
+        tool_result = await tool.run_async(get_test_tool_context(), a=1, b=2)
         assert tool_result == expected
 
 
-def test_portia_mcp_tool_call_with_error() -> None:
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_call_with_error() -> None:
     """Test invoking a tool via MCP."""
     mock_session = MagicMock(spec=ClientSession)
     mock_session.call_tool.return_value = mcp.types.CallToolResult(
@@ -627,4 +630,4 @@ def test_portia_mcp_tool_call_with_error() -> None:
         ),
         pytest.raises(ToolHardError),
     ):
-        tool.run(get_test_tool_context(), a=1, b=2)
+        await tool.run_async(get_test_tool_context(), a=1, b=2)

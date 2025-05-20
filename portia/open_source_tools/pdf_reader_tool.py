@@ -18,7 +18,7 @@ class PDFReaderToolSchema(BaseModel):
     )
 
 
-class PDFReaderTool(Tool[str]):
+class PDFReaderTool(Tool):
     """Read a PDF file and extract its text content using Mistral OCR."""
 
     id: str = "pdf_reader_tool"

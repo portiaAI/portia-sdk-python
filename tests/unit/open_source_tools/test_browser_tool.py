@@ -92,7 +92,8 @@ def mock_browser_infrastructure_provider() -> BrowserInfrastructureProvider:
     return MockBrowserInfrastructureProvider()
 
 
-def test_browser_tool_auth_check(
+@pytest.mark.asyncio
+async def test_browser_tool_auth_check(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the authentication check in browser tool."""
@@ -123,7 +124,7 @@ def test_browser_tool_auth_check(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called with correct parameters
         mock_agent.assert_called_once()
@@ -142,7 +143,8 @@ def test_browser_tool_auth_check(
         )
 
 
-def test_browser_tool_bad_response(
+@pytest.mark.asyncio
+async def test_browser_tool_bad_response(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool when no authentication is required."""
@@ -171,14 +173,15 @@ def test_browser_tool_bad_response(
 
         # Run the tool
         with pytest.raises(ToolHardError, match="Expected user guidance and login URL"):
-            browser_tool.run(context, "https://example.com", "test task")
+            await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called once
         assert mock_agent.call_count == 1
         assert mock_run.call_count == 1
 
 
-def test_browser_tool_no_auth_required(
+@pytest.mark.asyncio
+async def test_browser_tool_no_auth_required(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool when no authentication is required."""
@@ -207,7 +210,7 @@ def test_browser_tool_no_auth_required(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called once
         assert mock_agent.call_count == 1

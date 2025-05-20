@@ -59,7 +59,7 @@ class CalculatorToolSchema(BaseModel):
     )
 
 
-class CalculatorTool(Tool[float]):
+class CalculatorTool(Tool):
     """Takes a basic maths question in natural language and returns the result.
 
     Works best for maths expressions containing only numbers and the operators +, -, *, x, /.
