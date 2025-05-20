@@ -25,7 +25,7 @@ class SearchToolSchema(BaseModel):
     )
 
 
-class SearchTool(Tool[str]):
+class SearchTool(Tool):
     """Searches the internet to find answers to the search query provided.."""
 
     id: str = "search_tool"

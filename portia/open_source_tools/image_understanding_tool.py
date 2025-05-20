@@ -41,7 +41,7 @@ class ImageUnderstandingToolSchema(BaseModel):
         return self
 
 
-class ImageUnderstandingTool(Tool[str]):
+class ImageUnderstandingTool(Tool):
     """General purpose image understanding tool. Customizable to user requirements."""
 
     id: str = "image_understanding_tool"
