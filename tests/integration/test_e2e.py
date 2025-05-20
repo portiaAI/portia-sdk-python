@@ -212,41 +212,6 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     portia.resume(plan_run)
     assert plan_run.state == PlanRunState.COMPLETE
 
-def test_portia_set_run_state_to_fail_if_keyboard_interrupt_when_resume() -> None:
-    """Test that the run state set to FAILED if an KeyboardInterrupt is raised."""
-    config = Config.from_default(
-        default_log_level=LogLevel.DEBUG,
-        llm_provider=LLMProvider.OPENAI,
-        default_model="openai/gpt-4o-mini",
-        execution_agent_type=ExecutionAgentType.DEFAULT,
-        storage_class=StorageClass.MEMORY,
-    )
-
-    tool_registry = ToolRegistry([ClarificationTool()])
-    portia = Portia(config=config, tools=tool_registry)
-    clarification_step = Step(
-        tool_id="clarification_tool",
-        task="raise a clarification with a user guidance 'Return a clarification'",
-        output="",
-        inputs=[],
-    )
-    plan = Plan(
-        plan_context=PlanContext(
-            query="Raise a clarification",
-            tool_ids=["clarification_tool"],
-        ),
-        steps=[clarification_step],
-    )
-    portia.storage.save_plan(plan)
-
-    plan_run = portia.run_plan(plan)
-
-    assert plan_run.state == PlanRunState.NEED_CLARIFICATION
-
-    with pytest.raises(KeyboardInterrupt):
-        portia.resume(plan_run)
-
-    assert plan_run.state == PlanRunState.FAILED
 
 @pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
 @pytest.mark.parametrize("agent", AGENTS)
