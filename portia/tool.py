@@ -19,6 +19,7 @@ import asyncio
 import json
 from abc import abstractmethod
 from functools import partial
+from turtle import circle
 from typing import Any, Generic, Self
 
 import httpx
@@ -142,8 +143,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         If left unimplemented will always return true.
 
         Args:
-            ctx (ToolRunContext): Co
-            ntext of the tool run
+            ctx (ToolRunContext): Context of the tool run
 
         Returns:
             ReadyResponse: Whether the tool is ready to run and any clarifications that need to be
@@ -174,15 +174,38 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         """
 
-    def _run(
+    async def run_async(
+        self,
+        ctx: ToolRunContext,
+        *args: Any,
+        **kwargs: Any,
+    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
+        """Run the tool async.
+
+        This method can be implemented by subclasses but if not provided will
+        wrap the normal tool.run func.
+
+        Args:
+            ctx (ToolRunContext): Context of the tool execution
+            args (Any): The arguments passed to the tool for execution.
+            kwargs (Any): The keyword arguments passed to the tool for execution.
+
+        Returns:
+            Any: The result of the tool's execution which can be any serializable type
+            or a clarification.
+
+        """
+        return self.run(ctx, *args, **kwargs)
+
+    async def _run_async(
         self,
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
     ) -> Output:
-        """Invoke the Tool.run function and handle converting the result into an Output object.
+        """Invoke the Tool.run_async function and handle converting the result into an Output.
 
-        This is the entry point for agents to invoke a tool.
+        This is the entry point for agents to invoke a tool async.
 
         Args:
             ctx (ToolRunContext): The context for the tool.
@@ -197,7 +220,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         """
         try:
-            output = self.run(ctx, *args, **kwargs)
+            output = await self.run_async(ctx, *args, **kwargs)
         except Exception as e:
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
@@ -213,13 +236,13 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             )
         return LocalDataValue(value=output)  # type: ignore  # noqa: PGH003
 
-    def _run_with_artifacts(
+    async def _run_async_with_artifacts(
         self,
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
     ) -> tuple[str, Output]:
-        """Invoke the Tool.run function and handle converting to an Output object.
+        """Invoke the Tool.run_async function and handle converting to an Output object.
 
         This function returns a tuple consisting of the output and an Output object, as expected by
         langchain tools. It captures the output (artifact) directly instead of serializing
@@ -234,7 +257,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             tuple[str, Output]: A tuple containing the output and the Output.
 
         """
-        intermediate_output = self._run(ctx, *args, **kwargs)
+        intermediate_output = await self._run_async(ctx, *args, **kwargs)
         return (intermediate_output.get_value(), intermediate_output)  # type: ignore  # noqa: PGH003
 
     def _generate_tool_description(self) -> str:
@@ -324,7 +347,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             name=self.name.replace(" ", "_"),
             description=self._generate_tool_description(),
             args_schema=self.args_schema,
-            func=partial(self._run, ctx),
+            coroutine=partial(self._run_async, ctx),
         )
 
     def to_langchain_with_artifact(self, ctx: ToolRunContext) -> StructuredTool:
@@ -347,7 +370,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             name=self.name.replace(" ", "_"),
             description=self._generate_tool_description(),
             args_schema=self.args_schema,
-            func=partial(self._run_with_artifacts, ctx),
+            coroutine=partial(self._run_async_with_artifacts, ctx),
             return_direct=True,
             response_format="content_and_artifact",
         )
