@@ -553,7 +553,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             else:
                 return ready
 
-    async def run_async(
+    def run(
         self,
         ctx: ToolRunContext,
         *args: Any,
