@@ -492,8 +492,10 @@ class Portia:
             clarifications = plan_run.get_outstanding_clarifications()
             for clarification in clarifications:
                 logger().info(
-                    f"Clarification of type {clarification.category} requested by "
-                    "{clarification.source}"
+                    f"Clarification of type {clarification.category} requested"
+                    f"by '{clarification.source}'"
+                    if clarification.source
+                    else ""
                 )
                 self.execution_hooks.clarification_handler.handle(
                     clarification=clarification,

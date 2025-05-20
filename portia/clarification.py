@@ -78,8 +78,10 @@ class Clarification(BaseModel, ABC):
         default=False,
         description="Whether this clarification has been resolved.",
     )
-    source: str = Field(
-        description="The source of the clarification.",
+    source: str | None = Field(
+        default=None,
+        description="The source of the clarification. This should be a string that identifies the "
+        "origin of the clarification, such as a tool name or agent name.",
     )
 
 
