@@ -24,7 +24,7 @@ import sys
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -45,7 +45,7 @@ NotSet: Any = PydanticUndefined
 
 BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase", raise_error=False)
 
-T = TypeVar("T", bound=Union[str, BaseModel])
+T = TypeVar("T", bound=str | BaseModel)
 
 
 class BrowserToolForUrlSchema(BaseModel):
