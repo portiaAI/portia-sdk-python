@@ -16,7 +16,6 @@ If authentication is not required, the tool will return the task output. It uses
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os

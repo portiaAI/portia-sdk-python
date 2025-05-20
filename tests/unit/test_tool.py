@@ -89,7 +89,7 @@ def test_run_method_with_uncaught_error() -> None:
     """Test the _run method wraps errors."""
     tool = ErrorTool()
     with pytest.raises(ToolSoftError):
-        result = tool._run_async(  # noqa: F841, SLF001
+        result = tool._run(  # noqa: F841, SLF001
             ctx=get_test_tool_context(),
             error_str="this is an error",
             return_uncaught_error=True,
