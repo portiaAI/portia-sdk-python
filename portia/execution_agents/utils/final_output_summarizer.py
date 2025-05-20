@@ -97,6 +97,10 @@ class FinalOutputSummarizer:
         if plan_run.structured_output_schema:
 
             class SchemaWithSummary(plan_run.structured_output_schema):
+                # fo_summary prepended here with fo (=final_output) so as not to conflict with any
+                # existing fields in the structured output schema if the user was to want to supply
+                # their own summary field with a description of what to summarize, e.g.
+                # summary = Field(description="The summary of the weather in london") # noqa: ERA001
                 fo_summary: str = Field(description="The summary of the plan output")
 
             return model.get_structured_response(
