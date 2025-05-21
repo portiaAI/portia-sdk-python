@@ -28,6 +28,6 @@ def test_clarification_tool_raises_clarification() -> None:
 
     assert clarification.argument_name == argument_name
     assert clarification.user_guidance == f"Missing Argument: {argument_name}"
-    assert clarification.plan_run_id == ctx.plan_run_id
+    assert clarification.plan_run_id == ctx.plan_run.id
     assert clarification.step == tool.step
     assert clarification.category == ClarificationCategory.INPUT

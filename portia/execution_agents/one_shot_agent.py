@@ -29,7 +29,6 @@ from portia.execution_agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
-from portia.execution_agents.output import Output
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun

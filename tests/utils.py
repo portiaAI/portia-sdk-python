@@ -172,7 +172,7 @@ class ClarificationTool(Tool):
         """Add the numbers."""
         if len(ctx.clarifications) == 0:
             return InputClarification(
-                plan_run_id=ctx.plan_run_id,
+                plan_run_id=ctx.plan_run.id,
                 user_guidance=user_guidance,
                 argument_name="raise_clarification",
                 source="Test clarification tool",

@@ -424,7 +424,8 @@ def test_oneshot_model_fails_without_tool() -> None:
     )
     tool_context = ToolRunContext(
         end_user=agent.end_user,
-        plan_run_id=agent.plan_run.id,
+        plan=agent.plan,
+        plan_run=agent.plan_run,
         config=agent.config,
         clarifications=agent.plan_run.get_clarifications_for_step(),
     )

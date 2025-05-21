@@ -37,7 +37,7 @@ class ClarificationTool(Tool[str]):
         return InputClarification(
             argument_name=argument_name,
             user_guidance=f"Missing Argument: {argument_name}",
-            plan_run_id=ctx.plan_run_id,
+            plan_run_id=ctx.plan_run.id,
             step=self.step,
             source="Clarification tool",
         ).model_dump_json()

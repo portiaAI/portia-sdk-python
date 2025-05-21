@@ -1251,7 +1251,7 @@ def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) ->
 
     # First execution - should return clarification
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),

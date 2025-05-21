@@ -438,7 +438,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.ACTION:
                     return LocalDataValue(
                         value=ActionClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
@@ -448,7 +448,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.INPUT:
                     return LocalDataValue(
                         value=InputClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -458,7 +458,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.MULTIPLE_CHOICE:
                     return LocalDataValue(
                         value=MultipleChoiceClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -469,7 +469,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.VALUE_CONFIRMATION:
                     return LocalDataValue(
                         value=ValueConfirmationClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -497,7 +497,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run_id),
+                            "plan_run_id": str(ctx.plan_run.id),
                         },
                     },
                 ),
@@ -554,7 +554,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run_id),
+                            "plan_run_id": str(ctx.plan_run.id),
                             "additional_data": ctx.end_user.additional_data,
                         },
                     },
