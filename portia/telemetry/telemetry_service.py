@@ -118,8 +118,8 @@ class ProductTelemetry(BaseProductTelemetry):
 
             if not self.debug_logging:
                 # Silence posthog's logging
-                posthog_logger = logging.getLogger("posthog")
-                posthog_logger.disabled = True
+                posthog_logger = logging.getLogger("posthog")  # pragma: no cover
+                posthog_logger.disabled = True  # pragma: no cover
 
         if self._posthog_client is None:
             logger.debug("Telemetry disabled")
