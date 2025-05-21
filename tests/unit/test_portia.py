@@ -391,6 +391,27 @@ def test_portia_resume_after_interruption(portia: Portia, planning_model: MagicM
     assert plan_run.current_step_index == 1
 
 
+def test_portia_set_run_state_to_fail_if_keyboard_interrupt_when_resume(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test that the run state set to FAILED if an KeyboardInterrupt is raised."""
+    query = "example query"
+
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan_run = portia.run(query)
+
+    # Simulate run being in progress
+    plan_run.state = PlanRunState.IN_PROGRESS
+    plan_run.current_step_index = 1
+
+    with mock.patch.object(
+        portia, "_execute_plan_run", side_effect=KeyboardInterrupt
+    ):
+        portia.resume(plan_run)
+
+    assert plan_run.state == PlanRunState.FAILED
+
+
 def test_portia_resume_edge_cases(portia: Portia, planning_model: MagicMock) -> None:
     """Test edge cases for execute."""
     with pytest.raises(ValueError):  # noqa: PT011
