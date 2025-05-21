@@ -11,3 +11,14 @@ jobs:
       - uses: astral-sh/ruff-action@v1
         with:
           args: check
+
+  claude-lint:
+    needs: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Claude Code with direct prompt
+        uses: anthropics/claude-code-base-action@beta
+        with:
+          prompt_file: .claude/commands/lint-diff.md
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
