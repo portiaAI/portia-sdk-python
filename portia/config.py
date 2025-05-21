@@ -606,11 +606,6 @@ class Config(BaseModel):
                 "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
                 "have one",
             )
-        if self.storage_class == StorageClass.DISK and not self.storage_dir:
-            raise InvalidConfigError(
-                "storage_dir",
-                "A storage directory must be provided if using disk storage",
-            )
 
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.

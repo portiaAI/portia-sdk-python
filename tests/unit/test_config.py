@@ -79,6 +79,10 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.storage_class == StorageClass.DISK
     assert c.storage_dir == "/test"
 
+    c = Config.from_default(storage_class="DISK", storage_dir="/test")
+    assert c.storage_class == StorageClass.DISK
+    assert c.storage_dir == ".portia"
+
     # Need to specify storage_dir if using DISK
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(storage_class="DISK")

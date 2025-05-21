@@ -141,7 +141,7 @@ class Portia:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
-                self.storage = DiskFileStorage(storage_dir=self.config.must_get("storage_dir", str))
+                self.storage = DiskFileStorage(storage_dir=self.config.storage_dir)
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
 
