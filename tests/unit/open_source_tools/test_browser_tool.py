@@ -647,7 +647,7 @@ def test_browser_tool_with_structured_output_schema_auth_required(
                 action_url=HttpUrl("https://example.com/login"),
                 plan_run_id=context.plan_run_id,
                 require_confirmation=True,
-                source="test",
+                source="Browser tool",
             ),
         )
 
