@@ -62,7 +62,7 @@ PROVIDER_MODELS = [
         "mistralai/mistral-large-latest",
     ),
     (
-        LLMProvider.GOOGLE_GENERATIVE_AI,
+        LLMProvider.GOOGLE,
         "google/gemini-2.0-flash",
     ),
 ]

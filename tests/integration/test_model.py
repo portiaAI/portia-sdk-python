@@ -126,7 +126,7 @@ def test_get_structured_response_steps_or_error(model_str: str, messages: list[M
 
 def test_google_gemini_temperature(messages: list[Message]) -> None:
     """Test that GoogleGenAiGenerativeModel supports setting temperature."""
-    config = Config.from_default(llm_provider=LLMProvider.GOOGLE_GENERATIVE_AI)
+    config = Config.from_default(llm_provider=LLMProvider.GOOGLE)
     model = GoogleGenAiGenerativeModel(
         model_name="gemini-2.0-flash",
         api_key=config.google_api_key,

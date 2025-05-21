@@ -13,6 +13,7 @@ from portia.config import (
     LogLevel,
     PlanningAgentType,
     StorageClass,
+    parse_str_to_enum,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
@@ -528,7 +529,7 @@ def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
         ({"OPENAI_API_KEY": "test-openai-api-key"}, LLMProvider.OPENAI),
         ({"ANTHROPIC_API_KEY": "test-anthropic-api-key"}, LLMProvider.ANTHROPIC),
         ({"MISTRAL_API_KEY": "test-mistral-api-key"}, LLMProvider.MISTRALAI),
-        ({"GOOGLE_API_KEY": "test-google-api-key"}, LLMProvider.GOOGLE_GENERATIVE_AI),
+        ({"GOOGLE_API_KEY": "test-google-api-key"}, LLMProvider.GOOGLE),
         (
             {
                 "AZURE_OPENAI_API_KEY": "test-azure-openai-api-key",
@@ -557,7 +558,7 @@ def test_llm_provider_default_from_api_keys_env_vars(
         ({"openai_api_key": "test-openai-api-key"}, LLMProvider.OPENAI),
         ({"anthropic_api_key": "test-anthropic-api-key"}, LLMProvider.ANTHROPIC),
         ({"mistralai_api_key": "test-mistral-api-key"}, LLMProvider.MISTRALAI),
-        ({"google_api_key": "test-google-api-key"}, LLMProvider.GOOGLE_GENERATIVE_AI),
+        ({"google_api_key": "test-google-api-key"}, LLMProvider.GOOGLE),
         (
             {
                 "azure_openai_api_key": "test-azure-openai-api-key",
@@ -580,3 +581,21 @@ def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
     """Test deprecated LLMModel cannot be instantiated from a string."""
     with pytest.raises(ValueError, match="Invalid LLM model"):
         _ = LLMModel("adijabisfbgiwjebr")
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("google", LLMProvider.GOOGLE),
+        ("google_generative_ai", LLMProvider.GOOGLE),
+        ("google-generative-ai", LLMProvider.GOOGLE),
+        ("azure-openai", LLMProvider.AZURE_OPENAI),
+        ("azure_openai", LLMProvider.AZURE_OPENAI),
+        ("anthropic", LLMProvider.ANTHROPIC),
+        ("mistralai", LLMProvider.MISTRALAI),
+        ("openai", LLMProvider.OPENAI),
+    ],
+)
+def test_parse_str_to_enum(value: str, expected: LLMProvider) -> None:
+    """Test parse_str_to_enum works."""
+    assert parse_str_to_enum(value, LLMProvider) is expected

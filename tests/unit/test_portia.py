@@ -404,9 +404,7 @@ def test_portia_set_run_state_to_fail_if_keyboard_interrupt_when_resume(
     plan_run.state = PlanRunState.IN_PROGRESS
     plan_run.current_step_index = 1
 
-    with mock.patch.object(
-        portia, "_execute_plan_run", side_effect=KeyboardInterrupt
-    ):
+    with mock.patch.object(portia, "_execute_plan_run", side_effect=KeyboardInterrupt):
         portia.resume(plan_run)
 
     assert plan_run.state == PlanRunState.FAILED

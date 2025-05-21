@@ -8,8 +8,8 @@ import pytest
 from click.testing import CliRunner
 
 from portia.cli import cli
-from portia.config import StorageClass
-from portia.model import LLMProvider
+from portia.config import Config, StorageClass
+from portia.model import GenerativeModel, LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
 
 
@@ -18,6 +18,10 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mock the environment variables."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "test-endpoint")
 
 
 @pytest.fixture
@@ -25,6 +29,14 @@ def mock_portia_cls() -> Iterator[MagicMock]:
     """Mock the Portia class."""
     with patch("portia.cli.Portia", autospec=True) as mock_portia:
         yield mock_portia
+
+
+@pytest.fixture(autouse=True)
+def mock_config() -> Iterator[None]:
+    """Mock the Config class get_generative_model method."""
+    with patch.object(Config, "get_generative_model") as mock_get_generative_model:
+        mock_get_generative_model.return_value = MagicMock(spec=GenerativeModel)
+        yield None
 
 
 def test_cli_run(mock_portia_cls: MagicMock) -> None:
@@ -40,18 +52,32 @@ def test_cli_run(mock_portia_cls: MagicMock) -> None:
     assert mock_portia.run_plan.call_args[0][0] is mock_portia.plan.return_value
 
 
-def test_cli_run_config_set_provider(mock_portia_cls: MagicMock) -> None:
+@pytest.mark.parametrize(
+    ("provider", "expected_provider"),
+    [
+        ("anthropic", LLMProvider.ANTHROPIC),
+        ("google", LLMProvider.GOOGLE),
+        ("azure-openai", LLMProvider.AZURE_OPENAI),
+        ("mistralai", LLMProvider.MISTRALAI),
+        ("openai", LLMProvider.OPENAI),
+    ],
+)
+def test_cli_run_config_set_provider(
+    mock_portia_cls: MagicMock,
+    provider: str,
+    expected_provider: LLMProvider,
+) -> None:
     """Test the CLI --set-provider command."""
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["run", "Calculate 1 + 2", "--llm-provider", "anthropic"],
+        ["run", "Calculate 1 + 2", "--llm-provider", provider],
         input="y\n",
     )
     assert result.exit_code == 0
     assert mock_portia_cls.call_count == 1
     config = mock_portia_cls.call_args.kwargs["config"]
-    assert config.llm_provider == LLMProvider.ANTHROPIC
+    assert config.llm_provider == expected_provider
 
 
 def test_cli_run_config_set_planner_model(mock_portia_cls: MagicMock) -> None:
