@@ -40,7 +40,7 @@ def outputs() -> dict[str, Output]:
 
 def test_context_empty() -> None:
     """Test that the context is set up correctly."""
-    (_, plan_run) = get_test_plan_run()
+    (plan, plan_run) = get_test_plan_run()
     plan_run.outputs.step_outputs = {}
     context = build_context(
         ToolRunContext(
@@ -48,7 +48,8 @@ def test_context_empty() -> None:
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
             ),
-            plan_run_id=plan_run.id,
+            plan_run=plan_run,
+            plan=plan,
             config=get_test_config(),
             clarifications=[],
         ),
@@ -69,7 +70,8 @@ def test_context_execution_context() -> None:
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
             ),
-            plan_run_id=plan_run.id,
+            plan_run=plan_run,
+            plan=plan,
             config=get_test_config(),
             clarifications=[],
         ),

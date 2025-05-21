@@ -83,7 +83,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_after_tool_call = mock.MagicMock(return_value=None)
     tool = AdditionTool()
     agent = OneShotAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(),
@@ -121,7 +121,7 @@ def test_oneshot_agent_without_tool_raises() -> None:
     (plan, plan_run) = get_test_plan_run()
     with pytest.raises(InvalidAgentError):
         OneShotAgent(
-            step=plan.steps[0],
+            plan=plan,
             plan_run=plan_run,
             end_user=EndUser(external_id="123"),
             config=get_test_config(),
@@ -181,7 +181,7 @@ def test_oneshot_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyP
 
     # First execution - should return clarification
     agent = OneShotAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(),
@@ -260,7 +260,7 @@ def test_oneshot_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPa
 
     # First execution - should return clarification after tool call
     agent = OneShotAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(),
@@ -326,7 +326,7 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
 
     (plan, plan_run) = get_test_plan_run()
     agent = OneShotAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(
@@ -394,7 +394,7 @@ def test_oneshot_agent_templates_values(monkeypatch: pytest.MonkeyPatch) -> None
     }
 
     agent = OneShotAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(),
@@ -416,7 +416,7 @@ def test_oneshot_model_fails_without_tool() -> None:
     """Test that the oneshot model fails without a tool."""
     (plan, plan_run) = get_test_plan_run()
     agent = OneShotAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(),

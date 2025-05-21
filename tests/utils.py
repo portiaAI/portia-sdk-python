@@ -24,7 +24,7 @@ from portia.errors import ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalDataValue
 from portia.model import GenerativeModel, LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
-from portia.plan_run import PlanRun, PlanRunUUID
+from portia.plan_run import PlanRun
 from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
@@ -39,23 +39,21 @@ if TYPE_CHECKING:
 
 
 def get_test_tool_context(
-    plan_run_id: PlanRunUUID | None = None,
+    plan_run: PlanRun | None = None,
     config: Config | None = None,
     end_user: EndUser | None = None,
 ) -> ToolRunContext:
-    """Return a test tool context."""
-    if not plan_run_id:
-        plan_run_id = PlanRunUUID()
-    if not config:
-        config = get_test_config()
-    if not end_user:
-        end_user = EndUser(external_id="test")
-
+    """Return a test tool context for pytest fixtures."""
+    if plan_run is None:
+        (plan, plan_run) = get_test_plan_run()
+    else:
+        plan = get_test_plan_run()[0]
     return ToolRunContext(
-        plan_run_id=plan_run_id,
-        config=config,
+        plan_run=plan_run,
+        config=config or get_test_config(),
         clarifications=[],
-        end_user=end_user,
+        end_user=end_user or EndUser(external_id="test_user"),
+        plan=plan,
     )
 
 

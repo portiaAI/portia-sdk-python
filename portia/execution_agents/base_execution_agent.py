@@ -13,7 +13,7 @@ from langgraph.graph import END, MessagesState
 
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
-from portia.plan import ReadOnlyStep, Step
+from portia.plan import Plan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class BaseExecutionAgent:
 
     def __init__(  # noqa: PLR0913
         self,
-        step: Step,
+        plan: Plan,
         plan_run: PlanRun,
         config: Config,
         end_user: EndUser,
@@ -58,7 +58,7 @@ class BaseExecutionAgent:
         of the execute_sync method.
 
         Args:
-            step (Step): The step that defines the task to be executed.
+            plan (Plan): The plan containing the steps.
             plan_run (PlanRun): The run that contains the step and related data.
             config (Config): The configuration settings for the agent.
             end_user (EndUser): The end user for the execution.
@@ -67,7 +67,7 @@ class BaseExecutionAgent:
             execution_hooks: Optional hooks for extending execution functionality.
 
         """
-        self.step = step
+        self.plan = plan
         self.tool = tool
         self.config = config
         self.plan_run = plan_run
@@ -75,6 +75,11 @@ class BaseExecutionAgent:
         self.agent_memory = agent_memory
         self.execution_hooks = execution_hooks
         self.new_clarifications: list[Clarification] = []
+
+    @property
+    def step(self) -> Step:
+        """Get the current step from the plan."""
+        return self.plan.steps[self.plan_run.current_step_index]
 
     @abstractmethod
     def execute_sync(self) -> Output:

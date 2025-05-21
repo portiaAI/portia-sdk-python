@@ -663,7 +663,8 @@ class Portia:
                 ready_response = next_tool.ready(
                     ToolRunContext(
                         end_user=self.initialize_end_user(plan_run.end_user_id),
-                        plan_run_id=plan_run.id,
+                        plan_run=plan_run,
+                        plan=plan,
                         config=self.config,
                         clarifications=current_step_clarifications,
                     ),

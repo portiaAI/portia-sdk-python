@@ -32,9 +32,9 @@ from portia.execution_agents.execution_utils import (
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.model import GenerativeModel, Message
-from portia.plan import ReadOnlyStep, Step
+from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-from portia.tool import ToolRunContext
+from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -43,10 +43,7 @@ if TYPE_CHECKING:
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.execution_hooks import ExecutionHooks
-    from portia.plan import Step
-    from portia.plan_run import PlanRun
     from portia.storage import AgentMemory
-    from portia.tool import Tool
 
 
 class ExecutionState(MessagesState):
@@ -594,7 +591,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
 
     def __init__(  # noqa: PLR0913
         self,
-        step: Step,
+        plan: Plan,
         plan_run: PlanRun,
         config: Config,
         agent_memory: AgentMemory,
@@ -605,7 +602,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         """Initialize the agent.
 
         Args:
-            step (Step): The current step in the task plan.
+            plan (Plan): The plan containing the steps.
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
             agent_memory (AgentMemory): The agent memory to be used for the task.
@@ -614,7 +611,15 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             execution_hooks (ExecutionHooks | None): The execution hooks for the agent.
 
         """
-        super().__init__(step, plan_run, config, end_user, agent_memory, tool, execution_hooks)
+        super().__init__(
+            plan=plan,
+            plan_run=plan_run,
+            config=config,
+            end_user=end_user,
+            agent_memory=agent_memory,
+            tool=tool,
+            execution_hooks=execution_hooks,
+        )
         self.verified_args: VerifiedToolInputs | None = None
 
     def clarifications_or_continue(
@@ -692,7 +697,8 @@ class DefaultExecutionAgent(BaseExecutionAgent):
 
         tool_run_ctx = ToolRunContext(
             end_user=self.end_user,
-            plan_run_id=self.plan_run.id,
+            plan_run=self.plan_run,
+            plan=self.plan,
             config=self.config,
             clarifications=self.plan_run.get_clarifications_for_step(),
         )

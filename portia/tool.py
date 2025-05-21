@@ -52,7 +52,8 @@ from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
-from portia.plan_run import PlanRunUUID
+from portia.plan import Plan
+from portia.plan_run import PlanRun
 from portia.templates.render import render_template
 
 """MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
@@ -63,7 +64,8 @@ class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
     Attributes:
-        plan_run_id(RunUUID): The run id the tool run is part of.
+        plan_run(PlanRun): The run the tool run is part of.
+        plan(Plan): The plan the tool run is part of.
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
 
@@ -72,7 +74,8 @@ class ToolRunContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     end_user: EndUser
-    plan_run_id: PlanRunUUID
+    plan_run: PlanRun
+    plan: Plan
     config: Config
     clarifications: ClarificationListType
 
