@@ -10,20 +10,29 @@ from portia import (
     example_tool_registry,
 )
 from portia.cli import CLIExecutionHooks
+from portia.config import default_config
 from portia.end_user import EndUser
+from portia.tool_registry import PortiaToolRegistry
+
+registry = PortiaToolRegistry(default_config()).filter_tools(
+    lambda tool: not tool.id.startswith("portia:google:")
+)
 
 load_dotenv()
 
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
+    tools=registry,
+    execution_hooks=CLIExecutionHooks(),
 )
 
 
 # Simple Example
 plan_run = portia.run(
-    "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
+    "Send an email to Robbie saying hi",
 )
+
+input("Press Enter to continue...")
 
 # We can also provide additional data about the end user to the process
 plan_run = portia.run(
