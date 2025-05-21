@@ -22,6 +22,7 @@ from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED, Co
 from portia.errors import InvalidAgentError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.clarification_tool import ClarificationTool
+from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     AgentNode,
     process_output,
@@ -38,7 +39,6 @@ if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
     from portia.end_user import EndUser
-    from portia.execution_agents.context import StepInput
     from portia.execution_agents.output import Output
     from portia.execution_hooks import ExecutionHooks
     from portia.model import GenerativeModel

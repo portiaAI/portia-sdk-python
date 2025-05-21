@@ -16,9 +16,9 @@ from tests.utils import get_test_config, get_test_plan_run
 
 def test_memory_extraction_step_no_inputs() -> None:
     """Test MemoryExtractionStep with no step inputs."""
-    (plan, plan_run) = get_test_plan_run()
+    (_, plan_run) = get_test_plan_run()
     agent = BaseExecutionAgent(
-        plan=plan,
+        plan=PlanBuilder().step(task="DESCRIPTION_STRING", output="$out").build(),
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),
