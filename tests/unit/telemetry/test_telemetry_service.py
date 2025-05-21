@@ -1,5 +1,6 @@
 """Unit tests for the telemetry service module."""
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -115,6 +116,7 @@ class TestProductTelemetry:
             telemetry = ProductTelemetry()
             mock_logger.debug.assert_called_once_with("Telemetry disabled")
             assert telemetry._posthog_client is None  # noqa: SLF001
+            assert logging.getLogger("posthog").disabled is True
 
     def test_init_telemetry_enabled(self, mock_logger: MagicMock) -> None:
         """Test initialization with telemetry enabled."""
