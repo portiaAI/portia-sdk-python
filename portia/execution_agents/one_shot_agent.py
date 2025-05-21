@@ -33,6 +33,7 @@ from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
+from portia.telemetry.views import ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -180,6 +181,11 @@ class OneShotToolCallingModel:
             ],
             clarification_tool_args=clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
+        )
+        self.agent.telemetry.capture(
+            ToolCallTelemetryEvent(
+                tool_id=self.agent.tool.id if self.agent.tool else None,
+            )
         )
         response = model.invoke(formatted_messages)
         result = template_in_required_inputs(response, state["step_inputs"])
