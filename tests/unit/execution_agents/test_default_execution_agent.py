@@ -580,6 +580,7 @@ def test_tool_calling_model_no_hallucinations() -> None:
 
     (_, plan_run) = get_test_plan_run()
     mock_before_tool_call = mock.MagicMock(return_value=None)
+    mock_telemetry = mock.MagicMock()
     agent = SimpleNamespace(
         plan_run=plan_run,
         step=Step(task="DESCRIPTION_STRING", output="$out"),
@@ -595,6 +596,7 @@ def test_tool_calling_model_no_hallucinations() -> None:
             before_tool_call=mock_before_tool_call,
         ),
         new_clarifications=[],
+        telemetry=mock_telemetry,
     )
     tool_calling_model = ToolCallingModel(
         model=mock_model,
@@ -617,6 +619,10 @@ def test_tool_calling_model_no_hallucinations() -> None:
         ReadOnlyPlanRun.from_plan_run(agent.plan_run),
         ReadOnlyStep.from_step(agent.step),
     )
+    # Verify telemetry was captured
+    mock_telemetry.capture.assert_called_once()
+    telemetry_call = mock_telemetry.capture.call_args[0][0]
+    assert telemetry_call.tool_id == "TOOL_ID"
 
 
 def test_tool_calling_model_with_hallucinations() -> None:
@@ -638,6 +644,7 @@ def test_tool_calling_model_with_hallucinations() -> None:
     )
 
     (_, plan_run) = get_test_plan_run()
+    mock_telemetry = mock.MagicMock()
 
     clarification = InputClarification(
         plan_run_id=plan_run.id,
@@ -667,6 +674,7 @@ def test_tool_calling_model_with_hallucinations() -> None:
         else None,
         new_clarifications=[],
         execution_hooks=None,
+        telemetry=mock_telemetry,
     )
     agent.step = Step(task="DESCRIPTION_STRING", output="$out")
     agent.plan_run = plan_run
@@ -691,6 +699,10 @@ def test_tool_calling_model_with_hallucinations() -> None:
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
+    # Verify telemetry was captured
+    mock_telemetry.capture.assert_called_once()
+    telemetry_call = mock_telemetry.capture.call_args[0][0]
+    assert telemetry_call.tool_id == "TOOL_ID"
 
 
 def test_tool_calling_model_templates_inputs() -> None:
@@ -711,6 +723,7 @@ def test_tool_calling_model_templates_inputs() -> None:
 
     (_, plan_run) = get_test_plan_run()
     mock_model = get_mock_generative_model(templated_response)
+    mock_telemetry = mock.MagicMock()
     step_inputs = [
         StepInput(name="$input_value", value="templated value", description="Input value"),
     ]
@@ -721,6 +734,7 @@ def test_tool_calling_model_templates_inputs() -> None:
         ],
     )
 
+    addition_tool = AdditionTool()
     agent = SimpleNamespace(
         verified_args=verified_tool_inputs,
         step=Step(
@@ -730,11 +744,13 @@ def test_tool_calling_model_templates_inputs() -> None:
         ),
         new_clarifications=[],
         execution_hooks=None,
+        telemetry=mock_telemetry,
+        tool=addition_tool,
     )
     agent.plan_run = plan_run
     tool_calling_model = ToolCallingModel(
         model=mock_model,
-        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
+        tools=[addition_tool.to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 
@@ -746,6 +762,11 @@ def test_tool_calling_model_templates_inputs() -> None:
 
     assert tool_call["args"]["$templated_arg"] == "1. templated value 2. templated value"
     assert tool_call["args"]["$normal_arg"] == "normal value"
+
+    # Verify telemetry was captured
+    mock_telemetry.capture.assert_called_once()
+    telemetry_call = mock_telemetry.capture.call_args[0][0]
+    assert telemetry_call.tool_id == addition_tool.id
 
 
 def test_tool_calling_model_handles_missing_args_gracefully() -> None:
@@ -762,20 +783,24 @@ def test_tool_calling_model_handles_missing_args_gracefully() -> None:
 
     (_, plan_run) = get_test_plan_run()
     mock_model = get_mock_generative_model(invalid_response)
+    mock_telemetry = mock.MagicMock()
     verified_tool_inputs = VerifiedToolInputs(
         args=[
             VerifiedToolArgument(name="arg1", value="value1", made_up=False),
         ],
     )
+    addition_tool = AdditionTool()
     agent = SimpleNamespace(
         verified_args=verified_tool_inputs,
         step=Step(task="TASK_STRING", inputs=[], output="$out"),
         new_clarifications=[],
+        telemetry=mock_telemetry,
+        tool=addition_tool,
     )
     agent.plan_run = plan_run
     tool_calling_model = ToolCallingModel(
         model=mock_model,
-        tools=[AdditionTool().to_langchain_with_artifact(ctx=get_test_tool_context())],
+        tools=[addition_tool.to_langchain_with_artifact(ctx=get_test_tool_context())],
         agent=agent,  # type: ignore  # noqa: PGH003
     )
 

@@ -57,6 +57,8 @@ from portia.plan import (
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
+from portia.telemetry.telemetry_service import BaseProductTelemetry
+from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
 from portia.tool import ReadyResponse, Tool, ToolRunContext
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
@@ -72,6 +74,12 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
+def telemetry() -> MagicMock:
+    """Fixture to create ProductTelemetry mock."""
+    return MagicMock(spec=BaseProductTelemetry)
+
+
+@pytest.fixture
 def planning_model() -> MagicMock:
     """Fixture to create a mock planning model."""
     return MagicMock(spec=GenerativeModel)
@@ -84,7 +92,7 @@ def default_model() -> MagicMock:
 
 
 @pytest.fixture
-def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
+def portia(planning_model: MagicMock, default_model: MagicMock, telemetry: MagicMock) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
         models=GenerativeModelsConfig(
@@ -93,11 +101,13 @@ def portia(planning_model: MagicMock, default_model: MagicMock) -> Portia:
         ),
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
-    return Portia(config=config, tools=tool_registry)
+    return Portia(config=config, tools=tool_registry, telemetry=telemetry)
 
 
 @pytest.fixture
-def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock) -> Portia:
+def portia_with_agent_memory(
+    planning_model: MagicMock, default_model: MagicMock, telemetry: MagicMock
+) -> Portia:
     """Fixture to create a Portia instance for testing."""
     config = get_test_config(
         # Set a small threshold value so all outputs are stored in agent memory
@@ -111,7 +121,7 @@ def portia_with_agent_memory(planning_model: MagicMock, default_model: MagicMock
         portia_api_key="test-api-key",
     )
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
-    return Portia(config=config, tools=tool_registry)
+    return Portia(config=config, tools=tool_registry, telemetry=telemetry)
 
 
 def test_portia_local_default_config_with_api_keys() -> None:
@@ -175,7 +185,7 @@ def test_portia_local_default_config_without_api_keys() -> None:
         )
 
 
-def test_portia_run_query(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_run_query(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
     """Test running a query."""
     query = "example query"
 
@@ -185,20 +195,35 @@ def test_portia_run_query(portia: Portia, planning_model: MagicMock) -> None:
     )
 
     plan_run = portia.run(query)
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_run",
+            function_call_details={
+                "tools": None,
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_run_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
 
     assert plan_run.state == PlanRunState.COMPLETE
 
 
-def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
+def test_portia_run_query_tool_list(planning_model: MagicMock, telemetry: MagicMock) -> None:
     """Test running a query."""
     query = "example query"
+    addition_tool = AdditionTool()
+    clarification_tool = ClarificationTool()
     portia = Portia(
         config=get_test_config(
             models=GenerativeModelsConfig(
                 planning_model=planning_model,
             ),
         ),
-        tools=[AdditionTool(), ClarificationTool()],
+        tools=[addition_tool, clarification_tool],
+        telemetry=telemetry,
     )
 
     planning_model.get_structured_response.return_value = StepsOrError(
@@ -207,6 +232,18 @@ def test_portia_run_query_tool_list(planning_model: MagicMock) -> None:
     )
     plan_run = portia.run(query)
 
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_run",
+            function_call_details={
+                "tools": None,
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_run_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
     assert plan_run.state == PlanRunState.COMPLETE
 
 
@@ -237,17 +274,34 @@ def test_portia_run_query_disk_storage(planning_model: MagicMock) -> None:
         assert len(run_files) == 1
 
 
-def test_portia_generate_plan(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_generate_plan(
+    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+) -> None:
     """Test planning a query."""
     query = "example query"
 
     planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
     plan = portia.plan(query)
 
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_plan",
+            function_call_details={
+                "tools": None,
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
+
     assert plan.plan_context.query == query
 
 
-def test_portia_generate_plan_error(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_generate_plan_error(
+    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+) -> None:
     """Test planning a query that returns an error."""
     query = "example query"
 
@@ -258,19 +312,48 @@ def test_portia_generate_plan_error(portia: Portia, planning_model: MagicMock) -
     with pytest.raises(PlanError):
         portia.plan(query)
 
+    # Check that the telemetry event was captured despite the error.
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_plan",
+            function_call_details={
+                "tools": None,
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
 
-def test_portia_generate_plan_with_tools(portia: Portia, planning_model: MagicMock) -> None:
+
+def test_portia_generate_plan_with_tools(
+    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+) -> None:
     """Test planning a query."""
     query = "example query"
 
     planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
     plan = portia.plan(query, tools=["add_tool"])
 
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_plan",
+            function_call_details={
+                "tools": "add_tool",
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
+
     assert plan.plan_context.query == query
     assert plan.plan_context.tool_ids == ["add_tool"]
 
 
-def test_portia_resume(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_resume(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
     """Test running a plan."""
     query = "example query"
 
@@ -278,6 +361,15 @@ def test_portia_resume(portia: Portia, planning_model: MagicMock) -> None:
     plan = portia.plan(query)
     plan_run = portia.create_plan_run(plan)
     plan_run = portia.resume(plan_run)
+
+    assert telemetry.capture.call_count == 3
+    telemetry.capture.assert_called_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_resume",
+            function_call_details={"plan_run_provided": True, "plan_run_id_provided": False},
+            name="portia_function_call",
+        )
+    )
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.plan_id == plan.id
@@ -338,7 +430,9 @@ def test_portia_run_invalid_state(portia: Portia, planning_model: MagicMock) -> 
         portia.resume(plan_run)
 
 
-def test_portia_wait_for_ready(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_wait_for_ready(
+    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+) -> None:
     """Test wait for ready."""
     query = "example query"
 
@@ -374,6 +468,14 @@ def test_portia_wait_for_ready(portia: Portia, planning_model: MagicMock) -> Non
 
     plan_run = portia.wait_for_ready(plan_run)
     assert plan_run.state == PlanRunState.READY_TO_RESUME
+
+    telemetry.capture.assert_called_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_wait_for_ready",
+            function_call_details={},
+            name="portia_function_call",
+        )
+    )
 
 
 def test_portia_wait_for_ready_tool(portia: Portia) -> None:
@@ -819,7 +921,7 @@ def test_portia_resolve_clarification_error(portia: Portia) -> None:
         portia.resolve_clarification(clarification, "test", plan_run)
 
 
-def test_portia_resolve_clarification(portia: Portia) -> None:
+def test_portia_resolve_clarification(portia: Portia, telemetry: MagicMock) -> None:
     """Test resolve success."""
     plan, plan_run = get_test_plan_run()
     clarification = InputClarification(
@@ -833,6 +935,15 @@ def test_portia_resolve_clarification(portia: Portia) -> None:
     portia.storage.save_plan_run(plan_run)
 
     plan_run = portia.resolve_clarification(clarification, "test", plan_run)
+
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_resolve_clarification",
+            function_call_details={"clarification_category": "Input", "plan_run_provided": True},
+            name="portia_function_call",
+        )
+    )
+
     assert plan_run.state == PlanRunState.READY_TO_RESUME
 
 
@@ -871,7 +982,7 @@ def test_get_llm_tool() -> None:
     assert isinstance(tool._child_tool, LLMTool)  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
 
 
-def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
+def test_portia_run_plan(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
     """Test that run_plan calls create_plan_run and resume."""
     query = "example query"
 
@@ -883,8 +994,8 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
     # Mock the create_plan_run and resume methods
     with (
-        mock.patch.object(portia, "create_plan_run") as mockcreate_plan_run,
-        mock.patch.object(portia, "resume") as mock_resume,
+        mock.patch.object(portia, "_create_plan_run") as mockcreate_plan_run,
+        mock.patch.object(portia, "_resume") as mock_resume,
     ):
         mock_plan_run = MagicMock()
         mock_resumed_plan_run = MagicMock()
@@ -893,10 +1004,36 @@ def test_portia_run_plan(portia: Portia, planning_model: MagicMock) -> None:
 
         result = portia.run_plan(plan)
 
+        telemetry.capture.assert_has_calls(
+            [
+                mock.call(
+                    PortiaFunctionCallTelemetryEvent(
+                        function_name="portia_plan",
+                        function_call_details={
+                            "tools": None,
+                            "example_plans_provided": False,
+                            "end_user_provided": False,
+                            "plan_inputs_provided": False,
+                        },
+                        name="portia_function_call",
+                    )
+                ),
+                mock.call(
+                    PortiaFunctionCallTelemetryEvent(
+                        function_name="portia_run_plan",
+                        function_call_details={
+                            "plan_type": "Plan",
+                            "end_user_provided": False,
+                            "plan_run_inputs_provided": False,
+                        },
+                        name="portia_function_call",
+                    )
+                ),
+            ]
+        )
+
         mockcreate_plan_run.assert_called_once_with(plan, portia.initialize_end_user(), None)
-
         mock_resume.assert_called_once_with(mock_plan_run)
-
         assert result == mock_resumed_plan_run
 
 
@@ -915,8 +1052,8 @@ def test_portia_run_plan_with_new_plan(portia: Portia, planning_model: MagicMock
 
     # Mock the create_plan_run and resume methods
     with (
-        mock.patch.object(portia, "create_plan_run") as mockcreate_plan_run,
-        mock.patch.object(portia, "resume") as mock_resume,
+        mock.patch.object(portia, "_create_plan_run") as mockcreate_plan_run,
+        mock.patch.object(portia, "_resume") as mock_resume,
     ):
         mock_plan_run = MagicMock()
         mock_resumed_plan_run = MagicMock()
@@ -1400,6 +1537,7 @@ def test_portia_run_with_plan_run_inputs(
     portia: Portia,
     planning_model: MagicMock,
     plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str],
+    telemetry: MagicMock,
 ) -> None:
     """Test that Portia.run handles plan inputs correctly in different formats."""
     planning_model.get_structured_response.return_value = StepsOrError(
@@ -1445,6 +1583,18 @@ def test_portia_run_with_plan_run_inputs(
             plan_run_inputs=plan_run_inputs,
         )
 
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_run",
+            function_call_details={
+                "tools": None,
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_run_inputs_provided": True,
+            },
+            name="portia_function_call",
+        )
+    )
     planning_model.get_structured_response.assert_called_once()
     assert "$num_a" in planning_model.get_structured_response.call_args[1]["messages"][1].content
     assert "$num_b" in planning_model.get_structured_response.call_args[1]["messages"][1].content
@@ -1474,6 +1624,7 @@ def test_portia_plan_with_plan_inputs(
     portia: Portia,
     planning_model: MagicMock,
     plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str],
+    telemetry: MagicMock,
 ) -> None:
     """Test that Portia.plan handles plan inputs correctly in different formats."""
     planning_model.get_structured_response.return_value = StepsOrError(
@@ -1510,6 +1661,18 @@ def test_portia_plan_with_plan_inputs(
         tools=[AdditionTool()],
     )
 
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_plan",
+            function_call_details={
+                "tools": "add_tool",
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_inputs_provided": True,
+            },
+            name="portia_function_call",
+        )
+    )
     assert len(plan.plan_inputs) == 2
     assert any(input_.name == "$num_a" for input_ in plan.plan_inputs)
     assert any(input_.name == "$num_b" for input_ in plan.plan_inputs)
@@ -1617,7 +1780,7 @@ def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
         portia.run_plan(plan, plan_run_inputs=[required_input1])
 
     # Should work if we provide both required inputs
-    with mock.patch.object(portia, "resume") as mock_resume:
+    with mock.patch.object(portia, "_resume") as mock_resume:
         portia.run_plan(
             plan,
             plan_run_inputs=[required_input1, required_input2],
@@ -1663,7 +1826,7 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
 
     unknown_input = PlanInput(name="$unknown", description="Unknown input", value="unknown_value")
 
-    with mock.patch.object(portia, "resume") as mock_resume:
+    with mock.patch.object(portia, "_resume") as mock_resume:
         mock_resume.side_effect = lambda x: x
         plan_run = portia.run_plan(
             plan,
@@ -1675,7 +1838,7 @@ def test_portia_run_plan_with_additional_extra_input(portia: Portia) -> None:
         mock_resume.assert_called_once()
 
 
-def test_portia_run_plan_with_plan_uuid(portia: Portia) -> None:
+def test_portia_run_plan_with_plan_uuid(portia: Portia, telemetry: MagicMock) -> None:
     """Test that run_plan can retrieve a plan from storage using PlanUUID."""
     plan = Plan(
         plan_context=PlanContext(query="example query", tool_ids=["add_tool"]),
@@ -1693,13 +1856,25 @@ def test_portia_run_plan_with_plan_uuid(portia: Portia) -> None:
     portia.storage.save_plan(plan)
 
     # Mock the resume method to verify it gets called with the correct plan run
-    with mock.patch.object(portia, "resume") as mock_resume:
+    with mock.patch.object(portia, "_resume") as mock_resume:
         mock_resume.side_effect = lambda x: x
 
         plan_run = portia.run_plan(plan.id)
 
         assert plan_run.plan_id == plan.id
         mock_resume.assert_called_once()
+
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_run_plan",
+            function_call_details={
+                "plan_type": "PlanUUID",
+                "end_user_provided": False,
+                "plan_run_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
 
     with pytest.raises(PlanNotFoundError):
         portia.run_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
@@ -1723,7 +1898,7 @@ def test_portia_run_plan_with_uuid(portia: Portia) -> None:
     portia.storage.save_plan(plan)
 
     # Mock the resume method to verify it gets called with the correct plan run
-    with mock.patch.object(portia, "resume") as mock_resume:
+    with mock.patch.object(portia, "_resume") as mock_resume:
         mock_resume.side_effect = lambda x: x
 
         plan_run = portia.run_plan(plan.id)
