@@ -50,6 +50,7 @@ def test_from_default() -> None:
         openai_api_key=SecretStr("123"),
     )
     assert c.default_log_level == LogLevel.CRITICAL
+    assert c.llm_redis_cache_url is None
 
 
 def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -118,6 +119,22 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert c.large_output_threshold_tokens == 100
     assert not c.exceeds_output_threshold("Test " * 1000)
+
+
+def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """llm_redis_cache_url is read from environment variable."""
+    monkeypatch.setenv("LLM_redis_cache_url", "redis://localhost:6379/0")
+    config = Config.from_default(openai_api_key=SecretStr("123"))
+    assert config.llm_redis_cache_url == "redis://localhost:6379/0"
+
+
+def test_llm_redis_cache_url_kwarg() -> None:
+    """llm_redis_cache_url can be set via kwargs."""
+    config = Config.from_default(
+        openai_api_key=SecretStr("123"),
+        llm_redis_cache_url="redis://localhost:6380/1",
+    )
+    assert config.llm_redis_cache_url == "redis://localhost:6380/1"
 
 
 @pytest.mark.parametrize(

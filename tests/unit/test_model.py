@@ -10,12 +10,14 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, SecretStr, ValidationError
 
+import portia.model
 from portia.model import (
     AnthropicGenerativeModel,
     GenerativeModel,
     LangChainGenerativeModel,
     LLMProvider,
     Message,
+    OpenAIGenerativeModel,
     map_message_to_instructor,
 )
 
@@ -238,3 +240,56 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
             schema=StructuredOutputTestModel,
         )
         mock_instructor.return_value.chat.completions.create.assert_called_once()
+
+
+def test_langchain_generative_model_redis_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LangChainGenerativeModel sets up Redis cache when URL provided."""
+    base_chat_model = MagicMock(spec=BaseChatModel)
+    mock_set = MagicMock()
+    mock_cache_cls = MagicMock()
+    mock_from_url = MagicMock()
+    monkeypatch.setattr("portia.model.set_llm_cache", mock_set)
+    monkeypatch.setattr("portia.model.redis.from_url", mock_from_url)
+    monkeypatch.setattr("portia.model.RedisCache", mock_cache_cls)
+
+    LangChainGenerativeModel(
+        client=base_chat_model,
+        model_name="test",
+        redis_cache_url="redis://localhost:6379/0",
+    )
+
+    mock_from_url.assert_called_once_with("redis://localhost:6379/0")
+    mock_cache_cls.assert_called_once_with(
+        mock_from_url.return_value, ttl=portia.model.CACHE_TTL_SECONDS
+    )
+    mock_set.assert_called_once_with(mock_cache_cls.return_value)
+
+
+def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LLM responses are cached when redis URL provided."""
+    redis_client = MagicMock()
+    monkeypatch.setattr("portia.model.redis.from_url", MagicMock(return_value=redis_client))
+
+    mock_instructor_client = MagicMock()
+    monkeypatch.setattr(
+        "portia.model.instructor.from_openai",
+        MagicMock(return_value=mock_instructor_client),
+    )
+    mock_create = MagicMock()
+    mock_instructor_client.chat.completions.create = mock_create
+
+    model = OpenAIGenerativeModel(
+        model_name="gpt-4o",
+        api_key=SecretStr("k"),
+        redis_cache_url="redis://localhost:6379/0",
+    )
+
+    class Dummy(BaseModel):
+        pass
+
+    redis_client.get.return_value = None
+    model.get_structured_response_instructor([Message(role="user", content="hi")], Dummy)
+
+    redis_client.get.assert_called_once()
+    redis_client.setex.assert_called_once()
+    assert redis_client.setex.call_args.args[1] == portia.model.CACHE_TTL_SECONDS

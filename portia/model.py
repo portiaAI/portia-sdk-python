@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar
 import instructor
 import tiktoken
 from anthropic import Anthropic
+from langchain.cache import RedisCache
+from langchain.globals import set_llm_cache
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
@@ -16,7 +18,10 @@ from langsmith import wrappers
 from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr, ValidationError
 
+from portia import logger
 from portia.common import validate_extras_dependencies
+
+CACHE_TTL_SECONDS = 60 * 60 * 24
 
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
@@ -155,16 +160,34 @@ class LangChainGenerativeModel(GenerativeModel):
 
     provider: LLMProvider = LLMProvider.CUSTOM
 
-    def __init__(self, client: BaseChatModel, model_name: str) -> None:
+    def __init__(
+        self,
+        client: BaseChatModel,
+        model_name: str,
+        *,
+        redis_cache_url: str | None = None,
+    ) -> None:
         """Initialize with LangChain client.
 
         Args:
             client: LangChain chat model instance
             model_name: The name of the model
+            redis_cache_url: Optional Redis URL for caching
 
         """
         super().__init__(model_name)
         self._client = client
+        self._redis_client = None
+        if redis_cache_url and validate_extras_dependencies("redis", raise_error=False):
+            import redis
+
+            self._redis_client = redis.from_url(redis_cache_url)
+            set_llm_cache(RedisCache(self._redis_client, ttl=CACHE_TTL_SECONDS))
+        elif redis_cache_url:
+            logger().warning(
+                "Not using cache as cache group is not installed. "
+                "Install portia-sdk-python[caching] to use caching."
+            )
 
     def to_langchain(self) -> BaseChatModel:
         """Get the LangChain client."""
@@ -200,13 +223,37 @@ class LangChainGenerativeModel(GenerativeModel):
             return response
         return schema.model_validate(response)
 
+    def _cached_instructor_call(
+        self,
+        client: instructor.Instructor,
+        messages: list[Message],
+        schema: type[BaseModelT],
+        model: str,
+        provider: str,
+        **kwargs: Any,
+    ) -> BaseModelT:
+        """Call an instructor client with caching enabled if it is set up."""
+        if self._redis_client is None:
+            return client.chat.completions.create(
+                resonse_model=schema, messages=messages, model=model, seed=seed
+            )
+        key = "@@@TODO"
+        cached = self._redis_client.get(key)
+        if cached:
+            return schema.model_validate_json(cached)
+        response = client.chat.completions.create(
+            resonse_model=schema, messages=messages, model=model, **kwargs
+        )
+        self._redis_client.setex(key, CACHE_TTL_SECONDS, response.model_dump_json())
+        return response
+
 
 class OpenAIGenerativeModel(LangChainGenerativeModel):
     """OpenAI model implementation."""
 
     provider: LLMProvider = LLMProvider.OPENAI
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         model_name: str,
@@ -214,6 +261,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
+        redis_cache_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with OpenAI client.
@@ -224,6 +272,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             seed: Random seed for model generation
             max_retries: Maximum number of retries
             temperature: Temperature parameter
+            redis_cache_url: Optional Redis URL for caching
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
 
         """
@@ -245,7 +294,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             temperature=temperature,
             **kwargs,
         )
-        super().__init__(client, model_name)
+        super().__init__(client, model_name, redis_cache_url=redis_cache_url)
         self._instructor_client = instructor.from_openai(
             client=wrappers.wrap_openai(OpenAI(api_key=api_key.get_secret_value())),
             mode=instructor.Mode.JSON,
@@ -285,10 +334,12 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        return self._instructor_client.chat.completions.create(
-            response_model=schema,
+        return self._cached_instructor_call(
+            client=self._instructor_client,
             messages=instructor_messages,
+            schema=schema,
             model=self.model_name,
+            provider=self.provider.value,
             seed=self._seed,
         )
 
@@ -308,6 +359,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
+        redis_cache_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with Azure OpenAI client.
@@ -320,6 +372,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             api_key: API key for Azure OpenAI
             max_retries: Maximum number of retries
             temperature: Temperature parameter (defaults to 1 for O_3_MINI, 0 otherwise)
+            redis_cache_url: Optional Redis URL for caching
             **kwargs: Additional keyword arguments to pass to AzureChatOpenAI
 
         """
@@ -343,7 +396,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             temperature=temperature,
             **kwargs,
         )
-        super().__init__(client, model_name)
+        super().__init__(client, model_name, redis_cache_url=redis_cache_url)
         self._instructor_client = instructor.from_openai(
             client=AzureOpenAI(
                 api_key=api_key.get_secret_value(),
@@ -387,10 +440,12 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        return self._instructor_client.chat.completions.create(
-            response_model=schema,
+        return self._cached_instructor_call(
+            client=self._instructor_client,
             messages=instructor_messages,
+            schema=schema,
             model=self.model_name,
+            provider=self.provider.value,
             seed=self._seed,
         )
 
@@ -401,7 +456,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     provider: LLMProvider = LLMProvider.ANTHROPIC
     _output_instructor_threshold = 512
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         model_name: str = "claude-3-5-sonnet-latest",
@@ -409,6 +464,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         timeout: int = 120,
         max_retries: int = 3,
         max_tokens: int = 8096,
+        redis_cache_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with Anthropic client.
@@ -419,6 +475,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             max_retries: Maximum number of retries
             max_tokens: Maximum number of tokens to generate
             api_key: API key for Anthropic
+            redis_cache_url: Optional Redis URL for caching
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
         """
@@ -430,7 +487,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             **kwargs,
         )
-        super().__init__(client, model_name)
+        super().__init__(client, model_name, redis_cache_url=redis_cache_url)
         self._instructor_client = instructor.from_anthropic(
             client=wrappers.wrap_anthropic(
                 Anthropic(api_key=api_key.get_secret_value()),
@@ -482,10 +539,12 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        return self._instructor_client.chat.completions.create(
-            model=self.model_name,
-            response_model=schema,
+        return self._cached_instructor_call(
+            client=self._instructor_client,
             messages=instructor_messages,
+            schema=schema,
+            model=self.model_name,
+            provider=self.provider.value,
             max_tokens=self.max_tokens,
         )
 
@@ -505,6 +564,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             model_name: str = "mistral-large-latest",
             api_key: SecretStr,
             max_retries: int = 3,
+            redis_cache_url: str | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with MistralAI client.
@@ -513,6 +573,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 model_name: Name of the MistralAI model
                 api_key: API key for MistralAI
                 max_retries: Maximum number of retries
+                redis_cache_url: Optional Redis URL for caching
                 **kwargs: Additional keyword arguments to pass to ChatMistralAI
 
             """
@@ -522,7 +583,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
-            super().__init__(client, model_name)
+            super().__init__(client, model_name, redis_cache_url=redis_cache_url)
             self._instructor_client = instructor.from_mistral(
                 client=Mistral(api_key=api_key.get_secret_value()),
                 use_async=False,
@@ -561,10 +622,12 @@ if validate_extras_dependencies("mistralai", raise_error=False):
         ) -> BaseModelT:
             """Get structured response using instructor."""
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-            return self._instructor_client.chat.completions.create(
-                model=self.model_name,
-                response_model=schema,
+            return self._cached_instructor_call(
+                client=self._instructor_client,
                 messages=instructor_messages,
+                schema=schema,
+                model=self.model_name,
+                provider=self.provider.value,
             )
 
 
@@ -587,6 +650,7 @@ if validate_extras_dependencies("google", raise_error=False):
             api_key: SecretStr,
             max_retries: int = 3,
             temperature: float | None = None,
+            redis_cache_url: str | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with Google Generative AI client.
@@ -596,6 +660,7 @@ if validate_extras_dependencies("google", raise_error=False):
                 api_key: API key for Google Generative AI
                 max_retries: Maximum number of retries
                 temperature: Temperature parameter for model sampling
+                redis_cache_url: Optional Redis URL for caching
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
@@ -613,7 +678,7 @@ if validate_extras_dependencies("google", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
-            super().__init__(client, model_name)
+            super().__init__(client, model_name, redis_cache_url=redis_cache_url)
             self._instructor_client = instructor.from_gemini(
                 client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
                     model_name=model_name,
@@ -647,9 +712,12 @@ if validate_extras_dependencies("google", raise_error=False):
 
             """
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-            return self._instructor_client.messages.create(
+            return self._cached_instructor_call(
+                client=self._instructor_client,
                 messages=instructor_messages,
-                response_model=schema,
+                schema=schema,
+                model=self.model_name,
+                provider=self.provider.value,
             )
 
 
@@ -665,6 +733,7 @@ if validate_extras_dependencies("ollama", raise_error=False):
             self,
             model_name: str,
             base_url: str = "http://localhost:11434/v1",
+            redis_cache_url: str | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with Ollama client.
@@ -672,12 +741,14 @@ if validate_extras_dependencies("ollama", raise_error=False):
             Args:
                 model_name: Name of the Ollama model
                 base_url: Base URL of the Ollama server
+                redis_cache_url: Optional Redis URL for caching
                 **kwargs: Additional keyword arguments to pass to ChatOllama
 
             """
             super().__init__(
                 client=ChatOllama(model=model_name, **kwargs),
                 model_name=model_name,
+                redis_cache_url=redis_cache_url,
             )
             self.base_url = base_url
 
@@ -705,10 +776,13 @@ if validate_extras_dependencies("ollama", raise_error=False):
                 ),
                 mode=instructor.Mode.JSON,
             )
-            return client.chat.completions.create(
+            instructor_messages = [map_message_to_instructor(message) for message in messages]
+            return self._cached_instructor_call(
+                client=client,
+                messages=instructor_messages,
+                schema=schema,
                 model=self.model_name,
-                messages=[map_message_to_instructor(message) for message in messages],
-                response_model=schema,
+                provider=self.provider.value,
                 max_retries=2,
             )
 

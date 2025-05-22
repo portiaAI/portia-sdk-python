@@ -447,6 +447,11 @@ class Config(BaseModel):
         description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
     )
 
+    llm_redis_cache_url: str | None = Field(
+        default_factory=lambda: os.getenv("LLM_REDIS_CACHE_URL"),
+        description="Optional Redis URL used for caching LLM responses.",
+    )
+
     llm_provider: LLMProvider | None = Field(
         default=None,
         description="The LLM (API) provider. If set, Portia uses this to select the "
@@ -798,11 +803,13 @@ class Config(BaseModel):
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
+                    redis_cache_url=self.llm_redis_cache_url,
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
+                    redis_cache_url=self.llm_redis_cache_url,
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistralai")
@@ -811,6 +818,7 @@ class Config(BaseModel):
                 return MistralAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("mistralai_api_key"),
+                    redis_cache_url=self.llm_redis_cache_url,
                 )
             case LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
@@ -819,12 +827,14 @@ class Config(BaseModel):
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("google_api_key"),
+                    redis_cache_url=self.llm_redis_cache_url,
                 )
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
+                    redis_cache_url=self.llm_redis_cache_url,
                 )
             case LLMProvider.OLLAMA:
                 validate_extras_dependencies("ollama")
@@ -833,6 +843,7 @@ class Config(BaseModel):
                 return OllamaGenerativeModel(
                     model_name=model_name,
                     base_url=self.ollama_base_url,
+                    redis_cache_url=self.llm_redis_cache_url,
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")

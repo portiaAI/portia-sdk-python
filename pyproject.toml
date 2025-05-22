@@ -59,6 +59,7 @@ tools-browser-browserbase = [
     "browserbase>=1.2.0,<2",
 ]
 tools-pdf-reader = ["mistralai>=1.2.5,<2"]
+cache = ["redis>=6.1.0,<7"]
 all = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
