@@ -295,15 +295,15 @@ DEFAULT_MODEL_KEY = "default_model_name"
 
 PROVIDER_DEFAULT_MODELS = {
     "planning_model": {
-        LLMProvider.OPENAI: "openai/o3-mini",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-5-sonnet-latest",
+        LLMProvider.OPENAI: "openai/o3-mini/reasoning",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest/reasoning",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
     "introspection_model": {
-        LLMProvider.OPENAI: "openai/o3-mini",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-5-sonnet-latest",
+        LLMProvider.OPENAI: "openai/o4-mini/reasoning",
+        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest/reasoning",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
         LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
@@ -760,7 +760,7 @@ class Config(BaseModel):
         return model
 
     def _parse_model_string(self, model_string: str) -> GenerativeModel:
-        """Parse a model string in the form of "provider-prefix/model_name` to a GenerativeModel.
+        """Parse a model string in the form of "provider-prefix/model_name[/reasoning]` to a GenerativeModel.
 
         Supported provider-prefixes are:
         - openai
@@ -769,27 +769,35 @@ class Config(BaseModel):
         - google (requires portia-sdk-python[google] to be installed)
         - azure-openai
 
+        The optional "reasoning" parameter enables reasoning mode for models that support it.
+
         Args:
-            model_string (str): The model string to parse. E.G. "openai/gpt-4o"
+            model_string (str): The model string to parse. E.G. "openai/gpt-4o" or "anthropic/claude-3-7-sonnet-latest/reasoning"
 
         Returns:
             GenerativeModel: The parsed model.
 
-        """
-        provider, model_name = model_string.strip().split("/", maxsplit=1)
+        """  # noqa: E501
+        parts = model_string.strip().split("/", maxsplit=2)
+        provider = parts[0]
+        model_name = parts[1]
+        reasoning_enabled = len(parts) > 2 and parts[2] == "reasoning"  # noqa: PLR2004
+
         llm_provider = LLMProvider(provider)
-        return self._construct_model_from_name(llm_provider, model_name)
+        return self._construct_model_from_name(llm_provider, model_name, reasoning_enabled)
 
     def _construct_model_from_name(
         self,
         llm_provider: LLMProvider,
         model_name: str,
+        reasoning_enabled: bool,  # noqa: FBT001
     ) -> GenerativeModel:
         """Construct a Model instance from an LLMProvider and model name.
 
         Args:
             llm_provider (LLMProvider): The LLM provider.
             model_name (str): The model name as it appears in the LLM provider's API.
+            reasoning_enabled (bool): Whether reasoning mode is enabled for the model.
 
         Returns:
             GenerativeModel: The constructed model.
@@ -800,11 +808,13 @@ class Config(BaseModel):
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
+                    reasoning_enabled=reasoning_enabled,
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
+                    reasoning_enabled=reasoning_enabled,
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistralai")

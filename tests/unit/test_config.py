@@ -580,3 +580,44 @@ def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
     """Test deprecated LLMModel cannot be instantiated from a string."""
     with pytest.raises(ValueError, match="Invalid LLM model"):
         _ = LLMModel("adijabisfbgiwjebr")
+
+
+def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that default models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+    c = Config.from_default(llm_provider=LLMProvider.ANTHROPIC)
+
+    planning_model = c.get_planning_model()
+    assert isinstance(planning_model, AnthropicGenerativeModel)
+    assert planning_model.model_name == "claude-3-7-sonnet-latest"
+    assert planning_model.reasoning_enabled is True
+
+    introspection_model = c.get_introspection_model()
+    assert isinstance(introspection_model, AnthropicGenerativeModel)
+    assert introspection_model.model_name == "claude-3-7-sonnet-latest"
+    assert introspection_model.reasoning_enabled is True
+
+    default_model = c.get_default_model()
+    assert isinstance(default_model, AnthropicGenerativeModel)
+    assert default_model.model_name == "claude-3-7-sonnet-latest"
+    assert default_model.reasoning_enabled is False
+
+
+def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that OpenAI models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    c = Config.from_default(llm_provider=LLMProvider.OPENAI)
+
+    planning_model = c.get_planning_model()
+    assert isinstance(planning_model, OpenAIGenerativeModel)
+    assert planning_model.reasoning_enabled is True
+
+    introspection_model = c.get_introspection_model()
+    assert isinstance(introspection_model, OpenAIGenerativeModel)
+    assert introspection_model.reasoning_enabled is True
+
+    default_model = c.get_default_model()
+    assert isinstance(default_model, OpenAIGenerativeModel)
+    assert default_model.reasoning_enabled is False

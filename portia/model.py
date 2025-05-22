@@ -98,6 +98,7 @@ class GenerativeModel(ABC):
     """Base class for all generative model clients."""
 
     provider: LLMProvider
+    reasoning_enabled: bool = False
 
     def __init__(self, model_name: str) -> None:
         """Initialize the model.
@@ -139,10 +140,14 @@ class GenerativeModel(ABC):
 
     def __str__(self) -> str:
         """Get the string representation of the model."""
+        if self.reasoning_enabled:
+            return f"{self.provider.value}/{self.model_name}/reasoning"
         return f"{self.provider.value}/{self.model_name}"
 
     def __repr__(self) -> str:
         """Get the string representation of the model."""
+        if self.reasoning_enabled:
+            return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}/reasoning")'
         return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}")'
 
     @abstractmethod
@@ -206,7 +211,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
     provider: LLMProvider = LLMProvider.OPENAI
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         model_name: str,
@@ -214,6 +219,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
+        reasoning_enabled: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize with OpenAI client.
@@ -224,6 +230,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             seed: Random seed for model generation
             max_retries: Maximum number of retries
             temperature: Temperature parameter
+            reasoning_enabled: Whether to enable reasoning/thinking on the model
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
 
         """
@@ -232,9 +239,13 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             # See https://github.com/langchain-ai/langchain/issues/25357
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
 
+        model_kwargs = {}
+        self.reasoning_enabled = reasoning_enabled
+        if reasoning_enabled:
+            kwargs["reasoning_effort"] = "medium"
         # Unfortunately you get errors from o3 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
-        temperature = 1 if "o3-mini" in model_name.lower() else temperature
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini") else temperature
 
         client = ChatOpenAI(
             name=model_name,
@@ -243,6 +254,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             max_retries=max_retries,
             temperature=temperature,
+            model_kwargs=model_kwargs,
             **kwargs,
         )
         super().__init__(client, model_name)
@@ -285,11 +297,15 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
+        kwargs = {}
+        if self.reasoning_enabled:
+            kwargs["reasoning_effort"] = "medium"
         return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
             model=self.model_name,
             seed=self._seed,
+            **kwargs,
         )
 
 
@@ -308,6 +324,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
+        reasoning_enabled: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize with Azure OpenAI client.
@@ -320,6 +337,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             api_key: API key for Azure OpenAI
             max_retries: Maximum number of retries
             temperature: Temperature parameter (defaults to 1 for O_3_MINI, 0 otherwise)
+            reasoning_enabled: Whether to enable reasoning/thinking on the model
             **kwargs: Additional keyword arguments to pass to AzureChatOpenAI
 
         """
@@ -328,9 +346,13 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             # See https://github.com/langchain-ai/langchain/issues/25357
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
 
-        # Unfortunately you get errors from o3 mini with Langchain unless you set
+        if reasoning_enabled:
+            kwargs["reasoning_effort"] = "medium"
+        self.reasoning_enabled = reasoning_enabled
+
+        # Unfortunately you get errors from o3/o4 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
-        temperature = 1 if "o3-mini" in model_name.lower() else temperature
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini") else temperature
 
         client = AzureChatOpenAI(
             name=model_name,
@@ -387,11 +409,15 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
+        kwargs = {}
+        if self.reasoning_enabled:
+            kwargs["reasoning_effort"] = "medium"
         return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
             model=self.model_name,
             seed=self._seed,
+            **kwargs,
         )
 
 
@@ -399,16 +425,18 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     """Anthropic model implementation."""
 
     provider: LLMProvider = LLMProvider.ANTHROPIC
+    MAX_THINKING_TOKENS = 2000
     _output_instructor_threshold = 512
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
-        model_name: str = "claude-3-5-sonnet-latest",
+        model_name: str = "claude-3-7-sonnet-latest",
         api_key: SecretStr,
         timeout: int = 120,
         max_retries: int = 3,
         max_tokens: int = 8096,
+        reasoning_enabled: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize with Anthropic client.
@@ -419,9 +447,17 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             max_retries: Maximum number of retries
             max_tokens: Maximum number of tokens to generate
             api_key: API key for Anthropic
+            reasoning_enabled: Whether to enable reasoning/thinking on the model
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
         """
+        self.reasoning_enabled = reasoning_enabled
+
+        # atm we don't support thinking for anthropic models except for
+        # planning/introspection agents through the instructor library.
+        # Langchain-anthropic has fixed an issue for thinking in a later version (>= 0.2.9),
+        # but it conflicts with Browserbase library becuase it has pinned old version for
+        # langchain-anthropic.
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
@@ -456,7 +492,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
+        if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
@@ -487,6 +523,10 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             response_model=schema,
             messages=instructor_messages,
             max_tokens=self.max_tokens,
+            thinking={
+                "type": "enabled",
+                "budget_tokens": AnthropicGenerativeModel.MAX_THINKING_TOKENS,
+            },
         )
 
 
