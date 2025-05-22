@@ -1,0 +1,46 @@
+name: Formatting
+on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v1
+        with:
+          args: check
+
+  claude-lint:
+    needs: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install claude-code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Run Claude Code
+        id: claude
+        run: |
+          claude -p /project:lint-diff --output-format json --max-turns 5
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: claude-3-5-haiku-20241022
+          ANTHROPIC_SMALL_FAST_MODEL: claude-3-5-haiku-20241022
+      - name: Check for errors in Claude response
+        run: |
+          # First get the result field and parse it as JSON
+          result=$(jq -r '.result' "${{ steps.claude.outputs.execution_file }}" | sed 's/^```json\n//;s/\n```$//')
+          # Then check for errors in the parsed result
+          errors=$(echo "$result" | jq -r '.errors // empty')
+          if [ ! -z "$errors" ]; then
+            echo "Claude reported errors:"
+            echo "$errors"
+            exit 1
+          fi
