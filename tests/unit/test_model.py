@@ -242,15 +242,20 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
         mock_instructor.return_value.chat.completions.create.assert_called_once()
 
 
-def test_langchain_generative_model_redis_cache(monkeypatch: pytest.MonkeyPatch) -> None:
-    """LangChainGenerativeModel sets up Redis cache when URL provided."""
+def test_langchain_generative_model_redis_cache_setup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that Redis cache is set up correctly."""
     base_chat_model = MagicMock(spec=BaseChatModel)
     mock_set = MagicMock()
     mock_cache_cls = MagicMock()
-    mock_from_url = MagicMock()
     monkeypatch.setattr("portia.model.set_llm_cache", mock_set)
-    monkeypatch.setattr("portia.model.redis.from_url", mock_from_url)
     monkeypatch.setattr("portia.model.RedisCache", mock_cache_cls)
+
+    LangChainGenerativeModel(
+        client=base_chat_model,
+        model_name="test",
+    )
+    mock_cache_cls.assert_not_called()
+    mock_set.assert_not_called()
 
     LangChainGenerativeModel(
         client=base_chat_model,
@@ -258,18 +263,12 @@ def test_langchain_generative_model_redis_cache(monkeypatch: pytest.MonkeyPatch)
         redis_cache_url="redis://localhost:6379/0",
     )
 
-    mock_from_url.assert_called_once_with("redis://localhost:6379/0")
-    mock_cache_cls.assert_called_once_with(
-        mock_from_url.return_value, ttl=portia.model.CACHE_TTL_SECONDS
-    )
+    mock_cache_cls.assert_called_once_with(mock.ANY, ttl=portia.model.CACHE_TTL_SECONDS)
     mock_set.assert_called_once_with(mock_cache_cls.return_value)
 
 
 def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     """LLM responses are cached when redis URL provided."""
-    redis_client = MagicMock()
-    monkeypatch.setattr("portia.model.redis.from_url", MagicMock(return_value=redis_client))
-
     mock_instructor_client = MagicMock()
     monkeypatch.setattr(
         "portia.model.instructor.from_openai",
@@ -283,13 +282,22 @@ def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
         api_key=SecretStr("k"),
         redis_cache_url="redis://localhost:6379/0",
     )
+    redis_client = MagicMock()
+    model._redis_client = redis_client  # noqa: SLF001
 
-    class Dummy(BaseModel):
+    class DummyModel(BaseModel):
         pass
 
     redis_client.get.return_value = None
-    model.get_structured_response_instructor([Message(role="user", content="hi")], Dummy)
+    model.get_structured_response_instructor([Message(role="user", content="hi")], DummyModel)
 
     redis_client.get.assert_called_once()
     redis_client.setex.assert_called_once()
     assert redis_client.setex.call_args.args[1] == portia.model.CACHE_TTL_SECONDS
+
+    redis_client.get.reset_mock()
+    redis_client.get.return_value = "{}"
+    redis_client.setex.reset_mock()
+    model.get_structured_response_instructor([Message(role="user", content="hi")], DummyModel)
+    redis_client.get.assert_called_once()
+    redis_client.setex.assert_not_called()

@@ -123,7 +123,7 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url is read from environment variable."""
-    monkeypatch.setenv("LLM_redis_cache_url", "redis://localhost:6379/0")
+    monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/0")
     config = Config.from_default(openai_api_key=SecretStr("123"))
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
 

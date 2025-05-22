@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
@@ -9,9 +11,9 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar
 import instructor
 import tiktoken
 from anthropic import Anthropic
-from langchain.cache import RedisCache
 from langchain.globals import set_llm_cache
 from langchain_anthropic import ChatAnthropic
+from langchain_community.cache import RedisCache
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
@@ -178,7 +180,7 @@ class LangChainGenerativeModel(GenerativeModel):
         super().__init__(model_name)
         self._client = client
         self._redis_client = None
-        if redis_cache_url and validate_extras_dependencies("redis", raise_error=False):
+        if redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
             import redis
 
             self._redis_client = redis.from_url(redis_cache_url)
@@ -226,7 +228,7 @@ class LangChainGenerativeModel(GenerativeModel):
     def _cached_instructor_call(
         self,
         client: instructor.Instructor,
-        messages: list[Message],
+        messages: list[ChatCompletionMessageParam],
         schema: type[BaseModelT],
         model: str,
         provider: str,
@@ -235,9 +237,15 @@ class LangChainGenerativeModel(GenerativeModel):
         """Call an instructor client with caching enabled if it is set up."""
         if self._redis_client is None:
             return client.chat.completions.create(
-                resonse_model=schema, messages=messages, model=model, seed=seed
+                resonse_model=schema, messages=messages, model=model, **kwargs
             )
-        key = "@@@TODO"
+        # Create a cache key based on the model, provider, schema, and messages
+        cache_data = {
+            "schema": schema.model_json_schema(),
+            "messages": messages,
+        }
+        data_hash = hashlib.md5(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()  # noqa: S324
+        key = f"llm:{provider}:{model}:{data_hash}"
         cached = self._redis_client.get(key)
         if cached:
             return schema.model_validate_json(cached)
