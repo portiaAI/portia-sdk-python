@@ -837,6 +837,7 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
+                    reasoning_enabled=reasoning_enabled,
                 )
             case LLMProvider.OLLAMA:
                 validate_extras_dependencies("ollama")
