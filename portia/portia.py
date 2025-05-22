@@ -1458,7 +1458,7 @@ class Portia:
 
             tool = self._get_tool_for_step(step, plan_run)
             if not tool:
-                continue  # Should not happen if tool_id is set, but defensive check
+                continue  # pragma: no cover - Should not happen if tool_id is set - defensive check
             if tool.id.startswith("portia:"):
                 portia_cloud_tool_ids_remaining.add(step.tool_id)
             else:
