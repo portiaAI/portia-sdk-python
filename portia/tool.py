@@ -600,7 +600,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         batch_ready_response = client.post(
             url="/api/v0/tools/batch/ready/",
             json={
-                "tool_ids": tool_ids,
+                "tool_ids": sorted(tool_ids),
                 "execution_context": {
                     "end_user_id": tool_run_context.end_user.external_id,
                     "plan_run_id": str(tool_run_context.plan_run_id),

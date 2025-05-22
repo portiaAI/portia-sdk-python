@@ -2222,7 +2222,7 @@ def test_portia_tool_ready_multiple_tools_not_ready(
     assert (
         httpx_mock.get_request(
             match_json={
-                "tool_ids": [portia_tool.id, portia_tool_2.id],
+                "tool_ids": sorted([portia_tool.id, portia_tool_2.id]),
                 "execution_context": {
                     "end_user_id": "123",
                     "plan_run_id": str(plan_run.id),
