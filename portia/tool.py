@@ -44,6 +44,7 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
+from portia.cloud import PortiaCloudClient
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.end_user import EndUser
@@ -575,6 +576,43 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 raise ToolHardError(e) from e
             else:
                 return output.get_value()
+
+    @classmethod
+    def batch_ready_check(
+        cls,
+        config: Config,
+        tool_ids: list[str],
+        tool_run_context: ToolRunContext,
+    ) -> ReadyResponse:
+        """Batch check readiness for Portia cloud tools.
+
+        Args:
+            config (Config): The config for the SDK as a whole.
+            tool_ids (list[str]): The list of tool IDs to check readiness for.
+            tool_run_context (ToolRunContext): The context of the execution.
+
+        Returns:
+            ReadyResponse: The readiness response for the tools.
+
+        """
+        client = PortiaCloudClient().get_client(config)
+        logger().debug("Checking readiness for Portia cloud tools: " + ", ".join(tool_ids))
+        batch_ready_response = client.post(
+            url="/api/v0/tools/batch/ready/",
+            json={
+                "tool_ids": tool_ids,
+                "execution_context": {
+                    "end_user_id": tool_run_context.end_user.external_id,
+                    "plan_run_id": str(tool_run_context.plan_run_id),
+                },
+            },
+        )
+        if batch_ready_response.status_code == httpx.codes.NOT_FOUND:
+            # For backwards compatibility: if the endpoint is not found, we set ready=true
+            # and fallback to individual tool ready checks failing.
+            return ReadyResponse(ready=True, clarifications=[])
+        batch_ready_response.raise_for_status()
+        return ReadyResponse.model_validate(batch_ready_response.json())
 
 
 class PortiaMcpTool(Tool[str]):
