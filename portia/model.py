@@ -518,15 +518,18 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
+        kwargs = {}
+        if self.reasoning_enabled:
+            kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": AnthropicGenerativeModel.MAX_THINKING_TOKENS,
+            }
         return self._instructor_client.chat.completions.create(
             model=self.model_name,
             response_model=schema,
             messages=instructor_messages,
             max_tokens=self.max_tokens,
-            thinking={
-                "type": "enabled",
-                "budget_tokens": AnthropicGenerativeModel.MAX_THINKING_TOKENS,
-            },
+            **kwargs,
         )
 
 
