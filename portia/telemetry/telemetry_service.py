@@ -99,7 +99,7 @@ class ProductTelemetry(BaseProductTelemetry):
         # TODO(POR-1392): Set to true by default once documented and ready for # noqa: FIX002
         # release.
         # https://linear.app/portialabs/issue/POR-1392
-        telemetry_disabled = os.getenv("ANONYMIZED_TELEMETRY", "false").lower() == "false"
+        telemetry_disabled = os.getenv("ANONYMIZED_TELEMETRY", "true").lower() == "false"
 
         if telemetry_disabled:
             self._posthog_client = None
