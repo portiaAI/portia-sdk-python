@@ -45,10 +45,7 @@ def get_project_id_key() -> str:
             return "phc_QHjx4dKKNAqmLS1U64kIXo4NlYOGIFDgB1qYxw3wh1W"  # local / dev environment
         if "dev" in endpoint:  # type: ignore reportOperatorIssue
             return "phc_gkmBfAtjABu5dDAX9KX61iAF10Wyze4FGPrT3g7mcKo"  # staging environment
-    # TODO(POR-1391): Set to staging until we are confident in the data we are # noqa: FIX002
-    # collecting
-    # https://linear.app/portialabs/issue/POR-1391
-    return "phc_gkmBfAtjABu5dDAX9KX61iAF10Wyze4FGPrT3g7mcKo"  # staging environment
+    return "phc_fGJERhs0sljicW5IFBzJZoenOb0jtsIcAghCZHw97V1"  # prod environment
 
 
 class BaseProductTelemetry(ABC):
@@ -96,9 +93,6 @@ class ProductTelemetry(BaseProductTelemetry):
 
         Sets up the PostHog client if telemetry is enabled and configures logging.
         """
-        # TODO(POR-1392): Set to true by default once documented and ready for # noqa: FIX002
-        # release.
-        # https://linear.app/portialabs/issue/POR-1392
         telemetry_disabled = os.getenv("ANONYMIZED_TELEMETRY", "true").lower() == "false"
 
         if telemetry_disabled:
