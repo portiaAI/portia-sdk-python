@@ -12,8 +12,9 @@ from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 from langchain_core.messages import ToolMessage
 from langgraph.graph import MessagesState  # noqa: TC002
+from pydantic import Field
 
-from portia.execution_agents.output import Output
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.planning_agents.context import get_tool_descriptions_for_tools
@@ -115,18 +116,39 @@ class StepSummarizer:
                 "too long to provide the full value, but it starts with:"
                 f"{self._truncate(tool_output, self.config.large_output_threshold_tokens)}"
             )
+        messages = [
+            Message.from_langchain(m)
+            for m in self.summarizer_prompt.format_messages(
+                tool_output=tool_output,
+                max_length=self.summary_max_length,
+                tool_description=get_tool_descriptions_for_tools([self.tool]),
+                task_description=self.step.task,
+            )
+        ]
+        if (
+            self.tool.structured_output_schema
+            and not isinstance(tool_output, self.tool.structured_output_schema)
+            and isinstance(last_message.artifact, LocalDataValue)
+        ):
+
+            class SummarizerOutput(self.tool.structured_output_schema):
+                so_summary: str = Field(description="A summary of the tool output.")
+
+            try:
+                result = self.model.get_structured_response(messages, SummarizerOutput)
+                last_message.artifact.summary = result.so_summary  # type: ignore[attr-defined]
+                coerced_output = self.tool.structured_output_schema.model_validate(
+                    result.model_dump()
+                )
+                last_message.artifact.value = coerced_output
+            except Exception as e:  # noqa: BLE001 - we want to catch all exceptions
+                logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
+
+            return {"messages": [last_message]}
 
         try:
             response: Message = self.model.get_response(
-                messages=[
-                    Message.from_langchain(m)
-                    for m in self.summarizer_prompt.format_messages(
-                        tool_output=tool_output,
-                        max_length=self.summary_max_length,
-                        tool_description=get_tool_descriptions_for_tools([self.tool]),
-                        task_description=self.step.task,
-                    )
-                ],
+                messages=messages,
             )
             summary = response.content
             last_message.artifact.summary = summary  # type: ignore[attr-defined]
