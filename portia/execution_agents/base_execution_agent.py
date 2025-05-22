@@ -13,6 +13,7 @@ from langgraph.graph import END, MessagesState
 
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
+from portia.execution_agents.output import LocalDataValue
 from portia.plan import ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.telemetry_service import ProductTelemetry
@@ -161,10 +162,15 @@ class BaseExecutionAgent:
             "ToolSoftError" not in last_message.content
             and tool
             and (
-                getattr(tool, "should_summarize", False)
+                tool.should_summarize
                 # If the value is larger than the threshold value, always summarise them as they are
                 # too big to store the full value locally
                 or config.exceeds_output_threshold(last_message.content)
+                or (
+                    tool.structured_output_schema
+                    and isinstance(last_message, ToolMessage)
+                    and isinstance(last_message.artifact, LocalDataValue)
+                )
             )
             and isinstance(last_message, ToolMessage)
             and not is_clarification(last_message.artifact)
