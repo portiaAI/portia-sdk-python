@@ -27,7 +27,7 @@ class LLMToolSchema(BaseModel):
     )
 
 
-class LLMTool(Tool[str]):
+class LLMTool(Tool[str | BaseModel]):
     """General purpose LLM tool. Customizable to user requirements. Won't call other tools."""
 
     LLM_TOOL_ID: ClassVar[str] = "llm_tool"
@@ -67,6 +67,11 @@ class LLMTool(Tool[str]):
         description="The model to use for the LLMTool. If not provided, "
         "the model will be resolved from the config.",
     )
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        description="The schema to use for the structured output of the LLMTool. "
+        "If not provided, the output will be a string.",
+    )
 
     @staticmethod
     def process_task_data(task_data: list[Any] | str | None) -> str:
@@ -87,7 +92,9 @@ class LLMTool(Tool[str]):
 
         return "\n".join(str(item) for item in task_data)
 
-    def run(self, ctx: ToolRunContext, task: str, task_data: list[Any] | str | None = None) -> str:
+    def run(
+        self, ctx: ToolRunContext, task: str, task_data: list[Any] | str | None = None
+    ) -> str | BaseModel:
         """Run the LLMTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
 
@@ -109,5 +116,9 @@ class LLMTool(Tool[str]):
             Message(role="user", content=self.prompt),
             Message(role="user", content=content),
         ]
+
+        if self.structured_output_schema:
+            return model.get_structured_response(messages, self.structured_output_schema)
+
         response = model.get_response(messages)
         return str(response.content)
