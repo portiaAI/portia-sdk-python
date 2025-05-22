@@ -15,6 +15,7 @@ from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
 from portia.plan import ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
+from portia.telemetry.telemetry_service import ProductTelemetry
 
 if TYPE_CHECKING:
     from portia.clarification import Clarification
@@ -74,6 +75,7 @@ class BaseExecutionAgent:
         self.end_user = end_user
         self.agent_memory = agent_memory
         self.execution_hooks = execution_hooks
+        self.telemetry = ProductTelemetry()
         self.new_clarifications: list[Clarification] = []
 
     @abstractmethod

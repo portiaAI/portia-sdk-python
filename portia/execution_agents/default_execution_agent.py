@@ -34,6 +34,7 @@ from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.model import GenerativeModel, Message
 from portia.plan import ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
+from portia.telemetry.views import ToolCallTelemetryEvent
 from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
@@ -547,6 +548,9 @@ class ToolCallingModel:
 
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
+        self.agent.telemetry.capture(
+            ToolCallTelemetryEvent(tool_id=self.agent.tool.id if self.agent.tool else None)
+        )
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 verified_args=verified_args.model_dump_json(indent=2),

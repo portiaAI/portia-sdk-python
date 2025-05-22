@@ -74,6 +74,8 @@ from portia.storage import (
     InMemoryStorage,
     PortiaCloudStorage,
 )
+from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
+from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import (
     DefaultToolRegistry,
@@ -100,6 +102,7 @@ class Portia:
         config: Config | None = None,
         tools: ToolRegistry | list[Tool] | None = None,
         execution_hooks: ExecutionHooks | None = None,
+        telemetry: BaseProductTelemetry | None = None,
     ) -> None:
         """Initialize storage and tools.
 
@@ -111,6 +114,7 @@ class Portia:
                 from Portia cloud if a Portia API key is set.
             execution_hooks (ExecutionHooks | None): Hooks that can be used to modify or add
                 extra functionality to the run of a plan.
+            telemetry (BaseProductTelemetry | None): Anonymous telemetry service.
 
         """
         self.config = config if config else Config.from_default()
@@ -119,6 +123,7 @@ class Portia:
         if self.config.portia_api_key and self.config.portia_api_endpoint:
             logger().info(f"Using Portia cloud API endpoint: {self.config.portia_api_endpoint}")
         self._log_models(self.config)
+        self.telemetry = telemetry if telemetry else ProductTelemetry()
         self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
         if not self.config.has_api_key("portia_api_key"):
             logger().warning(
@@ -191,8 +196,23 @@ class Portia:
             PlanRun: The run resulting from executing the query.
 
         """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_run",
+                function_call_details={
+                    "tools": (
+                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
+                        if tools
+                        else None
+                    ),
+                    "example_plans_provided": example_plans is not None,
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan = self.plan(
+        plan = self._plan(
             query,
             tools,
             example_plans,
@@ -201,8 +221,8 @@ class Portia:
             structured_output_schema,
         )
         end_user = self.initialize_end_user(end_user)
-        plan_run = self.create_plan_run(plan, end_user, coerced_plan_run_inputs)
-        return self.resume(plan_run)
+        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
+        return self._resume(plan_run)
 
     def _coerce_plan_run_inputs(
         self,
@@ -255,11 +275,72 @@ class Portia:
             example_plans (list[Plan] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | None): Optional list of inputs required for the plan.
-              This can be a list of Planinput objects, a list of dicts with keys "name" and
-              "description" (optional), or a list of plan run input names. If a value is provided
-              with a PlanInput object or in a dictionary, it will be ignored as values are only
-              used when running the plan.
+            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
+                of inputs required for the plan.
+                This can be a list of Planinput objects, a list of dicts with keys "name" and
+                "description" (optional), or a list of plan run input names. If a value is provided
+                with a PlanInput object or in a dictionary, it will be ignored as values are only
+                used when running the plan.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query. This is passed on to plan runs created from this plan but will be
+                not be stored with the plan itself if using cloud storage and must be re-attached
+                to the plan run if using cloud storage.
+
+        Returns:
+            Plan: The plan for executing the query.
+
+        Raises:
+            PlanError: If there is an error while generating the plan.
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_plan",
+                function_call_details={
+                    "tools": (
+                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
+                        if tools
+                        else None
+                    ),
+                    "example_plans_provided": example_plans is not None,
+                    "end_user_provided": end_user is not None,
+                    "plan_inputs_provided": plan_inputs is not None,
+                },
+            )
+        )
+        return self._plan(
+            query,
+            tools,
+            example_plans,
+            end_user,
+            plan_inputs,
+            structured_output_schema,
+        )
+
+    def _plan(  # noqa: PLR0913
+        self,
+        query: str,
+        tools: list[Tool] | list[str] | None = None,
+        example_plans: list[Plan] | None = None,
+        end_user: str | EndUser | None = None,
+        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+    ) -> Plan:
+        """Plans how to do the query given the set of tools and any examples.
+
+        Args:
+            query (str): The query to generate the plan for.
+            tools (list[Tool] | list[str] | None): List of tools to use for the query.
+            If not provided all tools in the registry will be used.
+            example_plans (list[Plan] | None): Optional list of example plans. If not
+            provide a default set of example plans will be used.
+            end_user (str | EndUser | None = None): The optional end user for this plan.
+            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
+                of inputs required for the plan.
+                This can be a list of Planinput objects, a list of dicts with keys "name" and
+                "description" (optional), or a list of plan run input names. If a value is provided
+                with a PlanInput object or in a dictionary, it will be ignored as values are only
+                used when running the plan.
             structured_output_schema (type[BaseModel] | None): The optional structured output schema
                 for the query. This is passed on to plan runs created from this plan but will be
                 not be stored with the plan itself if using cloud storage and must be re-attached
@@ -375,6 +456,16 @@ class Portia:
             PlanRun: The resulting PlanRun object.
 
         """  # noqa: E501
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_run_plan",
+                function_call_details={
+                    "plan_type": type(plan).__name__,
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
         # ensure we have the plan in storage.
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
         plan_id = (
@@ -400,10 +491,47 @@ class Portia:
 
         end_user = self.initialize_end_user(end_user)
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan_run = self.create_plan_run(plan, end_user, coerced_plan_run_inputs)
-        return self.resume(plan_run)
+        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
+        return self._resume(plan_run)
 
     def resume(
+        self,
+        plan_run: PlanRun | None = None,
+        plan_run_id: PlanRunUUID | str | None = None,
+    ) -> PlanRun:
+        """Resume a PlanRun.
+
+        If a clarification handler was provided as part of the execution hooks, it will be used
+        to handle any clarifications that are raised during the execution of the plan run.
+        If no clarification handler was provided and a clarification is raised, the run will be
+        returned in the `NEED_CLARIFICATION` state. The clarification will then need to be handled
+        by the caller before the plan run is resumed.
+
+        Args:
+            plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
+            plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
+                None.
+
+        Returns:
+            PlanRun: The resulting PlanRun after execution.
+
+        Raises:
+            ValueError: If neither plan_run nor plan_run_id is provided.
+            InvalidPlanRunStateError: If the plan run is not in a valid state to be resumed.
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_resume",
+                function_call_details={
+                    "plan_run_provided": plan_run is not None,
+                    "plan_run_id_provided": plan_run_id is not None,
+                },
+            )
+        )
+        return self._resume(plan_run, plan_run_id)
+
+    def _resume(
         self,
         plan_run: PlanRun | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
@@ -507,35 +635,42 @@ class Portia:
         plan_run: PlanRun,
     ) -> PlanRun:
         """Execute a plan run and handle any clarifications that are raised."""
-        while plan_run.state not in [
-            PlanRunState.COMPLETE,
-            PlanRunState.FAILED,
-        ]:
-            plan_run = self._execute_plan_run(plan, plan_run)
+        try:
+            while plan_run.state not in [
+                PlanRunState.COMPLETE,
+                PlanRunState.FAILED,
+            ]:
+                plan_run = self._execute_plan_run(plan, plan_run)
 
-            # If we don't have a clarification handler, return the plan run even if a clarification
-            # has been raised
-            if not self.execution_hooks.clarification_handler:
-                return plan_run
+                # If we don't have a clarification handler, return the plan run
+                # even if a clarification has been raised
+                if not self.execution_hooks.clarification_handler:
+                    return plan_run
 
-            clarifications = plan_run.get_outstanding_clarifications()
-            for clarification in clarifications:
-                logger().info(
-                    f"Clarification of type {clarification.category} requested"
-                    f"by '{clarification.source}'"
-                    if clarification.source
-                    else ""
-                )
-                self.execution_hooks.clarification_handler.handle(
-                    clarification=clarification,
-                    on_resolution=lambda c, r: self.resolve_clarification(c, r) and None,
-                    on_error=lambda c, r: self.error_clarification(c, r) and None,
-                )
+                clarifications = plan_run.get_outstanding_clarifications()
+                for clarification in clarifications:
+                    logger().info(
+                        f"Clarification of type {clarification.category} requested"
+                        f"by '{clarification.source}'"
+                        if clarification.source
+                        else ""
+                    )
+                    self.execution_hooks.clarification_handler.handle(
+                        clarification=clarification,
+                        on_resolution=lambda c, r: self.resolve_clarification(c, r) and None,
+                        on_error=lambda c, r: self.error_clarification(c, r) and None,
+                    )
 
-            if len(clarifications) > 0:
-                # If clarifications are handled synchronously, we'll go through this immediately.
-                # If they're handled asynchronously, we'll wait for the plan run to be ready.
-                plan_run = self.wait_for_ready(plan_run)
+                if len(clarifications) > 0:
+                    # If clarifications are handled synchronously,
+                    # we'll go through this immediately.
+                    # If they're handled asynchronously,
+                    # we'll wait for the plan run to be ready.
+                    plan_run = self.wait_for_ready(plan_run)
+
+        except KeyboardInterrupt:
+            logger().info("Execution interrupted by user. Setting plan run state to FAILED.")
+            self._set_plan_run_state(plan_run, PlanRunState.FAILED)
 
         return plan_run
 
@@ -556,6 +691,15 @@ class Portia:
             PlanRun: The updated PlanRun.
 
         """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_resolve_clarification",
+                function_call_details={
+                    "clarification_category": clarification.category.value,
+                    "plan_run_provided": plan_run is not None,
+                },
+            )
+        )
         if plan_run is None:
             plan_run = self.storage.get_plan_run(clarification.plan_run_id)
 
@@ -624,6 +768,11 @@ class Portia:
             InvalidRunStateError: If the run cannot be waited for.
 
         """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_wait_for_ready", function_call_details={}
+            )
+        )
         start_time = time.time()
         tries = 0
         if plan_run.state not in [
@@ -694,6 +843,35 @@ class Portia:
         self.storage.save_plan_run(plan_run)
 
     def create_plan_run(
+        self,
+        plan: Plan,
+        end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput] | None = None,
+    ) -> PlanRun:
+        """Create a PlanRun from a Plan.
+
+        Args:
+            plan (Plan): The plan to create a plan run from.
+            end_user (str | EndUser | None = None): The end user this plan run is for.
+            plan_run_inputs (list[PlanInput] | None = None): The plan inputs for the
+              plan run with their values.
+
+        Returns:
+            PlanRun: The created PlanRun object.
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_create_plan_run",
+                function_call_details={
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
+        return self._create_plan_run(plan, end_user, plan_run_inputs)
+
+    def _create_plan_run(
         self,
         plan: Plan,
         end_user: str | EndUser | None = None,

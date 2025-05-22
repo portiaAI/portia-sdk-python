@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from browser_use import Browser
-from pydantic import HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
 from portia.end_user import EndUser
@@ -547,6 +547,109 @@ def test_browser_tool_for_url_init_subdomain_handling() -> None:
     assert tool.url == url
     assert tool.id == "browser_tool_for_url_sub_example_com"
     assert tool.name == "Browser Tool for sub_example_com"
+
+
+class TestStructuredOutputSchema(BaseModel):
+    """Test schema for structured output testing."""
+
+    result: str = Field(description="Test result field")
+    status: str = Field(description="Test status field")
+
+
+def test_browser_tool_with_structured_output_schema(
+    mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
+) -> None:
+    """Test the browser tool with structured output schema."""
+    # Mock task response data with structured output
+    mock_task_response = BrowserTaskOutput[TestStructuredOutputSchema](
+        task_output=TestStructuredOutputSchema(
+            result="Task completed successfully", status="success"
+        ),
+        human_login_required=False,
+    )
+
+    mock_task_result = MagicMock()
+    mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+
+    # Create async mock for agent.run()
+    mock_run = AsyncMock(return_value=mock_task_result)
+
+    # Patch the Agent class
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserTool(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider,
+            structured_output_schema=TestStructuredOutputSchema,
+        )
+        context = get_test_tool_context()
+
+        # Run the tool
+        result = browser_tool.run(context, "https://example.com", "test task")
+
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1
+
+        # Verify the result is the structured output
+        assert isinstance(result, TestStructuredOutputSchema)
+        assert result.result == "Task completed successfully"
+        assert result.status == "success"
+
+
+def test_browser_tool_with_structured_output_schema_auth_required(
+    mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
+) -> None:
+    """Test the browser tool with structured output schema when auth is required."""
+    # Mock auth response data
+    mock_auth_response = BrowserTaskOutput[TestStructuredOutputSchema](
+        human_login_required=True,
+        login_url="https://example.com/login",
+        user_login_guidance="Login to example.com",
+    )
+
+    # Create a mock result object
+    mock_result = MagicMock()
+    mock_result.final_result.return_value = json.dumps(mock_auth_response.model_dump())
+
+    # Create async mock for agent.run()
+    mock_run = AsyncMock(return_value=mock_result)
+
+    # Patch the Agent class
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserTool(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider,
+            structured_output_schema=TestStructuredOutputSchema,
+        )
+        context = get_test_tool_context()
+
+        # Run the tool
+        result = browser_tool.run(context, "https://example.com", "test task")
+
+        # Verify Agent was called with correct parameters
+        mock_agent.assert_called_once()
+        mock_run.assert_called_once()
+
+        # Verify result is an ActionClarification
+        assert isinstance(result, ActionClarification)
+        assert_clarification_equality_without_uuid(
+            result,
+            ActionClarification(
+                user_guidance="Login to example.com",
+                action_url=HttpUrl("https://example.com/login"),
+                plan_run_id=context.plan_run_id,
+                require_confirmation=True,
+                source="Browser tool",
+            ),
+        )
 
 
 def test_browserbase_provider_step_complete_with_session(

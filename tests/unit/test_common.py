@@ -11,6 +11,7 @@ from portia.common import (
     EXTRAS_GROUPS_DEPENDENCIES,
     PortiaEnum,
     combine_args_kwargs,
+    singleton,
     validate_extras_dependencies,
 )
 from portia.prefixed_uuid import PrefixedUUID
@@ -150,3 +151,24 @@ def test_validate_extras_dependencies_success() -> None:
     """Test function succeeds when package is installed."""
     with mock.patch.dict(EXTRAS_GROUPS_DEPENDENCIES, {"test": ["pytest"]}):
         validate_extras_dependencies("test")
+
+
+def test_singleton() -> None:
+    """Test singleton decorator functionality."""
+
+    @singleton
+    class TestClass:
+        def __init__(self, value: int = 0) -> None:
+            self.value = value
+
+    # Test that same instance is returned
+    instance1 = TestClass(1)
+    instance2 = TestClass(2)
+    assert instance1 is instance2
+    assert instance1.value == 1  # Value should not change on second instantiation
+
+    # Test reset functionality
+    TestClass.reset()  # type: ignore reportFunctionMemberAccess
+    instance3 = TestClass(3)
+    assert instance3 is not instance1
+    assert instance3.value == 3
