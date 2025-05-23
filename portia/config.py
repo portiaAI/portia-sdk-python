@@ -602,7 +602,6 @@ class Config(BaseModel):
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
                 return None
-        return None
 
     @model_validator(mode="after")
     def fill_default_models(self) -> Self:
