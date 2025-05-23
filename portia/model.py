@@ -23,6 +23,8 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from portia import logger
 from portia.common import validate_extras_dependencies
 
+# By default, cache for 1 day. Most of our prompts have the current date in them, so we don't
+# need to cache for longer than a day.
 CACHE_TTL_SECONDS = 60 * 60 * 24
 
 if TYPE_CHECKING:
@@ -182,9 +184,9 @@ class LangChainGenerativeModel(GenerativeModel):
         self._client = client
         self._redis_client = None
         if redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
-            import redis
+            from redis.client import Redis
 
-            self._redis_client = redis.from_url(redis_cache_url)
+            self._redis_client = Redis.from_url(redis_cache_url)
             set_llm_cache(RedisCache(self._redis_client, ttl=CACHE_TTL_SECONDS))
         elif redis_cache_url:
             logger().warning(
@@ -238,20 +240,20 @@ class LangChainGenerativeModel(GenerativeModel):
         """Call an instructor client with caching enabled if it is set up."""
         if self._redis_client is None:
             return client.chat.completions.create(
-                resonse_model=schema, messages=messages, model=model, **kwargs
+                response_model=schema, messages=messages, model=model, **kwargs
             )
         # Create a cache key based on the model, provider, schema, and messages
         cache_data = {
             "schema": schema.model_json_schema(),
             "messages": messages,
         }
-        data_hash = hashlib.md5(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()  # noqa: S324
+        data_hash = hashlib.md5(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()  # noqa: S324  # nosec B324
         key = f"llm:{provider}:{model}:{data_hash}"
         cached = self._redis_client.get(key)
         if cached:
-            return schema.model_validate_json(cached)
+            return schema.model_validate_json(cached)  # pyright: ignore[reportArgumentType]
         response = client.chat.completions.create(
-            resonse_model=schema, messages=messages, model=model, **kwargs
+            response_model=schema, messages=messages, model=model, **kwargs
         )
         self._redis_client.setex(key, CACHE_TTL_SECONDS, response.model_dump_json())
         return response
