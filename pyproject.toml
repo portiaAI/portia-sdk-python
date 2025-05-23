@@ -35,6 +35,8 @@ dependencies = [
     "posthog>=3.23.0",
     "testcontainers[redis]>=4.10.0",
     "pytest-repeat>=0.9.4",
+    "textual>=3.2.0",
+    "textual-dev>=1.7.0",
 ]
 
 [project.optional-dependencies]
