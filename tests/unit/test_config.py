@@ -363,7 +363,7 @@ def test_getters() -> None:
         Config.from_default(
             storage_class=StorageClass.CLOUD,
             portia_api_key=SecretStr(""),
-            extest_set_agent_model_default_model_not_settest_set_agent_model_default_model_not_setecution_agent_type=ExecutionAgentType.DEFAULT,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
             planning_agent_type=PlanningAgentType.DEFAULT,
             llm_provider=LLMProvider.OPENAI,
             openai_api_key=SecretStr("test-openai-api-key"),
@@ -591,17 +591,23 @@ def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch)
     planning_model = c.get_planning_model()
     assert isinstance(planning_model, AnthropicGenerativeModel)
     assert planning_model.model_name == "claude-3-7-sonnet-latest"
-    assert planning_model.reasoning_enabled is True
+    assert hasattr(planning_model, "_model_kwargs")
+    assert "thinking" in planning_model._model_kwargs  # noqa: SLF001
+    assert planning_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
 
     introspection_model = c.get_introspection_model()
     assert isinstance(introspection_model, AnthropicGenerativeModel)
     assert introspection_model.model_name == "claude-3-7-sonnet-latest"
-    assert introspection_model.reasoning_enabled is True
+    assert hasattr(introspection_model, "_model_kwargs")
+    assert "thinking" in introspection_model._model_kwargs  # noqa: SLF001
+    assert introspection_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
 
     default_model = c.get_default_model()
     assert isinstance(default_model, AnthropicGenerativeModel)
     assert default_model.model_name == "claude-3-7-sonnet-latest"
-    assert default_model.reasoning_enabled is False
+    assert not hasattr(default_model, "_model_kwargs") or "thinking" not in getattr(
+        default_model, "_model_kwargs", {}
+    )
 
 
 def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -612,12 +618,18 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
 
     planning_model = c.get_planning_model()
     assert isinstance(planning_model, OpenAIGenerativeModel)
-    assert planning_model.reasoning_enabled is True
+    assert hasattr(planning_model, "_model_kwargs")
+    assert "reasoning_effort" in planning_model._model_kwargs  # noqa: SLF001
+    assert planning_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
 
     introspection_model = c.get_introspection_model()
     assert isinstance(introspection_model, OpenAIGenerativeModel)
-    assert introspection_model.reasoning_enabled is True
+    assert hasattr(introspection_model, "_model_kwargs")
+    assert "reasoning_effort" in introspection_model._model_kwargs  # noqa: SLF001
+    assert introspection_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
 
     default_model = c.get_default_model()
     assert isinstance(default_model, OpenAIGenerativeModel)
-    assert default_model.reasoning_enabled is False
+    assert not hasattr(default_model, "_model_kwargs") or "reasoning_effort" not in getattr(
+        default_model, "_model_kwargs", {}
+    )

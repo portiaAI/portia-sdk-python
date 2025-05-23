@@ -131,6 +131,7 @@ def test_portia_local_default_config_with_api_keys() -> None:
         "os.environ",
         {
             "PORTIA_API_KEY": "",
+            "PORTIA_API_ENDPOINT": "",
             "OPENAI_API_KEY": "123",
             "TAVILY_API_KEY": "123",
             "OPENWEATHERMAP_API_KEY": "123",
@@ -162,6 +163,7 @@ def test_portia_local_default_config_without_api_keys() -> None:
         "os.environ",
         {
             "PORTIA_API_KEY": "",
+            "PORTIA_API_ENDPOINT": "",
             "OPENAI_API_KEY": "123",
             "TAVILY_API_KEY": "",
             "OPENWEATHERMAP_API_KEY": "",
@@ -404,9 +406,7 @@ def test_portia_set_run_state_to_fail_if_keyboard_interrupt_when_resume(
     plan_run.state = PlanRunState.IN_PROGRESS
     plan_run.current_step_index = 1
 
-    with mock.patch.object(
-        portia, "_execute_plan_run", side_effect=KeyboardInterrupt
-    ):
+    with mock.patch.object(portia, "_execute_plan_run", side_effect=KeyboardInterrupt):
         portia.resume(plan_run)
 
     assert plan_run.state == PlanRunState.FAILED

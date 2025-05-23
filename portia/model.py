@@ -98,7 +98,6 @@ class GenerativeModel(ABC):
     """Base class for all generative model clients."""
 
     provider: LLMProvider
-    reasoning_enabled: bool = False
 
     def __init__(self, model_name: str) -> None:
         """Initialize the model.
@@ -140,15 +139,25 @@ class GenerativeModel(ABC):
 
     def __str__(self) -> str:
         """Get the string representation of the model."""
-        if self.reasoning_enabled:
-            return f"{self.provider.value}/{self.model_name}/reasoning"
         return f"{self.provider.value}/{self.model_name}"
 
     def __repr__(self) -> str:
         """Get the string representation of the model."""
-        if self.reasoning_enabled:
-            return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}/reasoning")'
         return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}")'
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality based on class, provider, and model name."""
+        if not isinstance(other, GenerativeModel):
+            return False
+        return (
+            self.__class__ == other.__class__
+            and self.provider == other.provider
+            and self.model_name == other.model_name
+        )
+
+    def __hash__(self) -> int:
+        """Generate hash based on class, provider, and model name."""
+        return hash((self.__class__, self.provider, self.model_name))
 
     @abstractmethod
     def to_langchain(self) -> BaseChatModel:
@@ -211,7 +220,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
     provider: LLMProvider = LLMProvider.OPENAI
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         model_name: str,
@@ -219,7 +228,6 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
-        reasoning_enabled: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize with OpenAI client.
@@ -230,19 +238,16 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             seed: Random seed for model generation
             max_retries: Maximum number of retries
             temperature: Temperature parameter
-            reasoning_enabled: Whether to enable reasoning/thinking on the model
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
 
         """
+        self._model_kwargs = kwargs.copy()
+
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
 
-        model_kwargs = {}
-        self.reasoning_enabled = reasoning_enabled
-        if reasoning_enabled:
-            kwargs["reasoning_effort"] = "medium"
         # Unfortunately you get errors from o3 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
         temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini") else temperature
@@ -254,7 +259,6 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             max_retries=max_retries,
             temperature=temperature,
-            model_kwargs=model_kwargs,
             **kwargs,
         )
         super().__init__(client, model_name)
@@ -281,8 +285,9 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
+        if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
+
         return super().get_structured_response(
             messages,
             schema,
@@ -297,15 +302,12 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        kwargs = {}
-        if self.reasoning_enabled:
-            kwargs["reasoning_effort"] = "medium"
         return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
             model=self.model_name,
             seed=self._seed,
-            **kwargs,
+            **self._model_kwargs,
         )
 
 
@@ -324,7 +326,6 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
-        reasoning_enabled: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize with Azure OpenAI client.
@@ -337,7 +338,6 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             api_key: API key for Azure OpenAI
             max_retries: Maximum number of retries
             temperature: Temperature parameter (defaults to 1 for O_3_MINI, 0 otherwise)
-            reasoning_enabled: Whether to enable reasoning/thinking on the model
             **kwargs: Additional keyword arguments to pass to AzureChatOpenAI
 
         """
@@ -346,9 +346,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             # See https://github.com/langchain-ai/langchain/issues/25357
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
 
-        if reasoning_enabled:
-            kwargs["reasoning_effort"] = "medium"
-        self.reasoning_enabled = reasoning_enabled
+        self._model_kwargs = kwargs.copy()
 
         # Unfortunately you get errors from o3/o4 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
@@ -409,15 +407,12 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        kwargs = {}
-        if self.reasoning_enabled:
-            kwargs["reasoning_effort"] = "medium"
         return self._instructor_client.chat.completions.create(
             response_model=schema,
             messages=instructor_messages,
             model=self.model_name,
             seed=self._seed,
-            **kwargs,
+            **self._model_kwargs,
         )
 
 
@@ -425,10 +420,9 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     """Anthropic model implementation."""
 
     provider: LLMProvider = LLMProvider.ANTHROPIC
-    MAX_THINKING_TOKENS = 2000
     _output_instructor_threshold = 512
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         model_name: str = "claude-3-7-sonnet-latest",
@@ -436,7 +430,6 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         timeout: int = 120,
         max_retries: int = 3,
         max_tokens: int = 8096,
-        reasoning_enabled: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize with Anthropic client.
@@ -447,17 +440,10 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             max_retries: Maximum number of retries
             max_tokens: Maximum number of tokens to generate
             api_key: API key for Anthropic
-            reasoning_enabled: Whether to enable reasoning/thinking on the model
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
         """
-        self.reasoning_enabled = reasoning_enabled
-
-        # atm we don't support thinking for anthropic models except for
-        # planning/introspection agents through the instructor library.
-        # Langchain-anthropic has fixed an issue for thinking in a later version (>= 0.2.9),
-        # but it conflicts with Browserbase library becuase it has pinned old version for
-        # langchain-anthropic.
+        self._model_kwargs = kwargs.copy()
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
@@ -518,18 +504,12 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     ) -> BaseModelT:
         """Get structured response using instructor."""
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        kwargs = {}
-        if self.reasoning_enabled:
-            kwargs["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": AnthropicGenerativeModel.MAX_THINKING_TOKENS,
-            }
         return self._instructor_client.chat.completions.create(
             model=self.model_name,
             response_model=schema,
             messages=instructor_messages,
             max_tokens=self.max_tokens,
-            **kwargs,
+            **self._model_kwargs,
         )
 
 

@@ -293,31 +293,6 @@ SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 
 
-PROVIDER_DEFAULT_MODELS = {
-    "planning_model": {
-        LLMProvider.OPENAI: "openai/o3-mini/reasoning",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest/reasoning",
-        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
-        LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
-    },
-    "introspection_model": {
-        LLMProvider.OPENAI: "openai/o4-mini/reasoning",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest/reasoning",
-        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
-        LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
-    },
-    "default_model": {
-        LLMProvider.OPENAI: "openai/gpt-4.1",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
-        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
-        LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4.1",
-    },
-}
-
-
 class GenerativeModelsConfig(BaseModel):
     """Configuration for a Generative Models.
 
@@ -565,14 +540,90 @@ class Config(BaseModel):
         encoding = tiktoken.get_encoding("gpt2").encode(str(value))
         return len(encoding) > self.large_output_threshold_tokens
 
+    def get_agent_default_model(  # noqa: C901, PLR0911, PLR0912
+        self,
+        agent_key: str,
+        llm_provider: LLMProvider | None = None,
+    ) -> GenerativeModel | str | None:
+        """Get the default model for the given agent key."""
+        match agent_key:
+            case "planning_model":
+                match llm_provider:
+                    case LLMProvider.OPENAI:
+                        return OpenAIGenerativeModel(
+                            model_name="o3-mini",
+                            api_key=self.must_get_api_key("openai_api_key"),
+                            reasoning_effort="medium",
+                        )
+                    case LLMProvider.ANTHROPIC:
+                        return AnthropicGenerativeModel(
+                            model_name="claude-3-7-sonnet-latest",
+                            api_key=self.must_get_api_key("anthropic_api_key"),
+                            thinking={"type": "enabled", "budget_tokens": 3000},
+                        )
+                    case LLMProvider.MISTRALAI:
+                        return "mistralai/mistral-large-latest"
+                    case LLMProvider.GOOGLE_GENERATIVE_AI:
+                        return "google/gemini-2.0-flash"
+                    case LLMProvider.AZURE_OPENAI:
+                        return AzureOpenAIGenerativeModel(
+                            model_name="o3-mini",
+                            api_key=self.must_get_api_key("azure_openai_api_key"),
+                            azure_endpoint=self.must_get("azure_openai_endpoint", str),
+                            reasoning_effort="medium",
+                        )
+                return None
+            case "introspection_model":
+                match llm_provider:
+                    case LLMProvider.OPENAI:
+                        return OpenAIGenerativeModel(
+                            model_name="o4-mini",
+                            api_key=self.must_get_api_key("openai_api_key"),
+                            reasoning_effort="medium",
+                        )
+                    case LLMProvider.ANTHROPIC:
+                        return AnthropicGenerativeModel(
+                            model_name="claude-3-7-sonnet-latest",
+                            api_key=self.must_get_api_key("anthropic_api_key"),
+                            thinking={"type": "enabled", "budget_tokens": 3000},
+                        )
+                    case LLMProvider.MISTRALAI:
+                        return "mistralai/mistral-large-latest"
+                    case LLMProvider.GOOGLE_GENERATIVE_AI:
+                        return "google/gemini-2.0-flash"
+                    case LLMProvider.AZURE_OPENAI:
+                        return AzureOpenAIGenerativeModel(
+                            model_name="o4-mini",
+                            api_key=self.must_get_api_key("azure_openai_api_key"),
+                            azure_endpoint=self.must_get("azure_openai_endpoint", str),
+                            reasoning_effort="medium",
+                        )
+                return None
+            case "default_model":
+                match llm_provider:
+                    case LLMProvider.OPENAI:
+                        return "openai/gpt-4.1"
+                    case LLMProvider.ANTHROPIC:
+                        return "anthropic/claude-3-7-sonnet-latest"
+                    case LLMProvider.MISTRALAI:
+                        return "mistralai/mistral-large-latest"
+                    case LLMProvider.GOOGLE_GENERATIVE_AI:
+                        return "google/gemini-2.0-flash"
+                    case LLMProvider.AZURE_OPENAI:
+                        return "azure-openai/o3-mini"
+                return None
+        return None
+
     @model_validator(mode="after")
     def fill_default_models(self) -> Self:
         """Fill in default models for the LLM provider if not provided."""
-        if (
-            self.models.default_model is None
-            and self.llm_provider in PROVIDER_DEFAULT_MODELS["default_model"]
+        if self.models.default_model is None and (
+            model := self.get_agent_default_model(
+                agent_key="default_model",
+                llm_provider=self.llm_provider,
+            )
         ):
-            self.models.default_model = PROVIDER_DEFAULT_MODELS["default_model"][self.llm_provider]
+            self.models.default_model = model
         if self.models.default_model is None:
             raise InvalidConfigError(
                 "llm_provider or default_model",
@@ -581,20 +632,20 @@ class Config(BaseModel):
                 "external LLM provider (e.g. OpenAI / Anthropic etc), make sure you have provided "
                 "an API key for that provider.",
             )
-        if (
-            self.models.planning_model is None
-            and self.llm_provider in PROVIDER_DEFAULT_MODELS["planning_model"]
+        if self.models.planning_model is None and (
+            model := self.get_agent_default_model(
+                agent_key="planning_model",
+                llm_provider=self.llm_provider,
+            )
         ):
-            self.models.planning_model = PROVIDER_DEFAULT_MODELS["planning_model"][
-                self.llm_provider
-            ]
-        if (
-            self.models.introspection_model is None
-            and self.llm_provider in PROVIDER_DEFAULT_MODELS["introspection_model"]
+            self.models.planning_model = model
+        if self.models.introspection_model is None and (
+            model := self.get_agent_default_model(
+                agent_key="introspection_model",
+                llm_provider=self.llm_provider,
+            )
         ):
-            self.models.introspection_model = PROVIDER_DEFAULT_MODELS["introspection_model"][
-                self.llm_provider
-            ]
+            self.models.introspection_model = model
         return self
 
     @model_validator(mode="after")
@@ -781,23 +832,20 @@ class Config(BaseModel):
         parts = model_string.strip().split("/", maxsplit=2)
         provider = parts[0]
         model_name = parts[1]
-        reasoning_enabled = len(parts) > 2 and parts[2] == "reasoning"  # noqa: PLR2004
 
         llm_provider = LLMProvider(provider)
-        return self._construct_model_from_name(llm_provider, model_name, reasoning_enabled)
+        return self._construct_model_from_name(llm_provider, model_name)
 
     def _construct_model_from_name(
         self,
         llm_provider: LLMProvider,
         model_name: str,
-        reasoning_enabled: bool,  # noqa: FBT001
     ) -> GenerativeModel:
         """Construct a Model instance from an LLMProvider and model name.
 
         Args:
             llm_provider (LLMProvider): The LLM provider.
             model_name (str): The model name as it appears in the LLM provider's API.
-            reasoning_enabled (bool): Whether reasoning mode is enabled for the model.
 
         Returns:
             GenerativeModel: The constructed model.
@@ -808,13 +856,11 @@ class Config(BaseModel):
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
-                    reasoning_enabled=reasoning_enabled,
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
-                    reasoning_enabled=reasoning_enabled,
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistralai")
@@ -837,7 +883,6 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
-                    reasoning_enabled=reasoning_enabled,
                 )
             case LLMProvider.OLLAMA:
                 validate_extras_dependencies("ollama")
