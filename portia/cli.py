@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
 
+from portia.clarification_handler import ClarificationHandler  # noqa: TC001 - pydantic
 from portia.cli_clarification_handler import CLIClarificationHandler
 from portia.config import Config, GenerativeModelsConfig
 from portia.errors import InvalidConfigError
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pydantic.fields import FieldInfo
+
 
 DEFAULT_FILE_PATH = ".portia"
 PORTIA_API_KEY = "portia_api_key"
@@ -151,9 +153,7 @@ def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
 class CLIExecutionHooks(ExecutionHooks):
     """Execution hooks for the CLI."""
 
-    def __init__(self) -> None:
-        """Set up execution hooks for the CLI."""
-        super().__init__(clarification_handler=CLIClarificationHandler())
+    clarification_handler: ClarificationHandler | None = CLIClarificationHandler()
 
 
 @click.group(context_settings={"max_content_width": 240})

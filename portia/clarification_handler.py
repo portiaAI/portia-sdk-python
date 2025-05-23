@@ -15,6 +15,7 @@ from portia.clarification import (
     CustomClarification,
     InputClarification,
     MultipleChoiceClarification,
+    UserVerificationClarification,
     ValueConfirmationClarification,
 )
 
@@ -70,6 +71,12 @@ class ClarificationHandler(ABC):  # noqa: B024
                     on_resolution,
                     on_error,
                 )
+            case UserVerificationClarification():
+                return self.handle_user_verification_clarification(
+                    clarification,
+                    on_resolution,
+                    on_error,
+                )
             case CustomClarification():
                 return self.handle_custom_clarification(
                     clarification,
@@ -116,6 +123,15 @@ class ClarificationHandler(ABC):  # noqa: B024
     ) -> None:
         """Handle a value confirmation clarification."""
         raise NotImplementedError("handle_value_confirmation_clarification is not implemented")
+
+    def handle_user_verification_clarification(
+        self,
+        clarification: UserVerificationClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],
+    ) -> None:
+        """Handle a user verification clarification."""
+        raise NotImplementedError("handle_user_verification_clarification is not implemented")
 
     def handle_custom_clarification(
         self,
