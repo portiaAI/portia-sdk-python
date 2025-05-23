@@ -62,7 +62,7 @@ PROVIDER_MODELS = [
         "mistralai/mistral-large-latest",
     ),
     (
-        LLMProvider.GOOGLE_GENERATIVE_AI,
+        LLMProvider.GOOGLE,
         "google/gemini-2.0-flash",
     ),
 ]
@@ -325,7 +325,7 @@ def test_portia_run_query_with_multiple_clarifications(
             if a == 1:
                 self.retries += 1
                 return InputClarification(
-                    plan_run_id=ctx.plan_run_id,
+                    plan_run_id=ctx.plan_run.id,
                     argument_name="a",
                     user_guidance="please try again",
                     source="MyAdditionTool test tool",
@@ -397,7 +397,7 @@ def test_portia_run_query_with_multiple_async_clarifications(
             nonlocal resolved
             if not resolved:
                 return ActionClarification(
-                    plan_run_id=ctx.plan_run_id,
+                    plan_run_id=ctx.plan_run.id,
                     user_guidance="please try again",
                     action_url=HttpUrl("https://www.test.com"),
                     source="MyAdditionTool test tool",

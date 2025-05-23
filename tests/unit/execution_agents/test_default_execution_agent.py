@@ -880,7 +880,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_after_tool_call = mock.MagicMock(return_value=None)
     (plan, plan_run) = get_test_plan_run()
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(),
@@ -947,7 +947,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 
     (plan, plan_run) = get_test_plan_run()
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),
@@ -1022,7 +1022,7 @@ def test_get_last_resolved_clarification() -> None:
         unresolved_clarification,
     ]
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),
@@ -1045,7 +1045,7 @@ def test_clarifications_or_continue() -> None:
     )
 
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),
@@ -1087,7 +1087,7 @@ def test_clarifications_or_continue() -> None:
     (plan, plan_run) = get_test_plan_run()
     plan_run.outputs.clarifications = [clarification]
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         end_user=EndUser(external_id="123"),
         plan_run=plan_run,
         config=get_test_config(),
@@ -1121,7 +1121,7 @@ def test_default_execution_agent_none_tool_execute_sync() -> None:
     (plan, plan_run) = get_test_plan_run()
 
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
         config=get_test_config(),
@@ -1173,10 +1173,11 @@ def test_optional_args_with_none_values() -> None:
     Required args with None values should always be marked made_up.
     Optional args with None values should be marked not made_up.
     """
+    (plan, plan_run) = get_test_plan_run()
     agent = DefaultExecutionAgent(
-        step=Step(task="TASK_STRING", output="$out"),
+        plan=plan,
+        plan_run=plan_run,
         end_user=EndUser(external_id="123"),
-        plan_run=get_test_plan_run()[1],
         config=get_test_config(),
         tool=MockTool(),
         agent_memory=InMemoryStorage(),
@@ -1275,7 +1276,7 @@ def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) ->
 
     # First execution - should return clarification
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),
@@ -1359,7 +1360,7 @@ def test_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) -> 
 
     # First execution - should return clarification after tool call
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),

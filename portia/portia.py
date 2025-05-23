@@ -141,7 +141,7 @@ class Portia:
             case StorageClass.MEMORY:
                 self.storage = InMemoryStorage()
             case StorageClass.DISK:
-                self.storage = DiskFileStorage(storage_dir=self.config.must_get("storage_dir", str))
+                self.storage = DiskFileStorage(storage_dir=self.config.storage_dir)
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
 
@@ -812,7 +812,8 @@ class Portia:
                 ready_response = next_tool.ready(
                     ToolRunContext(
                         end_user=self.initialize_end_user(plan_run.end_user_id),
-                        plan_run_id=plan_run.id,
+                        plan_run=plan_run,
+                        plan=plan,
                         config=self.config,
                         clarifications=current_step_clarifications,
                     ),
@@ -978,6 +979,7 @@ class Portia:
                 # responsible for handling the output of the agent and updating the state.
                 agent = self._get_agent_for_step(
                     step=ReadOnlyStep.from_step(step),
+                    plan=ReadOnlyPlan.from_plan(plan),
                     plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 )
                 logger().debug(
@@ -1269,12 +1271,14 @@ class Portia:
     def _get_agent_for_step(
         self,
         step: Step,
+        plan: Plan,
         plan_run: PlanRun,
     ) -> BaseExecutionAgent:
         """Get the appropriate agent for executing a given step.
 
         Args:
             step (Step): The step for which the agent is needed.
+            plan (Plan): The plan associated with the step.
             plan_run (PlanRun): The run associated with the step.
 
         Returns:
@@ -1290,7 +1294,7 @@ class Portia:
                 cls = DefaultExecutionAgent
         cls = OneShotAgent if isinstance(tool, LLMTool) else cls
         return cls(
-            step,
+            plan,
             plan_run,
             self.config,
             self.storage,

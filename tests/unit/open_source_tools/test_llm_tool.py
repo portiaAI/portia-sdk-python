@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import BaseModel
 
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool, LLMToolSchema
@@ -35,6 +36,36 @@ def test_llm_tool_plan_run(
 
     # Assert the result is the expected response
     assert result == "Test response content"
+
+
+def test_llm_tool_structured_output_run(
+    mock_llm_tool: LLMTool,
+    mock_tool_run_context: ToolRunContext,
+    mock_model: MagicMock,
+) -> None:
+    """Test that LLMTool runs successfully and returns a response."""
+
+    class TestStructuredOutput(BaseModel):
+        capital: str
+
+    # Setup mock responses
+    mock_model.get_structured_response.return_value = TestStructuredOutput(capital="Paris")
+    # Define task input
+    task = "What is the capital of France?"
+
+    mock_llm_tool.structured_output_schema = TestStructuredOutput
+
+    # Run the tool
+    mock_llm_tool.structured_output_schema = TestStructuredOutput
+    result = mock_llm_tool.run(mock_tool_run_context, task)
+
+    mock_model.get_structured_response.assert_called_once_with(
+        [Message(role="user", content=mock_llm_tool.prompt), Message(role="user", content=task)],
+        TestStructuredOutput,
+    )
+
+    # Assert the result is the expected response
+    assert result == TestStructuredOutput(capital="Paris")
 
 
 def test_llm_tool_schema_valid_input() -> None:
