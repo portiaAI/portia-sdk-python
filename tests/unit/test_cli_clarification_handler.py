@@ -11,6 +11,7 @@ from portia.clarification import (
     CustomClarification,
     InputClarification,
     MultipleChoiceClarification,
+    UserVerificationClarification,
     ValueConfirmationClarification,
 )
 from portia.cli_clarification_handler import CLIClarificationHandler
@@ -283,4 +284,69 @@ def test_custom_clarification(
 
     # Verify resolution callback was called with user input
     on_resolution.assert_called_once_with(clarification, "custom response")
+    on_error.assert_not_called()
+
+
+@patch("portia.cli_clarification_handler.click.confirm")
+def test_user_verification_clarification_confirmed(
+    mock_confirm: MagicMock,
+    cli_handler: CLIClarificationHandler,
+) -> None:
+    """Test handling of user verification clarifications when confirmed."""
+    on_resolution = MagicMock()
+    on_error = MagicMock()
+
+    mock_confirm.return_value = True
+
+    clarification = UserVerificationClarification(
+        plan_run_id=PlanRunUUID(),
+        user_guidance="Please verify this information",
+        source="Test cli clarification handler",
+    )
+
+    cli_handler.handle_user_verification_clarification(clarification, on_resolution, on_error)
+
+    # Verify confirm was called
+    mock_confirm.assert_called_once()
+    confirm_text = mock_confirm.call_args[1]["text"]
+    assert "Please verify this information" in click.unstyle(confirm_text)
+
+    # Verify response field was set and user_confirmed property returns True
+    assert clarification.response is True
+    assert clarification.user_confirmed is True
+
+    # Verify resolution callback was called with True
+    on_resolution.assert_called_once_with(clarification, True)  # noqa: FBT003
+    on_error.assert_not_called()
+
+
+@patch("portia.cli_clarification_handler.click.confirm")
+def test_user_verification_clarification_rejected(
+    mock_confirm: MagicMock,
+    cli_handler: CLIClarificationHandler,
+) -> None:
+    """Test handling of user verification clarifications when rejected."""
+    on_resolution = MagicMock()
+    on_error = MagicMock()
+
+    mock_confirm.return_value = False
+
+    clarification = UserVerificationClarification(
+        plan_run_id=PlanRunUUID(),
+        user_guidance="Please verify this information",
+        source="Test cli clarification handler",
+    )
+
+    cli_handler.handle_user_verification_clarification(clarification, on_resolution, on_error)
+
+    # Verify confirm was called
+    mock_confirm.assert_called_once()
+
+    # Verify response field was set to False and user_confirmed property returns False
+    assert clarification.response is False
+    assert clarification.user_confirmed is False
+
+    # Verify resolution callback was called (even when user rejects)
+    on_resolution.assert_called_once_with(clarification, True)  # noqa: FBT003
+    # Verify error callback was NOT called (UserVerification always resolves)
     on_error.assert_not_called()

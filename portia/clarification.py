@@ -222,6 +222,14 @@ class UserVerificationClarification(Clarification):
         description="The category of this clarification",
     )
 
+    @property
+    def user_confirmed(self) -> bool:
+        """Whether the user has confirmed the verification.
+
+        Returns the response attribute as a boolean value.
+        """
+        return bool(self.response)
+
 
 class CustomClarification(Clarification):
     """Custom clarifications.
@@ -255,6 +263,7 @@ ClarificationType = (
     | ActionClarification
     | MultipleChoiceClarification
     | ValueConfirmationClarification
+    | UserVerificationClarification
     | CustomClarification
 )
 
