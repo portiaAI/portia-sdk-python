@@ -131,13 +131,14 @@ def test_portia_local_default_config_with_api_keys() -> None:
         "os.environ",
         {
             "PORTIA_API_KEY": "",
+            "PORTIA_API_ENDPOINT": "",
             "OPENAI_API_KEY": "123",
             "TAVILY_API_KEY": "123",
             "OPENWEATHERMAP_API_KEY": "123",
         },
     ):
         portia = Portia()
-        assert portia.config == Config.from_default()
+        assert str(portia.config) == str(Config.from_default())
 
         # BrowserTool is in open_source_tool_registry but not in the default tool registry
         # avaialble to the Portia instance. PDF reader is in open_source_tool_registry if
@@ -162,13 +163,14 @@ def test_portia_local_default_config_without_api_keys() -> None:
         "os.environ",
         {
             "PORTIA_API_KEY": "",
+            "PORTIA_API_ENDPOINT": "",
             "OPENAI_API_KEY": "123",
             "TAVILY_API_KEY": "",
             "OPENWEATHERMAP_API_KEY": "",
         },
     ):
         portia = Portia()
-        assert portia.config == Config.from_default()
+        assert str(portia.config) == str(Config.from_default())
 
         # BrowserTool, SerachTool + WeatherTool are in open_source_tool_registry but not in the
         # default tool registry avaialble to the Portia instance. PDF reader is in

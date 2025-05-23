@@ -36,7 +36,10 @@ jobs:
         with:
           path: portia-sdk-python
           repository: portiaAI/portia-sdk-python
-          ref: ${{ github.head_ref || 'main' }}
+          # For push events, use github.ref_name (branch name that was pushed)
+          # For pull_request_target, use github.event.pull_request.head.ref (PR branch)
+          # For workflow_dispatch, use github.ref_name
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.ref_name }}
           token: ${{ secrets.PORTIA_GH_TOKEN }}
 
       - name: Checkout platform repo
