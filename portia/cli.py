@@ -34,6 +34,8 @@ if TYPE_CHECKING:
 
     from pydantic.fields import FieldInfo
 
+    from portia.clarification_handler import ClarificationHandler
+
 DEFAULT_FILE_PATH = ".portia"
 PORTIA_API_KEY = "portia_api_key"
 
@@ -151,9 +153,9 @@ def common_options(f: Callable[..., Any]) -> Callable[..., Any]:
 class CLIExecutionHooks(ExecutionHooks):
     """Execution hooks for the CLI."""
 
-    def __init__(self) -> None:
-        """Set up execution hooks for the CLI."""
-        super().__init__(clarification_handler=CLIClarificationHandler())
+    clarification_handler: ClarificationHandler | None = Field(
+        default_factory=CLIClarificationHandler
+    )
 
 
 @click.group(context_settings={"max_content_width": 240})
