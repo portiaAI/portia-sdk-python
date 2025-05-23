@@ -581,14 +581,14 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     def batch_ready_check(
         cls,
         config: Config,
-        tool_ids: list[str],
+        tool_ids: set[str],
         tool_run_context: ToolRunContext,
     ) -> ReadyResponse:
         """Batch check readiness for Portia cloud tools.
 
         Args:
             config (Config): The config for the SDK as a whole.
-            tool_ids (list[str]): The list of tool IDs to check readiness for.
+            tool_ids (set[str]): The list of tool IDs to check readiness for.
             tool_run_context (ToolRunContext): The context of the execution.
 
         Returns:

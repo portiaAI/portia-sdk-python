@@ -1472,7 +1472,7 @@ class Portia:
 
         portia_tools_ready_response = PortiaRemoteTool.batch_ready_check(
             self.config,
-            list(portia_cloud_tool_ids_remaining),
+            portia_cloud_tool_ids_remaining,
             tool_run_context,
         )
         if not portia_tools_ready_response.ready:

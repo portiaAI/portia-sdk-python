@@ -649,7 +649,7 @@ def test_remote_tool_batch_ready_check(httpx_mock: HTTPXMock) -> None:
     with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
         response = PortiaRemoteTool.batch_ready_check(
             config,
-            ["tool1", "tool2"],
+            {"tool1", "tool2"},
             ctx,
         )
 
@@ -696,7 +696,7 @@ def test_remote_tool_batch_ready_check_not_ready(httpx_mock: HTTPXMock) -> None:
     with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
         response = PortiaRemoteTool.batch_ready_check(
             config,
-            ["tool1", "tool2"],
+            {"tool1", "tool2"},
             ctx,
         )
 
@@ -723,7 +723,7 @@ def test_remote_tool_batch_ready_check_404_fallback(httpx_mock: HTTPXMock) -> No
     with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
         response = PortiaRemoteTool.batch_ready_check(
             config,
-            ["tool1", "tool2"],
+            {"tool1", "tool2"},
             ctx,
         )
 
