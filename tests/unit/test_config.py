@@ -1,5 +1,7 @@
 """Tests for portia classes."""
 
+from unittest.mock import MagicMock
+
 import pytest
 from pydantic import SecretStr
 
@@ -44,8 +46,9 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(env_var, raising=False)
 
 
-def test_from_default() -> None:
+def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test from default."""
+    monkeypatch.delenv("LLM_REDIS_CACHE_URL", raising=False)
     c = Config.from_default(
         default_log_level=LogLevel.CRITICAL,
         openai_api_key=SecretStr("123"),
@@ -124,18 +127,35 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url is read from environment variable."""
+    mock_redis_cache_instance = MagicMock()
+    mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
+    monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
+
     monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/0")
     config = Config.from_default(openai_api_key=SecretStr("123"))
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
 
+    model = config.get_generative_model("openai/gpt-4o")
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+    assert model._cache is mock_redis_cache_instance  # noqa: SLF001
 
-def test_llm_redis_cache_url_kwarg() -> None:
+
+def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url can be set via kwargs."""
+    mock_redis_cache_instance = MagicMock()
+    mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
+    monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
+
     config = Config.from_default(
-        openai_api_key=SecretStr("123"),
-        llm_redis_cache_url="redis://localhost:6380/1",
+        openai_api_key=SecretStr("123"), llm_redis_cache_url="redis://localhost:6379/0"
     )
-    assert config.llm_redis_cache_url == "redis://localhost:6380/1"
+    assert config.llm_redis_cache_url == "redis://localhost:6379/0"
+
+    model = config.get_generative_model("openai/gpt-4o")
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+    assert model._cache is mock_redis_cache_instance  # noqa: SLF001
 
 
 @pytest.mark.parametrize(

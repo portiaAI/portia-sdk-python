@@ -13,16 +13,18 @@ import tiktoken
 from anthropic import Anthropic
 from langchain.globals import set_llm_cache
 from langchain_anthropic import ChatAnthropic
-from langchain_core.caches import BaseCache
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.outputs import Generation
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
 from openai import AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr, ValidationError
+from redis import RedisError
 
 from portia.common import validate_extras_dependencies
 
 if TYPE_CHECKING:
+    from langchain_core.caches import BaseCache
     from langchain_core.language_models.chat_models import BaseChatModel
     from openai.types.chat import ChatCompletionMessageParam
 
@@ -234,19 +236,19 @@ class LangChainGenerativeModel(GenerativeModel):
             **kwargs,
         }
         data_hash = hashlib.md5(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()  # noqa: S324  # nosec B324
-        llm_string = f"llm:{provider}:{model}:{data_hash}"
+        llm_string = f"{provider}:{model}:{data_hash}"
         prompt = json.dumps(messages)
-        cached = self._cache.lookup(prompt, llm_string)
-        if cached:
-            try:
-                return schema.model_validate_json(cached)  # pyright: ignore[reportArgumentType]
-            except ValidationError:
-                # On validation errors, re-fetch and update the entry in the cache
-                pass
+        try:
+            cached = self._cache.lookup(prompt, llm_string)
+            if cached and len(cached) > 0:
+                return schema.model_validate_json(cached[0])  # pyright: ignore[reportArgumentType]
+        except (ValidationError, RedisError):
+            # On validation errors, re-fetch and update the entry in the cache
+            pass
         response = client.chat.completions.create(
             response_model=schema, messages=messages, model=model, **kwargs
         )
-        self._cache.update(prompt, llm_string, response.model_dump_json())
+        self._cache.update(prompt, llm_string, [Generation(text=response.model_dump_json())])
         return response
 
 

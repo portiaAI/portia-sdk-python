@@ -455,7 +455,8 @@ class Config(BaseModel):
 
     llm_redis_cache_url: str | None = Field(
         default_factory=lambda: os.getenv("LLM_REDIS_CACHE_URL"),
-        description="Optional Redis URL used for caching LLM responses.",
+        description="Optional Redis URL used for caching LLM responses. This URl should include "
+        "the auth details if required for access to the cache.",
     )
 
     llm_provider: LLMProvider | None = Field(
@@ -805,10 +806,10 @@ class Config(BaseModel):
 
             cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
         elif self.llm_redis_cache_url:
-            logger().warning(
-                "Not using cache as cache group is not installed. "
-                "Install portia-sdk-python[caching] to use caching."
-            )
+            logger().warning(  # pragma: no cover
+                "Not using cache as cache group is not installed. "  # pragma: no cover
+                "Install portia-sdk-python[caching] to use caching."  # pragma: no cover
+            )  # pragma: no cover
         match llm_provider:
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
