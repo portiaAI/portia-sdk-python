@@ -28,7 +28,8 @@ jobs:
       - name: Run Claude Code
         id: claude
         run: |
-          claude -p /project:lint-diff --output-format json --max-turns 5
+          claude -p /project:lint-diff --max-turns 5 --verbose --output-format json > claude_output.json
+          echo "output=claude_output.json" >> $GITHUB_OUTPUT
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: claude-3-5-haiku-20241022
@@ -36,7 +37,7 @@ jobs:
       - name: Check for errors in Claude response
         run: |
           # First get the result field and parse it as JSON
-          result=$(jq -r '.result' "${{ steps.claude.outputs.execution_file }}" | sed 's/^```json\n//;s/\n```$//')
+          result=$(jq -r '.result' "${{ steps.claude.outputs.output }}" | sed 's/^```json\n//;s/\n```$//')
           # Then check for errors in the parsed result
           errors=$(echo "$result" | jq -r '.errors // empty')
           if [ ! -z "$errors" ]; then
