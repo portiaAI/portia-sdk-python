@@ -795,7 +795,7 @@ class Config(BaseModel):
         return model
 
     def _parse_model_string(self, model_string: str) -> GenerativeModel:
-        """Parse a model string in the form of "provider-prefix/model_name[/reasoning]` to a GenerativeModel.
+        """Parse a model string in the form of "provider-prefix/model_name" to a GenerativeModel.
 
         Supported provider-prefixes are:
         - openai
@@ -807,13 +807,13 @@ class Config(BaseModel):
         The optional "reasoning" parameter enables reasoning mode for models that support it.
 
         Args:
-            model_string (str): The model string to parse. E.G. "openai/gpt-4o" or "anthropic/claude-3-7-sonnet-latest/reasoning"
+            model_string (str): The model string to parse. E.G. "openai/gpt-4o"
 
         Returns:
             GenerativeModel: The parsed model.
 
-        """  # noqa: E501
-        parts = model_string.strip().split("/", maxsplit=2)
+        """
+        parts = model_string.strip().split("/", maxsplit=1)
         provider = parts[0]
         model_name = parts[1]
 
