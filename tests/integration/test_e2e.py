@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
+from langchain.globals import set_llm_cache
 from pydantic import BaseModel, Field, HttpUrl
 from testcontainers.redis import RedisContainer
 
@@ -745,3 +746,5 @@ async def test_llm_caching(monkeypatch: pytest.MonkeyPatch) -> None:
             key.startswith(b"llm")
             for key in keys  # pyright: ignore[reportGeneralTypeIssues]
         ), "At least one Redis key should start with 'llm' - this is the planning key"
+
+    set_llm_cache(None)

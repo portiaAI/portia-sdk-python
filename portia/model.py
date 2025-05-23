@@ -222,14 +222,17 @@ class LangChainGenerativeModel(GenerativeModel):
         client: instructor.Instructor,
         messages: list[ChatCompletionMessageParam],
         schema: type[BaseModelT],
-        model: str,
         provider: str,
+        model: str | None = None,
         **kwargs: Any,
     ) -> BaseModelT:
         """Call an instructor client with caching enabled if it is set up."""
+        if model is not None:
+            kwargs["model"] = model
+
         if self._cache is None:
             return client.chat.completions.create(
-                response_model=schema, messages=messages, model=model, **kwargs
+                response_model=schema, messages=messages, **kwargs
             )
         cache_data = {
             "schema": schema.model_json_schema(),
@@ -248,7 +251,7 @@ class LangChainGenerativeModel(GenerativeModel):
             # On validation errors, re-fetch and update the entry in the cache
             pass
         response = client.chat.completions.create(
-            response_model=schema, messages=messages, model=model, **kwargs
+            response_model=schema, messages=messages, **kwargs
         )
         self._cache.update(prompt, llm_string, [Generation(text=response.model_dump_json())])
         return response
@@ -722,7 +725,6 @@ if validate_extras_dependencies("google", raise_error=False):
                 client=self._instructor_client,
                 messages=instructor_messages,
                 schema=schema,
-                model=self.model_name,
                 provider=self.provider.value,
             )
 
