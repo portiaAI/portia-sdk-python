@@ -24,6 +24,7 @@ from pydantic import (
     model_validator,
 )
 
+from portia import logger
 from portia.common import validate_extras_dependencies
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
@@ -367,6 +368,11 @@ class GenerativeModelsConfig(BaseModel):
             else:
                 new_data[key] = value
         return new_data
+
+
+# By default, cache for 1 day. Most of our prompts have the current date in them, so we don't
+# need to cache for longer than a day.
+CACHE_TTL_SECONDS = 60 * 60 * 24
 
 
 class Config(BaseModel):
@@ -793,18 +799,28 @@ class Config(BaseModel):
             GenerativeModel: The constructed model.
 
         """
+        cache = None
+        if self.llm_redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
+            from langchain_redis import RedisCache
+
+            cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
+        elif self.llm_redis_cache_url:
+            logger().warning(
+                "Not using cache as cache group is not installed. "
+                "Install portia-sdk-python[caching] to use caching."
+            )
         match llm_provider:
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
-                    redis_cache_url=self.llm_redis_cache_url,
+                    cache=cache,
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
-                    redis_cache_url=self.llm_redis_cache_url,
+                    cache=cache,
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistralai")
@@ -813,7 +829,7 @@ class Config(BaseModel):
                 return MistralAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("mistralai_api_key"),
-                    redis_cache_url=self.llm_redis_cache_url,
+                    cache=cache,
                 )
             case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
@@ -822,14 +838,14 @@ class Config(BaseModel):
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("google_api_key"),
-                    redis_cache_url=self.llm_redis_cache_url,
+                    cache=cache,
                 )
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
-                    redis_cache_url=self.llm_redis_cache_url,
+                    cache=cache,
                 )
             case LLMProvider.OLLAMA:
                 validate_extras_dependencies("ollama")
@@ -838,7 +854,7 @@ class Config(BaseModel):
                 return OllamaGenerativeModel(
                     model_name=model_name,
                     base_url=self.ollama_base_url,
-                    redis_cache_url=self.llm_redis_cache_url,
+                    cache=cache,
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
