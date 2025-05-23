@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from langchain_anthropic import ChatAnthropic
+from langchain_core.caches import BaseCache
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, SecretStr, ValidationError
@@ -276,7 +277,7 @@ def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_create = MagicMock(return_value=DummyModel())
     mock_instructor_client.chat.completions.create = mock_create
 
-    cache = MagicMock()
+    cache = MagicMock(spec=BaseCache)
     model = OpenAIGenerativeModel(
         model_name="gpt-4o",
         api_key=SecretStr("k"),

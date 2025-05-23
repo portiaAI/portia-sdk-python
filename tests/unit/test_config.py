@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+from langchain_core.caches import InMemoryCache
 from pydantic import SecretStr
 
 from portia.config import (
@@ -143,8 +144,8 @@ def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url can be set via kwargs."""
-    mock_redis_cache_instance = MagicMock()
-    mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
+    redis_cache_instance = InMemoryCache()
+    mock_redis_cache = MagicMock(return_value=redis_cache_instance)
     monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
 
     config = Config.from_default(
@@ -155,7 +156,7 @@ def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     model = config.get_generative_model("openai/gpt-4o")
     assert isinstance(model, OpenAIGenerativeModel)
     assert str(model) == "openai/gpt-4o"
-    assert model._cache is mock_redis_cache_instance  # noqa: SLF001
+    assert model._cache is redis_cache_instance  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
