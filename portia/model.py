@@ -146,20 +146,6 @@ class GenerativeModel(ABC):
         """Get the string representation of the model."""
         return f'{self.__class__.__name__}("{self.provider.value}/{self.model_name}")'
 
-    def __eq__(self, other: object) -> bool:
-        """Check equality based on class, provider, and model name."""
-        if not isinstance(other, GenerativeModel):
-            return False
-        return (
-            self.__class__ == other.__class__
-            and self.provider == other.provider
-            and self.model_name == other.model_name
-        )
-
-    def __hash__(self) -> int:
-        """Generate hash based on class, provider, and model name."""
-        return hash((self.__class__, self.provider, self.model_name))
-
     @abstractmethod
     def to_langchain(self) -> BaseChatModel:
         """Get the LangChain client."""

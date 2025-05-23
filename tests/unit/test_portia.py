@@ -138,7 +138,7 @@ def test_portia_local_default_config_with_api_keys() -> None:
         },
     ):
         portia = Portia()
-        assert portia.config == Config.from_default()
+        assert str(portia.config) == str(Config.from_default())
 
         # BrowserTool is in open_source_tool_registry but not in the default tool registry
         # avaialble to the Portia instance. PDF reader is in open_source_tool_registry if
@@ -170,7 +170,7 @@ def test_portia_local_default_config_without_api_keys() -> None:
         },
     ):
         portia = Portia()
-        assert portia.config == Config.from_default()
+        assert str(portia.config) == str(Config.from_default())
 
         # BrowserTool, SerachTool + WeatherTool are in open_source_tool_registry but not in the
         # default tool registry avaialble to the Portia instance. PDF reader is in
