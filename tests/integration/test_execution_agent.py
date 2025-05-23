@@ -112,7 +112,7 @@ def test_execution_agent_with_long_tool_description(model: str) -> None:
 
     # Instantiate Agent
     agent = DefaultExecutionAgent(
-        step=plan.steps[0],
+        plan=plan,
         plan_run=plan_run,
         config=config,
         agent_memory=agent_memory,

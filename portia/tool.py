@@ -52,7 +52,8 @@ from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
-from portia.plan_run import PlanRunUUID
+from portia.plan import Plan
+from portia.plan_run import PlanRun
 from portia.templates.render import render_template
 
 """MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
@@ -63,7 +64,8 @@ class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
     Attributes:
-        plan_run_id(RunUUID): The run id the tool run is part of.
+        plan_run(PlanRun): The run the tool run is part of.
+        plan(Plan): The plan the tool run is part of.
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
 
@@ -72,7 +74,8 @@ class ToolRunContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     end_user: EndUser
-    plan_run_id: PlanRunUUID
+    plan_run: PlanRun
+    plan: Plan
     config: Config
     clarifications: ClarificationListType
 
@@ -435,7 +438,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.ACTION:
                     return LocalDataValue(
                         value=ActionClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
@@ -445,7 +448,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.INPUT:
                     return LocalDataValue(
                         value=InputClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -455,7 +458,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.MULTIPLE_CHOICE:
                     return LocalDataValue(
                         value=MultipleChoiceClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -466,7 +469,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.VALUE_CONFIRMATION:
                     return LocalDataValue(
                         value=ValueConfirmationClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -494,7 +497,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run_id),
+                            "plan_run_id": str(ctx.plan_run.id),
                         },
                     },
                 ),
@@ -551,7 +554,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run_id),
+                            "plan_run_id": str(ctx.plan_run.id),
                             "additional_data": ctx.end_user.additional_data,
                         },
                     },
