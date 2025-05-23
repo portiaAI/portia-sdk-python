@@ -328,12 +328,12 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             **kwargs: Additional keyword arguments to pass to AzureChatOpenAI
 
         """
+        self._model_kwargs = kwargs.copy()
+
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
-
-        self._model_kwargs = kwargs.copy()
 
         # Unfortunately you get errors from o3/o4 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
