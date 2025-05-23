@@ -66,6 +66,7 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "tools-browser-local": ["browser_use"],
     "tools-browser-browserbase": ["browser_use", "browserbase"],
     "tools-pdf-reader": ["mistralai"],
+    "cache": ["langchain_redis"],
 }
 
 
