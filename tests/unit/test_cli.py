@@ -74,6 +74,7 @@ def test_cli_run_config_set_provider(
         ["run", "Calculate 1 + 2", "--llm-provider", provider],
         input="y\n",
     )
+    print("output here: " + str(result.output))
     assert result.exit_code == 0
     assert mock_portia_cls.call_count == 1
     config = mock_portia_cls.call_args.kwargs["config"]

@@ -415,7 +415,7 @@ class Config(BaseModel):
         description="The API Key for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
     azure_openai_endpoint: str = Field(
-        default_factory=lambda: os.getenv("AZURE_OPENAI_ENDPOINT") or "",
+        default_factory=lambda: (os.getenv("AZURE_OPENAI_ENDPOINT") or ""),
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
     ollama_base_url: str = Field(
@@ -565,12 +565,7 @@ class Config(BaseModel):
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
-                        return AzureOpenAIGenerativeModel(
-                            model_name="o3-mini",
-                            api_key=self.must_get_api_key("azure_openai_api_key"),
-                            azure_endpoint=self.must_get("azure_openai_endpoint", str),
-                            reasoning_effort="medium",
-                        )
+                        return "azure-openai/o3-mini"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -591,12 +586,7 @@ class Config(BaseModel):
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
-                        return AzureOpenAIGenerativeModel(
-                            model_name="o4-mini",
-                            api_key=self.must_get_api_key("azure_openai_api_key"),
-                            azure_endpoint=self.must_get("azure_openai_endpoint", str),
-                            reasoning_effort="medium",
-                        )
+                        return "azure-openai/o4-mini"
                 return None
             case "default_model":
                 match llm_provider:
