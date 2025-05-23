@@ -668,7 +668,7 @@ def test_remote_tool_batch_ready_check(httpx_mock: HTTPXMock) -> None:
     request_body = json.loads(json_data)
     assert request_body["tool_ids"] == ["tool1", "tool2"]
     assert request_body["execution_context"]["end_user_id"] == ctx.end_user.external_id
-    assert request_body["execution_context"]["plan_run_id"] == str(ctx.plan_run_id)
+    assert request_body["execution_context"]["plan_run_id"] == str(ctx.plan_run.id)
 
 
 def test_remote_tool_batch_ready_check_not_ready(httpx_mock: HTTPXMock) -> None:
@@ -682,7 +682,7 @@ def test_remote_tool_batch_ready_check_not_ready(httpx_mock: HTTPXMock) -> None:
         category=ClarificationCategory.ACTION,
         user_guidance="Please authenticate",
         action_url=HttpUrl("https://example.com"),
-        plan_run_id=ctx.plan_run_id,
+        plan_run_id=ctx.plan_run.id,
     )
 
     httpx_mock.add_response(

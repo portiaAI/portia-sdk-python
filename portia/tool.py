@@ -603,7 +603,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 "tool_ids": sorted(tool_ids),
                 "execution_context": {
                     "end_user_id": tool_run_context.end_user.external_id,
-                    "plan_run_id": str(tool_run_context.plan_run_id),
+                    "plan_run_id": str(tool_run_context.plan_run.id),
                 },
             },
         )

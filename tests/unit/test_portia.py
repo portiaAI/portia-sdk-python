@@ -2130,7 +2130,7 @@ class ReadyTool(Tool):
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:
         """Is the tool ready."""
-        clarifications = self._get_clarifications(ctx.plan_run_id)
+        clarifications = self._get_clarifications(ctx.plan_run.id)
         return ReadyResponse(
             ready=len(clarifications) == 0,
             clarifications=clarifications,
@@ -2370,18 +2370,18 @@ class RaiseClarificationAgent(BaseExecutionAgent):
 class CustomPortia(Portia):
     """A custom portia that uses a custom execution agent."""
 
-    def _get_agent_for_step(self, step: Step, plan_run: PlanRun) -> BaseExecutionAgent:
+    def _get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
         if step.task == "raise_clarification":
             tool = self._get_tool_for_step(step, plan_run)
             return RaiseClarificationAgent(
-                step=step,
+                plan=plan,
                 plan_run=plan_run,
                 config=self.config,
                 end_user=self.initialize_end_user(plan_run.end_user_id),
                 agent_memory=self.storage,
                 tool=tool,
             )
-        return super()._get_agent_for_step(step, plan_run)
+        return super()._get_agent_for_step(step, plan, plan_run)
 
 
 def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() -> None:

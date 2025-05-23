@@ -1446,7 +1446,8 @@ class Portia:
         check_from_index = start_index if start_index is not None else plan_run.current_step_index
         tool_run_context = ToolRunContext(
             end_user=self.initialize_end_user(plan_run.end_user_id),
-            plan_run_id=plan_run.id,
+            plan_run=plan_run,
+            plan=plan,
             config=self.config,
             clarifications=[],
         )
