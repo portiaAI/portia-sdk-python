@@ -304,7 +304,7 @@ def test_user_verification_clarification_confirmed(
         source="Test cli clarification handler",
     )
 
-    cli_handler.handle_user_verification_clarification(clarification, on_resolution, on_error)
+    cli_handler.handle(clarification, on_resolution, on_error)
 
     # Verify confirm was called
     mock_confirm.assert_called_once()
@@ -337,7 +337,7 @@ def test_user_verification_clarification_rejected(
         source="Test cli clarification handler",
     )
 
-    cli_handler.handle_user_verification_clarification(clarification, on_resolution, on_error)
+    cli_handler.handle(clarification, on_resolution, on_error)
 
     # Verify confirm was called
     mock_confirm.assert_called_once()
