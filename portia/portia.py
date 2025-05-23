@@ -1239,9 +1239,8 @@ class Portia:
             for clarification in new_clarifications:
                 clarification.step = plan_run.current_step_index
                 logger().info(
-                    "Clarification requested - category: %s, user_guidance: %r.",
-                    clarification.category,
-                    clarification.user_guidance,
+                    f"Clarification requested - category: {clarification.category}, "
+                    f"user_guidance: {clarification.user_guidance}.",
                     extra={"plan": str(plan.id), "plan_run": str(plan_run.id)},
                 )
                 logger().debug(
