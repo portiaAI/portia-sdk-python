@@ -160,6 +160,37 @@ def test_model_to_string() -> None:
     assert repr(model) == 'DummyGenerativeModel("custom/test")'
 
 
+def test_generative_model_equality_and_hash() -> None:
+    """Test that GenerativeModel equality and hash works correctly."""
+    model1 = DummyGenerativeModel(model_name="test")
+    model2 = DummyGenerativeModel(model_name="test")
+    assert model1 == model2
+    assert hash(model1) == hash(model2)
+    model3 = DummyGenerativeModel(model_name="different")
+    assert model1 != model3
+    assert hash(model1) != hash(model3)
+
+    class DifferentProviderModel(DummyGenerativeModel):
+        provider: LLMProvider = LLMProvider.OPENAI
+
+        def __init__(self, model_name: str) -> None:
+            super().__init__(model_name)
+
+    model4 = DifferentProviderModel(model_name="test")
+    assert model1 != model4
+    assert hash(model1) != hash(model4)
+
+    class AnotherDummyModel(DummyGenerativeModel):
+        provider: LLMProvider = LLMProvider.CUSTOM
+
+        def __init__(self, model_name: str) -> None:
+            super().__init__(model_name)
+
+    model5 = AnotherDummyModel(model_name="test")
+    assert model1 != model5
+    assert hash(model1) != hash(model5)
+
+
 class StructuredOutputTestModel(BaseModel):
     """Test model for structured output."""
 
