@@ -1070,17 +1070,30 @@ class Portia:
                 > 0
             ):
                 # If execution raised a clarification, re-check readiness of subsequent tools
-                logger().debug(
-                    "Re-checking tool readiness after execution clarification.",
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
-                )
-                ready_clarifications = self._check_remaining_tool_readiness(
-                    plan,
-                    plan_run,
-                    start_index=index + 1,
-                )
-                combined_clarifications = new_clarifications + ready_clarifications
+                # If the clarification raised is an action clarification for a PortiaRemoteTool
+                # (i.e. the tool is not ready), run a combined readiness check for this step and
+                # all subsequent steps.
+                # Otherwise, combine the new clarifications with the ready clarifications from the
+                # next step.
+                if (
+                    len(new_clarifications) == 1
+                    and isinstance(
+                        self.tool_registry.get_tool(step.tool_id or ""), PortiaRemoteTool
+                    )
+                    and new_clarifications[0].category == ClarificationCategory.ACTION
+                ):
+                    combined_clarifications = self._check_remaining_tool_readiness(
+                        plan,
+                        plan_run,
+                        start_index=index,
+                    )
+                else:
+                    ready_clarifications = self._check_remaining_tool_readiness(
+                        plan,
+                        plan_run,
+                        start_index=index + 1,
+                    )
+                    combined_clarifications = new_clarifications + ready_clarifications
                 # No after_plan_run call here as the plan run will be resumed later
                 return self._raise_clarifications(combined_clarifications, plan_run)
 
