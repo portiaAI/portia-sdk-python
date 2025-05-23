@@ -138,15 +138,15 @@ class LLMModel(Enum):
 
     # Google Generative AI
     GEMINI_2_0_FLASH = Model(
-        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        provider=LLMProvider.GOOGLE,
         model_name="gemini-2.0-flash",
     )
     GEMINI_2_0_FLASH_LITE = Model(
-        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        provider=LLMProvider.GOOGLE,
         model_name="gemini-2.0-flash-lite",
     )
     GEMINI_1_5_FLASH = Model(
-        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        provider=LLMProvider.GOOGLE,
         model_name="gemini-1.5-flash",
     )
 
@@ -271,7 +271,7 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     """
     if isinstance(value, str):
         try:
-            return enum_type[value.upper()]
+            return enum_type[value.upper().replace("-", "_")]
         except KeyError as e:
             raise InvalidConfigError(
                 value=value,
@@ -291,7 +291,6 @@ EXECUTION_MODEL_KEY = "execution_model_name"
 INTROSPECTION_MODEL_KEY = "introspection_model_name"
 SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
-
 
 class GenerativeModelsConfig(BaseModel):
     """Configuration for a Generative Models.
@@ -563,7 +562,7 @@ class Config(BaseModel):
                         )
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
-                    case LLMProvider.GOOGLE_GENERATIVE_AI:
+                    case LLMProvider.GOOGLE:
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return AzureOpenAIGenerativeModel(
@@ -589,7 +588,7 @@ class Config(BaseModel):
                         )
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
-                    case LLMProvider.GOOGLE_GENERATIVE_AI:
+                    case LLMProvider.GOOGLE:
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return AzureOpenAIGenerativeModel(
@@ -607,7 +606,7 @@ class Config(BaseModel):
                         return "anthropic/claude-3-7-sonnet-latest"
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
-                    case LLMProvider.GOOGLE_GENERATIVE_AI:
+                    case LLMProvider.GOOGLE:
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
@@ -658,11 +657,6 @@ class Config(BaseModel):
                 "A Portia API key must be provided if using cloud storage. Follow the steps at "
                 "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
                 "have one",
-            )
-        if self.storage_class == StorageClass.DISK and not self.storage_dir:
-            raise InvalidConfigError(
-                "storage_dir",
-                "A storage directory must be provided if using disk storage",
             )
 
         # Check that all models passed as strings are instantiable, i.e. they have the
@@ -870,7 +864,7 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("mistralai_api_key"),
                 )
-            case LLMProvider.GOOGLE_GENERATIVE_AI:
+            case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
                 from portia.model import GoogleGenAiGenerativeModel
 
@@ -911,7 +905,7 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
     if os.getenv("MISTRAL_API_KEY") or kwargs.get("mistralai_api_key"):
         return LLMProvider.MISTRALAI
     if os.getenv("GOOGLE_API_KEY") or kwargs.get("google_api_key"):
-        return LLMProvider.GOOGLE_GENERATIVE_AI
+        return LLMProvider.GOOGLE
     if (os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT")) or (
         kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
     ):
