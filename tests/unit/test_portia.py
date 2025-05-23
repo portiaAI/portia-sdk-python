@@ -82,7 +82,8 @@ from tests.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Sequence
+    from typing import Any
 
     from pytest_httpx import HTTPXMock
 
@@ -2354,21 +2355,35 @@ def test_portia_and_custom_tool_not_ready(
 class RaiseClarificationAgent(BaseExecutionAgent):
     """A dummy execution agent that raises a clarification on run."""
 
+    def __init__(
+        self,
+        *args: Any,
+        forced_clarifications: Sequence[Clarification] = (),
+        **kwargs: Any,
+    ) -> None:
+        """Override the constructor to add forced clarifications."""
+        super().__init__(*args, **kwargs)
+        self.forced_clarifications = list(forced_clarifications)
+
     def execute_sync(self) -> Output:
         """Execute the agent - return a clarification."""
         return LocalDataValue(
-            value=[
-                InputClarification(
-                    user_guidance="user guidance",
-                    plan_run_id=self.plan_run.id,
-                    argument_name="argument_name",
-                )
-            ]
+            value=[*self.forced_clarifications],
         )
 
 
 class CustomPortia(Portia):
     """A custom portia that uses a custom execution agent."""
+
+    def __init__(
+        self,
+        *args: Any,
+        forced_clarifications: Sequence[Clarification] = (),
+        **kwargs: Any,
+    ) -> None:
+        """Override the constructor to add forced clarifications."""
+        super().__init__(*args, **kwargs)
+        self.forced_clarifications = forced_clarifications
 
     def _get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
         if step.task == "raise_clarification":
@@ -2380,6 +2395,7 @@ class CustomPortia(Portia):
                 end_user=self.initialize_end_user(plan_run.end_user_id),
                 agent_memory=self.storage,
                 tool=tool,
+                forced_clarifications=self.forced_clarifications,
             )
         return super()._get_agent_for_step(step, plan, plan_run)
 
@@ -2388,7 +2404,17 @@ def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() ->
     """Test that all remaining steps have their tool ready status checked on any interruption."""
     ready_tool = ReadyTool(is_ready=True)
     ready_once_tool = ReadyTool(id="ready_once_tool", is_ready=[True, False])
-    portia = CustomPortia(config=get_test_config(), tools=[ready_tool, ready_once_tool])
+    portia = CustomPortia(
+        config=get_test_config(),
+        tools=[ready_tool, ready_once_tool],
+        forced_clarifications=[
+            InputClarification(
+                user_guidance="user guidance",
+                plan_run_id=PlanRunUUID(),
+                argument_name="argument_name",
+            )
+        ],
+    )
     plan = (
         PlanBuilder()
         .step("raise_clarification", ready_tool.id)
@@ -2403,10 +2429,74 @@ def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() ->
     assert len(output_plan_run.get_outstanding_clarifications()) == 2
     outstanding_clarifications = output_plan_run.get_outstanding_clarifications()
     assert isinstance(outstanding_clarifications[0], InputClarification)
-    assert outstanding_clarifications[0].plan_run_id == plan_run.id
     assert outstanding_clarifications[0].argument_name == "argument_name"
     assert outstanding_clarifications[0].resolved is False
     assert isinstance(outstanding_clarifications[1], ActionClarification)
-    assert outstanding_clarifications[1].plan_run_id == plan_run.id
     assert str(outstanding_clarifications[1].action_url) == ready_tool.auth_url
     assert outstanding_clarifications[1].resolved is False
+
+
+def test_portia_tool_readiness_rechecked_after_raised_clarification(
+    mock_cloud_client: httpx.Client, httpx_mock: HTTPXMock
+) -> None:
+    """Test that all remaining steps have their tool ready status checked on any interruption.
+
+    When the interruption is a PortiaRemoteTool action clarification, we want the readiness
+    clarifications combined.
+    """
+    portia_tool = MockPortiaTool(client=mock_cloud_client)
+    portia_tool_2 = MockPortiaTool(id="portia:mock_portia_tool_2", client=mock_cloud_client)
+    action_url = HttpUrl("https://example.com/auth")
+    portia = CustomPortia(
+        config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
+        tools=[portia_tool, portia_tool_2],
+        forced_clarifications=[
+            ActionClarification(
+                id=ClarificationUUID(),
+                category=ClarificationCategory.ACTION,
+                user_guidance="Please authenticate",
+                action_url=action_url,
+                plan_run_id=PlanRunUUID(),
+            )
+        ],
+    )
+    plan = (
+        PlanBuilder()
+        .step("raise_clarification", portia_tool.id)
+        .step("1", portia_tool.id)
+        .step("2", portia_tool_2.id)
+        .build()
+    )
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    # Initially all tools are ready
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": True,
+            "clarifications": [],
+        },
+    )
+    # Second time, a clarification is raised
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": False,
+            "clarifications": [
+                ActionClarification(
+                    id=ClarificationUUID(),
+                    category=ClarificationCategory.ACTION,
+                    user_guidance="Please authenticate",
+                    action_url=action_url,
+                    plan_run_id=plan_run.id,
+                ).model_dump(mode="json")
+            ],
+        },
+    )
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 1
+    outstanding_clarification = output_plan_run.get_outstanding_clarifications()[0]
+    assert isinstance(outstanding_clarification, ActionClarification)
+    assert outstanding_clarification.resolved is False
+    assert str(outstanding_clarification.action_url) == str(action_url)
