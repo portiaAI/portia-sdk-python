@@ -235,7 +235,9 @@ class LangChainGenerativeModel(GenerativeModel):
             "schema": schema.model_json_schema(),
             **kwargs,
         }
-        data_hash = hashlib.md5(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()  # noqa: S324  # nosec B324
+        data_hash = hashlib.md5(  # nosec B324  # noqa: S324
+            json.dumps(cache_data, sort_keys=True, default=str).encode()
+        ).hexdigest()
         llm_string = f"{provider}:{model}:{data_hash}"
         prompt = json.dumps(messages)
         try:
