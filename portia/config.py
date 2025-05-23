@@ -292,6 +292,7 @@ INTROSPECTION_MODEL_KEY = "introspection_model_name"
 SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 
+
 class GenerativeModelsConfig(BaseModel):
     """Configuration for a Generative Models.
 

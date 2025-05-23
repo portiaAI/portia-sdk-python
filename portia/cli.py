@@ -175,9 +175,7 @@ def run(
     **kwargs,  # noqa: ANN003
 ) -> None:
     """Run a query."""
-    print("before get config")
     cli_config, config = _get_config(**kwargs)
-    print("after get config")
 
     # Add the tool registry
     registry = DefaultToolRegistry(config)
@@ -238,9 +236,7 @@ def _get_config(
     if cli_config.env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
     try:
-        print("before config")
         config = Config.from_default(**kwargs)
-        print("after config")
     except InvalidConfigError as e:
         logger().error(e.message)
         sys.exit(1)
