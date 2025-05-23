@@ -104,8 +104,25 @@ def test_user_verification_clarification() -> None:
     # Verify category is set correctly
     assert clarification.category == ClarificationCategory.USER_VERIFICATION
 
+    # Verify user_confirmed defaults to False (since response is None by default)
+    assert clarification.user_confirmed is False
+
     # Verify serialization
     clarification_model = clarification.model_dump()
     assert clarification_model["category"] == "User Verification"
     assert clarification_model["user_guidance"] == "Please verify this information"
+    # user_confirmed should not be in the serialized model since it's a property
+    assert "user_confirmed" not in clarification_model
     assert isinstance(clarification.id, ClarificationUUID)
+
+    # Test that user_confirmed returns True when response is set to True
+    clarification.response = True
+    assert clarification.user_confirmed is True
+
+    # Test that user_confirmed returns False when response is set to False
+    clarification.response = False
+    assert clarification.user_confirmed is False
+
+    # Test that user_confirmed returns False when response is set to None
+    clarification.response = None
+    assert clarification.user_confirmed is False
