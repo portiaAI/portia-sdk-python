@@ -137,15 +137,15 @@ class LLMModel(Enum):
 
     # Google Generative AI
     GEMINI_2_0_FLASH = Model(
-        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        provider=LLMProvider.GOOGLE,
         model_name="gemini-2.0-flash",
     )
     GEMINI_2_0_FLASH_LITE = Model(
-        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        provider=LLMProvider.GOOGLE,
         model_name="gemini-2.0-flash-lite",
     )
     GEMINI_1_5_FLASH = Model(
-        provider=LLMProvider.GOOGLE_GENERATIVE_AI,
+        provider=LLMProvider.GOOGLE,
         model_name="gemini-1.5-flash",
     )
 
@@ -269,7 +269,7 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     """
     if isinstance(value, str):
         try:
-            return enum_type[value.upper()]
+            return enum_type[value.upper().replace("-", "_")]
         except KeyError as e:
             raise InvalidConfigError(
                 value=value,
@@ -296,21 +296,21 @@ PROVIDER_DEFAULT_MODELS = {
         LLMProvider.OPENAI: "openai/o3-mini",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
+        LLMProvider.GOOGLE: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
     "introspection_model": {
         LLMProvider.OPENAI: "openai/o3-mini",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
+        LLMProvider.GOOGLE: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
     },
     "default_model": {
         LLMProvider.OPENAI: "openai/gpt-4o",
         LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
         LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE_GENERATIVE_AI: "google/gemini-2.0-flash",
+        LLMProvider.GOOGLE: "google/gemini-2.0-flash",
         LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4o",
     },
 }
@@ -611,11 +611,6 @@ class Config(BaseModel):
                 "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
                 "have one",
             )
-        if self.storage_class == StorageClass.DISK and not self.storage_dir:
-            raise InvalidConfigError(
-                "storage_dir",
-                "A storage directory must be provided if using disk storage",
-            )
 
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.
@@ -820,7 +815,7 @@ class Config(BaseModel):
                     api_key=self.must_get_api_key("mistralai_api_key"),
                     redis_cache_url=self.llm_redis_cache_url,
                 )
-            case LLMProvider.GOOGLE_GENERATIVE_AI:
+            case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
                 from portia.model import GoogleGenAiGenerativeModel
 
@@ -864,7 +859,7 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
     if os.getenv("MISTRAL_API_KEY") or kwargs.get("mistralai_api_key"):
         return LLMProvider.MISTRALAI
     if os.getenv("GOOGLE_API_KEY") or kwargs.get("google_api_key"):
-        return LLMProvider.GOOGLE_GENERATIVE_AI
+        return LLMProvider.GOOGLE
     if (os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT")) or (
         kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
     ):

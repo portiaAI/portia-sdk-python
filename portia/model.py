@@ -84,7 +84,7 @@ class LLMProvider(Enum):
         OPENAI: OpenAI provider.
         ANTHROPIC: Anthropic provider.
         MISTRALAI: MistralAI provider.
-        GOOGLE_GENERATIVE_AI: Google Generative AI provider.
+        GOOGLE: Google Generative AI provider.
         AZURE_OPENAI: Azure OpenAI provider.
 
     """
@@ -92,10 +92,11 @@ class LLMProvider(Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     MISTRALAI = "mistralai"
-    GOOGLE_GENERATIVE_AI = "google"
+    GOOGLE = "google"
     AZURE_OPENAI = "azure-openai"
     CUSTOM = "custom"
     OLLAMA = "ollama"
+    GOOGLE_GENERATIVE_AI = "google"  # noqa: PIE796 - Alias for GOOGLE member
 
 
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
@@ -649,7 +650,7 @@ if validate_extras_dependencies("google", raise_error=False):
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""
 
-        provider: LLMProvider = LLMProvider.GOOGLE_GENERATIVE_AI
+        provider: LLMProvider = LLMProvider.GOOGLE
 
         def __init__(
             self,
