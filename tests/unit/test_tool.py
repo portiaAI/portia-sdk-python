@@ -1,5 +1,6 @@
 """Tests for the Tool class."""
 
+import json
 from enum import Enum
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,7 @@ from pytest_httpx import HTTPXMock
 
 from portia.clarification import (
     ActionClarification,
+    ClarificationCategory,
     ClarificationUUID,
     InputClarification,
     MultipleChoiceClarification,
@@ -25,6 +27,7 @@ from tests.utils import (
     ClarificationTool,
     ErrorTool,
     MockMcpSessionWrapper,
+    get_test_config,
     get_test_tool_context,
 )
 
@@ -628,3 +631,101 @@ def test_portia_mcp_tool_call_with_error() -> None:
         pytest.raises(ToolHardError),
     ):
         tool.run(get_test_tool_context(), a=1, b=2)
+
+
+def test_remote_tool_batch_ready_check(httpx_mock: HTTPXMock) -> None:
+    """Test batch_ready_check classmethod."""
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/batch/ready/",
+        json={"ready": True, "clarifications": []},
+    )
+
+    ctx = get_test_tool_context()
+    config = get_test_config()
+
+    # Configure mock for PortiaCloudClient to return our client
+    mock_client = httpx.Client(base_url=endpoint)
+    with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
+        response = PortiaRemoteTool.batch_ready_check(
+            config,
+            {"tool1", "tool2"},
+            ctx,
+        )
+
+    assert response.ready is True
+    assert len(response.clarifications) == 0
+
+    # Verify correct request was made
+    request = httpx_mock.get_request(
+        method="POST",
+        url=f"{endpoint}/api/v0/tools/batch/ready/",
+    )
+    assert request is not None
+
+    # Check request JSON
+    json_data = request.read().decode()
+    request_body = json.loads(json_data)
+    assert request_body["tool_ids"] == ["tool1", "tool2"]
+    assert request_body["execution_context"]["end_user_id"] == ctx.end_user.external_id
+    assert request_body["execution_context"]["plan_run_id"] == str(ctx.plan_run.id)
+
+
+def test_remote_tool_batch_ready_check_not_ready(httpx_mock: HTTPXMock) -> None:
+    """Test batch_ready_check classmethod with tools not ready."""
+    endpoint = "https://api.fake-portia.test"
+    ctx = get_test_tool_context()
+
+    # Create a clarification to include in the response
+    clarification = ActionClarification(
+        id=ClarificationUUID(),
+        category=ClarificationCategory.ACTION,
+        user_guidance="Please authenticate",
+        action_url=HttpUrl("https://example.com"),
+        plan_run_id=ctx.plan_run.id,
+    )
+
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/batch/ready/",
+        json={"ready": False, "clarifications": [clarification.model_dump(mode="json")]},
+    )
+
+    config = get_test_config()
+    # Configure mock for PortiaCloudClient to return our client
+    mock_client = httpx.Client(base_url=endpoint)
+    with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
+        response = PortiaRemoteTool.batch_ready_check(
+            config,
+            {"tool1", "tool2"},
+            ctx,
+        )
+
+    assert response.ready is False
+    assert len(response.clarifications) == 1
+    assert isinstance(response.clarifications[0], ActionClarification)
+    assert response.clarifications[0] == clarification
+
+
+def test_remote_tool_batch_ready_check_404_fallback(httpx_mock: HTTPXMock) -> None:
+    """Test batch_ready_check classmethod with 404 fallback."""
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/batch/ready/",
+        status_code=404,
+        json={"error": "Resource not found", "status": 404},
+    )
+
+    ctx = get_test_tool_context()
+    config = get_test_config()
+
+    # Configure mock for PortiaCloudClient to return our client
+    mock_client = httpx.Client(base_url=endpoint)
+    with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
+        response = PortiaRemoteTool.batch_ready_check(
+            config,
+            {"tool1", "tool2"},
+            ctx,
+        )
+
+    assert response.ready is True
+    assert len(response.clarifications) == 0
