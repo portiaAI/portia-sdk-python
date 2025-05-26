@@ -620,6 +620,7 @@ def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
     with pytest.raises(ValueError, match="Invalid LLM model"):
         _ = LLMModel("adijabisfbgiwjebr")
 
+
 def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that default models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
@@ -642,7 +643,7 @@ def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch)
 
     default_model = c.get_default_model()
     assert isinstance(default_model, AnthropicGenerativeModel)
-    assert default_model.model_name == "claude-3-7-sonnet-latest"
+    assert default_model.model_name == "claude-3-5-sonnet-latest"
     assert not hasattr(default_model, "_model_kwargs") or "thinking" not in getattr(
         default_model, "_model_kwargs", {}
     )
@@ -672,6 +673,7 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
         default_model, "_model_kwargs", {}
     )
 
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -688,4 +690,3 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
 def test_parse_str_to_enum(value: str, expected: LLMProvider) -> None:
     """Test parse_str_to_enum works."""
     assert parse_str_to_enum(value, LLMProvider) is expected
-
