@@ -495,7 +495,10 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
         """
-        self._model_kwargs = kwargs.copy()
+        if "model_kwargs" in kwargs:
+            self._model_kwargs = kwargs["model_kwargs"].copy()
+        else:
+            self._model_kwargs = kwargs.copy()
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,

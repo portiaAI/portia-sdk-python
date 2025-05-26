@@ -571,7 +571,7 @@ class Config(BaseModel):
                         return AnthropicGenerativeModel(
                             model_name="claude-3-7-sonnet-latest",
                             api_key=self.must_get_api_key("anthropic_api_key"),
-                            thinking={"type": "enabled", "budget_tokens": 3000},
+                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
                         )
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
@@ -592,7 +592,7 @@ class Config(BaseModel):
                         return AnthropicGenerativeModel(
                             model_name="claude-3-7-sonnet-latest",
                             api_key=self.must_get_api_key("anthropic_api_key"),
-                            thinking={"type": "enabled", "budget_tokens": 3000},
+                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
                         )
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
@@ -606,7 +606,7 @@ class Config(BaseModel):
                     case LLMProvider.OPENAI:
                         return "openai/gpt-4.1"
                     case LLMProvider.ANTHROPIC:
-                        return "anthropic/claude-3-7-sonnet-latest"
+                        return "anthropic/claude-3-5-sonnet-latest"
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
