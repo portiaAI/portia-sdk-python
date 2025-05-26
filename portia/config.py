@@ -800,6 +800,7 @@ class Config(BaseModel):
             GenerativeModel | None: The model instance or None.
 
         """
+        print(f"debug: model: {model}")
         if model is None:
             return None
         if isinstance(model, str):
