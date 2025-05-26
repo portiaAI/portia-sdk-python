@@ -402,7 +402,7 @@ def test_getters() -> None:
         Config.from_default(
             storage_class=StorageClass.CLOUD,
             portia_api_key=SecretStr(""),
-            extest_set_agent_model_default_model_not_settest_set_agent_model_default_model_not_setecution_agent_type=ExecutionAgentType.DEFAULT,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
             planning_agent_type=PlanningAgentType.DEFAULT,
             llm_provider=LLMProvider.OPENAI,
             openai_api_key=SecretStr("test-openai-api-key"),
@@ -619,6 +619,59 @@ def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
     """Test deprecated LLMModel cannot be instantiated from a string."""
     with pytest.raises(ValueError, match="Invalid LLM model"):
         _ = LLMModel("adijabisfbgiwjebr")
+
+
+def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that default models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+    c = Config.from_default(llm_provider=LLMProvider.ANTHROPIC)
+
+    planning_model = c.get_planning_model()
+    assert isinstance(planning_model, AnthropicGenerativeModel)
+    assert planning_model.model_name == "claude-3-7-sonnet-latest"
+    assert hasattr(planning_model, "_model_kwargs")
+    assert "thinking" in planning_model._model_kwargs  # noqa: SLF001
+    assert planning_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
+
+    introspection_model = c.get_introspection_model()
+    assert isinstance(introspection_model, AnthropicGenerativeModel)
+    assert introspection_model.model_name == "claude-3-7-sonnet-latest"
+    assert hasattr(introspection_model, "_model_kwargs")
+    assert "thinking" in introspection_model._model_kwargs  # noqa: SLF001
+    assert introspection_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
+
+    default_model = c.get_default_model()
+    assert isinstance(default_model, AnthropicGenerativeModel)
+    assert default_model.model_name == "claude-3-5-sonnet-latest"
+    assert not hasattr(default_model, "_model_kwargs") or "thinking" not in getattr(
+        default_model, "_model_kwargs", {}
+    )
+
+
+def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that OpenAI models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    c = Config.from_default(llm_provider=LLMProvider.OPENAI)
+
+    planning_model = c.get_planning_model()
+    assert isinstance(planning_model, OpenAIGenerativeModel)
+    assert hasattr(planning_model, "_model_kwargs")
+    assert "reasoning_effort" in planning_model._model_kwargs  # noqa: SLF001
+    assert planning_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
+
+    introspection_model = c.get_introspection_model()
+    assert isinstance(introspection_model, OpenAIGenerativeModel)
+    assert hasattr(introspection_model, "_model_kwargs")
+    assert "reasoning_effort" in introspection_model._model_kwargs  # noqa: SLF001
+    assert introspection_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
+
+    default_model = c.get_default_model()
+    assert isinstance(default_model, OpenAIGenerativeModel)
+    assert not hasattr(default_model, "_model_kwargs") or "reasoning_effort" not in getattr(
+        default_model, "_model_kwargs", {}
+    )
 
 
 @pytest.mark.parametrize(

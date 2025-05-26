@@ -24,9 +24,9 @@ from pydantic import (
     model_validator,
 )
 
-from portia import logger
 from portia.common import validate_extras_dependencies
 from portia.errors import ConfigNotFoundError, InvalidConfigError
+from portia.logger import logger
 from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
@@ -123,6 +123,7 @@ class LLMModel(Enum):
 
     # OpenAI
     GPT_4_O = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o")
+    GPT_4_1 = Model(provider=LLMProvider.OPENAI, model_name="gpt-4.1")
     GPT_4_O_MINI = Model(provider=LLMProvider.OPENAI, model_name="gpt-4o-mini")
     GPT_3_5_TURBO = Model(provider=LLMProvider.OPENAI, model_name="gpt-3.5-turbo")
     O_3_MINI = Model(provider=LLMProvider.OPENAI, model_name="o3-mini")
@@ -153,6 +154,7 @@ class LLMModel(Enum):
     # Azure OpenAI
     AZURE_GPT_4_O = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o")
     AZURE_GPT_4_O_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
+    AZURE_GPT_4_1 = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4.1")
     AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
 
     @property
@@ -292,31 +294,6 @@ SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 
 
-PROVIDER_DEFAULT_MODELS = {
-    "planning_model": {
-        LLMProvider.OPENAI: "openai/o3-mini",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
-        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE: "google/gemini-2.0-flash",
-        LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
-    },
-    "introspection_model": {
-        LLMProvider.OPENAI: "openai/o3-mini",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
-        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE: "google/gemini-2.0-flash",
-        LLMProvider.AZURE_OPENAI: "azure-openai/o3-mini",
-    },
-    "default_model": {
-        LLMProvider.OPENAI: "openai/gpt-4o",
-        LLMProvider.ANTHROPIC: "anthropic/claude-3-7-sonnet-latest",
-        LLMProvider.MISTRALAI: "mistralai/mistral-large-latest",
-        LLMProvider.GOOGLE: "google/gemini-2.0-flash",
-        LLMProvider.AZURE_OPENAI: "azure-openai/gpt-4o",
-    },
-}
-
-
 class GenerativeModelsConfig(BaseModel):
     """Configuration for a Generative Models.
 
@@ -445,7 +422,7 @@ class Config(BaseModel):
         description="The API Key for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
     azure_openai_endpoint: str = Field(
-        default_factory=lambda: os.getenv("AZURE_OPENAI_ENDPOINT") or "",
+        default_factory=lambda: (os.getenv("AZURE_OPENAI_ENDPOINT") or ""),
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
     ollama_base_url: str = Field(
@@ -575,14 +552,79 @@ class Config(BaseModel):
         encoding = tiktoken.get_encoding("gpt2").encode(str(value))
         return len(encoding) > self.large_output_threshold_tokens
 
+    def get_agent_default_model(  # noqa: C901, PLR0911, PLR0912
+        self,
+        agent_key: str,
+        llm_provider: LLMProvider | None = None,
+    ) -> GenerativeModel | str | None:
+        """Get the default model for the given agent key."""
+        match agent_key:
+            case "planning_model":
+                match llm_provider:
+                    case LLMProvider.OPENAI:
+                        return OpenAIGenerativeModel(
+                            model_name="o3-mini",
+                            api_key=self.must_get_api_key("openai_api_key"),
+                            reasoning_effort="medium",
+                        )
+                    case LLMProvider.ANTHROPIC:
+                        return AnthropicGenerativeModel(
+                            model_name="claude-3-7-sonnet-latest",
+                            api_key=self.must_get_api_key("anthropic_api_key"),
+                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
+                        )
+                    case LLMProvider.MISTRALAI:
+                        return "mistralai/mistral-large-latest"
+                    case LLMProvider.GOOGLE:
+                        return "google/gemini-2.0-flash"
+                    case LLMProvider.AZURE_OPENAI:
+                        return "azure-openai/o3-mini"
+                return None
+            case "introspection_model":
+                match llm_provider:
+                    case LLMProvider.OPENAI:
+                        return OpenAIGenerativeModel(
+                            model_name="o4-mini",
+                            api_key=self.must_get_api_key("openai_api_key"),
+                            reasoning_effort="medium",
+                        )
+                    case LLMProvider.ANTHROPIC:
+                        return AnthropicGenerativeModel(
+                            model_name="claude-3-7-sonnet-latest",
+                            api_key=self.must_get_api_key("anthropic_api_key"),
+                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
+                        )
+                    case LLMProvider.MISTRALAI:
+                        return "mistralai/mistral-large-latest"
+                    case LLMProvider.GOOGLE:
+                        return "google/gemini-2.0-flash"
+                    case LLMProvider.AZURE_OPENAI:
+                        return "azure-openai/o4-mini"
+                return None
+            case "default_model":
+                match llm_provider:
+                    case LLMProvider.OPENAI:
+                        return "openai/gpt-4.1"
+                    case LLMProvider.ANTHROPIC:
+                        return "anthropic/claude-3-5-sonnet-latest"
+                    case LLMProvider.MISTRALAI:
+                        return "mistralai/mistral-large-latest"
+                    case LLMProvider.GOOGLE:
+                        return "google/gemini-2.0-flash"
+                    case LLMProvider.AZURE_OPENAI:
+                        return "azure-openai/o3-mini"
+                return None
+
     @model_validator(mode="after")
     def fill_default_models(self) -> Self:
         """Fill in default models for the LLM provider if not provided."""
-        if (
-            self.models.default_model is None
-            and self.llm_provider in PROVIDER_DEFAULT_MODELS["default_model"]
+        if self.models.default_model is None and (
+            model := self.get_agent_default_model(
+                agent_key="default_model",
+                llm_provider=self.llm_provider,
+            )
         ):
-            self.models.default_model = PROVIDER_DEFAULT_MODELS["default_model"][self.llm_provider]
+            self.models.default_model = model
         if self.models.default_model is None:
             raise InvalidConfigError(
                 "llm_provider or default_model",
@@ -591,20 +633,20 @@ class Config(BaseModel):
                 "external LLM provider (e.g. OpenAI / Anthropic etc), make sure you have provided "
                 "an API key for that provider.",
             )
-        if (
-            self.models.planning_model is None
-            and self.llm_provider in PROVIDER_DEFAULT_MODELS["planning_model"]
+        if self.models.planning_model is None and (
+            model := self.get_agent_default_model(
+                agent_key="planning_model",
+                llm_provider=self.llm_provider,
+            )
         ):
-            self.models.planning_model = PROVIDER_DEFAULT_MODELS["planning_model"][
-                self.llm_provider
-            ]
-        if (
-            self.models.introspection_model is None
-            and self.llm_provider in PROVIDER_DEFAULT_MODELS["introspection_model"]
+            self.models.planning_model = model
+        if self.models.introspection_model is None and (
+            model := self.get_agent_default_model(
+                agent_key="introspection_model",
+                llm_provider=self.llm_provider,
+            )
         ):
-            self.models.introspection_model = PROVIDER_DEFAULT_MODELS["introspection_model"][
-                self.llm_provider
-            ]
+            self.models.introspection_model = model
         return self
 
     @model_validator(mode="after")
@@ -765,7 +807,7 @@ class Config(BaseModel):
         return model
 
     def _parse_model_string(self, model_string: str) -> GenerativeModel:
-        """Parse a model string in the form of "provider-prefix/model_name` to a GenerativeModel.
+        """Parse a model string in the form of "provider-prefix/model_name" to a GenerativeModel.
 
         Supported provider-prefixes are:
         - openai
@@ -774,6 +816,8 @@ class Config(BaseModel):
         - google (requires portia-sdk-python[google] to be installed)
         - azure-openai
 
+        The optional "reasoning" parameter enables reasoning mode for models that support it.
+
         Args:
             model_string (str): The model string to parse. E.G. "openai/gpt-4o"
 
@@ -781,7 +825,10 @@ class Config(BaseModel):
             GenerativeModel: The parsed model.
 
         """
-        provider, model_name = model_string.strip().split("/", maxsplit=1)
+        parts = model_string.strip().split("/", maxsplit=1)
+        provider = parts[0]
+        model_name = parts[1]
+
         llm_provider = LLMProvider(provider)
         return self._construct_model_from_name(llm_provider, model_name)
 

@@ -285,6 +285,8 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
 
         """
+        self._model_kwargs = kwargs.copy()
+
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
@@ -292,7 +294,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
         # Unfortunately you get errors from o3 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
-        temperature = 1 if "o3-mini" in model_name.lower() else temperature
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini") else temperature
 
         client = ChatOpenAI(
             name=model_name,
@@ -327,8 +329,9 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
+        if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
+
         return super().get_structured_response(
             messages,
             schema,
@@ -350,6 +353,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             model=self.model_name,
             provider=self.provider.value,
             seed=self._seed,
+            **self._model_kwargs,
         )
 
 
@@ -385,14 +389,16 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             **kwargs: Additional keyword arguments to pass to AzureChatOpenAI
 
         """
+        self._model_kwargs = kwargs.copy()
+
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
 
-        # Unfortunately you get errors from o3 mini with Langchain unless you set
+        # Unfortunately you get errors from o3/o4 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
-        temperature = 1 if "o3-mini" in model_name.lower() else temperature
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini") else temperature
 
         client = AzureChatOpenAI(
             name=model_name,
@@ -456,6 +462,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             model=self.model_name,
             provider=self.provider.value,
             seed=self._seed,
+            **self._model_kwargs,
         )
 
 
@@ -468,7 +475,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     def __init__(  # noqa: PLR0913
         self,
         *,
-        model_name: str = "claude-3-5-sonnet-latest",
+        model_name: str = "claude-3-7-sonnet-latest",
         api_key: SecretStr,
         timeout: int = 120,
         max_retries: int = 3,
@@ -488,6 +495,10 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
         """
+        if "model_kwargs" in kwargs:
+            self._model_kwargs = kwargs["model_kwargs"].copy()
+        else:
+            self._model_kwargs = kwargs.copy()
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
@@ -522,7 +533,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
+        if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
@@ -555,6 +566,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             model=self.model_name,
             provider=self.provider.value,
             max_tokens=self.max_tokens,
+            **self._model_kwargs,
         )
 
 
