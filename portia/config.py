@@ -24,9 +24,9 @@ from pydantic import (
     model_validator,
 )
 
-from portia import logger
 from portia.common import validate_extras_dependencies
 from portia.errors import ConfigNotFoundError, InvalidConfigError
+from portia.logger import logger
 from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
@@ -800,7 +800,6 @@ class Config(BaseModel):
             GenerativeModel | None: The model instance or None.
 
         """
-        print(f"debug: model: {model}")
         if model is None:
             return None
         if isinstance(model, str):
