@@ -1164,7 +1164,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
             clarification_handler.received_clarification.user_guidance
             == "Handle this clarification"
         )
-        assert portia.execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        assert portia.execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         assert portia.execution_hooks.after_plan_run.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
