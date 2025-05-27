@@ -42,5 +42,5 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
             raise exception[0]
         return result[0]
 
-    # Loop exists but not running
+    # Loop exists but not running (should never happen but for completeness)
     return loop.run_until_complete(coro)

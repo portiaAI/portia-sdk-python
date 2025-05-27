@@ -257,6 +257,7 @@ class BrowserTool(Tool):
         )
 
         result = await agent.run()
+        print(result)
         task_result = output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
 
         if task_result.human_login_required:  # type: ignore reportCallIssue
@@ -311,6 +312,8 @@ class BrowserToolForUrl(BrowserTool):
         custom_infrastructure_provider (BrowserInfrastructureProvider, optional): A custom
             infrastructure provider to use. If not provided, the infrastructure provider will be
             resolved from the `infrastructure_option` argument.
+        structured_output_schema (BaseModel, optional): A Pydantic model to use for structured
+            output. If not provided, the tool will return a string.
 
     """
 
@@ -327,6 +330,8 @@ class BrowserToolForUrl(BrowserTool):
         description: str | None = None,
         model: GenerativeModel | None | str = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
+        custom_infrastructure_provider: BrowserInfrastructureProvider | None = NotSet,
+        structured_output_schema: type[BaseModel] | None = NotSet,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
         domain_parts = str(HttpUrl(url).host).split(".")
@@ -348,6 +353,8 @@ class BrowserToolForUrl(BrowserTool):
             url=url,  # type: ignore reportCallIssue
             model=model,
             infrastructure_option=infrastructure_option,
+            custom_infrastructure_provider=custom_infrastructure_provider,
+            structured_output_schema=structured_output_schema,
         )
 
     async def run_async(  # type: ignore  # noqa: PGH003

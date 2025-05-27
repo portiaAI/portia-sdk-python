@@ -135,8 +135,17 @@ class Tool(BaseModel):
     def __init_subclass__(cls) -> None:
         """Control subclass init to allow tools to either implement run or run_async."""
         super().__init_subclass__()
-        run_is_overridden = cls.run is not Tool.run
-        run_async_is_overridden = cls.run_async is not Tool.run_async
+
+        def is_overridden(method_name: str) -> bool:
+            """Check if `method_name` is overridden in `cls` compared to the base `Tool`."""
+            base_method = getattr(Tool, method_name, None)
+            sub_method = getattr(cls, method_name, None)
+            return sub_method is not base_method
+
+        run_is_overridden = is_overridden("run")
+        run_async_is_overridden = is_overridden("run_async")
+        print(run_is_overridden, run_async_is_overridden)
+
         if not (run_is_overridden or run_async_is_overridden):
             raise TypeError(f"{cls.__name__} must override at least one of 'run' or 'run_async'")
 
@@ -209,7 +218,7 @@ class Tool(BaseModel):
         *args: Any,
         **kwargs: Any,
     ) -> Output:
-        """Invoke the Tool.run_async function and handle converting the result into an Output.
+        """Invoke the Tool.run or Tool.run_async function and convert the result into an Output.
 
         This is the entry point for agents to invoke a tool async.
 
@@ -226,8 +235,15 @@ class Tool(BaseModel):
 
         """
         try:
-            run_is_overridden = self.run is not Tool.run
-            run_async_is_overridden = self.run_async is not Tool.run_async
+
+            def is_overridden(method_name: str) -> bool:
+                """Check if `method_name` is overridden in this instance compared to base Tool."""
+                base_method = getattr(Tool, method_name, None)
+                sub_method = getattr(type(self), method_name, None)
+                return sub_method is not base_method
+
+            run_is_overridden = is_overridden("run")
+            run_async_is_overridden = is_overridden("run_async")
             if run_is_overridden:
                 output = self.run(ctx, *args, **kwargs)
             elif run_async_is_overridden:
@@ -236,6 +252,7 @@ class Tool(BaseModel):
                 # This shouldn't happen as we check in the init_subclasses method
                 raise NotImplementedError  # noqa: TRY301
         except Exception as e:
+            print(e)
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):

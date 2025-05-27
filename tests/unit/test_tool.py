@@ -2,6 +2,7 @@
 
 import json
 from enum import Enum
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -21,7 +22,7 @@ from portia.clarification import (
 )
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.mcp_session import StdioMcpClientConfig
-from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool, ToolRunContext
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -50,9 +51,62 @@ def test_tool_no_run() -> None:
         TypeError, match="MyTool must override at least one of 'run' or 'run_async'"
     ):
 
-        class MyTool(Tool):
+        class MyTool(Tool):  # type: ignore  # noqa: PGH003
             def other_func(self) -> str:
                 return ""
+
+
+class NoRunTool(Tool):
+    """Tool that doesn't override run correctly."""
+
+    id: str = "dummy"
+    name: str = "Dummy Tool"
+    description: str = "A dummy tool"
+    output_schema: tuple[str, str] = ("str", "dummy output")
+
+    def run(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any:  # type: ignore  # noqa: ANN401, PGH003
+        """Delegate to Tool."""
+        return super().run(ctx, *args, **kwargs)
+
+    async def run_async(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any:  # type: ignore  # noqa: ANN401, PGH003
+        """Delegate to Tool."""
+        return await super().run_async(ctx, *args, **kwargs)
+
+
+def test_tool_run_raises_not_implemented() -> None:
+    """Check not implemented error."""
+    tool = NoRunTool()
+    with pytest.raises(NotImplementedError):
+        tool.run(ctx=get_test_tool_context())
+
+
+@pytest.mark.asyncio
+async def test_tool_run_async() -> None:
+    """Check async implementation is called."""
+
+    class AsyncTool(Tool):
+        """Tool that overrides async run correctly."""
+
+        id: str = "dummy"
+        name: str = "Dummy Tool"
+        description: str = "A dummy tool"
+        output_schema: tuple[str, str] = ("str", "dummy output")
+
+        async def run_async(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> str:  # type: ignore  # noqa: ARG002, PGH003
+            """Delegate to Tool."""
+            return "answer"
+
+    tool = AsyncTool()
+    output = await tool._run(ctx=get_test_tool_context())  # noqa: SLF001
+    assert output.get_value() == "answer"
+
+
+@pytest.mark.asyncio
+async def test_tool_run_async_raises_not_implemented() -> None:
+    """Check not implemented error."""
+    tool = NoRunTool()
+    with pytest.raises(NotImplementedError):
+        await tool.run_async(ctx=get_test_tool_context())
 
 
 def test_tool_initialization(add_tool: AdditionTool) -> None:
