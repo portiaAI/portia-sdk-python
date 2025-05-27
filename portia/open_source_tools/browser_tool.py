@@ -294,7 +294,7 @@ class BrowserTool(Tool[str | BaseModel]):
                         ctx,
                         result.login_url,
                     ),
-                    plan_run_id=ctx.plan_run_id,
+                    plan_run_id=ctx.plan_run.id,
                     require_confirmation=True,
                     source="Browser tool",
                 )

@@ -44,6 +44,7 @@ from portia.clarification import (
     MultipleChoiceClarification,
     ValueConfirmationClarification,
 )
+from portia.cloud import PortiaCloudClient
 from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
 from portia.config import Config
 from portia.end_user import EndUser
@@ -52,7 +53,8 @@ from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
-from portia.plan_run import PlanRunUUID
+from portia.plan import Plan
+from portia.plan_run import PlanRun
 from portia.templates.render import render_template
 
 """MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
@@ -63,7 +65,8 @@ class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
     Attributes:
-        plan_run_id(RunUUID): The run id the tool run is part of.
+        plan_run(PlanRun): The run the tool run is part of.
+        plan(Plan): The plan the tool run is part of.
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
 
@@ -72,7 +75,8 @@ class ToolRunContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     end_user: EndUser
-    plan_run_id: PlanRunUUID
+    plan_run: PlanRun
+    plan: Plan
     config: Config
     clarifications: ClarificationListType
 
@@ -435,7 +439,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.ACTION:
                     return LocalDataValue(
                         value=ActionClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
@@ -445,7 +449,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.INPUT:
                     return LocalDataValue(
                         value=InputClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -455,7 +459,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.MULTIPLE_CHOICE:
                     return LocalDataValue(
                         value=MultipleChoiceClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -466,7 +470,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.VALUE_CONFIRMATION:
                     return LocalDataValue(
                         value=ValueConfirmationClarification(
-                            plan_run_id=ctx.plan_run_id,
+                            plan_run_id=ctx.plan_run.id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -494,7 +498,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run_id),
+                            "plan_run_id": str(ctx.plan_run.id),
                         },
                     },
                 ),
@@ -551,7 +555,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run_id),
+                            "plan_run_id": str(ctx.plan_run.id),
                             "additional_data": ctx.end_user.additional_data,
                         },
                     },
@@ -572,6 +576,43 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 raise ToolHardError(e) from e
             else:
                 return output.get_value()
+
+    @classmethod
+    def batch_ready_check(
+        cls,
+        config: Config,
+        tool_ids: set[str],
+        tool_run_context: ToolRunContext,
+    ) -> ReadyResponse:
+        """Batch check readiness for Portia cloud tools.
+
+        Args:
+            config (Config): The config for the SDK as a whole.
+            tool_ids (set[str]): The list of tool IDs to check readiness for.
+            tool_run_context (ToolRunContext): The context of the execution.
+
+        Returns:
+            ReadyResponse: The readiness response for the tools.
+
+        """
+        client = PortiaCloudClient().get_client(config)
+        logger().debug("Checking readiness for Portia cloud tools: " + ", ".join(tool_ids))
+        batch_ready_response = client.post(
+            url="/api/v0/tools/batch/ready/",
+            json={
+                "tool_ids": sorted(tool_ids),
+                "execution_context": {
+                    "end_user_id": tool_run_context.end_user.external_id,
+                    "plan_run_id": str(tool_run_context.plan_run.id),
+                },
+            },
+        )
+        if batch_ready_response.status_code == httpx.codes.NOT_FOUND:
+            # For backwards compatibility: if the endpoint is not found, we set ready=true
+            # and fallback to individual tool ready checks failing.
+            return ReadyResponse(ready=True, clarifications=[])
+        batch_ready_response.raise_for_status()
+        return ReadyResponse.model_validate(batch_ready_response.json())
 
 
 class PortiaMcpTool(Tool[str]):
