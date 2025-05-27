@@ -1,7 +1,6 @@
 """Tests for run_async helper."""
 
 import asyncio
-from pdb import run
 from unittest import mock
 
 import pytest
@@ -30,7 +29,6 @@ def test_run_async_no_loop() -> None:
 @pytest.mark.asyncio
 async def test_run_async_with_loop() -> None:
     """Test with existing loop."""
-
     # Run in a thread so we can test run_async from within an already-running loop
     loop_result = run_async(sample_coro(2))
     assert loop_result == 3

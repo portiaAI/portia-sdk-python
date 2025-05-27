@@ -144,7 +144,6 @@ class Tool(BaseModel):
 
         run_is_overridden = is_overridden("run")
         run_async_is_overridden = is_overridden("run_async")
-        print(run_is_overridden, run_async_is_overridden)
 
         if not (run_is_overridden or run_async_is_overridden):
             raise TypeError(f"{cls.__name__} must override at least one of 'run' or 'run_async'")
@@ -252,7 +251,6 @@ class Tool(BaseModel):
                 # This shouldn't happen as we check in the init_subclasses method
                 raise NotImplementedError  # noqa: TRY301
         except Exception as e:
-            print(e)
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):

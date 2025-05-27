@@ -257,7 +257,6 @@ class BrowserTool(Tool):
         )
 
         result = await agent.run()
-        print(result)
         task_result = output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
 
         if task_result.human_login_required:  # type: ignore reportCallIssue
