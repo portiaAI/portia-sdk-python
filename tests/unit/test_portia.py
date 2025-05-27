@@ -1164,7 +1164,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
             clarification_handler.received_clarification.user_guidance
             == "Handle this clarification"
         )
-        assert portia.execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        assert portia.execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         assert portia.execution_hooks.after_plan_run.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
@@ -2502,3 +2502,66 @@ def test_portia_tool_readiness_rechecked_after_raised_clarification(
     assert isinstance(outstanding_clarification, ActionClarification)
     assert outstanding_clarification.resolved is False
     assert str(outstanding_clarification.action_url) == str(action_url)
+
+
+def test_portia_resume_with_unresolved_clarification_for_current_step(
+    portia: Portia,
+) -> None:
+    """Test that resume returns immediately if current step has unresolved clarification."""
+    # Create a plan with multiple steps
+    step1 = Step(task="Step 1", inputs=[], output="$step1_result")
+    step2 = Step(task="Step 2", inputs=[], output="$step2_result")
+    plan = Plan(
+        plan_context=PlanContext(query="Test query", tool_ids=[]),
+        steps=[step1, step2],
+    )
+
+    # Create an unresolved clarification for step 1 (current step)
+    unresolved_clarification = InputClarification(
+        plan_run_id=PlanRunUUID(),
+        user_guidance="Please provide input",
+        argument_name="test_input",
+        step=1,  # This matches current_step_index
+        source="Test unresolved clarification for current step",
+        resolved=False,
+    )
+
+    # Create a plan run that's at step 1 with the unresolved clarification
+    plan_run = PlanRun(
+        plan_id=plan.id,
+        current_step_index=1,  # Currently on step 2 (index 1)
+        state=PlanRunState.IN_PROGRESS,
+        end_user_id="test123",
+        outputs=PlanRunOutputs(
+            step_outputs={
+                "$step1_result": LocalDataValue(value="Step 1 completed"),
+            },
+            clarifications=[unresolved_clarification],
+        ),
+    )
+
+    # Save plan and plan_run to storage
+    portia.storage.save_plan(plan)
+    portia.storage.save_plan_run(plan_run)
+
+    # Mock the execution agent to track if it gets called
+    mock_execution_agent = MagicMock()
+    mock_execution_agent.execute_sync.return_value = LocalDataValue(value="Should not be called")
+
+    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_execution_agent):
+        result_plan_run = portia.resume(plan_run)
+
+        # Verify the execution agent was NOT called
+        mock_execution_agent.execute_sync.assert_not_called()
+
+        # Verify the plan run state is NEED_CLARIFICATION
+        assert result_plan_run.state == PlanRunState.NEED_CLARIFICATION
+
+        # Verify the unresolved clarification is still present
+        outstanding_clarifications = result_plan_run.get_outstanding_clarifications()
+        assert len(outstanding_clarifications) == 1
+        assert outstanding_clarifications[0].step == 1
+        assert outstanding_clarifications[0].resolved is False
+
+        # Verify we're still on the same step
+        assert result_plan_run.current_step_index == 1

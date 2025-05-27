@@ -46,7 +46,7 @@ def test_clarify_before_tool_call_with_previous_yes_response() -> None:
         user_guidance=f"Are you happy to proceed with the call to {tool.name} with args {args}? "
         "Enter 'y' or 'yes' to proceed",
         resolved=True,
-        response="yes",
+        response=True,
         step=0,
         source="Test execution hooks",
     )
@@ -69,7 +69,7 @@ def test_clarify_before_tool_call_with_previous_no_response() -> None:
         user_guidance=f"Are you happy to proceed with the call to {tool.name} with args {args}? "
         "Enter 'y' or 'yes' to proceed",
         resolved=True,
-        response="no",
+        response=False,
         step=0,
         source="Test execution hooks",
     )
