@@ -8,7 +8,6 @@ be more successful than the OneShotAgent.
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.prompts import (
@@ -31,6 +30,7 @@ from portia.execution_agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
+from portia.execution_agents.utils.run_async import run_async
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
@@ -317,14 +317,6 @@ class OneShotAgent(BaseExecutionAgent):
         # This is an intermediate implementation that allows tools
         # to be async while agents are sync. Soon agents will also
         # be async and this will go away
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:  # pragma: no cover
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        invocation_result = loop.run_until_complete(
-            app.ainvoke({"messages": [], "step_inputs": []})
-        )
+        invocation_result = run_async(app.ainvoke({"messages": [], "step_inputs": []}))
 
         return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
