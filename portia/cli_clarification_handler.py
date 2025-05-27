@@ -43,7 +43,7 @@ class CLIClarificationHandler(ClarificationHandler):
         """
         click.echo(
             click.style(
-                f"{clarification.user_guidance} -- Please click on the link below to proceed."
+                f"{clarification.user_guidance} -- Please click on the link below to proceed. "
                 f"{clarification.action_url}",
                 fg=87,
             ),
