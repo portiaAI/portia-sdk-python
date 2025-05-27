@@ -6,6 +6,7 @@ in completing tasks.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.prompts import (
@@ -778,7 +779,20 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
         app = graph.compile()
-        invocation_result = app.invoke({"messages": [], "step_inputs": []})
+
+        # This is an intermediate implementation that allows tools
+        # to be async while agents are sync. Soon agents will also
+        # be async and this will go away
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:  # pragma: no cover
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        invocation_result = loop.run_until_complete(
+            app.ainvoke({"messages": [], "step_inputs": []})
+        )
+
         return process_output(
             invocation_result["messages"],
             self.tool,
