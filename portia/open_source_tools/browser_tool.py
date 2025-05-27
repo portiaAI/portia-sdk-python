@@ -57,12 +57,24 @@ class BrowserToolForUrlSchema(BaseModel):
         task (str): The task description that should be performed by the browser tool.
             This is a required field that specifies what actions should be taken
             on the predefined URL.
+        task_data (list[Any] | str | None): Task data that should be used to complete the task.
+            Can be a string, a list of strings, or a list of objects that will be converted to
+            strings. Important: This should include all relevant data in their entirety,
+            from the first to the last character (i.e. NOT a summary).
 
     """
 
     task: str = Field(
         ...,
         description="The task to be completed by the Browser tool.",
+    )
+    task_data: list[Any] | str | None = Field(
+        default=None,
+        description="Task data that should be used to complete the task. "
+        "Can be a string, a list of strings, "
+        "or a list of objects that will be converted to strings. "
+        "Important: This should include all relevant data in their entirety, "
+        "from the first to the last character (i.e. NOT a summary).",
     )
 
 
@@ -77,6 +89,10 @@ class BrowserToolSchema(BaseModel):
         task (str): The task description that should be performed by the browser tool.
             This is a required field that specifies what actions should be taken
             on the provided URL.
+        task_data (list[Any] | str | None): Task data that should be used to complete the task.
+            Can be a string, a list of strings, or a list of objects that will be converted to
+            strings. Important: This should include all relevant data in their entirety,
+            from the first to the last character (i.e. NOT a summary).
 
     """
 
@@ -87,6 +103,14 @@ class BrowserToolSchema(BaseModel):
     task: str = Field(
         ...,
         description="The task to be completed by the Browser tool.",
+    )
+    task_data: list[Any] | str | None = Field(
+        default=None,
+        description="Task data that should be used to complete the task. "
+        "Can be a string, a list of strings, "
+        "or a list of objects that will be converted to strings. "
+        "Important: This should include all relevant data in their entirety, "
+        "from the first to the last character (i.e. NOT a summary).",
     )
 
 
@@ -229,11 +253,27 @@ class BrowserTool(Tool[str | BaseModel]):
             return BrowserInfrastructureProviderBrowserBase()
         return BrowserInfrastructureProviderLocal()
 
+    @staticmethod
+    def process_task_data(task_data: list[Any] | str | None) -> str:
+        """Process task_data into a string, handling different input types.
+
+        Args:
+            task_data: Data that can be a None, a string or a list of objects.
+
+        Returns:
+            A string representation of the data, with list items joined by newlines.
+
+        """
+        if task_data is None:
+            return ""
+
+        if isinstance(task_data, str):
+            return task_data
+
+        return "\n".join(str(item) for item in task_data)
+
     def run(
-        self,
-        ctx: ToolRunContext,
-        url: str,
-        task: str,
+        self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
@@ -280,7 +320,9 @@ class BrowserTool(Tool[str | BaseModel]):
                 f"Go to {url} and complete the following task: {task}. The user may already be "
                 "logged in. If the user is NOT already logged in and at any point login is "
                 "required to complete the task, please return human_login_required=True, and the "
-                "url of the sign in page as well as what the user should do to sign in."
+                "url of the sign in page as well as what the user should do to sign in. "
+                "Additional data is available below: "
+                f"{self.process_task_data(task_data)}"
             )
 
             task_result = await run_agent_task(task_to_complete, output_model)
@@ -369,9 +411,14 @@ class BrowserToolForUrl(BrowserTool):
             infrastructure_option=infrastructure_option,
         )
 
-    def run(self, ctx: ToolRunContext, task: str) -> str | BaseModel | ActionClarification:  # type: ignore reportIncompatibleMethodOverride
+    def run(  # type: ignore reportIncompatibleMethodOverride
+        self,
+        ctx: ToolRunContext,
+        task: str,
+        task_data: list[Any] | str | None = None,
+    ) -> str | BaseModel | ActionClarification:
         """Run the BrowserToolForUrl."""
-        return super().run(ctx, self.url, task)  # pragma: no cover
+        return super().run(ctx, self.url, task, task_data)  # pragma: no cover
 
 
 class BrowserInfrastructureProvider(ABC):
