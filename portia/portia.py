@@ -579,8 +579,10 @@ class Portia:
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
         # Perform initial readiness check
-        if len(ready_clarifications := self._check_remaining_tool_readiness(plan, plan_run)):
-            plan_run = self._raise_clarifications(ready_clarifications, plan_run)
+        outstanding_clarifications = plan_run.get_outstanding_clarifications()
+        ready_clarifications = self._check_remaining_tool_readiness(plan, plan_run)
+        if len(clarifications_to_raise := outstanding_clarifications + ready_clarifications):
+            plan_run = self._raise_clarifications(clarifications_to_raise, plan_run)
             plan_run = self._handle_clarifications(plan_run)
             if len(plan_run.get_outstanding_clarifications()) > 0:
                 return plan_run
@@ -1321,8 +1323,12 @@ class Portia:
             logger().debug(
                 f"Clarification requested: {clarification.model_dump_json(indent=4)}",
             )
+        existing_clarification_ids = [clar.id for clar in plan_run.outputs.clarifications]
+        new_clarifications = [
+            clar for clar in clarifications if clar.id not in existing_clarification_ids
+        ]
 
-        plan_run.outputs.clarifications = plan_run.outputs.clarifications + clarifications
+        plan_run.outputs.clarifications = plan_run.outputs.clarifications + new_clarifications
         self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
         return plan_run
 
