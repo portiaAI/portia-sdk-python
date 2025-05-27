@@ -21,7 +21,7 @@ from portia.clarification import (
 )
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.mcp_session import StdioMcpClientConfig
-from portia.tool import PortiaMcpTool, PortiaRemoteTool
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -42,6 +42,17 @@ def add_tool() -> AdditionTool:
 def clarification_tool() -> ClarificationTool:
     """Fixture to create a mock tool instance."""
     return ClarificationTool()
+
+
+def test_tool_no_run() -> None:
+    """A tool that doesn't override run or async_run should error."""
+    with pytest.raises(
+        TypeError, match="MyTool must override at least one of 'run' or 'run_async'"
+    ):
+
+        class MyTool(Tool):
+            def other_func(self) -> str:
+                return ""
 
 
 def test_tool_initialization(add_tool: AdditionTool) -> None:

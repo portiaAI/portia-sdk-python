@@ -69,7 +69,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_model = get_mock_generative_model(response=model_response)
     monkeypatch.setattr("portia.config.Config.get_execution_model", lambda self: mock_model)  # noqa: ARG005
 
-    def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
+    async def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
         return {
             "messages": ToolMessage(
                 content="Sent email",
@@ -78,7 +78,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
             ),
         }
 
-    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+    monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
     (plan, plan_run) = get_test_plan_run()
     mock_before_tool_call = mock.MagicMock(return_value=None)
@@ -159,7 +159,7 @@ def test_oneshot_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyP
 
     tool_node_called = False
 
-    def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
+    async def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
         nonlocal tool_node_called
         tool_node_called = True
         return {
@@ -170,7 +170,7 @@ def test_oneshot_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyP
             ),
         }
 
-    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+    monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
     return_clarification = True
 
@@ -238,7 +238,7 @@ def test_oneshot_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPa
 
     tool_node_called = False
 
-    def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
+    async def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
         nonlocal tool_node_called
         tool_node_called = True
         return {
@@ -249,7 +249,7 @@ def test_oneshot_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPa
             ),
         }
 
-    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+    monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
     return_clarification = True
 
@@ -315,7 +315,7 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
 
     tool_node_called = False
 
-    def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
+    async def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
         nonlocal tool_node_called
         tool_node_called = True
         return {
@@ -331,7 +331,7 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
             ),
         }
 
-    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+    monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
     (plan, plan_run) = get_test_plan_run()
     agent = OneShotAgent(
@@ -377,7 +377,7 @@ def test_oneshot_agent_templates_values(monkeypatch: pytest.MonkeyPatch) -> None
     tool_node_called = False
     tool_args = None
 
-    def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
+    async def tool_call(self, input, config) -> dict[str, Any]:  # noqa: A002, ANN001, ARG001
         nonlocal tool_node_called, tool_args
         tool_node_called = True
         tool_args = input["messages"][0].tool_calls[0]["args"]
@@ -389,7 +389,7 @@ def test_oneshot_agent_templates_values(monkeypatch: pytest.MonkeyPatch) -> None
             ),
         }
 
-    monkeypatch.setattr(ToolNode, "invoke", tool_call)
+    monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
     (plan, plan_run) = get_test_plan_run()
     step = plan.steps[0]
