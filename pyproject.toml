@@ -71,6 +71,8 @@ all = [
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
+    "redis>=5.2.1,<6",
+    "langchain-redis>=0.1.2"
 ]
 
 [project.urls]

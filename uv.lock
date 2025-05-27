@@ -1797,8 +1797,10 @@ all = [
     { name = "langchain-google-genai", marker = "python_full_version < '4.0'" },
     { name = "langchain-mistralai", marker = "python_full_version < '4.0'" },
     { name = "langchain-ollama", marker = "python_full_version < '4.0'" },
+    { name = "langchain-redis" },
     { name = "mistralai" },
     { name = "playwright" },
+    { name = "redis" },
 ]
 cache = [
     { name = "langchain-redis" },
@@ -1870,6 +1872,7 @@ requires-dist = [
     { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=0.2.2,<0.3" },
     { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'ollama'", specifier = ">=0.2.2,<0.3" },
     { name = "langchain-openai", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3,<0.4" },
+    { name = "langchain-redis", marker = "extra == 'all'", specifier = ">=0.1.2" },
     { name = "langchain-redis", marker = "extra == 'cache'", specifier = ">=0.1.2" },
     { name = "langgraph", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.2.59,<0.3" },
     { name = "langsmith", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3.15,<0.4" },
@@ -1889,6 +1892,7 @@ requires-dist = [
     { name = "pytest-mock", specifier = ">=3.14.0,<4" },
     { name = "pytest-repeat", specifier = ">=0.9.4" },
     { name = "python-dotenv", specifier = ">=1.0.1,<2" },
+    { name = "redis", marker = "extra == 'all'", specifier = ">=5.2.1,<6" },
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
     { name = "testcontainers", extras = ["redis"], specifier = ">=4.10.0" },
     { name = "tiktoken", specifier = ">=0.9.0,<0.10" },
