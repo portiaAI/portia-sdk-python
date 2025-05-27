@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from langchain_anthropic import ChatAnthropic
+from langchain_core.caches import BaseCache
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, SecretStr, ValidationError
@@ -16,6 +17,7 @@ from portia.model import (
     LangChainGenerativeModel,
     LLMProvider,
     Message,
+    OpenAIGenerativeModel,
     map_message_to_instructor,
 )
 
@@ -238,3 +240,66 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
             schema=StructuredOutputTestModel,
         )
         mock_instructor.return_value.chat.completions.create.assert_called_once()
+
+
+def test_langchain_generative_model_redis_cache_setup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that Redis cache is set up correctly."""
+    base_chat_model = MagicMock(spec=BaseChatModel)
+    mock_set = MagicMock()
+    monkeypatch.setattr("portia.model.set_llm_cache", mock_set)
+
+    LangChainGenerativeModel(
+        client=base_chat_model,
+        model_name="test",
+    )
+    mock_set.assert_not_called()
+
+    LangChainGenerativeModel(
+        client=base_chat_model,
+        model_name="test",
+        cache=MagicMock(),
+    )
+
+    mock_set.assert_called_once()
+
+
+def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LLM responses are cached when redis URL provided."""
+
+    class DummyModel(BaseModel):
+        pass
+
+    mock_instructor_client = MagicMock()
+    monkeypatch.setattr(
+        "portia.model.instructor.from_openai",
+        MagicMock(return_value=mock_instructor_client),
+    )
+    mock_create = MagicMock(return_value=DummyModel())
+    mock_instructor_client.chat.completions.create = mock_create
+
+    cache = MagicMock(spec=BaseCache)
+    model = OpenAIGenerativeModel(
+        model_name="gpt-4o",
+        api_key=SecretStr("k"),
+        cache=cache,
+    )
+
+    # Test cache miss
+    cache.lookup.return_value = None
+    model.get_structured_response_instructor([Message(role="user", content="hi")], DummyModel)
+    cache.lookup.assert_called_once()
+    cache.update.assert_called_once()
+
+    # Test cache hit
+    cache.reset_mock()
+    cache.lookup.return_value = ["{}"]
+    model.get_structured_response_instructor([Message(role="user", content="hi")], DummyModel)
+    cache.lookup.assert_called_once()
+    cache.update.assert_not_called()
+
+    # Test cache hit with validation error
+    cache.reset_mock()
+    cache.lookup.return_value = "{"
+    model.get_structured_response_instructor([Message(role="user", content="hi")], DummyModel)
+    cache.lookup.assert_called_once()
+    cache.update.assert_called_once()

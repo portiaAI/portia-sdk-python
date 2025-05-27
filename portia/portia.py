@@ -76,7 +76,7 @@ from portia.storage import (
 )
 from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
-from portia.tool import Tool, ToolRunContext
+from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
 from portia.tool_registry import (
     DefaultToolRegistry,
     PortiaToolRegistry,
@@ -578,6 +578,13 @@ class Portia:
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
+        # Perform initial readiness check
+        if len(ready_clarifications := self._check_remaining_tool_readiness(plan, plan_run)):
+            plan_run = self._raise_clarifications(ready_clarifications, plan_run)
+            plan_run = self._handle_clarifications(plan_run)
+            if len(plan_run.get_outstanding_clarifications()) > 0:
+                return plan_run
+
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
 
     def _process_plan_input_values(
@@ -642,35 +649,51 @@ class Portia:
             ]:
                 plan_run = self._execute_plan_run(plan, plan_run)
 
-                # If we don't have a clarification handler, return the plan run
-                # even if a clarification has been raised
-                if not self.execution_hooks.clarification_handler:
+                plan_run = self._handle_clarifications(plan_run)
+                if len(plan_run.get_outstanding_clarifications()) > 0:
                     return plan_run
-
-                clarifications = plan_run.get_outstanding_clarifications()
-                for clarification in clarifications:
-                    logger().info(
-                        f"Clarification of type {clarification.category} requested"
-                        f"by '{clarification.source}'"
-                        if clarification.source
-                        else ""
-                    )
-                    self.execution_hooks.clarification_handler.handle(
-                        clarification=clarification,
-                        on_resolution=lambda c, r: self.resolve_clarification(c, r) and None,
-                        on_error=lambda c, r: self.error_clarification(c, r) and None,
-                    )
-
-                if len(clarifications) > 0:
-                    # If clarifications are handled synchronously,
-                    # we'll go through this immediately.
-                    # If they're handled asynchronously,
-                    # we'll wait for the plan run to be ready.
-                    plan_run = self.wait_for_ready(plan_run)
 
         except KeyboardInterrupt:
             logger().info("Execution interrupted by user. Setting plan run state to FAILED.")
             self._set_plan_run_state(plan_run, PlanRunState.FAILED)
+
+        return plan_run
+
+    def _handle_clarifications(self, plan_run: PlanRun) -> PlanRun:
+        """Handle any clarifications that are raised during the execution of a plan run.
+
+        Args:
+            plan_run (PlanRun): The plan run to handle clarifications for.
+
+        Returns:
+            PlanRun: The updated plan run, after handling the clarifications.
+
+        """
+        # If we don't have a clarification handler, return the plan run even if a clarification
+        # has been raised
+        if not self.execution_hooks.clarification_handler:
+            return plan_run
+
+        clarifications = plan_run.get_outstanding_clarifications()
+        for clarification in clarifications:
+            logger().info(
+                f"Clarification of type {clarification.category} requested"
+                f"by '{clarification.source}'"
+                if clarification.source
+                else ""
+            )
+            self.execution_hooks.clarification_handler.handle(
+                clarification=clarification,
+                on_resolution=lambda c, r: self.resolve_clarification(c, r) and None,
+                on_error=lambda c, r: self.error_clarification(c, r) and None,
+            )
+
+        if len(clarifications) > 0:
+            # If clarifications are handled synchronously,
+            # we'll go through this immediately.
+            # If they're handled asynchronously,
+            # we'll wait for the plan run to be ready.
+            plan_run = self.wait_for_ready(plan_run)
 
         return plan_run
 
@@ -812,7 +835,8 @@ class Portia:
                 ready_response = next_tool.ready(
                     ToolRunContext(
                         end_user=self.initialize_end_user(plan_run.end_user_id),
-                        plan_run_id=plan_run.id,
+                        plan_run=plan_run,
+                        plan=plan,
                         config=self.config,
                         clarifications=current_step_clarifications,
                     ),
@@ -897,6 +921,7 @@ class Portia:
             structured_output_schema=plan.structured_output_schema,
         )
         self._process_plan_input_values(plan, plan_run, plan_run_inputs)
+        # Ensure the plan is saved before the plan run
         self.storage.save_plan_run(plan_run)
         return plan_run
 
@@ -978,6 +1003,7 @@ class Portia:
                 # responsible for handling the output of the agent and updating the state.
                 agent = self._get_agent_for_step(
                     step=ReadOnlyStep.from_step(step),
+                    plan=ReadOnlyPlan.from_plan(plan),
                     plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 )
                 logger().debug(
@@ -1034,9 +1060,42 @@ class Portia:
                     last_executed_step_output,
                 )
 
-            if self._raise_clarifications(plan_run, last_executed_step_output, plan):
+            if (
+                len(
+                    new_clarifications := self._get_clarifications_from_output(
+                        last_executed_step_output,
+                        plan_run,
+                    )
+                )
+                > 0
+            ):
+                # If execution raised a clarification, re-check readiness of subsequent tools
+                # If the clarification raised is an action clarification for a PortiaRemoteTool
+                # (i.e. the tool is not ready), run a combined readiness check for this step and
+                # all subsequent steps.
+                # Otherwise, combine the new clarifications with the ready clarifications from the
+                # next step.
+                if (
+                    len(new_clarifications) == 1
+                    and isinstance(
+                        self.tool_registry.get_tool(step.tool_id or ""), PortiaRemoteTool
+                    )
+                    and new_clarifications[0].category == ClarificationCategory.ACTION
+                ):
+                    combined_clarifications = self._check_remaining_tool_readiness(
+                        plan,
+                        plan_run,
+                        start_index=index,
+                    )
+                else:
+                    ready_clarifications = self._check_remaining_tool_readiness(
+                        plan,
+                        plan_run,
+                        start_index=index + 1,
+                    )
+                    combined_clarifications = new_clarifications + ready_clarifications
                 # No after_plan_run call here as the plan run will be resumed later
-                return plan_run
+                return self._raise_clarifications(combined_clarifications, plan_run)
 
             # persist at the end of each step
             self.storage.save_plan_run(plan_run)
@@ -1215,16 +1274,16 @@ class Portia:
 
         return final_output
 
-    def _raise_clarifications(self, plan_run: PlanRun, step_output: Output, plan: Plan) -> bool:
-        """Update the plan run based on any clarifications raised.
+    def _get_clarifications_from_output(
+        self,
+        step_output: Output,
+        plan_run: PlanRun,
+    ) -> list[Clarification]:
+        """Get clarifications from the output of a step.
 
         Args:
-            plan_run (PlanRun): The PlanRun to execute.
-            step_output (Output): The output of the last step.
-            plan (Plan): The plan to execute.
-
-        Returns:
-            bool: True if clarification is needed and run execution should stop.
+            step_output (Output): The output of the step.
+            plan_run (PlanRun): The plan run to get the clarifications from.
 
         """
         output_value = step_output.get_value()
@@ -1238,20 +1297,34 @@ class Portia:
             )
             for clarification in new_clarifications:
                 clarification.step = plan_run.current_step_index
-                logger().info(
-                    "Clarification requested - category: %s, user_guidance: %r.",
-                    clarification.category,
-                    clarification.user_guidance,
-                    extra={"plan": str(plan.id), "plan_run": str(plan_run.id)},
-                )
-                logger().debug(
-                    f"Clarification requested: {clarification.model_dump_json(indent=4)}",
-                )
+            return new_clarifications
+        return []
 
-            plan_run.outputs.clarifications = plan_run.outputs.clarifications + new_clarifications
-            self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
-            return True
-        return False
+    def _raise_clarifications(
+        self, clarifications: list[Clarification], plan_run: PlanRun
+    ) -> PlanRun:
+        """Update the plan run based on any clarifications raised.
+
+        Args:
+            clarifications (list[Clarification]): The clarifications to raise.
+            plan_run (PlanRun): The PlanRun to execute.
+
+        """
+        for clarification in clarifications:
+            clarification.step = plan_run.current_step_index
+            logger().info(
+                f"Clarification requested - category: {clarification.category}, "
+                f"user_guidance: {clarification.user_guidance}.",
+                plan=str(plan_run.plan_id),
+                plan_run=str(plan_run.id),
+            )
+            logger().debug(
+                f"Clarification requested: {clarification.model_dump_json(indent=4)}",
+            )
+
+        plan_run.outputs.clarifications = plan_run.outputs.clarifications + clarifications
+        self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
+        return plan_run
 
     def _get_tool_for_step(self, step: Step, plan_run: PlanRun) -> Tool | None:
         if not step.tool_id:
@@ -1270,12 +1343,14 @@ class Portia:
     def _get_agent_for_step(
         self,
         step: Step,
+        plan: Plan,
         plan_run: PlanRun,
     ) -> BaseExecutionAgent:
         """Get the appropriate agent for executing a given step.
 
         Args:
             step (Step): The step for which the agent is needed.
+            plan (Plan): The plan associated with the step.
             plan_run (PlanRun): The run associated with the step.
 
         Returns:
@@ -1291,7 +1366,7 @@ class Portia:
                 cls = DefaultExecutionAgent
         cls = OneShotAgent if isinstance(tool, LLMTool) else cls
         return cls(
-            step,
+            plan,
             plan_run,
             self.config,
             self.storage,
@@ -1359,6 +1434,64 @@ class Portia:
             plan_run.outputs.step_outputs[step.output] = step_output
 
         self.storage.save_plan_run(plan_run)
+
+    def _check_remaining_tool_readiness(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        start_index: int | None = None,
+    ) -> list[Clarification]:
+        """Check if there are any new clarifications raised by tools in remaining steps.
+
+        Args:
+            plan: The plan containing the steps.
+            plan_run: The current plan run.
+            start_index: The step index to start checking from. Defaults to the plan run's
+                current step index.
+
+        Returns:
+            list[Clarification]: The clarifications raised by the tools.
+
+        """
+        tools_remaining = set()
+        portia_cloud_tool_ids_remaining = set()
+        ready_clarifications = []
+        check_from_index = start_index if start_index is not None else plan_run.current_step_index
+        tool_run_context = ToolRunContext(
+            end_user=self.initialize_end_user(plan_run.end_user_id),
+            plan_run=plan_run,
+            plan=plan,
+            config=self.config,
+            clarifications=[],
+        )
+        for step_index in range(check_from_index, len(plan.steps)):
+            step = plan.steps[step_index]
+            if not step.tool_id or step.tool_id in tools_remaining:
+                continue
+            tools_remaining.add(step.tool_id)
+
+            tool = self._get_tool_for_step(step, plan_run)
+            if not tool:
+                continue  # pragma: no cover - Should not happen if tool_id is set - defensive check
+            if tool.id.startswith("portia:"):
+                portia_cloud_tool_ids_remaining.add(step.tool_id)
+            else:
+                ready_response = tool.ready(tool_run_context)
+                if not ready_response.ready:
+                    ready_clarifications.extend(ready_response.clarifications)
+
+        if len(portia_cloud_tool_ids_remaining) == 0:
+            return ready_clarifications
+
+        portia_tools_ready_response = PortiaRemoteTool.batch_ready_check(
+            self.config,
+            portia_cloud_tool_ids_remaining,
+            tool_run_context,
+        )
+        if not portia_tools_ready_response.ready:
+            ready_clarifications.extend(portia_tools_ready_response.clarifications)
+
+        return ready_clarifications
 
     @staticmethod
     def _log_models(config: Config) -> None:

@@ -29,7 +29,7 @@ def test_base_agent_default_context() -> None:
     """Test default context."""
     plan, plan_run = get_test_plan_run()
     agent = BaseExecutionAgent(
-        plan.steps[0],
+        plan,
         plan_run,
         get_test_config(),
         EndUser(external_id="test"),
@@ -95,7 +95,7 @@ def test_next_state_after_tool_call_no_error() -> None:
     )
     plan, plan_run = get_test_plan_run()
     agent = BaseExecutionAgent(
-        plan.steps[0],
+        plan,
         plan_run,
         get_test_config(),
         EndUser(external_id="test"),
@@ -126,7 +126,7 @@ def test_next_state_after_tool_call_with_summarize() -> None:
     tool.should_summarize = True
 
     agent = BaseExecutionAgent(
-        plan.steps[0],
+        plan,
         plan_run,
         get_test_config(),
         EndUser(external_id="test"),
@@ -154,7 +154,7 @@ def test_next_state_after_tool_call_with_large_output() -> None:
     tool = AdditionTool()
 
     agent = BaseExecutionAgent(
-        plan.steps[0],
+        plan,
         plan_run,
         get_test_config(
             # Set a small threshold value so all outputs are stored in agent memory
@@ -185,7 +185,7 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
     tool = AdditionTool()
 
     agent = BaseExecutionAgent(
-        plan.steps[0],
+        plan,
         plan_run,
         get_test_config(),
         EndUser(external_id="test"),
@@ -217,7 +217,7 @@ def test_next_state_after_tool_call_with_clarification_artifact() -> None:
     tool.should_summarize = True
 
     agent = BaseExecutionAgent(
-        plan.steps[0],
+        plan,
         plan_run,
         get_test_config(),
         EndUser(external_id="test"),
@@ -256,7 +256,7 @@ def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
     tool.should_summarize = True
 
     agent = BaseExecutionAgent(
-        plan.steps[0],
+        plan,
         plan_run,
         get_test_config(),
         EndUser(external_id="test"),

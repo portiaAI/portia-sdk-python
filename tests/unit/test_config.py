@@ -1,6 +1,9 @@
 """Tests for portia classes."""
 
+from unittest.mock import MagicMock
+
 import pytest
+from langchain_core.caches import InMemoryCache
 from pydantic import SecretStr
 
 from portia.config import (
@@ -44,13 +47,15 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(env_var, raising=False)
 
 
-def test_from_default() -> None:
+def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test from default."""
+    monkeypatch.delenv("LLM_REDIS_CACHE_URL", raising=False)
     c = Config.from_default(
         default_log_level=LogLevel.CRITICAL,
         openai_api_key=SecretStr("123"),
     )
     assert c.default_log_level == LogLevel.CRITICAL
+    assert c.llm_redis_cache_url is None
 
 
 def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,6 +124,39 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert c.large_output_threshold_tokens == 100
     assert not c.exceeds_output_threshold("Test " * 1000)
+
+
+def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """llm_redis_cache_url is read from environment variable."""
+    mock_redis_cache_instance = MagicMock()
+    mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
+    monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
+
+    monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/0")
+    config = Config.from_default(openai_api_key=SecretStr("123"))
+    assert config.llm_redis_cache_url == "redis://localhost:6379/0"
+
+    model = config.get_generative_model("openai/gpt-4o")
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+    assert model._cache is mock_redis_cache_instance  # noqa: SLF001
+
+
+def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
+    """llm_redis_cache_url can be set via kwargs."""
+    redis_cache_instance = InMemoryCache()
+    mock_redis_cache = MagicMock(return_value=redis_cache_instance)
+    monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
+
+    config = Config.from_default(
+        openai_api_key=SecretStr("123"), llm_redis_cache_url="redis://localhost:6379/0"
+    )
+    assert config.llm_redis_cache_url == "redis://localhost:6379/0"
+
+    model = config.get_generative_model("openai/gpt-4o")
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+    assert model._cache is redis_cache_instance  # noqa: SLF001
 
 
 @pytest.mark.parametrize(
@@ -364,7 +402,7 @@ def test_getters() -> None:
         Config.from_default(
             storage_class=StorageClass.CLOUD,
             portia_api_key=SecretStr(""),
-            extest_set_agent_model_default_model_not_settest_set_agent_model_default_model_not_setecution_agent_type=ExecutionAgentType.DEFAULT,
+            execution_agent_type=ExecutionAgentType.DEFAULT,
             planning_agent_type=PlanningAgentType.DEFAULT,
             llm_provider=LLMProvider.OPENAI,
             openai_api_key=SecretStr("test-openai-api-key"),
@@ -581,6 +619,59 @@ def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
     """Test deprecated LLMModel cannot be instantiated from a string."""
     with pytest.raises(ValueError, match="Invalid LLM model"):
         _ = LLMModel("adijabisfbgiwjebr")
+
+
+def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that default models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+    c = Config.from_default(llm_provider=LLMProvider.ANTHROPIC)
+
+    planning_model = c.get_planning_model()
+    assert isinstance(planning_model, AnthropicGenerativeModel)
+    assert planning_model.model_name == "claude-3-7-sonnet-latest"
+    assert hasattr(planning_model, "_model_kwargs")
+    assert "thinking" in planning_model._model_kwargs  # noqa: SLF001
+    assert planning_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
+
+    introspection_model = c.get_introspection_model()
+    assert isinstance(introspection_model, AnthropicGenerativeModel)
+    assert introspection_model.model_name == "claude-3-7-sonnet-latest"
+    assert hasattr(introspection_model, "_model_kwargs")
+    assert "thinking" in introspection_model._model_kwargs  # noqa: SLF001
+    assert introspection_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
+
+    default_model = c.get_default_model()
+    assert isinstance(default_model, AnthropicGenerativeModel)
+    assert default_model.model_name == "claude-3-5-sonnet-latest"
+    assert not hasattr(default_model, "_model_kwargs") or "thinking" not in getattr(
+        default_model, "_model_kwargs", {}
+    )
+
+
+def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that OpenAI models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    c = Config.from_default(llm_provider=LLMProvider.OPENAI)
+
+    planning_model = c.get_planning_model()
+    assert isinstance(planning_model, OpenAIGenerativeModel)
+    assert hasattr(planning_model, "_model_kwargs")
+    assert "reasoning_effort" in planning_model._model_kwargs  # noqa: SLF001
+    assert planning_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
+
+    introspection_model = c.get_introspection_model()
+    assert isinstance(introspection_model, OpenAIGenerativeModel)
+    assert hasattr(introspection_model, "_model_kwargs")
+    assert "reasoning_effort" in introspection_model._model_kwargs  # noqa: SLF001
+    assert introspection_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
+
+    default_model = c.get_default_model()
+    assert isinstance(default_model, OpenAIGenerativeModel)
+    assert not hasattr(default_model, "_model_kwargs") or "reasoning_effort" not in getattr(
+        default_model, "_model_kwargs", {}
+    )
 
 
 @pytest.mark.parametrize(
