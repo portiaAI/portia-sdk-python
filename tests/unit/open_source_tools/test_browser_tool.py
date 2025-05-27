@@ -559,7 +559,8 @@ class TestStructuredOutputSchema(BaseModel):
     status: str = Field(description="Test status field")
 
 
-def test_browser_tool_with_structured_output_schema(
+@pytest.mark.asyncio
+async def test_browser_tool_with_structured_output_schema(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool with structured output schema."""
@@ -591,7 +592,7 @@ def test_browser_tool_with_structured_output_schema(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called once
         assert mock_agent.call_count == 1
@@ -603,7 +604,8 @@ def test_browser_tool_with_structured_output_schema(
         assert result.status == "success"
 
 
-def test_browser_tool_with_structured_output_schema_auth_required(
+@pytest.mark.asyncio
+async def test_browser_tool_with_structured_output_schema_auth_required(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool with structured output schema when auth is required."""
@@ -635,7 +637,7 @@ def test_browser_tool_with_structured_output_schema_auth_required(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called with correct parameters
         mock_agent.assert_called_once()

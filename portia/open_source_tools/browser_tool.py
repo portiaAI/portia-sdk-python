@@ -350,7 +350,7 @@ class BrowserToolForUrl(BrowserTool):
             infrastructure_option=infrastructure_option,
         )
 
-    async def run_async(
+    async def run_async(  # type: ignore  # noqa: PGH003
         self, ctx: ToolRunContext, task: str
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserToolForUrl."""
