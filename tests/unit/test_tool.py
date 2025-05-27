@@ -81,6 +81,23 @@ def test_tool_run_raises_not_implemented() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tool_run_raises_not_implemented_on_run() -> None:
+    """Check NotImplementedError is raised when neither run nor run_async is overridden."""
+    with patch.object(Tool, "__init_subclass__", lambda: None):
+
+        class NoRunTool(Tool):
+            id: str = "dummy"
+            name: str = "Dummy Tool"
+            description: str = "A dummy tool"
+            output_schema: tuple[str, str] = ("str", "dummy output")
+
+    tool = NoRunTool()
+
+    with pytest.raises(NotImplementedError):
+        await tool._run(ctx=get_test_tool_context())  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_tool_run_async() -> None:
     """Check async implementation is called."""
 

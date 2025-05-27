@@ -251,6 +251,8 @@ class Tool(BaseModel):
                 # This shouldn't happen as we check in the init_subclasses method
                 raise NotImplementedError  # noqa: TRY301
         except Exception as e:
+            if isinstance(e, NotImplementedError):
+                raise
             # check if error is wrapped as a Hard or Soft Tool Error.
             # if not wrap as ToolSoftError
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
