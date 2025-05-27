@@ -39,6 +39,8 @@ from portia.tool import Tool, ToolRunContext
 if TYPE_CHECKING:
     from browserbase.types import SessionCreateResponse
 
+    from portia import Plan, PlanRun
+
 logger = logging.getLogger(__name__)
 
 NotSet: Any = PydanticUndefined
@@ -186,8 +188,6 @@ class BrowserTool(Tool[str | BaseModel]):
             "General purpose browser tool. Can be used to navigate to a URL and "
             "complete tasks. Should only be used if the task requires a browser "
             "and you are sure of the URL. This tool handles a full end to end task. "
-            "DO NOT break a single task into multiple browser tool steps as each step is run "
-            "in an independent new session!"
         ),
     )
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
@@ -287,7 +287,8 @@ class BrowserTool(Tool[str | BaseModel]):
             if task_result.human_login_required:  # type: ignore reportCallIssue
                 return handle_login_requirement(task_result)  # type: ignore reportCallIssue
 
-            self.infrastructure_provider.step_complete(ctx)
+            if self._is_final_browser_call(ctx.plan_run, ctx.plan):
+                self.infrastructure_provider.close(ctx)
             return task_result.task_output  # type: ignore reportCallIssue
 
         try:
@@ -296,6 +297,12 @@ class BrowserTool(Tool[str | BaseModel]):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop.run_until_complete(run_browser_tasks())
+
+    def _is_final_browser_call(self, plan_run: PlanRun, plan: Plan) -> bool:
+        """Check if the current call is the final browser call in the plan run."""
+        return any(
+            step.tool_id == "browser_tool" for step in plan.steps[plan_run.current_step_index + 1 :]
+        )
 
 
 class BrowserToolForUrl(BrowserTool):
@@ -379,15 +386,21 @@ class BrowserInfrastructureProvider(ABC):
 
     @abstractmethod
     def setup_browser(self, ctx: ToolRunContext) -> Browser:
-        """Get a Browser instance."""
+        """Get a Browser instance.
+
+        This is called at the start of every step using this tool.
+        """
 
     @abstractmethod
     def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:
         """Construct the URL for the auth clarification."""
 
     @abstractmethod
-    def step_complete(self, ctx: ToolRunContext) -> None:
-        """Call when the step is complete to e.g release the session."""
+    def close(self, ctx: ToolRunContext) -> None:
+        """Clean up any resources used by the browser infrastructure provider.
+
+        This is called after the final usage of this tool in the plan run.
+        """
 
 
 class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
@@ -473,7 +486,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-    def step_complete(self, ctx: ToolRunContext) -> None:
+    def close(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g release the session."""
 
     def get_extra_chromium_args(self) -> list[str] | None:
@@ -540,7 +553,7 @@ if BROWSERBASE_AVAILABLE:
 
             self.bb = Browserbase(api_key=api_key)
 
-        def step_complete(self, ctx: ToolRunContext) -> None:
+        def close(self, ctx: ToolRunContext) -> None:
             """Call when the step is complete closes the session to persist context."""
             session_id = ctx.end_user.get_additional_data("bb_session_id")
             if session_id:
@@ -643,7 +656,7 @@ if BROWSERBASE_AVAILABLE:
 
             logger.info(
                 "Browser tool debug link: %s",
-                self.bb.sessions.debug(session_id).debugger_fullscreen_url,
+                self.bb.sessions.debug(session_id).debugger_url,
             )
 
             return session_connect_url

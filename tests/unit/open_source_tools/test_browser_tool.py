@@ -21,6 +21,8 @@ from portia.open_source_tools.browser_tool import (
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
 )
+from portia.plan import PlanBuilder
+from portia.plan_run import PlanRun
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import assert_clarification_equality_without_uuid, get_test_tool_context
 
@@ -74,6 +76,8 @@ def mock_browserbase_provider(
 class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
     """Mock browser infrastructure provider."""
 
+    close_called = False
+
     def setup_browser(self, _: ToolRunContext) -> Browser:  # type: ignore reportIncompatibleMethodOverride
         """Create the browser with a mock for testing."""
         return MagicMock()
@@ -82,8 +86,13 @@ class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
         """Construct the auth clarification for testing."""
         return HttpUrl(sign_in_url)
 
-    def step_complete(self, _: ToolRunContext) -> None:  # type: ignore reportIncompatibleMethodOverride
+    def close(self, _: ToolRunContext) -> None:  # type: ignore reportIncompatibleMethodOverride
         """Call when the step is complete to e.g release the session."""
+        _close_called = True
+
+    def is_closed(self) -> bool:
+        """Check whether the provider has been closed."""
+        return self._close_called
 
 
 @pytest.fixture
@@ -154,7 +163,6 @@ def test_browser_tool_bad_response(
     mock_auth_result = MagicMock()
     mock_auth_result.final_result.return_value = json.dumps(mock_auth_response.model_dump())
 
-    # Create async mock for agent.run() that returns different results for auth and task
     mock_run = AsyncMock(return_value=mock_auth_result)
 
     # Patch the Agent class
@@ -191,7 +199,6 @@ def test_browser_tool_no_auth_required(
     mock_task_result = MagicMock()
     mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
 
-    # Create async mock for agent.run() that returns different results for auth and task
     mock_run = AsyncMock(return_value=mock_task_result)
 
     # Patch the Agent class
@@ -660,7 +667,7 @@ def test_browserbase_provider_step_complete_with_session(
     end_user = EndUser(external_id="123", additional_data={"bb_session_id": "session123"})
     mock_ctx.end_user = end_user
 
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.close(mock_ctx)
 
     mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # type: ignore reportFunctionMemberAccess
         "session123",
@@ -677,7 +684,7 @@ def test_browserbase_provider_step_complete_without_session(
     end_user = EndUser(external_id="123", additional_data={})
     mock_ctx.end_user = end_user
 
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.close(mock_ctx)
 
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # type: ignore reportFunctionMemberAccess
 
@@ -730,3 +737,47 @@ def test_browserbase_provider_get_or_create_session_without_clarifications(
 
     assert connect_url == "test_connect_url"
     mock_browserbase_provider.bb.sessions.create.assert_called_once()  # type: ignore reportFunctionMemberAccess
+
+
+def test_browser_tool_multiple_calls(
+    mock_browser_infrastructure_provider: MockBrowserInfrastructureProvider,
+) -> None:
+    """Test the browser tool cleans up sessions correctly."""
+    mock_task_response = BrowserTaskOutput(
+        task_output="Task completed successfully",
+        human_login_required=False,
+    )
+    mock_task_result = MagicMock()
+    mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+    mock_run = AsyncMock(return_value=mock_task_result)
+
+    ctx = get_test_tool_context()
+    ctx.plan = (
+        PlanBuilder()
+        .step(task="1st browser tool task", tool_id="browser_tool")
+        .step(task="2nd browser tool task", tool_id="browser_tool")
+        .step(task="3rd browser tool task", tool_id="browser_tool")
+        .build()
+    )
+    ctx.plan_run = PlanRun(plan_id=ctx.plan.id, current_step_index=0, end_user_id="test")
+
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserTool(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider
+        )
+
+        browser_tool.run(ctx, "https://example.com", "1st browser tool task")
+        assert not mock_browser_infrastructure_provider.is_closed()
+
+        ctx.plan_run.current_step_index = 1
+        browser_tool.run(ctx, "https://example.com", "1st browser tool task")
+        assert mock_browser_infrastructure_provider.is_closed()
+
+        ctx.plan_run.current_step_index = 2
+        browser_tool.run(ctx, "https://example.com", "1st browser tool task")
+        assert mock_browser_infrastructure_provider.is_closed()
