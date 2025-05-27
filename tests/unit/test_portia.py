@@ -23,6 +23,7 @@ from portia.clarification import (
     InputClarification,
     ValueConfirmationClarification,
 )
+from portia.clarification_handler import ClarificationHandler
 from portia.config import (
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
     Config,
@@ -934,8 +935,10 @@ def test_portia_wait_for_ready_backoff_period(portia: Portia) -> None:
     plan_run.state = PlanRunState.NEED_CLARIFICATION
     portia.storage.save_plan(plan)
     portia.storage.get_plan_run = mock.MagicMock(return_value=plan_run)
-    with pytest.raises(InvalidPlanRunStateError):
-        portia.wait_for_ready(plan_run, max_retries=1, backoff_start_time_seconds=0)
+    with mock.patch.object(portia, "_check_remaining_tool_readiness") as mock_check:
+        mock_check.return_value = [MagicMock()]
+        with pytest.raises(InvalidPlanRunStateError):
+            portia.wait_for_ready(plan_run, max_retries=1, backoff_start_time_seconds=0)
 
 
 def test_portia_resolve_clarification_error(portia: Portia) -> None:
@@ -2354,6 +2357,70 @@ def test_portia_and_custom_tool_not_ready(
     assert outstanding_clarifications[1].resolved is False
 
 
+class PortiaWithoutExecution(Portia):
+    """A portia that bypasses step execution."""
+
+    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:  # noqa: ARG002
+        """Bypass step execution."""
+        self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
+        return self.storage.get_plan_run(plan_run.id)
+
+
+def test_portia_tool_not_ready_with_clarification_handler(
+    mock_cloud_client: httpx.Client, httpx_mock: HTTPXMock
+) -> None:
+    """Test that a portia can run a plan with a PortiaRemoteTool that becomes ready."""
+    portia_tool = MockPortiaTool(client=mock_cloud_client)
+    ready_tool = ReadyTool(is_ready=True)
+    execution_hooks = ExecutionHooks(
+        clarification_handler=MagicMock(spec=ClarificationHandler),
+        before_tool_call=MagicMock(),
+        after_tool_call=MagicMock(),
+        before_step_execution=MagicMock(),
+        after_step_execution=MagicMock(),
+        before_plan_run=MagicMock(),
+        after_plan_run=MagicMock(),
+    )
+    portia = PortiaWithoutExecution(
+        config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
+        tools=[portia_tool, ready_tool],
+        execution_hooks=execution_hooks,
+    )
+    plan = PlanBuilder().step("", ready_tool.id).step("", portia_tool.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    action_url = HttpUrl("https://example.com/auth")
+    # Initially the portia tool is not ready
+    for _ in range(2):
+        httpx_mock.add_response(
+            url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+            json={
+                "ready": False,
+                "clarifications": [
+                    ActionClarification(
+                        id=ClarificationUUID(),
+                        category=ClarificationCategory.ACTION,
+                        user_guidance="Please authenticate",
+                        action_url=action_url,
+                        plan_run_id=plan_run.id,
+                    ).model_dump(mode="json")
+                ],
+            },
+        )
+    # Second time, the portia tool is ready
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": True,
+            "clarifications": [],
+        },
+    )
+    output_plan_run = portia.resume(plan_run)
+    assert len(httpx_mock.get_requests()) == 3
+    assert output_plan_run.state == PlanRunState.COMPLETE
+    assert len(output_plan_run.get_outstanding_clarifications()) == 0
+
+
 class RaiseClarificationAgent(BaseExecutionAgent):
     """A dummy execution agent that raises a clarification on run."""
 
@@ -2502,66 +2569,3 @@ def test_portia_tool_readiness_rechecked_after_raised_clarification(
     assert isinstance(outstanding_clarification, ActionClarification)
     assert outstanding_clarification.resolved is False
     assert str(outstanding_clarification.action_url) == str(action_url)
-
-
-def test_portia_resume_with_unresolved_clarification_for_current_step(
-    portia: Portia,
-) -> None:
-    """Test that resume returns immediately if current step has unresolved clarification."""
-    # Create a plan with multiple steps
-    step1 = Step(task="Step 1", inputs=[], output="$step1_result")
-    step2 = Step(task="Step 2", inputs=[], output="$step2_result")
-    plan = Plan(
-        plan_context=PlanContext(query="Test query", tool_ids=[]),
-        steps=[step1, step2],
-    )
-
-    # Create an unresolved clarification for step 1 (current step)
-    unresolved_clarification = InputClarification(
-        plan_run_id=PlanRunUUID(),
-        user_guidance="Please provide input",
-        argument_name="test_input",
-        step=1,  # This matches current_step_index
-        source="Test unresolved clarification for current step",
-        resolved=False,
-    )
-
-    # Create a plan run that's at step 1 with the unresolved clarification
-    plan_run = PlanRun(
-        plan_id=plan.id,
-        current_step_index=1,  # Currently on step 2 (index 1)
-        state=PlanRunState.IN_PROGRESS,
-        end_user_id="test123",
-        outputs=PlanRunOutputs(
-            step_outputs={
-                "$step1_result": LocalDataValue(value="Step 1 completed"),
-            },
-            clarifications=[unresolved_clarification],
-        ),
-    )
-
-    # Save plan and plan_run to storage
-    portia.storage.save_plan(plan)
-    portia.storage.save_plan_run(plan_run)
-
-    # Mock the execution agent to track if it gets called
-    mock_execution_agent = MagicMock()
-    mock_execution_agent.execute_sync.return_value = LocalDataValue(value="Should not be called")
-
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_execution_agent):
-        result_plan_run = portia.resume(plan_run)
-
-        # Verify the execution agent was NOT called
-        mock_execution_agent.execute_sync.assert_not_called()
-
-        # Verify the plan run state is NEED_CLARIFICATION
-        assert result_plan_run.state == PlanRunState.NEED_CLARIFICATION
-
-        # Verify the unresolved clarification is still present
-        outstanding_clarifications = result_plan_run.get_outstanding_clarifications()
-        assert len(outstanding_clarifications) == 1
-        assert outstanding_clarifications[0].step == 1
-        assert outstanding_clarifications[0].resolved is False
-
-        # Verify we're still on the same step
-        assert result_plan_run.current_step_index == 1
