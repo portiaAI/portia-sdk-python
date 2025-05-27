@@ -1052,14 +1052,6 @@ class Portia:
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
 
-            if self.execution_hooks.after_step_execution:
-                self.execution_hooks.after_step_execution(
-                    ReadOnlyPlan.from_plan(plan),
-                    ReadOnlyPlanRun.from_plan_run(plan_run),
-                    ReadOnlyStep.from_step(step),
-                    last_executed_step_output,
-                )
-
             if (
                 len(
                     new_clarifications := self._get_clarifications_from_output(
@@ -1096,6 +1088,14 @@ class Portia:
                     combined_clarifications = new_clarifications + ready_clarifications
                 # No after_plan_run call here as the plan run will be resumed later
                 return self._raise_clarifications(combined_clarifications, plan_run)
+
+            if self.execution_hooks.after_step_execution:
+                self.execution_hooks.after_step_execution(
+                    ReadOnlyPlan.from_plan(plan),
+                    ReadOnlyPlanRun.from_plan_run(plan_run),
+                    ReadOnlyStep.from_step(step),
+                    last_executed_step_output,
+                )
 
             # persist at the end of each step
             self.storage.save_plan_run(plan_run)
