@@ -126,3 +126,22 @@ def test_user_verification_clarification() -> None:
     # Test that user_confirmed returns False when response is set to None
     clarification.response = None
     assert clarification.user_confirmed is False
+
+
+def test_user_verification_clarification_validation() -> None:
+    """Test user verification clarification validation."""
+    with pytest.raises(ValueError, match="response must be a boolean value or None"):
+        UserVerificationClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Please verify this information",
+            source="Test clarification",
+            response="not a boolean",
+        )
+
+    clarification = UserVerificationClarification(
+        plan_run_id=PlanRunUUID(),
+        user_guidance="Please verify this information",
+        source="Test clarification",
+        response=True,
+    )
+    assert clarification.user_confirmed is True

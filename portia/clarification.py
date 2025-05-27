@@ -16,6 +16,7 @@ from pydantic import (
     Field,
     HttpUrl,
     field_serializer,
+    field_validator,
     model_validator,
 )
 
@@ -221,6 +222,25 @@ class UserVerificationClarification(Clarification):
         default=ClarificationCategory.USER_VERIFICATION,
         description="The category of this clarification",
     )
+
+    @field_validator("response")
+    @classmethod
+    def validate_response(cls, v: Any) -> Any:  # noqa: ANN401
+        """Validate that response is a boolean value or None.
+
+        Args:
+            v: The value to validate.
+
+        Returns:
+            Any: The validated value.
+
+        Raises:
+            ValueError: If the response is not a boolean.
+
+        """
+        if v is not None and not isinstance(v, bool):
+            raise ValueError("response must be a boolean value or None")
+        return v
 
     @property
     def user_confirmed(self) -> bool:
