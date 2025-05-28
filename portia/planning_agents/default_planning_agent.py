@@ -67,14 +67,16 @@ IMPORTANT GUIDELINES:
  create a plan with zero steps. When returning an error, return only the JSON object with
  the error message filled in plus an empty list of steps - DO NOT include text (explaining the
  error or otherwise) outside the JSON object.
-- Information provided in the EndUser block will also be provided at execution so you do not need to
- add inputs for this information. However if information about the EndUser is not available now
- it will also NOT be available later and you should return an error if it is required and there is
- no other way to retrieve the information.
+- If information is provided in the EndUser block, it will also be provided at execution so you do
+ not need to add inputs for this information. However if information about the EndUser is not
+ available now it will also NOT be available later and you should return an error if it is required
+ and there is no other way to retrieve the information.
 - For EVERY tool that requires an id as an input, make sure to check
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides
- the user IDs before making the tool call that  requires the user ID.
+ the user IDs before making the tool call that requires the user ID.
+- Ensure all information for the step is captured in the task - the query will not be available
+ when executing the task
 - For conditional steps:
   1. Task field: Write only the task description without conditions.
   2. Condition field: Write the condition in concise natural language.
