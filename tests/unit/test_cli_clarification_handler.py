@@ -182,7 +182,7 @@ def test_multiple_choice_clarification(
     # Verify type parameter was a click.Choice with the correct options
     choice_type = mock_prompt.call_args[1]["type"]
     assert isinstance(choice_type, click.Choice)
-    assert choice_type.choices == ["option1", "option2", "option3"]
+    assert choice_type.choices == ("option1", "option2", "option3")
 
     # Verify resolution callback was called with selected option
     on_resolution.assert_called_once_with(clarification, "option2")

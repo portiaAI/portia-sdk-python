@@ -22,7 +22,7 @@ class FileReaderToolSchema(BaseModel):
     )
 
 
-class FileReaderTool(Tool[str]):
+class FileReaderTool(Tool):
     """Finds and reads content from a local file on Disk."""
 
     id: str = "file_reader_tool"

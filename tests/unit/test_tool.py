@@ -2,6 +2,7 @@
 
 import json
 from enum import Enum
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -21,7 +22,7 @@ from portia.clarification import (
 )
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.mcp_session import StdioMcpClientConfig
-from portia.tool import PortiaMcpTool, PortiaRemoteTool
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool, ToolRunContext
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -42,6 +43,87 @@ def add_tool() -> AdditionTool:
 def clarification_tool() -> ClarificationTool:
     """Fixture to create a mock tool instance."""
     return ClarificationTool()
+
+
+def test_tool_no_run() -> None:
+    """A tool that doesn't override run or async_run should error."""
+    with pytest.raises(
+        TypeError, match="MyTool must override at least one of 'run' or 'run_async'"
+    ):
+
+        class MyTool(Tool):  # type: ignore  # noqa: PGH003
+            def other_func(self) -> str:
+                return ""
+
+
+class NoRunTool(Tool):
+    """Tool that doesn't override run correctly."""
+
+    id: str = "dummy"
+    name: str = "Dummy Tool"
+    description: str = "A dummy tool"
+    output_schema: tuple[str, str] = ("str", "dummy output")
+
+    def run(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any:  # type: ignore  # noqa: ANN401, PGH003
+        """Delegate to Tool."""
+        return super().run(ctx, *args, **kwargs)
+
+    async def run_async(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any:  # type: ignore  # noqa: ANN401, PGH003
+        """Delegate to Tool."""
+        return await super().run_async(ctx, *args, **kwargs)
+
+
+def test_tool_run_raises_not_implemented() -> None:
+    """Check not implemented error."""
+    tool = NoRunTool()
+    with pytest.raises(NotImplementedError):
+        tool.run(ctx=get_test_tool_context())
+
+
+@pytest.mark.asyncio
+async def test_tool_run_raises_not_implemented_on_run() -> None:
+    """Check NotImplementedError is raised when neither run nor run_async is overridden."""
+    with patch.object(Tool, "__init_subclass__", lambda: None):
+
+        class NoRunTool(Tool):
+            id: str = "dummy"
+            name: str = "Dummy Tool"
+            description: str = "A dummy tool"
+            output_schema: tuple[str, str] = ("str", "dummy output")
+
+    tool = NoRunTool()
+
+    with pytest.raises(NotImplementedError):
+        await tool._run(ctx=get_test_tool_context())  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_tool_run_async() -> None:
+    """Check async implementation is called."""
+
+    class AsyncTool(Tool):
+        """Tool that overrides async run correctly."""
+
+        id: str = "dummy"
+        name: str = "Dummy Tool"
+        description: str = "A dummy tool"
+        output_schema: tuple[str, str] = ("str", "dummy output")
+
+        async def run_async(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> str:  # type: ignore  # noqa: ARG002, PGH003
+            """Delegate to Tool."""
+            return "answer"
+
+    tool = AsyncTool()
+    output = await tool._run(ctx=get_test_tool_context())  # noqa: SLF001
+    assert output.get_value() == "answer"
+
+
+@pytest.mark.asyncio
+async def test_tool_run_async_raises_not_implemented() -> None:
+    """Check not implemented error."""
+    tool = NoRunTool()
+    with pytest.raises(NotImplementedError):
+        await tool.run_async(ctx=get_test_tool_context())
 
 
 def test_tool_initialization(add_tool: AdditionTool) -> None:
@@ -85,11 +167,12 @@ def test_handle(add_tool: AdditionTool) -> None:
     assert result == a + b
 
 
-def test_run_method_with_uncaught_error() -> None:
+@pytest.mark.asyncio
+async def test_run_method_with_uncaught_error() -> None:
     """Test the _run method wraps errors."""
     tool = ErrorTool()
     with pytest.raises(ToolSoftError):
-        tool._run(  # noqa: SLF001
+        await tool._run(  # noqa: SLF001
             ctx=get_test_tool_context(),
             error_str="this is an error",
             return_uncaught_error=True,
@@ -558,7 +641,8 @@ def test_remote_tool_value_confirm_clarifications(httpx_mock: HTTPXMock) -> None
     )
 
 
-def test_portia_mcp_tool_call() -> None:
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_call() -> None:
     """Test invoking a tool via MCP."""
     mock_session = MagicMock(spec=ClientSession)
     mock_session.call_tool.return_value = mcp.types.CallToolResult(
@@ -594,11 +678,12 @@ def test_portia_mcp_tool_call() -> None:
         "portia.tool.get_mcp_session",
         new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
-        tool_result = tool.run(get_test_tool_context(), a=1, b=2)
+        tool_result = await tool.run_async(get_test_tool_context(), a=1, b=2)
         assert tool_result == expected
 
 
-def test_portia_mcp_tool_call_with_error() -> None:
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_call_with_error() -> None:
     """Test invoking a tool via MCP."""
     mock_session = MagicMock(spec=ClientSession)
     mock_session.call_tool.return_value = mcp.types.CallToolResult(
@@ -630,7 +715,7 @@ def test_portia_mcp_tool_call_with_error() -> None:
         ),
         pytest.raises(ToolHardError),
     ):
-        tool.run(get_test_tool_context(), a=1, b=2)
+        await tool.run_async(get_test_tool_context(), a=1, b=2)
 
 
 def test_remote_tool_batch_ready_check(httpx_mock: HTTPXMock) -> None:

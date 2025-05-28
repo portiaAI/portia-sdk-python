@@ -92,7 +92,8 @@ def mock_browser_infrastructure_provider() -> BrowserInfrastructureProvider:
     return MockBrowserInfrastructureProvider()
 
 
-def test_browser_tool_auth_check(
+@pytest.mark.asyncio
+async def test_browser_tool_auth_check(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the authentication check in browser tool."""
@@ -123,7 +124,7 @@ def test_browser_tool_auth_check(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called with correct parameters
         mock_agent.assert_called_once()
@@ -142,7 +143,8 @@ def test_browser_tool_auth_check(
         )
 
 
-def test_browser_tool_bad_response(
+@pytest.mark.asyncio
+async def test_browser_tool_bad_response(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool when no authentication is required."""
@@ -171,14 +173,15 @@ def test_browser_tool_bad_response(
 
         # Run the tool
         with pytest.raises(ToolHardError, match="Expected user guidance and login URL"):
-            browser_tool.run(context, "https://example.com", "test task")
+            await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called once
         assert mock_agent.call_count == 1
         assert mock_run.call_count == 1
 
 
-def test_browser_tool_no_auth_required(
+@pytest.mark.asyncio
+async def test_browser_tool_no_auth_required(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool when no authentication is required."""
@@ -207,7 +210,7 @@ def test_browser_tool_no_auth_required(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called once
         assert mock_agent.call_count == 1
@@ -556,7 +559,8 @@ class TestStructuredOutputSchema(BaseModel):
     status: str = Field(description="Test status field")
 
 
-def test_browser_tool_with_structured_output_schema(
+@pytest.mark.asyncio
+async def test_browser_tool_with_structured_output_schema(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool with structured output schema."""
@@ -588,7 +592,7 @@ def test_browser_tool_with_structured_output_schema(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called once
         assert mock_agent.call_count == 1
@@ -600,7 +604,54 @@ def test_browser_tool_with_structured_output_schema(
         assert result.status == "success"
 
 
-def test_browser_tool_with_structured_output_schema_auth_required(
+@pytest.mark.asyncio
+async def test_browser_tool_for_url_with_structured_output_schema(
+    mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
+) -> None:
+    """Test the browser tool with structured output schema."""
+    # Mock task response data with structured output
+    mock_task_response = BrowserTaskOutput[TestStructuredOutputSchema](
+        task_output=TestStructuredOutputSchema(
+            result="Task completed successfully", status="success"
+        ),
+        human_login_required=False,
+    )
+
+    mock_task_result = MagicMock()
+    mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+
+    # Create async mock for agent.run()
+    mock_run = AsyncMock(return_value=mock_task_result)
+
+    # Patch the Agent class
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserToolForUrl(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider,
+            structured_output_schema=TestStructuredOutputSchema,
+            url="https://example.com",
+        )
+        context = get_test_tool_context()
+
+        # Run the tool
+        result = await browser_tool.run_async(context, "test task")
+
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1
+
+        # Verify the result is the structured output
+        assert isinstance(result, TestStructuredOutputSchema)
+        assert result.result == "Task completed successfully"
+        assert result.status == "success"
+
+
+@pytest.mark.asyncio
+async def test_browser_tool_with_structured_output_schema_auth_required(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
 ) -> None:
     """Test the browser tool with structured output schema when auth is required."""
@@ -632,7 +683,7 @@ def test_browser_tool_with_structured_output_schema_auth_required(
         context = get_test_tool_context()
 
         # Run the tool
-        result = browser_tool.run(context, "https://example.com", "test task")
+        result = await browser_tool.run_async(context, "https://example.com", "test task")
 
         # Verify Agent was called with correct parameters
         mock_agent.assert_called_once()

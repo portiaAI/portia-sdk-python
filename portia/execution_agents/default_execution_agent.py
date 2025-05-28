@@ -30,6 +30,7 @@ from portia.execution_agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
+from portia.execution_agents.utils.run_async import run_async
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.model import GenerativeModel, Message
 from portia.plan import Plan, ReadOnlyStep
@@ -778,7 +779,12 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
         app = graph.compile()
-        invocation_result = app.invoke({"messages": [], "step_inputs": []})
+
+        # This is an intermediate implementation that allows tools
+        # to be async while agents are sync. Soon agents will also
+        # be async and this will go away
+        invocation_result = run_async(app.ainvoke({"messages": [], "step_inputs": []}))
+
         return process_output(
             invocation_result["messages"],
             self.tool,
