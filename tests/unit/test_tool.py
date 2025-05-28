@@ -20,8 +20,9 @@ from portia.clarification import (
     ValueConfirmationClarification,
 )
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
+from portia.execution_agents.output import LocalDataValue
 from portia.mcp_session import StdioMcpClientConfig
-from portia.tool import PortiaMcpTool, PortiaRemoteTool
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, ToolRunContext
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -729,3 +730,69 @@ def test_remote_tool_batch_ready_check_404_fallback(httpx_mock: HTTPXMock) -> No
 
     assert response.ready is True
     assert len(response.clarifications) == 0
+
+
+def test_structured_output_schema(add_tool: AdditionTool) -> None:
+    """Test structured output schema."""
+    assert add_tool.structured_output_schema is None
+
+    class AdditionOutput(BaseModel):
+        result: int
+
+    class StructuredAdditionTool(AdditionTool):
+        structured_output_schema: type[BaseModel] | None = AdditionOutput
+
+        def run(self, _: ToolRunContext, a: int, b: int) -> AdditionOutput:
+            return AdditionOutput(result=a + b)
+
+    structured_add_tool = StructuredAdditionTool()
+    assert structured_add_tool.structured_output_schema is AdditionOutput
+
+    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)  # noqa: SLF001
+    assert output is not None
+    assert isinstance(output, LocalDataValue)
+    assert output.value == AdditionOutput(result=3)
+
+
+def test_structured_output_schema_coercion(add_tool: AdditionTool) -> None:
+    """Test structured output schema."""
+    assert add_tool.structured_output_schema is None
+
+    class AdditionOutput(BaseModel):
+        result: int
+
+    class StructuredAdditionTool(AdditionTool):
+        structured_output_schema: type[BaseModel] | None = AdditionOutput
+
+        def run(self, _: ToolRunContext, a: int, b: int) -> dict[str, int]:
+            return {"result": a + b}
+
+    structured_add_tool = StructuredAdditionTool()
+    assert structured_add_tool.structured_output_schema is AdditionOutput
+
+    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)  # noqa: SLF001
+    assert output is not None
+    assert isinstance(output, LocalDataValue)
+    assert output.value == AdditionOutput(result=3)
+
+
+def test_structured_output_schema_coercion_error(add_tool: AdditionTool) -> None:
+    """Test structured output schema."""
+    assert add_tool.structured_output_schema is None
+
+    class AdditionOutput(BaseModel):
+        result: int
+
+    class StructuredAdditionTool(AdditionTool):
+        structured_output_schema: type[BaseModel] | None = AdditionOutput
+
+        def run(self, _: ToolRunContext, __: int, ___: int) -> dict[str, str]:
+            return {"result": "not an int"}
+
+    structured_add_tool = StructuredAdditionTool()
+    assert structured_add_tool.structured_output_schema is AdditionOutput
+
+    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)  # noqa: SLF001
+    assert output is not None
+    assert isinstance(output, LocalDataValue)
+    assert output.value == {"result": "not an int"}
