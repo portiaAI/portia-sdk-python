@@ -224,8 +224,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 return LocalDataValue(value=output)
             try:
                 return LocalDataValue(value=self.structured_output_schema.model_validate(output))
-            except ValidationError as e:
-                logger().warning(f"Error validating structured output: {e}")
+            except ValidationError:
+                pass
 
         return LocalDataValue(value=output)  # type: ignore  # noqa: PGH003
 
