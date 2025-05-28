@@ -46,6 +46,7 @@ class PlanBuilder:
     query: str
     steps: list[Step]
     plan_inputs: list[PlanInput]
+    structured_output_schema: type[BaseModel] | None
 
     def __init__(
         self, query: str | None = None, structured_output_schema: type[BaseModel] | None = None
@@ -63,13 +64,14 @@ class PlanBuilder:
         self.plan_inputs = []
         self.structured_output_schema = structured_output_schema
 
-    def step(
+    def step(  # noqa: PLR0913
         self,
         task: str,
         tool_id: str | None = None,
         output: str | None = None,
         inputs: list[Variable] | None = None,
         condition: str | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanBuilder:
         """Add a step to the plan.
 
@@ -80,6 +82,9 @@ class PlanBuilder:
             inputs (list[Variable] | None): The inputs to the step
             condition (str | None): A human readable condition which controls if the step should run
               or not.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the step. Will override the tool output schema if provided by calling step
+                summarizer with structured response.
 
         Returns:
             PlanBuilder: The builder instance with the new step added.
@@ -96,6 +101,7 @@ class PlanBuilder:
                 inputs=inputs,
                 tool_id=tool_id,
                 condition=condition,
+                structured_output_schema=structured_output_schema,
             ),
         )
         return self
@@ -306,6 +312,11 @@ class Step(BaseModel):
         "If provided the condition will be evaluated and the step skipped if false. "
         "The step will run by default if not provided.",
     )
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        exclude=True,
+        description="The optional structured output schema for output of this step.",
+    )
 
     def pretty_print(self) -> str:
         """Return the pretty print representation of the step.
@@ -354,6 +365,8 @@ class ReadOnlyStep(Step):
             inputs=step.inputs,
             tool_id=step.tool_id,
             output=step.output,
+            condition=step.condition,
+            structured_output_schema=step.structured_output_schema,
         )
 
 

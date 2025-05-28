@@ -133,6 +133,12 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description="Whether the tool's output requires a summary. "
         "Tools may not require a summary if they already produce a nice textual output.",
     )
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        description="The schema to use for the structured output of the tool if summarization is "
+        "enabled. If not provided, the output will be the default output schema of the tool.run() "
+        "method.",
+    )
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
         """Check whether the tool can be plan_run.
@@ -211,6 +217,16 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             return LocalDataValue(
                 value=clarifications,
             )
+        if self.structured_output_schema:
+            # try to coerce output to structured output schema if it's not already, but fall back
+            # to the default output schema, letting the llm step summarizer handle it
+            if isinstance(output, self.structured_output_schema):
+                return LocalDataValue(value=output)
+            try:
+                return LocalDataValue(value=self.structured_output_schema.model_validate(output))
+            except ValidationError:
+                pass
+
         return LocalDataValue(value=output)  # type: ignore  # noqa: PGH003
 
     def _run_with_artifacts(
