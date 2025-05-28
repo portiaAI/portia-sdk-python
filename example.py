@@ -2,13 +2,7 @@
 
 from dotenv import load_dotenv
 
-from portia import (
-    Config,
-    LogLevel,
-    PlanRunState,
-    Portia,
-    example_tool_registry,
-)
+from portia import Config, LogLevel, PlanRunState, Portia, example_tool_registry
 from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
 
@@ -22,7 +16,7 @@ portia = Portia(
 
 # Simple Example
 plan_run = portia.run(
-    "Get the temperature in London and Sydney and then add the two temperatures rounded to 2DP",
+    "Get the temperature in London and Sydney and then add the two temperatures",
 )
 
 # We can also provide additional data about the end user to the process
@@ -38,9 +32,8 @@ plan_run = portia.run(
 )
 
 # When we hit a clarification we can ask our end user for clarification then resume the process
-# Deliberate typo in the second place name to hit the clarification
 plan_run = portia.run(
-    "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
+    "Get the temperature in <location> and London and then add the two temperatures",
 )
 
 # Fetch run
@@ -56,6 +49,7 @@ if plan_run.state == PlanRunState.NEED_CLARIFICATION:
             clarification=c,
             response=new_value,
         )
+    portia.resume(plan_run)
 
 # You can also pass in a clarification handler to manage clarifications
 portia = Portia(
@@ -64,7 +58,7 @@ portia = Portia(
     execution_hooks=CLIExecutionHooks(),
 )
 plan_run = portia.run(
-    "Get the temperature in London and xydwne and then add the two temperatures rounded to 2DP",
+    "Get the temperature in <location> and London and then add the two temperatures",
 )
 
 # You can pass inputs into a plan

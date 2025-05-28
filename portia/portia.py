@@ -579,8 +579,10 @@ class Portia:
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
         # Perform initial readiness check
-        if len(ready_clarifications := self._check_remaining_tool_readiness(plan, plan_run)):
-            plan_run = self._raise_clarifications(ready_clarifications, plan_run)
+        outstanding_clarifications = plan_run.get_outstanding_clarifications()
+        ready_clarifications = self._check_remaining_tool_readiness(plan, plan_run)
+        if len(clarifications_to_raise := outstanding_clarifications + ready_clarifications):
+            plan_run = self._raise_clarifications(clarifications_to_raise, plan_run)
             plan_run = self._handle_clarifications(plan_run)
             if len(plan_run.get_outstanding_clarifications()) > 0:
                 return plan_run
@@ -677,7 +679,7 @@ class Portia:
         clarifications = plan_run.get_outstanding_clarifications()
         for clarification in clarifications:
             logger().info(
-                f"Clarification of type {clarification.category} requested"
+                f"Clarification of type {clarification.category} requested "
                 f"by '{clarification.source}'"
                 if clarification.source
                 else ""
@@ -829,31 +831,22 @@ class Portia:
             # wait a couple of seconds as we're long polling
             time.sleep(backoff_time_seconds)
 
-            step = plan.steps[plan_run.current_step_index]
-            next_tool = self._get_tool_for_step(step, plan_run)
-            if next_tool:
-                ready_response = next_tool.ready(
-                    ToolRunContext(
-                        end_user=self.initialize_end_user(plan_run.end_user_id),
-                        plan_run=plan_run,
-                        plan=plan,
-                        config=self.config,
-                        clarifications=current_step_clarifications,
-                    ),
-                )
-                logger().debug(f"Tool state for {next_tool.name} is ready={ready_response.ready}")
-                if ready_response.ready:
-                    for clarification in current_step_clarifications:
-                        if clarification.category is ClarificationCategory.ACTION:
-                            clarification.resolved = True
-                            clarification.response = "complete"
-                    if len(plan_run.get_outstanding_clarifications()) == 0:
-                        self._set_plan_run_state(plan_run, PlanRunState.READY_TO_RESUME)
-                else:
-                    for clarification in current_step_clarifications:
-                        logger().info(
-                            f"Waiting for clarification {clarification.category} to be resolved",
-                        )
+            ready_clarifications = self._check_remaining_tool_readiness(
+                plan, plan_run, start_index=plan_run.current_step_index
+            )
+
+            if len(ready_clarifications) == 0:
+                for clarification in current_step_clarifications:
+                    if clarification.category is ClarificationCategory.ACTION:
+                        clarification.resolved = True
+                        clarification.response = "complete"
+                if len(plan_run.get_outstanding_clarifications()) == 0:
+                    self._set_plan_run_state(plan_run, PlanRunState.READY_TO_RESUME)
+            else:
+                for clarification in current_step_clarifications:
+                    logger().info(
+                        f"Waiting for clarification {clarification.category} to be resolved",
+                    )
 
             logger().info(f"New run state for {plan_run.id!s} is {plan_run.state!s}")
 
@@ -1052,14 +1045,6 @@ class Portia:
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
 
-            if self.execution_hooks.after_step_execution:
-                self.execution_hooks.after_step_execution(
-                    ReadOnlyPlan.from_plan(plan),
-                    ReadOnlyPlanRun.from_plan_run(plan_run),
-                    ReadOnlyStep.from_step(step),
-                    last_executed_step_output,
-                )
-
             if (
                 len(
                     new_clarifications := self._get_clarifications_from_output(
@@ -1096,6 +1081,14 @@ class Portia:
                     combined_clarifications = new_clarifications + ready_clarifications
                 # No after_plan_run call here as the plan run will be resumed later
                 return self._raise_clarifications(combined_clarifications, plan_run)
+
+            if self.execution_hooks.after_step_execution:
+                self.execution_hooks.after_step_execution(
+                    ReadOnlyPlan.from_plan(plan),
+                    ReadOnlyPlanRun.from_plan_run(plan_run),
+                    ReadOnlyStep.from_step(step),
+                    last_executed_step_output,
+                )
 
             # persist at the end of each step
             self.storage.save_plan_run(plan_run)
@@ -1321,8 +1314,12 @@ class Portia:
             logger().debug(
                 f"Clarification requested: {clarification.model_dump_json(indent=4)}",
             )
+        existing_clarification_ids = [clar.id for clar in plan_run.outputs.clarifications]
+        new_clarifications = [
+            clar for clar in clarifications if clar.id not in existing_clarification_ids
+        ]
 
-        plan_run.outputs.clarifications = plan_run.outputs.clarifications + clarifications
+        plan_run.outputs.clarifications = plan_run.outputs.clarifications + new_clarifications
         self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
         return plan_run
 
