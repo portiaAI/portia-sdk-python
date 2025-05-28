@@ -335,7 +335,9 @@ def test_portia_run_query_with_multiple_clarifications(
             return a + b
 
     test_clarification_handler = TestClarificationHandler()
-    test_clarification_handler.clarification_response = 456
+    test_clarification_handler.clarification_response = (
+        "Override value a with 456, keep value b as 2."
+    )
     tool_registry = ToolRegistry([MyAdditionTool()])
     portia = Portia(
         config=config,
