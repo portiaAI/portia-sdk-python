@@ -123,14 +123,17 @@ def test_render_prompt() -> None:
         examples=plans,
         end_user=EndUser(external_id="123"),
         plan_inputs=[plan_input],
+        previous_errors=[StepsOrError(steps=[], error="test error")],
     )
     overall_pattern = re.compile(
-        r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?",
+        r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<PreviousErrors>(.*?)</PreviousErrors>.*?<Request>(.*?)</Request>.*?",
         re.DOTALL,
     )
-    example_match, tools_content, request_content = overall_pattern.findall(
-        rendered_prompt,
-    )[0]
+    example_match, tools_content, previous_errors_content, request_content = (
+        overall_pattern.findall(
+            rendered_prompt,
+        )[0]
+    )
 
     tool_pattern = re.compile(r"<Tools>(.*?)</Tools>", re.DOTALL)
     tool_match = tool_pattern.findall(example_match)[0]
@@ -161,6 +164,7 @@ def test_render_prompt() -> None:
     assert "add_tool" in tools_content
 
     assert "test query" in request_content
+    assert "test error" in previous_errors_content
 
 
 def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:

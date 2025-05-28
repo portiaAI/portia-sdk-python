@@ -1,3 +1,5 @@
+Use the following information to construct a plan in response to the following user query: {{query}}
+
 <Instructions>
     Enumerate the steps you plan on taking to answer the query.
     IMPORTANT: Ensure you use the tool id exactly as it is defined in <Tools> below (including whether it has a portia: prefix or not)
@@ -5,7 +7,7 @@
      - include a description, plus any outputs from previous steps or plan inputs that will be required for this step should be specified as inputs for this step.
      - you need to ensure that all the information for carrying out the step will be provided in the combination of the task description and the inputs.
      - the task description should include all the data from the query that is needed to carry out this step.
-     - DO NOT specify information in the step description that is already being passed in by an input
+     - DO NOT specify information in the 'task' field for a step if that is already being passed in by an input to the step
      - MAKE SURE inputs are ONLY referencing variables from previous steps or the provided plan inputs, IT SHOULD NOT contain any other data and plan inputs should ONLY be used if they are provided.
      - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
      - give a name to the variable for the output of the step if it is successful.
@@ -17,14 +19,18 @@
     {% if plan_inputs %}IMPORTANT: Values for plan inputs will be provided when the plan is executed, so make sure to use them in your steps appropriately.{% endif %}
 </Instructions>
 
+{% if system_context %}<SystemContext>{% for context in system_context %}
+    {{context}}{% endfor %}
+</SystemContext>{% endif %}
+
 <Examples>{% for example in examples %}
     <Example>
         <Request>
             <Tools>
-            {{example.plan_context.tool_ids | safe }}
+                {{example.plan_context.tool_ids | safe }}
             </Tools>
             <Query>
-            {{example.plan_context.query}}
+                {{example.plan_context.query}}
             </Query>
         </Request>
         <Response>
@@ -41,35 +47,24 @@
 
         Tool arguments:
             {{tool.args | safe}}
+        Output schema:
+            {{tool.output_schema | safe}}
     </Tool>{% endfor %}
 </Tools>
-
 {% if end_user.email or end_user.name or end_user.phone_number or end_user.additional_data %}
 <EndUser>
-    {% if end_user.email %}
-    <EndUser.Email>{{ end_user.email }}</EndUser.Email>
-    {% endif %}
-    {% if end_user.name %}
-    <EndUser.Name>{{ end_user.name }}</EndUser.Name>
-    {% endif %}
-    {% if end_user.phone_number %}
-    <EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>
-    {% endif %}
-    {% if end_user.additional_data %}
-    <EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>
-    {% endif %}
+    {% if end_user.email %}<EndUser.Email>{{ end_user.email }}</EndUser.Email>{% endif %}
+    {% if end_user.name %}<EndUser.Name>{{ end_user.name }}</EndUser.Name>{% endif %}
+    {% if end_user.phone_number %}<EndUser.PhoneNumber>{{ end_user.phone_number }}</EndUser.PhoneNumber>{% endif %}
+    {% if end_user.additional_data %}<EndUser.AdditionalData>{{ end_user.additional_data }}</EndUser.AdditionalData>{% endif %}
 </EndUser>
-{% endif %}
-
-{% if plan_inputs %}
+{% endif %}{% if plan_inputs %}
 <PlanInputs>{% for input in plan_inputs %}
     <PlanInput name="{{input.name}}">
         {{input.description}}
     </PlanInput>{% endfor %}
 </PlanInputs>
-{% endif %}
-
-{% if previous_errors %}
+{% endif %}{% if previous_errors %}
 <PreviousErrors>{% for error in previous_errors %}
     <PreviousError>
         Encountered following error with the plan steps below: {{error.error}}
@@ -77,7 +72,6 @@
     </PreviousError>{% endfor %}
 </PreviousErrors>
 {% endif %}
-
 <Request>
     <Tools>
         {{tools | map(attribute='id') | list}}
@@ -91,8 +85,3 @@ Use the example plans as a scaffold to build this plan, following the same struc
 You must use the example plans as a template if at all applicable and they are similar to the query.
 Be biased towards using the same tools and tool groups as the example plans if they are similar.
 {% endif %}
-
-{% if system_context %}
-<SystemContext>{% for context in system_context %}
-    {{context}}{% endfor %}
-</SystemContext>{% endif %}
