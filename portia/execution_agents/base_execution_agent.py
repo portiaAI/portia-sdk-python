@@ -164,9 +164,8 @@ class BaseExecutionAgent:
                     return END
 
         # Prefers the step's structured output schema, if available.
-        structured_output_schema = (
-            self.step.structured_output_schema
-            or (tool and tool.structured_output_schema)
+        structured_output_schema = self.step.structured_output_schema or (
+            tool and tool.structured_output_schema
         )
 
         if (

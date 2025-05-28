@@ -64,7 +64,7 @@ class PlanBuilder:
         self.plan_inputs = []
         self.structured_output_schema = structured_output_schema
 
-    def step(
+    def step(  # noqa: PLR0913
         self,
         task: str,
         tool_id: str | None = None,
@@ -82,6 +82,9 @@ class PlanBuilder:
             inputs (list[Variable] | None): The inputs to the step
             condition (str | None): A human readable condition which controls if the step should run
               or not.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the step. Will override the tool output schema if provided by calling step
+                summarizer with structured response.
 
         Returns:
             PlanBuilder: The builder instance with the new step added.
