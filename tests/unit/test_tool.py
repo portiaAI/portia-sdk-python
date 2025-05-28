@@ -765,7 +765,7 @@ def test_structured_output_schema_coercion(add_tool: AdditionTool) -> None:
         structured_output_schema: type[BaseModel] | None = AdditionOutput
 
         def run(self, _: ToolRunContext, a: int, b: int) -> int:
-            return a + b  # type: ignore[ReportReturnType]
+            return AdditionOutput(result=a + b)  # type: ignore[ReportReturnType]
 
     structured_add_tool = StructuredAdditionTool()
     assert structured_add_tool.structured_output_schema is AdditionOutput
