@@ -46,6 +46,7 @@ class PlanBuilder:
     query: str
     steps: list[Step]
     plan_inputs: list[PlanInput]
+    structured_output_schema: type[BaseModel] | None
 
     def __init__(
         self, query: str | None = None, structured_output_schema: type[BaseModel] | None = None
@@ -70,6 +71,7 @@ class PlanBuilder:
         output: str | None = None,
         inputs: list[Variable] | None = None,
         condition: str | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanBuilder:
         """Add a step to the plan.
 
@@ -96,6 +98,7 @@ class PlanBuilder:
                 inputs=inputs,
                 tool_id=tool_id,
                 condition=condition,
+                structured_output_schema=structured_output_schema,
             ),
         )
         return self
@@ -306,6 +309,11 @@ class Step(BaseModel):
         "If provided the condition will be evaluated and the step skipped if false. "
         "The step will run by default if not provided.",
     )
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        exclude=True,
+        description="The optional structured output schema for output of this step.",
+    )
 
     def pretty_print(self) -> str:
         """Return the pretty print representation of the step.
@@ -354,6 +362,8 @@ class ReadOnlyStep(Step):
             inputs=step.inputs,
             tool_id=step.tool_id,
             output=step.output,
+            condition=step.condition,
+            structured_output_schema=step.structured_output_schema,
         )
 
 
