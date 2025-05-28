@@ -125,7 +125,9 @@ class StepSummarizer:
                 task_description=self.step.task,
             )
         ]
-        structured_output_schema = self.step.structured_output_schema or self.tool.structured_output_schema
+        structured_output_schema = (
+            self.step.structured_output_schema or self.tool.structured_output_schema
+        )
         if (
             structured_output_schema
             and not isinstance(tool_output, structured_output_schema)
@@ -138,9 +140,7 @@ class StepSummarizer:
             try:
                 result = self.model.get_structured_response(messages, SummarizerOutput)
                 last_message.artifact.summary = result.so_summary  # type: ignore[attr-defined]
-                coerced_output = structured_output_schema.model_validate(
-                    result.model_dump()
-                )
+                coerced_output = structured_output_schema.model_validate(result.model_dump())
                 last_message.artifact.value = coerced_output
             except Exception as e:  # noqa: BLE001 - we want to catch all exceptions
                 logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
