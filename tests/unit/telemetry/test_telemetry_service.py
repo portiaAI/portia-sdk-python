@@ -80,7 +80,7 @@ def test_get_project_id_key_dev() -> None:
 def test_get_project_id_key_default() -> None:
     """Test get_project_id_key function with default endpoint."""
     with patch.dict(os.environ, {}, clear=True):
-        assert get_project_id_key() == "phc_gkmBfAtjABu5dDAX9KX61iAF10Wyze4FGPrT3g7mcKo"
+        assert get_project_id_key() == "phc_fGJERhs0sljicW5IFBzJZoenOb0jtsIcAghCZHw97V1"
 
 
 class TestProductTelemetry:

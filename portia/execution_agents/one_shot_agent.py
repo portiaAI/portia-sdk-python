@@ -6,48 +6,44 @@ However, for more complex tool calls, the DefaultExecutionAgent is recommended a
 be more successful than the OneShotAgent.
 """
 
-from __future__ import annotations  # noqa: I001
+from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
-from langgraph.graph import END, START, MessagesState, StateGraph
-from langgraph.prebuilt import ToolNode
 from langchain_core.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
 )
+from langgraph.graph import END, START, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode
 
-from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED
+from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED, Config
 from portia.errors import InvalidAgentError
-
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.clarification_tool import ClarificationTool
+from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     AgentNode,
-    template_in_required_inputs,
     process_output,
+    template_in_required_inputs,
     tool_call_or_end,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
-from portia.execution_agents.clarification_tool import ClarificationTool
-from portia.tool import ToolRunContext
-from portia.execution_agents.context import StepInput  # noqa: TC001
-from portia.plan import Step, ReadOnlyStep
+from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.views import ToolCallTelemetryEvent
+from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
-    from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.execution_hooks import ExecutionHooks
     from portia.model import GenerativeModel
-    from portia.plan import Step
-    from portia.plan_run import PlanRun
     from portia.storage import AgentMemory
-    from portia.tool import Tool
 
 
 class ExecutionState(MessagesState):
@@ -227,7 +223,7 @@ class OneShotAgent(BaseExecutionAgent):
 
     def __init__(  # noqa: PLR0913
         self,
-        step: Step,
+        plan: Plan,
         plan_run: PlanRun,
         config: Config,
         agent_memory: AgentMemory,
@@ -238,7 +234,7 @@ class OneShotAgent(BaseExecutionAgent):
         """Initialize the OneShotAgent.
 
         Args:
-            step (Step): The current step in the task plan.
+            plan (Plan): The plan containing the steps.
             plan_run (PlanRun): The run that defines the task execution process.
             config (Config): The configuration settings for the agent.
             agent_memory (AgentMemory): The agent memory for persisting outputs.
@@ -247,7 +243,15 @@ class OneShotAgent(BaseExecutionAgent):
             execution_hooks (ExecutionHooks | None): The execution hooks for the agent.
 
         """
-        super().__init__(step, plan_run, config, end_user, agent_memory, tool, execution_hooks)
+        super().__init__(
+            plan=plan,
+            plan_run=plan_run,
+            config=config,
+            end_user=end_user,
+            agent_memory=agent_memory,
+            tool=tool,
+            execution_hooks=execution_hooks,
+        )
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.
@@ -263,7 +267,8 @@ class OneShotAgent(BaseExecutionAgent):
 
         tool_run_ctx = ToolRunContext(
             end_user=self.end_user,
-            plan_run_id=self.plan_run.id,
+            plan_run=self.plan_run,
+            plan=self.plan,
             config=self.config,
             clarifications=self.plan_run.get_clarifications_for_step(),
         )

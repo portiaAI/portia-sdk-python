@@ -40,7 +40,7 @@ def outputs() -> dict[str, Output]:
 
 def test_context_empty() -> None:
     """Test that the context is set up correctly."""
-    (_, plan_run) = get_test_plan_run()
+    (plan, plan_run) = get_test_plan_run()
     plan_run.outputs.step_outputs = {}
     context = build_context(
         ToolRunContext(
@@ -48,7 +48,8 @@ def test_context_empty() -> None:
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
             ),
-            plan_run_id=plan_run.id,
+            plan_run=plan_run,
+            plan=plan,
             config=get_test_config(),
             clarifications=[],
         ),
@@ -69,7 +70,8 @@ def test_context_execution_context() -> None:
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
             ),
-            plan_run_id=plan_run.id,
+            plan_run=plan_run,
+            plan=plan,
             config=get_test_config(),
             clarifications=[],
         ),
@@ -93,7 +95,8 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
             ),
-            plan_run_id=plan_run.id,
+            plan_run=plan_run,
+            plan=plan,
             config=get_test_config(),
             clarifications=[],
         ),
@@ -146,7 +149,8 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
                 external_id="123",
                 additional_data={"email": "hello@world.com"},
             ),
-            plan_run_id=plan_run.id,
+            plan=plan,
+            plan_run=plan_run,
             config=get_test_config(),
             clarifications=clarifications,
         ),
@@ -240,7 +244,8 @@ def test_context_inputs_outputs_clarifications(
     context = build_context(
         ToolRunContext(
             end_user=EndUser(external_id="123"),
-            plan_run_id=plan_run.id,
+            plan=plan,
+            plan_run=plan_run,
             config=get_test_config(),
             clarifications=clarifications,
         ),

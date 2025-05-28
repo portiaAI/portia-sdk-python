@@ -12,6 +12,7 @@ from portia.clarification import (
     CustomClarification,
     InputClarification,
     MultipleChoiceClarification,
+    UserVerificationClarification,
     ValueConfirmationClarification,
 )
 from portia.clarification_handler import ClarificationHandler
@@ -154,6 +155,7 @@ __all__ = [
     "ToolRegistry",
     "ToolRetryError",
     "ToolRunContext",
+    "UserVerificationClarification",
     "ValueConfirmationClarification",
     "Variable",
     "WeatherTool",

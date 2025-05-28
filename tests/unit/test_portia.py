@@ -12,14 +12,18 @@ from unittest import mock
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from pydantic import BaseModel, HttpUrl, SecretStr
 
 from portia.clarification import (
     ActionClarification,
+    Clarification,
+    ClarificationCategory,
     InputClarification,
     ValueConfirmationClarification,
 )
+from portia.clarification_handler import ClarificationHandler
 from portia.config import (
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
     Config,
@@ -33,7 +37,8 @@ from portia.errors import (
     PlanNotFoundError,
     PlanRunNotFoundError,
 )
-from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
+from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+from portia.execution_agents.output import AgentMemoryValue, LocalDataValue, Output
 from portia.execution_hooks import BeforeStepExecutionOutcome
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -46,6 +51,7 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import (
     Plan,
+    PlanBuilder,
     PlanContext,
     PlanInput,
     PlanUUID,
@@ -57,9 +63,16 @@ from portia.plan import (
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
+from portia.prefixed_uuid import ClarificationUUID
 from portia.telemetry.telemetry_service import BaseProductTelemetry
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
-from portia.tool import ReadyResponse, Tool, ToolRunContext
+from portia.tool import (
+    PortiaRemoteTool,
+    ReadyResponse,
+    Tool,
+    ToolRunContext,
+    _ArgsSchemaPlaceholder,
+)
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
     AdditionTool,
@@ -70,6 +83,11 @@ from tests.utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+    from typing import Any
+
+    from pytest_httpx import HTTPXMock
+
     from portia.common import Serializable
 
 
@@ -131,13 +149,14 @@ def test_portia_local_default_config_with_api_keys() -> None:
         "os.environ",
         {
             "PORTIA_API_KEY": "",
+            "PORTIA_API_ENDPOINT": "",
             "OPENAI_API_KEY": "123",
             "TAVILY_API_KEY": "123",
             "OPENWEATHERMAP_API_KEY": "123",
         },
     ):
         portia = Portia()
-        assert portia.config == Config.from_default()
+        assert str(portia.config) == str(Config.from_default())
 
         # BrowserTool is in open_source_tool_registry but not in the default tool registry
         # avaialble to the Portia instance. PDF reader is in open_source_tool_registry if
@@ -162,13 +181,14 @@ def test_portia_local_default_config_without_api_keys() -> None:
         "os.environ",
         {
             "PORTIA_API_KEY": "",
+            "PORTIA_API_ENDPOINT": "",
             "OPENAI_API_KEY": "123",
             "TAVILY_API_KEY": "",
             "OPENWEATHERMAP_API_KEY": "",
         },
     ):
         portia = Portia()
-        assert portia.config == Config.from_default()
+        assert str(portia.config) == str(Config.from_default())
 
         # BrowserTool, SerachTool + WeatherTool are in open_source_tool_registry but not in the
         # default tool registry avaialble to the Portia instance. PDF reader is in
@@ -915,8 +935,10 @@ def test_portia_wait_for_ready_backoff_period(portia: Portia) -> None:
     plan_run.state = PlanRunState.NEED_CLARIFICATION
     portia.storage.save_plan(plan)
     portia.storage.get_plan_run = mock.MagicMock(return_value=plan_run)
-    with pytest.raises(InvalidPlanRunStateError):
-        portia.wait_for_ready(plan_run, max_retries=1, backoff_start_time_seconds=0)
+    with mock.patch.object(portia, "_check_remaining_tool_readiness") as mock_check:
+        mock_check.return_value = [MagicMock()]
+        with pytest.raises(InvalidPlanRunStateError):
+            portia.wait_for_ready(plan_run, max_retries=1, backoff_start_time_seconds=0)
 
 
 def test_portia_resolve_clarification_error(portia: Portia) -> None:
@@ -1145,7 +1167,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
             clarification_handler.received_clarification.user_guidance
             == "Handle this clarification"
         )
-        assert portia.execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+        assert portia.execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         assert portia.execution_hooks.after_plan_run.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
@@ -2065,3 +2087,487 @@ def test_portia_execution_step_hooks_with_skip(portia: Portia, planning_model: M
     execution_hooks.after_step_execution.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         mock.ANY, mock.ANY, ReadOnlyStep.from_step(step2), step_2_result
     )
+
+
+class MockPortiaTool(PortiaRemoteTool):
+    """A dummy portia remote tool."""
+
+    id: str = "portia:mock_portia_tool"
+    name: str = "Mock Portia Tool"
+    description: str = "A dummy portia remote tool"
+    args_schema: type[BaseModel] = _ArgsSchemaPlaceholder
+    output_schema: tuple[str, str] = ("str", "A response from the tool")
+
+    def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+        """Run the tool."""
+        return "tool output"
+
+
+class ReadyTool(Tool):
+    """A dummy tool that can be set to ready or not ready."""
+
+    id: str = "ready_tool"
+    name: str = "Ready Tool"
+    description: str = "A dummy tool that can be set to ready or not ready."
+    args_schema: type[BaseModel] = _ArgsSchemaPlaceholder
+    output_schema: tuple[str, str] = ("ReadyResponse", "A response from the tool")
+
+    auth_url: str = "https://fake.portiaai.test/auth"
+    is_ready: bool | list[bool] = False
+
+    def _get_clarifications(self, plan_run_id: PlanRunUUID) -> list[Clarification]:
+        """Generate clarifications for the ready check."""
+        is_ready = (
+            self.is_ready
+            if isinstance(self.is_ready, bool)
+            else self.is_ready.pop(0)
+            if isinstance(self.is_ready, list) and len(self.is_ready) > 0
+            else False
+        )
+        if is_ready:
+            return []
+        return [  # pyright: ignore[reportReturnType]
+            ActionClarification(
+                user_guidance="user guidance",
+                plan_run_id=plan_run_id,
+                action_url=HttpUrl(self.auth_url),
+            )
+        ]
+
+    def ready(self, ctx: ToolRunContext) -> ReadyResponse:
+        """Is the tool ready."""
+        clarifications = self._get_clarifications(ctx.plan_run.id)
+        return ReadyResponse(
+            ready=len(clarifications) == 0,
+            clarifications=clarifications,
+        )
+
+    def run(self, ctx: ToolRunContext) -> None:  # noqa: ARG002
+        """Run the tool."""
+        return
+
+
+@pytest.fixture
+def mock_cloud_client() -> Iterator[httpx.Client]:
+    """Mock the batch ready check."""
+    client = httpx.Client(base_url="https://fake.portiaai.test")
+    with mock.patch("portia.tool.PortiaCloudClient.get_client", return_value=client):
+        yield client
+
+
+def test_portia_tool_ready_not_ready(
+    mock_cloud_client: httpx.Client, httpx_mock: HTTPXMock
+) -> None:
+    """Test that a tool that requires clarification gets raised at start of plan run."""
+    portia_tool = MockPortiaTool(client=mock_cloud_client)
+    portia = Portia(
+        config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
+        tools=[portia_tool],
+    )
+    plan = PlanBuilder().step("", portia_tool.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    action_url = HttpUrl("https://example.com/auth")
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": False,
+            "clarifications": [
+                ActionClarification(
+                    id=ClarificationUUID(),
+                    category=ClarificationCategory.ACTION,
+                    user_guidance="Please authenticate",
+                    action_url=action_url,
+                    plan_run_id=plan_run.id,
+                ).model_dump(mode="json")
+            ],
+        },
+    )
+
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 1
+    outstanding_clarification = output_plan_run.get_outstanding_clarifications()[0]
+    assert isinstance(outstanding_clarification, ActionClarification)
+    assert outstanding_clarification.resolved is False
+    assert outstanding_clarification.plan_run_id == plan_run.id
+    assert str(outstanding_clarification.action_url) == str(action_url)
+
+
+def test_portia_tool_ready_multiple_tools_not_ready(
+    mock_cloud_client: httpx.Client, httpx_mock: HTTPXMock
+) -> None:
+    """Test readiness of portia remote tools when there are multiple tools."""
+    portia_tool = MockPortiaTool(client=mock_cloud_client)
+    portia_tool_2 = MockPortiaTool(id="portia:mock_portia_tool_2", client=mock_cloud_client)
+    portia = Portia(
+        config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
+        tools=[portia_tool, portia_tool_2],
+    )
+    plan = PlanBuilder().step("", portia_tool.id).step("", portia_tool_2.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    action_url = HttpUrl("https://example.com/auth")
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": False,
+            "clarifications": [
+                ActionClarification(
+                    id=ClarificationUUID(),
+                    category=ClarificationCategory.ACTION,
+                    user_guidance="Please authenticate",
+                    action_url=action_url,
+                    plan_run_id=plan_run.id,
+                ).model_dump(mode="json")
+            ],
+        },
+    )
+
+    output_plan_run = portia.resume(plan_run)
+    assert (
+        httpx_mock.get_request(
+            match_json={
+                "tool_ids": sorted([portia_tool.id, portia_tool_2.id]),
+                "execution_context": {
+                    "end_user_id": "123",
+                    "plan_run_id": str(plan_run.id),
+                },
+            },
+        )
+        is not None
+    )
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 1
+    outstanding_clarification = output_plan_run.get_outstanding_clarifications()[0]
+    assert isinstance(outstanding_clarification, ActionClarification)
+    assert outstanding_clarification.resolved is False
+    assert outstanding_clarification.plan_run_id == plan_run.id
+    assert str(outstanding_clarification.action_url) == str(action_url)
+
+
+def test_custom_tool_ready_not_ready() -> None:
+    """Test clarification handling for a custom tool that is not ready."""
+    ready_tool = ReadyTool()
+    portia = Portia(
+        config=get_test_config(),
+        tools=[ready_tool],
+    )
+    plan = PlanBuilder().step("", ready_tool.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 1
+    outstanding_clarification = output_plan_run.get_outstanding_clarifications()[0]
+    assert isinstance(outstanding_clarification, ActionClarification)
+    assert outstanding_clarification.resolved is False
+    assert outstanding_clarification.plan_run_id == plan_run.id
+    assert str(outstanding_clarification.action_url) == ready_tool.auth_url
+
+
+def test_custom_tool_ready_resume_multiple_instances_of_same_tool() -> None:
+    """Clarification handling for multiple instances of the same tool with custom implementation.
+
+    Only one clarification should be raised for the tool.
+    """
+    ready_tool = ReadyTool()
+    portia = Portia(
+        config=get_test_config(),
+        tools=[ready_tool, ready_tool],
+    )
+    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 1
+    outstanding_clarification = output_plan_run.get_outstanding_clarifications()[0]
+    assert isinstance(outstanding_clarification, ActionClarification)
+    assert outstanding_clarification.resolved is False
+    assert outstanding_clarification.plan_run_id == plan_run.id
+    assert str(outstanding_clarification.action_url) == ready_tool.auth_url
+
+
+def test_custom_tool_ready_resume_multiple_custom_tools() -> None:
+    """Test clarifications are raised for multiple tools in a plan run if they require it."""
+    ready_tool = ReadyTool(id="ready_tool", auth_url="https://fake.portiaai.test/auth")
+    ready_tool_2 = ReadyTool(id="ready_tool_2", auth_url="https://fake.portiaai.test/auth2")
+    portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool_2])
+    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 2
+    outstanding_clarifications = output_plan_run.get_outstanding_clarifications()
+    assert isinstance(outstanding_clarifications[0], ActionClarification)
+    assert outstanding_clarifications[0].plan_run_id == plan_run.id
+    assert str(outstanding_clarifications[0].action_url) == ready_tool.auth_url
+    assert outstanding_clarifications[0].resolved is False
+    assert isinstance(outstanding_clarifications[1], ActionClarification)
+    assert outstanding_clarifications[1].plan_run_id == plan_run.id
+    assert str(outstanding_clarifications[1].action_url) == ready_tool_2.auth_url
+    assert outstanding_clarifications[1].resolved is False
+
+
+def test_portia_and_custom_tool_not_ready(
+    mock_cloud_client: httpx.Client, httpx_mock: HTTPXMock
+) -> None:
+    """Test that a portia tool and a custom tool are not ready."""
+    portia_tool = MockPortiaTool(client=mock_cloud_client)
+    ready_tool = ReadyTool(is_ready=False)
+    portia = Portia(
+        config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
+        tools=[portia_tool, ready_tool],
+    )
+    plan = PlanBuilder().step("", portia_tool.id).step("", ready_tool.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    action_url = HttpUrl("https://example.com/auth")
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": False,
+            "clarifications": [
+                ActionClarification(
+                    id=ClarificationUUID(),
+                    category=ClarificationCategory.ACTION,
+                    user_guidance="Please authenticate",
+                    action_url=action_url,
+                    plan_run_id=plan_run.id,
+                ).model_dump(mode="json")
+            ],
+        },
+    )
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 2
+    outstanding_clarifications = output_plan_run.get_outstanding_clarifications()
+    assert isinstance(outstanding_clarifications[0], ActionClarification)
+    assert outstanding_clarifications[0].plan_run_id == plan_run.id
+    assert str(outstanding_clarifications[0].action_url) == str(ready_tool.auth_url)
+    assert outstanding_clarifications[0].resolved is False
+    assert isinstance(outstanding_clarifications[1], ActionClarification)
+    assert outstanding_clarifications[1].plan_run_id == plan_run.id
+    assert str(outstanding_clarifications[1].action_url) == str(action_url)
+    assert outstanding_clarifications[1].resolved is False
+
+
+class PortiaWithoutExecution(Portia):
+    """A portia that bypasses step execution."""
+
+    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:  # noqa: ARG002
+        """Bypass step execution."""
+        self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
+        return self.storage.get_plan_run(plan_run.id)
+
+
+def test_portia_tool_not_ready_with_clarification_handler(
+    mock_cloud_client: httpx.Client, httpx_mock: HTTPXMock
+) -> None:
+    """Test that a portia can run a plan with a PortiaRemoteTool that becomes ready."""
+    portia_tool = MockPortiaTool(client=mock_cloud_client)
+    ready_tool = ReadyTool(is_ready=True)
+    # ExecutionHooks are required to trigger the wait_for_ready behaviour
+    execution_hooks = ExecutionHooks(
+        clarification_handler=MagicMock(spec=ClarificationHandler),
+        before_tool_call=MagicMock(),
+        after_tool_call=MagicMock(),
+        before_step_execution=MagicMock(),
+        after_step_execution=MagicMock(),
+        before_plan_run=MagicMock(),
+        after_plan_run=MagicMock(),
+    )
+    portia = PortiaWithoutExecution(
+        config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
+        tools=[portia_tool, ready_tool],
+        execution_hooks=execution_hooks,
+    )
+    plan = PlanBuilder().step("", ready_tool.id).step("", portia_tool.id).build()
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    action_url = HttpUrl("https://example.com/auth")
+    # Initially the portia tool is not ready
+    # Have wait_for_ready check twice to iterate through the full loop
+    for _ in range(2):
+        httpx_mock.add_response(
+            url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+            json={
+                "ready": False,
+                "clarifications": [
+                    ActionClarification(
+                        id=ClarificationUUID(),
+                        category=ClarificationCategory.ACTION,
+                        user_guidance="Please authenticate",
+                        action_url=action_url,
+                        plan_run_id=plan_run.id,
+                    ).model_dump(mode="json")
+                ],
+            },
+        )
+    # After a couple of iterations, the tool becomes ready
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": True,
+            "clarifications": [],
+        },
+    )
+    output_plan_run = portia.resume(plan_run)
+    assert len(httpx_mock.get_requests()) == 3
+    assert output_plan_run.state == PlanRunState.COMPLETE
+    assert len(output_plan_run.get_outstanding_clarifications()) == 0
+
+
+class RaiseClarificationAgent(BaseExecutionAgent):
+    """A dummy execution agent that raises a clarification on run."""
+
+    def __init__(
+        self,
+        *args: Any,
+        forced_clarifications: Sequence[Clarification] = (),
+        **kwargs: Any,
+    ) -> None:
+        """Override the constructor to add forced clarifications."""
+        super().__init__(*args, **kwargs)
+        self.forced_clarifications = list(forced_clarifications)
+
+    def execute_sync(self) -> Output:
+        """Execute the agent - return a clarification."""
+        return LocalDataValue(
+            value=[*self.forced_clarifications],
+        )
+
+
+class CustomPortia(Portia):
+    """A custom portia that uses a custom execution agent."""
+
+    def __init__(
+        self,
+        *args: Any,
+        forced_clarifications: Sequence[Clarification] = (),
+        **kwargs: Any,
+    ) -> None:
+        """Override the constructor to add forced clarifications."""
+        super().__init__(*args, **kwargs)
+        self.forced_clarifications = forced_clarifications
+
+    def _get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
+        if step.task == "raise_clarification":
+            tool = self._get_tool_for_step(step, plan_run)
+            return RaiseClarificationAgent(
+                plan=plan,
+                plan_run=plan_run,
+                config=self.config,
+                end_user=self.initialize_end_user(plan_run.end_user_id),
+                agent_memory=self.storage,
+                tool=tool,
+                forced_clarifications=self.forced_clarifications,
+            )
+        return super()._get_agent_for_step(step, plan, plan_run)
+
+
+def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() -> None:
+    """Test that all remaining steps have their tool ready status checked on any interruption."""
+    ready_tool = ReadyTool(is_ready=True)
+    ready_once_tool = ReadyTool(id="ready_once_tool", is_ready=[True, False])
+    portia = CustomPortia(
+        config=get_test_config(),
+        tools=[ready_tool, ready_once_tool],
+        forced_clarifications=[
+            InputClarification(
+                user_guidance="user guidance",
+                plan_run_id=PlanRunUUID(),
+                argument_name="argument_name",
+            )
+        ],
+    )
+    plan = (
+        PlanBuilder()
+        .step("raise_clarification", ready_tool.id)
+        .step("2", ready_once_tool.id)
+        .build()
+    )
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 2
+    outstanding_clarifications = output_plan_run.get_outstanding_clarifications()
+    assert isinstance(outstanding_clarifications[0], InputClarification)
+    assert outstanding_clarifications[0].argument_name == "argument_name"
+    assert outstanding_clarifications[0].resolved is False
+    assert isinstance(outstanding_clarifications[1], ActionClarification)
+    assert str(outstanding_clarifications[1].action_url) == ready_tool.auth_url
+    assert outstanding_clarifications[1].resolved is False
+
+
+def test_portia_tool_readiness_rechecked_after_raised_clarification(
+    mock_cloud_client: httpx.Client, httpx_mock: HTTPXMock
+) -> None:
+    """Test that all remaining steps have their tool ready status checked on any interruption.
+
+    When the interruption is a PortiaRemoteTool action clarification, we want the readiness
+    clarifications combined.
+    """
+    portia_tool = MockPortiaTool(client=mock_cloud_client)
+    portia_tool_2 = MockPortiaTool(id="portia:mock_portia_tool_2", client=mock_cloud_client)
+    action_url = HttpUrl("https://example.com/auth")
+    portia = CustomPortia(
+        config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
+        tools=[portia_tool, portia_tool_2],
+        forced_clarifications=[
+            ActionClarification(
+                id=ClarificationUUID(),
+                category=ClarificationCategory.ACTION,
+                user_guidance="Please authenticate",
+                action_url=action_url,
+                plan_run_id=PlanRunUUID(),
+            )
+        ],
+    )
+    plan = (
+        PlanBuilder()
+        .step("raise_clarification", portia_tool.id)
+        .step("1", portia_tool.id)
+        .step("2", portia_tool_2.id)
+        .build()
+    )
+    plan_run = portia.create_plan_run(plan, end_user="123")
+    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    # Initially all tools are ready
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": True,
+            "clarifications": [],
+        },
+    )
+    # Second time, a clarification is raised
+    httpx_mock.add_response(
+        url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
+        json={
+            "ready": False,
+            "clarifications": [
+                ActionClarification(
+                    id=ClarificationUUID(),
+                    category=ClarificationCategory.ACTION,
+                    user_guidance="Please authenticate",
+                    action_url=action_url,
+                    plan_run_id=plan_run.id,
+                ).model_dump(mode="json")
+            ],
+        },
+    )
+    output_plan_run = portia.resume(plan_run)
+    assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert len(output_plan_run.get_outstanding_clarifications()) == 1
+    outstanding_clarification = output_plan_run.get_outstanding_clarifications()[0]
+    assert isinstance(outstanding_clarification, ActionClarification)
+    assert outstanding_clarification.resolved is False
+    assert str(outstanding_clarification.action_url) == str(action_url)

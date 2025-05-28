@@ -12,6 +12,7 @@ from portia.clarification import (
     CustomClarification,
     InputClarification,
     MultipleChoiceClarification,
+    UserVerificationClarification,
     ValueConfirmationClarification,
 )
 from portia.clarification_handler import ClarificationHandler
@@ -125,6 +126,32 @@ def test_value_confirmation_clarification() -> None:
     handler.handle_value_confirmation_clarification = MagicMock()
     handler.handle(clarification, on_resolution, on_error)
     handler.handle_value_confirmation_clarification.assert_called_once_with(
+        clarification,
+        on_resolution,
+        on_error,
+    )
+
+
+def test_user_verification_clarification() -> None:
+    """Test that UserVerificationClarification is routed to the correct handler method."""
+    handler = TestClarificationHandler()
+
+    on_resolution = MagicMock()
+    on_error = MagicMock()
+    clarification = UserVerificationClarification(
+        plan_run_id=PlanRunUUID(),
+        user_guidance="test",
+        source="Test clarification handler",
+    )
+
+    # Test without implementation
+    with pytest.raises(NotImplementedError):
+        handler.handle(clarification, on_resolution, on_error)
+
+    # Test with implementation
+    handler.handle_user_verification_clarification = MagicMock()
+    handler.handle(clarification, on_resolution, on_error)
+    handler.handle_user_verification_clarification.assert_called_once_with(
         clarification,
         on_resolution,
         on_error,

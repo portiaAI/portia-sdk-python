@@ -9,7 +9,7 @@ from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.output import LocalDataValue
-from portia.plan import Step, Variable
+from portia.plan import PlanBuilder, Variable
 from portia.storage import InMemoryStorage
 from tests.utils import get_test_config, get_test_plan_run
 
@@ -18,7 +18,7 @@ def test_memory_extraction_step_no_inputs() -> None:
     """Test MemoryExtractionStep with no step inputs."""
     (_, plan_run) = get_test_plan_run()
     agent = BaseExecutionAgent(
-        step=Step(task="DESCRIPTION_STRING", output="$out"),
+        plan=PlanBuilder().step(task="DESCRIPTION_STRING", output="$out").build(),
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),
@@ -48,14 +48,16 @@ def test_memory_extraction_step_with_inputs() -> None:
     }
 
     agent = BaseExecutionAgent(
-        step=Step(
+        plan=PlanBuilder()
+        .step(
             task="DESCRIPTION_STRING",
             output="$out",
             inputs=[
                 Variable(name="$local_output", description="Local input description"),
                 Variable(name="$memory_output", description="Memory input description"),
             ],
-        ),
+        )
+        .build(),
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
@@ -79,14 +81,16 @@ def test_memory_extraction_step_errors_with_missing_input() -> None:
     """Test MemoryExtractionStep ignores step inputs that aren't in previous outputs."""
     (_, plan_run) = get_test_plan_run()
     agent = BaseExecutionAgent(
-        step=Step(
+        plan=PlanBuilder()
+        .step(
             task="DESCRIPTION_STRING",
             output="$out",
             inputs=[
                 Variable(name="$missing_input", description="Missing input description"),
                 Variable(name="$a", description="A value"),
             ],
-        ),
+        )
+        .build(),
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
@@ -107,13 +111,15 @@ def test_memory_extraction_step_with_plan_run_inputs() -> None:
     }
 
     agent = BaseExecutionAgent(
-        step=Step(
+        plan=PlanBuilder()
+        .step(
             task="DESCRIPTION_STRING",
             output="$out",
             inputs=[
                 Variable(name="$plan_run_input", description="Plan run input description"),
             ],
-        ),
+        )
+        .build(),
         plan_run=plan_run,
         config=get_test_config(),
         tool=None,
