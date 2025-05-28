@@ -74,7 +74,9 @@ IMPORTANT GUIDELINES:
 - For EVERY tool that requires an id as an input, make sure to check
  if there's a corresponding tool call that provides the id from natural language if possible.
  For example, if a tool asks for a user ID check if there's a tool call that provides
- the user IDs before making the tool call that  requires the user ID.
+ the user IDs before making the tool call that requires the user ID.
+- Ensure all information for the step is captured in the task - the query will not be available
+ when executing the task
 - For conditional steps:
   1. Task field: Write only the task description without conditions.
   2. Condition field: Write the condition in concise natural language.
