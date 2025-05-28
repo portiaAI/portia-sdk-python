@@ -70,7 +70,7 @@
 {% endif %}
 
 {% if previous_errors %}
-<PreviousErrors>{% for error in previous_errprs %}
+<PreviousErrors>{% for error in previous_errors %}
     <PreviousError>
         Encountered following error with the plan steps below: {{error.error}}
         Steps: {{error.steps}}
