@@ -2372,6 +2372,7 @@ def test_portia_tool_not_ready_with_clarification_handler(
     """Test that a portia can run a plan with a PortiaRemoteTool that becomes ready."""
     portia_tool = MockPortiaTool(client=mock_cloud_client)
     ready_tool = ReadyTool(is_ready=True)
+    # ExecutionHooks are required to trigger the wait_for_ready behaviour
     execution_hooks = ExecutionHooks(
         clarification_handler=MagicMock(spec=ClarificationHandler),
         before_tool_call=MagicMock(),
@@ -2391,6 +2392,7 @@ def test_portia_tool_not_ready_with_clarification_handler(
     portia.storage.save_plan(plan)  # Explicitly save plan for test
     action_url = HttpUrl("https://example.com/auth")
     # Initially the portia tool is not ready
+    # Have wait_for_ready check twice to iterate through the full loop
     for _ in range(2):
         httpx_mock.add_response(
             url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
@@ -2407,7 +2409,7 @@ def test_portia_tool_not_ready_with_clarification_handler(
                 ],
             },
         )
-    # Second time, the portia tool is ready
+    # After a couple of iterations, the tool becomes ready
     httpx_mock.add_response(
         url=f"{mock_cloud_client.base_url}/api/v0/tools/batch/ready/",
         json={
