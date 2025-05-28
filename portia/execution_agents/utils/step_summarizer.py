@@ -125,19 +125,20 @@ class StepSummarizer:
                 task_description=self.step.task,
             )
         ]
+        structured_output_schema = self.step.structured_output_schema or self.tool.structured_output_schema
         if (
-            self.tool.structured_output_schema
-            and not isinstance(tool_output, self.tool.structured_output_schema)
+            structured_output_schema
+            and not isinstance(tool_output, structured_output_schema)
             and isinstance(last_message.artifact, LocalDataValue)
         ):
 
-            class SummarizerOutput(self.tool.structured_output_schema):
+            class SummarizerOutput(structured_output_schema):
                 so_summary: str = Field(description="A summary of the tool output.")
 
             try:
                 result = self.model.get_structured_response(messages, SummarizerOutput)
                 last_message.artifact.summary = result.so_summary  # type: ignore[attr-defined]
-                coerced_output = self.tool.structured_output_schema.model_validate(
+                coerced_output = structured_output_schema.model_validate(
                     result.model_dump()
                 )
                 last_message.artifact.value = coerced_output
