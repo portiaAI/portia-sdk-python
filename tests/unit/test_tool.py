@@ -742,8 +742,8 @@ def test_structured_output_schema(add_tool: AdditionTool) -> None:
     class StructuredAdditionTool(AdditionTool):
         structured_output_schema: type[BaseModel] | None = AdditionOutput
 
-        def run(self, _: ToolRunContext, a: int, b: int) -> AdditionOutput:
-            return AdditionOutput(result=a + b)
+        def run(self, _: ToolRunContext, a: int, b: int) -> int:
+            return AdditionOutput(result=a + b)  # type: ignore[ReportReturnType]
 
     structured_add_tool = StructuredAdditionTool()
     assert structured_add_tool.structured_output_schema is AdditionOutput
@@ -764,8 +764,8 @@ def test_structured_output_schema_coercion(add_tool: AdditionTool) -> None:
     class StructuredAdditionTool(AdditionTool):
         structured_output_schema: type[BaseModel] | None = AdditionOutput
 
-        def run(self, _: ToolRunContext, a: int, b: int) -> dict[str, int]:
-            return {"result": a + b}
+        def run(self, _: ToolRunContext, a: int, b: int) -> int:
+            return a + b  # type: ignore[ReportReturnType]
 
     structured_add_tool = StructuredAdditionTool()
     assert structured_add_tool.structured_output_schema is AdditionOutput
@@ -786,8 +786,8 @@ def test_structured_output_schema_coercion_error(add_tool: AdditionTool) -> None
     class StructuredAdditionTool(AdditionTool):
         structured_output_schema: type[BaseModel] | None = AdditionOutput
 
-        def run(self, _: ToolRunContext, __: int, ___: int) -> dict[str, str]:
-            return {"result": "not an int"}
+        def run(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
+            return {"result": "not an int"}  # type: ignore[ReportReturnType]
 
     structured_add_tool = StructuredAdditionTool()
     assert structured_add_tool.structured_output_schema is AdditionOutput
