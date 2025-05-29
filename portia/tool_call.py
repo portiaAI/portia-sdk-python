@@ -7,6 +7,7 @@ The `ToolCallRecord` class is a Pydantic model used to capture details about a
 specific tool call, including its status, input, output, and associated metadata.
 """
 
+import json
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -62,3 +63,25 @@ class ToolCallRecord(BaseModel):
     input: Any
     output: Any
     latency_seconds: float
+
+    def serialize_input(self) -> Any:  # noqa: ANN401
+        """Handle serialization of inputs."""
+        return self._serialize_value(self.input)
+
+    def serialize_output(self) -> Any:  # noqa: ANN401
+        """Handle serialization of outputs."""
+        return self._serialize_value(self.output)
+
+    def _serialize_value(self, value: Any) -> Any:  # noqa: ANN401
+        """Handle serialization of inputs/outputs."""
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="json")
+
+        # If we can JSON dumps here it means we can just return the
+        # raw value
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            return f"<<UNSERIALIZABLE: {type(value).__name__}>>"
+        else:
+            return value
