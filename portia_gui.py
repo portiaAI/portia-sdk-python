@@ -11,15 +11,14 @@ from __future__ import annotations
 import io
 import threading
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Any
 
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.reactive import var
+from textual.reactive import reactive, var
 from textual.widgets import Button, Footer, Header, RichLog, Static
 
-from portia import Portia, PlanRun, PlanRunState
+from portia import PlanRun, PlanRunState, Portia
 from portia.logger import default_logger
 
 
@@ -62,9 +61,7 @@ class PlanStepWidget(Static):
 class PlanPanel(Vertical):
     """Panel to display the plan execution status."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.step_widgets: list[PlanStepWidget] = []
+    step_widgets: list[PlanStepWidget] = reactive([])
 
     def compose(self) -> ComposeResult:
         """Compose the plan panel."""
@@ -451,7 +448,7 @@ class PortiaGUI(App):
                     for clarification in clarifications:
                         self.call_from_thread(
                             log_widget.write,
-                            f"[yellow]Clarification needed: {clarification.prompt}[/yellow]",
+                            f"[yellow]Clarification needed: {clarification.model_dump_json(indent=2)}[/yellow]",
                         )
 
         except Exception as e:
