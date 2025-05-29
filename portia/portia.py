@@ -983,7 +983,12 @@ class Portia:
                     plan_run=str(plan_run.id),
                 )
 
-                if self.execution_hooks.before_step_execution:
+                if (
+                    self.execution_hooks.before_step_execution
+                    # Don't call before_step_execution if we've already executed the step and
+                    # raised a clarification
+                    and len(plan_run.get_clarifications_for_step()) == 0
+                ):
                     outcome = self.execution_hooks.before_step_execution(
                         ReadOnlyPlan.from_plan(plan),
                         ReadOnlyPlanRun.from_plan_run(plan_run),
