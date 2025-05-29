@@ -27,32 +27,45 @@ def _process_outputs(
     outputs: generation_types.GenerateContentResponse,
 ) -> dict[str, list[dict[str, str]]]:
     """Process outputs for tracing."""
-    return {
-        "messages": [
-            {
-                "role": "ai",
-                "content": outputs.candidates[0].content.parts[0].text,
-            },
-        ]
-    }
+    try:
+        return {
+            "messages": [
+                {
+                    "role": "ai",
+                    "content": outputs.candidates[0].content.parts[0].text,
+                },
+            ]
+        }
+    except (IndexError, AttributeError):
+        return {"messages": []}
 
 
 def _process_inputs(
     inputs: dict[Literal["contents"], content_types.ContentsType],
 ) -> dict[str, list[dict[str, str]]]:
     """Process inputs for tracing."""
-    return {
-        "messages": [
-            {
-                "role": "system",
-                "content": inputs["contents"][0]["parts"][0],  # pyright: ignore[reportIndexIssue,reportOptionalSubscript,reportGeneralTypeIssues,reportArgumentType]
-            },
-            {
-                "role": "user",
-                "content": inputs["contents"][0]["parts"][1],  # pyright: ignore[reportIndexIssue,reportOptionalSubscript,reportGeneralTypeIssues,reportArgumentType]
-            },
-        ]
-    }
+    try:
+        if len(inputs["contents"][0]["parts"]) == 2:  # noqa: PLR2004  # pyright: ignore[reportIndexIssue,reportOptionalSubscript,reportGeneralTypeIssues,reportArgumentType]
+            return {
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": inputs["contents"][0]["parts"][0],  # pyright: ignore[reportIndexIssue,reportOptionalSubscript,reportGeneralTypeIssues,reportArgumentType]
+                    },
+                    {
+                        "role": "user",
+                        "content": inputs["contents"][0]["parts"][1],  # pyright: ignore[reportIndexIssue,reportOptionalSubscript,reportGeneralTypeIssues,reportArgumentType]
+                    },
+                ]
+            }
+        return {
+            "messages": [
+                {"content": part}
+                for part in inputs["contents"][0]["parts"]  # pyright: ignore[reportIndexIssue,reportOptionalSubscript,reportGeneralTypeIssues,reportArgumentType]
+            ]
+        }
+    except (IndexError, AttributeError):
+        return {"messages": []}
 
 
 def wrap_gemini(client: genai.GenerativeModel) -> genai.GenerativeModel:  # pyright: ignore[reportPrivateImportUsage]
