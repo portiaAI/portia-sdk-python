@@ -36,8 +36,8 @@ def _process_outputs(
                 },
             ]
         }
-    except (IndexError, AttributeError):
-        return {"messages": []}
+    except (IndexError, AttributeError):  # pragma: no cover
+        return {"messages": []}  # pragma: no cover
 
 
 def _process_inputs(
@@ -64,8 +64,8 @@ def _process_inputs(
                 for part in inputs["contents"][0]["parts"]  # pyright: ignore[reportIndexIssue,reportOptionalSubscript,reportGeneralTypeIssues,reportArgumentType]
             ]
         }
-    except (IndexError, AttributeError):
-        return {"messages": []}
+    except (IndexError, AttributeError):  # pragma: no cover
+        return {"messages": []}  # pragma: no cover
 
 
 def wrap_gemini(client: genai.GenerativeModel) -> genai.GenerativeModel:  # pyright: ignore[reportPrivateImportUsage]

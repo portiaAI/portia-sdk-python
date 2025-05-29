@@ -136,6 +136,27 @@ def test_process_inputs(mock_inputs: dict[Literal["contents"], list[dict[str, li
     }
 
 
+def test_process_inputs_single_part() -> None:
+    """Test _process_inputs function."""
+    mock_inputs = {
+        "contents": [
+            {
+                "parts": [
+                    "User message",
+                ]
+            }
+        ]
+    }
+    result = _process_inputs(mock_inputs)  # pyright: ignore[reportArgumentType]
+    assert result == {
+        "messages": [
+            {
+                "content": "User message",
+            },
+        ]
+    }
+
+
 def test_process_outputs(mock_outputs: MagicMock) -> None:
     """Test _process_outputs function."""
     result = _process_outputs(mock_outputs)
