@@ -730,3 +730,12 @@ def test_browserbase_provider_get_or_create_session_without_clarifications(
 
     assert connect_url == "test_connect_url"
     mock_browserbase_provider.bb.sessions.create.assert_called_once()  # type: ignore reportFunctionMemberAccess
+
+
+def test_process_task_data() -> None:
+    """Check strings are passed through."""
+    task_data = "this is the data"
+    assert BrowserTool.process_task_data(task_data) == task_data
+
+    task_data = ["this is the data"]
+    assert BrowserTool.process_task_data(task_data) == "\n".join(task_data)
