@@ -656,6 +656,8 @@ if validate_extras_dependencies("google", raise_error=False):
     import google.generativeai as genai
     from langchain_google_genai import ChatGoogleGenerativeAI
 
+    from portia.gemini_langsmith_wrapper import wrap_gemini
+
     if TYPE_CHECKING:
         from google.generativeai.types.generation_types import GenerationConfigDict
 
@@ -700,11 +702,14 @@ if validate_extras_dependencies("google", raise_error=False):
                 **kwargs,
             )
             super().__init__(client, model_name, cache=cache)
-            self._instructor_client = instructor.from_gemini(
-                client=genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
+            wrapped_gemini_model = wrap_gemini(
+                genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
                     model_name=model_name,
                     generation_config=generation_config,
-                ),
+                )
+            )
+            self._instructor_client = instructor.from_gemini(
+                client=wrapped_gemini_model,
                 mode=instructor.Mode.GEMINI_JSON,
                 use_async=False,
             )
