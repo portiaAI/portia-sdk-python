@@ -12,7 +12,7 @@ Thank you for your interest in contributing to Portia SDK! We welcome contributi
 
 ⚠️ **A note on new features** If you have something in mind, please give us a shout on our Discord channel. Features like new core abstractions, changes to infra or to dependencies will require careful consideration before we can move forward with them.
 
-## Paid contributions
+## Paid contributions
 Paid contributions are shown in the [Issue](https://github.com/portiaAI/portia-sdk-python/issues) list with the monetary amount shown as follows [£20]. If an issue does not include a monetary amount, it indicates that fixing it will not be remunerated (though we appreciate it greatly!). Please bear in mind the following rules for paid contributions:
 * If you wish to work on a paid contribution you should assign it to yourself. You then have a week to submit the code for the issue or else it will be unassigned from you. If the code is not submitted in this time, and you are unassigned, you are not permitted to assign yourself to that issue again.
 * Contributors can have only a single assigned issue at a time.
