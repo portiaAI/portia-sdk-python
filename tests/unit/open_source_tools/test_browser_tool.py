@@ -156,6 +156,7 @@ def test_browser_tool_bad_response(
     mock_auth_result = MagicMock()
     mock_auth_result.final_result.return_value = json.dumps(mock_auth_response.model_dump())
 
+    # Create async mock for agent.run() that returns different results for auth and task
     mock_run = AsyncMock(return_value=mock_auth_result)
 
     # Patch the Agent class
@@ -192,6 +193,7 @@ def test_browser_tool_no_auth_required(
     mock_task_result = MagicMock()
     mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
 
+    # Create async mock for agent.run() that returns different results for auth and task
     mock_run = AsyncMock(return_value=mock_task_result)
 
     # Patch the Agent class
@@ -730,6 +732,15 @@ def test_browserbase_provider_get_or_create_session_without_clarifications(
 
     assert connect_url == "test_connect_url"
     mock_browserbase_provider.bb.sessions.create.assert_called_once()  # type: ignore reportFunctionMemberAccess
+
+
+def test_process_task_data() -> None:
+    """Check strings are passed through."""
+    task_data = "this is the data"
+    assert BrowserTool.process_task_data(task_data) == task_data
+
+    task_data = ["this is the data"]
+    assert BrowserTool.process_task_data(task_data) == "\n".join(task_data)
 
 
 def test_browser_tool_multiple_calls(
