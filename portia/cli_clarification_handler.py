@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         CustomClarification,
         InputClarification,
         MultipleChoiceClarification,
+        UserVerificationClarification,
         ValueConfirmationClarification,
     )
 
@@ -42,7 +43,7 @@ class CLIClarificationHandler(ClarificationHandler):
         """
         click.echo(
             click.style(
-                f"{clarification.user_guidance} -- Please click on the link below to proceed."
+                f"{clarification.user_guidance} -- Please click on the link below to proceed. "
                 f"{clarification.action_url}",
                 fg=87,
             ),
@@ -93,6 +94,17 @@ class CLIClarificationHandler(ClarificationHandler):
             on_resolution(clarification, True)  # noqa: FBT003
         else:
             on_error(clarification, "Clarification was rejected by the user")
+
+    def handle_user_verification_clarification(
+        self,
+        clarification: UserVerificationClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle a user verification clarification by asking the user to confirm from the CLI."""
+        result = click.confirm(text=click.style(clarification.user_guidance, fg=87), default=False)
+        clarification.response = result
+        on_resolution(clarification, True)  # noqa: FBT003
 
     def handle_custom_clarification(
         self,

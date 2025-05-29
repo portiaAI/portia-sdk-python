@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
+from langchain.globals import set_llm_cache
 from pydantic import BaseModel, Field, HttpUrl
+from testcontainers.redis import RedisContainer
 
 from portia.clarification import ActionClarification, Clarification, InputClarification
 from portia.clarification_handler import ClarificationHandler
@@ -18,7 +20,7 @@ from portia.config import (
     StorageClass,
 )
 from portia.errors import PlanError, ToolHardError, ToolSoftError
-from portia.model import LLMProvider
+from portia.model import LLMProvider, OpenAIGenerativeModel
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step, Variable
 from portia.plan_run import PlanRunState
@@ -333,7 +335,9 @@ def test_portia_run_query_with_multiple_clarifications(
             return a + b
 
     test_clarification_handler = TestClarificationHandler()
-    test_clarification_handler.clarification_response = 456
+    test_clarification_handler.clarification_response = (
+        "Override value a with 456, keep value b as 2."
+    )
     tool_registry = ToolRegistry([MyAdditionTool()])
     portia = Portia(
         config=config,
@@ -696,3 +700,53 @@ def test_run_plan_with_large_step_input() -> None:
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert email_tool_called
+
+
+@pytest.mark.asyncio
+async def test_llm_caching(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test running a simple query."""
+    with RedisContainer() as redis:
+        monkeypatch.setenv(
+            "LLM_REDIS_CACHE_URL",
+            f"redis://{redis.get_container_host_ip()}:{redis.get_exposed_port(6379)}",
+        )
+        config = Config.from_default()
+
+        addition_tool = AdditionTool()
+        addition_tool.should_summarize = True
+
+        tool_registry = ToolRegistry([addition_tool])
+        portia = Portia(config=config, tools=tool_registry)
+        query = "Add 1 + 2"
+
+        plan_run = portia.run(query)
+
+        assert plan_run.state == PlanRunState.COMPLETE
+        assert plan_run.outputs.final_output
+        assert plan_run.outputs.final_output.get_value() == 3
+        for output in plan_run.outputs.step_outputs.values():
+            assert output.get_summary() is not None
+
+        # Run the test again, but with the OpenAI client mocked out so we can check it isn't called
+        original_model = cast("OpenAIGenerativeModel", config.get_planning_model())
+        client_mock = MagicMock()
+        original_model._client = client_mock  # noqa: SLF001
+        monkeypatch.setattr(Config, "get_planning_model", lambda self: original_model)  # noqa: ARG005
+
+        # Run the same query again
+        plan_run = portia.run(query)
+
+        assert plan_run.state == PlanRunState.COMPLETE
+        assert plan_run.outputs.final_output
+        client_mock.assert_not_called()
+
+        # Check we have data in the cache
+        redis_client = redis.get_client()
+        keys = redis_client.keys()
+        assert len(keys) > 0, "Redis should have at least one key"  # pyright: ignore[reportArgumentType]
+        assert any(
+            key.startswith(b"llm")
+            for key in keys  # pyright: ignore[reportGeneralTypeIssues]
+        ), "At least one Redis key should start with 'llm' - this is the planning key"
+
+    set_llm_cache(None)

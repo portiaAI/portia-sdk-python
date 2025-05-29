@@ -55,7 +55,7 @@ portia-cli run "add 1 + 2"
 **All set? Now let's explore some basic usage of the product 🚀**
 
 ### E2E example repo
-We have a repo that showcases some of our core concepts to get you started. It's available <a href="https://github.com/portiaAI/portia-agent-examples" target="_blank">**here (↗)**</a>. We recommend starting with the <a href="https://github.com/portiaAI/portia-agent-examples/tree/main/get_started_google_tools" target="_blank">**Google Tools example (↗)**</a> if you are brand new to Portia.
+We have a repo that showcases some of our core concepts to get you started. It's available <a href="https://github.com/portiaAI/portia-agent-examples" target="_blank">**here (↗)**</a>. We recommend starting with the <a href="https://github.com/portiaAI/portia-agent-examples/tree/main/get-started-google-tools" target="_blank">**Google Tools example (↗)**</a> if you are brand new to Portia.
 
 ### E2E example with open source tools
 This example is meant to get you familiar with a few of our core abstractions:
@@ -138,8 +138,10 @@ print(plan_run.model_dump_json(indent=2))
 - Watch us embarrass ourselves on our <a href="https://www.youtube.com/@PortiaAI" target="_blank">**YouTube channel (↗)**</a>.
 - Follow us on <a href="https://www.producthunt.com/posts/portia-ai" target="_blank">**Product Hunt (↗)**</a>.
 
-## Contribution guidelines
+## Paid contributions & contribution guidelines
 Head on over to our <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a> for details.
+
+Portia offers a **PAID** contribution program by fixing issues on our 'Issues' list. You can read all about this in the <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a>.
 
 # ⭐ Support
 You can support our work best by leaving a star!

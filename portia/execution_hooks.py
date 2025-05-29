@@ -205,7 +205,10 @@ def _clarify_on_tool_call_hook(
             source="User verification tool hook",
         )
 
-    if str(previous_clarification.response).lower() not in ["y", "yes", "Y", "YES", "Yes"]:
+    if (
+        isinstance(previous_clarification, UserVerificationClarification)
+        and not previous_clarification.user_confirmed
+    ):
         raise ToolHardError("User rejected tool call to {tool.name} with args {args}")
 
     return None
