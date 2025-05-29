@@ -689,6 +689,7 @@ if BROWSERBASE_AVAILABLE:
             session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
 
             if (
+                # Force a new session for each plan run
                 self._is_first_browser_tool_call(context.plan_run, context.plan)
                 or not session_id
                 or not session_connect_url

@@ -319,12 +319,15 @@ def test_browser_infra_local_setup_browser(
     context = get_test_tool_context()
     context.end_user = EndUser(external_id="test_user")
 
-    with patch("logging.Logger.warning") as mock_warning:
+    mock_logger_instance = MagicMock()
+    mock_logger = MagicMock(return_value=mock_logger_instance)
+    with patch("portia.open_source_tools.browser_tool.logger", mock_logger):
         browser = local_browser_provider.setup_browser(context)
 
         # Verify warning was logged for end_user
-        mock_warning.assert_called_once()
-        assert "does not support end users" in mock_warning.call_args[0][0]
+        mock_logger.assert_called_once()
+        mock_logger_instance.warning.assert_called_once()
+        assert "does not support end users" in mock_logger_instance.warning.call_args[0][0]
 
         # Verify browser instance
         assert isinstance(browser, Browser)
@@ -695,8 +698,10 @@ def test_browserbase_provider_get_or_create_session_with_clarifications(
             plan_run_id=PlanRunUUID(),
             action_url=HttpUrl("https://example.com"),
             source="Browser tool",
+            step=0,
         )
     ]
+    context.plan_run.outputs.clarifications = context.clarifications
     context.end_user.additional_data = {
         "bb_session_id": "existing_session_id",
         "bb_session_connect_url": "existing_connect_url",
