@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import os
 import sys
 from abc import ABC, abstractmethod
@@ -30,6 +29,7 @@ from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
+from portia import logger
 from portia.clarification import ActionClarification
 from portia.common import validate_extras_dependencies
 from portia.errors import ToolHardError
@@ -40,8 +40,6 @@ if TYPE_CHECKING:
     from browserbase.types import SessionCreateResponse
 
     from portia import Plan, PlanRun
-
-logger = logging.getLogger(__name__)
 
 NotSet: Any = PydanticUndefined
 
@@ -185,9 +183,13 @@ class BrowserTool(Tool[str | BaseModel]):
     description: str = Field(
         init_var=True,
         default=(
-            "General purpose browser tool. Can be used to navigate to a URL and "
-            "complete tasks. Should only be used if the task requires a browser "
-            "and you are sure of the URL. This tool handles a full end to end task. "
+            "General purpose browser tool. Can be used to navigate to a URL and complete tasks. "
+            "Should only be used if the task requires a browser and you are sure of the URL. "
+            "This tool handles a full end to end task. It is capable of doing multiple things "
+            "across different URLs within the same root domain as part of the end to end task. As "
+            "a result, do not call this tool more than once back to back unless it is for "
+            "different root domains - just call it once with the combined task and the URL set "
+            "to the root domain."
         ),
     )
     args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
@@ -287,8 +289,7 @@ class BrowserTool(Tool[str | BaseModel]):
             if task_result.human_login_required:  # type: ignore reportCallIssue
                 return handle_login_requirement(task_result)  # type: ignore reportCallIssue
 
-            if self._is_final_browser_call(ctx.plan_run, ctx.plan):
-                self.infrastructure_provider.close(ctx)
+            self.infrastructure_provider.step_complete(ctx)
             return task_result.task_output  # type: ignore reportCallIssue
 
         try:
@@ -297,12 +298,6 @@ class BrowserTool(Tool[str | BaseModel]):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop.run_until_complete(run_browser_tasks())
-
-    def _is_final_browser_call(self, plan_run: PlanRun, plan: Plan) -> bool:
-        """Check if the current call is the final browser call in the plan run."""
-        return any(
-            step.tool_id == "browser_tool" for step in plan.steps[plan_run.current_step_index + 1 :]
-        )
 
 
 class BrowserToolForUrl(BrowserTool):
@@ -396,11 +391,8 @@ class BrowserInfrastructureProvider(ABC):
         """Construct the URL for the auth clarification."""
 
     @abstractmethod
-    def close(self, ctx: ToolRunContext) -> None:
-        """Clean up any resources used by the browser infrastructure provider.
-
-        This is called after the final usage of this tool in the plan run.
-        """
+    def step_complete(self, ctx: ToolRunContext) -> None:
+        """Call when the step is complete to e.g. release the session if needed."""
 
 
 class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
@@ -429,7 +421,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
 
         """
         if ctx.end_user.external_id:
-            logger.warning(
+            logger().warning(
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
@@ -486,7 +478,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-    def close(self, ctx: ToolRunContext) -> None:
+    def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g release the session."""
 
     def get_extra_chromium_args(self) -> list[str] | None:
@@ -553,9 +545,14 @@ if BROWSERBASE_AVAILABLE:
 
             self.bb = Browserbase(api_key=api_key)
 
-        def close(self, ctx: ToolRunContext) -> None:
+        def step_complete(self, ctx: ToolRunContext) -> None:
             """Call when the step is complete closes the session to persist context."""
+            # Only clean up the session on the final browser tool call
+            if not self._is_final_browser_tool_call(ctx.plan_run, ctx.plan):
+                return
+
             session_id = ctx.end_user.get_additional_data("bb_session_id")
+            logger().debug(f"Closing BrowserBase session with id: {session_id}")
             if session_id:
                 self.bb.sessions.update(
                     session_id,
@@ -581,8 +578,8 @@ if BROWSERBASE_AVAILABLE:
 
             """
             if ctx.end_user.get_additional_data("bb_context_id"):
-                logger.debug(
-                    "Reusing existing context id: "  # noqa: G004
+                logger().debug(
+                    "Reusing existing context id: "
                     f"{ctx.end_user.get_additional_data('bb_context_id')}, "
                     f"end user: {ctx.end_user.external_id}"
                 )
@@ -605,6 +602,7 @@ if BROWSERBASE_AVAILABLE:
                     session ID and connection URL.
 
             """
+            logger().debug(f"Creating BrowserBase session with context id: {bb_context_id}")
             return self.bb.sessions.create(
                 project_id=self.project_id,  # type: ignore reportArgumentType
                 browser_settings={
@@ -640,23 +638,24 @@ if BROWSERBASE_AVAILABLE:
 
             context.end_user.set_additional_data("bb_context_id", context_id)
 
-            if context.clarifications:
-                session_id = context.end_user.get_additional_data("bb_session_id")
-                session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
-            else:
-                session_id = None
-                session_connect_url = None
+            session_id = context.end_user.get_additional_data("bb_session_id")
+            session_connect_url = context.end_user.get_additional_data("bb_session_connect_url")
 
-            if not session_id or not session_connect_url:
+            if (
+                self._is_first_browser_tool_call(context.plan_run, context.plan)
+                or not session_id
+                or not session_connect_url
+            ):
                 session = self.create_session(context_id)
                 session_connect_url = session.connect_url
                 session_id = session.id
                 context.end_user.set_additional_data("bb_session_id", session_id)
                 context.end_user.set_additional_data("bb_session_connect_url", session_connect_url)
+            else:
+                logger().debug(f"Reusing existing BrowserBase session with id: {session_id}")
 
-            logger.info(
-                "Browser tool debug link: %s",
-                self.bb.sessions.debug(session_id).debugger_url,
+            logger().info(
+                f"Browser tool debug link: {self.bb.sessions.debug(session_id).debugger_url}"
             )
 
             return session_connect_url
@@ -707,4 +706,23 @@ if BROWSERBASE_AVAILABLE:
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
                 ),
+            )
+
+        def _is_final_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
+            """Check if the current call is the final browser call in the plan run."""
+            return not any(
+                step.tool_id == "browser_tool"
+                for step in plan.steps[plan_run.current_step_index + 1 :]
+            )
+
+        def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
+            """Check if the current call is the first browser call in the plan run.
+
+            This will return false if we have resumed after a clarification.
+            """
+            if len(plan_run.get_clarifications_for_step()) > 0:
+                return False
+
+            return not any(
+                step.tool_id == "browser_tool" for step in plan.steps[: plan_run.current_step_index]
             )
