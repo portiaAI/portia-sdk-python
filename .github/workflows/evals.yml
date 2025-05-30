@@ -55,12 +55,12 @@ jobs:
       - name: Install dependencies to SteelThread
         working-directory: ./platform/steel_thread
         run: |
-          uv add "portia-sdk-python @ file://../../portia-sdk-python"
+          uv add "portia-sdk-python @ file://../../portia-sdk-python[all]"
 
       - name: Install dependencies to Evals
         working-directory: ./platform/evals
         run: |
-          uv add "portia-sdk-python @ file://../../portia-sdk-python"
+          uv add "portia-sdk-python @ file://../../portia-sdk-python[all]"
 
       - name: Check tool IDs
         working-directory: ./platform/evals
