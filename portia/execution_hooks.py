@@ -196,12 +196,15 @@ def _clarify_on_tool_call_hook(
     previous_clarification = plan_run.get_clarification_for_step(
         ClarificationCategory.USER_VERIFICATION
     )
+    serialised_args = (
+        ", ".join([f"{k}={v}" for k, v in args.items()]).replace("{", "[").replace("}", "]")
+    )
 
     if not previous_clarification or not previous_clarification.resolved:
         return UserVerificationClarification(
             plan_run_id=plan_run.id,
             user_guidance=f"Are you happy to proceed with the call to {tool.name} with args "
-            f"{args}? Enter 'y' or 'yes' to proceed",
+            f"{serialised_args}? Enter 'y' or 'yes' to proceed",
             source="User verification tool hook",
         )
 
