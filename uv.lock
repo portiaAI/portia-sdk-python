@@ -1874,7 +1874,7 @@ requires-dist = [
     { name = "langgraph", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.2.59,<0.3" },
     { name = "langsmith", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3.15,<0.4" },
     { name = "loguru", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.7.3,<0.8" },
-    { name = "mcp", specifier = ">=1.6.0,<2" },
+    { name = "mcp", specifier = ">=1.9.2,<2" },
     { name = "mistralai", marker = "extra == 'all'", specifier = ">=1.2.5,<2" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = ">=1.2.5,<2" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = ">=1.2.5,<2" },
