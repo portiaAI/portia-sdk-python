@@ -32,6 +32,7 @@ from portia.mcp_session import (
     McpClientConfig,
     SseMcpClientConfig,
     StdioMcpClientConfig,
+    StreamableHttpMcpClientConfig,
     get_mcp_session,
 )
 from portia.open_source_tools.calculator_tool import CalculatorTool
@@ -417,6 +418,56 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
+    def from_streamable_http_connection(  # noqa: PLR0913
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 30,
+        sse_read_timeout: float = 60 * 5,
+        *,
+        terminate_on_close: bool = True,
+        auth: httpx.Auth | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a StreamableHTTP connection (Sync version)."""
+        config = StreamableHttpMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
+            terminate_on_close=terminate_on_close,
+            auth=auth,
+        )
+        tools = cls._load_tools(config)
+        return cls(tools)
+
+    @classmethod
+    async def from_streamable_http_connection_async(  # noqa: PLR0913
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 30,  # noqa: ASYNC109
+        sse_read_timeout: float = 60 * 5,
+        *,
+        terminate_on_close: bool = True,
+        auth: httpx.Auth | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a StreamableHTTP connection (Async version)."""
+        config = StreamableHttpMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
+            terminate_on_close=terminate_on_close,
+            auth=auth,
+        )
+        tools = await cls._load_tools_async(config)
+        return cls(tools)
+
+    @classmethod
     def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
         """Sync version to load tools from an MCP server."""
         return asyncio.run(cls._load_tools_async(mcp_client_config))
@@ -602,7 +653,7 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  #
             types = [
                 _map_single_pydantic_type(field_name, t, allow_nonetype=True) for t in union_types
             ]
-            return Union[*types]
+            return Union[*types]  # pyright: ignore[reportInvalidTypeForm, reportInvalidTypeArguments]
         case _:
             logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
             return Any
