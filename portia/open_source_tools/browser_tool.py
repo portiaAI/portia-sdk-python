@@ -595,7 +595,10 @@ if BROWSERBASE_AVAILABLE:
         def step_complete(self, ctx: ToolRunContext) -> None:
             """Call when the step is complete closes the session to persist context."""
             # Only clean up the session on the final browser tool call
-            if not self._is_final_browser_tool_call(ctx.plan_run, ctx.plan):
+            if any(
+                step.tool_id == "browser_tool"
+                for step in ctx.plan.steps[ctx.plan_run.current_step_index + 1 :]
+            ):
                 return
 
             session_id = ctx.end_user.get_additional_data("bb_session_id")
@@ -754,13 +757,6 @@ if BROWSERBASE_AVAILABLE:
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
                 ),
-            )
-
-        def _is_final_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
-            """Check if the current call is the final browser call in the plan run."""
-            return not any(
-                step.tool_id == "browser_tool"
-                for step in plan.steps[plan_run.current_step_index + 1 :]
             )
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
