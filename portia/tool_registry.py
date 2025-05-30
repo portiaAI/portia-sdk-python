@@ -653,7 +653,7 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  #
             types = [
                 _map_single_pydantic_type(field_name, t, allow_nonetype=True) for t in union_types
             ]
-            return Union[*types]
+            return Union[*types]  # pyright: ignore[reportInvalidTypeForm, reportInvalidTypeArguments]
         case _:
             logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
             return Any
