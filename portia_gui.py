@@ -8,21 +8,20 @@ This module provides a Terminal GUI for visualizing Portia execution with:
 
 from __future__ import annotations
 
-import contextlib
 import threading
-from typing import Any
+from typing import Any, ClassVar
 
 import dotenv
-from textual import on
+from textual import events, log, on
+from textual.binding import Binding, BindingType
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
+from textual.message import Message
 from textual.reactive import reactive, var
-from textual.widget import Widget
-from textual.widgets import Button, Footer, Header, Label, RichLog, Static
+from textual.widgets import Button, Label, RichLog, Static, TextArea, Footer, Header
 
-from portia import PlanRun, PlanRunState, Portia
+from portia import PlanRun, Portia
 from portia.clarification import Clarification
-from portia.clarification_handler import ClarificationHandler
 from portia.config import Config
 from portia.execution_agents.output import Output
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
@@ -31,25 +30,41 @@ from portia.plan import Plan, Step
 from portia.tool import Tool
 
 
+class PanelTitle(Static):
+    """Panel title."""
+
+    def __init__(self, title: str) -> None:
+        super().__init__()
+        self.title = title
+
+    def compose(self) -> ComposeResult:
+        yield Label(self.title, classes="panel-title")
+
 class QueryText(Static):
     """Panel to display the query being executed."""
 
     query: reactive[str] = reactive("")
 
-    def render(self) -> str:
-        """Render the query panel."""
-        return f"Query: {self.query}"
+    class QueryUpdate(Message):
+        """Message to update the query."""
 
-    def set_query(self, query: str) -> None:
-        """Set the query to display."""
-        self.query = query
+        def __init__(self, query: str) -> None:
+            super().__init__()
+            self.query = query
 
+    def compose(self) -> ComposeResult:
+        yield PanelTitle("Query")
+        yield TextArea(id="query-input")
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        """Handle the query update."""
+        self.post_message(self.QueryUpdate(event.control.text))
 
 class StatusText(Static):
     """Panel to display the status of the execution."""
 
     def compose(self) -> ComposeResult:
-        yield Label("Status")
+        yield PanelTitle("Status")
         yield Static("", id="status-text", markup=True)
 
     def set_status(self, message: str) -> None:
@@ -85,7 +100,7 @@ class PlanPanel(Vertical):
 
     def compose(self) -> ComposeResult:
         """Compose the plan panel."""
-        yield Static("Plan Execution:", classes="panel-title")
+        yield PanelTitle("Plan Execution")
         yield Container(id="plan-steps")
 
     def set_plan(self, plan) -> None:
@@ -175,7 +190,7 @@ class LogPanel(Vertical):
 
     def compose(self) -> ComposeResult:
         """Compose the log panel."""
-        yield Static("Logs:", classes="panel-title")
+        yield PanelTitle("Logs")
         yield RichLog(id="log-output", auto_scroll=True, wrap=True, highlight=True, markup=True)
 
 
@@ -187,6 +202,10 @@ class PortiaGUI(App):
     """Main Portia GUI application."""
 
     theme = "nord"
+    CSS_PATH = "portia_gui.tcss"
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("ctrl+r", "start_execution", "Start execution", priority=True, show=True),
+    ]
 
     # Reactive variables for state management
     current_plan_run: var[PlanRun | None] = var(None)
@@ -215,28 +234,34 @@ class PortiaGUI(App):
 
     def compose(self) -> ComposeResult:
         """Compose the main application layout."""
-        yield Header()
-        yield Horizontal(
-            Vertical(
-                Container(QueryText()),
-                Container(StatusText())
-            ),
-            Container(PlanPanel(), id="plan-panel"),
-            Container(LogPanel(), id="log-panel"),
-        )
-        yield Horizontal(
-            Button("Start Execution", id="start-btn", variant="success"),
-            Button("Stop Execution", id="stop-btn", variant="error", disabled=True),
-            Button("Quit", id="quit-btn", variant="warning"),
-            id="controls",
-        )
-        yield Footer()
+        with Container(id="main-container"):
+            yield Header()
+            yield Horizontal(
+                Vertical(
+                    Container(QueryText(), classes="app-panel"),
+                    Container(StatusText(), classes="app-panel")
+                ),
+                Container(PlanPanel(), id="plan-panel", classes="app-panel"),
+                Container(LogPanel(), id="log-panel", classes="app-panel"),
+                id="query-status-panel",
+            )
+            yield Horizontal(
+                Button("Start Execution", id="start-btn", variant="success"),
+                Button("Stop Execution", id="stop-btn", variant="error", disabled=True),
+                Button("Quit", id="quit-btn", variant="warning"),
+                id="controls-panel",
+                classes="app-panel",
+            )
+            yield Footer()
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""
         self.title = "Portia Terminal GUI"
-        query_panel = self.query_one(QueryText)
-        query_panel.set_query(self.query)
+
+    @on(QueryText.QueryUpdate)
+    def update_query(self, event: QueryText.QueryUpdate) -> None:
+        """Update the query."""
+        self.query = event.query
 
     def _run_portia(self) -> None:
         self.query_one(StatusText).set_status("Setting up Portia...")
@@ -327,11 +352,21 @@ class PortiaGUI(App):
             stop_btn = self.query_one("#stop-btn", Button)
             self.call_from_thread(self._reset_buttons, start_btn, stop_btn)
 
+    def action_start_execution(self) -> None:
+        """Start the execution."""
+        self.start_execution()
+
     @on(Button.Pressed, "#start-btn")
+    def handle_press_start_btn(self) -> None:
+        """Handle the press of the start button."""
+        self.start_execution()
+
     def start_execution(self) -> None:
         """Start the execution."""
         if self.execution_thread and self.execution_thread.is_alive():
             return
+        if self.execution_thread and not self.execution_thread.is_alive():
+            self.execution_thread = None
 
         self._stop_requested = False
 
@@ -359,9 +394,6 @@ class PortiaGUI(App):
         stop_btn.disabled = True
 
         self.query_one(StatusText).set_status("[red]Execution stop requested by user[/red]")
-        if self.execution_thread:
-            self.execution_thread.join()
-            self.execution_thread = None
 
     def set_status(self, message: str) -> None:
         """Set the status of the execution."""

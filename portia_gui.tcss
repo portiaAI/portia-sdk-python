@@ -1,0 +1,26 @@
+#main-container > #query-status-panel {
+    height: 7fr;
+}
+
+#main-container > #controls-panel {
+    height: 1fr;
+}
+
+#controls-panel {
+    align: center middle;
+}
+
+#controls-panel Button {
+    margin: 0 2;
+    
+}
+
+.app-panel {
+    padding: 1;
+    border: solid $primary;
+}
+
+.panel-title {
+    margin: 1 1;
+    text-style: bold;
+}
