@@ -186,64 +186,7 @@ class PortiaExit(Exception):
 class PortiaGUI(App):
     """Main Portia GUI application."""
 
-    CSS = """
-    Horizontal {
-        height: 100%;
-    }
-    
-    QueryText {
-        width: 1fr;
-        min-width: 30;
-        padding: 1;
-        border: solid $primary;
-    }
-    
-    #plan-panel {
-        width: 2fr;
-        min-width: 40;
-        border: solid blue;
-    }
-    
-    #log-panel {
-        width: 2fr;
-        min-width: 40;
-        border: solid red;
-    }
-    
-    .panel-title {
-        background: $primary;
-        color: $text;
-        padding: 0 1;
-        margin-bottom: 1;
-        text-style: bold;
-    }
-    
-    #plan-steps {
-        padding: 1;
-        height: auto;
-    }
-    
-    #log-output {
-        height: 1fr;
-        border: solid $primary;
-        margin: 1;
-    }
-    
-    #controls {
-        height: 3;
-        dock: bottom;
-    }
-    
-    Button {
-        margin: 0 1;
-    }
-    
-    PlanStepWidget {
-        height: auto;
-        margin: 0 0 1 0;
-        padding: 0 1;
-    }
-    """
+    theme = "nord"
 
     # Reactive variables for state management
     current_plan_run: var[PlanRun | None] = var(None)
@@ -281,7 +224,7 @@ class PortiaGUI(App):
             Container(PlanPanel(), id="plan-panel"),
             Container(LogPanel(), id="log-panel"),
         )
-        yield Container(
+        yield Horizontal(
             Button("Start Execution", id="start-btn", variant="success"),
             Button("Stop Execution", id="stop-btn", variant="error", disabled=True),
             Button("Quit", id="quit-btn", variant="warning"),
@@ -375,7 +318,7 @@ class PortiaGUI(App):
                 self.set_status("Executing...")
                 portia.run_plan(self.plan)
         except PortiaExit:
-            self.set_status("[red]Execution stop requested by user[/red]")
+            self.set_status("[red]Portia exited after execution stop requested by user[/red]")
         except Exception as e:
             self.set_status(f"[red]Execution failed: {e!s}[/red]")
         finally:
@@ -415,147 +358,21 @@ class PortiaGUI(App):
         stop_btn = self.query_one("#stop-btn", Button)
         stop_btn.disabled = True
 
-        self.set_status("[red]Execution stop requested by user[/red]")
+        self.query_one(StatusText).set_status("[red]Execution stop requested by user[/red]")
+        if self.execution_thread:
+            self.execution_thread.join()
+            self.execution_thread = None
 
     def set_status(self, message: str) -> None:
         """Set the status of the execution."""
-        self.log("hello")
         status_text = self.query_one(StatusText)
-        self.log(f"Setting status: {message} on {status_text}")
-        self.call_from_thread(self.query_one(StatusText).set_status, message)
+        self.call_from_thread(status_text.set_status, message)
 
     @on(Button.Pressed, "#quit-btn")
     def quit_app(self) -> None:
         """Quit the application."""
         self._stop_requested = True
         self.exit()
-
-    # def _run_execution(self) -> None:
-    #     """Run the Portia execution in a separate thread."""
-    #     log_widget = None
-
-    #     try:
-    #         # Get the log widget for capturing output
-    #         log_widget = self.query_one("#log-output", RichLog)
-
-    #         # Setup log capture
-    #         with LogCapture(log_widget, level=self.portia.config.default_log_level.value):
-    #             if self._stop_requested:
-    #                 return
-
-    #             # First, create the plan
-    #             self.plan = self.portia.plan(self.query)
-
-    #             if self._stop_requested:
-    #                 return
-
-    #             # Update the plan panel
-    #             plan_panel = self.query_one("#plan-panel PlanPanel", PlanPanel)
-    #             self.call_from_thread(plan_panel.set_plan, self.plan)
-
-    #             if self._stop_requested:
-    #                 return
-
-    #             # Execute the plan step by step with updates
-    #             self._execute_plan_with_updates()
-
-    #     except Exception as e:
-    #         self.set_status(f"[red]Execution failed: {e!s}[/red]")
-
-    #     finally:
-    #         # Re-enable start button
-    #         start_btn = self.query_one("#start-btn", Button)
-    #         stop_btn = self.query_one("#stop-btn", Button)
-    #         self.call_from_thread(self._reset_buttons, start_btn, stop_btn)
-
-    # def _execute_plan_with_updates(self) -> None:
-    #     """Execute the plan while providing real-time updates."""
-    #     plan_panel = self.query_one("#plan-panel PlanPanel", PlanPanel)
-
-    #     try:
-    #         if self._stop_requested:
-    #             return
-
-    #         # Run the plan directly and monitor via polling
-    #         # This is simpler than trying to step through manually
-
-    #         # Start execution in the background and monitor progress
-    #         execution_thread = threading.Thread(target=self._execute_plan_run)
-    #         execution_thread.daemon = True
-    #         execution_thread.start()
-
-    #         # Monitor progress
-    #         last_observed_step_index = -1
-    #         while execution_thread.is_alive() and not self._stop_requested:
-    #             if (
-    #                 self.plan_run_id is not None
-    #                 (plan_run := self.portia.storage.get_plan_run(self.plan_run_id))
-    #                 and plan_run.current_step_index != last_observed_step_index
-    #             ):
-    #                 current_step_index = plan_run.current_step_index
-
-    #                 # Mark previous step as completed
-    #                 if last_observed_step_index >= 0:
-    #                     self.call_from_thread(
-    #                         plan_panel.update_step_status, last_observed_step_index, "completed"
-    #                     )
-
-    #                 # Mark current step as running
-    #                 if current_step_index < len(self.plan.steps):
-    #                     self.call_from_thread(
-    #                         plan_panel.update_step_status, current_step_index, "running"
-    #                     )
-
-    #                 last_observed_step_index = current_step_index
-
-    #             # Small delay to avoid busy waiting
-    #             threading.Event().wait(0.1)
-
-    #         # Wait for execution to complete
-    #         execution_thread.join(timeout=1.0)
-
-    #         # Final status updates
-    #         if self.plan_run_id is not None:
-    #             plan_run = self.portia.storage.get_plan_run(self.plan_run_id)
-    #             if plan_run.state == PlanRunState.COMPLETE:
-    #                 # Mark last step as completed
-    #                 for step_index in range(max(last_observed_step_index, 0), len(self.plan.steps)):
-    #                     self.call_from_thread(
-    #                         plan_panel.update_step_status, step_index, "completed"
-    #                     )
-
-    #                 self.set_status("[green]Execution completed successfully![/green]")
-    #                 if plan_run.outputs.final_output:
-    #                     self.set_status(f"[green]Final output: {plan_run.outputs.final_output.get_summary()}[/green]")
-    #             elif plan_run.state == PlanRunState.FAILED:
-    #                 # Mark current step as failed
-    #                 if last_observed_step_index >= 0:
-    #                     self.call_from_thread(
-    #                         plan_panel.update_step_status, last_observed_step_index, "failed"
-    #                     )
-
-    #                 self.set_status("[red]Execution failed![/red]")
-    #             elif plan_run.state == PlanRunState.NEED_CLARIFICATION:
-    #                 clarifications = plan_run.get_outstanding_clarifications()
-    #                 clarifications_str = "\n".join(
-    #                     clarification.model_dump_json(indent=2) for clarification in clarifications
-    #                 )
-    #                 self.set_status(
-    #                     f"[yellow]Clarifications:\n{clarifications_str}[/yellow]"
-    #                 )
-
-    #     except Exception as e:
-    #         import traceback
-    #         stack_trace = traceback.format_exc()
-    #         self.set_status(f"[red]Error during execution: {e!s} {stack_trace}[/red]")
-    #     finally:
-    #         self.plan_run_id = None
-
-    # def _execute_plan_run(self) -> None:
-    #     """Execute the plan run (called in separate thread)."""
-    #     with contextlib.suppress(Exception):
-    #         plan_run = self.portia.run_plan(self.plan)
-    #         self.plan_run_id = plan_run.id
 
     def _reset_buttons(self, start_btn: Button, stop_btn: Button) -> None:
         """Reset button states after execution."""
