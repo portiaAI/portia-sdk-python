@@ -13,12 +13,12 @@ from typing import Any, ClassVar
 
 import dotenv
 from textual import events, log, on
-from textual.binding import Binding, BindingType
 from textual.app import App, ComposeResult
+from textual.binding import Binding, BindingType
 from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive, var
-from textual.widgets import Button, Label, RichLog, Static, TextArea, Footer, Header
+from textual.widgets import Button, Footer, Header, Label, RichLog, Static, TextArea
 
 from portia import PlanRun, Portia
 from portia.clarification import Clarification

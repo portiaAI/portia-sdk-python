@@ -425,12 +425,57 @@ toml = [
 ]
 
 [[package]]
+name = "daytona-api-client"
+version = "0.19.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "python-dateutil" },
+    { name = "typing-extensions" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/88/f9/f8bc5d08af61a4c8d17f95a942abcda285e4cd8d0ba2674a7779b6e3f3e3/daytona_api_client-0.19.1.tar.gz", hash = "sha256:855fb6e569021c5d1d13ea6236837a4c780a1efec9d06dec085520cce790c0a9", size = 72529, upload-time = "2025-05-22T10:48:28.763Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/7a/5c083c799b5cef7da47fc23570b596783ca7de323e3fab1e265b44fd3d2f/daytona_api_client-0.19.1-py3-none-any.whl", hash = "sha256:7c16be29a2bcc21109e14fc314b348063390cec018823c6ff77d5c464b6b3484", size = 195578, upload-time = "2025-05-22T10:48:27.528Z" },
+]
+
+[[package]]
+name = "daytona-sdk"
+version = "0.10.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "daytona-api-client" },
+    { name = "deprecated" },
+    { name = "environs" },
+    { name = "marshmallow" },
+    { name = "pydantic" },
+    { name = "python-dateutil" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/51/fd6d2449eea4dc4d7ecf66ad339b6822f88db340caf9fdd50afc12b56d63/daytona_sdk-0.10.5.tar.gz", hash = "sha256:0fa33fcf8bff337c3639dccc1b533dd8d00232362922b20c33f93508c76f250f", size = 29467, upload-time = "2025-03-20T11:08:28.994Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/22/63/80d03e18ce57cf605506d93f39719b56808b025f194ad22fd45cce5acab9/daytona_sdk-0.10.5-py3-none-any.whl", hash = "sha256:105569413c1538e2ace1b586f504db146fead915f878e80ff763445aefda740f", size = 34701, upload-time = "2025-03-20T11:08:27.459Z" },
+]
+
+[[package]]
 name = "defusedxml"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69", size = 75520, upload-time = "2021-03-08T10:59:26.269Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61", size = 25604, upload-time = "2021-03-08T10:59:24.45Z" },
+]
+
+[[package]]
+name = "deprecated"
+version = "1.2.18"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/97/06afe62762c9a8a86af0cfb7bfdab22a43ad17138b07af5b1a58442690a2/deprecated-1.2.18.tar.gz", hash = "sha256:422b6f6d859da6f2ef57857761bfb392480502a64c3028ca9bbe86085d72115d", size = 2928744, upload-time = "2025-01-27T10:46:25.7Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6e/c6/ac0b6c1e2d138f1002bcf799d330bd6d85084fece321e662a14223794041/Deprecated-1.2.18-py2.py3-none-any.whl", hash = "sha256:bd5011788200372a32418f888e326a09ff80d0214bd961147cfed01b5c018eec", size = 9998, upload-time = "2025-01-27T10:46:09.186Z" },
 ]
 
 [[package]]
@@ -472,6 +517,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/08/12/9c22a58c0b1e29271051222d8906257616da84135af9ed167c9e28f85cb3/docstring_parser-0.16.tar.gz", hash = "sha256:538beabd0af1e2db0146b6bd3caa526c35a34d61af9fd2887f3a8a27a739aa6e", size = 26565, upload-time = "2024-03-15T10:39:44.419Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d5/7c/e9fcff7623954d86bdc17782036cbf715ecab1bec4847c008557affe1ca8/docstring_parser-0.16-py3-none-any.whl", hash = "sha256:bf0a1387354d3691d102edef7ec124f219ef639982d096e26e3b60aeffa90637", size = 36533, upload-time = "2024-03-15T10:39:41.527Z" },
+]
+
+[[package]]
+name = "environs"
+version = "9.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "marshmallow" },
+    { name = "python-dotenv" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d4/e3/c3c6c76f3dbe3e019e9a451b35bf9f44690026a5bb1232f7b77097b72ff5/environs-9.5.0.tar.gz", hash = "sha256:a76307b36fbe856bdca7ee9161e6c466fd7fcffc297109a118c59b54e27e30c9", size = 20795, upload-time = "2022-01-30T18:07:56.251Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/5e/f0f217dc393372681bfe05c50f06a212e78d0a3fee907a74ab451ec1dcdb/environs-9.5.0-py2.py3-none-any.whl", hash = "sha256:1e549569a3de49c05f856f40bce86979e7d5ffbbc4398e7f338574c220189124", size = 12548, upload-time = "2022-01-30T18:07:54.874Z" },
 ]
 
 [[package]]
@@ -1331,6 +1389,18 @@ wheels = [
 ]
 
 [[package]]
+name = "marshmallow"
+version = "3.26.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ab/5e/5e53d26b42ab75491cda89b871dab9e97c840bf12c63ec58a1919710cd06/marshmallow-3.26.1.tar.gz", hash = "sha256:e6d8affb6cb61d39d26402096dc0aee12d5a26d490a121f118d2e81dc0719dc6", size = 221825, upload-time = "2025-02-03T15:32:25.093Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/34/75/51952c7b2d3873b44a0028b1bd26a25078c18f92f256608e8d1dc61b39fd/marshmallow-3.26.1-py3-none-any.whl", hash = "sha256:3350409f20a70a7e4e11a27661187b77cdcaeb20abca41c1454fe33636bea09c", size = 50878, upload-time = "2025-02-03T15:32:22.295Z" },
+]
+
+[[package]]
 name = "mcp"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1852,6 +1922,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "click" },
+    { name = "daytona-sdk" },
     { name = "instructor", marker = "python_full_version < '4.0'" },
     { name = "jinja2" },
     { name = "jsonref" },
@@ -1941,6 +2012,7 @@ requires-dist = [
     { name = "browserbase", marker = "extra == 'all'", specifier = ">=1.2.0,<2" },
     { name = "browserbase", marker = "extra == 'tools-browser-browserbase'", specifier = ">=1.2.0,<2" },
     { name = "click", specifier = ">=8.1.7,<9" },
+    { name = "daytona-sdk", specifier = ">=0.10.5" },
     { name = "google-generativeai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=0.8.4,<0.9" },
     { name = "google-generativeai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'google'", specifier = ">=0.8.4,<0.9" },
     { name = "instructor", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=1.7.7,<2" },

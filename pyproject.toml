@@ -37,6 +37,7 @@ dependencies = [
     "pytest-repeat>=0.9.4",
     "textual>=3.2.0",
     "textual-dev>=1.7.0",
+    "daytona-sdk>=0.10.5",
 ]
 
 [project.optional-dependencies]
