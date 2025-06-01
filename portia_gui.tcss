@@ -1,5 +1,9 @@
+#main-container {
+    height: 100%;
+}
+
 #main-container > #query-status-panel {
-    height: 7fr;
+    height: 4fr;
 }
 
 #main-container > #controls-panel {

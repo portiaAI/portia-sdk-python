@@ -12,7 +12,7 @@ import threading
 from typing import Any, ClassVar
 
 import dotenv
-from textual import events, log, on
+from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Container, Horizontal, Vertical
@@ -341,7 +341,8 @@ class PortiaGUI(App):
                 self.call_from_thread(plan_panel.set_plan, self.plan)
 
                 self.set_status("Executing...")
-                portia.run_plan(self.plan)
+                plan_run = portia.run_plan(self.plan)
+                self.set_status("[b][green]Final output[/green][/b]\n\n" + plan_run.outputs.final_output.summary)
         except PortiaExit:
             self.set_status("[red]Portia exited after execution stop requested by user[/red]")
         except Exception as e:
@@ -410,14 +411,6 @@ class PortiaGUI(App):
         """Reset button states after execution."""
         start_btn.disabled = False
         stop_btn.disabled = True
-
-
-# import multiprocessing as mp
-
-
-# def portia_server(queue: mp.Queue):
-#     while True:
-#         queue.get()
 
 
 dotenv.load_dotenv()
