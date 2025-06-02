@@ -439,7 +439,9 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_custom_model_from_string_raises_error() -> None:
     """Test custom model from string raises an error."""
-    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
+    with pytest.raises(
+        InvalidConfigError, match="DEFAULT_MODEL is not valid - The value custom/test is not valid"
+    ):
         _ = Config.from_default(default_model="custom/test")
 
 
@@ -466,7 +468,10 @@ def test_check_model_supported_raises_deprecation_warning() -> None:
 def test_summarizer_model_not_instantiable(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test summarizer model is not instantiable."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
-    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
+    with pytest.raises(
+        InvalidConfigError,
+        match="SUMMARIZER_MODEL is not valid - The value mistralai/mistral-large-latest",
+    ):
         Config.from_default(
             default_model="openai/gpt-4o",
             summarizer_model="mistralai/mistral-large-latest",
