@@ -1,44 +1,13 @@
 """Token counting utilities with fallback for offline environments."""
 
-import concurrent.futures
-
-import tiktoken
+AVERAGE_CHARS_PER_TOKEN = 5
 
 
-class TokenCounter:
-    """A wrapper around tiktoken with fallback for offline environments."""
+def estimate_tokens(text: str) -> int:
+    """Estimate the number of tokens in a string using character-based estimation.
 
-    AVERAGE_CHARS_PER_TOKEN = 5
-    DEFAULT_TIMEOUT = 2.0
-    _encoding = None
-    _encoding_download_attempted = False
-
-    @classmethod
-    def count_tokens(cls, text: str) -> int:
-        """Count tokens in text using tiktoken, with fallback to character-based estimation.
-
-        We expect to use the fallback behaviour in offline environments where tiktoken can't
-        download encodings.
-        """
-        if not cls._encoding_download_attempted:
-            try:
-                cls._encoding = cls.get_encoding_with_timeout()
-            except Exception:  # noqa: BLE001
-                cls._encoding = None
-            cls._encoding_download_attempted = True
-
-        if cls._encoding is not None:
-            return len(cls._encoding.encode(text))
-        return int(len(text) / cls.AVERAGE_CHARS_PER_TOKEN)
-
-    @classmethod
-    def get_encoding_with_timeout(cls, timeout: float | None = None) -> tiktoken.Encoding:
-        """Get the encoding with a timeout for tiktoken's requests."""
-        timeout = timeout or cls.DEFAULT_TIMEOUT
-        executor = concurrent.futures.ThreadPoolExecutor()
-        try:
-            future = executor.submit(tiktoken.get_encoding, "gpt2")
-            return future.result(timeout=timeout)
-        finally:
-            # Always shutdown without waiting to prevent hanging on timeout
-            executor.shutdown(wait=False)
+    We used to do a proper count using tiktoken, but that loads encodings from the internet at
+    runtime, which doens't work in environments where we don't have internet access / where network
+    access is locked down. As our current usages only require an estimate, this suffices for now.
+    """
+    return int(len(text) / AVERAGE_CHARS_PER_TOKEN)
