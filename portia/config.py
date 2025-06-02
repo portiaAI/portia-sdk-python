@@ -547,8 +547,6 @@ class Config(BaseModel):
         """Determine whether the provided output value exceeds the large output threshold."""
         if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
             return False
-        # It doesn't really matter which model we use here, so choose gpt2 for speed.
-        # More details at https://chatgpt.com/share/67ee4931-a794-8007-9859-13aca611dba9
         return estimate_tokens(str(value)) > self.large_output_threshold_tokens
 
     def get_agent_default_model(  # noqa: C901, PLR0911, PLR0912
