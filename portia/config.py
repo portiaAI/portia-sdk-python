@@ -612,7 +612,7 @@ class Config(BaseModel):
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
-                        return "azure-openai/o3-mini"
+                        return "azure-openai/gpt-4.1"
                 return None
 
     @model_validator(mode="after")
