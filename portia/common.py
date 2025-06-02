@@ -82,7 +82,7 @@ def combine_args_kwargs(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
 EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
     "mistralai": ["mistralai", "langchain_mistralai"],  # in process of refactoring
-    "google": ["google.generativeai", "langchain_google_genai"],
+    "google": ["google.genai", "langchain_google_genai"],
     "ollama": ["langchain_ollama"],
     "tools-browser-local": ["browser_use"],
     "tools-browser-browserbase": ["browser_use", "browserbase"],
