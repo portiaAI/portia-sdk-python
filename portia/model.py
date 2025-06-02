@@ -9,7 +9,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import instructor
-import tiktoken
 from anthropic import Anthropic
 from langchain.globals import set_llm_cache
 from langchain_anthropic import ChatAnthropic
@@ -22,6 +21,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
 from portia.common import validate_extras_dependencies
+from portia.token_counter import estimate_tokens
 
 if TYPE_CHECKING:
     from langchain_core.caches import BaseCache
@@ -543,7 +543,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         # Anthropic sometimes struggles serializing large JSON responses, so we fall back to
         # instructor if the response is above a certain size.
         if isinstance(raw_response.get("parsing_error"), ValidationError) and (
-            len(tiktoken.get_encoding("gpt2").encode(raw_response["raw"].model_dump_json()))
+            estimate_tokens(raw_response["raw"].model_dump_json())
             > self._output_instructor_threshold
         ):
             return self.get_structured_response_instructor(messages, schema)

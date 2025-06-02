@@ -1786,7 +1786,6 @@ dependencies = [
     { name = "pytest-repeat" },
     { name = "python-dotenv" },
     { name = "testcontainers", extra = ["redis"] },
-    { name = "tiktoken" },
 ]
 
 [package.optional-dependencies]
@@ -1895,7 +1894,6 @@ requires-dist = [
     { name = "redis", marker = "extra == 'all'", specifier = ">=5.2.1,<6" },
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
     { name = "testcontainers", extras = ["redis"], specifier = ">=4.10.0" },
-    { name = "tiktoken", specifier = ">=0.9.0,<0.10" },
 ]
 provides-extras = ["mistral", "mistralai", "google", "ollama", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
 
