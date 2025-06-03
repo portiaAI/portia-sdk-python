@@ -4,20 +4,36 @@
 
 # Portia SDK Python
 
-Portia AI is an open source developer framework for stateful, authenticated agentic workflows. The core product accessible in this repository is extensible with our complimentary cloud features which are aimed at making production deployments easier and faster.
+An easy way to guide LLM reasoning, intervene in multi-agent execution and iron out production complexities in your agent deployments.
 Play around, break things and tell us how you're getting on in our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">**Code of Conduct (↗)**</a>).
 
 If you want to dive straight in with an example, dive into one of our examples in our **[Examples Repo (↗)](https://github.com/portiaAI/portia-agent-examples)**.
 
+## Key features
+
+**Iterate on agents’ reasoning and intervene in their execution**</br>
+🧠 Create your multi-agent [`Plan`](https://docs.portialabs.ai/generate-plan) conversationally, or build them with our [`PlanBuilder`](https://docs.portialabs.ai/generate-plan#build-a-plan-manually).</br>
+📝 Enrich a [`PlanRunState`](https://docs.portialabs.ai/run-plan) during execution to track progress.</br>
+🚧 Define inputs and output structures for enhanced predictability.</br>
+✋🏼 Add deterministic tasks through an [`ExecutionHook`](https://docs.portialabs.ai/execution-hooks). Use a [`clarification`](https://docs.portialabs.ai/understand-clarifications) for human:agent interactions.</br>
+
+**Extensive tool support including MCP support**</br>
+🔧 Connect [tool registries](https://docs.portialabs.ai/extend-run-tools) from any MCP server, local tools, Portia cloud tools or another AI tool provider (e.g. ACI.dev).</br>
+🌐 Navigate the web and cope with captchas and logins using our [open source browser tool](https://docs.portialabs.ai/browser-tools).</br>
+
+**Authentication for API and web agents**</br>
+🔑 Handle user credentials seamlessly, for both API tools and browser sessions, with our `clarification` interface.</br>
+
+**Production ready**</br>
+👤 Attribute multi-agent runs and auth at an [`EndUser`](https://docs.portialabs.ai/manage-end-users) level.</br>
+💾 Large inputs and outputs are automatically stored / retrieved in [Agent memory](https://docs.portialabs.ai/agent-memory) at runtime.
+🔗 Connect [any LLM](https://docs.portialabs.ai/manage-config#configure-llm-options) including local ones, and use your own Redis server for [caching](https://docs.portialabs.ai/manage-config#manage-caching).</br>
+
 <p align="center"><strong>🌟 Star Portia AI to stay updated on new releases!</strong></p>
 
-## Why Portia AI
-| Problem | Portia's answer |
-| ------- | --------------- |
-| **Planning:** Many use cases require visibility into the LLM's reasoning, particularly for complex tasks requiring multiple steps and tools. LLMs also struggle picking the right tools as their tool set grows: a recurring limitation for production deployments | **Multi-agent plans:** Our open source, multi-shot prompter guides your LLM to produce a [`Plan`](https://docs.portialabs.ai/generate-plan) in response to a prompt, weaving the relevant tools, inputs and outputs for every step. |
-| **Execution:** Tracking an LLM's progress mid-task is difficult, making it harder to intervene when guidance is needed. This is especially critical for enforcing company policies or correcting hallucinations (hello, missing arguments in tool calls!) | **Stateful PlanRuns:** Portia will spin up a multi-agent [`PlanRun`](https://docs.portialabs.ai/execute-workflow) to execute on generated plans and track their state throughout execution. Using our [`Clarification`](https://docs.portialabs.ai/manage-clarifications) abstraction you can define points where you want to take control of run execution e.g. to resolve missing information or multiple choice decisions. Portia serialises the run state, and you can manage its storage / retrieval yourself or use our cloud offering for simplicity. |
-| **Authentication:** Existing solutions often disrupt the user experience with cumbersome authentication flows or require pre-emptive, full access to every tool—an approach that doesn't scale for multi-agent assistants. | **Extensible, authenticated tool calling:** Bring your own tools on our extensible [`Tool`](https://docs.portialabs.ai/extend-tool-definitions) abstraction, or use our growing plug and play authenticated [tool library](https://docs.portialabs.ai/run-portia-tools), which will include a number of popular SaaS providers over time (Google, Zendesk, Hubspot, Github etc.). All Portia tools feature just-in-time authentication with token refresh, offering security without compromising on user experience. |
-
+## Demo
+To clickthrough at your own pace, please follow this [link](https://snappify.com/view/3d721d6c-c5ff-4e84-b770-83e93bd1a8f1)</br>
+[▶️ Watch the demo video](GitHub%20Readme.mp4)
 
 ## Quickstart
 
@@ -40,7 +56,7 @@ pip install portia-sdk-python
 > 
 > Alternatively you can add all dependencies with `portia-sdk-python[all]`
 
-2. Ensure you have an API key set up
+2. Ensure you have an LLM API key set up
 ```bash
 export OPENAI_API_KEY='your-api-key-here'
 ```
@@ -54,42 +70,8 @@ portia-cli run "add 1 + 2"
 
 **All set? Now let's explore some basic usage of the product 🚀**
 
-### E2E example repo
-We have a repo that showcases some of our core concepts to get you started. It's available <a href="https://github.com/portiaAI/portia-agent-examples" target="_blank">**here (↗)**</a>. We recommend starting with the <a href="https://github.com/portiaAI/portia-agent-examples/tree/main/get-started-google-tools" target="_blank">**Google Tools example (↗)**</a> if you are brand new to Portia.
-
-### E2E example with open source tools
-This example is meant to get you familiar with a few of our core abstractions:
-- A `Plan` is the set of steps an LLM thinks it should take in order to respond to a user prompt. They are immutable, structured and human-readable.
-- A `PlanRun` is a unique instantiation of a `Plan`. The purpose of a `PlanRun` is to capture the state of a unique plan run at every step in an auditable way.
-- `Portia` orchestrates plan generation and execution, including the creation, pausing and resumption of plan runs.
-
-Before running the code below, make sure you have the following keys set as environment variables in your .env file:
-- An OpenAI API key (or other LLM API key) set as `OPENAI_API_KEY=`
-- A Tavily <a href="https://tavily.com/" target="_blank">(**↗**)</a> API key set as `TAVILY_API_KEY=`
-
-```python
-from dotenv import load_dotenv
-from portia import Portia, default_config, example_tool_registry
-
-load_dotenv()
-
-# Instantiate a Portia client. Load it with the default config and with the example tools.
-portia = Portia(config=default_config(), tools=example_tool_registry)
-
-# Generate the plan from the user query
-plan = portia.plan('Which stock price grew faster in 2024, Amazon or Google?')
-print(plan.model_dump_json(indent=2))
-
-# Create and execute the run from the generated plan
-plan_run = portia.run_plan(plan)
-
-# Serialise into JSON and print the output
-print(plan_run.model_dump_json(indent=2))
-```
-
-### E2E example with Portia cloud storage
-Our cloud offering will allow you to easily store and retrieve plans in the Portia cloud, access our library of cloud hosted tools, and use the Portia dashboard to view plan runs, clarifications and tool call logs. Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will need to set it as the env variable `PORTIA_API_KEY`.<br/>
-Note that this example also requires the environment variables `OPENAI_API_KEY` (or ANTHROPIC or MISTRALAI if you're using either) and `TAVILY_API_KEY` as the [previous one](#e2e-example-with-open-source-tools).
+### E2E example
+You will need a Portia API key for this one because we use one of our cloud tools to schedule a calendar event and send an email. We have a free tier so you do not need to share payment details to get started. Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will then need to set it as the env variable `PORTIA_API_KEY`.<br/>
 
 The example below introduces **some** of the config options available with Portia AI (check out our <a href="https://docs.portialabs.ai/manage-config" target="_blank">**docs (↗)**</a> for more):
 - The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, runs and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
@@ -99,38 +81,35 @@ The example below introduces **some** of the config options available with Porti
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
 
 ```python
-import os
 from dotenv import load_dotenv
-from portia import (
-    Portia,
-    Config,
-    StorageClass,
-    LogLevel,
-    LLMProvider,
-    example_tool_registry,
+from portia import Config, Portia, DefaultToolRegistry
+from portia.cli import CLIExecutionHooks
+
+load_dotenv(override=True)
+
+recipient_email = input("Please enter the email address of the person you want to schedule a meeting with:\n")
+task = f"""
+Please help me accomplish the following tasks:
+- Get my availability from Google Calendar tomorrow between 8:00 and 8:30
+- If I am available, schedule a 30 minute meeting with {recipient_email} at a time that works for me with the title "Portia AI Demo" and a description of the meeting as "Test demo".
+"""
+
+config = Config.from_default()
+portia = Portia(
+   config=config,
+   tools=DefaultToolRegistry(config=config),
+   execution_hooks=CLIExecutionHooks(),
 )
 
-load_dotenv()
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
-# Load the default config and override the storage class to point to the Portia cloud
-my_config = Config.from_default(
-    storage_class=StorageClass.CLOUD,
-    default_log_level=LogLevel.DEBUG,
-    llm_provider=LLMProvider.OPENAI, # You can use `MISTRAL`, `ANTHROPIC` instead
-    default_model="openai/gpt-4o", # You can pass any of the OpenAI models here instead
-    openai_api_key=OPENAI_API_KEY # Use `mistralai_api_key=MISTRALAI` or `anthropic_api_key=ANTHROPIC_API_KEY` instead
-)
-
-# Instantiate a Portia client. Load it with the config and with the open source example tool registry
-portia = Portia(config=my_config, tools=example_tool_registry)
-
-# Execute query.
-plan_run = portia.run('Which stock price grew faster in 2024, Amazon or Google?')
-
-# Serialise into JSON an print the output
-print(plan_run.model_dump_json(indent=2))
+plan = portia.run(task)
 ```
+
+### Advanced examples on YouTube
+Here is an example where we build a customer refund agent using Stripe's MCP server. It leverages execution hooks and clarifications to confirm human approval before moving money.</br>
+[Customer refund agent with Stripe MCP](https://youtu.be/DB-FDEM_7_Y?si=IqVq14eskvLIKmvv))
+
+Here is another example where we use our open browser tool. It uses clarifications when it encounters a login page to allow a human to enter their credentials directly into the session and allow it to progress.</br>
+[Manage Linkedin connections](https://youtu.be/hSq8Ww-hagg?si=8oQaXcTcAyrzEQty)
 
 ## Learn more
 - Head over to our docs at <a href="https://docs.portialabs.ai" target="_blank">**docs.portialabs.ai (↗)**</a>.
@@ -145,7 +124,6 @@ Portia offers a **PAID** contribution program by fixing issues on our 'Issues' l
 
 # ⭐ Support
 You can support our work best by leaving a star!
-
 ![star](https://github.com/user-attachments/assets/8df5e1d9-a0d4-40b4-9c51-945841744050)
 
 We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
