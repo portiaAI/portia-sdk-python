@@ -24,6 +24,9 @@ from portia.mcp_session import StdioMcpClientConfig
 from portia.tool import PortiaMcpTool, PortiaRemoteTool
 from tests.utils import (
     AdditionTool,
+    AsyncAdditionTool,
+    AsyncClarificationTool,
+    AsyncErrorTool,
     ClarificationTool,
     ErrorTool,
     MockMcpSessionWrapper,
@@ -67,6 +70,10 @@ def test_tool_to_langchain() -> None:
     """Test langchain rep of a Tool."""
     tool = AdditionTool()
     tool.to_langchain(ctx=get_test_tool_context())
+    tool.to_langchain_with_artifact(ctx=get_test_tool_context())
+    tool = AsyncAdditionTool()
+    tool.to_langchain(ctx=get_test_tool_context())
+    tool.to_langchain_with_artifact(ctx=get_test_tool_context())
 
 
 def test_run_method(add_tool: AdditionTool) -> None:
@@ -731,3 +738,75 @@ def test_remote_tool_batch_ready_check_404_fallback(httpx_mock: HTTPXMock) -> No
 
     assert response.ready is True
     assert len(response.clarifications) == 0
+
+
+def test_run_method_on_async_tool() -> None:
+    """Test the run method errors."""
+    tool = AsyncAdditionTool()
+    with pytest.raises(RuntimeError):
+        tool.run(get_test_tool_context())
+
+
+@pytest.mark.asyncio
+async def test__run_method_on_async_tool() -> None:
+    """Test the run method errors."""
+    tool = AsyncAdditionTool()
+    result = await tool._run_async(get_test_tool_context(), 1, 2)  # noqa: SLF001
+    assert result.get_value() == 3
+
+
+@pytest.mark.asyncio
+async def test__run_with_artifacts_method_on_async_tool() -> None:
+    """Test the run method errors."""
+    tool = AsyncAdditionTool()
+    (result, output) = await tool._run_with_artifacts_async(get_test_tool_context(), 1, 2)  # noqa: SLF001
+    assert result == 3
+
+
+@pytest.mark.asyncio
+async def test__run_method_on_async_tool_error() -> None:
+    """Test the run method errors."""
+    tool = AsyncErrorTool()
+    with pytest.raises(ToolSoftError):
+        await tool._run_async(  # noqa: SLF001
+            get_test_tool_context(),
+            error_str="",
+            return_uncaught_error=False,
+            return_soft_error=True,
+        )
+
+
+@pytest.mark.asyncio
+async def test__run_method_on_async_tool_error_uncaught() -> None:
+    """Test the run method errors."""
+    tool = AsyncErrorTool()
+    with pytest.raises(ToolSoftError):
+        await tool._run_async(  # noqa: SLF001
+            get_test_tool_context(),
+            error_str="",
+            return_uncaught_error=True,
+            return_soft_error=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test__run_with_artifacts_method_on_async_tool_error() -> None:
+    """Test the run method errors."""
+    tool = AsyncErrorTool()
+    with pytest.raises(ToolSoftError):
+        await tool._run_with_artifacts_async(get_test_tool_context(), 1, 2)  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test__run_method_async_clarifications() -> None:
+    """Test the run method errors."""
+    tool = AsyncClarificationTool()
+    result = await tool._run_async(  # noqa: SLF001
+        get_test_tool_context(),
+        "",
+    )
+    assert isinstance(result.get_value(), list)
+    value = result.get_value()
+    assert value
+    assert value[0]
+    assert isinstance(value[0], InputClarification)
