@@ -87,7 +87,7 @@ class LocalDataValue(BaseOutput):
         """Serialize the value to a string.
 
         Args:
-            value (SERIALIZABLE_TYPE_VAR | None): The value to serialize.
+            value (Serializable | None): The value to serialize.
 
         Returns:
             str: The serialized value as a string.
