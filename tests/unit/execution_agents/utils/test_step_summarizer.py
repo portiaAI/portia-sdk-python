@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from langchain_core.messages import AIMessage, ToolMessage
+from pydantic import BaseModel
 
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
 from portia.execution_agents.output import LocalDataValue
@@ -149,3 +152,64 @@ def test_summarizer_model_error_handling() -> None:
     output_message = result["messages"][0]
     assert isinstance(output_message, ToolMessage)
     assert output_message.artifact.summary is None
+
+
+def test_summarizer_model_structured_output_schema() -> None:
+    """Test the summarizer model with structured output schema."""
+    tool = AdditionTool()
+
+    class AdditionOutput(BaseModel):
+        result: int
+        so_summary: str
+
+    tool.structured_output_schema = AdditionOutput
+    mock_model = MagicMock()
+    output = AdditionOutput(result=3, so_summary="Short summary")
+    mock_model.get_structured_response.return_value = output
+    tool_message = ToolMessage(
+        content="Tool output content",
+        tool_call_id="123",
+        name=tool.name,
+        artifact=LocalDataValue(value=3),
+    )
+    summarizer_model = StepSummarizer(
+        config=get_test_config(),
+        model=mock_model,
+        tool=tool,
+        step=Step(task="Test task", output="$output"),
+    )
+    result = summarizer_model.invoke({"messages": [tool_message]})
+
+    # Check that summaries were added to the artifact
+    output_message = result["messages"][0]
+    assert isinstance(output_message, ToolMessage)
+    assert output_message.artifact.summary == output.so_summary
+
+
+def test_summarizer_model_structured_output_schema_error_fallback() -> None:
+    """Test the summarizer model with structured output schema."""
+    tool = AdditionTool()
+
+    mock_model = MagicMock()
+    mock_model.get_structured_response.side_effect = Exception("Test error")
+    summary = AIMessage(content="Short Summary")
+    mock_model.get_response.return_value = summary
+
+    tool_message = ToolMessage(
+        content="Tool output content",
+        tool_call_id="123",
+        name=tool.name,
+        artifact=LocalDataValue(value=3),
+    )
+    summarizer_model = StepSummarizer(
+        config=get_test_config(),
+        model=mock_model,
+        tool=tool,
+        step=Step(task="Test task", output="$output"),
+    )
+    result = summarizer_model.invoke({"messages": [tool_message]})
+
+    # Check that summaries were added to the artifact
+    output_message = result["messages"][0]
+    assert isinstance(output_message, ToolMessage)
+    assert output_message.artifact.summary == "Short Summary"
