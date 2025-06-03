@@ -191,6 +191,8 @@ def test_summarizer_model_structured_output_schema_error_fallback() -> None:
     tool = AdditionTool()
 
     mock_model = MagicMock()
+
+    tool.structured_output_schema = BaseModel
     mock_model.get_structured_response.side_effect = Exception("Test error")
     summary = AIMessage(content="Short Summary")
     mock_model.get_response.return_value = summary
@@ -209,7 +211,6 @@ def test_summarizer_model_structured_output_schema_error_fallback() -> None:
     )
     result = summarizer_model.invoke({"messages": [tool_message]})
 
-    # Check that summaries were added to the artifact
+    # Check that the tool message is returned unchanged
     output_message = result["messages"][0]
-    assert isinstance(output_message, ToolMessage)
-    assert output_message.artifact.summary == "Short Summary"
+    assert output_message == tool_message
