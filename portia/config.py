@@ -660,19 +660,25 @@ class Config(BaseModel):
 
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.
-        for model_getter in (
-            self.get_default_model,
-            self.get_planning_model,
-            self.get_execution_model,
-            self.get_introspection_model,
-            self.get_summarizer_model,
-        ):
+        for model_getter, label, value in [
+            (self.get_default_model, "default_model", self.models.default_model),
+            (self.get_planning_model, "planning_model", self.models.planning_model),
+            (self.get_execution_model, "execution_model", self.models.execution_model),
+            (self.get_introspection_model, "introspection_model", self.models.introspection_model),
+            (
+                self.get_summarizer_model,
+                "summarizer_model",
+                self.models.summarizer_model,
+            ),
+        ]:
             try:
                 model_getter()
             except Exception as e:
                 raise InvalidConfigError(
-                    f"models.{model_getter.__name__}",
-                    "All models must be instantiable",
+                    label,
+                    f"The value {value!s} is not valid for the the {label} model. "
+                    "This is usually either because of a typo in the model name or a missing "
+                    "API Key. Please review the docs here: https://docs.portialabs.ai/manage-config",
                 ) from e
         return self
 
