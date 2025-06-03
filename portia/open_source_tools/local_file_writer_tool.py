@@ -20,7 +20,7 @@ class FileWriterToolSchema(BaseModel):
     )
 
 
-class FileWriterTool(Tool[str]):
+class FileWriterTool(Tool):
     """Writes content to a file."""
 
     id: str = "file_writer_tool"
