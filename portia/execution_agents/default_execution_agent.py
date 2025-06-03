@@ -275,12 +275,10 @@ class ParserModel:
         errors = []
         tool_inputs: ToolInputs | None = None
         try:
-            print([Message.from_langchain(m) for m in formatted_messages])
             response = self.model.get_structured_response(
                 messages=[Message.from_langchain(m) for m in formatted_messages],
                 schema=ToolInputs,
             )
-            print(response)
             tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
             errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
@@ -297,7 +295,6 @@ class ParserModel:
             try:
                 self.agent.tool.args_schema.model_validate(test_args)
             except ValidationError as e:
-                print(e)
                 errors.append(str(e) + "\n")
 
         if errors:

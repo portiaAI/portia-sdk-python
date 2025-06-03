@@ -43,7 +43,7 @@ def _process_outputs(
         return {"messages": []}  # pragma: no cover
 
 
-def _extract_parts(content_item: types.ContentUnion | types.ContentUnionDict) -> list[str]:  # noqa: C901, PLR0911, PLR0912
+def _extract_parts(content_item: types.ContentUnion | types.ContentUnionDict) -> list[str]:  # noqa: C901, PLR0911
     """Handle extracting content from response."""
     # Case 1: list of parts (Part, PartDict-like dict, or str)
     if isinstance(content_item, list):

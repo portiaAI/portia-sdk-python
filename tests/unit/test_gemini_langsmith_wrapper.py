@@ -1,6 +1,6 @@
 """Test genai wrapper."""
 
-from typing import Callable
+from collections.abc import Callable
 from unittest.mock import Mock, patch
 
 import pytest
@@ -146,7 +146,7 @@ def test_wrap_gemini_traces_and_calls_original(traceable_mock: Mock, fake_client
     client, original_generate_content = fake_client
 
     traced_func = Mock(return_value="traced result")
-    traceable_mock.return_value = lambda f: traced_func
+    traceable_mock.return_value = lambda _: traced_func
 
     wrapped_client = wrap_gemini(client)
 

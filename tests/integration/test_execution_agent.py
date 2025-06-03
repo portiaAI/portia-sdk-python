@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 from portia.config import Config
 from portia.end_user import EndUser
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanBuilder
