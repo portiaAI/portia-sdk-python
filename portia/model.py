@@ -669,7 +669,7 @@ if validate_extras_dependencies("google", raise_error=False):
             model_name: str = "gemini-2.0-flash",
             api_key: SecretStr,
             max_retries: int = 3,
-            temperature: float | None = None,  # noqa: ARG002
+            temperature: float | None = None,
             cache: BaseCache | None = None,
             **kwargs: Any,
         ) -> None:
@@ -691,6 +691,7 @@ if validate_extras_dependencies("google", raise_error=False):
                 model=model_name,
                 api_key=api_key,
                 max_retries=max_retries,
+                temperature=temperature or 0,
                 **kwargs,
             )
             super().__init__(client, model_name, cache=cache)

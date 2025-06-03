@@ -166,6 +166,7 @@ class ParserModel:
                 "Your responses must clearly explain the source of each argument "
                 "(e.g., context, past messages, clarifications). "
                 "Avoid assumptions or fabricated information. "
+                "Pay attention to previous errors given and do not repeat them. "
                 "If any of the inputs is a large string and you want to use it verbatim, rather "
                 "than repeating it, you should provide the name in curly braces and it will be "
                 "templated in before the tool is called. "
@@ -199,6 +200,7 @@ class ParserModel:
                 "- Do not include references to any of the input values (e.g. 'as provided in "
                 "the input'): you must put the exact value the tool should be called with in "
                 "the value field\n"
+                "- If the tool has a list return it as a list, i.e. [1, 2, 3] not '[1, 2, 3]'"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
                 "- If any of the inputs is a large string and you want to use it verbatim, rather "
@@ -273,10 +275,12 @@ class ParserModel:
         errors = []
         tool_inputs: ToolInputs | None = None
         try:
+            print([Message.from_langchain(m) for m in formatted_messages])
             response = self.model.get_structured_response(
                 messages=[Message.from_langchain(m) for m in formatted_messages],
                 schema=ToolInputs,
             )
+            print(response)
             tool_inputs = ToolInputs.model_validate(response)
         except ValidationError as e:
             errors.append("Invalid JSON for ToolInputs: " + str(e) + "\n")
@@ -293,6 +297,7 @@ class ParserModel:
             try:
                 self.agent.tool.args_schema.model_validate(test_args)
             except ValidationError as e:
+                print(e)
                 errors.append(str(e) + "\n")
 
         if errors:

@@ -63,12 +63,8 @@ def _extract_parts(content_item: types.ContentUnion | types.ContentUnionDict) ->
         if not content_item.parts:
             return []
         for p in content_item.parts:
-            if isinstance(p, str):
-                result.append(p)
-            elif isinstance(p, types.Part):
+            if isinstance(p, types.Part):
                 result.append(p.text or "")
-            elif isinstance(p, dict) and "text" in p:
-                result.append(str(p["text"]) or "")
         return result
 
     # Case 3: single Part or dict
@@ -123,7 +119,7 @@ def wrap_gemini(client: genai.Client) -> genai.Client:  # pyright: ignore[report
     ) -> types.GenerateContentResponse:
         """Traced version of generate_content."""
         decorator = run_helpers.traceable(
-            name="GoogleGenerativeAI",
+            name="GoogleGenAI",
             run_type="llm",
             process_outputs=_process_outputs,
             process_inputs=_process_inputs,

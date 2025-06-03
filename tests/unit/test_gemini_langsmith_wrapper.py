@@ -1,5 +1,8 @@
 """Test genai wrapper."""
 
+from typing import Callable
+from unittest.mock import Mock, patch
+
 import pytest
 from google.genai import types
 
@@ -8,6 +11,7 @@ from portia.gemini_langsmith_wrapper import (
     _get_ls_params,
     _process_inputs,
     _process_outputs,
+    wrap_gemini,
 )
 
 # ------------------------
@@ -48,6 +52,8 @@ def test_process_outputs_empty() -> None:
 # ------------------------
 # Tests for _extract_parts
 # ------------------------
+
+
 @pytest.mark.parametrize(
     ("input_value", "expected"),
     [
@@ -60,6 +66,7 @@ def test_process_outputs_empty() -> None:
         ({"parts": "bar"}, ["bar"]),
         ("baz", ["baz"]),
         (None, []),
+        (types.Content(parts=None), []),
     ],
 )
 def test_extract_parts(
@@ -102,7 +109,92 @@ def test_process_inputs_single_part() -> None:
     assert result == {"messages": [{"content": "hello msg"}]}
 
 
+def test_process_inputs_no_list() -> None:
+    """Check with single input."""
+    inputs = {
+        "contents": types.Content(parts=[types.Part(text="hello msg")]),
+    }
+    result = _process_inputs(inputs)  # type: ignore  # noqa: PGH003
+    assert result == {"messages": [{"content": "hello msg"}]}
+
+
 def test_process_inputs_invalid() -> None:
     """Check no error on invalid."""
     result = _process_inputs({})
     assert result == {"messages": []}
+
+
+# ------------------------
+# Tests for wrap_gemini
+# ------------------------
+
+
+@pytest.fixture
+def fake_client() -> tuple[Mock, Mock]:
+    """Mock Client."""
+    mock_client = Mock()
+    mock_model_interface = Mock()
+    mock_generate_content = Mock(return_value="original result")
+    mock_model_interface.generate_content = mock_generate_content
+    mock_client.models = mock_model_interface
+    return mock_client, mock_generate_content
+
+
+@patch("portia.gemini_langsmith_wrapper.run_helpers.traceable")
+def test_wrap_gemini_traces_and_calls_original(traceable_mock: Mock, fake_client: Mock) -> None:
+    """Check success."""
+    client, original_generate_content = fake_client
+
+    traced_func = Mock(return_value="traced result")
+    traceable_mock.return_value = lambda f: traced_func
+
+    wrapped_client = wrap_gemini(client)
+
+    result = wrapped_client.models.generate_content(
+        model="gemini-pro", contents=["Say hello!"], config={"temperature": 0.5}
+    )
+
+    assert result == "traced result"
+    traced_func.assert_called_once_with("gemini-pro", ["Say hello!"], {"temperature": 0.5})
+    original_generate_content.assert_not_called()
+
+
+@patch("portia.gemini_langsmith_wrapper.run_helpers.traceable")
+@patch("portia.gemini_langsmith_wrapper.logger")
+def test_wrap_gemini_falls_back_on_trace_error(
+    trace_logger: Mock,
+    traceable_mock: Mock,
+    fake_client: Mock,
+) -> None:
+    """Check error."""
+    client, original_generate_content = fake_client
+
+    def raise_in_tracing(
+        run_type: str,  # noqa: ARG001
+        name: str,  # noqa: ARG001
+        process_inputs: Callable[[dict], dict],  # noqa: ARG001
+        process_outputs: Callable[..., dict],  # noqa: ARG001
+        _invocation_params_fn: Callable[[dict], dict],
+    ) -> Callable:
+        """Fake an error."""
+
+        def inner(*args, **kwargs) -> None:  # noqa: ANN002, ANN003, ARG001
+            """Raise error."""
+            raise ValueError("tracing broke")
+
+        return inner
+
+    traceable_mock.side_effect = raise_in_tracing
+    original_generate_content.return_value = "original fallback result"
+
+    wrapped_client = wrap_gemini(client)
+
+    result = wrapped_client.models.generate_content(
+        model="gemini-pro",
+        contents=["Fail gracefully?"],
+        config=None,
+    )
+
+    assert result == "original fallback result"
+    original_generate_content.assert_called_once_with("gemini-pro", ["Fail gracefully?"], None)
+    trace_logger().error.assert_called_once()
