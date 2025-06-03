@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from abc import ABC, abstractmethod
+from contextvars import ContextVar
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
     from langchain_core.caches import BaseCache
     from langchain_core.language_models.chat_models import BaseChatModel
     from openai.types.chat import ChatCompletionMessageParam
+
+llm_cache: ContextVar[BaseCache | None] = ContextVar("llm_cache", default=None)
 
 
 class Message(BaseModel):
@@ -166,22 +169,16 @@ class LangChainGenerativeModel(GenerativeModel):
         self,
         client: BaseChatModel,
         model_name: str,
-        *,
-        cache: BaseCache | None = None,
     ) -> None:
         """Initialize with LangChain client.
 
         Args:
             client: LangChain chat model instance
             model_name: The name of the model
-            cache: Optional cache instance
 
         """
         super().__init__(model_name)
         self._client = client
-        self._cache = cache
-        if cache:
-            set_llm_cache(self._cache)
 
     def to_langchain(self) -> BaseChatModel:
         """Get the LangChain client."""
@@ -189,6 +186,7 @@ class LangChainGenerativeModel(GenerativeModel):
 
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
+        self._set_cache()
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = self._client.invoke(langchain_messages)
         return Message.from_langchain(response)
@@ -210,6 +208,7 @@ class LangChainGenerativeModel(GenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
+        self._set_cache()
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = structured_client.invoke(langchain_messages)
@@ -230,10 +229,12 @@ class LangChainGenerativeModel(GenerativeModel):
         if model is not None:
             kwargs["model"] = model
 
-        if self._cache is None:
+        cache = llm_cache.get()
+        if cache is None:
             return client.chat.completions.create(
                 response_model=schema, messages=messages, **kwargs
             )
+
         cache_data = {
             "schema": schema.model_json_schema(),
             **kwargs,
@@ -244,7 +245,7 @@ class LangChainGenerativeModel(GenerativeModel):
         llm_string = f"{provider}:{model}:{data_hash}"
         prompt = json.dumps(messages)
         try:
-            cached = self._cache.lookup(prompt, llm_string)
+            cached = cache.lookup(prompt, llm_string)
             if cached and len(cached) > 0:
                 return schema.model_validate_json(cached[0])  # pyright: ignore[reportArgumentType]
         except (ValidationError, RedisError):
@@ -253,8 +254,14 @@ class LangChainGenerativeModel(GenerativeModel):
         response = client.chat.completions.create(
             response_model=schema, messages=messages, **kwargs
         )
-        self._cache.update(prompt, llm_string, [Generation(text=response.model_dump_json())])
+        cache.update(prompt, llm_string, [Generation(text=response.model_dump_json())])
         return response
+
+    def _set_cache(self) -> None:
+        """Set the cache for the model."""
+        cache = llm_cache.get()
+        if cache:
+            set_llm_cache(cache)
 
 
 class OpenAIGenerativeModel(LangChainGenerativeModel):
@@ -262,7 +269,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
     provider: LLMProvider = LLMProvider.OPENAI
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         model_name: str,
@@ -270,7 +277,6 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
-        cache: BaseCache | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with OpenAI client.
@@ -281,7 +287,6 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             seed: Random seed for model generation
             max_retries: Maximum number of retries
             temperature: Temperature parameter
-            cache: Optional cache instance
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
 
         """
@@ -305,7 +310,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             temperature=temperature,
             **kwargs,
         )
-        super().__init__(client, model_name, cache=cache)
+        super().__init__(client, model_name)
         self._instructor_client = instructor.from_openai(
             client=wrappers.wrap_openai(OpenAI(api_key=api_key.get_secret_value())),
             mode=instructor.Mode.JSON,
@@ -372,7 +377,6 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
-        cache: BaseCache | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with Azure OpenAI client.
@@ -385,7 +389,6 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             api_key: API key for Azure OpenAI
             max_retries: Maximum number of retries
             temperature: Temperature parameter (defaults to 1 for O_3_MINI, 0 otherwise)
-            cache: Optional cache instance
             **kwargs: Additional keyword arguments to pass to AzureChatOpenAI
 
         """
@@ -411,7 +414,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             temperature=temperature,
             **kwargs,
         )
-        super().__init__(client, model_name, cache=cache)
+        super().__init__(client, model_name)
         self._instructor_client = instructor.from_openai(
             client=AzureOpenAI(
                 api_key=api_key.get_secret_value(),
@@ -472,7 +475,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
     provider: LLMProvider = LLMProvider.ANTHROPIC
     _output_instructor_threshold = 512
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         model_name: str = "claude-3-7-sonnet-latest",
@@ -480,7 +483,6 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         timeout: int = 120,
         max_retries: int = 3,
         max_tokens: int = 8096,
-        cache: BaseCache | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with Anthropic client.
@@ -491,7 +493,6 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             max_retries: Maximum number of retries
             max_tokens: Maximum number of tokens to generate
             api_key: API key for Anthropic
-            cache: Optional cache instance
             **kwargs: Additional keyword arguments to pass to ChatAnthropic
 
         """
@@ -507,7 +508,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             **kwargs,
         )
-        super().__init__(client, model_name, cache=cache)
+        super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
             client=wrappers.wrap_anthropic(
                 Anthropic(api_key=api_key.get_secret_value()),
@@ -585,7 +586,6 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             model_name: str = "mistral-large-latest",
             api_key: SecretStr,
             max_retries: int = 3,
-            cache: BaseCache | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with MistralAI client.
@@ -594,7 +594,6 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 model_name: Name of the MistralAI model
                 api_key: API key for MistralAI
                 max_retries: Maximum number of retries
-                cache: Optional cache instance
                 **kwargs: Additional keyword arguments to pass to ChatMistralAI
 
             """
@@ -604,7 +603,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
-            super().__init__(client, model_name, cache=cache)
+            super().__init__(client, model_name)
             self._instructor_client = instructor.from_mistral(
                 client=Mistral(api_key=api_key.get_secret_value()),
                 use_async=False,
@@ -673,7 +672,6 @@ if validate_extras_dependencies("google", raise_error=False):
             api_key: SecretStr,
             max_retries: int = 3,
             temperature: float | None = None,
-            cache: BaseCache | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with Google Generative AI client.
@@ -683,7 +681,6 @@ if validate_extras_dependencies("google", raise_error=False):
                 api_key: API key for Google Generative AI
                 max_retries: Maximum number of retries
                 temperature: Temperature parameter for model sampling
-                cache: Optional cache instance
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
@@ -701,7 +698,7 @@ if validate_extras_dependencies("google", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
-            super().__init__(client, model_name, cache=cache)
+            super().__init__(client, model_name)
             wrapped_gemini_model = wrap_gemini(
                 genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
                     model_name=model_name,
@@ -758,7 +755,6 @@ if validate_extras_dependencies("ollama", raise_error=False):
             self,
             model_name: str,
             base_url: str = "http://localhost:11434/v1",
-            cache: BaseCache | None = None,
             **kwargs: Any,
         ) -> None:
             """Initialize with Ollama client.
@@ -766,14 +762,12 @@ if validate_extras_dependencies("ollama", raise_error=False):
             Args:
                 model_name: Name of the Ollama model
                 base_url: Base URL of the Ollama server
-                cache: Optional cache instance
                 **kwargs: Additional keyword arguments to pass to ChatOllama
 
             """
             super().__init__(
                 client=ChatOllama(model=model_name, **kwargs),
                 model_name=model_name,
-                cache=cache,
             )
             self.base_url = base_url
 
