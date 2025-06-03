@@ -537,7 +537,7 @@ class AsyncTool(Tool):
         )
 
 
-class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
+class PortiaRemoteTool(Tool):
     """Tool that passes run execution to Portia Cloud."""
 
     client: httpx.Client
