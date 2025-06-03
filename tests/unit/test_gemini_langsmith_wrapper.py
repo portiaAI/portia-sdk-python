@@ -57,7 +57,7 @@ def test_process_outputs_empty() -> None:
             ["a", "b", "c"],
         ),
         (types.Part(text="foo"), ["foo"]),
-        ({"text": "bar"}, ["bar"]),
+        ({"parts": "bar"}, ["bar"]),
         ("baz", ["baz"]),
         (None, []),
     ],
