@@ -168,8 +168,14 @@ class StructuredOutputTestModel(BaseModel):
     test_field: str
 
 
-def test_langchain_model_structured_output_returns_dict() -> None:
+def test_langchain_model_structured_output_returns_dict(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that LangchainModel.structured_output returns a dict."""
+    mock_context_var = MagicMock()
+    mock_context_var.get.return_value = MagicMock()
+    monkeypatch.setattr("portia.model.llm_cache", mock_context_var)
+    mock_set = MagicMock()
+    monkeypatch.setattr("portia.model.set_llm_cache", mock_set)
+
     base_chat_model = MagicMock(spec=BaseChatModel)
     structured_output = MagicMock()
     base_chat_model.with_structured_output.return_value = structured_output
@@ -181,10 +187,18 @@ def test_langchain_model_structured_output_returns_dict() -> None:
     )
     assert isinstance(result, StructuredOutputTestModel)
     assert result.test_field == "Response from model"
+    # The context var's get method should have been called to check for cache
+    mock_context_var.get.assert_called()
+    mock_set.assert_called()
 
 
-def test_anthropic_model_structured_output_returns_invalid_data() -> None:
+def test_anthropic_model_structured_output_returns_invalid_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test that AnthropicModel.structured_output returns a dict."""
+    mock_set = MagicMock()
+    monkeypatch.setattr("portia.model.set_llm_cache", mock_set)
+
     mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
     structured_output = MagicMock()
     mock_chat_anthropic.with_structured_output.return_value = structured_output
@@ -198,6 +212,7 @@ def test_anthropic_model_structured_output_returns_invalid_data() -> None:
                 messages=[Message(role="user", content="Hello")],
                 schema=StructuredOutputTestModel,
             )
+        mock_set.assert_not_called()
 
 
 def test_anthropic_model_structured_output_returns_dict() -> None:
@@ -229,9 +244,12 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
         "parsed": None,
     }
 
+    mock_cache = MagicMock()
+    mock_cache.get.return_value = None
     with (
         mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls,
         mock.patch("instructor.from_anthropic") as mock_instructor,
+        mock.patch("portia.model.llm_cache", mock_cache),
     ):
         mock_chat_anthropic_cls.return_value = mock_chat_anthropic
         model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
@@ -240,27 +258,6 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
             schema=StructuredOutputTestModel,
         )
         mock_instructor.return_value.chat.completions.create.assert_called_once()
-
-
-def test_langchain_generative_model_redis_cache_setup(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that Redis cache is set up correctly."""
-    base_chat_model = MagicMock(spec=BaseChatModel)
-    mock_set = MagicMock()
-    monkeypatch.setattr("portia.model.set_llm_cache", mock_set)
-
-    LangChainGenerativeModel(
-        client=base_chat_model,
-        model_name="test",
-    )
-    mock_set.assert_not_called()
-
-    LangChainGenerativeModel(
-        client=base_chat_model,
-        model_name="test",
-        cache=MagicMock(),
-    )
-
-    mock_set.assert_called_once()
 
 
 def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -278,10 +275,12 @@ def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_instructor_client.chat.completions.create = mock_create
 
     cache = MagicMock(spec=BaseCache)
+    mock_context_var = MagicMock()
+    mock_context_var.get.return_value = cache
+    monkeypatch.setattr("portia.model.llm_cache", mock_context_var)
     model = OpenAIGenerativeModel(
         model_name="gpt-4o",
         api_key=SecretStr("k"),
-        cache=cache,
     )
 
     # Test cache miss

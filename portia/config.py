@@ -32,6 +32,7 @@ from portia.model import (
     GenerativeModel,
     LLMProvider,
     OpenAIGenerativeModel,
+    llm_cache,
 )
 from portia.token_counter import estimate_tokens
 
@@ -471,6 +472,21 @@ class Config(BaseModel):
         }
         return self
 
+    @model_validator(mode="after")
+    def setup_cache(self) -> Self:
+        """Set up LLM cache if Redis URL is provided."""
+        if self.llm_redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
+            from langchain_redis import RedisCache
+
+            cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
+            llm_cache.set(cache)
+        elif self.llm_redis_cache_url:
+            logger().warning(  # pragma: no cover
+                "Not using cache as cache group is not installed. "  # pragma: no cover
+                "Install portia-sdk-python[caching] to use caching."  # pragma: no cover
+            )  # pragma: no cover
+        return self
+
     # Storage Options
     storage_class: StorageClass = Field(
         default_factory=lambda: StorageClass.CLOUD
@@ -834,29 +850,17 @@ class Config(BaseModel):
             GenerativeModel: The constructed model.
 
         """
-        cache = None
-        if self.llm_redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
-            from langchain_redis import RedisCache
-
-            cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
-        elif self.llm_redis_cache_url:
-            logger().warning(  # pragma: no cover
-                "Not using cache as cache group is not installed. "  # pragma: no cover
-                "Install portia-sdk-python[caching] to use caching."  # pragma: no cover
-            )  # pragma: no cover
         match llm_provider:
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
-                    cache=cache,
                     **MODEL_EXTRA_KWARGS.get(f"openai/{model_name}", {}),
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
-                    cache=cache,
                     **MODEL_EXTRA_KWARGS.get(f"anthropic/{model_name}", {}),
                 )
             case LLMProvider.MISTRALAI:
@@ -866,7 +870,6 @@ class Config(BaseModel):
                 return MistralAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("mistralai_api_key"),
-                    cache=cache,
                     **MODEL_EXTRA_KWARGS.get("mistralai/{model_name}", {}),
                 )
             case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
@@ -876,7 +879,6 @@ class Config(BaseModel):
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("google_api_key"),
-                    cache=cache,
                     **MODEL_EXTRA_KWARGS.get("google/{model_name}", {}),
                 )
             case LLMProvider.AZURE_OPENAI:
@@ -884,7 +886,6 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
-                    cache=cache,
                     **MODEL_EXTRA_KWARGS.get("azure-openai/{model_name}", {}),
                 )
             case LLMProvider.OLLAMA:
@@ -894,7 +895,6 @@ class Config(BaseModel):
                 return OllamaGenerativeModel(
                     model_name=model_name,
                     base_url=self.ollama_base_url,
-                    cache=cache,
                     **MODEL_EXTRA_KWARGS.get("ollama/{model_name}", {}),
                 )
             case LLMProvider.CUSTOM:

@@ -27,6 +27,7 @@ from portia.model import (
     LLMProvider,
     MistralAIGenerativeModel,
     OpenAIGenerativeModel,
+    llm_cache,
 )
 
 PROVIDER_ENV_VARS = [
@@ -56,6 +57,7 @@ def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert c.default_log_level == LogLevel.CRITICAL
     assert c.llm_redis_cache_url is None
+    assert llm_cache.get() is None
 
 
 def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -135,28 +137,20 @@ def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/0")
     config = Config.from_default(openai_api_key=SecretStr("123"))
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
-
-    model = config.get_generative_model("openai/gpt-4o")
-    assert isinstance(model, OpenAIGenerativeModel)
-    assert str(model) == "openai/gpt-4o"
-    assert model._cache is mock_redis_cache_instance  # noqa: SLF001
+    assert llm_cache.get() is mock_redis_cache_instance
 
 
 def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url can be set via kwargs."""
-    redis_cache_instance = InMemoryCache()
-    mock_redis_cache = MagicMock(return_value=redis_cache_instance)
+    mock_redis_cache_instance = InMemoryCache()
+    mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
     monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
 
     config = Config.from_default(
         openai_api_key=SecretStr("123"), llm_redis_cache_url="redis://localhost:6379/0"
     )
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
-
-    model = config.get_generative_model("openai/gpt-4o")
-    assert isinstance(model, OpenAIGenerativeModel)
-    assert str(model) == "openai/gpt-4o"
-    assert model._cache is redis_cache_instance  # noqa: SLF001
+    assert llm_cache.get() is mock_redis_cache_instance
 
 
 @pytest.mark.parametrize(
