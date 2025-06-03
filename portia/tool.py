@@ -45,7 +45,7 @@ from portia.clarification import (
     ValueConfirmationClarification,
 )
 from portia.cloud import PortiaCloudClient
-from portia.common import SERIALIZABLE_TYPE_VAR, combine_args_kwargs
+from portia.common import Serializable, combine_args_kwargs
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
@@ -92,7 +92,7 @@ class ReadyResponse(BaseModel):
     clarifications: ClarificationListType
 
 
-class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
+class Tool(BaseModel):
     """Abstract base class for a tool.
 
     This class serves as the blueprint for all tools. Child classes must implement the `run` method.
@@ -158,7 +158,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
+    ) -> Serializable | Clarification:
         """Run the tool.
 
         This method must be implemented by subclasses to define the tool's specific behavior.
@@ -397,7 +397,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         return value.__name__
 
 
-class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
+class PortiaRemoteTool(Tool):
     """Tool that passes run execution to Portia Cloud."""
 
     client: httpx.Client
@@ -525,7 +525,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> SERIALIZABLE_TYPE_VAR | None | Clarification:
+    ) -> Serializable | None | Clarification:
         """Invoke the run endpoint and handle the response.
 
         This method sends the execution request to the Portia Cloud API, passing the arguments and
@@ -539,7 +539,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             **kwargs (Any): The keyword arguments for the tool.
 
         Returns:
-            SERIALIZABLE_TYPE_VAR | None | Clarification: The result of the run execution, which
+            Serializable | None | Clarification: The result of the run execution, which
             could either be a serialized value, None, or a `Clarification` object.
 
         Raises:
@@ -615,7 +615,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         return ReadyResponse.model_validate(batch_ready_response.json())
 
 
-class PortiaMcpTool(Tool[str]):
+class PortiaMcpTool(Tool):
     """A Portia Tool wrapper for an MCP server-based tool."""
 
     mcp_client_config: McpClientConfig
