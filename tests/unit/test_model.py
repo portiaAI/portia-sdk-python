@@ -252,7 +252,11 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
         mock.patch("portia.model.llm_cache", mock_cache),
     ):
         mock_chat_anthropic_cls.return_value = mock_chat_anthropic
-        model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        model = AnthropicGenerativeModel(
+            model_name="test",
+            api_key=SecretStr("test"),
+            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
+        )
         _ = model.get_structured_response(
             messages=[Message(role="user", content="Hello")],
             schema=StructuredOutputTestModel,

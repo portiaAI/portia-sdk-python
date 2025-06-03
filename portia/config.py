@@ -855,13 +855,13 @@ class Config(BaseModel):
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
-                    **MODEL_EXTRA_KWARGS.get(f"openai/{model_name}", {}),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
-                    **MODEL_EXTRA_KWARGS.get(f"anthropic/{model_name}", {}),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistralai")
@@ -870,7 +870,7 @@ class Config(BaseModel):
                 return MistralAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("mistralai_api_key"),
-                    **MODEL_EXTRA_KWARGS.get("mistralai/{model_name}", {}),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
@@ -879,14 +879,14 @@ class Config(BaseModel):
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("google_api_key"),
-                    **MODEL_EXTRA_KWARGS.get("google/{model_name}", {}),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
-                    **MODEL_EXTRA_KWARGS.get("azure-openai/{model_name}", {}),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.OLLAMA:
                 validate_extras_dependencies("ollama")
@@ -895,7 +895,7 @@ class Config(BaseModel):
                 return OllamaGenerativeModel(
                     model_name=model_name,
                     base_url=self.ollama_base_url,
-                    **MODEL_EXTRA_KWARGS.get("ollama/{model_name}", {}),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
