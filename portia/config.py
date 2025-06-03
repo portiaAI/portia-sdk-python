@@ -799,7 +799,7 @@ class Config(BaseModel):
         Supported provider-prefixes are:
         - openai
         - anthropic
-        - mistral (requires portia-sdk-python[mistral] to be installed)
+        - mistralai (requires portia-sdk-python[mistral] to be installed)
         - google (requires portia-sdk-python[google] to be installed)
         - azure-openai
 
@@ -850,14 +850,14 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
                     cache=cache,
-                    **MODEL_EXTRA_KWARGS.get(model_name, {}),
+                    **MODEL_EXTRA_KWARGS.get(f"openai/{model_name}", {}),
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
                     cache=cache,
-                    **MODEL_EXTRA_KWARGS.get(model_name, {}),
+                    **MODEL_EXTRA_KWARGS.get(f"anthropic/{model_name}", {}),
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistralai")
@@ -867,7 +867,7 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("mistralai_api_key"),
                     cache=cache,
-                    **MODEL_EXTRA_KWARGS.get(model_name, {}),
+                    **MODEL_EXTRA_KWARGS.get("mistralai/{model_name}", {}),
                 )
             case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
@@ -877,7 +877,7 @@ class Config(BaseModel):
                     model_name=model_name,
                     api_key=self.must_get_api_key("google_api_key"),
                     cache=cache,
-                    **MODEL_EXTRA_KWARGS.get(model_name, {}),
+                    **MODEL_EXTRA_KWARGS.get("google/{model_name}", {}),
                 )
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
@@ -885,7 +885,7 @@ class Config(BaseModel):
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
                     cache=cache,
-                    **MODEL_EXTRA_KWARGS.get(model_name, {}),
+                    **MODEL_EXTRA_KWARGS.get("azure-openai/{model_name}", {}),
                 )
             case LLMProvider.OLLAMA:
                 validate_extras_dependencies("ollama")
@@ -895,7 +895,7 @@ class Config(BaseModel):
                     model_name=model_name,
                     base_url=self.ollama_base_url,
                     cache=cache,
-                    **MODEL_EXTRA_KWARGS.get(model_name, {}),
+                    **MODEL_EXTRA_KWARGS.get("ollama/{model_name}", {}),
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
