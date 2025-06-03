@@ -16,7 +16,6 @@ If authentication is not required, the tool will return the task output. It uses
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import sys
@@ -34,7 +33,7 @@ from portia.clarification import ActionClarification
 from portia.common import validate_extras_dependencies
 from portia.errors import ToolHardError
 from portia.model import GenerativeModel  # noqa: TC001 - used in Pydantic Schema
-from portia.tool import AsyncTool, Tool, ToolRunContext
+from portia.tool import AsyncTool, ToolRunContext
 
 if TYPE_CHECKING:
     from browserbase.types import SessionCreateResponse

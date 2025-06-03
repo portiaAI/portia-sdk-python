@@ -15,7 +15,6 @@ while relying on common functionality provided by the base class.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from abc import abstractmethod
 from functools import partial
@@ -398,6 +397,8 @@ class Tool(BaseModel):
 
 
 class AsyncTool(Tool):
+    """Async Tool base class."""
+
     @abstractmethod
     async def run_async(
         self,
@@ -405,7 +406,20 @@ class AsyncTool(Tool):
         *args: Any,
         **kwargs: Any,
     ) -> Serializable | Clarification:
-        pass
+        """Run the tool async.
+
+        This method must be implemented by subclasses to define the tool's specific behavior.
+
+        Args:
+            ctx (ToolRunContext): Context of the tool execution
+            args (Any): The arguments passed to the tool for execution.
+            kwargs (Any): The keyword arguments passed to the tool for execution.
+
+        Returns:
+            Any: The result of the tool's execution which can be any serializable type
+            or a clarification.
+
+        """
 
     def run(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401, ARG002
         """Raise an error on sync invocation."""
