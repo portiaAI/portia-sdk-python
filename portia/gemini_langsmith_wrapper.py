@@ -74,8 +74,8 @@ def _extract_parts(content_item: types.ContentUnion | types.ContentUnionDict) ->
     # Case 3: single Part or dict
     if isinstance(content_item, types.Part):
         return [content_item.text or ""]
-    if isinstance(content_item, dict) and "text" in content_item:
-        return [str(content_item["text"]) or ""]
+    if isinstance(content_item, dict) and "parts" in content_item:
+        return [str(content_item["parts"]) or ""]
 
     # Case 4: Fallback to string if nothing else matches
     if isinstance(content_item, str):
