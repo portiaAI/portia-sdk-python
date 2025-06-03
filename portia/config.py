@@ -559,17 +559,9 @@ class Config(BaseModel):
             case "planning_model":
                 match llm_provider:
                     case LLMProvider.OPENAI:
-                        return OpenAIGenerativeModel(
-                            model_name="o3-mini",
-                            api_key=self.must_get_api_key("openai_api_key"),
-                            reasoning_effort="medium",
-                        )
+                        return "openai/o3-mini"
                     case LLMProvider.ANTHROPIC:
-                        return AnthropicGenerativeModel(
-                            model_name="claude-3-7-sonnet-latest",
-                            api_key=self.must_get_api_key("anthropic_api_key"),
-                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
-                        )
+                        return "anthropic/claude-3-7-sonnet-latest"
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
@@ -580,17 +572,9 @@ class Config(BaseModel):
             case "introspection_model":
                 match llm_provider:
                     case LLMProvider.OPENAI:
-                        return OpenAIGenerativeModel(
-                            model_name="o4-mini",
-                            api_key=self.must_get_api_key("openai_api_key"),
-                            reasoning_effort="medium",
-                        )
+                        return "openai/o4-mini"
                     case LLMProvider.ANTHROPIC:
-                        return AnthropicGenerativeModel(
-                            model_name="claude-3-7-sonnet-latest",
-                            api_key=self.must_get_api_key("anthropic_api_key"),
-                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
-                        )
+                        return "anthropic/claude-3-7-sonnet-latest"
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
@@ -859,12 +843,14 @@ class Config(BaseModel):
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
+                    reasoning_effort="medium",
                     cache=cache,
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
+                    model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
                     cache=cache,
                 )
             case LLMProvider.MISTRALAI:
