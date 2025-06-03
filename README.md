@@ -4,7 +4,7 @@
 
 # Portia SDK Python
 
-An easy way to guide LLM reasoning, intervene in multi-agent execution and iron out production complexities in your agent deployments.
+Portia AI is an open source developer framework for predictable, stateful, authenticated agentic workflows. We allow developers to have as much or as little oversight as they’d like over their multi-agent deployments and we are obsessively focused on production readiness.
 Play around, break things and tell us how you're getting on in our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">**Code of Conduct (↗)**</a>).
 
 If you want to dive straight in with an example, dive into one of our examples in our **[Examples Repo (↗)](https://github.com/portiaAI/portia-agent-examples)**.
@@ -33,7 +33,7 @@ If you want to dive straight in with an example, dive into one of our examples i
 
 ## Demo
 To clickthrough at your own pace, please follow this [link](https://snappify.com/view/3d721d6c-c5ff-4e84-b770-83e93bd1a8f1)</br>
-[▶️ Watch the demo video](GitHub%20Readme.mp4)
+![Feature run-through](https://github.com/user-attachments/assets/1cd66940-ee78-42a6-beb4-7533835de7e9)
 
 ## Quickstart
 
@@ -106,10 +106,10 @@ plan = portia.run(task)
 
 ### Advanced examples on YouTube
 Here is an example where we build a customer refund agent using Stripe's MCP server. It leverages execution hooks and clarifications to confirm human approval before moving money.</br>
-[Customer refund agent with Stripe MCP](https://youtu.be/DB-FDEM_7_Y?si=IqVq14eskvLIKmvv))
+[![Customer refund agent with Stripe MCP](assets/stripemcp.jpg)](https://youtu.be/DB-FDEM_7_Y?si=IqVq14eskvLIKmvv)
 
 Here is another example where we use our open browser tool. It uses clarifications when it encounters a login page to allow a human to enter their credentials directly into the session and allow it to progress.</br>
-[Manage Linkedin connections](https://youtu.be/hSq8Ww-hagg?si=8oQaXcTcAyrzEQty)
+[![Manage Linkedin connections](assets/linkedinbrowsertool.jpg)](https://youtu.be/hSq8Ww-hagg?si=8oQaXcTcAyrzEQty)
 
 ## Learn more
 - Head over to our docs at <a href="https://docs.portialabs.ai" target="_blank">**docs.portialabs.ai (↗)**</a>.
