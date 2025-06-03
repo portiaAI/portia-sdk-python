@@ -530,3 +530,23 @@ def test_generate_pydantic_model_from_json_schema_handles_omissible_fields() -> 
     assert deserialized.email is None  # pyright: ignore[reportAttributeAccessIssue]
     assert deserialized.phone is None  # pyright: ignore[reportAttributeAccessIssue]
     assert deserialized.model_dump() == {"name": "John", "phone": None}
+
+
+@pytest.mark.usefixtures("mock_get_mcp_session")
+def test_mcp_tool_registry_from_streamable_http_connection() -> None:
+    """Test constructing a McpToolRegistry from a StreamableHTTP connection."""
+    mcp_registry_streamable_http = McpToolRegistry.from_streamable_http_connection(
+        server_name="mock_mcp",
+        url="http://localhost:8000/mcp",
+    )
+    assert isinstance(mcp_registry_streamable_http, McpToolRegistry)
+
+
+@pytest.mark.usefixtures("mock_get_mcp_session")
+async def test_mcp_tool_registry_from_streamable_http_connection_async() -> None:
+    """Test constructing a McpToolRegistry from a StreamableHTTP connection (async)."""
+    mcp_registry_streamable_http = await McpToolRegistry.from_streamable_http_connection_async(
+        server_name="mock_mcp",
+        url="http://localhost:8000/mcp",
+    )
+    assert isinstance(mcp_registry_streamable_http, McpToolRegistry)

@@ -74,18 +74,26 @@ AGENTS = [
     ExecutionAgentType.ONE_SHOT,
 ]
 
+STORAGE = [
+    StorageClass.DISK,
+    StorageClass.MEMORY,
+    StorageClass.CLOUD,
+]
+
 
 @pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize("storage", STORAGE)
 @pytest.mark.flaky(reruns=4)
 def test_portia_run_query(
     llm_provider: LLMProvider,
     default_model_name: str,
+    storage: StorageClass,
 ) -> None:
     """Test running a simple query."""
     config = Config.from_default(
         llm_provider=llm_provider,
         default_model=default_model_name,
-        storage_class=StorageClass.MEMORY,
+        storage_class=storage,
     )
 
     addition_tool = AdditionTool()
@@ -129,11 +137,13 @@ def test_portia_generate_plan(
 
 @pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.parametrize("storage", STORAGE)
 @pytest.mark.flaky(reruns=3)
 def test_portia_run_query_with_clarifications(
     llm_provider: LLMProvider,
     default_model_name: str,
     agent: ExecutionAgentType,
+    storage: StorageClass,
 ) -> None:
     """Test running a query with clarification."""
     config = Config.from_default(
@@ -141,7 +151,7 @@ def test_portia_run_query_with_clarifications(
         llm_provider=llm_provider,
         default_model=default_model_name,
         execution_agent_type=agent,
-        storage_class=StorageClass.MEMORY,
+        storage_class=storage,
     )
 
     test_clarification_handler = TestClarificationHandler()
@@ -335,7 +345,9 @@ def test_portia_run_query_with_multiple_clarifications(
             return a + b
 
     test_clarification_handler = TestClarificationHandler()
-    test_clarification_handler.clarification_response = 456
+    test_clarification_handler.clarification_response = (
+        "Override value a with 456, keep value b as 2."
+    )
     tool_registry = ToolRegistry([MyAdditionTool()])
     portia = Portia(
         config=config,

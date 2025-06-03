@@ -14,7 +14,6 @@ from collections.abc import Container
 from enum import Enum
 from typing import Any, NamedTuple, Self, TypeVar
 
-import tiktoken
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -34,6 +33,7 @@ from portia.model import (
     LLMProvider,
     OpenAIGenerativeModel,
 )
+from portia.token_counter import estimate_tokens
 
 T = TypeVar("T")
 
@@ -547,10 +547,7 @@ class Config(BaseModel):
         """Determine whether the provided output value exceeds the large output threshold."""
         if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
             return False
-        # It doesn't really matter which model we use here, so choose gpt2 for speed.
-        # More details at https://chatgpt.com/share/67ee4931-a794-8007-9859-13aca611dba9
-        encoding = tiktoken.get_encoding("gpt2").encode(str(value))
-        return len(encoding) > self.large_output_threshold_tokens
+        return estimate_tokens(str(value)) > self.large_output_threshold_tokens
 
     def get_agent_default_model(  # noqa: C901, PLR0911, PLR0912
         self,
@@ -612,7 +609,7 @@ class Config(BaseModel):
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
-                        return "azure-openai/o3-mini"
+                        return "azure-openai/gpt-4.1"
                 return None
 
     @model_validator(mode="after")
@@ -663,19 +660,25 @@ class Config(BaseModel):
 
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.
-        for model_getter in (
-            self.get_default_model,
-            self.get_planning_model,
-            self.get_execution_model,
-            self.get_introspection_model,
-            self.get_summarizer_model,
-        ):
+        for model_getter, label, value in [
+            (self.get_default_model, "default_model", self.models.default_model),
+            (self.get_planning_model, "planning_model", self.models.planning_model),
+            (self.get_execution_model, "execution_model", self.models.execution_model),
+            (self.get_introspection_model, "introspection_model", self.models.introspection_model),
+            (
+                self.get_summarizer_model,
+                "summarizer_model",
+                self.models.summarizer_model,
+            ),
+        ]:
             try:
                 model_getter()
             except Exception as e:
                 raise InvalidConfigError(
-                    f"models.{model_getter.__name__}",
-                    "All models must be instantiable",
+                    label,
+                    f"The value {value!s} is not valid for the the {label} model. "
+                    "This is usually either because of a typo in the model name or a missing "
+                    "API Key. Please review the docs here: https://docs.portialabs.ai/manage-config",
                 ) from e
         return self
 

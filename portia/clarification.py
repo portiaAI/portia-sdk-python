@@ -50,7 +50,7 @@ class Clarification(BaseModel, ABC):
     Attributes:
         id (ClarificationUUID): A unique identifier for this clarification.
         category (ClarificationCategory): The category of this clarification, indicating its type.
-        response (SERIALIZABLE_TYPE_VAR | None): The user's response to this clarification, if any.
+        response (Serializable | None): The user's response to this clarification, if any.
         step (int | None): The step this clarification is associated with, if applicable.
         user_guidance (str): Guidance provided to the user to assist with the clarification.
         resolved (bool): Whether the clarification has been resolved by the user.

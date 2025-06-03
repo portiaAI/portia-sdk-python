@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.4.0"
+version = "0.4.1"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -28,12 +28,12 @@ dependencies = [
     "pandas>=2.2.3,<3",
     "pytest-mock>=3.14.0,<4",
     "openpyxl>=3.1.5,<4",
-    "mcp>=1.6.0,<2",
+    "mcp>=1.9.2,<2",
     "langsmith>=0.3.15,<0.4 ; python_version >= '3.11' and python_version < '4.0'",
-    "tiktoken>=0.9.0,<0.10",
     "jsonref>=1.1.0,<2",
     "posthog>=3.23.0",
     "testcontainers[redis]>=4.10.0",
+    "pytest-repeat>=0.9.4",
 ]
 
 [project.optional-dependencies]
@@ -70,6 +70,8 @@ all = [
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
+    "redis>=5.2.1,<6",
+    "langchain-redis>=0.1.2"
 ]
 
 [project.urls]

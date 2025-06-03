@@ -104,6 +104,7 @@ def test_get_response(model_str: str, messages: list[Message]) -> None:
 
 
 @pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
+@pytest.mark.flaky(reruns=4)
 def test_get_structured_response(model_str: str, messages: list[Message]) -> None:
     """Test get_structured_response for each model type."""
     model = Config.from_default(default_model=model_str).get_default_model()

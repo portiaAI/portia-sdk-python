@@ -21,6 +21,8 @@ from portia.open_source_tools.browser_tool import (
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
 )
+from portia.plan import PlanBuilder
+from portia.plan_run import PlanRun
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import assert_clarification_equality_without_uuid, get_test_tool_context
 
@@ -317,12 +319,15 @@ def test_browser_infra_local_setup_browser(
     context = get_test_tool_context()
     context.end_user = EndUser(external_id="test_user")
 
-    with patch("logging.Logger.warning") as mock_warning:
+    mock_logger_instance = MagicMock()
+    mock_logger = MagicMock(return_value=mock_logger_instance)
+    with patch("portia.open_source_tools.browser_tool.logger", mock_logger):
         browser = local_browser_provider.setup_browser(context)
 
         # Verify warning was logged for end_user
-        mock_warning.assert_called_once()
-        assert "does not support end users" in mock_warning.call_args[0][0]
+        mock_logger.assert_called_once()
+        mock_logger_instance.warning.assert_called_once()
+        assert "does not support end users" in mock_logger_instance.warning.call_args[0][0]
 
         # Verify browser instance
         assert isinstance(browser, Browser)
@@ -693,8 +698,10 @@ def test_browserbase_provider_get_or_create_session_with_clarifications(
             plan_run_id=PlanRunUUID(),
             action_url=HttpUrl("https://example.com"),
             source="Browser tool",
+            step=0,
         )
     ]
+    context.plan_run.outputs.clarifications = context.clarifications
     context.end_user.additional_data = {
         "bb_session_id": "existing_session_id",
         "bb_session_connect_url": "existing_connect_url",
@@ -730,3 +737,60 @@ def test_browserbase_provider_get_or_create_session_without_clarifications(
 
     assert connect_url == "test_connect_url"
     mock_browserbase_provider.bb.sessions.create.assert_called_once()  # type: ignore reportFunctionMemberAccess
+
+
+def test_process_task_data() -> None:
+    """Check strings are passed through."""
+    task_data = "this is the data"
+    assert BrowserTool.process_task_data(task_data) == task_data
+
+    task_data = ["this is the data"]
+    assert BrowserTool.process_task_data(task_data) == "\n".join(task_data)
+
+
+def test_browser_tool_multiple_calls(
+    mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+) -> None:
+    """Test step_complete only cleans up on final browser tool call."""
+    plan = (
+        PlanBuilder()
+        .step(task="1st browser tool task", tool_id="browser_tool")
+        .step(task="2nd browser tool task", tool_id="browser_tool")
+        .step(task="3rd browser tool task", tool_id="browser_tool")
+        .build()
+    )
+    end_user = EndUser(
+        external_id="123",
+        additional_data={"bb_session_id": "session123", "bb_session_connect_url": "connect_url"},
+    )
+    mock_ctx = MagicMock()
+    mock_ctx.end_user = end_user
+    mock_ctx.plan = plan
+    mock_ctx.plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
+
+    # Test first browser tool call (should set up session and not clean up)
+    mock_browserbase_provider.setup_browser(mock_ctx)
+    mock_browserbase_provider.bb.sessions.create.assert_called_once()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.reset_mock()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+
+    # Test middle browser tool call (should not set up or clean up)
+    end_user.set_additional_data("bb_session_id", "session123")
+    end_user.set_additional_data("bb_session_connect_url", "connect_url")
+    mock_ctx.plan_run.current_step_index = 1
+    mock_browserbase_provider.setup_browser(mock_ctx)
+    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+
+    # Test final browser tool call (should not set up but should clean up)
+    mock_ctx.plan_run.current_step_index = 2
+    mock_browserbase_provider.setup_browser(mock_ctx)
+    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess]
+        "session123",
+        project_id="test_project",
+        status="REQUEST_RELEASE",
+    )
