@@ -19,7 +19,7 @@ import asyncio
 import json
 from abc import abstractmethod
 from functools import partial
-from typing import Any, Generic, Self
+from typing import Any, Self
 
 import httpx
 from jsonref import replace_refs
