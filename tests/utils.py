@@ -25,7 +25,7 @@ from portia.execution_agents.output import LocalDataValue
 from portia.model import GenerativeModel, LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun
-from portia.tool import Tool, ToolRunContext
+from portia.tool import AsyncTool, Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
@@ -126,6 +126,20 @@ class AdditionTool(Tool):
         return a + b
 
 
+class AsyncAdditionTool(AsyncTool):
+    """Adds two numbers."""
+
+    id: str = "add_tool"
+    name: str = "Add Tool"
+    description: str = "Use this tool to add two numbers together, it takes two numbers a + b"
+    args_schema: type[BaseModel] = AdditionToolSchema
+    output_schema: tuple[str, str] = ("int", "int: The value of the addition")
+
+    async def run_async(self, _: ToolRunContext, a: int, b: int) -> int:
+        """Add the numbers."""
+        return a + b
+
+
 class EndUserUpdateToolSchema(BaseModel):
     """Input for AdditionTool."""
 
@@ -166,6 +180,34 @@ class ClarificationTool(Tool):
     )
 
     def run(
+        self,
+        ctx: ToolRunContext,
+        user_guidance: str,
+    ) -> Clarification | None:
+        """Add the numbers."""
+        if len(ctx.clarifications) == 0:
+            return InputClarification(
+                plan_run_id=ctx.plan_run.id,
+                user_guidance=user_guidance,
+                argument_name="raise_clarification",
+                source="Test clarification tool",
+            )
+        return None
+
+
+class AsyncClarificationTool(AsyncTool):
+    """Returns a Clarification."""
+
+    id: str = "clarification_tool"
+    name: str = "Clarification Tool"
+    description: str = "Returns a clarification"
+    args_schema: type[BaseModel] = ClarificationToolSchema
+    output_schema: tuple[str, str] = (
+        "Clarification",
+        "Clarification: The value of the Clarification",
+    )
+
+    async def run_async(
         self,
         ctx: ToolRunContext,
         user_guidance: str,
@@ -222,6 +264,33 @@ class ErrorTool(Tool):
     )
 
     def run(
+        self,
+        _: ToolRunContext,
+        error_str: str,
+        return_uncaught_error: bool,  # noqa: FBT001
+        return_soft_error: bool,  # noqa: FBT001
+    ) -> None:
+        """Return the error."""
+        if return_uncaught_error:
+            raise Exception(error_str)  # noqa: TRY002
+        if return_soft_error:
+            raise ToolSoftError(error_str)
+        raise ToolHardError(error_str)
+
+
+class AsyncErrorTool(AsyncTool):
+    """Returns an Error."""
+
+    id: str = "error_tool"
+    name: str = "Error Tool"
+    description: str = "Returns a error"
+    args_schema: type[BaseModel] = ErrorToolSchema
+    output_schema: tuple[str, str] = (
+        "Error",
+        "Error: The value of the error",
+    )
+
+    async def run_async(
         self,
         _: ToolRunContext,
         error_str: str,

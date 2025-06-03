@@ -15,7 +15,6 @@ while relying on common functionality provided by the base class.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from abc import abstractmethod
 from functools import partial
@@ -397,6 +396,147 @@ class Tool(BaseModel):
         return value.__name__
 
 
+class AsyncTool(Tool):
+    """Async Tool base class."""
+
+    @abstractmethod
+    async def run_async(
+        self,
+        ctx: ToolRunContext,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Serializable | Clarification:
+        """Run the tool async.
+
+        This method must be implemented by subclasses to define the tool's specific behavior.
+
+        Args:
+            ctx (ToolRunContext): Context of the tool execution
+            args (Any): The arguments passed to the tool for execution.
+            kwargs (Any): The keyword arguments passed to the tool for execution.
+
+        Returns:
+            Any: The result of the tool's execution which can be any serializable type
+            or a clarification.
+
+        """
+
+    def run(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401, ARG002
+        """Raise an error on sync invocation."""
+        raise RuntimeError("cannot call run on an async tool.")
+
+    async def _run_async(
+        self,
+        ctx: ToolRunContext,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Output:
+        """Invoke the Tool.run_async function and handle converting the result into an Output.
+
+        This is the entry point for agents to invoke a tool.
+
+        Args:
+            ctx (ToolRunContext): The context for the tool.
+            *args (Any): Additional positional arguments for the tool function.
+            **kwargs (Any): Additional keyword arguments for the tool function.
+
+        Returns:
+            Output: The tool's output wrapped in an Output object.
+
+        Raises:
+            ToolSoftError: If an error occurs and it is not already a Hard or Soft Tool error.
+
+        """
+        try:
+            output = await self.run_async(ctx, *args, **kwargs)
+        except Exception as e:
+            # check if error is wrapped as a Hard or Soft Tool Error.
+            # if not wrap as ToolSoftError
+            if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
+                raise ToolSoftError(e) from e
+            raise
+
+        # handle clarifications cleanly
+        if is_clarification(output):
+            clarifications = output if isinstance(output, list) else [output]
+            return LocalDataValue(
+                value=clarifications,
+            )
+        return LocalDataValue(value=output)  # type: ignore  # noqa: PGH003
+
+    async def _run_with_artifacts_async(
+        self,
+        ctx: ToolRunContext,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[str, Output]:
+        """Invoke the Tool.run_async function and handle converting to an Output object.
+
+        This function returns a tuple consisting of the output and an Output object, as expected by
+        langchain tools. It captures the output (artifact) directly instead of serializing
+        it to a string first.
+
+        Args:
+            ctx (ToolRunContext): The context for the tool.
+            *args (Any): Additional positional arguments for the tool function.
+            **kwargs (Any): Additional keyword arguments for the tool function.
+
+        Returns:
+            tuple[str, Output]: A tuple containing the output and the Output.
+
+        """
+        intermediate_output = await self._run_async(ctx, *args, **kwargs)
+        return (intermediate_output.get_value(), intermediate_output)  # type: ignore  # noqa: PGH003
+
+    def to_langchain(self, ctx: ToolRunContext) -> StructuredTool:
+        """Return a LangChain representation of this tool.
+
+        This function provides a LangChain-compatible version of the tool. The response format is
+        the default one without including artifacts. The ExecutionContext is baked into the
+        StructuredTool via a partial run function.
+
+        Args:
+            ctx (ToolRunContext): The context for the tool.
+
+        Returns:
+            StructuredTool: The LangChain-compatible representation of the tool, including the
+            tool's name, description, and argument schema, with the execution context baked
+            into the function.
+
+        """
+        return StructuredTool(
+            name=self.name.replace(" ", "_"),
+            description=self._generate_tool_description(),
+            args_schema=self.args_schema,
+            coroutine=partial(self._run_async, ctx),
+        )
+
+    def to_langchain_with_artifact(self, ctx: ToolRunContext) -> StructuredTool:
+        """Return a LangChain representation of this tool with content and artifact.
+
+        This function provides a LangChain-compatible version of the tool, where the response format
+        includes both the content and the artifact. The ToolRunContext is baked into the
+        StructuredTool via a partial run function for capturing output directly.
+
+        Args:
+            ctx (ToolRunContext): The context for the tool.
+
+        Returns:
+            StructuredTool: The LangChain-compatible representation of the tool, including the
+            tool's name, description, argument schema, and the ability to return both content
+            and artifact.
+
+        """
+        return StructuredTool(
+            name=self.name.replace(" ", "_"),
+            description=self._generate_tool_description(),
+            args_schema=self.args_schema,
+            coroutine=partial(self._run_with_artifacts_async, ctx),
+            return_direct=True,
+            response_format="content_and_artifact",
+        )
+
+
 class PortiaRemoteTool(Tool):
     """Tool that passes run execution to Portia Cloud."""
 
@@ -615,12 +755,12 @@ class PortiaRemoteTool(Tool):
         return ReadyResponse.model_validate(batch_ready_response.json())
 
 
-class PortiaMcpTool(Tool):
+class PortiaMcpTool(AsyncTool):
     """A Portia Tool wrapper for an MCP server-based tool."""
 
     mcp_client_config: McpClientConfig
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> str:
+    async def run_async(self, _: ToolRunContext, **kwargs: Any) -> str:
         """Invoke the tool by dispatching to the MCP server.
 
         Args:
@@ -632,14 +772,10 @@ class PortiaMcpTool(Tool):
 
         """
         logger().debug(f"Calling tool {self.name} with arguments {kwargs}")
-        return asyncio.run(self.call_remote_mcp_tool(self.name, kwargs))
-
-    async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
-        """Call a tool using the MCP session."""
         async with get_mcp_session(self.mcp_client_config) as session:
-            tool_result = await session.call_tool(name, arguments)
+            tool_result = await session.call_tool(self.name, kwargs)
             if tool_result.isError:
                 raise ToolHardError(
-                    f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
+                    f"MCP tool {self.name} returned an error: {tool_result.model_dump_json()}",
                 )
             return tool_result.model_dump_json()
