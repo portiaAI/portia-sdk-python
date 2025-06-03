@@ -741,12 +741,12 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         return ReadyResponse.model_validate(batch_ready_response.json())
 
 
-class PortiaMcpTool(Tool):
+class PortiaMcpTool(AsyncTool):
     """A Portia Tool wrapper for an MCP server-based tool."""
 
     mcp_client_config: McpClientConfig
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> str:
+    async def run_async(self, _: ToolRunContext, **kwargs: Any) -> str:
         """Invoke the tool by dispatching to the MCP server.
 
         Args:
@@ -758,14 +758,10 @@ class PortiaMcpTool(Tool):
 
         """
         logger().debug(f"Calling tool {self.name} with arguments {kwargs}")
-        return asyncio.run(self.call_remote_mcp_tool(self.name, kwargs))
-
-    async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
-        """Call a tool using the MCP session."""
         async with get_mcp_session(self.mcp_client_config) as session:
-            tool_result = await session.call_tool(name, arguments)
+            tool_result = await session.call_tool(self.name, kwargs)
             if tool_result.isError:
                 raise ToolHardError(
-                    f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
+                    f"MCP tool {self.name} returned an error: {tool_result.model_dump_json()}",
                 )
             return tool_result.model_dump_json()
