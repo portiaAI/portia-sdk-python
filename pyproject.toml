@@ -34,7 +34,6 @@ dependencies = [
     "posthog>=3.23.0",
     "testcontainers[redis]>=4.10.0",
     "pytest-repeat>=0.9.4",
-    "google-genai==1.18.0",
 ]
 
 [project.optional-dependencies]
@@ -48,7 +47,7 @@ mistralai = [
 ]
 google = [
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-generativeai>=0.8.4,<0.9 ; python_version >= '3.11' and python_version < '4.0'",
+    "google-genai==1.18.0",
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
 tools-browser-local = [
@@ -66,7 +65,7 @@ all = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-generativeai>=0.8.4,<0.9 ; python_version >= '3.11' and python_version < '4.0'",
+    "google-genai==1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
