@@ -17,7 +17,7 @@ class WeatherToolSchema(BaseModel):
     city: str = Field(..., description="The city to get the weather for")
 
 
-class WeatherTool(Tool):
+class WeatherTool(Tool[str]):
     """Get the weather for a given city."""
 
     id: str = "weather_tool"
