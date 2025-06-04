@@ -166,7 +166,7 @@ class BrowserInfrastructureOption(Enum):
     REMOTE = "remote"
 
 
-class BrowserTool(Tool):
+class BrowserTool(Tool[str | BaseModel]):
     """General purpose browser tool. Customizable to user requirements.
 
     This tool is designed to be used for tasks that require a browser. If authentication is

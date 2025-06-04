@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 Serializable = Any
+SERIALIZABLE_TYPE_VAR = TypeVar("SERIALIZABLE_TYPE_VAR", bound=Serializable)
 
 
 class PortiaEnum(str, Enum):
