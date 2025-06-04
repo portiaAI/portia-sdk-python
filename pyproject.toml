@@ -47,7 +47,7 @@ mistralai = [
 ]
 google = [
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-generativeai>=0.8.4,<0.9 ; python_version >= '3.11' and python_version < '4.0'",
+    "google-genai==1.18.0",
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
 tools-browser-local = [
@@ -65,7 +65,7 @@ all = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-generativeai>=0.8.4,<0.9 ; python_version >= '3.11' and python_version < '4.0'",
+    "google-genai==1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
@@ -90,9 +90,9 @@ dev = [
     "pytest-rerunfailures~=14.0",
     "pytest-cov>=5.0.0,<6",
     "pyright>=1.1.382,<2",
-    "pytest-httpx>=0.33.0,<0.34",
     "pytest-xdist[psutil]>=3.6.1,<4",
     "pytest-asyncio>=0.25.3,<0.26",
+    "pytest-httpx>=0.35.0",
 ]
 
 [tool.hatch.build.targets.sdist]

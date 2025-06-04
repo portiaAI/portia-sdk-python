@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from portia.config import Config
 from portia.end_user import EndUser
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
+from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanBuilder
 from portia.plan_run import PlanRun
@@ -111,7 +111,7 @@ def test_execution_agent_with_long_tool_description(model: str) -> None:
     agent_memory = InMemoryStorage()
 
     # Instantiate Agent
-    agent = DefaultExecutionAgent(
+    agent = OneShotAgent(
         plan=plan,
         plan_run=plan_run,
         config=config,
