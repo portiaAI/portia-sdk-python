@@ -19,7 +19,7 @@ class ClarificationToolSchema(BaseModel):
     )
 
 
-class ClarificationTool(Tool):
+class ClarificationTool(Tool[str]):
     """Raises a clarification if the agent is unsure of an argument."""
 
     id: str = "clarification_tool"

@@ -652,13 +652,10 @@ if validate_extras_dependencies("mistralai", raise_error=False):
 
 
 if validate_extras_dependencies("google", raise_error=False):
-    import google.generativeai as genai
+    from google import genai
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     from portia.gemini_langsmith_wrapper import wrap_gemini
-
-    if TYPE_CHECKING:
-        from google.generativeai.types.generation_types import GenerationConfigDict
 
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""
@@ -685,61 +682,21 @@ if validate_extras_dependencies("google", raise_error=False):
 
             """
             # Configure genai with the api key
-            genai.configure(api_key=api_key.get_secret_value())  # pyright: ignore[reportPrivateImportUsage]
-
-            generation_config: GenerationConfigDict = {}
-            if temperature is not None:
-                kwargs["temperature"] = temperature
-                generation_config["temperature"] = temperature
+            genai_client = genai.Client(api_key=api_key.get_secret_value())
 
             client = ChatGoogleGenerativeAI(
                 model=model_name,
                 api_key=api_key,
                 max_retries=max_retries,
+                temperature=temperature or 0,
                 **kwargs,
             )
             super().__init__(client, model_name)
-            wrapped_gemini_model = wrap_gemini(
-                genai.GenerativeModel(  # pyright: ignore[reportPrivateImportUsage]
-                    model_name=model_name,
-                    generation_config=generation_config,
-                )
-            )
-            self._instructor_client = instructor.from_gemini(
-                client=wrapped_gemini_model,
-                mode=instructor.Mode.GEMINI_JSON,
-                use_async=False,
-            )
+            wrapped_gemini_client = wrap_gemini(genai_client)
 
-        def get_structured_response(
-            self,
-            messages: list[Message],
-            schema: type[BaseModelT],
-            **_: Any,
-        ) -> BaseModelT:
-            """Get structured response from Google Generative AI model using instructor.
-
-            NB. We use the instructor library to get the structured response, because the Google
-            Generative AI API does not support Any-types in structured output mode. Instructor
-            works around this by NOT using the API structured output mode, and instead using the
-            text generation API to generate a JSON-formatted response, which is then parsed into
-            the Pydantic model.
-
-            Args:
-                messages (list[Message]): The list of messages to send to the model.
-                schema (type[BaseModelT]): The Pydantic model to use for the response.
-                **kwargs: Additional keyword arguments to pass to the model.
-
-            Returns:
-                BaseModelT: The structured response from the model.
-
-            """
-            instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-            return self._cached_instructor_call(
-                client=self._instructor_client,
-                messages=instructor_messages,
-                schema=schema,
-                provider=self.provider.value,
+            self._instructor_client = instructor.from_genai(
+                client=wrapped_gemini_client,
+                mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
             )
 
 

@@ -27,7 +27,7 @@ class LLMToolSchema(BaseModel):
     )
 
 
-class LLMTool(Tool):
+class LLMTool(Tool[str | BaseModel]):
     """General purpose LLM tool. Customizable to user requirements. Won't call other tools."""
 
     LLM_TOOL_ID: ClassVar[str] = "llm_tool"
