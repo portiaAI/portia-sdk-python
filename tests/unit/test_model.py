@@ -9,6 +9,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.caches import BaseCache
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.outputs import Generation
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.model import (
@@ -295,7 +296,7 @@ def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Test cache hit
     cache.reset_mock()
-    cache.lookup.return_value = ["{}"]
+    cache.lookup.return_value = [Generation(text="{}")]
     model.get_structured_response_instructor([Message(role="user", content="hi")], DummyModel)
     cache.lookup.assert_called_once()
     cache.update.assert_not_called()

@@ -247,8 +247,8 @@ class LangChainGenerativeModel(GenerativeModel):
         try:
             cached = cache.lookup(prompt, llm_string)
             if cached and len(cached) > 0:
-                return schema.model_validate_json(cached[0])  # pyright: ignore[reportArgumentType]
-        except (ValidationError, RedisError):
+                return schema.model_validate_json(cached[0].text)  # pyright: ignore[reportArgumentType]
+        except (ValidationError, RedisError, AttributeError):
             # On validation errors, re-fetch and update the entry in the cache
             pass
         response = client.chat.completions.create(
