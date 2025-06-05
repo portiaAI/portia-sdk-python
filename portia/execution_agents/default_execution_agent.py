@@ -6,6 +6,7 @@ in completing tasks.
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.prompts import (
@@ -15,7 +16,7 @@ from langchain_core.prompts import (
 )
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from portia.clarification import Clarification, InputClarification
 from portia.errors import InvalidAgentError, InvalidPlanRunStateError
@@ -193,6 +194,7 @@ class ParserModel:
                 "{previous_errors}\n"
                 "\n\n----------\n\n"
                 "Please provide the arguments for the tool. Adhere to the following guidelines:\n"
+                "- If the tool has a list return it as a list, i.e. [1, 2, 3] not '[1, 2, 3]'"
                 "- If a tool needs to be called many times, you can repeat the argument\n"
                 "- You may take values from the task, inputs, previous steps or clarifications\n"
                 "- Prefer values clarified in follow-up inputs over initial inputs.\n"
@@ -200,7 +202,6 @@ class ParserModel:
                 "- Do not include references to any of the input values (e.g. 'as provided in "
                 "the input'): you must put the exact value the tool should be called with in "
                 "the value field\n"
-                "- If the tool has a list return it as a list, i.e. [1, 2, 3] not '[1, 2, 3]'"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
                 "- If any of the inputs is a large string and you want to use it verbatim, rather "
@@ -420,7 +421,6 @@ class VerifierModel:
             schema=VerifiedToolInputs,
         )
         response = VerifiedToolInputs.model_validate(response)
-
         # Validate the arguments against the tool's schema
         response = self._validate_args_against_schema(response, state["step_inputs"])
         self.agent.verified_args = response
@@ -451,11 +451,16 @@ class VerifierModel:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
             # At this point we know the arguments are invalid, so we can trigger a clarification
             # request.
-            invalid_arg_names = {
-                error["loc"][0]
-                for error in e.errors()
-                if error.get("loc") and len(error["loc"]) > 0
-            }
+            invalid_arg_names = []
+            for error in e.errors():
+                # Gemini often returns lists as '[1,2,3]', but downstream LLMs can handle this.
+                if error["msg"] == "Input should be a valid list" and error["input"].startswith(
+                    "["
+                ):
+                    continue
+                if error.get("loc") and len(error["loc"]) > 0:
+                    invalid_arg_names.append(error["loc"][0])
+
             [
                 setattr(arg, "schema_invalid", True)
                 for arg in tool_inputs.args
