@@ -17,6 +17,13 @@ Key Components
 
 from __future__ import annotations
 
+import inspect
+import textwrap
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - only used for type checking
+    from collections.abc import Callable
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.clarification import (
@@ -27,6 +34,64 @@ from portia.clarification import (
 from portia.common import PortiaEnum
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
+
+if TYPE_CHECKING:  # pragma: no cover - only used for type checking
+    from portia.execution_hooks import ExecutionHooks
+
+
+class HookInfo(BaseModel):
+    """Information about a single execution hook."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    defined: bool = Field(default=False, description="Whether the hook is provided.")
+    file: str | None = Field(default=None, description="File where the hook is defined.")
+    line: int | None = Field(default=None, description="Line number where the hook starts.")
+    source: str | None = Field(default=None, description="Snippet of the hook source code.")
+
+    @classmethod
+    def from_callable(cls, func: Callable | None) -> HookInfo:
+        """Create HookInfo from a callable."""
+        if func is None:
+            return cls(defined=False)
+        try:
+            source_lines, start_line = inspect.getsourcelines(func)
+            file = inspect.getsourcefile(func)
+            source = textwrap.dedent("".join(source_lines[:5])).rstrip()
+        except Exception:  # noqa: BLE001 - introspection can fail for builtins
+            file = None
+            start_line = None
+            source = getattr(func, "__name__", str(func))
+        return cls(defined=True, file=file, line=start_line, source=source)
+
+
+class ExecutionHooksInfo(BaseModel):
+    """Information about the execution hooks used for a plan run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clarification_handler: HookInfo = Field(default_factory=HookInfo)
+    before_step_execution: HookInfo = Field(default_factory=HookInfo)
+    after_step_execution: HookInfo = Field(default_factory=HookInfo)
+    before_plan_run: HookInfo = Field(default_factory=HookInfo)
+    after_plan_run: HookInfo = Field(default_factory=HookInfo)
+    before_tool_call: HookInfo = Field(default_factory=HookInfo)
+    after_tool_call: HookInfo = Field(default_factory=HookInfo)
+
+    @classmethod
+    def from_execution_hooks(cls, hooks: ExecutionHooks) -> ExecutionHooksInfo:
+        """Create hook info from execution hooks."""
+        return cls(
+            clarification_handler=HookInfo.from_callable(
+                hooks.clarification_handler.handle if hooks.clarification_handler else None
+            ),
+            before_step_execution=HookInfo.from_callable(hooks.before_step_execution),
+            after_step_execution=HookInfo.from_callable(hooks.after_step_execution),
+            before_plan_run=HookInfo.from_callable(hooks.before_plan_run),
+            after_plan_run=HookInfo.from_callable(hooks.after_plan_run),
+            before_tool_call=HookInfo.from_callable(hooks.before_tool_call),
+            after_tool_call=HookInfo.from_callable(hooks.after_tool_call),
+        )
 
 
 class PlanRunState(PortiaEnum):
@@ -128,6 +193,11 @@ class PlanRun(BaseModel):
         description="The optional structured output schema for the plan run.",
     )
 
+    execution_hooks_info: ExecutionHooksInfo = Field(
+        default_factory=ExecutionHooksInfo,
+        description="Information about the execution hooks configured for this run.",
+    )
+
     def get_outstanding_clarifications(self) -> ClarificationListType:
         """Return all outstanding clarifications.
 
@@ -227,4 +297,5 @@ class ReadOnlyPlanRun(PlanRun):
             end_user_id=plan_run.end_user_id,
             plan_run_inputs=plan_run.plan_run_inputs,
             structured_output_schema=plan_run.structured_output_schema,
+            execution_hooks_info=plan_run.execution_hooks_info,
         )

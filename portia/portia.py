@@ -66,7 +66,13 @@ from portia.introspection_agents.introspection_agent import (
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, ReadOnlyPlan, ReadOnlyStep, Step
-from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
+from portia.plan_run import (
+    ExecutionHooksInfo,
+    PlanRun,
+    PlanRunState,
+    PlanRunUUID,
+    ReadOnlyPlanRun,
+)
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.prefixed_uuid import PlanUUID
 from portia.storage import (
@@ -914,6 +920,7 @@ class Portia:
             state=PlanRunState.NOT_STARTED,
             end_user_id=end_user.external_id,
             structured_output_schema=plan.structured_output_schema,
+            execution_hooks_info=ExecutionHooksInfo.from_execution_hooks(self.execution_hooks),
         )
         self._process_plan_input_values(plan, plan_run, plan_run_inputs)
         # Ensure the plan is saved before the plan run
