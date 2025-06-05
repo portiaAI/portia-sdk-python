@@ -6,6 +6,7 @@ in completing tasks.
 
 from __future__ import annotations
 
+from collections.abc import Set
 from typing import TYPE_CHECKING, Any, Literal
 
 from langchain_core.prompts import (
@@ -451,7 +452,7 @@ class VerifierModel:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
             # At this point we know the arguments are invalid, so we can trigger a clarification
             # request.
-            invalid_arg_names = []
+            invalid_arg_names = set()
             for error in e.errors():
                 # Gemini often returns lists as '[1,2,3]', but downstream LLMs can handle this.
                 if error["msg"] == "Input should be a valid list" and error["input"].startswith(
@@ -459,7 +460,7 @@ class VerifierModel:
                 ):
                     continue
                 if error.get("loc") and len(error["loc"]) > 0:
-                    invalid_arg_names.append(error["loc"][0])
+                    invalid_arg_names.add(error["loc"][0])
 
             [
                 setattr(arg, "schema_invalid", True)
