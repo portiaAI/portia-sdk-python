@@ -684,11 +684,13 @@ class Portia:
                 if clarification.source
                 else ""
             )
+            logger().debug("Calling clarification_handler execution hook")
             self.execution_hooks.clarification_handler.handle(
                 clarification=clarification,
                 on_resolution=lambda c, r: self.resolve_clarification(c, r) and None,
                 on_error=lambda c, r: self.error_clarification(c, r) and None,
             )
+            logger().debug("Finished clarification_handler execution hook")
 
         if len(clarifications) > 0:
             # If clarifications are handled synchronously,
@@ -947,9 +949,12 @@ class Portia:
         )
 
         if self.execution_hooks.before_plan_run and plan_run.current_step_index == 0:
+            logger().debug("Calling before_plan_run execution hook")
             self.execution_hooks.before_plan_run(
-                ReadOnlyPlan.from_plan(plan), ReadOnlyPlanRun.from_plan_run(plan_run)
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
             )
+            logger().debug("Finished before_plan_run execution hook")
 
         last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
         introspection_agent = self._get_introspection_agent()
@@ -970,11 +975,13 @@ class Portia:
                 if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
                     self._log_final_output(plan_run, plan)
                     if self.execution_hooks.after_plan_run and plan_run.outputs.final_output:
+                        logger().debug("Calling after_plan_run execution hook")
                         self.execution_hooks.after_plan_run(
                             ReadOnlyPlan.from_plan(plan),
                             ReadOnlyPlanRun.from_plan_run(plan_run),
                             plan_run.outputs.final_output,
                         )
+                        logger().debug("Finished after_plan_run execution hook")
                     return plan_run
 
                 logger().info(
@@ -989,11 +996,13 @@ class Portia:
                     # raised a clarification
                     and len(plan_run.get_clarifications_for_step()) == 0
                 ):
+                    logger().debug("Calling before_step_execution execution hook")
                     outcome = self.execution_hooks.before_step_execution(
                         ReadOnlyPlan.from_plan(plan),
                         ReadOnlyPlanRun.from_plan_run(plan_run),
                         ReadOnlyStep.from_step(step),
                     )
+                    logger().debug("Finished before_step_execution execution hook")
                     if outcome == BeforeStepExecutionOutcome.SKIP:
                         continue
 
@@ -1029,19 +1038,23 @@ class Portia:
                 )
 
                 if self.execution_hooks.after_step_execution:
+                    logger().debug("Calling after_step_execution execution hook")
                     self.execution_hooks.after_step_execution(
                         ReadOnlyPlan.from_plan(plan),
                         ReadOnlyPlanRun.from_plan_run(plan_run),
                         ReadOnlyStep.from_step(step),
                         error_output,
                     )
+                    logger().debug("Finished after_step_execution execution hook")
 
                 if self.execution_hooks.after_plan_run:
+                    logger().debug("Calling after_plan_run execution hook")
                     self.execution_hooks.after_plan_run(
                         ReadOnlyPlan.from_plan(plan),
                         ReadOnlyPlanRun.from_plan_run(plan_run),
                         plan_run.outputs.final_output,
                     )
+                    logger().debug("Finished after_plan_run execution hook")
 
                 return plan_run
             else:
@@ -1088,12 +1101,14 @@ class Portia:
                 return self._raise_clarifications(combined_clarifications, plan_run)
 
             if self.execution_hooks.after_step_execution:
+                logger().debug("Calling after_step_execution execution hook")
                 self.execution_hooks.after_step_execution(
                     ReadOnlyPlan.from_plan(plan),
                     ReadOnlyPlanRun.from_plan_run(plan_run),
                     ReadOnlyStep.from_step(step),
                     last_executed_step_output,
                 )
+                logger().debug("Finished after_step_execution execution hook")
 
             # persist at the end of each step
             self.storage.save_plan_run(plan_run)
@@ -1111,11 +1126,13 @@ class Portia:
         self._log_final_output(plan_run, plan)
 
         if self.execution_hooks.after_plan_run and plan_run.outputs.final_output:
+            logger().debug("Calling after_plan_run execution hook")
             self.execution_hooks.after_plan_run(
                 ReadOnlyPlan.from_plan(plan),
                 ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan_run.outputs.final_output,
             )
+            logger().debug("Finished after_plan_run execution hook")
 
         return plan_run
 

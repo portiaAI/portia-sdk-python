@@ -31,6 +31,7 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
+from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
@@ -568,12 +569,14 @@ class ToolCallingModel:
             and self.agent.tool
         ):
             for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
+                logger().debug("Calling before_tool_call execution hook")
                 clarification = self.agent.execution_hooks.before_tool_call(
                     self.agent.tool,
                     tool_call.get("args"),
                     ReadOnlyPlanRun.from_plan_run(self.agent.plan_run),
                     ReadOnlyStep.from_step(self.agent.step),
                 )
+                logger().debug("Finished before_tool_call execution hook")
                 if clarification:
                     self.agent.new_clarifications.append(clarification)
                     return {"messages": []}
