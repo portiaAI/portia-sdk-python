@@ -421,7 +421,6 @@ class VerifierModel:
             schema=VerifiedToolInputs,
         )
         response = VerifiedToolInputs.model_validate(response)
-
         # Validate the arguments against the tool's schema
         response = self._validate_args_against_schema(response, state["step_inputs"])
         self.agent.verified_args = response
@@ -452,11 +451,16 @@ class VerifierModel:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
             # At this point we know the arguments are invalid, so we can trigger a clarification
             # request.
-            invalid_arg_names = {
-                error["loc"][0]
-                for error in e.errors()
-                if error.get("loc") and len(error["loc"]) > 0
-            }
+            invalid_arg_names = set()
+            for error in e.errors():
+                # Gemini often returns lists as '[1,2,3]', but downstream LLMs can handle this.
+                if error["msg"] == "Input should be a valid list" and error["input"].startswith(
+                    "["
+                ):
+                    continue
+                if error.get("loc") and len(error["loc"]) > 0:
+                    invalid_arg_names.add(error["loc"][0])
+
             [
                 setattr(arg, "schema_invalid", True)
                 for arg in tool_inputs.args
