@@ -534,6 +534,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
+        self._set_cache()
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
