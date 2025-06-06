@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 _llm_cache: ContextVar[BaseCache | None] = ContextVar("llm_cache", default=None)
 
-# TODO: Remove once we've rolled out and moved everything to _llm_cache
+# TODO(RH): Remove once we've rolled out and moved everything to _llm_cache  # noqa: FIX002, TD003
 llm_cache = _llm_cache
 
 
