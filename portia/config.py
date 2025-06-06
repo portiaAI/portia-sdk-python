@@ -30,9 +30,9 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    LangChainGenerativeModel,
     LLMProvider,
     OpenAIGenerativeModel,
-    llm_cache,
 )
 from portia.token_counter import estimate_tokens
 
@@ -479,7 +479,7 @@ class Config(BaseModel):
             from langchain_redis import RedisCache
 
             cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
-            llm_cache.set(cache)
+            LangChainGenerativeModel.set_cache(cache)
         elif self.llm_redis_cache_url:
             logger().warning(  # pragma: no cover
                 "Not using cache as cache group is not installed. "  # pragma: no cover
