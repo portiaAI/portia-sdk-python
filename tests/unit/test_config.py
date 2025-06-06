@@ -27,7 +27,7 @@ from portia.model import (
     LLMProvider,
     MistralAIGenerativeModel,
     OpenAIGenerativeModel,
-    llm_cache,
+    _llm_cache,
 )
 
 PROVIDER_ENV_VARS = [
@@ -57,7 +57,7 @@ def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert c.default_log_level == LogLevel.CRITICAL
     assert c.llm_redis_cache_url is None
-    assert llm_cache.get() is None
+    assert _llm_cache.get() is None
 
 
 def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -137,7 +137,7 @@ def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/0")
     config = Config.from_default(openai_api_key=SecretStr("123"))
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
-    assert llm_cache.get() is mock_redis_cache_instance
+    assert _llm_cache.get() is mock_redis_cache_instance
 
 
 def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -150,7 +150,7 @@ def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
         openai_api_key=SecretStr("123"), llm_redis_cache_url="redis://localhost:6379/0"
     )
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
-    assert llm_cache.get() is mock_redis_cache_instance
+    assert _llm_cache.get() is mock_redis_cache_instance
 
 
 @pytest.mark.parametrize(

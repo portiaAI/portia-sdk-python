@@ -1,6 +1,8 @@
-<p align="center">
-  <img style="width: 200px; height: 178px" src="Logo_Portia_Stacked_Black.png" />
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/Logo_Portia_Line_Black.png">
+  <img alt="Portia AI logo" src="assets/Logo_Portia_Line_Black.png"  width="full">
+</picture>
 
 # Portia SDK Python
 
@@ -26,7 +28,7 @@ If you want to dive straight in with an example, dive into one of our examples i
 
 **Production ready**</br>
 👤 Attribute multi-agent runs and auth at an [`EndUser`](https://docs.portialabs.ai/manage-end-users) level.</br>
-💾 Large inputs and outputs are automatically stored / retrieved in [Agent memory](https://docs.portialabs.ai/agent-memory) at runtime.
+💾 Large inputs and outputs are automatically stored / retrieved in [Agent memory](https://docs.portialabs.ai/agent-memory) at runtime.</br>
 🔗 Connect [any LLM](https://docs.portialabs.ai/manage-config#configure-llm-options) including local ones, and use your own Redis server for [caching](https://docs.portialabs.ai/manage-config#manage-caching).</br>
 
 <p align="center"><strong>🌟 Star Portia AI to stay updated on new releases!</strong></p>
@@ -37,36 +39,23 @@ To clickthrough at your own pace, please follow this [link](https://snappify.com
 
 ## Quickstart
 
-### Installation
+### Installation in 3 quick steps
 
-0. Ensure you have python 3.11 or higher installed. If you need to update your python version please visit their [docs](https://www.python.org/downloads/).
-```bash
-python --version
-```
+Ensure you have python 3.11 or higher installed using `python --version`. If you need to update your python version please visit their [docs](https://www.python.org/downloads/). Note that the example below uses OpenAI but we support other models as well. For instructions on linking other models, refer to our [docs](https://docs.portialabs.ai/manage-config).</br>
 
-1. Install the Portia Python SDK
+**Step 1:** Install the Portia Python SDK
 ```bash
 pip install portia-sdk-python 
 ```
 
->[!NOTE]
-> OpenAI and Anthropic dependencies are included by default. We also provide the following extras:<br/>
-> * **MistralAI**: `portia-sdk-python[mistral]`
-> * **Google Generative AI**: `portia-sdk-python[google]`
-> 
-> Alternatively you can add all dependencies with `portia-sdk-python[all]`
-
-2. Ensure you have an LLM API key set up
+**Step 2:** Ensure you have an LLM API key set up
 ```bash
 export OPENAI_API_KEY='your-api-key-here'
 ```
-3. Validate your installation by submitting a simple maths prompt from the command line
+**Step 3:** Validate your installation by submitting a simple maths prompt from the command line
 ```
 portia-cli run "add 1 + 2"
 ```
->[!NOTE]
-> We support Anthropic and Mistral AI as well and we're working on adding more models asap. For now if you want to use either model you'd have to set up the relevant API key and add one of these args to your CLI command:<br/>
-> `portia-cli run --llm-provider="anthropic" "add 1 + 2"` or `portia-cli run --llm-provider="mistralai" "add 1 + 2"`
 
 **All set? Now let's explore some basic usage of the product 🚀**
 

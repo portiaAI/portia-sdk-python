@@ -14,6 +14,7 @@ from langgraph.graph import END, MessagesState
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
 from portia.execution_agents.output import LocalDataValue
+from portia.logger import logger
 from portia.plan import Plan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.telemetry_service import ProductTelemetry
@@ -153,12 +154,14 @@ class BaseExecutionAgent:
                 continue
 
             if tool and self.execution_hooks and self.execution_hooks.after_tool_call:
+                logger().debug("Calling after_tool_call execution hook")
                 clarification = self.execution_hooks.after_tool_call(
                     tool,
                     message.content,
                     ReadOnlyPlanRun.from_plan_run(self.plan_run),
                     ReadOnlyStep.from_step(self.step),
                 )
+                logger().debug("Finished after_tool_call execution hook")
                 if clarification:
                     self.new_clarifications.append(clarification)
                     return END
