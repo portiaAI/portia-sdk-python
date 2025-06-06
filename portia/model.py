@@ -29,7 +29,10 @@ if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
     from openai.types.chat import ChatCompletionMessageParam
 
-llm_cache: ContextVar[BaseCache | None] = ContextVar("llm_cache", default=None)
+_llm_cache: ContextVar[BaseCache | None] = ContextVar("llm_cache", default=None)
+
+# TODO: Remove once we've rolled out and moved everything to _llm_cache
+llm_cache = _llm_cache
 
 
 class Message(BaseModel):
@@ -186,7 +189,6 @@ class LangChainGenerativeModel(GenerativeModel):
 
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
-        self._set_cache()
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = self._client.invoke(langchain_messages)
         return Message.from_langchain(response)
@@ -208,7 +210,6 @@ class LangChainGenerativeModel(GenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        self._set_cache()
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = structured_client.invoke(langchain_messages)
@@ -229,7 +230,7 @@ class LangChainGenerativeModel(GenerativeModel):
         if model is not None:
             kwargs["model"] = model
 
-        cache = llm_cache.get()
+        cache = _llm_cache.get()
         if cache is None:
             return client.chat.completions.create(
                 response_model=schema, messages=messages, **kwargs
@@ -257,11 +258,11 @@ class LangChainGenerativeModel(GenerativeModel):
         cache.update(prompt, llm_string, [Generation(text=response.model_dump_json())])
         return response
 
-    def _set_cache(self) -> None:
+    @classmethod
+    def set_cache(cls, cache: BaseCache) -> None:
         """Set the cache for the model."""
-        cache = llm_cache.get()
-        if cache:
-            set_llm_cache(cache)
+        _llm_cache.set(cache)
+        set_llm_cache(cache)
 
 
 class OpenAIGenerativeModel(LangChainGenerativeModel):
@@ -534,7 +535,6 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        self._set_cache()
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
