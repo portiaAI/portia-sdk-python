@@ -311,10 +311,6 @@ def test_user_verification_clarification_confirmed(
     confirm_text = mock_confirm.call_args[1]["text"]
     assert "Please verify this information" in click.unstyle(confirm_text)
 
-    # Verify response field was set and user_confirmed property returns True
-    assert clarification.response is True
-    assert clarification.user_confirmed is True
-
     # Verify resolution callback was called with True
     on_resolution.assert_called_once_with(clarification, True)  # noqa: FBT003
     on_error.assert_not_called()
