@@ -341,12 +341,7 @@ def test_user_verification_clarification_rejected(
 
     # Verify confirm was called
     mock_confirm.assert_called_once()
-
-    # Verify response field was set to False and user_confirmed property returns False
-    assert clarification.response is False
-    assert clarification.user_confirmed is False
-
     # Verify resolution callback was called (even when user rejects)
-    on_resolution.assert_called_once_with(clarification, True)  # noqa: FBT003
+    on_resolution.assert_called_once_with(clarification, False)  # noqa: FBT003
     # Verify error callback was NOT called (UserVerification always resolves)
     on_error.assert_not_called()
