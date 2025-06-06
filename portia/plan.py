@@ -213,7 +213,9 @@ class Variable(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: str = Field(
-        description="The name of the output or plan input to reference, e.g. $best_offers.",
+        description="The name of the output or plan input to reference, e.g. $best_offers. "
+        "This must reference an existing output or plan input. Do not use this field to "
+        "pass values to a step.",
     )
     description: str = Field(
         description="A description of the output or plan input.",
@@ -289,7 +291,8 @@ class Step(BaseModel):
     inputs: list[Variable] = Field(
         default=[],
         description=(
-            "The input to the step, as a reference to an output of a previous step or a plan input."
+            "Inputs to the step that reference an output of a previous step or a plan input. "
+            "They should not be used to pass values to steps, only to reference previous outputs."
         ),
     )
     tool_id: str | None = Field(
