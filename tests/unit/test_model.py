@@ -238,10 +238,10 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
 
     mock_cache = MagicMock()
     mock_cache.get.return_value = None
+    LangChainGenerativeModel.set_cache(mock_cache)
     with (
         mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls,
         mock.patch("instructor.from_anthropic") as mock_instructor,
-        mock.patch("portia.model.llm_cache", mock_cache),
     ):
         mock_chat_anthropic_cls.return_value = mock_chat_anthropic
         model = AnthropicGenerativeModel(
