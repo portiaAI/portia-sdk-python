@@ -169,8 +169,8 @@ def generate_context_from_run_context(context: ToolRunContext) -> list[str]:
     execution_context.extend(
         [
             "Details on the end user.",
-            "You can use this information when the user mentions themselves (i.e. send me an email)"
-            " if no other information is provided in the task.",
+            "You can use this information when the user mentions themselves (i.e send me an email)",
+            "if no other information is provided in the task.",
             f"end_user_id:{context.end_user.external_id}",
             f"end_user_name:{context.end_user.name}",
             f"end_user_email:{context.end_user.email}",
