@@ -203,7 +203,8 @@ input_value: bob@bla.com
 ----------
 Metadata: This section contains general context about this execution.
 Details on the end user.
-You can use this information if no other information is provided in the task.
+You can use this information when the user mentions themselves (i.e send me an email)
+if no other information is provided in the task.
 end_user_id:123
 end_user_name:
 end_user_email:

@@ -297,7 +297,7 @@ class Step(BaseModel):
     inputs: list[Variable] = Field(
         default=[],
         description=(
-            "Inputs to the step that reference an output of a previous step or a plan input. "
+            "Inputs to the step that reference an output of a previous step or a plan input."
             "They should not be used to pass values to steps, only to reference previous outputs."
         ),
     )

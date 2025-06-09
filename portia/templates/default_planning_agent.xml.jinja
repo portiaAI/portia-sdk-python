@@ -19,6 +19,15 @@ Use the following information to construct a plan in response to the following u
     {% if plan_inputs %}IMPORTANT: Values for plan inputs will be provided when the plan is executed, so make sure to use them in your steps appropriately.{% endif %}
 </Instructions>
 
+{% if previous_errors %}
+<PreviousErrors>{% for error in previous_errors %}
+    <PreviousError>
+        Encountered following error with the plan steps below: {{error.error}}
+        Steps: {{error.steps}}
+    </PreviousError>{% endfor %}
+</PreviousErrors>
+{% endif %}
+
 {% if system_context %}<SystemContext>{% for context in system_context %}
     {{context}}{% endfor %}
 </SystemContext>{% endif %}
@@ -64,13 +73,6 @@ Use the following information to construct a plan in response to the following u
         {{input.description}}
     </PlanInput>{% endfor %}
 </PlanInputs>
-{% endif %}{% if previous_errors %}
-<PreviousErrors>{% for error in previous_errors %}
-    <PreviousError>
-        Encountered following error with the plan steps below: {{error.error}}
-        Steps: {{error.steps}}
-    </PreviousError>{% endfor %}
-</PreviousErrors>
 {% endif %}
 <Request>
     <Tools>

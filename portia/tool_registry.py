@@ -18,8 +18,18 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import threading
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
 from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model, model_serializer
@@ -45,7 +55,7 @@ from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Coroutine, Sequence
 
     import httpx
     import mcp
@@ -470,7 +480,38 @@ class McpToolRegistry(ToolRegistry):
     @classmethod
     def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
         """Sync version to load tools from an MCP server."""
-        return asyncio.run(cls._load_tools_async(mcp_client_config))
+        T = TypeVar("T")
+
+        def _run_async_in_new_loop(coro: Coroutine[Any, Any, T]) -> T:
+            """Run an asynchronous coroutine in a new event loop within a separate thread.
+
+            Args:
+                coro: The coroutine to execute.
+
+            Returns:
+                The result returned by the coroutine.
+
+            """
+            result_container: dict[str, T] = {}
+
+            def runner() -> None:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result_container["result"] = loop.run_until_complete(coro)
+                loop.close()
+
+            thread = threading.Thread(target=runner)
+            thread.start()
+            thread.join()
+            return result_container["result"]
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:  # pragma: no cover
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return _run_async_in_new_loop(cls._load_tools_async(mcp_client_config))
 
     @classmethod
     async def _load_tools_async(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
