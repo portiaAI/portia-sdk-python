@@ -22,7 +22,7 @@ from portia.clarification import (
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalDataValue
 from portia.mcp_session import StdioMcpClientConfig
-from portia.tool import PortiaMcpTool, PortiaRemoteTool, ToolRunContext
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool, ToolRunContext
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -62,6 +62,66 @@ def test_tool_initialization_long_description() -> None:
 
     with pytest.raises(InvalidToolDescriptionError):
         FakeAdditionTool()
+
+
+def test_run_signature_validation() -> None:
+    """Check that invalid run signatures raise a validation error."""
+
+    class TestArgSchema(BaseModel):
+        foo: str
+
+    class BadTool(Tool):
+        id: str = "bad_tool"
+        name: str = "Bad Tool"
+        description: str = "bad"
+        args_schema: type[BaseModel] = TestArgSchema
+        output_schema: tuple[str, str] = ("str", "out")
+
+        def run(self, ctx: ToolRunContext, foo: int) -> str:  # noqa: ARG002
+            return "bad"
+
+    with pytest.raises(ValueError, match="Run method argument"):
+        BadTool()
+
+
+def test_run_signature_validation_complex_type() -> None:
+    """Check that complex type mismatches raise a validation error."""
+
+    class ComplexSchema(BaseModel):
+        foo: dict[str, list[int]]
+
+    class BadTool(Tool):
+        id: str = "bad_tool_complex"
+        name: str = "Bad Tool Complex"
+        description: str = "bad"
+        args_schema: type[BaseModel] = ComplexSchema
+        output_schema: tuple[str, str] = ("str", "out")
+
+        def run(self, ctx: ToolRunContext, foo: list[str]) -> str:  # noqa: ARG002
+            return "bad"
+
+    with pytest.raises(ValueError, match="Run method argument"):
+        BadTool()
+
+
+def test_run_signature_context_type_required() -> None:
+    """Check that first argument must be annotated as ToolRunContext."""
+
+    class TestArgSchema(BaseModel):
+        foo: str
+
+    class BadTool(Tool):
+        id: str = "bad_tool_ctx"
+        name: str = "Bad Tool Context"
+        description: str = "bad"
+        args_schema: type[BaseModel] = TestArgSchema
+        output_schema: tuple[str, str] = ("str", "out")
+
+        def run(self, ctx: int, foo: str) -> str:  # type: ignore[no-redef]  # noqa: ARG002
+            return "bad"
+
+    with pytest.raises(ValueError, match="annotated as ToolRunContext"):
+        BadTool()
 
 
 def test_tool_to_langchain() -> None:
