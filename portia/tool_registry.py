@@ -19,6 +19,7 @@ import asyncio
 import os
 import re
 from enum import StrEnum
+import threading
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Union, get_args, get_origin
 
 from jsonref import replace_refs
@@ -470,7 +471,27 @@ class McpToolRegistry(ToolRegistry):
     @classmethod
     def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
         """Sync version to load tools from an MCP server."""
-        return asyncio.run(cls._load_tools_async(mcp_client_config))
+
+        def _run_async_in_new_loop(coro: Any):
+            result_container = {}
+
+            def runner():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result_container["result"] = loop.run_until_complete(coro)
+                loop.close()
+
+            thread = threading.Thread(target=runner)
+            thread.start()
+            thread.join()
+            return result_container["result"]
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:  # pragma: no cover
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return _run_async_in_new_loop(cls._load_tools_async(mcp_client_config))
 
     @classmethod
     async def _load_tools_async(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
