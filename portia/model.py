@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
     from openai.types.chat import ChatCompletionMessageParam
 
-llm_cache: ContextVar[BaseCache | None] = ContextVar("llm_cache", default=None)
+_llm_cache: ContextVar[BaseCache | None] = ContextVar("llm_cache", default=None)
 
 
 class Message(BaseModel):
@@ -186,7 +186,6 @@ class LangChainGenerativeModel(GenerativeModel):
 
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
-        self._set_cache()
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = self._client.invoke(langchain_messages)
         return Message.from_langchain(response)
@@ -208,7 +207,6 @@ class LangChainGenerativeModel(GenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        self._set_cache()
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = structured_client.invoke(langchain_messages)
@@ -229,7 +227,7 @@ class LangChainGenerativeModel(GenerativeModel):
         if model is not None:
             kwargs["model"] = model
 
-        cache = llm_cache.get()
+        cache = _llm_cache.get()
         if cache is None:
             return client.chat.completions.create(
                 response_model=schema, messages=messages, **kwargs
@@ -247,8 +245,8 @@ class LangChainGenerativeModel(GenerativeModel):
         try:
             cached = cache.lookup(prompt, llm_string)
             if cached and len(cached) > 0:
-                return schema.model_validate_json(cached[0])  # pyright: ignore[reportArgumentType]
-        except (ValidationError, RedisError):
+                return schema.model_validate_json(cached[0].text)  # pyright: ignore[reportArgumentType]
+        except (ValidationError, RedisError, AttributeError):
             # On validation errors, re-fetch and update the entry in the cache
             pass
         response = client.chat.completions.create(
@@ -257,11 +255,11 @@ class LangChainGenerativeModel(GenerativeModel):
         cache.update(prompt, llm_string, [Generation(text=response.model_dump_json())])
         return response
 
-    def _set_cache(self) -> None:
+    @classmethod
+    def set_cache(cls, cache: BaseCache) -> None:
         """Set the cache for the model."""
-        cache = llm_cache.get()
-        if cache:
-            set_llm_cache(cache)
+        _llm_cache.set(cache)
+        set_llm_cache(cache)
 
 
 class OpenAIGenerativeModel(LangChainGenerativeModel):

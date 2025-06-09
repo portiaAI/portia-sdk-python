@@ -13,6 +13,7 @@ from langgraph.graph import END, MessagesState
 
 from portia.execution_agents.context import StepInput, build_context
 from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
+from portia.execution_agents.output import LocalDataValue
 from portia.logger import logger
 from portia.plan import Plan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
@@ -165,14 +166,27 @@ class BaseExecutionAgent:
                     self.new_clarifications.append(clarification)
                     return END
 
+        # Prefers the step's structured output schema, if available.
+        structured_output_schema = self.step.structured_output_schema or (
+            tool and tool.structured_output_schema
+        )
+
         if (
             "ToolSoftError" not in last_message.content
             and tool
             and (
-                getattr(tool, "should_summarize", False)
+                tool.should_summarize
                 # If the value is larger than the threshold value, always summarise them as they are
                 # too big to store the full value locally
                 or config.exceeds_output_threshold(last_message.content)
+                # If the tool has a structured output schema attached and hasn't already been
+                # coerced to that schema, call the summarizer with structured response
+                or (
+                    structured_output_schema
+                    and isinstance(last_message, ToolMessage)
+                    and isinstance(last_message.artifact, LocalDataValue)
+                    and not isinstance(last_message.artifact.value, structured_output_schema)
+                )
             )
             and isinstance(last_message, ToolMessage)
             and not is_clarification(last_message.artifact)

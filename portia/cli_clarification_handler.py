@@ -103,8 +103,7 @@ class CLIClarificationHandler(ClarificationHandler):
     ) -> None:
         """Handle a user verification clarification by asking the user to confirm from the CLI."""
         result = click.confirm(text=click.style(clarification.user_guidance, fg=87), default=False)
-        clarification.response = result
-        on_resolution(clarification, True)  # noqa: FBT003
+        on_resolution(clarification, result)
 
     def handle_custom_clarification(
         self,

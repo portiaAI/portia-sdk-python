@@ -9,6 +9,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.caches import BaseCache
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.outputs import Generation
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.model import (
@@ -168,14 +169,8 @@ class StructuredOutputTestModel(BaseModel):
     test_field: str
 
 
-def test_langchain_model_structured_output_returns_dict(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_langchain_model_structured_output_returns_dict() -> None:
     """Test that LangchainModel.structured_output returns a dict."""
-    mock_context_var = MagicMock()
-    mock_context_var.get.return_value = MagicMock()
-    monkeypatch.setattr("portia.model.llm_cache", mock_context_var)
-    mock_set = MagicMock()
-    monkeypatch.setattr("portia.model.set_llm_cache", mock_set)
-
     base_chat_model = MagicMock(spec=BaseChatModel)
     structured_output = MagicMock()
     base_chat_model.with_structured_output.return_value = structured_output
@@ -187,9 +182,6 @@ def test_langchain_model_structured_output_returns_dict(monkeypatch: pytest.Monk
     )
     assert isinstance(result, StructuredOutputTestModel)
     assert result.test_field == "Response from model"
-    # The context var's get method should have been called to check for cache
-    mock_context_var.get.assert_called()
-    mock_set.assert_called()
 
 
 def test_anthropic_model_structured_output_returns_invalid_data(
@@ -246,10 +238,10 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
 
     mock_cache = MagicMock()
     mock_cache.get.return_value = None
+    LangChainGenerativeModel.set_cache(mock_cache)
     with (
         mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls,
         mock.patch("instructor.from_anthropic") as mock_instructor,
-        mock.patch("portia.model.llm_cache", mock_cache),
     ):
         mock_chat_anthropic_cls.return_value = mock_chat_anthropic
         model = AnthropicGenerativeModel(
@@ -279,9 +271,7 @@ def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_instructor_client.chat.completions.create = mock_create
 
     cache = MagicMock(spec=BaseCache)
-    mock_context_var = MagicMock()
-    mock_context_var.get.return_value = cache
-    monkeypatch.setattr("portia.model.llm_cache", mock_context_var)
+    LangChainGenerativeModel.set_cache(cache)
     model = OpenAIGenerativeModel(
         model_name="gpt-4o",
         api_key=SecretStr("k"),
@@ -295,7 +285,7 @@ def test_instructor_manual_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Test cache hit
     cache.reset_mock()
-    cache.lookup.return_value = ["{}"]
+    cache.lookup.return_value = [Generation(text="{}")]
     model.get_structured_response_instructor([Message(role="user", content="hi")], DummyModel)
     cache.lookup.assert_called_once()
     cache.update.assert_not_called()

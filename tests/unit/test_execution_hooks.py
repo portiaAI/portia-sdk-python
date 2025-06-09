@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from portia.clarification import ClarificationCategory, UserVerificationClarification
+from portia.clarification import Clarification, ClarificationCategory, UserVerificationClarification
 from portia.errors import ToolHardError
 from portia.execution_agents.output import LocalDataValue
 from portia.execution_hooks import (
@@ -56,7 +56,7 @@ def test_clarify_before_tool_call_with_previous_yes_response() -> None:
     assert result is None
 
 
-def test_clarify_before_tool_call_with_previous_no_response() -> None:
+def test_clarify_before_tool_call_with_previous_negative_response() -> None:
     """Test the cli_user_verify_before_tool_call hook with a previous 'no' response."""
     tool = AdditionTool()
     args = {"a": 1, "b": 2}
@@ -66,6 +66,32 @@ def test_clarify_before_tool_call_with_previous_no_response() -> None:
     # Create a previous clarification with 'no' response
     prev_clarification = UserVerificationClarification(
         plan_run_id=plan_run.id,
+        user_guidance=f"Are you happy to proceed with the call to {tool.name} with args {args}? "
+        "Enter 'y' or 'yes' to proceed",
+        resolved=True,
+        response=False,
+        step=0,
+        source="Test execution hooks",
+    )
+    plan_run.outputs.clarifications = [prev_clarification]
+
+    with pytest.raises(ToolHardError):
+        clarify_on_all_tool_calls(tool, args, plan_run, step)
+
+
+def test_clarify_before_tool_call_with_previous_negative_response_bare_clarification() -> None:
+    """Test the cli_user_verify_before_tool_call hook with a previous 'no' response."""
+    tool = AdditionTool()
+    args = {"a": 1, "b": 2}
+    plan, plan_run = get_test_plan_run()
+    step = plan.steps[0]
+
+    # Create a previous clarification with 'no' response
+    # This is a bare clarification, not a UserVerificationClarification, which reflects the
+    # real runtime behaviour, where PlanRuns are serialised and deserialised
+    prev_clarification = Clarification(
+        plan_run_id=plan_run.id,
+        category=ClarificationCategory.USER_VERIFICATION,
         user_guidance=f"Are you happy to proceed with the call to {tool.name} with args {args}? "
         "Enter 'y' or 'yes' to proceed",
         resolved=True,
