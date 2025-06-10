@@ -498,13 +498,14 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             self._model_kwargs = kwargs["model_kwargs"].copy()
         else:
             self._model_kwargs = kwargs.copy()
+
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
             max_retries=max_retries,
             max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
             api_key=api_key,
-            **kwargs,
+            model_kwargs=kwargs,
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
@@ -535,7 +536,9 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._client.with_structured_output(
+            schema, include_raw=True, **kwargs
+        )
         raw_response = structured_client.invoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
@@ -750,7 +753,9 @@ if validate_extras_dependencies("ollama", raise_error=False):
                 ),
                 mode=instructor.Mode.JSON,
             )
-            instructor_messages = [map_message_to_instructor(message) for message in messages]
+            instructor_messages = [
+                map_message_to_instructor(message) for message in messages
+            ]
             return self._cached_instructor_call(
                 client=client,
                 messages=instructor_messages,
