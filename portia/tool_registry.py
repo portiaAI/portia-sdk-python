@@ -18,8 +18,18 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import threading
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
 from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model, model_serializer
@@ -32,6 +42,7 @@ from portia.mcp_session import (
     McpClientConfig,
     SseMcpClientConfig,
     StdioMcpClientConfig,
+    StreamableHttpMcpClientConfig,
     get_mcp_session,
 )
 from portia.open_source_tools.calculator_tool import CalculatorTool
@@ -44,7 +55,7 @@ from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Coroutine, Sequence
 
     import httpx
     import mcp
@@ -417,9 +428,90 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
+    def from_streamable_http_connection(  # noqa: PLR0913
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 30,
+        sse_read_timeout: float = 60 * 5,
+        *,
+        terminate_on_close: bool = True,
+        auth: httpx.Auth | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a StreamableHTTP connection (Sync version)."""
+        config = StreamableHttpMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
+            terminate_on_close=terminate_on_close,
+            auth=auth,
+        )
+        tools = cls._load_tools(config)
+        return cls(tools)
+
+    @classmethod
+    async def from_streamable_http_connection_async(  # noqa: PLR0913
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 30,  # noqa: ASYNC109
+        sse_read_timeout: float = 60 * 5,
+        *,
+        terminate_on_close: bool = True,
+        auth: httpx.Auth | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a StreamableHTTP connection (Async version)."""
+        config = StreamableHttpMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
+            terminate_on_close=terminate_on_close,
+            auth=auth,
+        )
+        tools = await cls._load_tools_async(config)
+        return cls(tools)
+
+    @classmethod
     def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
         """Sync version to load tools from an MCP server."""
-        return asyncio.run(cls._load_tools_async(mcp_client_config))
+        T = TypeVar("T")
+
+        def _run_async_in_new_loop(coro: Coroutine[Any, Any, T]) -> T:
+            """Run an asynchronous coroutine in a new event loop within a separate thread.
+
+            Args:
+                coro: The coroutine to execute.
+
+            Returns:
+                The result returned by the coroutine.
+
+            """
+            result_container: dict[str, T] = {}
+
+            def runner() -> None:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result_container["result"] = loop.run_until_complete(coro)
+                loop.close()
+
+            thread = threading.Thread(target=runner)
+            thread.start()
+            thread.join()
+            return result_container["result"]
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:  # pragma: no cover
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return _run_async_in_new_loop(cls._load_tools_async(mcp_client_config))
 
     @classmethod
     async def _load_tools_async(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
@@ -602,7 +694,7 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  #
             types = [
                 _map_single_pydantic_type(field_name, t, allow_nonetype=True) for t in union_types
             ]
-            return Union[*types]
+            return Union[*types]  # pyright: ignore[reportInvalidTypeForm, reportInvalidTypeArguments]
         case _:
             logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
             return Any

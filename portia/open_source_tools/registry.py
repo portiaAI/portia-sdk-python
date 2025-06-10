@@ -1,6 +1,5 @@
 """Example registry containing simple tools."""
 
-import logging
 import os
 
 from portia.common import validate_extras_dependencies
@@ -14,8 +13,6 @@ from portia.open_source_tools.weather import WeatherTool
 from portia.tool_registry import (
     ToolRegistry,
 )
-
-logger = logging.getLogger(__name__)
 
 example_tool_registry = ToolRegistry(
     [CalculatorTool(), WeatherTool(), SearchTool(), LLMTool()],

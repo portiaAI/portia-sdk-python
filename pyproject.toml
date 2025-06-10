@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.4.0"
+version = "0.4.2"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -28,16 +28,13 @@ dependencies = [
     "pandas>=2.2.3,<3",
     "pytest-mock>=3.14.0,<4",
     "openpyxl>=3.1.5,<4",
-    "mcp>=1.6.0,<2",
+    "mcp>=1.9.2,<2",
     "langsmith>=0.3.15,<0.4 ; python_version >= '3.11' and python_version < '4.0'",
-    "tiktoken>=0.9.0,<0.10",
     "jsonref>=1.1.0,<2",
     "posthog>=3.23.0",
     "testcontainers[redis]>=4.10.0",
     "pytest-repeat>=0.9.4",
-    "textual>=3.2.0",
-    "textual-dev>=1.7.0",
-    "daytona-sdk>=0.10.5",
+    "instructor>=1.8.3"
 ]
 
 [project.optional-dependencies]
@@ -51,7 +48,7 @@ mistralai = [
 ]
 google = [
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-generativeai>=0.8.4,<0.9 ; python_version >= '3.11' and python_version < '4.0'",
+    "google-genai==1.18.0",
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
 tools-browser-local = [
@@ -65,15 +62,22 @@ tools-browser-browserbase = [
 ]
 tools-pdf-reader = ["mistralai>=1.2.5,<2"]
 cache = ["redis>=5.2.1,<6", "langchain-redis>=0.1.2" ]
+gui = [
+    "textual>=3.2.0",
+    "textual-dev>=1.7.0",
+    "daytona-sdk>=0.10.5",
+]
 all = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-generativeai>=0.8.4,<0.9 ; python_version >= '3.11' and python_version < '4.0'",
+    "google-genai==1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
+    "redis>=5.2.1,<6",
+    "langchain-redis>=0.1.2"
 ]
 
 [project.urls]
@@ -92,9 +96,9 @@ dev = [
     "pytest-rerunfailures~=14.0",
     "pytest-cov>=5.0.0,<6",
     "pyright>=1.1.382,<2",
-    "pytest-httpx>=0.33.0,<0.34",
     "pytest-xdist[psutil]>=3.6.1,<4",
     "pytest-asyncio>=0.25.3,<0.26",
+    "pytest-httpx>=0.35.0",
 ]
 
 [tool.hatch.build.targets.sdist]

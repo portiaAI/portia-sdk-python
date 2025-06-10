@@ -27,6 +27,7 @@ from portia.model import (
     LLMProvider,
     MistralAIGenerativeModel,
     OpenAIGenerativeModel,
+    _llm_cache,
 )
 
 PROVIDER_ENV_VARS = [
@@ -56,6 +57,7 @@ def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert c.default_log_level == LogLevel.CRITICAL
     assert c.llm_redis_cache_url is None
+    assert _llm_cache.get() is None
 
 
 def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -135,28 +137,20 @@ def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/0")
     config = Config.from_default(openai_api_key=SecretStr("123"))
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
-
-    model = config.get_generative_model("openai/gpt-4o")
-    assert isinstance(model, OpenAIGenerativeModel)
-    assert str(model) == "openai/gpt-4o"
-    assert model._cache is mock_redis_cache_instance  # noqa: SLF001
+    assert _llm_cache.get() is mock_redis_cache_instance
 
 
 def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url can be set via kwargs."""
-    redis_cache_instance = InMemoryCache()
-    mock_redis_cache = MagicMock(return_value=redis_cache_instance)
+    mock_redis_cache_instance = InMemoryCache()
+    mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
     monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
 
     config = Config.from_default(
         openai_api_key=SecretStr("123"), llm_redis_cache_url="redis://localhost:6379/0"
     )
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
-
-    model = config.get_generative_model("openai/gpt-4o")
-    assert isinstance(model, OpenAIGenerativeModel)
-    assert str(model) == "openai/gpt-4o"
-    assert model._cache is redis_cache_instance  # noqa: SLF001
+    assert _llm_cache.get() is mock_redis_cache_instance
 
 
 @pytest.mark.parametrize(
@@ -439,7 +433,9 @@ def test_azure_openai_requires_endpoint(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_custom_model_from_string_raises_error() -> None:
     """Test custom model from string raises an error."""
-    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
+    with pytest.raises(
+        InvalidConfigError, match="DEFAULT_MODEL is not valid - The value custom/test is not valid"
+    ):
         _ = Config.from_default(default_model="custom/test")
 
 
@@ -466,7 +462,10 @@ def test_check_model_supported_raises_deprecation_warning() -> None:
 def test_summarizer_model_not_instantiable(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test summarizer model is not instantiable."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
-    with pytest.raises(InvalidConfigError, match="All models must be instantiable"):
+    with pytest.raises(
+        InvalidConfigError,
+        match="SUMMARIZER_MODEL is not valid - The value mistralai/mistral-large-latest",
+    ):
         Config.from_default(
             default_model="openai/gpt-4o",
             summarizer_model="mistralai/mistral-large-latest",
