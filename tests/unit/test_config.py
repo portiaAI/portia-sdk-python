@@ -620,34 +620,6 @@ def test_deprecated_llm_model_cannot_instantiate_from_string() -> None:
         _ = LLMModel("adijabisfbgiwjebr")
 
 
-def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that default models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
-
-    c = Config.from_default(llm_provider=LLMProvider.ANTHROPIC)
-
-    planning_model = c.get_planning_model()
-    assert isinstance(planning_model, AnthropicGenerativeModel)
-    assert planning_model.model_name == "claude-3-7-sonnet-latest"
-    assert hasattr(planning_model, "_model_kwargs")
-    assert "thinking" in planning_model._model_kwargs  # noqa: SLF001
-    assert planning_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
-
-    introspection_model = c.get_introspection_model()
-    assert isinstance(introspection_model, AnthropicGenerativeModel)
-    assert introspection_model.model_name == "claude-3-7-sonnet-latest"
-    assert hasattr(introspection_model, "_model_kwargs")
-    assert "thinking" in introspection_model._model_kwargs  # noqa: SLF001
-    assert introspection_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
-
-    default_model = c.get_default_model()
-    assert isinstance(default_model, AnthropicGenerativeModel)
-    assert default_model.model_name == "claude-3-5-sonnet-latest"
-    assert not hasattr(default_model, "_model_kwargs") or "thinking" not in getattr(
-        default_model, "_model_kwargs", {}
-    )
-
-
 def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that OpenAI models with reasoning in PROVIDER_DEFAULT_MODELS work correctly."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")

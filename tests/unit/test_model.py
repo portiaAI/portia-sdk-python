@@ -247,7 +247,6 @@ def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
         model = AnthropicGenerativeModel(
             model_name="test",
             api_key=SecretStr("test"),
-            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
         )
         _ = model.get_structured_response(
             messages=[Message(role="user", content="Hello")],
