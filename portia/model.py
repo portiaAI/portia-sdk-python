@@ -504,7 +504,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             max_retries=max_retries,
             max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
             api_key=api_key,
-            **kwargs,
+            model_kwargs=kwargs,
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
