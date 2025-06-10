@@ -294,10 +294,9 @@ INTROSPECTION_MODEL_KEY = "introspection_model_name"
 SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 
-MODEL_EXTRA_KWARGS = {
+MODEL_EXTRA_KWARGS: dict[str, dict[str, Any]] = {
     "openai/o3-mini": {"reasoning_effort": "medium"},
     "openai/o4-mini": {"reasoning_effort": "medium"},
-    "anthropic/claude-3-7-sonnet-latest": {"thinking": {"type": "enabled", "budget_tokens": 3000}},
 }
 
 
@@ -670,7 +669,11 @@ class Config(BaseModel):
             (self.get_default_model, "default_model", self.models.default_model),
             (self.get_planning_model, "planning_model", self.models.planning_model),
             (self.get_execution_model, "execution_model", self.models.execution_model),
-            (self.get_introspection_model, "introspection_model", self.models.introspection_model),
+            (
+                self.get_introspection_model,
+                "introspection_model",
+                self.models.introspection_model,
+            ),
             (
                 self.get_summarizer_model,
                 "summarizer_model",
