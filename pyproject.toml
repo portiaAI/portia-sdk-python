@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.4.3"
+version = "0.4.4"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
