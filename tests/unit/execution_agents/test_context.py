@@ -8,7 +8,7 @@ from pydantic import HttpUrl
 from portia.clarification import ActionClarification, InputClarification
 from portia.end_user import EndUser
 from portia.execution_agents.context import StepInput, build_context
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, OutputDataValue
 from portia.plan import Variable
 from portia.tool import ToolRunContext
 from tests.utils import get_test_config, get_test_plan_run
@@ -28,7 +28,7 @@ def inputs() -> list[Variable]:
 
 
 @pytest.fixture
-def outputs() -> dict[str, Output]:
+def outputs() -> dict[str, OutputDataValue]:
     """Return a dictionary of outputs for pytest fixtures."""
     return {
         "$email_body": LocalDataValue(value="The body of the email"),
@@ -84,7 +84,7 @@ def test_context_execution_context() -> None:
     assert "test1" in context
 
 
-def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, Output]) -> None:
+def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, OutputDataValue]) -> None:
     """Test that the context is set up correctly with inputs and outputs."""
     (plan, plan_run) = get_test_plan_run()
     plan.steps[0].inputs = inputs
@@ -113,7 +113,7 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
             assert val in context
 
 
-def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> None:
+def test_all_contexts(inputs: list[Variable], outputs: dict[str, OutputDataValue]) -> None:
     """Test that the context is set up correctly with all contexts."""
     (plan, plan_run) = get_test_plan_run()
     plan.steps[0].inputs = inputs
@@ -218,7 +218,7 @@ Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""
 
 def test_context_inputs_outputs_clarifications(
     inputs: list[Variable],
-    outputs: dict[str, Output],
+    outputs: dict[str, OutputDataValue],
 ) -> None:
     """Test that the context is set up correctly with inputs, outputs, and missing args."""
     (plan, plan_run) = get_test_plan_run()

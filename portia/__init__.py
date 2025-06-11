@@ -49,7 +49,7 @@ from portia.errors import (
     ToolNotFoundError,
     ToolRetryError,
 )
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, Output, OutputDataValue
 
 # Logging
 from portia.logger import logger
@@ -128,6 +128,7 @@ __all__ = [
     "Message",
     "MultipleChoiceClarification",
     "Output",
+    "OutputDataValue",
     "Plan",
     "PlanBuilder",
     "PlanContext",

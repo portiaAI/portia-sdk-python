@@ -25,7 +25,7 @@ from portia.clarification import (
     ClarificationListType,
 )
 from portia.common import PortiaEnum
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, Output, OutputDataValue
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
 
 
@@ -73,10 +73,17 @@ class PlanRunOutputs(BaseModel):
         description="A dictionary containing outputs of individual run steps.",
     )
 
-    final_output: Output | None = Field(
+    final_output: OutputDataValue | None = Field(
         default=None,
         description="The final consolidated output of the PlanRun if available.",
     )
+
+    def getOutputForStep(self, step: int) -> Output | None:
+        """Return the output for the given step if it exists."""
+        return next(
+            (output for output in self.step_outputs.values() if output.step == step),
+            None,
+        )
 
 
 class PlanRun(BaseModel):
@@ -180,9 +187,10 @@ class PlanRun(BaseModel):
             None,
         )
 
-    def get_potential_step_inputs(self) -> dict[str, Output]:
+    def get_potential_step_inputs(self) -> dict[str, OutputDataValue]:
         """Return a dictionary of potential step inputs for future steps."""
-        return self.outputs.step_outputs | self.plan_run_inputs
+        step_inputs = {name: output.value for name, output in self.outputs.step_outputs.items()}
+        return step_inputs | self.plan_run_inputs
 
     def __str__(self) -> str:
         """Return the string representation of the PlanRun.

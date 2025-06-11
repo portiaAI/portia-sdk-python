@@ -16,7 +16,7 @@ from portia.errors import InvalidAgentError
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.one_shot_agent import OneShotAgent, OneShotToolCallingModel
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, OutputDataValue
 from portia.execution_hooks import ExecutionHooks
 from portia.plan import ReadOnlyStep, Variable
 from portia.plan_run import ReadOnlyPlanRun
@@ -105,7 +105,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     call_args = mock_telemetry.capture.call_args[0][0]
     assert call_args.tool_id == tool.id
 
-    assert isinstance(output, Output)
+    assert isinstance(output, OutputDataValue)
     assert output.get_value() == "Sent email with id: 0"
     mock_before_tool_call.assert_called_once_with(
         tool,

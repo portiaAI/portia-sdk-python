@@ -52,6 +52,7 @@ from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import (
     LocalDataValue,
     Output,
+    OutputDataValue,
 )
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
@@ -1147,7 +1148,7 @@ class Portia:
                 f"Final output: {plan_run.outputs.final_output.get_summary()!s}",
             )
 
-    def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
+    def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> OutputDataValue | None:
         """Get the output of the last executed step.
 
         Args:
@@ -1155,7 +1156,7 @@ class Portia:
             plan_run (PlanRun): The plan run to get the output from.
 
         Returns:
-            Output | None: The output of the last executed step.
+            OutputDataValue | None: The output of the last executed step.
 
         """
         return next(
@@ -1175,7 +1176,7 @@ class Portia:
         introspection_agent: BaseIntrospectionAgent,
         plan: Plan,
         plan_run: PlanRun,
-        last_executed_step_output: Output | None,
+        last_executed_step_output: OutputDataValue | None,
     ) -> tuple[PlanRun, PreStepIntrospection]:
         """Handle the outcome of the pre-step introspection.
 
@@ -1183,7 +1184,7 @@ class Portia:
             introspection_agent (BaseIntrospectionAgent): The introspection agent to use.
             plan (Plan): The plan being executed.
             plan_run (PlanRun): The plan run being executed.
-            last_executed_step_output (Output | None): The output of the last step executed.
+            last_executed_step_output (OutputDataValue | None): The output of the last step executed.
 
         Returns:
             tuple[PlanRun, PreStepIntrospectionOutcome]: The updated plan run and the
@@ -1254,13 +1255,13 @@ class Portia:
 
         return cls(self.config)
 
-    def _get_final_output(self, plan: Plan, plan_run: PlanRun, step_output: Output) -> Output:
+    def _get_final_output(self, plan: Plan, plan_run: PlanRun, step_output: OutputDataValue) -> OutputDataValue:
         """Get the final output and add summarization to it.
 
         Args:
             plan (Plan): The plan to execute.
             plan_run (PlanRun): The PlanRun to execute.
-            step_output (Output): The output of the last step.
+            step_output (OutputDataValue): The output of the last step.
 
         """
         final_output = LocalDataValue(
@@ -1291,13 +1292,13 @@ class Portia:
 
     def _get_clarifications_from_output(
         self,
-        step_output: Output,
+        step_output: OutputDataValue,
         plan_run: PlanRun,
     ) -> list[Clarification]:
         """Get clarifications from the output of a step.
 
         Args:
-            step_output (Output): The output of the step.
+            step_output (OutputDataValue): The output of the step.
             plan_run (PlanRun): The plan run to get the clarifications from.
 
         """
@@ -1433,16 +1434,20 @@ class Portia:
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config, self.storage)
 
-    def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> None:
+    def _set_step_output(self, output: OutputDataValue, plan_run: PlanRun, step: Step) -> None:
         """Set the output for a step."""
-        plan_run.outputs.step_outputs[step.output] = output
+        plan_run.outputs.step_outputs[step.output] = Output(
+            name=step.output,
+            step=plan_run.current_step_index,
+            value=output,
+        )
         self._persist_step_state(plan_run, step)
 
     def _persist_step_state(self, plan_run: PlanRun, step: Step) -> None:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
         if (
-            isinstance(step_output, LocalDataValue)
+            isinstance(step_output.value, LocalDataValue)
             and self.config.exceeds_output_threshold(
                 step_output.serialize_value(),
             )

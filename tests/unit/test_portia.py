@@ -691,8 +691,8 @@ def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock
         assert plan_run.state == PlanRunState.COMPLETE
 
         # Verify step outputs were stored correctly
-        assert plan_run.outputs.step_outputs["$weather"] == weather_output
-        assert plan_run.outputs.step_outputs["$activities"] == activities_output
+        assert plan_run.outputs.step_outputs["$weather"].value == weather_output
+        assert plan_run.outputs.step_outputs["$activities"].value == activities_output
 
         # Verify final output and summary
         assert plan_run.outputs.final_output is not None
@@ -873,7 +873,7 @@ def test_portia_run_query_with_memory(
         assert plan_run.state == PlanRunState.COMPLETE
 
         # Verify step outputs were stored correctly
-        assert plan_run.outputs.step_outputs["$weather"] == AgentMemoryValue(
+        assert plan_run.outputs.step_outputs["$weather"].value == AgentMemoryValue(
             output_name="$weather",
             plan_run_id=plan_run.id,
             summary=weather_summary,
@@ -882,7 +882,7 @@ def test_portia_run_query_with_memory(
             portia_with_agent_memory.storage.get_plan_run_output("$weather", plan_run.id)
             == weather_output
         )
-        assert plan_run.outputs.step_outputs["$activities"] == AgentMemoryValue(
+        assert plan_run.outputs.step_outputs["$activities"].value == AgentMemoryValue(
             output_name="$activities",
             plan_run_id=plan_run.id,
             summary=activities_summary,

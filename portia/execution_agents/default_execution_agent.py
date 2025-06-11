@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 
     from portia.config import Config
     from portia.end_user import EndUser
-    from portia.execution_agents.output import Output
+    from portia.execution_agents.output import OutputDataValue
     from portia.execution_hooks import ExecutionHooks
     from portia.storage import AgentMemory
 
@@ -696,13 +696,13 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 matching_clarification = clarification
         return matching_clarification
 
-    def execute_sync(self) -> Output:
+    def execute_sync(self) -> OutputDataValue:
         """Run the core execution logic of the task.
 
         This method will invoke the tool with arguments that are parsed and verified first.
 
         Returns:
-            Output: The result of the agent's execution, containing the tool call result.
+            OutputDataValue: The result of the agent's execution, containing the tool call result.
 
         """
         if not self.tool:
