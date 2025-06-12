@@ -598,7 +598,7 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "gemini-2.5-pro-preview-03-25"
+                            return "google/gemini-2.5-pro-preview-03-25"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
@@ -613,7 +613,7 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "gemini-2.5-flash-preview-04-17"
+                            return "google/gemini-2.5-flash-preview-04-17"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
@@ -628,7 +628,7 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "gemini-2.5-flash-preview-04-17"
+                            return "google/gemini-2.5-flash-preview-04-17"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
