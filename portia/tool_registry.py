@@ -580,29 +580,39 @@ class DefaultToolRegistry(ToolRegistry):
         super().__init__(tools)
 
 
-class GeneratedBaseModel(BaseModel):
-    """BaseModel that is generated from a JSON schema.
 
-    Handles serialization of fields that must omit None values: fields that are not required in
-    the JSON schema, but that are not nullable. Pydantic has no concept of an omissible field,
-    so we must for it to be nullable and then make sure we don't serialize None values.
+def _create_generated_base_model() -> type[BaseModel]:
+    """Create the generated base model.
+
+    This is generated per tool so that we can have a different base model for each tool,
+    which isolates the _fields_must_omit_none_on_serialize
     """
 
-    _fields_must_omit_none_on_serialize: ClassVar[list[str]] = []
+    class GeneratedBaseModel(BaseModel):
+        """BaseModel that is generated from a JSON schema.
 
-    @model_serializer(mode="wrap")
-    def serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
-        """Serialize the model to a dictionary, excluding fields for which we must omit None."""
-        ser = handler(self)
-        for field in self._fields_must_omit_none_on_serialize:
-            if field in ser and (ser[field] is PydanticUndefined or ser[field] is None):
-                del ser[field]
-        return ser
+        Handles serialization of fields that must omit None values: fields that are not required in
+        the JSON schema, but that are not nullable. Pydantic has no concept of an omissible field,
+        so we must for it to be nullable and then make sure we don't serialize None values.
+        """
 
-    @classmethod
-    def extend_exclude_unset_fields(cls, fields: list[str]) -> None:
-        """Extend the list of fields to exclude from serialization."""
-        cls._fields_must_omit_none_on_serialize.extend(fields)
+        _fields_must_omit_none_on_serialize: ClassVar[list[str]] = []
+
+        @model_serializer(mode="wrap")
+        def serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+            """Serialize the model to a dictionary, excluding fields for which we must omit None."""
+            ser = handler(self)
+            for field in self._fields_must_omit_none_on_serialize:
+                if field in ser and (ser[field] is PydanticUndefined or ser[field] is None):
+                    del ser[field]
+            return ser
+
+        @classmethod
+        def extend_exclude_unset_fields(cls, fields: list[str]) -> None:
+            """Extend the list of fields to exclude from serialization."""
+            cls._fields_must_omit_none_on_serialize.extend(fields)
+
+    return GeneratedBaseModel
 
 
 def generate_pydantic_model_from_json_schema(
@@ -649,7 +659,7 @@ def generate_pydantic_model_from_json_schema(
     )
 
     # Create the Pydantic model dynamically
-    model = create_model(model_name, __base__=GeneratedBaseModel, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
+    model = create_model(model_name, __base__=_create_generated_base_model(), **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
     model.extend_exclude_unset_fields(non_nullable_omissible_fields)
     return model
 
