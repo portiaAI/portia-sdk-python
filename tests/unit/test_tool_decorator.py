@@ -26,7 +26,7 @@ def test_basic_tool_decorator() -> None:
         return a + b
 
     # Create an instance of the tool
-    tool_instance = add_numbers()
+    tool_instance = add_numbers()  # pyright: ignore[reportCallIssue]
 
     # Check basic properties
     assert tool_instance.id == "add_numbers"
@@ -55,7 +55,7 @@ def test_tool_with_optional_parameters() -> None:
         """Greet a user with a custom greeting."""
         return f"{greeting}, {name}!"
 
-    tool_instance = greet_user()
+    tool_instance = greet_user()  # pyright: ignore[reportCallIssue]
     ctx = get_test_tool_context()
 
     # Test with default parameter
@@ -75,7 +75,7 @@ def test_tool_with_context_parameter() -> None:
         """Get the current user ID from context."""
         return ctx.end_user.external_id
 
-    tool_instance = get_user_id()
+    tool_instance = get_user_id()  # pyright: ignore[reportCallIssue]
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx)
@@ -90,7 +90,7 @@ def test_tool_with_context_named_context() -> None:
         """Get the current plan ID from context."""
         return str(context.plan_run.plan_id)
 
-    tool_instance = get_plan_id()
+    tool_instance = get_plan_id()  # pyright: ignore[reportCallIssue]
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx)
@@ -105,7 +105,7 @@ def test_tool_with_mixed_parameters() -> None:
         """Create a personalized message for the current user."""
         return f"{prefix} for {ctx.end_user.external_id}: {message}"
 
-    tool_instance = personalized_message()
+    tool_instance = personalized_message()  # pyright: ignore[reportCallIssue]
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx, message="Hello World")
@@ -125,7 +125,7 @@ def test_tool_with_complex_types() -> None:
             count = len(items)
         return {"total_items": len(items), "requested_count": count}
 
-    tool_instance = process_data()
+    tool_instance = process_data()  # pyright: ignore[reportCallIssue]
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx, items=["a", "b", "c"])
@@ -149,7 +149,7 @@ def test_tool_raises_errors() -> None:
             raise ValueError("Unknown error")
         return "Success"
 
-    tool_instance = failing_tool()
+    tool_instance = failing_tool()  # pyright: ignore[reportCallIssue]
     ctx = get_test_tool_context()
 
     # Test successful execution
@@ -180,7 +180,7 @@ def test_weather_tool_example() -> None:
         return f"The current weather in {city} is sunny with a temperature of 22°C."
 
     # Create tool instance
-    tool_instance = weather_tool()
+    tool_instance = weather_tool()  # pyright: ignore[reportCallIssue]
 
     # Check properties match expected format
     assert tool_instance.id == "weather_tool"
@@ -208,7 +208,7 @@ def test_tool_class_naming() -> None:
         """A custom tool for testing."""
         return value.upper()
 
-    tool_instance = my_custom_tool()
+    tool_instance = my_custom_tool()  # pyright: ignore[reportCallIssue]
 
     # Check the class name
     assert tool_instance.__class__.__name__ == "MyCustomToolTool"
@@ -244,7 +244,7 @@ def test_tool_args_schema_generation() -> None:
         """A tool with various parameter types."""
         return f"{required_str}-{optional_int}-{optional_bool}-{required_float}"
 
-    tool_instance = complex_tool()
+    tool_instance = complex_tool()  # pyright: ignore[reportCallIssue]
     schema = tool_instance.args_schema
 
     # Check required fields
@@ -260,10 +260,10 @@ def test_tool_args_schema_generation() -> None:
         required_str="test",
         required_float=3.14,
     )
-    assert schema_instance.required_str == "test"
-    assert schema_instance.optional_int == 42
-    assert schema_instance.optional_bool is True
-    assert schema_instance.required_float == 3.14
+    assert schema_instance.required_str == "test"  # pyright: ignore[reportAttributeAccessIssue]
+    assert schema_instance.optional_int == 42  # pyright: ignore[reportAttributeAccessIssue]
+    assert schema_instance.optional_bool is True  # pyright: ignore[reportAttributeAccessIssue]
+    assert schema_instance.required_float == 3.14  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_tool_to_langchain() -> None:
@@ -274,7 +274,7 @@ def test_tool_to_langchain() -> None:
         """A simple tool for LangChain testing."""
         return text.upper()
 
-    tool_instance = simple_tool()
+    tool_instance = simple_tool()  # pyright: ignore[reportCallIssue]
     ctx = get_test_tool_context()
 
     # Convert to LangChain tool
@@ -294,7 +294,7 @@ def test_tool_serialization() -> None:
         """A tool that can be serialized."""
         return data
 
-    tool_instance = serializable_tool()
+    tool_instance = serializable_tool()  # pyright: ignore[reportCallIssue]
 
     # Test string representation
     str_repr = str(tool_instance)
@@ -317,7 +317,7 @@ def test_annotated_string_description() -> None:
         """Say hello to someone."""
         return f"Hello, {name}!"
 
-    tool_instance = say_hello()
+    tool_instance = say_hello()  # pyright: ignore[reportCallIssue]
 
     # Check that the tool was created properly
     assert tool_instance.id == "say_hello"
@@ -348,7 +348,7 @@ def test_annotated_field_description() -> None:
         """Calculate the area of a rectangle."""
         return length * width
 
-    tool_instance = calculate_area()
+    tool_instance = calculate_area()  # pyright: ignore[reportCallIssue]
 
     # Check that the tool was created properly
     assert tool_instance.id == "calculate_area"
@@ -389,7 +389,7 @@ def test_mixed_annotation_patterns() -> None:
         """Function with mixed annotation patterns."""
         return f"{required_annotated}-{required_regular}-{optional_annotated}-{optional_regular}"
 
-    tool_instance = mixed_function()
+    tool_instance = mixed_function()  # pyright: ignore[reportCallIssue]
 
     # Check the args schema
     schema = tool_instance.args_schema
@@ -403,7 +403,9 @@ def test_mixed_annotation_patterns() -> None:
     # Check required_regular (should get fallback description)
     assert "required_regular" in fields
     assert fields["required_regular"].annotation == int
-    assert "Parameter required_regular for mixed_function" in fields["required_regular"].description
+    description = fields["required_regular"].description
+    assert description is not None
+    assert "Parameter required_regular for mixed_function" in description
 
     # Check optional_annotated
     assert "optional_annotated" in fields
@@ -446,7 +448,7 @@ def test_get_type_hints_exception_handling() -> None:
 
     # Create a function that will cause get_type_hints to fail
     def problematic_function(
-        param: "NonExistentType",
+        param: "NonExistentType",  # pyright: ignore[reportUndefinedVariable]
     ) -> str:  # Forward reference to non-existent type
         return "test"
 
@@ -500,6 +502,7 @@ def test_malformed_annotated_type() -> None:
             )
 
             assert param_type == Any
+            assert field_info.description is not None
             assert "Parameter test_param for test_func" in field_info.description
 
 
@@ -576,6 +579,7 @@ def test_description_fallback_in_annotated() -> None:
     )
 
     assert param_type == str
+    assert field_info.description is not None
     assert "Parameter test_param for test_func" in field_info.description
 
 
@@ -591,7 +595,7 @@ def test_field_with_custom_default() -> None:
         """Tool with Field default."""
         return f"Hello, {name}!"
 
-    tool_instance = tool_with_field_default()
+    tool_instance = tool_with_field_default()  # pyright: ignore[reportCallIssue]
 
     # Check the args schema
     schema = tool_instance.args_schema

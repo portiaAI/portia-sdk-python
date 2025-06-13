@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, TypeVar, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel, Field, create_model
+from pydantic.fields import FieldInfo
 
 from portia.tool import Tool, ToolRunContext
 
@@ -15,7 +16,7 @@ P = inspect.Parameter
 T = TypeVar("T")
 
 
-def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[T]]:
+def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[Any]]:
     """Convert a function into a Tool class.
 
     This decorator automatically creates a Tool subclass from a function by:
@@ -63,7 +64,7 @@ def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[T]]:
 
     # Create the Tool class dynamically
     def make_run_method() -> Callable:
-        def run(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:  # noqa: ARG001
+        def run(self: Tool, ctx: ToolRunContext, **kwargs: Any) -> Any:  # noqa: ARG001
             """Execute the original function."""
             # Filter out 'ctx' parameter if the function doesn't expect it
             func_params = set(sig.parameters.keys())
@@ -78,7 +79,9 @@ def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[T]]:
 
         return run
 
-    class FunctionTool(Tool[T]):
+    RunReturnType = TypeVar("RunReturnType")
+
+    class FunctionTool(Tool[RunReturnType]):
         """Dynamically created tool from function."""
 
         def __init__(self, **data: Any) -> None:
@@ -164,7 +167,7 @@ def _extract_type_and_field_info(
     param: inspect.Parameter,
     param_name: str,
     func_name: str,
-) -> tuple[Any, Field]:
+) -> tuple[Any, FieldInfo]:
     """Extract type and field information from parameter annotation.
 
     Supports:
