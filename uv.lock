@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13' and python_full_version < '4.0'",
@@ -1759,7 +1760,7 @@ wheels = [
 
 [[package]]
 name = "portia-sdk-python"
-version = "0.4.2"
+version = "0.4.3"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -1893,6 +1894,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
     { name = "testcontainers", extras = ["redis"], specifier = ">=4.10.0" },
 ]
+provides-extras = ["mistral", "mistralai", "google", "ollama", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
 
 [package.metadata.requires-dev]
 dev = [
