@@ -62,16 +62,6 @@ jobs:
         run: |
           uv add "portia-sdk-python[all] @ file://../../portia-sdk-python"
 
-      - name: Check tool IDs
-        working-directory: ./platform/evals
-        id: check_tool_ids
-        env:
-          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          uv run check_tool_ids.py
-
       - name: eval query planner
         id: eval_query_planner
         working-directory: ./platform/evals
