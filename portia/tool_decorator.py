@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, TypeVar, get_origin, get_args, get_type_hints
-from pydantic import BaseModel, Field, create_model
-from portia.tool import Tool, ToolRunContext
-from typing import Annotated
 from collections.abc import Awaitable, Callable
+from typing import Annotated, Any, TypeVar, get_args, get_origin, get_type_hints
+
+from pydantic import BaseModel, Field, create_model
+
+from portia.tool import Tool, ToolRunContext
 
 # Type variables for the decorator
 P = inspect.Parameter
@@ -232,10 +233,7 @@ def _extract_type_and_field_info(
                                 field_kwargs["le"] = constraint.le
 
                     # Use Field's default if specified and param has no default
-                    if (
-                        metadata.default is not ...
-                        and param.default == inspect.Parameter.empty
-                    ):
+                    if metadata.default is not ... and param.default == inspect.Parameter.empty:
                         default = metadata.default
 
             # Use extracted description or fallback
@@ -254,16 +252,12 @@ def _extract_type_and_field_info(
     return param_type, field_info
 
 
-def _create_output_schema(
-    type_hints: dict[str, Any], func_name: str
-) -> tuple[str, str]:
+def _create_output_schema(type_hints: dict[str, Any], func_name: str) -> tuple[str, str]:
     """Create output schema tuple from return type annotation."""
     return_type = type_hints.get("return", Any)
 
     # Convert type to string representation
-    type_str = (
-        return_type.__name__ if hasattr(return_type, "__name__") else str(return_type)
-    )
+    type_str = return_type.__name__ if hasattr(return_type, "__name__") else str(return_type)
 
     # Create description
     description = f"Output from {func_name} function"

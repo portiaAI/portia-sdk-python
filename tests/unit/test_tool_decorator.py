@@ -1,10 +1,8 @@
 """Tests for the tool decorator."""
 
 import os
-import sys
 import unittest.mock
-from typing import Optional, Annotated, Any
-from collections.abc import Callable
+from typing import Annotated, Any
 
 import pytest
 from pydantic import BaseModel, Field
@@ -12,9 +10,9 @@ from pydantic import BaseModel, Field
 from portia.errors import ToolHardError, ToolSoftError
 from portia.tool import ToolRunContext
 from portia.tool_decorator import (
-    tool,
     _create_args_schema,
     _extract_type_and_field_info,
+    tool,
 )
 from tests.utils import get_test_tool_context
 
@@ -103,9 +101,7 @@ def test_tool_with_mixed_parameters() -> None:
     """Test tool decorator with both regular and context parameters."""
 
     @tool
-    def personalized_message(
-        message: str, ctx: ToolRunContext, prefix: str = "Message"
-    ) -> str:
+    def personalized_message(message: str, ctx: ToolRunContext, prefix: str = "Message") -> str:
         """Create a personalized message for the current user."""
         return f"{prefix} for {ctx.end_user.external_id}: {message}"
 
@@ -123,7 +119,7 @@ def test_tool_with_complex_types() -> None:
     """Test tool decorator with complex type annotations."""
 
     @tool
-    def process_data(items: list[str], count: Optional[int] = None) -> dict[str, int]:
+    def process_data(items: list[str], count: int | None = None) -> dict[str, int]:
         """Process a list of items and return counts."""
         if count is None:
             count = len(items)
@@ -148,10 +144,9 @@ def test_tool_raises_errors() -> None:
         if should_fail:
             if error_type == "hard":
                 raise ToolHardError("Hard error occurred")
-            elif error_type == "soft":
+            if error_type == "soft":
                 raise ToolSoftError("Soft error occurred")
-            else:
-                raise ValueError("Unknown error")
+            raise ValueError("Unknown error")
         return "Success"
 
     tool_instance = failing_tool()
@@ -222,7 +217,6 @@ def test_tool_class_naming() -> None:
 
 def test_tool_validation_missing_return_type() -> None:
     """Test that tools without return type annotations are rejected."""
-
     with pytest.raises(ValueError, match="must have a return type annotation"):
 
         @tool
@@ -233,7 +227,6 @@ def test_tool_validation_missing_return_type() -> None:
 
 def test_tool_validation_non_callable() -> None:
     """Test that non-callable objects are rejected."""
-
     with pytest.raises(TypeError, match="must be callable"):
         tool("not a function")  # type: ignore
 
@@ -405,18 +398,12 @@ def test_mixed_annotation_patterns() -> None:
     # Check required_annotated
     assert "required_annotated" in fields
     assert fields["required_annotated"].annotation == str
-    assert (
-        fields["required_annotated"].description
-        == "A required parameter with annotation"
-    )
+    assert fields["required_annotated"].description == "A required parameter with annotation"
 
     # Check required_regular (should get fallback description)
     assert "required_regular" in fields
     assert fields["required_regular"].annotation == int
-    assert (
-        "Parameter required_regular for mixed_function"
-        in fields["required_regular"].description
-    )
+    assert "Parameter required_regular for mixed_function" in fields["required_regular"].description
 
     # Check optional_annotated
     assert "optional_annotated" in fields
@@ -456,7 +443,6 @@ def test_mixed_annotation_patterns() -> None:
 def test_get_type_hints_exception_handling() -> None:
     """Test exception handling in _create_args_schema when get_type_hints fails."""
     import inspect
-    from portia.tool_decorator import _create_args_schema
 
     # Create a function that will cause get_type_hints to fail
     def problematic_function(
@@ -477,7 +463,6 @@ def test_get_type_hints_exception_handling() -> None:
 def test_empty_parameter_annotation_fallback() -> None:
     """Test fallback when parameter annotation is empty."""
     import inspect
-    from portia.tool_decorator import _create_args_schema
 
     # Create a function with no type annotation
     def test_func(param):  # No annotation
@@ -500,21 +485,15 @@ def test_empty_parameter_annotation_fallback() -> None:
 def test_malformed_annotated_type() -> None:
     """Test handling of malformed Annotated types."""
     import inspect
-    from typing import get_origin, get_args
-    from portia.tool_decorator import _extract_type_and_field_info
 
     # Create a mock malformed Annotated type (has origin but no args)
     class MockAnnotated:
         pass
 
     # Mock get_origin and get_args to simulate malformed Annotated
-    with unittest.mock.patch(
-        "portia.tool_decorator.get_origin", return_value=Annotated
-    ):
+    with unittest.mock.patch("portia.tool_decorator.get_origin", return_value=Annotated):
         with unittest.mock.patch("portia.tool_decorator.get_args", return_value=[]):
-            param = inspect.Parameter(
-                "test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD
-            )
+            param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
 
             param_type, field_info = _extract_type_and_field_info(
                 MockAnnotated, param, "test_param", "test_func"
@@ -527,8 +506,6 @@ def test_malformed_annotated_type() -> None:
 def test_validation_attribute_none_values() -> None:
     """Test validation attribute handling when values are None."""
     import inspect
-    from pydantic import Field
-    from portia.tool_decorator import _extract_type_and_field_info
 
     class MockField:
         description = "test description"
@@ -553,8 +530,6 @@ def test_validation_attribute_none_values() -> None:
 def test_pydantic_v2_constraint_metadata() -> None:
     """Test pydantic v2 constraint metadata handling."""
     import inspect
-    from pydantic import Field
-    from portia.tool_decorator import _extract_type_and_field_info
 
     # Create a mock Field with metadata attribute containing constraints
     class MockConstraint:
@@ -588,7 +563,6 @@ def test_pydantic_v2_constraint_metadata() -> None:
 def test_description_fallback_in_annotated() -> None:
     """Test description fallback when no description is found in Annotated metadata."""
     import inspect
-    from portia.tool_decorator import _extract_type_and_field_info
 
     # Create an Annotated type with metadata that doesn't contain description
     class MockMetadata:
