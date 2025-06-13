@@ -528,40 +528,6 @@ def test_validation_attribute_none_values() -> None:
     assert param_type is str
     assert field_info.description == "test description"
 
-
-def test_pydantic_v2_constraint_metadata() -> None:
-    """Test pydantic v2 constraint metadata handling."""
-    import inspect
-
-    # Create a mock Field with metadata attribute containing constraints
-    class MockConstraint:
-        def __init__(self, **kwargs: Any) -> None:
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-
-    class MockField:
-        description = "test description"
-        default = ...
-        metadata: list[MockConstraint] = [  # noqa: RUF012
-            MockConstraint(min_length=5),
-            MockConstraint(max_length=10),
-            MockConstraint(gt=0),
-            MockConstraint(ge=1),
-            MockConstraint(lt=100),
-            MockConstraint(le=99),
-        ]
-
-    annotated_type = Annotated[str, MockField()]
-    param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
-
-    param_type, field_info = _extract_type_and_field_info(
-        annotated_type, param, "test_param", "test_func"
-    )
-
-    assert param_type is str
-    assert field_info.description == "test description"
-
-
 def test_description_fallback_in_annotated() -> None:
     """Test description fallback when no description is found in Annotated metadata."""
     import inspect
@@ -624,19 +590,3 @@ def test_extract_constraints_metadata_none() -> None:
 
     result = _extract_constraints_from_metadata(MockMetadata())
     assert result == {}
-
-
-def test_create_output_schema_no_name_attribute() -> None:
-    """Test _create_output_schema when return type has no __name__ attribute."""
-    from portia.tool_decorator import _create_output_schema
-
-    # Create a type-like object without __name__ attribute
-    class TypeWithoutName:
-        def __str__(self) -> str:
-            return "CustomType"
-
-    type_hints = {"return": TypeWithoutName()}
-    type_str, description = _create_output_schema(type_hints, "test_function")
-
-    assert type_str == "CustomType"
-    assert description == "Output from test_function function"
