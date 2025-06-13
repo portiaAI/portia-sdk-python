@@ -1,0 +1,415 @@
+"""Tests for the tool decorator."""
+
+import os
+from typing import Optional, Annotated
+
+import pytest
+from pydantic import BaseModel, Field
+
+from portia.errors import ToolHardError, ToolSoftError
+from portia.tool import ToolRunContext
+from portia.tool_decorator import tool
+from tests.utils import get_test_tool_context
+
+
+def test_basic_tool_decorator() -> None:
+    """Test basic usage of the tool decorator."""
+    
+    @tool
+    def add_numbers(a: int, b: int) -> int:
+        """Add two numbers together."""
+        return a + b
+    
+    # Create an instance of the tool
+    tool_instance = add_numbers()
+    
+    # Check basic properties
+    assert tool_instance.id == "add_numbers"
+    assert tool_instance.name == "Add Numbers"
+    assert tool_instance.description == "Add two numbers together."
+    assert tool_instance.output_schema == ("int", "Output from add_numbers function")
+    
+    # Test args schema
+    schema = tool_instance.args_schema
+    assert issubclass(schema, BaseModel)
+    assert hasattr(schema, "model_fields")
+    assert "a" in schema.model_fields
+    assert "b" in schema.model_fields
+    
+    # Test running the tool
+    ctx = get_test_tool_context()
+    result = tool_instance.run(ctx, a=3, b=4)
+    assert result == 7
+
+
+def test_tool_with_optional_parameters() -> None:
+    """Test tool decorator with optional parameters."""
+    
+    @tool
+    def greet_user(name: str, greeting: str = "Hello") -> str:
+        """Greet a user with a custom greeting."""
+        return f"{greeting}, {name}!"
+    
+    tool_instance = greet_user()
+    ctx = get_test_tool_context()
+    
+    # Test with default parameter
+    result = tool_instance.run(ctx, name="Alice")
+    assert result == "Hello, Alice!"
+    
+    # Test with custom parameter
+    result = tool_instance.run(ctx, name="Bob", greeting="Hi")
+    assert result == "Hi, Bob!"
+
+
+def test_tool_with_context_parameter() -> None:
+    """Test tool decorator with context parameter."""
+    
+    @tool
+    def get_user_id(ctx: ToolRunContext) -> str:
+        """Get the current user ID from context."""
+        return ctx.end_user.external_id
+    
+    tool_instance = get_user_id()
+    ctx = get_test_tool_context()
+    
+    result = tool_instance.run(ctx)
+    assert result == "test_user"
+
+
+def test_tool_with_context_named_context() -> None:
+    """Test tool decorator with context parameter named 'context'."""
+    
+    @tool
+    def get_plan_id(context: ToolRunContext) -> str:
+        """Get the current plan ID from context."""
+        return str(context.plan_run.plan_id)
+    
+    tool_instance = get_plan_id()
+    ctx = get_test_tool_context()
+    
+    result = tool_instance.run(ctx)
+    assert result == str(ctx.plan_run.plan_id)
+
+
+def test_tool_with_mixed_parameters() -> None:
+    """Test tool decorator with both regular and context parameters."""
+    
+    @tool
+    def personalized_message(message: str, ctx: ToolRunContext, prefix: str = "Message") -> str:
+        """Create a personalized message for the current user."""
+        return f"{prefix} for {ctx.end_user.external_id}: {message}"
+    
+    tool_instance = personalized_message()
+    ctx = get_test_tool_context()
+    
+    result = tool_instance.run(ctx, message="Hello World")
+    assert result == "Message for test_user: Hello World"
+    
+    result = tool_instance.run(ctx, message="Test", prefix="Alert")
+    assert result == "Alert for test_user: Test"
+
+
+def test_tool_with_complex_types() -> None:
+    """Test tool decorator with complex type annotations."""
+    
+    @tool
+    def process_data(items: list[str], count: Optional[int] = None) -> dict[str, int]:
+        """Process a list of items and return counts."""
+        if count is None:
+            count = len(items)
+        return {"total_items": len(items), "requested_count": count}
+    
+    tool_instance = process_data()
+    ctx = get_test_tool_context()
+    
+    result = tool_instance.run(ctx, items=["a", "b", "c"])
+    assert result == {"total_items": 3, "requested_count": 3}
+    
+    result = tool_instance.run(ctx, items=["x", "y"], count=5)
+    assert result == {"total_items": 2, "requested_count": 5}
+
+
+def test_tool_raises_errors() -> None:
+    """Test that decorated tools can raise Tool errors."""
+    
+    @tool
+    def failing_tool(should_fail: bool, error_type: str = "soft") -> str:
+        """A tool that can fail in different ways."""
+        if should_fail:
+            if error_type == "hard":
+                raise ToolHardError("Hard error occurred")
+            elif error_type == "soft":
+                raise ToolSoftError("Soft error occurred")
+            else:
+                raise ValueError("Unknown error")
+        return "Success"
+    
+    tool_instance = failing_tool()
+    ctx = get_test_tool_context()
+    
+    # Test successful execution
+    result = tool_instance.run(ctx, should_fail=False)
+    assert result == "Success"
+    
+    # Test soft error
+    with pytest.raises(ToolSoftError):
+        tool_instance.run(ctx, should_fail=True, error_type="soft")
+    
+    # Test hard error
+    with pytest.raises(ToolHardError):
+        tool_instance.run(ctx, should_fail=True, error_type="hard")
+
+
+def test_weather_tool_example() -> None:
+    """Test the weather tool example from the requirement."""
+    
+    @tool
+    def weather_tool(city: str) -> str:
+        """Retrieves the weather of the provided city."""
+        # Mock implementation for testing
+        api_key = os.getenv("OPENWEATHERMAP_API_KEY")
+        if not api_key or api_key == "":
+            raise ToolHardError("OPENWEATHERMAP_API_KEY is required")
+        
+        # Mock weather data for testing
+        return f"The current weather in {city} is sunny with a temperature of 22°C."
+    
+    # Create tool instance
+    tool_instance = weather_tool()
+    
+    # Check properties match expected format
+    assert tool_instance.id == "weather_tool"
+    assert tool_instance.name == "Weather Tool"
+    assert tool_instance.description == "Retrieves the weather of the provided city."
+    assert tool_instance.output_schema == ("str", "Output from weather_tool function")
+    
+    # Check args schema has city parameter
+    schema = tool_instance.args_schema
+    assert "city" in schema.model_fields
+    city_field = schema.model_fields["city"]
+    assert city_field.annotation == str
+    
+    # Test without API key (should raise error)
+    ctx = get_test_tool_context()
+    with pytest.raises(ToolHardError, match="OPENWEATHERMAP_API_KEY is required"):
+        tool_instance.run(ctx, city="London")
+
+
+def test_tool_class_naming() -> None:
+    """Test that tool classes get proper names."""
+    
+    @tool
+    def my_custom_tool(value: str) -> str:
+        """A custom tool for testing."""
+        return value.upper()
+    
+    tool_instance = my_custom_tool()
+    
+    # Check the class name
+    assert tool_instance.__class__.__name__ == "MyCustomToolTool"
+    assert tool_instance.__class__.__qualname__ == "MyCustomToolTool"
+
+
+def test_tool_validation_missing_return_type() -> None:
+    """Test that tools without return type annotations are rejected."""
+    
+    with pytest.raises(ValueError, match="must have a return type annotation"):
+        @tool
+        def invalid_tool(a: int, b: int):  # Missing return type
+            """This tool is invalid."""
+            return a + b
+
+
+def test_tool_validation_non_callable() -> None:
+    """Test that non-callable objects are rejected."""
+    
+    with pytest.raises(TypeError, match="must be callable"):
+        tool("not a function")  # type: ignore
+
+
+def test_tool_args_schema_generation() -> None:
+    """Test detailed args schema generation."""
+    
+    @tool
+    def complex_tool(
+        required_str: str,
+        required_float: float,
+        optional_int: int = 42,
+        optional_bool: bool = True,
+    ) -> str:
+        """A tool with various parameter types."""
+        return f"{required_str}-{optional_int}-{optional_bool}-{required_float}"
+    
+    tool_instance = complex_tool()
+    schema = tool_instance.args_schema
+    
+    # Check required fields
+    assert "required_str" in schema.model_fields
+    assert "required_float" in schema.model_fields
+    
+    # Check optional fields with defaults
+    assert "optional_int" in schema.model_fields
+    assert "optional_bool" in schema.model_fields
+    
+    # Test schema instantiation
+    schema_instance = schema(
+        required_str="test",
+        required_float=3.14,
+    )
+    assert schema_instance.required_str == "test"
+    assert schema_instance.optional_int == 42
+    assert schema_instance.optional_bool is True
+    assert schema_instance.required_float == 3.14
+
+
+def test_tool_to_langchain() -> None:
+    """Test that decorated tools can be converted to LangChain tools."""
+    
+    @tool
+    def simple_tool(text: str) -> str:
+        """A simple tool for LangChain testing."""
+        return text.upper()
+    
+    tool_instance = simple_tool()
+    ctx = get_test_tool_context()
+    
+    # Convert to LangChain tool
+    lc_tool = tool_instance.to_langchain(ctx)
+    
+    # Check properties
+    assert lc_tool.name == "Simple_Tool"
+    assert "simple tool for langchain testing" in lc_tool.description.lower()
+    assert lc_tool.args_schema == tool_instance.args_schema
+
+
+def test_tool_serialization() -> None:
+    """Test that decorated tools can be serialized."""
+    
+    @tool
+    def serializable_tool(data: str) -> str:
+        """A tool that can be serialized."""
+        return data
+    
+    tool_instance = serializable_tool()
+    
+    # Test string representation
+    str_repr = str(tool_instance)
+    assert "serializable_tool" in str_repr
+    assert "Serializable Tool" in str_repr
+    
+    # Test JSON serialization
+    json_data = tool_instance.model_dump_json()
+    assert isinstance(json_data, str)
+    assert "serializable_tool" in json_data
+
+
+def test_annotated_string_description() -> None:
+    """Test Annotated[Type, "description"] pattern."""
+    
+    @tool
+    def say_hello(name: Annotated[str, "The name of the person to say hello to"]) -> str:
+        """Say hello to someone."""
+        return f"Hello, {name}!"
+    
+    tool_instance = say_hello()
+    
+    # Check that the tool was created properly
+    assert tool_instance.id == "say_hello"
+    assert tool_instance.name == "Say Hello"
+    assert tool_instance.description == "Say hello to someone."
+    
+    # Check the args schema
+    schema = tool_instance.args_schema
+    assert "name" in schema.model_fields
+    name_field = schema.model_fields["name"]
+    assert name_field.annotation == str
+    assert name_field.description == "The name of the person to say hello to"
+    
+    # Test execution
+    ctx = get_test_tool_context()
+    result = tool_instance.run(ctx, name="Alice")
+    assert result == "Hello, Alice!"
+
+
+def test_annotated_field_description() -> None:
+    """Test Annotated[Type, Field(description="...")] pattern."""
+    
+    @tool
+    def calculate_area(
+        length: Annotated[float, Field(description="The length of the rectangle")],
+        width: Annotated[float, Field(description="The width of the rectangle", gt=0)]
+    ) -> float:
+        """Calculate the area of a rectangle."""
+        return length * width
+    
+    tool_instance = calculate_area()
+    
+    # Check that the tool was created properly
+    assert tool_instance.id == "calculate_area"
+    assert tool_instance.name == "Calculate Area"
+    
+    # Check the args schema
+    schema = tool_instance.args_schema
+    assert "length" in schema.model_fields
+    assert "width" in schema.model_fields
+    
+    length_field = schema.model_fields["length"]
+    width_field = schema.model_fields["width"]
+    
+    assert length_field.annotation == float
+    assert length_field.description == "The length of the rectangle"
+    
+    assert width_field.annotation == float
+    assert width_field.description == "The width of the rectangle"
+    
+    # Test execution
+    ctx = get_test_tool_context()
+    result = tool_instance.run(ctx, length=5.0, width=3.0)
+    assert result == 15.0
+
+
+def test_mixed_annotation_patterns() -> None:
+    """Test mixing different annotation patterns."""
+    
+    @tool
+    def mixed_function(
+        required_annotated: Annotated[str, "A required parameter with annotation"],
+        required_regular: int,
+        optional_annotated: Annotated[str, Field(description="An optional parameter", min_length=1)] = "default",
+        optional_regular: bool = True
+    ) -> str:
+        """Function with mixed annotation patterns."""
+        return f"{required_annotated}-{required_regular}-{optional_annotated}-{optional_regular}"
+    
+    tool_instance = mixed_function()
+    
+    # Check the args schema
+    schema = tool_instance.args_schema
+    fields = schema.model_fields
+    
+    # Check required_annotated
+    assert "required_annotated" in fields
+    assert fields["required_annotated"].annotation == str
+    assert fields["required_annotated"].description == "A required parameter with annotation"
+    
+    # Check required_regular (should get fallback description)
+    assert "required_regular" in fields
+    assert fields["required_regular"].annotation == int
+    assert "Parameter required_regular for mixed_function" in fields["required_regular"].description
+    
+    # Check optional_annotated
+    assert "optional_annotated" in fields
+    assert fields["optional_annotated"].annotation == str
+    assert fields["optional_annotated"].description == "An optional parameter"
+    assert fields["optional_annotated"].default == "default"
+    
+    # Check optional_regular
+    assert "optional_regular" in fields
+    assert fields["optional_regular"].annotation == bool
+    assert fields["optional_regular"].default == True
+    
+    # Test execution
+    ctx = get_test_tool_context()
+    result = tool_instance.run(ctx, required_annotated="test", required_regular=42)
+    assert result == "test-42-default-True"
