@@ -139,6 +139,14 @@ class LLMModel(Enum):
     MISTRAL_LARGE = Model(provider=LLMProvider.MISTRALAI, model_name="mistral-large-latest")
 
     # Google Generative AI
+    GEMINI_2_5_FLASH = Model(
+        provider=LLMProvider.GOOGLE,
+        model_name="gemini-2.5-flash-preview-04-17",
+    )
+    GEMINI_2_5_PRO = Model(
+        provider=LLMProvider.GOOGLE,
+        model_name="gemini-2.5-pro-preview-03-25",
+    )
     GEMINI_2_0_FLASH = Model(
         provider=LLMProvider.GOOGLE,
         model_name="gemini-2.0-flash",
@@ -252,6 +260,7 @@ FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
 FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED = (
     "feature_flag_one_shot_agent_clarifications_enabled"
 )
+FEATURE_FLAG_GOOGLE_2_5_DEFAULTS = "feature_flag_google_2_5_defaults"
 
 
 E = TypeVar("E", bound=Enum)
@@ -468,6 +477,7 @@ class Config(BaseModel):
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED: False,
+            FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: False,
             **self.feature_flags,
         }
         return self
@@ -587,6 +597,8 @@ class Config(BaseModel):
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
+                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
+                            return "google/gemini-2.5-pro-preview-03-25"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
@@ -600,6 +612,8 @@ class Config(BaseModel):
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
+                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
+                            return "google/gemini-2.5-flash-preview-04-17"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
@@ -613,6 +627,8 @@ class Config(BaseModel):
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
+                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
+                            return "google/gemini-2.5-flash-preview-04-17"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
