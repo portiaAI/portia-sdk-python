@@ -505,49 +505,6 @@ def test_malformed_annotated_type() -> None:
         assert "Parameter test_param for test_func" in field_info.description
 
 
-def test_validation_attribute_none_values() -> None:
-    """Test validation attribute handling when values are None."""
-    import inspect
-
-    class MockField:
-        description = "test description"
-        default = ...
-        gt = None  # This should not be included
-        ge = 5  # This should be included
-        min_length = None  # This should not be included
-        max_length = 10  # This should be included
-
-    annotated_type = Annotated[str, MockField()]
-    param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
-
-    param_type, field_info = _extract_type_and_field_info(
-        annotated_type, param, "test_param", "test_func"
-    )
-
-    # Check that None values were filtered out and non-None values were included
-    assert param_type is str
-    assert field_info.description == "test description"
-
-def test_description_fallback_in_annotated() -> None:
-    """Test description fallback when no description is found in Annotated metadata."""
-    import inspect
-
-    # Create an Annotated type with metadata that doesn't contain description
-    class MockMetadata:
-        pass
-
-    annotated_type = Annotated[str, MockMetadata()]
-    param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
-
-    param_type, field_info = _extract_type_and_field_info(
-        annotated_type, param, "test_param", "test_func"
-    )
-
-    assert param_type is str
-    assert field_info.description is not None
-    assert "Parameter test_param for test_func" in field_info.description
-
-
 def test_field_with_custom_default() -> None:
     """Test Field with custom default value handling."""
 
@@ -555,7 +512,7 @@ def test_field_with_custom_default() -> None:
     def tool_with_field_default(
         name: Annotated[
             str, Field(default="default_name", description="Name parameter")
-        ] = "default_name",
+        ] = "default_name_foo",
     ) -> str:
         """Tool with Field default."""
         return f"Hello, {name}!"
@@ -565,28 +522,25 @@ def test_field_with_custom_default() -> None:
     # Check the args schema
     schema = tool_instance.args_schema
     name_field = schema.model_fields["name"]
-    assert name_field.default == "default_name"
+    assert name_field.default == "default_name_foo"
     assert name_field.description == "Name parameter"
 
     # Test execution with default
     ctx = get_test_tool_context()
     result = tool_instance.run(ctx)
-    assert result == "Hello, default_name!"
+    assert result == "Hello, default_name_foo!"
 
     # Test execution with custom value
     result = tool_instance.run(ctx, name="Alice")
     assert result == "Hello, Alice!"
 
 
-def test_extract_constraints_metadata_none() -> None:
-    """Test _extract_constraints_from_metadata when metadata.metadata returns None."""
-    from portia.tool_decorator import _extract_constraints_from_metadata
-
-    # Create a mock object that has metadata attribute but returns None when accessed
-    class MockMetadata:
-        @property
-        def metadata(self) -> None:
-            return None
-
-    result = _extract_constraints_from_metadata(MockMetadata())
-    assert result == {}
+def test_tool_with_invalid_annotation_metadata() -> None:
+    """Test that invalid annotation metadata raises an error."""
+    with pytest.raises(ValueError, match="Unsupported annotation metadata: 123"):
+        @tool
+        def tool_with_invalid_annotation_metadata(
+            name: Annotated[str, 123],
+        ) -> str:
+            """Tool with invalid annotation metadata."""
+            return f"Hello, {name}!"

@@ -188,7 +188,7 @@ def _extract_type_and_field_info(
     # Check if annotation is Annotated type
     origin = get_origin(param_annotation)
     if origin is Annotated:
-        return _process_annotated_type(param_annotation, param, param_name, func_name, default)
+        return _process_annotated_type(param_annotation, param_name, func_name, default)
 
     # Regular type annotation without special metadata
     return _process_regular_type(param_annotation, param_name, func_name, default)
@@ -196,7 +196,6 @@ def _extract_type_and_field_info(
 
 def _process_annotated_type(
     param_annotation: type | object,
-    param: inspect.Parameter,
     param_name: str,
     func_name: str,
     default: object,
@@ -206,21 +205,25 @@ def _process_annotated_type(
     if not args:
         # Malformed Annotated, treat as Any
         param_type = Any
-        description = _extract_param_description(None, param_name, func_name)
+        description = _form_param_description(param_name, func_name)
         field_info = cast(FieldInfo, Field(default=default, description=description))
         return param_type, field_info
 
     # First arg is the actual type
     param_type = args[0]
 
-    # Extract metadata from annotations
-    description, field_kwargs, updated_default = _extract_metadata_from_args(
-        args[1:], param, param_name, func_name, default
-    )
+    # Extract metadata from annotations, it is an annotation therefore there is a second argument
+    annotation_metadata = args[1]
 
-    field_info = cast(
-        FieldInfo, Field(default=updated_default, description=description, **field_kwargs)
-    )
+    field_info: FieldInfo
+    match annotation_metadata:
+        case str():
+            field_info = cast(FieldInfo, Field(default=default, description=annotation_metadata))
+        case FieldInfo():
+            field_info = cast(FieldInfo, annotation_metadata)
+            field_info.default = default
+        case _:
+            raise ValueError(f"Unsupported annotation metadata: {annotation_metadata}")
     return param_type, field_info
 
 
@@ -232,89 +235,9 @@ def _process_regular_type(
 ) -> tuple[type | object, FieldInfo]:
     """Process regular type annotations without metadata."""
     param_type = param_annotation
-    description = _extract_param_description(None, param_name, func_name)
+    description = _form_param_description(param_name, func_name)
     field_info = cast(FieldInfo, Field(default=default, description=description))
     return param_type, field_info
-
-
-def _extract_metadata_from_args(
-    metadata_args: tuple,
-    param: inspect.Parameter,
-    param_name: str,
-    func_name: str,
-    default: object,
-) -> tuple[str, dict, object]:
-    """Extract description, field kwargs, and default from metadata args."""
-    description = None
-    field_kwargs = {}
-    updated_default = default
-
-    for metadata in metadata_args:
-        if isinstance(metadata, str):
-            description = metadata
-        elif hasattr(metadata, "description") and hasattr(metadata, "default"):
-            description = metadata.description
-            field_kwargs.update(_extract_validation_attrs(metadata))
-            field_kwargs.update(_extract_constraints_from_metadata(metadata))
-
-            # Use Field's default if specified and param has no default
-            if metadata.default is not ... and param.default == inspect.Parameter.empty:
-                updated_default = metadata.default
-
-    # Use extracted description or fallback
-    if description is None:
-        description = _extract_param_description(None, param_name, func_name)
-
-    return description, field_kwargs, updated_default
-
-
-def _extract_validation_attrs(metadata: object) -> dict:
-    """Extract validation attributes from metadata."""
-    field_kwargs = {}
-    validation_attrs = [
-        "gt",
-        "ge",
-        "lt",
-        "le",
-        "min_length",
-        "max_length",
-        "regex",
-        "allow_inf_nan",
-    ]
-    for attr in validation_attrs:
-        if hasattr(metadata, attr):
-            value = getattr(metadata, attr)
-            if value is not None:
-                field_kwargs[attr] = value
-    return field_kwargs
-
-
-def _extract_constraints_from_metadata(metadata: object) -> dict:
-    """Extract constraints from metadata (for pydantic v2)."""
-    field_kwargs = {}
-    if not hasattr(metadata, "metadata"):
-        return field_kwargs
-
-    constraint_mappings = {
-        "min_length": "min_length",
-        "max_length": "max_length",
-        "gt": "gt",
-        "ge": "ge",
-        "lt": "lt",
-        "le": "le",
-    }
-
-    # Type guard to ensure metadata has the attribute we need
-    metadata_attr = getattr(metadata, "metadata", None)
-    if metadata_attr is None:
-        return field_kwargs
-
-    for constraint in metadata_attr:
-        for attr, kwarg_name in constraint_mappings.items():
-            if hasattr(constraint, attr):
-                field_kwargs[kwarg_name] = getattr(constraint, attr)
-
-    return field_kwargs
 
 
 def _create_output_schema(type_hints: dict[str, type | object], func_name: str) -> tuple[str, str]:
@@ -330,16 +253,9 @@ def _create_output_schema(type_hints: dict[str, type | object], func_name: str) 
     return (type_str, description)
 
 
-def _extract_param_description(
-    sig: inspect.Signature | None,  # noqa: ARG001
-    param_name: str,
-    func_name: str,
-) -> str:
-    """Extract parameter description from function docstring.
+def _form_param_description(param_name: str, func_name: str) -> str:
+    """Format parameter description using the func_name.
 
-    This is a simple implementation that looks for basic patterns.
-    Could be enhanced to parse more sophisticated docstring formats.
+    This is used for arg that are not annotated with string or FieldInfo.
     """
-    # For now, return a basic description
-    # In a real implementation, you might parse docstrings more thoroughly
     return f"Parameter {param_name} for {func_name}"
