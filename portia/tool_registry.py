@@ -580,7 +580,6 @@ class DefaultToolRegistry(ToolRegistry):
         super().__init__(tools)
 
 
-
 def _create_generated_base_model() -> type[BaseModel]:
     """Create the generated base model.
 

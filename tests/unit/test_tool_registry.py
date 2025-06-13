@@ -532,24 +532,31 @@ def test_generate_pydantic_model_from_json_schema_handles_omissible_fields() -> 
     assert deserialized.model_dump() == {"name": "John", "phone": None}
 
 
-
-def test_generate_pydantic_model_from_json_schema_handles_omissible_fields_model_isolation() -> None:
+def test_generate_pydantic_model_from_json_schema_handles_omissible_fields_model_isolation() -> (
+    None
+):
     """Test for generate_pydantic_model_from_json_schema.
 
     Check that the generated base model is isolated for each tool.
     """
-    model_1 = generate_pydantic_model_from_json_schema("TestOmissibleFields", {
-        "type": "object",
-        "properties": {
-            "name": {"type": "string", "description": "The name of the customer"},
+    model_1 = generate_pydantic_model_from_json_schema(
+        "TestOmissibleFields",
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "The name of the customer"},
+            },
         },
-    })
-    model_2 = generate_pydantic_model_from_json_schema("TestOmissibleFields", {
-        "type": "object",
-        "properties": {
-            "last_name": {"type": "string", "description": "The last name of the customer"},
+    )
+    model_2 = generate_pydantic_model_from_json_schema(
+        "TestOmissibleFields",
+        {
+            "type": "object",
+            "properties": {
+                "last_name": {"type": "string", "description": "The last name of the customer"},
+            },
         },
-    })
+    )
     assert model_1._fields_must_omit_none_on_serialize == ["name"]  # type: ignore  # noqa: PGH003, SLF001
     assert model_2._fields_must_omit_none_on_serialize == ["last_name"]  # type: ignore  # noqa: PGH003, SLF001
 
