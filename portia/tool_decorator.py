@@ -3,20 +3,19 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, TypeVar, get_args, get_origin, get_type_hints
-
+from typing import Any, TypeVar, get_origin, get_args, get_type_hints
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
-
 from portia.tool import Tool, ToolRunContext
+from typing import Annotated
+from collections.abc import Awaitable, Callable
 
 # Type variables for the decorator
 P = inspect.Parameter
 T = TypeVar("T")
 
 
-def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[Any]]:
+def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[T]]:
     """Convert a function into a Tool class.
 
     This decorator automatically creates a Tool subclass from a function by:
@@ -64,7 +63,7 @@ def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[Any]]:
 
     # Create the Tool class dynamically
     def make_run_method() -> Callable:
-        def run(self: Tool, ctx: ToolRunContext, **kwargs: Any) -> Any:  # noqa: ARG001
+        def run(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:  # noqa: ARG001
             """Execute the original function."""
             # Filter out 'ctx' parameter if the function doesn't expect it
             func_params = set(sig.parameters.keys())
@@ -79,9 +78,7 @@ def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[Any]]:
 
         return run
 
-    RunReturnType = TypeVar("RunReturnType")
-
-    class FunctionTool(Tool[RunReturnType]):
+    class FunctionTool(Tool[T]):
         """Dynamically created tool from function."""
 
         def __init__(self, **data: Any) -> None:
@@ -197,10 +194,8 @@ def _extract_type_and_field_info(
 
             for metadata in args[1:]:
                 if isinstance(metadata, str):
-                    # Annotated[str, "description"]
                     description = metadata
                 elif hasattr(metadata, "description") and hasattr(metadata, "default"):
-                    # Annotated[str, Field(description="...")]
                     description = metadata.description
                     # Copy specific field validation properties we care about
                     validation_attrs = [

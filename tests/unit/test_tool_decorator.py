@@ -140,7 +140,7 @@ def test_tool_raises_errors() -> None:
 
     @tool
     def failing_tool(should_fail: bool, error_type: str = "soft") -> str:
-        """A tool that can fail in different ways."""
+        """Fail in different ways."""
         if should_fail:
             if error_type == "hard":
                 raise ToolHardError("Hard error occurred")
@@ -170,7 +170,7 @@ def test_weather_tool_example() -> None:
 
     @tool
     def weather_tool(city: str) -> str:
-        """Retrieves the weather of the provided city."""
+        """Retrieve the weather of the provided city."""
         # Mock implementation for testing
         api_key = os.getenv("OPENWEATHERMAP_API_KEY")
         if not api_key or api_key == "":
@@ -185,14 +185,14 @@ def test_weather_tool_example() -> None:
     # Check properties match expected format
     assert tool_instance.id == "weather_tool"
     assert tool_instance.name == "Weather Tool"
-    assert tool_instance.description == "Retrieves the weather of the provided city."
+    assert tool_instance.description == "Retrieve the weather of the provided city."
     assert tool_instance.output_schema == ("str", "Output from weather_tool function")
 
     # Check args schema has city parameter
     schema = tool_instance.args_schema
     assert "city" in schema.model_fields
     city_field = schema.model_fields["city"]
-    assert city_field.annotation == str
+    assert city_field.annotation is str
 
     # Test without API key (should raise error)
     ctx = get_test_tool_context()
@@ -205,7 +205,7 @@ def test_tool_class_naming() -> None:
 
     @tool
     def my_custom_tool(value: str) -> str:
-        """A custom tool for testing."""
+        """Custom tool for testing."""
         return value.upper()
 
     tool_instance = my_custom_tool()  # pyright: ignore[reportCallIssue]
@@ -217,18 +217,19 @@ def test_tool_class_naming() -> None:
 
 def test_tool_validation_missing_return_type() -> None:
     """Test that tools without return type annotations are rejected."""
-    with pytest.raises(ValueError, match="must have a return type annotation"):
 
-        @tool
-        def invalid_tool(a: int, b: int):  # Missing return type
-            """This tool is invalid."""
-            return a + b
+    def invalid_tool_func(a: int, b: int):  # Actually missing return type
+        """Invalid tool."""
+        return a + b
+
+    with pytest.raises(ValueError, match="must have a return type annotation"):
+        tool(invalid_tool_func)
 
 
 def test_tool_validation_non_callable() -> None:
     """Test that non-callable objects are rejected."""
     with pytest.raises(TypeError, match="must be callable"):
-        tool("not a function")  # type: ignore
+        tool("not a function")  # type: ignore[arg-type]
 
 
 def test_tool_args_schema_generation() -> None:
@@ -239,9 +240,9 @@ def test_tool_args_schema_generation() -> None:
         required_str: str,
         required_float: float,
         optional_int: int = 42,
-        optional_bool: bool = True,
+        optional_bool: bool = True,  # noqa: FBT002
     ) -> str:
-        """A tool with various parameter types."""
+        """Tool with various parameter types."""
         return f"{required_str}-{optional_int}-{optional_bool}-{required_float}"
 
     tool_instance = complex_tool()  # pyright: ignore[reportCallIssue]
@@ -271,7 +272,7 @@ def test_tool_to_langchain() -> None:
 
     @tool
     def simple_tool(text: str) -> str:
-        """A simple tool for LangChain testing."""
+        """Simple tool for LangChain testing."""
         return text.upper()
 
     tool_instance = simple_tool()  # pyright: ignore[reportCallIssue]
@@ -291,7 +292,7 @@ def test_tool_serialization() -> None:
 
     @tool
     def serializable_tool(data: str) -> str:
-        """A tool that can be serialized."""
+        """Tool that can be serialized."""
         return data
 
     tool_instance = serializable_tool()  # pyright: ignore[reportCallIssue]
@@ -328,7 +329,7 @@ def test_annotated_string_description() -> None:
     schema = tool_instance.args_schema
     assert "name" in schema.model_fields
     name_field = schema.model_fields["name"]
-    assert name_field.annotation == str
+    assert name_field.annotation is str
     assert name_field.description == "The name of the person to say hello to"
 
     # Test execution
@@ -362,10 +363,10 @@ def test_annotated_field_description() -> None:
     length_field = schema.model_fields["length"]
     width_field = schema.model_fields["width"]
 
-    assert length_field.annotation == float
+    assert length_field.annotation is float
     assert length_field.description == "The length of the rectangle"
 
-    assert width_field.annotation == float
+    assert width_field.annotation is float
     assert width_field.description == "The width of the rectangle"
 
     # Test execution
@@ -384,7 +385,7 @@ def test_mixed_annotation_patterns() -> None:
         optional_annotated: Annotated[
             str, Field(description="An optional parameter", min_length=1)
         ] = "default",
-        optional_regular: bool = True,
+        optional_regular: bool = True,  # noqa: FBT002
     ) -> str:
         """Function with mixed annotation patterns."""
         return f"{required_annotated}-{required_regular}-{optional_annotated}-{optional_regular}"
@@ -397,19 +398,19 @@ def test_mixed_annotation_patterns() -> None:
 
     # Check required_annotated
     assert "required_annotated" in fields
-    assert fields["required_annotated"].annotation == str
+    assert fields["required_annotated"].annotation is str
     assert fields["required_annotated"].description == "A required parameter with annotation"
 
     # Check required_regular (should get fallback description)
     assert "required_regular" in fields
-    assert fields["required_regular"].annotation == int
+    assert fields["required_regular"].annotation is int
     description = fields["required_regular"].description
     assert description is not None
     assert "Parameter required_regular for mixed_function" in description
 
     # Check optional_annotated
     assert "optional_annotated" in fields
-    assert fields["optional_annotated"].annotation == str
+    assert fields["optional_annotated"].annotation is str
     assert fields["optional_annotated"].description == "An optional parameter"
     assert fields["optional_annotated"].default == "default"
     # Validate that min_length constraint is present
@@ -427,14 +428,12 @@ def test_mixed_annotation_patterns() -> None:
 
     # Test that the schema rejects empty strings (min_length=1 constraint)
     with pytest.raises(ValueError, match="String should have at least 1 character"):
-        schema_instance = schema(
-            required_annotated="test", required_regular=42, optional_annotated=""
-        )
+        schema(required_annotated="test", required_regular=42, optional_annotated="")
 
     # Check optional_regular
     assert "optional_regular" in fields
-    assert fields["optional_regular"].annotation == bool
-    assert fields["optional_regular"].default == True
+    assert fields["optional_regular"].annotation is bool
+    assert fields["optional_regular"].default is True
 
     # Test execution
     ctx = get_test_tool_context()
@@ -448,7 +447,7 @@ def test_get_type_hints_exception_handling() -> None:
 
     # Create a function that will cause get_type_hints to fail
     def problematic_function(
-        param: "NonExistentType",  # pyright: ignore[reportUndefinedVariable]
+        param: "NonExistentType",  # pyright: ignore[reportUndefinedVariable]  # noqa: F821
     ) -> str:  # Forward reference to non-existent type
         return "test"
 
@@ -467,7 +466,7 @@ def test_empty_parameter_annotation_fallback() -> None:
     import inspect
 
     # Create a function with no type annotation
-    def test_func(param):  # No annotation
+    def test_func(param) -> str:  # No annotation
         return "test"
 
     sig = inspect.signature(test_func)
@@ -481,7 +480,7 @@ def test_empty_parameter_annotation_fallback() -> None:
 
     # The parameter should have type Any (since it had no annotation)
     param_field = schema.model_fields["param"]
-    assert param_field.annotation == Any
+    assert param_field.annotation is Any
 
 
 def test_malformed_annotated_type() -> None:
@@ -493,17 +492,19 @@ def test_malformed_annotated_type() -> None:
         pass
 
     # Mock get_origin and get_args to simulate malformed Annotated
-    with unittest.mock.patch("portia.tool_decorator.get_origin", return_value=Annotated):
-        with unittest.mock.patch("portia.tool_decorator.get_args", return_value=[]):
-            param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    with (
+        unittest.mock.patch("portia.tool_decorator.get_origin", return_value=Annotated),
+        unittest.mock.patch("portia.tool_decorator.get_args", return_value=[]),
+    ):
+        param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
 
-            param_type, field_info = _extract_type_and_field_info(
-                MockAnnotated, param, "test_param", "test_func"
-            )
+        param_type, field_info = _extract_type_and_field_info(
+            MockAnnotated, param, "test_param", "test_func"
+        )
 
-            assert param_type == Any
-            assert field_info.description is not None
-            assert "Parameter test_param for test_func" in field_info.description
+        assert param_type is Any
+        assert field_info.description is not None
+        assert "Parameter test_param for test_func" in field_info.description
 
 
 def test_validation_attribute_none_values() -> None:
@@ -526,7 +527,7 @@ def test_validation_attribute_none_values() -> None:
     )
 
     # Check that None values were filtered out and non-None values were included
-    assert param_type == str
+    assert param_type is str
     assert field_info.description == "test description"
 
 
@@ -536,14 +537,14 @@ def test_pydantic_v2_constraint_metadata() -> None:
 
     # Create a mock Field with metadata attribute containing constraints
     class MockConstraint:
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs: Any) -> None:
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
     class MockField:
         description = "test description"
         default = ...
-        metadata = [
+        metadata: list[MockConstraint] = [
             MockConstraint(min_length=5),
             MockConstraint(max_length=10),
             MockConstraint(gt=0),
@@ -559,7 +560,7 @@ def test_pydantic_v2_constraint_metadata() -> None:
         annotated_type, param, "test_param", "test_func"
     )
 
-    assert param_type == str
+    assert param_type is str
     assert field_info.description == "test description"
 
 
@@ -578,7 +579,7 @@ def test_description_fallback_in_annotated() -> None:
         annotated_type, param, "test_param", "test_func"
     )
 
-    assert param_type == str
+    assert param_type is str
     assert field_info.description is not None
     assert "Parameter test_param for test_func" in field_info.description
 
