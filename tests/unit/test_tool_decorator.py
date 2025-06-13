@@ -101,7 +101,9 @@ def test_tool_with_mixed_parameters() -> None:
     """Test tool decorator with both regular and context parameters."""
 
     @tool
-    def personalized_message(message: str, ctx: ToolRunContext, prefix: str = "Message") -> str:
+    def personalized_message(
+        message: str, ctx: ToolRunContext, prefix: str = "Message"
+    ) -> str:
         """Create a personalized message for the current user."""
         return f"{prefix} for {ctx.end_user.external_id}: {message}"
 
@@ -261,10 +263,18 @@ def test_tool_args_schema_generation() -> None:
         required_str="test",
         required_float=3.14,
     )
-    assert schema_instance.required_str == "test"  # pyright: ignore[reportAttributeAccessIssue]
-    assert schema_instance.optional_int == 42  # pyright: ignore[reportAttributeAccessIssue]
-    assert schema_instance.optional_bool is True  # pyright: ignore[reportAttributeAccessIssue]
-    assert schema_instance.required_float == 3.14  # pyright: ignore[reportAttributeAccessIssue]
+    assert (
+        schema_instance.required_str == "test"
+    )  # pyright: ignore[reportAttributeAccessIssue]
+    assert (
+        schema_instance.optional_int == 42
+    )  # pyright: ignore[reportAttributeAccessIssue]
+    assert (
+        schema_instance.optional_bool is True
+    )  # pyright: ignore[reportAttributeAccessIssue]
+    assert (
+        schema_instance.required_float == 3.14
+    )  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_tool_to_langchain() -> None:
@@ -399,7 +409,10 @@ def test_mixed_annotation_patterns() -> None:
     # Check required_annotated
     assert "required_annotated" in fields
     assert fields["required_annotated"].annotation is str
-    assert fields["required_annotated"].description == "A required parameter with annotation"
+    assert (
+        fields["required_annotated"].description
+        == "A required parameter with annotation"
+    )
 
     # Check required_regular (should get fallback description)
     assert "required_regular" in fields
@@ -452,9 +465,8 @@ def test_get_type_hints_exception_handling() -> None:
         return "test"
 
     sig = inspect.signature(problematic_function)
-    type_hints = {"return": str}
 
-    schema = _create_args_schema(sig, type_hints, "test_func", problematic_function)
+    schema = _create_args_schema(sig, "test_func", problematic_function)
 
     # Should still create a valid schema
     assert issubclass(schema, BaseModel)
@@ -470,9 +482,8 @@ def test_empty_parameter_annotation_fallback() -> None:
         return "test"
 
     sig = inspect.signature(test_func)
-    type_hints = {"return": str}
 
-    schema = _create_args_schema(sig, type_hints, "test_func", test_func)
+    schema = _create_args_schema(sig, "test_func", test_func)
 
     # Should still create a valid schema with Any type
     assert issubclass(schema, BaseModel)
