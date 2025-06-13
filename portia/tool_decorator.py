@@ -16,7 +16,7 @@ from typing import (
 from pydantic import BaseModel, Field, create_model
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Callable
 
     from pydantic.fields import FieldInfo
 
@@ -27,7 +27,7 @@ P = inspect.Parameter
 T = TypeVar("T")
 
 
-def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[T]]:
+def tool(fn: Callable[..., T]) -> type[Tool[T]]:
     """Convert a function into a Tool class.
 
     This decorator automatically creates a Tool subclass from a function by:
@@ -90,7 +90,7 @@ def tool(fn: Callable[..., T] | Callable[..., Awaitable[T]]) -> type[Tool[T]]:
 
         return run
 
-    class FunctionTool(Tool[T]):
+    class FunctionTool(Tool[T]):  # type: ignore[misc]
         """Dynamically created tool from function."""
 
         def __init__(self, **data: Any) -> None:
