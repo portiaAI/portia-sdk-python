@@ -29,7 +29,7 @@ from portia.execution_agents.default_execution_agent import (
     VerifierModel,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, OutputDataValue
 from portia.execution_hooks import ExecutionHooks
 from portia.model import LangChainGenerativeModel
 from portia.plan import ReadOnlyStep, Step, Variable
@@ -892,7 +892,7 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     output = agent.execute_sync()
-    assert isinstance(output, Output)
+    assert isinstance(output, OutputDataValue)
     assert output.get_value() == "Sent email with id: 0"
     mock_after_tool_call.assert_called_once_with(
         agent.tool,
@@ -957,7 +957,7 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
     agent.verified_args = verified_tool_inputs
 
     output = agent.execute_sync()
-    assert isinstance(output, Output)
+    assert isinstance(output, OutputDataValue)
     assert output.get_value() == "Sent email with id: 0"
 
 

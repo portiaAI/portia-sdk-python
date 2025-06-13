@@ -20,7 +20,7 @@ from portia.errors import (
     ToolFailedError,
     ToolRetryError,
 )
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, OutputDataValue
 
 if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
@@ -143,7 +143,7 @@ def process_output(  # noqa: C901
     messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
-) -> Output:
+) -> OutputDataValue:
     """Process the output of the agent.
 
     This function processes the agent's output based on the type of message received.
@@ -155,7 +155,7 @@ def process_output(  # noqa: C901
         clarifications (list[Clarification] | None): A list of clarifications, if any.
 
     Returns:
-        Output: The processed output, which can be an error, tool output, or clarification.
+        OutputDataValue: The processed output, which can be an error, tool output, or clarification.
 
     Raises:
         ToolRetryError: If there was a soft error with the tool and retries are allowed.
@@ -166,7 +166,7 @@ def process_output(  # noqa: C901
     if clarifications and len(clarifications) > 0:
         return LocalDataValue(value=clarifications)
 
-    output_values: list[Output] = []
+    output_values: list[OutputDataValue] = []
     for message in messages:
         if "ToolSoftError" in message.content and tool:
             raise ToolRetryError(tool.id, str(message.content))
@@ -179,7 +179,7 @@ def process_output(  # noqa: C901
             except ValidationError:
                 pass
 
-            if message.artifact and isinstance(message.artifact, Output):
+            if message.artifact and isinstance(message.artifact, OutputDataValue):
                 output_values.append(message.artifact)
             elif message.artifact:
                 output_values.append(LocalDataValue(value=message.artifact))
