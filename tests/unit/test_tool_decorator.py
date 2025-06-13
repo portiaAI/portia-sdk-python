@@ -101,9 +101,7 @@ def test_tool_with_mixed_parameters() -> None:
     """Test tool decorator with both regular and context parameters."""
 
     @tool
-    def personalized_message(
-        message: str, ctx: ToolRunContext, prefix: str = "Message"
-    ) -> str:
+    def personalized_message(message: str, ctx: ToolRunContext, prefix: str = "Message") -> str:
         """Create a personalized message for the current user."""
         return f"{prefix} for {ctx.end_user.external_id}: {message}"
 
@@ -141,7 +139,7 @@ def test_tool_raises_errors() -> None:
     """Test that decorated tools can raise Tool errors."""
 
     @tool
-    def failing_tool(should_fail: bool, error_type: str = "soft") -> str:
+    def failing_tool(should_fail: bool, error_type: str = "soft") -> str:  # noqa: FBT001
         """Fail in different ways."""
         if should_fail:
             if error_type == "hard":
@@ -207,7 +205,7 @@ def test_tool_class_naming() -> None:
 
     @tool
     def my_custom_tool(value: str) -> str:
-        """Custom tool for testing."""
+        """Test custom tool functionality."""
         return value.upper()
 
     tool_instance = my_custom_tool()  # pyright: ignore[reportCallIssue]
@@ -220,8 +218,8 @@ def test_tool_class_naming() -> None:
 def test_tool_validation_missing_return_type() -> None:
     """Test that tools without return type annotations are rejected."""
 
-    def invalid_tool_func(a: int, b: int):  # Actually missing return type
-        """Invalid tool."""
+    def invalid_tool_func(a: int, b: int):  # type: ignore[no-untyped-def]  # noqa: ANN202
+        """Invalid tool function."""
         return a + b
 
     with pytest.raises(ValueError, match="must have a return type annotation"):
@@ -242,7 +240,7 @@ def test_tool_args_schema_generation() -> None:
         required_str: str,
         required_float: float,
         optional_int: int = 42,
-        optional_bool: bool = True,  # noqa: FBT002
+        optional_bool: bool = True,  # noqa: FBT002 FBT001
     ) -> str:
         """Tool with various parameter types."""
         return f"{required_str}-{optional_int}-{optional_bool}-{required_float}"
@@ -263,18 +261,10 @@ def test_tool_args_schema_generation() -> None:
         required_str="test",
         required_float=3.14,
     )
-    assert (
-        schema_instance.required_str == "test"
-    )  # pyright: ignore[reportAttributeAccessIssue]
-    assert (
-        schema_instance.optional_int == 42
-    )  # pyright: ignore[reportAttributeAccessIssue]
-    assert (
-        schema_instance.optional_bool is True
-    )  # pyright: ignore[reportAttributeAccessIssue]
-    assert (
-        schema_instance.required_float == 3.14
-    )  # pyright: ignore[reportAttributeAccessIssue]
+    assert schema_instance.required_str == "test"  # pyright: ignore[reportAttributeAccessIssue]
+    assert schema_instance.optional_int == 42  # pyright: ignore[reportAttributeAccessIssue]
+    assert schema_instance.optional_bool is True  # pyright: ignore[reportAttributeAccessIssue]
+    assert schema_instance.required_float == 3.14  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_tool_to_langchain() -> None:
@@ -282,7 +272,7 @@ def test_tool_to_langchain() -> None:
 
     @tool
     def simple_tool(text: str) -> str:
-        """Simple tool for LangChain testing."""
+        """Convert text to uppercase for LangChain testing."""
         return text.upper()
 
     tool_instance = simple_tool()  # pyright: ignore[reportCallIssue]
@@ -293,7 +283,7 @@ def test_tool_to_langchain() -> None:
 
     # Check properties
     assert lc_tool.name == "Simple_Tool"
-    assert "simple tool for langchain testing" in lc_tool.description.lower()
+    assert "convert text to uppercase for langchain testing" in lc_tool.description.lower()
     assert lc_tool.args_schema == tool_instance.args_schema
 
 
@@ -395,9 +385,9 @@ def test_mixed_annotation_patterns() -> None:
         optional_annotated: Annotated[
             str, Field(description="An optional parameter", min_length=1)
         ] = "default",
-        optional_regular: bool = True,  # noqa: FBT002
+        optional_regular: bool = True,  # noqa: FBT002 FBT001
     ) -> str:
-        """Function with mixed annotation patterns."""
+        """Test function with mixed annotation patterns."""
         return f"{required_annotated}-{required_regular}-{optional_annotated}-{optional_regular}"
 
     tool_instance = mixed_function()  # pyright: ignore[reportCallIssue]
@@ -409,10 +399,7 @@ def test_mixed_annotation_patterns() -> None:
     # Check required_annotated
     assert "required_annotated" in fields
     assert fields["required_annotated"].annotation is str
-    assert (
-        fields["required_annotated"].description
-        == "A required parameter with annotation"
-    )
+    assert fields["required_annotated"].description == "A required parameter with annotation"
 
     # Check required_regular (should get fallback description)
     assert "required_regular" in fields
@@ -460,7 +447,7 @@ def test_get_type_hints_exception_handling() -> None:
 
     # Create a function that will cause get_type_hints to fail
     def problematic_function(
-        param: "NonExistentType",  # pyright: ignore[reportUndefinedVariable]  # noqa: F821
+        param: "NonExistentType",  # pyright: ignore[reportUndefinedVariable]  # noqa: F821 ARG001
     ) -> str:  # Forward reference to non-existent type
         return "test"
 
@@ -478,7 +465,7 @@ def test_empty_parameter_annotation_fallback() -> None:
     import inspect
 
     # Create a function with no type annotation
-    def test_func(param) -> str:  # No annotation
+    def test_func(param) -> str:  # No annotation  # noqa: ANN001 ARG001
         return "test"
 
     sig = inspect.signature(test_func)
@@ -555,7 +542,7 @@ def test_pydantic_v2_constraint_metadata() -> None:
     class MockField:
         description = "test description"
         default = ...
-        metadata: list[MockConstraint] = [
+        metadata: list[MockConstraint] = [  # noqa: RUF012
             MockConstraint(min_length=5),
             MockConstraint(max_length=10),
             MockConstraint(gt=0),
@@ -623,3 +610,33 @@ def test_field_with_custom_default() -> None:
     # Test execution with custom value
     result = tool_instance.run(ctx, name="Alice")
     assert result == "Hello, Alice!"
+
+
+def test_extract_constraints_metadata_none() -> None:
+    """Test _extract_constraints_from_metadata when metadata.metadata returns None."""
+    from portia.tool_decorator import _extract_constraints_from_metadata
+
+    # Create a mock object that has metadata attribute but returns None when accessed
+    class MockMetadata:
+        @property
+        def metadata(self) -> None:
+            return None
+
+    result = _extract_constraints_from_metadata(MockMetadata())
+    assert result == {}
+
+
+def test_create_output_schema_no_name_attribute() -> None:
+    """Test _create_output_schema when return type has no __name__ attribute."""
+    from portia.tool_decorator import _create_output_schema
+
+    # Create a type-like object without __name__ attribute
+    class TypeWithoutName:
+        def __str__(self) -> str:
+            return "CustomType"
+
+    type_hints = {"return": TypeWithoutName()}
+    type_str, description = _create_output_schema(type_hints, "test_function")
+
+    assert type_str == "CustomType"
+    assert description == "Output from test_function function"

@@ -8,17 +8,17 @@ from typing import (
     Annotated,
     Any,
     TypeVar,
+    cast,
     get_args,
     get_origin,
     get_type_hints,
 )
 
 from pydantic import BaseModel, Field, create_model
+from pydantic.fields import FieldInfo
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from pydantic.fields import FieldInfo
 
 from portia.tool import Tool, ToolRunContext
 
@@ -129,9 +129,7 @@ def _snake_to_title_case(snake_str: str) -> str:
     return " ".join(word.capitalize() for word in snake_str.split("_"))
 
 
-def _create_args_schema(
-    sig: inspect.Signature, func_name: str, func: Callable
-) -> type[BaseModel]:
+def _create_args_schema(sig: inspect.Signature, func_name: str, func: Callable) -> type[BaseModel]:
     """Create a Pydantic schema from function parameters."""
     fields = {}
 
@@ -172,11 +170,11 @@ def _create_args_schema(
 
 
 def _extract_type_and_field_info(
-    param_annotation: Any,
+    param_annotation: type | object,
     param: inspect.Parameter,
     param_name: str,
     func_name: str,
-) -> tuple[Any, FieldInfo]:
+) -> tuple[type | object, FieldInfo]:
     """Extract type and field information from parameter annotation.
 
     Supports:
@@ -190,91 +188,141 @@ def _extract_type_and_field_info(
     # Check if annotation is Annotated type
     origin = get_origin(param_annotation)
     if origin is Annotated:
-        args = get_args(param_annotation)
-        if not args:
-            # Malformed Annotated, treat as Any
-            param_type = Any
-            description = _extract_param_description(None, param_name, func_name)
-            field_info = Field(default=default, description=description)
-        else:
-            # First arg is the actual type
-            param_type = args[0]
-
-            # Look for description in metadata
-            description = None
-            field_kwargs = {}
-
-            for metadata in args[1:]:
-                if isinstance(metadata, str):
-                    description = metadata
-                elif hasattr(metadata, "description") and hasattr(metadata, "default"):
-                    description = metadata.description
-                    # Copy specific field validation properties we care about
-                    validation_attrs = [
-                        "gt",
-                        "ge",
-                        "lt",
-                        "le",
-                        "min_length",
-                        "max_length",
-                        "regex",
-                        "allow_inf_nan",
-                    ]
-                    for attr in validation_attrs:
-                        if hasattr(metadata, attr):
-                            value = getattr(metadata, attr)
-                            if value is not None:
-                                field_kwargs[attr] = value
-
-                    # Also check for constraints in metadata (for pydantic v2)
-                    if hasattr(metadata, "metadata"):
-                        for constraint in metadata.metadata:
-                            if hasattr(constraint, "min_length"):
-                                field_kwargs["min_length"] = constraint.min_length
-                            elif hasattr(constraint, "max_length"):
-                                field_kwargs["max_length"] = constraint.max_length
-                            elif hasattr(constraint, "gt"):
-                                field_kwargs["gt"] = constraint.gt
-                            elif hasattr(constraint, "ge"):
-                                field_kwargs["ge"] = constraint.ge
-                            elif hasattr(constraint, "lt"):
-                                field_kwargs["lt"] = constraint.lt
-                            elif hasattr(constraint, "le"):
-                                field_kwargs["le"] = constraint.le
-
-                    # Use Field's default if specified and param has no default
-                    if (
-                        metadata.default is not ...
-                        and param.default == inspect.Parameter.empty
-                    ):
-                        default = metadata.default
-
-            # Use extracted description or fallback
-            if description is None:
-                description = _extract_param_description(None, param_name, func_name)
-
-            field_info = Field(default=default, description=description, **field_kwargs)
-
-        return param_type, field_info
+        return _process_annotated_type(param_annotation, param, param_name, func_name, default)
 
     # Regular type annotation without special metadata
-    param_type = param_annotation
-    description = _extract_param_description(None, param_name, func_name)
-    field_info = Field(default=default, description=description)
+    return _process_regular_type(param_annotation, param_name, func_name, default)
 
+
+def _process_annotated_type(
+    param_annotation: type | object,
+    param: inspect.Parameter,
+    param_name: str,
+    func_name: str,
+    default: object,
+) -> tuple[type | object, FieldInfo]:
+    """Process Annotated type annotations."""
+    args = get_args(param_annotation)
+    if not args:
+        # Malformed Annotated, treat as Any
+        param_type = Any
+        description = _extract_param_description(None, param_name, func_name)
+        field_info = cast(FieldInfo, Field(default=default, description=description))
+        return param_type, field_info
+
+    # First arg is the actual type
+    param_type = args[0]
+
+    # Extract metadata from annotations
+    description, field_kwargs, updated_default = _extract_metadata_from_args(
+        args[1:], param, param_name, func_name, default
+    )
+
+    field_info = cast(
+        FieldInfo, Field(default=updated_default, description=description, **field_kwargs)
+    )
     return param_type, field_info
 
 
-def _create_output_schema(
-    type_hints: dict[str, Any], func_name: str
-) -> tuple[str, str]:
+def _process_regular_type(
+    param_annotation: type | object,
+    param_name: str,
+    func_name: str,
+    default: object,
+) -> tuple[type | object, FieldInfo]:
+    """Process regular type annotations without metadata."""
+    param_type = param_annotation
+    description = _extract_param_description(None, param_name, func_name)
+    field_info = cast(FieldInfo, Field(default=default, description=description))
+    return param_type, field_info
+
+
+def _extract_metadata_from_args(
+    metadata_args: tuple,
+    param: inspect.Parameter,
+    param_name: str,
+    func_name: str,
+    default: object,
+) -> tuple[str, dict, object]:
+    """Extract description, field kwargs, and default from metadata args."""
+    description = None
+    field_kwargs = {}
+    updated_default = default
+
+    for metadata in metadata_args:
+        if isinstance(metadata, str):
+            description = metadata
+        elif hasattr(metadata, "description") and hasattr(metadata, "default"):
+            description = metadata.description
+            field_kwargs.update(_extract_validation_attrs(metadata))
+            field_kwargs.update(_extract_constraints_from_metadata(metadata))
+
+            # Use Field's default if specified and param has no default
+            if metadata.default is not ... and param.default == inspect.Parameter.empty:
+                updated_default = metadata.default
+
+    # Use extracted description or fallback
+    if description is None:
+        description = _extract_param_description(None, param_name, func_name)
+
+    return description, field_kwargs, updated_default
+
+
+def _extract_validation_attrs(metadata: object) -> dict:
+    """Extract validation attributes from metadata."""
+    field_kwargs = {}
+    validation_attrs = [
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "min_length",
+        "max_length",
+        "regex",
+        "allow_inf_nan",
+    ]
+    for attr in validation_attrs:
+        if hasattr(metadata, attr):
+            value = getattr(metadata, attr)
+            if value is not None:
+                field_kwargs[attr] = value
+    return field_kwargs
+
+
+def _extract_constraints_from_metadata(metadata: object) -> dict:
+    """Extract constraints from metadata (for pydantic v2)."""
+    field_kwargs = {}
+    if not hasattr(metadata, "metadata"):
+        return field_kwargs
+
+    constraint_mappings = {
+        "min_length": "min_length",
+        "max_length": "max_length",
+        "gt": "gt",
+        "ge": "ge",
+        "lt": "lt",
+        "le": "le",
+    }
+
+    # Type guard to ensure metadata has the attribute we need
+    metadata_attr = getattr(metadata, "metadata", None)
+    if metadata_attr is None:
+        return field_kwargs
+
+    for constraint in metadata_attr:
+        for attr, kwarg_name in constraint_mappings.items():
+            if hasattr(constraint, attr):
+                field_kwargs[kwarg_name] = getattr(constraint, attr)
+
+    return field_kwargs
+
+
+def _create_output_schema(type_hints: dict[str, type | object], func_name: str) -> tuple[str, str]:
     """Create output schema tuple from return type annotation."""
     return_type = type_hints.get("return", Any)
 
     # Convert type to string representation
-    type_str = (
-        return_type.__name__ if hasattr(return_type, "__name__") else str(return_type)
-    )
+    type_str = return_type.__name__ if hasattr(return_type, "__name__") else str(return_type)  # type: ignore[attr-defined]
 
     # Create description
     description = f"Output from {func_name} function"
