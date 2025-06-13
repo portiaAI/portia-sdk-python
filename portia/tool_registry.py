@@ -363,7 +363,7 @@ class McpToolRegistry(ToolRegistry):
             sse_read_timeout=sse_read_timeout,
             use_oauth=use_oauth,
         )
-        tools = cls._load_tools(config)
+        tools = asyncio.run(cls._load_tools_async(config))
         return cls(tools)
 
     @classmethod

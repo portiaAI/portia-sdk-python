@@ -226,14 +226,33 @@ def authorize_flow(mcp_client_config: SseMcpClientConfig) -> None:
     httpd.serve_forever()
 
 
+def extract_domain_from_url(url: str) -> str:
+    """Extract the domain name from a URL.
+    
+    Args:
+        url: The URL to extract the domain from
+        
+    Returns:
+        The domain name extracted from the URL
+        
+    Examples:
+        >>> extract_domain_from_url("https://example.com/path")
+        'example.com'
+        >>> extract_domain_from_url("http://subdomain.example.com:8080/")
+        'subdomain.example.com'
+    """
+    parsed = urlparse(url)
+    return parsed.netloc.split(':')[0] if ':' in parsed.netloc else parsed.netloc
+
+
 def fetch_oauth_server_metadata(mcp_client_config: SseMcpClientConfig) -> OAuthServerMetadata:
     """
     Fetches the OAuth authorization server metadata from the MCP GitHub OAuth server.
     Returns the JSON response containing server configuration.
     """
-
+    domain = extract_domain_from_url(mcp_client_config.url)
     response = requests.get(
-        f"{mcp_client_config.url}/.well-known/oauth-authorization-server",
+        f"https://{domain}/.well-known/oauth-authorization-server",
     )
     response.raise_for_status()
     return OAuthServerMetadata.model_validate_json(response.content)
