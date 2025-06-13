@@ -3,23 +3,11 @@
 from __future__ import annotations
 
 import inspect
-import sys
-from typing import TYPE_CHECKING, Any, TypeVar, get_origin, get_args, get_type_hints
-
+from typing import Any, TypeVar, get_origin, get_args, get_type_hints
 from pydantic import BaseModel, Field, create_model
-
 from portia.tool import Tool, ToolRunContext
-
-# Import Annotated from appropriate module based on Python version
-if sys.version_info >= (3, 9):
-    from typing import Annotated
-else:
-    from typing_extensions import Annotated
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-else:
-    from collections.abc import Callable
+from typing import Annotated
+from collections.abc import Awaitable, Callable
 
 # Type variables for the decorator
 P = inspect.Parameter

@@ -1,14 +1,21 @@
 """Tests for the tool decorator."""
 
 import os
-from typing import Optional, Annotated
+import sys
+import unittest.mock
+from typing import Optional, Annotated, Any
+from collections.abc import Callable
 
 import pytest
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError, ToolSoftError
 from portia.tool import ToolRunContext
-from portia.tool_decorator import tool
+from portia.tool_decorator import (
+    tool,
+    _create_args_schema,
+    _extract_type_and_field_info,
+)
 from tests.utils import get_test_tool_context
 
 
@@ -444,3 +451,185 @@ def test_mixed_annotation_patterns() -> None:
     ctx = get_test_tool_context()
     result = tool_instance.run(ctx, required_annotated="test", required_regular=42)
     assert result == "test-42-default-True"
+
+
+def test_get_type_hints_exception_handling() -> None:
+    """Test exception handling in _create_args_schema when get_type_hints fails."""
+    import inspect
+    from portia.tool_decorator import _create_args_schema
+
+    # Create a function that will cause get_type_hints to fail
+    def problematic_function(
+        param: "NonExistentType",
+    ) -> str:  # Forward reference to non-existent type
+        return "test"
+
+    sig = inspect.signature(problematic_function)
+    type_hints = {"return": str}
+
+    schema = _create_args_schema(sig, type_hints, "test_func", problematic_function)
+
+    # Should still create a valid schema
+    assert issubclass(schema, BaseModel)
+    assert "param" in schema.model_fields
+
+
+def test_empty_parameter_annotation_fallback() -> None:
+    """Test fallback when parameter annotation is empty."""
+    import inspect
+    from portia.tool_decorator import _create_args_schema
+
+    # Create a function with no type annotation
+    def test_func(param):  # No annotation
+        return "test"
+
+    sig = inspect.signature(test_func)
+    type_hints = {"return": str}
+
+    schema = _create_args_schema(sig, type_hints, "test_func", test_func)
+
+    # Should still create a valid schema with Any type
+    assert issubclass(schema, BaseModel)
+    assert "param" in schema.model_fields
+
+    # The parameter should have type Any (since it had no annotation)
+    param_field = schema.model_fields["param"]
+    assert param_field.annotation == Any
+
+
+def test_malformed_annotated_type() -> None:
+    """Test handling of malformed Annotated types."""
+    import inspect
+    from typing import get_origin, get_args
+    from portia.tool_decorator import _extract_type_and_field_info
+
+    # Create a mock malformed Annotated type (has origin but no args)
+    class MockAnnotated:
+        pass
+
+    # Mock get_origin and get_args to simulate malformed Annotated
+    with unittest.mock.patch(
+        "portia.tool_decorator.get_origin", return_value=Annotated
+    ):
+        with unittest.mock.patch("portia.tool_decorator.get_args", return_value=[]):
+            param = inspect.Parameter(
+                "test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD
+            )
+
+            param_type, field_info = _extract_type_and_field_info(
+                MockAnnotated, param, "test_param", "test_func"
+            )
+
+            assert param_type == Any
+            assert "Parameter test_param for test_func" in field_info.description
+
+
+def test_validation_attribute_none_values() -> None:
+    """Test validation attribute handling when values are None."""
+    import inspect
+    from pydantic import Field
+    from portia.tool_decorator import _extract_type_and_field_info
+
+    class MockField:
+        description = "test description"
+        default = ...
+        gt = None  # This should not be included
+        ge = 5  # This should be included
+        min_length = None  # This should not be included
+        max_length = 10  # This should be included
+
+    annotated_type = Annotated[str, MockField()]
+    param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
+
+    param_type, field_info = _extract_type_and_field_info(
+        annotated_type, param, "test_param", "test_func"
+    )
+
+    # Check that None values were filtered out and non-None values were included
+    assert param_type == str
+    assert field_info.description == "test description"
+
+
+def test_pydantic_v2_constraint_metadata() -> None:
+    """Test pydantic v2 constraint metadata handling."""
+    import inspect
+    from pydantic import Field
+    from portia.tool_decorator import _extract_type_and_field_info
+
+    # Create a mock Field with metadata attribute containing constraints
+    class MockConstraint:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    class MockField:
+        description = "test description"
+        default = ...
+        metadata = [
+            MockConstraint(min_length=5),
+            MockConstraint(max_length=10),
+            MockConstraint(gt=0),
+            MockConstraint(ge=1),
+            MockConstraint(lt=100),
+            MockConstraint(le=99),
+        ]
+
+    annotated_type = Annotated[str, MockField()]
+    param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
+
+    param_type, field_info = _extract_type_and_field_info(
+        annotated_type, param, "test_param", "test_func"
+    )
+
+    assert param_type == str
+    assert field_info.description == "test description"
+
+
+def test_description_fallback_in_annotated() -> None:
+    """Test description fallback when no description is found in Annotated metadata."""
+    import inspect
+    from portia.tool_decorator import _extract_type_and_field_info
+
+    # Create an Annotated type with metadata that doesn't contain description
+    class MockMetadata:
+        pass
+
+    annotated_type = Annotated[str, MockMetadata()]
+    param = inspect.Parameter("test_param", inspect.Parameter.POSITIONAL_OR_KEYWORD)
+
+    param_type, field_info = _extract_type_and_field_info(
+        annotated_type, param, "test_param", "test_func"
+    )
+
+    assert param_type == str
+    assert "Parameter test_param for test_func" in field_info.description
+
+
+def test_field_with_custom_default() -> None:
+    """Test Field with custom default value handling."""
+
+    @tool
+    def tool_with_field_default(
+        name: Annotated[
+            str, Field(default="default_name", description="Name parameter")
+        ] = "default_name",
+    ) -> str:
+        """Tool with Field default."""
+        return f"Hello, {name}!"
+
+    tool_instance = tool_with_field_default()
+
+    # Check the args schema
+    schema = tool_instance.args_schema
+    name_field = schema.model_fields["name"]
+    assert name_field.default == "default_name"
+    assert name_field.description == "Name parameter"
+
+    # Test execution with default
+    ctx = get_test_tool_context()
+    result = tool_instance.run(ctx)
+    assert result == "Hello, default_name!"
+
+    # Test execution with custom value
+    result = tool_instance.run(ctx, name="Alice")
+    assert result == "Hello, Alice!"
