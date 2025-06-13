@@ -35,6 +35,8 @@ dependencies = [
     "testcontainers[redis]>=4.10.0",
     "pytest-repeat>=0.9.4",
     "instructor>=1.8.3",
+    "authlib>=1.6.0",
+    "keyring>=25.6.0",
 ]
 
 [project.optional-dependencies]
