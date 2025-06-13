@@ -16,10 +16,11 @@ while relying on common functionality provided by the base class.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from abc import abstractmethod
 from functools import partial
-from typing import Any, Generic, Self
+from typing import Any, Generic, Self, get_type_hints
 
 import httpx
 from jsonref import replace_refs
@@ -318,6 +319,43 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description_length = len(self._generate_tool_description())
         if description_length > MAX_TOOL_DESCRIPTION_LENGTH:
             raise InvalidToolDescriptionError(self.id)
+        return self
+
+    @model_validator(mode="after")
+    def check_run_method_signature(self) -> Self:
+        """Ensure the run method signature matches the args_schema."""
+        sig = inspect.signature(self.__class__.run)
+        params = list(sig.parameters.values())
+
+        if params and params[0].name == "self":
+            params = params[1:]
+        if not params:
+            return self
+
+        ctx_param = params[0]
+        if ctx_param.annotation not in (
+            ToolRunContext,
+            inspect.Signature.empty,
+        ):
+            raise ValueError("First argument of run must be annotated as ToolRunContext")
+
+        param_map = {
+            p.name: p.annotation
+            for p in params[1:]
+            if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+        }
+
+        schema_types = get_type_hints(self.args_schema)
+        if set(param_map) != set(schema_types):
+            raise ValueError("Run method arguments must match args_schema fields")
+
+        for name, expected in schema_types.items():
+            actual = param_map.get(name, inspect.Signature.empty)
+            if actual is inspect.Signature.empty or actual != expected:
+                raise ValueError(
+                    f"Run method argument '{name}' type {actual} does not match expected {expected}"
+                )
+
         return self
 
     def to_langchain(self, ctx: ToolRunContext) -> StructuredTool:
