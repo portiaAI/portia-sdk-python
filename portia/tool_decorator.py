@@ -206,7 +206,7 @@ def _process_annotated_type(
         # Malformed Annotated, treat as Any
         param_type = Any
         description = _form_param_description(param_name, func_name)
-        field_info = cast(FieldInfo, Field(default=default, description=description))
+        field_info = cast("FieldInfo", Field(default=default, description=description))
         return param_type, field_info
 
     # First arg is the actual type
@@ -218,9 +218,9 @@ def _process_annotated_type(
     field_info: FieldInfo
     match annotation_metadata:
         case str():
-            field_info = cast(FieldInfo, Field(default=default, description=annotation_metadata))
+            field_info = cast("FieldInfo", Field(default=default, description=annotation_metadata))
         case FieldInfo():
-            field_info = cast(FieldInfo, annotation_metadata)
+            field_info = cast("FieldInfo", annotation_metadata)
             field_info.default = default
         case _:
             raise ValueError(f"Unsupported annotation metadata: {annotation_metadata}")
@@ -236,7 +236,7 @@ def _process_regular_type(
     """Process regular type annotations without metadata."""
     param_type = param_annotation
     description = _form_param_description(param_name, func_name)
-    field_info = cast(FieldInfo, Field(default=default, description=description))
+    field_info = cast("FieldInfo", Field(default=default, description=description))
     return param_type, field_info
 
 
