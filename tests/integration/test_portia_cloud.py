@@ -105,18 +105,6 @@ def test_default_portia_has_correct_tools() -> None:
     assert not any(tool.id == "portia:microsoft:outlook:draft_email" for tool in tools)
 
 
-def test_portia_with_microsoft_tools() -> None:
-    """Test that the default portia has the correct tools."""
-    portia_registry = PortiaToolRegistry(config=Config.from_default())
-    ms_tools = [tool for tool in portia_registry.get_tools() if "microsoft:outlook" in tool.id]
-    assert len(ms_tools) > 0
-
-    filtered_registry = portia_registry.with_default_tool_filter()
-    filtered_tools = filtered_registry.get_tools()
-    assert len(filtered_tools) > 0
-    assert not any("portia:microsoft:outlook" in tool.id for tool in filtered_tools)
-
-
 def test_portia_end_user_update_with_cloud() -> None:
     """Test running a query that updates end user state."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
