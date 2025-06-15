@@ -166,7 +166,33 @@ class AgentMemoryValue(BaseOutput):
         return self.summary
 
 
-Output = LocalDataValue | AgentMemoryValue
+OutputDataValue = LocalDataValue | AgentMemoryValue
+
+
+class Output(BaseModel):
+    """Wrapper for an output value produced by a plan step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    step: int
+    value: OutputDataValue
+
+    def get_value(self) -> Serializable | None:
+        """Return the value of the output."""
+        return self.value.get_value()
+
+    def serialize_value(self) -> str:
+        """Serialize the value to a string."""
+        return self.value.serialize_value()
+
+    def full_value(self, agent_memory: AgentMemory) -> Serializable | None:
+        """Get the full value from memory if needed."""
+        return self.value.full_value(agent_memory)
+
+    def get_summary(self) -> str | None:
+        """Return the summary of the output value."""
+        return self.value.get_summary()
 
 
 @deprecated(

@@ -43,6 +43,7 @@ from portia.execution_agents.output import (
     AgentMemoryValue,
     LocalDataValue,
     Output,
+    OutputDataValue,
 )
 from portia.logger import logger
 from portia.plan import Plan, PlanUUID
@@ -482,17 +483,21 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             logger().warning(
                 f"Storing Output {output} with no summary",
             )
-        if not isinstance(output, LocalDataValue):
+        if not isinstance(output.value, LocalDataValue):
             logger().warning(
                 f"Storing output that is already in agent memory: {output}",
             )
             return output
 
-        self.outputs[plan_run_id][output_name] = output
-        return AgentMemoryValue(
-            output_name=output_name,
-            plan_run_id=plan_run_id,
-            summary=output.get_summary() or "",
+        self.outputs[plan_run_id][output_name] = output.value
+        return Output(
+            name=output_name,
+            step=output.step,
+            value=AgentMemoryValue(
+                output_name=output_name,
+                plan_run_id=plan_run_id,
+                summary=output.get_summary() or "",
+            ),
         )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
@@ -718,11 +723,15 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         """
         _check_size(output_name, output)
         filename = f"{plan_run_id}/{output_name}.json"
-        self._write(filename, output)
-        return AgentMemoryValue(
-            output_name=output_name,
-            plan_run_id=plan_run_id,
-            summary=output.get_summary() or "",
+        self._write(filename, output.value)
+        return Output(
+            name=output_name,
+            step=output.step,
+            value=AgentMemoryValue(
+                output_name=output_name,
+                plan_run_id=plan_run_id,
+                summary=output.get_summary() or "",
+            ),
         )
 
     def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
@@ -1138,15 +1147,19 @@ class PortiaCloudStorage(Storage, AgentMemory):
             self.check_response(response)
 
             # Save to local cache
-            if isinstance(output, LocalDataValue):
+            if isinstance(output.value, LocalDataValue):
                 cache_file_path = f"{plan_run_id}/{output_name}.json"
-                self._write_to_cache(cache_file_path, output)
+                self._write_to_cache(cache_file_path, output.value)
                 logger().debug(f"Saved output to local cache: {cache_file_path}")
 
-            return AgentMemoryValue(
-                output_name=output_name,
-                plan_run_id=plan_run_id,
-                summary=output.get_summary() or "",
+            return Output(
+                name=output_name,
+                step=output.step,
+                value=AgentMemoryValue(
+                    output_name=output_name,
+                    plan_run_id=plan_run_id,
+                    summary=output.get_summary() or "",
+                ),
             )
         except Exception as e:
             raise StorageError(e) from e
