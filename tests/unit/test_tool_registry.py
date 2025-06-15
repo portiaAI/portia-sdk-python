@@ -231,6 +231,53 @@ def test_portia_tool_registry_missing_required_args() -> None:
         PortiaToolRegistry()
 
 
+def test_tool_registry_with_tool_description() -> None:
+    """Test updating a tool registry with a new tool description."""
+    mock_tool_1 = MockTool(id=MOCK_TOOL_ID, description="mock tool 1")
+    mock_tool_2 = MockTool(id=OTHER_MOCK_TOOL_ID, description="mock tool 2")
+    tool_registry = ToolRegistry([mock_tool_1, mock_tool_2])
+
+    tool_registry.with_tool_description(MOCK_TOOL_ID, "A bit more description")
+
+    assert len(tool_registry.get_tools()) == 2
+    assert tool_registry.get_tool(MOCK_TOOL_ID).description == "mock tool 1. A bit more description"
+    assert tool_registry.get_tool(OTHER_MOCK_TOOL_ID).description == "mock tool 2"
+
+    # The updated tool description should not have affected the original tool
+    assert mock_tool_1.description == "mock tool 1"
+
+
+def test_tool_registry_with_tool_description_overwrite() -> None:
+    """Test updating a tool registry with a new tool description."""
+    mock_tool_1 = MockTool(id=MOCK_TOOL_ID, description="mock tool 1")
+    tool_registry = ToolRegistry(
+        [mock_tool_1, MockTool(id=OTHER_MOCK_TOOL_ID, description="mock tool 2")]
+    )
+
+    tool_registry.with_tool_description(MOCK_TOOL_ID, "A bit more description", overwrite=True)
+
+    assert len(tool_registry.get_tools()) == 2
+    assert tool_registry.get_tool(MOCK_TOOL_ID).description == "A bit more description"
+    assert tool_registry.get_tool(OTHER_MOCK_TOOL_ID).description == "mock tool 2"
+
+    # The updated tool description should not have affected the original tool
+    assert mock_tool_1.description == "mock tool 1"
+
+
+def test_tool_registry_with_tool_description_tool_id_not_found(mocker: MockerFixture) -> None:
+    """Test updating a tool registry with a description for a tool that wasn't found."""
+    mock_logger = mocker.Mock()
+    mocker.patch("portia.tool_registry.logger", return_value=mock_logger)
+
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
+    tool_registry.with_tool_description("unknown_id", "very descriptive")
+
+    mock_logger.warning.assert_called_once_with(
+        "Unknown tool ID: unknown_id. Description was not edited."
+    )
+    assert len(tool_registry.get_tools()) == 1
+
+
 def test_tool_registry_reconfigure_llm_tool() -> None:
     """Test replacing the LLMTool with a new LLMTool."""
     registry = ToolRegistry(open_source_tool_registry.get_tools())
