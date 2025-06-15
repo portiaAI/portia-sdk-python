@@ -626,6 +626,11 @@ class GeneratedBaseModel(BaseModel):
 
     _fields_must_omit_none_on_serialize: ClassVar[list[str]] = []
 
+    def __init_subclass__(cls) -> None:
+        """Ensure omissible fields are isolated between models."""
+        super().__init_subclass__()
+        cls._fields_must_omit_none_on_serialize = []
+
     @model_serializer(mode="wrap")
     def serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
         """Serialize the model to a dictionary, excluding fields for which we must omit None."""
