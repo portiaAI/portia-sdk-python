@@ -75,15 +75,17 @@ class ToolRegistry:
         with_tool(tool: Tool, *, overwrite: bool = False) -> None:
             Inserts a new tool.
         replace_tool(tool: Tool) -> None:
-            Replaces a tool with a new tool.
+            Replaces a tool with a new tool in the current registry.
             NB. This is a shortcut for `with_tool(tool, overwrite=True)`.
         get_tool(tool_id: str) -> Tool:
             Retrieves a tool by its ID.
         get_tools() -> list[Tool]:
             Retrieves all tools in the registry.
         match_tools(query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
-            Optionally, retrieve tools that match a given query and tool_ids. Useful to implement
-            tool filtering.
+            Optionally, retrieve tools that match a given query and tool_ids.
+        filter_tools(predicate: Callable[[Tool], bool]) -> ToolRegistry:
+            Create a new tool registry with only the tools that match the predicate. Useful to
+            implement tool exclusions.
 
     """
 
@@ -191,6 +193,40 @@ class ToolRegistry:
 
         """
         return ToolRegistry({tool.id: tool for tool in self._tools.values() if predicate(tool)})
+
+    def with_tool_description(
+        self, tool_id: str, updated_description: str, *, overwrite: bool = False
+    ) -> None:
+        """Update a tool with an extension or override of the tool description.
+
+        Args:
+            tool_id (str): The id of the tool to update.
+            updated_description (str): The tool description to update. If `overwrite` is False, this
+                will extend the existing tool description, otherwise, the entire tool description
+                will be updated.
+            overwrite (bool): Whether to update or extend the existing tool description.
+
+        Returns:
+            None: The tool registry is updated in place.
+
+        Particularly useful for customising tools in MCP servers for usecases. A deep copy is made
+        of the underlying tool such that the tool description is only updated within this registry.
+        Logs a warning if the tool is not found.
+
+        """
+        try:
+            tool = self.get_tool(tool_id=tool_id)
+            new_tool = tool.__deepcopy__()
+            new_description = (
+                updated_description
+                if overwrite
+                else f"{new_tool.description}. {updated_description}"
+            )
+            new_tool.description = new_description
+
+            self.replace_tool(new_tool)
+        except ToolNotFoundError:
+            logger().warning(f"Unknown tool ID: {tool_id}. Description was not edited.")
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
