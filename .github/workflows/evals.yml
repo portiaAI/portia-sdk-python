@@ -62,7 +62,7 @@ jobs:
         run: |
           uv add "portia-sdk-python[all] @ file://../../portia-sdk-python"
 
-      - name: eval query planner
+      - name: Eval query planner
         id: eval_query_planner
         working-directory: ./platform/evals
         env:
@@ -85,7 +85,7 @@ jobs:
             echo "has_failing_eval_planner_scores=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: eval agent (execution)
+      - name: Eval agent (execution)
         id: eval_agent_execution
         working-directory: ./platform/evals
         env:
@@ -110,7 +110,7 @@ jobs:
             echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: eval agent (introspection)
+      - name: Eval agent (introspection)
         id: eval_agent_introspection
         working-directory: ./platform/evals
         env:
