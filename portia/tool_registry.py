@@ -196,7 +196,7 @@ class ToolRegistry:
 
     def with_tool_description(
         self, tool_id: str, updated_description: str, *, overwrite: bool = False
-    ) -> None:
+    ) -> ToolRegistry:
         """Update a tool with an extension or override of the tool description.
 
         Args:
@@ -207,7 +207,7 @@ class ToolRegistry:
             overwrite (bool): Whether to update or extend the existing tool description.
 
         Returns:
-            None: The tool registry is updated in place.
+            Self: The tool registry is updated in place and returned.
 
         Particularly useful for customising tools in MCP servers for usecases. A deep copy is made
         of the underlying tool such that the tool description is only updated within this registry.
@@ -216,17 +216,13 @@ class ToolRegistry:
         """
         try:
             tool = self.get_tool(tool_id=tool_id)
-            new_tool = tool.__deepcopy__()
             new_description = (
-                updated_description
-                if overwrite
-                else f"{new_tool.description}. {updated_description}"
+                updated_description if overwrite else f"{tool.description}. {updated_description}"
             )
-            new_tool.description = new_description
-
-            self.replace_tool(new_tool)
+            self.replace_tool(tool.model_copy(update={"description": new_description}, deep=True))
         except ToolNotFoundError:
             logger().warning(f"Unknown tool ID: {tool_id}. Description was not edited.")
+        return self
 
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
