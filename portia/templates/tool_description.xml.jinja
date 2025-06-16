@@ -1,8 +1,8 @@
 ---
-{{tool.overview_description}}
+{{tool.overview_description | safe}}
+
 Args:{% for arg in tool.args %}
-    {{arg.name}} ({{arg.type}}) {% if arg.examples %}Sample inputs: {{arg.examples}}{% endif %} {% if arg.enum %}Enum: {{arg.enum}}{% endif %} {% if arg.default %}Default Value: {{arg.default}}{% endif %}
-{% endfor %}
+- {{arg.name}} ({{arg.type}}) {% if arg.examples %}Sample inputs: {{arg.examples}}{% endif %} {% if arg.enum %}Enum: {{arg.enum}}{% endif %} {% if arg.default %}Default Value: {{arg.default}}{% endif %}{% endfor %}
+
 Returns: {% if tool.output_description %}{{tool.output_description}}{% endif %}
-"""
 ---
