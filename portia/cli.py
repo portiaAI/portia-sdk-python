@@ -225,7 +225,7 @@ def list_tools(
     cli_config, config = _get_config(**kwargs)
 
     for tool in DefaultToolRegistry(config).get_tools():
-        click.echo(tool.model_dump_json(indent=4))
+        click.echo(tool.pretty() + "\n")
 
 
 def _get_config(
