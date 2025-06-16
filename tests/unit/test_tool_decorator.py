@@ -7,7 +7,7 @@ from typing import Annotated, Any
 import pytest
 from pydantic import BaseModel, Field
 
-from portia.errors import ToolHardError, ToolSoftError
+from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.tool import ToolRunContext
 from portia.tool_decorator import (
     _create_args_schema,
@@ -544,3 +544,16 @@ def test_tool_with_invalid_annotation_metadata() -> None:
         ) -> str:
             """Tool with invalid annotation metadata."""
             return f"Hello, {name}!"
+
+
+def test_tool_description_length_validation() -> None:
+    """Test that tool descriptions exceeding MAX_TOOL_DESCRIPTION_LENGTH raise error."""
+
+    def tool_with_long_description() -> str:
+        return "result"
+    tool_with_long_description.__doc__ = "x" * 4097
+    tool_class = tool(tool_with_long_description)
+
+    # The error should be raised when we instantiate the tool
+    with pytest.raises(InvalidToolDescriptionError):
+        tool_class() # pyright: ignore[reportCallIssue]
