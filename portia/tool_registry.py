@@ -519,18 +519,24 @@ class McpToolRegistry(ToolRegistry):
                 The result returned by the coroutine.
 
             """
-            result_container: dict[str, T] = {}
+            result_container: dict[str, T | Exception] = {}
 
             def runner() -> None:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                result_container["result"] = loop.run_until_complete(coro)
-                loop.close()
+                try:
+                    result_container["result"] = loop.run_until_complete(coro)
+                except Exception as e:  # noqa: BLE001
+                    result_container["error"] = e
+                finally:
+                    loop.close()
 
             thread = threading.Thread(target=runner)
             thread.start()
             thread.join()
-            return result_container["result"]
+            if isinstance(result_container.get("error"), Exception):
+                raise result_container["error"]  # type: ignore  # noqa: PGH003
+            return result_container["result"]  # type: ignore  # noqa: PGH003
 
         try:
             loop = asyncio.get_event_loop()
