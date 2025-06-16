@@ -296,12 +296,7 @@ class PortiaToolRegistry(ToolRegistry):
     This class interacts with the Portia API to retrieve and manage tools.
     """
 
-    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
-        {
-            # Exclude Outlook by default as it clashes with Gmail
-            "portia:microsoft:outlook:*",
-        },
-    )
+    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset()
 
     def __init__(
         self,
