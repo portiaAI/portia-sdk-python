@@ -626,3 +626,22 @@ async def test_mcp_tool_registry_from_streamable_http_connection_async() -> None
         url="http://localhost:8000/mcp",
     )
     assert isinstance(mcp_registry_streamable_http, McpToolRegistry)
+
+
+def test_mcp_tool_registry_load_tools_error_in_async() -> None:
+    """Test that an error in the async _load_tools method is raised."""
+
+    class CustomError(Exception):
+        """Custom exception for testing."""
+
+    with (
+        patch.object(
+            McpToolRegistry, "_load_tools_async", side_effect=CustomError("test message 123")
+        ),
+        pytest.raises(CustomError, match="test message 123"),
+    ):
+        McpToolRegistry.from_stdio_connection(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        )
