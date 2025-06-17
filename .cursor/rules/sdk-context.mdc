@@ -3,7 +3,7 @@ description:
 globs: 
 alwaysApply: true
 ---
-This is the portia-sdk-python, a python package for managing agentic LLM workflows, with access to planning and execution of workflows. This includes tool calling with in built tools, and ability to create your own via classes and decorators, including support for MCP tools. The project uses uv to manage python version and dependencies. Here are some common commands for uv, and should be preferenced over pip or calling python directly.
+This is the portia-sdk-python repository, a python package for managing agentic LLM workflows, with access to planning and execution of workflows. This includes tool calling with in built tools, and ability to create your own via classes and decorators, including support for MCP tools. The project uses uv to manage python version and dependencies. Here are some common commands for uv, and should be preferenced over pip or calling python directly.
 - `uv sync`: updates python packages in lock file
 - `uv run <command>`: runs a command, like `python`, `pytest`
 - `uv add <package>`: adds a package to the pyproject.toml, lock file and also installs it to the virtual environment
