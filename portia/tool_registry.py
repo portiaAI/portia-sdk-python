@@ -339,11 +339,11 @@ class PortiaToolRegistry(ToolRegistry):
     def _load_tools(cls, client: httpx.Client) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
         response = client.get(
-            url="/api/v0/tools/descriptions/",
+            url="/api/v0/tools/descriptions-v2/",
         )
         response.raise_for_status()
         tools = {}
-        for raw_tool in response.json():
+        for raw_tool in response.json().get("tools", []):
             tool = PortiaRemoteTool(
                 id=raw_tool["tool_id"],
                 name=raw_tool["tool_name"],
@@ -361,6 +361,10 @@ class PortiaToolRegistry(ToolRegistry):
                 client=client,
             )
             tools[raw_tool["tool_id"]] = tool
+        for error in response.json().get("errors", []):
+            logger().warning(
+                f"Error loading Portia Cloud tool for app: {error['app_name']}: {error['error']}"
+            )
         return tools
 
 
