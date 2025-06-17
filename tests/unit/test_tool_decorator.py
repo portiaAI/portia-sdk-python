@@ -538,6 +538,7 @@ def test_field_with_custom_default() -> None:
 def test_tool_with_invalid_annotation_metadata() -> None:
     """Test that invalid annotation metadata raises an error."""
     with pytest.raises(ValueError, match="Unsupported annotation metadata: 123"):
+
         @tool
         def tool_with_invalid_annotation_metadata(
             name: Annotated[str, 123],
@@ -551,9 +552,10 @@ def test_tool_description_length_validation() -> None:
 
     def tool_with_long_description() -> str:
         return "result"
+
     tool_with_long_description.__doc__ = "x" * 4097
     tool_class = tool(tool_with_long_description)
 
     # The error should be raised when we instantiate the tool
     with pytest.raises(InvalidToolDescriptionError):
-        tool_class() # pyright: ignore[reportCallIssue]
+        tool_class()  # pyright: ignore[reportCallIssue]

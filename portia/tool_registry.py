@@ -31,6 +31,7 @@ from typing import (
     get_origin,
 )
 
+import httpx
 from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model, model_serializer
 from pydantic_core import PydanticUndefined
@@ -57,7 +58,6 @@ from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Sequence
 
-    import httpx
     import mcp
     from pydantic_core.core_schema import SerializerFunctionWrapHandler
 
@@ -339,11 +339,23 @@ class PortiaToolRegistry(ToolRegistry):
     def _load_tools(cls, client: httpx.Client) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
         response = client.get(
-            url="/api/v0/tools/descriptions/",
+            url="/api/v0/tools/descriptions-v2/",
         )
-        response.raise_for_status()
+        if response.status_code == httpx.codes.NOT_FOUND:
+            response = client.get(
+                url="/api/v0/tools/descriptions/",
+            )
+            response_tools = response.json()
+        else:
+            response.raise_for_status()
+            response_tools = response.json().get("tools", [])
+            for error in response.json().get("errors", []):
+                logger().warning(
+                    f"Error loading Portia Cloud tool for app: {error['app_name']}: "
+                    f"{error['error']}"
+                )
         tools = {}
-        for raw_tool in response.json():
+        for raw_tool in response_tools:
             tool = PortiaRemoteTool(
                 id=raw_tool["tool_id"],
                 name=raw_tool["tool_name"],

@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import mcp
 import pytest
+from httpx import HTTPStatusError
 from mcp import ClientSession
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
@@ -15,6 +17,7 @@ from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.model import GenerativeModel
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import open_source_tool_registry
+from portia.tool import PortiaRemoteTool
 from portia.tool_registry import (
     InMemoryToolRegistry,
     McpToolRegistry,
@@ -27,6 +30,7 @@ from tests.utils import MockMcpSessionWrapper, MockTool, get_test_tool_context
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pytest_httpx import HTTPXMock
     from pytest_mock import MockerFixture
 
 
@@ -229,6 +233,206 @@ def test_portia_tool_registry_missing_required_args() -> None:
     """Test that PortiaToolRegistry raises an error if required args are missing."""
     with pytest.raises(ValueError, match="Either config, client or tools must be provided"):
         PortiaToolRegistry()
+
+
+def test_portia_tool_registry_load_tools(httpx_mock: HTTPXMock) -> None:
+    """Test the _load_tools class method with HTTPXMock."""
+    # Create mock response data that matches the expected API format
+    mock_response_data = {
+        "tools": [
+            {
+                "tool_id": "test_tool_1",
+                "tool_name": "Test Tool 1",
+                "should_summarize": True,
+                "description": {
+                    "overview_description": "This is a test tool for unit testing",
+                    "overview": "Tool overview",
+                    "output_description": "Returns test data",
+                },
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "input_param": {"type": "string", "description": "Test input parameter"}
+                    },
+                    "required": ["input_param"],
+                },
+            },
+            {
+                "tool_id": "test_tool_2",
+                "tool_name": "Test Tool 2",
+                "should_summarize": False,
+                "description": {
+                    "overview_description": "This is another test tool",
+                    "overview": "Another overview",
+                    "output_description": "Returns different test data",
+                },
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "number_param": {"type": "integer", "description": "Test number parameter"}
+                    },
+                    "required": [],
+                },
+            },
+        ],
+        "errors": [{"app_name": "failing_app", "error": "Some error occurred"}],
+    }
+
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        json=mock_response_data,
+        status_code=200,
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test the PortiaToolRegistry initialization with the client
+    tools = PortiaToolRegistry(client=client)
+
+    # Verify the tools were created correctly
+    assert len(tools.get_tools()) == 2
+
+    # Check first tool
+    tool1 = tools.get_tool("test_tool_1")
+    assert isinstance(tool1, PortiaRemoteTool)
+    assert tool1.id == "test_tool_1"
+    assert tool1.name == "Test Tool 1"
+    assert tool1.should_summarize is True
+    assert tool1.description == "This is a test tool for unit testing"
+    assert tool1.output_schema == ("Tool overview", "Returns test data")
+
+    # Check second tool
+    tool2 = tools.get_tool("test_tool_2")
+    assert isinstance(tool2, PortiaRemoteTool)
+    assert tool2.id == "test_tool_2"
+    assert tool2.name == "Test Tool 2"
+    assert tool2.should_summarize is False
+    assert tool2.description == "This is another test tool"
+    assert tool2.output_schema == ("Another overview", "Returns different test data")
+
+
+def test_portia_tool_registry_load_tools_fallback_v1(httpx_mock: HTTPXMock) -> None:
+    """Test PortiaToolRegistry fallback to describe-tools v1 API on 404 of v2 API."""
+    mock_response_data = [
+        {
+            "tool_id": "test_tool_1",
+            "tool_name": "Test Tool 1",
+            "should_summarize": True,
+            "description": {
+                "overview_description": "This is a test tool for unit testing",
+                "overview": "Tool overview",
+                "output_description": "Returns test data",
+            },
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "input_param": {"type": "string", "description": "Test input parameter"}
+                },
+                "required": ["input_param"],
+            },
+        },
+        {
+            "tool_id": "test_tool_2",
+            "tool_name": "Test Tool 2",
+            "should_summarize": False,
+            "description": {
+                "overview_description": "This is another test tool",
+                "overview": "Another overview",
+                "output_description": "Returns different test data",
+            },
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "number_param": {"type": "integer", "description": "Test number parameter"}
+                },
+                "required": [],
+            },
+        },
+    ]
+
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        status_code=404,
+    )
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions/",
+        json=mock_response_data,
+        status_code=200,
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test the PortiaToolRegistry initialization with the client
+    tools = PortiaToolRegistry(client=client)
+
+    # Verify the tools were created correctly
+    assert len(tools.get_tools()) == 2
+
+
+def test_portia_tool_registry_load_tools_with_logger_warning(
+    httpx_mock: HTTPXMock, mocker: MockerFixture
+) -> None:
+    """Test the _load_tools method logs warnings for errors in the response."""
+    # Mock the logger
+    mock_logger = mocker.Mock()
+    mocker.patch("portia.tool_registry.logger", return_value=mock_logger)
+
+    # Create mock response data with errors
+    mock_response_data = {
+        "tools": [],
+        "errors": [
+            {"app_name": "failing_app_1", "error": "Connection timeout"},
+            {"app_name": "failing_app_2", "error": "Authentication failed"},
+        ],
+    }
+
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        json=mock_response_data,
+        status_code=200,
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test the PortiaToolRegistry initialization with the client
+    tools = PortiaToolRegistry(client=client)
+
+    # Verify no tools were created
+    assert len(tools.get_tools()) == 0
+
+    # Verify warnings were logged for each error
+    expected_calls = [
+        mocker.call("Error loading Portia Cloud tool for app: failing_app_1: Connection timeout"),
+        mocker.call(
+            "Error loading Portia Cloud tool for app: failing_app_2: Authentication failed"
+        ),
+    ]
+    mock_logger.warning.assert_has_calls(expected_calls)
+
+
+def test_portia_tool_registry_load_tools_http_error(httpx_mock: HTTPXMock) -> None:
+    """Test that PortiaToolRegistry handles HTTP errors properly."""
+    # Mock an HTTP error response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        status_code=401,
+        text="Unauthorized",
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test that HTTP errors are raised
+    with pytest.raises(HTTPStatusError) as exc_info:
+        PortiaToolRegistry(client=client)
+
+    assert exc_info.value.response.status_code == 401
 
 
 def test_tool_registry_with_tool_description() -> None:
