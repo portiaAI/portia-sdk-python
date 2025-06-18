@@ -50,7 +50,7 @@ from portia.config import Config
 from portia.end_user import EndUser
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.execution_utils import is_clarification
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, OutputDataValue
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
 from portia.plan import Plan
@@ -185,7 +185,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> Output:
+    ) -> OutputDataValue:
         """Invoke the Tool.run function and handle converting the result into an Output object.
 
         This is the entry point for agents to invoke a tool.
@@ -234,7 +234,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         ctx: ToolRunContext,
         *args: Any,
         **kwargs: Any,
-    ) -> tuple[str, Output]:
+    ) -> tuple[str, OutputDataValue]:
         """Invoke the Tool.run function and handle converting to an Output object.
 
         This function returns a tuple consisting of the output and an Output object, as expected by
@@ -428,7 +428,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def parse_response(self, ctx: ToolRunContext, response: dict[str, Any]) -> Output:
+    def parse_response(self, ctx: ToolRunContext, response: dict[str, Any]) -> OutputDataValue:
         """Parse a JSON response into domain models or errors.
 
         This method handles the response from the Portia Cloud API, converting it into domain

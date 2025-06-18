@@ -78,7 +78,7 @@ class PlanRunOutputs(BaseModel):
         description="The final consolidated output of the PlanRun if available.",
     )
 
-    def getOutputForStep(self, step: int) -> Output | None:
+    def for_step(self, step: int) -> Output | None:
         """Return the output for the given step if it exists."""
         return next(
             (output for output in self.step_outputs.values() if output.step == step),

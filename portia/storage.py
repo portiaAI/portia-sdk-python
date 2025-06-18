@@ -43,7 +43,6 @@ from portia.execution_agents.output import (
     AgentMemoryValue,
     LocalDataValue,
     Output,
-    OutputDataValue,
 )
 from portia.logger import logger
 from portia.plan import Plan, PlanUUID

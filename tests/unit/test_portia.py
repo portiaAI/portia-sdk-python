@@ -721,8 +721,14 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
     ]
 
     plan_run.outputs.step_outputs = {
-        "$london_weather": LocalDataValue(value="Sunny and warm"),
-        "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
+        "$london_weather": Output(
+            name="$london_weather", step=0, value=LocalDataValue(value="Sunny and warm")
+        ),
+        "$activities": Output(
+            name="$activities",
+            step=1,
+            value=LocalDataValue(value="Visit Hyde Park and have a picnic"),
+        ),
     }
 
     expected_summary = "Weather is sunny and warm in London, visit to Hyde Park for a picnic"
@@ -733,8 +739,8 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         "portia.portia.FinalOutputSummarizer",
         return_value=mock_summarizer,
     ):
-        last_step_output = LocalDataValue(value="Visit Hyde Park and have a picnic")
-        output = portia._get_final_output(plan, plan_run, last_step_output)  # noqa: SLF001
+        last_step_value = LocalDataValue(value="Visit Hyde Park and have a picnic")
+        output = portia._get_final_output(plan, plan_run, last_step_value)  # noqa: SLF001
 
         # Verify the final output
         assert output is not None
@@ -765,8 +771,14 @@ def test_portia_sets_final_output_with_structured_summary(portia: Portia) -> Non
     ]
 
     plan_run.outputs.step_outputs = {
-        "$london_weather": LocalDataValue(value="Sunny and warm"),
-        "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
+        "$london_weather": Output(
+            name="$london_weather", step=0, value=LocalDataValue(value="Sunny and warm")
+        ),
+        "$activities": Output(
+            name="$activities",
+            step=1,
+            value=LocalDataValue(value="Visit Hyde Park and have a picnic"),
+        ),
     }
 
     # Define the structured output schema
@@ -1288,9 +1300,12 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         plan_run: PlanRun = kwargs.get("plan_run")  # type: ignore  # noqa: PGH003
 
         if plan_run.current_step_index == 1:
-            plan_run.outputs.step_outputs["$step2_result"] = LocalDataValue(
-                value=COMPLETED_OUTPUT,
-                summary="Remaining steps cannot be executed",
+            plan_run.outputs.step_outputs["$step2_result"] = Output(
+                name="$step2_result",
+                step=1,
+                value=LocalDataValue(
+                    value=COMPLETED_OUTPUT, summary="Remaining steps cannot be executed"
+                ),
             )
             plan_run.outputs.final_output = final_output
             plan_run.state = PlanRunState.COMPLETE
@@ -1474,7 +1489,11 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
         end_user_id="test123",
         outputs=PlanRunOutputs(
             step_outputs={
-                "$step1_result": LocalDataValue(value="Step 1 result", summary="Summary of step 1"),
+                "$step1_result": Output(
+                    name="$step1_result",
+                    step=0,
+                    value=LocalDataValue(value="Step 1 result", summary="Summary of step 1"),
+                ),
             },
         ),
     )
@@ -2438,7 +2457,7 @@ class RaiseClarificationAgent(BaseExecutionAgent):
         super().__init__(*args, **kwargs)
         self.forced_clarifications = list(forced_clarifications)
 
-    def execute_sync(self) -> Output:
+    def execute_sync(self) -> LocalDataValue:
         """Execute the agent - return a clarification."""
         return LocalDataValue(
             value=[*self.forced_clarifications],

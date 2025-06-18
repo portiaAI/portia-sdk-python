@@ -1148,7 +1148,9 @@ class Portia:
                 f"Final output: {plan_run.outputs.final_output.get_summary()!s}",
             )
 
-    def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> OutputDataValue | None:
+    def _get_last_executed_step_output(
+        self, plan: Plan, plan_run: PlanRun
+    ) -> OutputDataValue | None:
         """Get the output of the last executed step.
 
         Args:
@@ -1161,7 +1163,7 @@ class Portia:
         """
         return next(
             (
-                plan_run.outputs.step_outputs[step.output]
+                plan_run.outputs.step_outputs[step.output].value
                 for i in range(plan_run.current_step_index, -1, -1)
                 if i < len(plan.steps)
                 and (step := plan.steps[i]).output in plan_run.outputs.step_outputs
@@ -1184,7 +1186,8 @@ class Portia:
             introspection_agent (BaseIntrospectionAgent): The introspection agent to use.
             plan (Plan): The plan being executed.
             plan_run (PlanRun): The plan run being executed.
-            last_executed_step_output (OutputDataValue | None): The output of the last step executed.
+            last_executed_step_output (OutputDataValue | None): The output of the last step
+              executed.
 
         Returns:
             tuple[PlanRun, PreStepIntrospectionOutcome]: The updated plan run and the
@@ -1255,7 +1258,9 @@ class Portia:
 
         return cls(self.config)
 
-    def _get_final_output(self, plan: Plan, plan_run: PlanRun, step_output: OutputDataValue) -> OutputDataValue:
+    def _get_final_output(
+        self, plan: Plan, plan_run: PlanRun, step_output: OutputDataValue
+    ) -> OutputDataValue:
         """Get the final output and add summarization to it.
 
         Args:
