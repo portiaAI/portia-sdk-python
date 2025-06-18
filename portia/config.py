@@ -547,7 +547,7 @@ class Config(BaseModel):
     )
     # Agent Options
     execution_agent_type: ExecutionAgentType = Field(
-        default=ExecutionAgentType.DEFAULT,
+        default=ExecutionAgentType.ONE_SHOT,
         description="The default agent type to use.",
     )
 
