@@ -82,6 +82,7 @@ from portia.portia import ExecutionHooks, Portia
 
 # Tool related classes
 from portia.tool import Tool, ToolRunContext
+from portia.tool_decorator import tool
 from portia.tool_registry import (
     DefaultToolRegistry,
     InMemoryToolRegistry,
@@ -164,4 +165,5 @@ __all__ = [
     "example_tool_registry",
     "logger",
     "open_source_tool_registry",
+    "tool",
 ]

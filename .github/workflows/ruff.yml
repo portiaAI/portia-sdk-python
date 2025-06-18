@@ -11,3 +11,4 @@ jobs:
       - uses: astral-sh/ruff-action@v1
         with:
           args: check
+          version: "0.8.6"

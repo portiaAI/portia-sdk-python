@@ -31,6 +31,7 @@ from typing import (
     get_origin,
 )
 
+import httpx
 from jsonref import replace_refs
 from pydantic import BaseModel, Field, create_model, model_serializer
 from pydantic_core import PydanticUndefined
@@ -57,7 +58,6 @@ from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Sequence
 
-    import httpx
     import mcp
     from pydantic_core.core_schema import SerializerFunctionWrapHandler
 
@@ -75,15 +75,17 @@ class ToolRegistry:
         with_tool(tool: Tool, *, overwrite: bool = False) -> None:
             Inserts a new tool.
         replace_tool(tool: Tool) -> None:
-            Replaces a tool with a new tool.
+            Replaces a tool with a new tool in the current registry.
             NB. This is a shortcut for `with_tool(tool, overwrite=True)`.
         get_tool(tool_id: str) -> Tool:
             Retrieves a tool by its ID.
         get_tools() -> list[Tool]:
             Retrieves all tools in the registry.
         match_tools(query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
-            Optionally, retrieve tools that match a given query and tool_ids. Useful to implement
-            tool filtering.
+            Optionally, retrieve tools that match a given query and tool_ids.
+        filter_tools(predicate: Callable[[Tool], bool]) -> ToolRegistry:
+            Create a new tool registry with only the tools that match the predicate. Useful to
+            implement tool exclusions.
 
     """
 
@@ -192,6 +194,36 @@ class ToolRegistry:
         """
         return ToolRegistry({tool.id: tool for tool in self._tools.values() if predicate(tool)})
 
+    def with_tool_description(
+        self, tool_id: str, updated_description: str, *, overwrite: bool = False
+    ) -> ToolRegistry:
+        """Update a tool with an extension or override of the tool description.
+
+        Args:
+            tool_id (str): The id of the tool to update.
+            updated_description (str): The tool description to update. If `overwrite` is False, this
+                will extend the existing tool description, otherwise, the entire tool description
+                will be updated.
+            overwrite (bool): Whether to update or extend the existing tool description.
+
+        Returns:
+            Self: The tool registry is updated in place and returned.
+
+        Particularly useful for customising tools in MCP servers for usecases. A deep copy is made
+        of the underlying tool such that the tool description is only updated within this registry.
+        Logs a warning if the tool is not found.
+
+        """
+        try:
+            tool = self.get_tool(tool_id=tool_id)
+            new_description = (
+                updated_description if overwrite else f"{tool.description}. {updated_description}"
+            )
+            self.replace_tool(tool.model_copy(update={"description": new_description}, deep=True))
+        except ToolNotFoundError:
+            logger().warning(f"Unknown tool ID: {tool_id}. Description was not edited.")
+        return self
+
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
 
@@ -264,12 +296,7 @@ class PortiaToolRegistry(ToolRegistry):
     This class interacts with the Portia API to retrieve and manage tools.
     """
 
-    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
-        {
-            # Exclude Outlook by default as it clashes with Gmail
-            "portia:microsoft:outlook:*",
-        },
-    )
+    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset()
 
     def __init__(
         self,
@@ -312,11 +339,23 @@ class PortiaToolRegistry(ToolRegistry):
     def _load_tools(cls, client: httpx.Client) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
         response = client.get(
-            url="/api/v0/tools/descriptions/",
+            url="/api/v0/tools/descriptions-v2/",
         )
-        response.raise_for_status()
+        if response.status_code == httpx.codes.NOT_FOUND:
+            response = client.get(
+                url="/api/v0/tools/descriptions/",
+            )
+            response_tools = response.json()
+        else:
+            response.raise_for_status()
+            response_tools = response.json().get("tools", [])
+            for error in response.json().get("errors", []):
+                logger().warning(
+                    f"Error loading Portia Cloud tool for app: {error['app_name']}: "
+                    f"{error['error']}"
+                )
         tools = {}
-        for raw_tool in response.json():
+        for raw_tool in response_tools:
             tool = PortiaRemoteTool(
                 id=raw_tool["tool_id"],
                 name=raw_tool["tool_name"],
@@ -492,18 +531,24 @@ class McpToolRegistry(ToolRegistry):
                 The result returned by the coroutine.
 
             """
-            result_container: dict[str, T] = {}
+            result_container: dict[str, T | Exception] = {}
 
             def runner() -> None:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                result_container["result"] = loop.run_until_complete(coro)
-                loop.close()
+                try:
+                    result_container["result"] = loop.run_until_complete(coro)
+                except Exception as e:  # noqa: BLE001
+                    result_container["error"] = e
+                finally:
+                    loop.close()
 
             thread = threading.Thread(target=runner)
             thread.start()
             thread.join()
-            return result_container["result"]
+            if isinstance(result_container.get("error"), Exception):
+                raise result_container["error"]  # type: ignore  # noqa: PGH003
+            return result_container["result"]  # type: ignore  # noqa: PGH003
 
         try:
             loop = asyncio.get_event_loop()
@@ -589,6 +634,11 @@ class GeneratedBaseModel(BaseModel):
     """
 
     _fields_must_omit_none_on_serialize: ClassVar[list[str]] = []
+
+    def __init_subclass__(cls) -> None:
+        """Ensure omissible fields are isolated between models."""
+        super().__init_subclass__()
+        cls._fields_must_omit_none_on_serialize = []
 
     @model_serializer(mode="wrap")
     def serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
