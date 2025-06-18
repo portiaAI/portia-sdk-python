@@ -14,7 +14,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.graph import MessagesState  # noqa: TC002
 from pydantic import Field
 
-from portia.execution_agents.output import LocalDataValue, Output
+from portia.execution_agents.output import LocalDataValue, OutputDataValue
 from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.planning_agents.context import get_tool_descriptions_for_tools
@@ -104,7 +104,7 @@ class StepSummarizer:
         last_message = messages[-1] if len(messages) > 0 else None
         if not isinstance(last_message, ToolMessage) or not isinstance(
             last_message.artifact,
-            Output,
+            OutputDataValue,
         ):
             return {"messages": [last_message]}
 

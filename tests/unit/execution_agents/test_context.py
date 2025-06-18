@@ -31,10 +31,18 @@ def inputs() -> list[Variable]:
 def outputs() -> dict[str, Output]:
     """Return a dictionary of outputs for pytest fixtures."""
     return {
-        "$email_body": LocalDataValue(value="The body of the email"),
-        "$email_title": LocalDataValue(value="Example email"),
-        "$email_address": LocalDataValue(value="test@example.com"),
-        "$london_weather": LocalDataValue(value="rainy"),
+        "$email_body": Output(
+            name="$email_body", step=0, value=LocalDataValue(value="The body of the email")
+        ),
+        "$email_title": Output(
+            name="$email_title", step=1, value=LocalDataValue(value="Example email")
+        ),
+        "$email_address": Output(
+            name="$email_address", step=2, value=LocalDataValue(value="test@example.com")
+        ),
+        "$london_weather": Output(
+            name="$london_weather", step=3, value=LocalDataValue(value="rainy")
+        ),
     }
 
 

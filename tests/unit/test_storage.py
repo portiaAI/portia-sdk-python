@@ -15,6 +15,7 @@ from portia.errors import StorageError
 from portia.execution_agents.output import (
     AgentMemoryValue,
     LocalDataValue,
+    Output,
 )
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID
@@ -124,11 +125,11 @@ def test_in_memory_storage() -> None:
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
     saved_output_1 = storage.save_plan_run_output(
         "test name",
-        LocalDataValue(value="test value"),
+        Output(name="test name", step=0, value=LocalDataValue(value="test value")),
         plan_run.id,
     )
-    assert storage.get_plan_run_output("test name", plan_run.id) == LocalDataValue(
-        value="test value"
+    assert storage.get_plan_run_output("test name", plan_run.id) == Output(
+        name="test name", step=0, value=LocalDataValue(value="test value")
     )
     # Check that we ignore outputs that are already in agent memory
     saved_output_2 = storage.save_plan_run_output(
@@ -144,7 +145,7 @@ def test_in_memory_storage() -> None:
     ):
         storage.save_plan_run_output(
             "large_output",
-            LocalDataValue(value="large value"),
+            Output(name="large_output", step=0, value=LocalDataValue(value="large value")),
             plan_run.id,
         )
 
@@ -184,9 +185,13 @@ def test_disk_storage(tmp_path: Path) -> None:
     all_runs = storage.get_plan_runs()
     assert all_runs.results == [plan_run]
     assert storage.get_plan_runs(PlanRunState.FAILED).results == []
-    storage.save_plan_run_output("test name", LocalDataValue(value="test value"), plan_run.id)
-    assert storage.get_plan_run_output("test name", plan_run.id) == LocalDataValue(
-        value="test value"
+    storage.save_plan_run_output(
+        "test name",
+        Output(name="test name", step=0, value=LocalDataValue(value="test value")),
+        plan_run.id,
+    )
+    assert storage.get_plan_run_output("test name", plan_run.id) == Output(
+        name="test name", step=0, value=LocalDataValue(value="test value")
     )
 
     # Check with an output that's too large
@@ -196,7 +201,7 @@ def test_disk_storage(tmp_path: Path) -> None:
     ):
         storage.save_plan_run_output(
             "large_output",
-            LocalDataValue(value="large value"),
+            Output(name="large_output", step=0, value=LocalDataValue(value="large value")),
             plan_run.id,
         )
 
@@ -550,7 +555,9 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalDataValue(value="test value", summary="test summary")
+    output = Output(
+        name="test_output", step=0, value=LocalDataValue(value="test value", summary="test summary")
+    )
     mock_success_response = MagicMock()
     mock_success_response.is_success = True
 
@@ -645,7 +652,6 @@ def test_portia_cloud_agent_memory_local_cache_expiry() -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalDataValue(value="test value", summary="test summary")
     mock_success_response = MagicMock()
     mock_success_response.is_success = True
 
@@ -662,7 +668,15 @@ def test_portia_cloud_agent_memory_local_cache_expiry() -> None:
     ):
         # Write 21 outputs to the cache (cache size is 20)
         for i in range(21):
-            agent_memory.save_plan_run_output(f"test_output_{i}", output, plan_run.id)
+            agent_memory.save_plan_run_output(
+                f"test_output_{i}",
+                Output(
+                    name=f"test_output_{i}",
+                    step=0,
+                    value=LocalDataValue(value="test value", summary="test summary"),
+                ),
+                plan_run.id,
+            )
 
         # Check that the cache only stores 20 entries
         cache_files = list(Path(agent_memory.cache_dir).glob("**/*.json"))
@@ -684,7 +698,11 @@ def test_portia_cloud_agent_memory_errors() -> None:
         plan_id=plan.id,
         end_user_id="test123",
     )
-    output = LocalDataValue(value="test value", summary="test summary")
+    output = Output(
+        name="test_output",
+        step=0,
+        value=LocalDataValue(value="test value", summary="test summary"),
+    )
 
     mock_exception = RuntimeError("An error occurred.")
     with (
@@ -729,7 +747,7 @@ def test_portia_cloud_agent_memory_errors() -> None:
     ):
         agent_memory.save_plan_run_output(
             "large_output",
-            LocalDataValue(value="large value"),
+            Output(name="large_output", step=0, value=LocalDataValue(value="large value")),
             plan_run.id,
         )
 
@@ -745,7 +763,7 @@ def test_portia_cloud_agent_memory_errors() -> None:
     ):
         agent_memory.save_plan_run_output(
             "too_large_output",
-            LocalDataValue(value="too large value"),
+            Output(name="too_large_output", step=0, value=LocalDataValue(value="too large value")),
             plan_run.id,
         )
 
@@ -762,7 +780,11 @@ def test_portia_cloud_agent_memory_errors() -> None:
     ):
         agent_memory.save_plan_run_output(
             "over_size_limit",
-            LocalDataValue(value="value that creates a large request"),
+            Output(
+                name="over_size_limit",
+                step=0,
+                value=LocalDataValue(value="value that creates a large request"),
+            ),
             plan_run.id,
         )
 

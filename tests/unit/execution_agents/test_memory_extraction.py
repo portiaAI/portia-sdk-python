@@ -8,7 +8,7 @@ from portia.end_user import EndUser
 from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
-from portia.execution_agents.output import LocalDataValue
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.plan import PlanBuilder, Variable
 from portia.storage import InMemoryStorage
 from tests.utils import get_test_config, get_test_plan_run
@@ -39,11 +39,13 @@ def test_memory_extraction_step_with_inputs() -> None:
     storage = InMemoryStorage()
     saved_output = storage.save_plan_run_output(
         "$memory_output",
-        LocalDataValue(value="memory_value"),
+        Output(name="$memory_output", step=1, value=LocalDataValue(value="memory_value")),
         plan_run.id,
     )
     plan_run.outputs.step_outputs = {
-        "$local_output": LocalDataValue(value="local_value"),
+        "$local_output": Output(
+            name="$local_output", step=0, value=LocalDataValue(value="local_value")
+        ),
         "$memory_output": saved_output,
     }
 

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from portia.clarification import Clarification
     from portia.config import Config
     from portia.end_user import EndUser
-    from portia.execution_agents.output import Output
+    from portia.execution_agents.output import OutputDataValue
     from portia.execution_hooks import ExecutionHooks
     from portia.storage import AgentMemory
     from portia.tool import Tool, ToolRunContext
@@ -86,14 +86,14 @@ class BaseExecutionAgent:
         return self.plan.steps[self.plan_run.current_step_index]
 
     @abstractmethod
-    def execute_sync(self) -> Output:
+    def execute_sync(self) -> OutputDataValue:
         """Run the core execution logic of the task synchronously.
 
         Implementation of this function is deferred to individual agent implementations,
         making it simple to write new ones.
 
         Returns:
-            Output: The output of the task execution.
+            OutputDataValue: The output of the task execution.
 
         """
 

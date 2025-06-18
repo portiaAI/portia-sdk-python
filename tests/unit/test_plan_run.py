@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from portia.clarification import Clarification, ClarificationCategory, InputClarification
 from portia.errors import ToolHardError, ToolSoftError
-from portia.execution_agents.output import LocalDataValue
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.plan import PlanUUID, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, ReadOnlyPlanRun
 from portia.prefixed_uuid import PlanRunUUID
@@ -35,7 +35,9 @@ def plan_run(mock_clarification: InputClarification) -> PlanRun:
         end_user_id="test123",
         outputs=PlanRunOutputs(
             clarifications=[mock_clarification],
-            step_outputs={"step1": LocalDataValue(value="Test output")},
+            step_outputs={
+                "step1": Output(name="step1", step=0, value=LocalDataValue(value="Test output"))
+            },
         ),
     )
 
@@ -134,8 +136,16 @@ def test_run_serialization() -> None:
                 ),
             ],
             step_outputs={
-                "1": LocalDataValue(value=ToolHardError("this is a tool hard error")),
-                "2": LocalDataValue(value=ToolSoftError("this is a tool soft error")),
+                "1": Output(
+                    name="1",
+                    step=0,
+                    value=LocalDataValue(value=ToolHardError("this is a tool hard error")),
+                ),
+                "2": Output(
+                    name="2",
+                    step=1,
+                    value=LocalDataValue(value=ToolSoftError("this is a tool soft error")),
+                ),
             },
             final_output=LocalDataValue(value="This is the end"),
         ),
@@ -189,4 +199,30 @@ def test_get_clarification_for_step_without_matching_clarification(plan_run: Pla
 
     # Try to get clarification for step 1
     result = plan_run.get_clarification_for_step(ClarificationCategory.INPUT)
+    assert result is None
+
+
+def test_plan_run_outputs_for_step_found() -> None:
+    """Test for_step returns the correct Output when the step exists."""
+    output0 = Output(name="step0", step=0, value=LocalDataValue(value="output0"))
+    output1 = Output(name="step1", step=1, value=LocalDataValue(value="output1"))
+    outputs = PlanRunOutputs(
+        step_outputs={
+            "step0": output0,
+            "step1": output1,
+        }
+    )
+    result = outputs.for_step(1)
+    assert result == output1
+
+
+def test_plan_run_outputs_for_step_not_found() -> None:
+    """Test for_step returns None when the step does not exist."""
+    output0 = Output(name="step0", step=0, value=LocalDataValue(value="output0"))
+    outputs = PlanRunOutputs(
+        step_outputs={
+            "step0": output0,
+        }
+    )
+    result = outputs.for_step(2)
     assert result is None
