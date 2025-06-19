@@ -257,9 +257,6 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
-FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED = (
-    "feature_flag_one_shot_agent_clarifications_enabled"
-)
 FEATURE_FLAG_GOOGLE_2_5_DEFAULTS = "feature_flag_google_2_5_defaults"
 
 
@@ -396,7 +393,7 @@ class Config(BaseModel):
         planning_agent_type: The planning agent type.
         execution_agent_type: The execution agent type.
         feature_flags: A dictionary of feature flags for the SDK.
-
+        clarifications_enabled: Whether to enable clarifications for the execution agent.
     """
 
     # Portia Cloud Options
@@ -468,6 +465,10 @@ class Config(BaseModel):
         default={},
         description="A dictionary of feature flags for the SDK.",
     )
+    clarifications_enabled: bool = Field(
+        default=False,
+        description="Whether to enable clarifications for the execution agent.",
+    )
 
     @model_validator(mode="after")
     def parse_feature_flags(self) -> Self:
@@ -476,7 +477,6 @@ class Config(BaseModel):
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
-            FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED: False,
             FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: False,
             **self.feature_flags,
         }

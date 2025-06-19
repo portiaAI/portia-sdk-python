@@ -18,7 +18,7 @@ from langchain_core.prompts import (
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED, Config
+from portia.config import Config
 from portia.errors import InvalidAgentError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.clarification_tool import ClarificationTool
@@ -177,9 +177,7 @@ class OneShotToolCallingModel:
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
             tool_description=self.agent.tool.description,
-            use_clarification_tool=self.agent.config.feature_flags[
-                FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED
-            ],
+            use_clarification_tool=self.agent.config.clarifications_enabled,
             clarification_tool_args=clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
         )
@@ -283,7 +281,7 @@ class OneShotAgent(BaseExecutionAgent):
             ),
         ]
         clarification_tool = ClarificationTool(step=self.plan_run.current_step_index)
-        if self.config.feature_flags[FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED]:
+        if self.config.clarifications_enabled:
             tools.append(clarification_tool.to_langchain_with_artifact(ctx=tool_run_ctx))
         tool_node = ToolNode(tools)
 
