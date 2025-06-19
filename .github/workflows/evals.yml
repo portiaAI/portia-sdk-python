@@ -103,6 +103,7 @@ jobs:
           echo $EVAL_OUTPUT
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          echo "eval_name: $EVAL_OUTPUT"
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
             BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
             echo "BREACHES: $BREACHES"
@@ -148,6 +149,9 @@ jobs:
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
           INTROSPECTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_introspection.outputs.eval_name }}
         run: |
+          echo "EXECUTION_AGENT_EXPERIMENT_ID: $EXECUTION_AGENT_EXPERIMENT_ID"
+          echo "QUERY_PLANNER_EXPERIMENT_ID: $QUERY_PLANNER_EXPERIMENT_ID"
+          echo "INTROSPECTION_AGENT_EXPERIMENT_ID: $INTROSPECTION_AGENT_EXPERIMENT_ID"
           uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
           # Removes style blocks that GitHub won't render properly
           sed -i '/<style[^>]*>/,/<\/style>/d' analysis/notebook_output.md

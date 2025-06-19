@@ -165,8 +165,9 @@ def test_tool_raises_errors() -> None:
         tool_instance.run(ctx, should_fail=True, error_type="hard")
 
 
-def test_weather_tool_example() -> None:
+def test_weather_tool_example(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the weather tool example from the requirement."""
+    monkeypatch.setenv("OPENWEATHERMAP_API_KEY", "")
 
     @tool
     def weather_tool(city: str) -> str:
