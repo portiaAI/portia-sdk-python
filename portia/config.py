@@ -468,7 +468,10 @@ class Config(BaseModel):
     )
     argument_clarifications_enabled: bool = Field(
         default=True,
-        description="Whether to enable clarifications for the execution agent.",
+        description=(
+            "Whether to enable clarifications for the execution agent which allows the agent to "
+            "ask clarifying questions to the user about the arguments to a tool call."
+        ),
     )
 
     @model_validator(mode="after")
