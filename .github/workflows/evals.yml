@@ -86,7 +86,7 @@ jobs:
           fi
 
       - name: Eval agent (execution)
-        id: eval_agent_execution
+        id: eval_execution_agent
         working-directory: ./platform/evals
         env:
           LANGCHAIN_TRACING_V2: "true"
@@ -145,7 +145,7 @@ jobs:
           LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
-          EXECUTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_execution.outputs.eval_name }}
+          EXECUTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_execution_agent.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
           INTROSPECTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_introspection.outputs.eval_name }}
         run: |
@@ -169,9 +169,9 @@ jobs:
           fi
 
           # Check if the execution agent has failing scores
-          if [[ "${{ steps.eval_agent_execution.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
+          if [[ "${{ steps.eval_execution_agent.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
             echo "Execution agent failed or has breaches."
-            echo "Breaches: ${{ steps.eval_agent_execution.outputs.metric_breaches }}"
+            echo "Breaches: ${{ steps.eval_execution_agent.outputs.metric_breaches }}"
             CONTAINS_THRESHOLD_BREACH=true
           fi
 
