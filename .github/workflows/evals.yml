@@ -144,7 +144,7 @@ jobs:
           LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
-          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_execution.outputs.eval_name }}
+          EXECUTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_execution.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
           INTROSPECTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_introspection.outputs.eval_name }}
         run: |
