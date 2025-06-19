@@ -18,7 +18,6 @@ from langchain_core.prompts import (
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.config import Config
 from portia.errors import InvalidAgentError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.clarification_tool import ClarificationTool
@@ -40,6 +39,7 @@ from portia.tool import Tool, ToolRunContext
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
+    from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.execution_hooks import ExecutionHooks
