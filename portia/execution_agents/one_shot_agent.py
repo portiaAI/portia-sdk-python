@@ -177,7 +177,7 @@ class OneShotToolCallingModel:
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
             tool_description=self.agent.tool.description,
-            use_clarification_tool=self.agent.config.clarifications_enabled,
+            use_clarification_tool=self.agent.config.argument_clarifications_enabled,
             clarification_tool_args=clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
         )
@@ -281,7 +281,7 @@ class OneShotAgent(BaseExecutionAgent):
             ),
         ]
         clarification_tool = ClarificationTool(step=self.plan_run.current_step_index)
-        if self.config.clarifications_enabled:
+        if self.config.argument_clarifications_enabled:
             tools.append(clarification_tool.to_langchain_with_artifact(ctx=tool_run_ctx))
         tool_node = ToolNode(tools)
 

@@ -466,8 +466,8 @@ class Config(BaseModel):
         default={},
         description="A dictionary of feature flags for the SDK.",
     )
-    clarifications_enabled: bool = Field(
-        default=False,
+    argument_clarifications_enabled: bool = Field(
+        default=True,
         description="Whether to enable clarifications for the execution agent.",
     )
 
