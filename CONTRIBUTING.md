@@ -14,10 +14,10 @@ Thank you for your interest in contributing to Portia SDK! We welcome contributi
 
 ## Paid contributions
 Paid contributions are shown in the [Issue](https://github.com/portiaAI/portia-sdk-python/issues) list with the monetary amount shown as follows [£20]. If an issue does not include a monetary amount, it indicates that fixing it will not be remunerated (though we appreciate it greatly!). Please bear in mind the following rules for paid contributions:
-* If you wish to work on a paid contribution you should assign it to yourself. You then have a week to submit the code for the issue or else it will be unassigned from you. If the code is not submitted in this time, and you are unassigned, you are not permitted to assign yourself to that issue again.
+* If you wish to work on a paid contribution you should comment on the issue indicating that you want to work on it and we'll assign it to you. You then have a week to submit the code for the issue or else it will be unassigned from you. If the code is not submitted in this time, and you are unassigned, you are not permitted to request that you work on that issue again.
 * Contributors can have only a single assigned issue at a time.
 * We expect paid contributions to require no more than 1 major review (i.e broader suggestions on direction), and 4 minor reviews. If more than this is required, the contribution will not be remunerated.
-* Once your feature is ready for review, please assign emmaportia as a reviewer.
+* Once your feature is ready for review, please email code-submission@portialabs.ai with a link to the PR and we will review it.
 
 ### Getting paid
 * Once you have contributed and submitted a paid contribution, please email code-submission@portialabs.ai including a link to the PR you made and a screenshot of the Github accounts profile page that authored the PR to prove your identiy. If you are using a different currency we will provide the remuneration at the local exchange rate.

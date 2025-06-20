@@ -62,17 +62,7 @@ jobs:
         run: |
           uv add "portia-sdk-python[all] @ file://../../portia-sdk-python"
 
-      - name: Check tool IDs
-        working-directory: ./platform/evals
-        id: check_tool_ids
-        env:
-          PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
-          PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          uv run check_tool_ids.py
-
-      - name: eval query planner
+      - name: Eval query planner
         id: eval_query_planner
         working-directory: ./platform/evals
         env:
@@ -95,8 +85,8 @@ jobs:
             echo "has_failing_eval_planner_scores=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: eval agent (execution)
-        id: eval_agent_execution
+      - name: Eval agent (execution)
+        id: eval_execution_agent
         working-directory: ./platform/evals
         env:
           LANGCHAIN_TRACING_V2: "true"
@@ -113,6 +103,7 @@ jobs:
           echo $EVAL_OUTPUT
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
+          echo "eval_name: $EVAL_OUTPUT"
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
             BREACHES=$(echo "$EVAL_OUTPUT" | grep "EVAL BREACH:" | tr '\n' ' ' | sed 's/"/\\"/g')
             echo "BREACHES: $BREACHES"
@@ -120,7 +111,7 @@ jobs:
             echo "has_failing_eval_agent_scores=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: eval agent (introspection)
+      - name: Eval agent (introspection)
         id: eval_agent_introspection
         working-directory: ./platform/evals
         env:
@@ -154,10 +145,13 @@ jobs:
           LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
-          AGENT_VERIFIER_EXPERIMENT_ID: ${{ steps.eval_agent_execution.outputs.eval_name }}
+          EXECUTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_execution_agent.outputs.eval_name }}
           QUERY_PLANNER_EXPERIMENT_ID: ${{ steps.eval_query_planner.outputs.eval_name }}
           INTROSPECTION_AGENT_EXPERIMENT_ID: ${{ steps.eval_agent_introspection.outputs.eval_name }}
         run: |
+          echo "EXECUTION_AGENT_EXPERIMENT_ID: $EXECUTION_AGENT_EXPERIMENT_ID"
+          echo "QUERY_PLANNER_EXPERIMENT_ID: $QUERY_PLANNER_EXPERIMENT_ID"
+          echo "INTROSPECTION_AGENT_EXPERIMENT_ID: $INTROSPECTION_AGENT_EXPERIMENT_ID"
           uv run jupyter nbconvert --to markdown --execute analysis/github_analysis.ipynb --output notebook_output.md --no-input
           # Removes style blocks that GitHub won't render properly
           sed -i '/<style[^>]*>/,/<\/style>/d' analysis/notebook_output.md
@@ -175,9 +169,9 @@ jobs:
           fi
 
           # Check if the execution agent has failing scores
-          if [[ "${{ steps.eval_agent_execution.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
+          if [[ "${{ steps.eval_execution_agent.outputs.has_failing_eval_agent_scores }}" == "true" ]]; then
             echo "Execution agent failed or has breaches."
-            echo "Breaches: ${{ steps.eval_agent_execution.outputs.metric_breaches }}"
+            echo "Breaches: ${{ steps.eval_execution_agent.outputs.metric_breaches }}"
             CONTAINS_THRESHOLD_BREACH=true
           fi
 

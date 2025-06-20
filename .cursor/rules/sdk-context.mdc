@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+This is the portia-sdk-python repository, a python package for managing agentic LLM workflows, with access to planning and execution of workflows. This includes tool calling with in built tools, and ability to create your own via classes and decorators, including support for MCP tools. The project uses uv to manage python version and dependencies. Here are some common commands for uv, and should be preferenced over pip or calling python directly.
+- `uv sync`: updates python packages in lock file
+- `uv run <command>`: runs a command, like `python`, `pytest`
+- `uv add <package>`: adds a package to the pyproject.toml, lock file and also installs it to the virtual environment
+
+This project uses ruff to lint, pyright to do static typechecking and pytest for tests. Tests are split between unit and integration under the tests/unit and tests/integration folders. Don't call pytest directly, always call via the seperate folders. 
+
+Whenever making changes, make sure to run, in order
+- `uv run ruff format`
+- `uv run ruff check --fix`
+- `uv run pyright`
+- `uv run pytest tests/unit`
+- `uv run pytest tests/integration`
+and then resolve any issues. 

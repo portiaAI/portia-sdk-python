@@ -412,6 +412,14 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         return value.__name__
 
+    def pretty(self) -> str:
+        """Return a pretty string representation of the tool."""
+        title = f"| {self.name} ({self.id}) |"
+        return (
+            f"{'-' * len(title)}\n{title}\n{'-' * len(title)}"
+            f"\n{self._generate_tool_description()}"
+        )
+
 
 class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
     """Tool that passes run execution to Portia Cloud."""

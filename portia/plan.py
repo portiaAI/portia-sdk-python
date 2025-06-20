@@ -220,8 +220,8 @@ class Variable(BaseModel):
 
     name: str = Field(
         description="The name of the output or plan input to reference, e.g. $best_offers. "
-        "This must reference an existing output or plan input. Do not use this field to "
-        "pass values to a step.",
+        "This must reference an existing output or plan input. IMPORTANT: Do not use this field to "
+        "pass values to a step as the execution agent will manage that.",
     )
     description: str = Field(
         description="A description of the output or plan input.",
