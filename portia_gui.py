@@ -194,6 +194,25 @@ class LogPanel(Vertical):
         yield RichLog(id="log-output", auto_scroll=True, wrap=True, highlight=True, markup=True)
 
 
+class OutputsPanel(Vertical):
+    """Panel to display outputs."""
+
+    def compose(self) -> ComposeResult:
+        """Compose the outputs panel."""
+        yield PanelTitle("Outputs")
+        yield RichLog(id="outputs-display", auto_scroll=True, wrap=True, highlight=True, markup=True)
+
+    def add_output(self, output: str) -> None:
+        """Add output to the panel."""
+        output_widget = self.query_one("#outputs-display", RichLog)
+        output_widget.write(output)
+
+    def clear_outputs(self) -> None:
+        """Clear all outputs."""
+        output_widget = self.query_one("#outputs-display", RichLog)
+        output_widget.clear()
+
+
 class PortiaExit(Exception):
     """Exception to signal that the Portia execution should be stopped."""
 
@@ -204,11 +223,13 @@ class PortiaGUI(App):
     theme = "nord"
     CSS_PATH = "portia_gui.tcss"
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("ctrl+r", "start_execution", "Start execution", priority=True, show=True),
+        Binding("ctrl+r", "plan_execution", "Plan execution", priority=True, show=True),
     ]
 
     # Reactive variables for state management
+    current_plan: var[Plan | None] = var(None)
     current_plan_run: var[PlanRun | None] = var(None)
+    planning_complete: var[bool] = var(False)
     execution_complete: var[bool] = var(False)
 
     def __init__(
@@ -241,14 +262,18 @@ class PortiaGUI(App):
                     Container(QueryText(), classes="app-panel"),
                     Container(StatusText(), classes="app-panel")
                 ),
-                Container(PlanPanel(), id="plan-panel", classes="app-panel"),
+                Vertical(
+                    Container(PlanPanel(), id="plan-panel", classes="app-panel"),
+                    Container(OutputsPanel(), id="outputs-panel", classes="app-panel"),
+                    id="plan-outputs-container",
+                ),
                 Container(LogPanel(), id="log-panel", classes="app-panel"),
                 id="query-status-panel",
             )
             yield Horizontal(
-                Button("Start Execution", id="start-btn", variant="success"),
-                Button("Stop Execution", id="stop-btn", variant="error", disabled=True),
-                Button("Quit", id="quit-btn", variant="warning"),
+                Button("Plan", id="start-btn", variant="success"),
+                Button("Run", id="stop-btn", variant="error", disabled=True),
+                Button("Reset", id="quit-btn", variant="warning"),
                 id="controls-panel",
                 classes="app-panel",
             )
@@ -263,8 +288,32 @@ class PortiaGUI(App):
         """Update the query."""
         self.query = event.query
 
-    def _run_portia(self) -> None:
+
+    def _plan_query(self) -> None:
+        """Plan the query."""
         self.query_one(StatusText).set_status("Setting up Portia...")
+
+        portia = Portia(
+            Config.from_default(),
+        )
+
+        try:
+            with LogCapture(
+                self.query_one("#log-output", RichLog),
+                level=portia.config.default_log_level.value
+            ):
+                self.plan = portia.plan(self.query)
+                self.set_status("Planning complete")
+        except Exception as e:
+            self.set_status(f"[red]Planning failed: {e!s}[/red]")
+        finally:
+            self.query_one(StatusText).set_status("Planning complete")
+
+    def _run_plan(self) -> None:
+        """Run the plan."""
+        self.query_one(StatusText).set_status("Setting up Portia...")
+        if not self.plan:
+            return
         def before_step_execution(plan: Plan, plan_run: PlanRun, step: Step) -> BeforeStepExecutionOutcome:
             self.current_plan_run = plan_run
             self.set_status(f"Running step {plan_run.current_step_index + 1} of {len(plan.steps)}")
@@ -342,7 +391,9 @@ class PortiaGUI(App):
 
                 self.set_status("Executing...")
                 plan_run = portia.run_plan(self.plan)
-                self.set_status("[b][green]Final output[/green][/b]\n\n" + plan_run.outputs.final_output.summary)
+                final_output = plan_run.outputs.final_output.summary if plan_run.outputs.final_output else "No output available"
+                self.set_status("[b][green]Execution complete[/green][/b]")
+                self.add_output(f"[b]Final Output:[/b]\n{final_output}")
         except PortiaExit:
             self.set_status("[red]Portia exited after execution stop requested by user[/red]")
         except Exception as e:
@@ -354,16 +405,16 @@ class PortiaGUI(App):
             self.call_from_thread(self._reset_buttons, start_btn, stop_btn)
 
     def action_start_execution(self) -> None:
-        """Start the execution."""
-        self.start_execution()
+        """Start the planning phase."""
+        self.plan_execution()
 
     @on(Button.Pressed, "#start-btn")
     def handle_press_start_btn(self) -> None:
-        """Handle the press of the start button."""
-        self.start_execution()
+        """Handle the press of the plan button."""
+        self.plan_execution()
 
-    def start_execution(self) -> None:
-        """Start the execution."""
+    def plan_execution(self) -> None:
+        """Start the planning phase."""
         if self.execution_thread and self.execution_thread.is_alive():
             return
         if self.execution_thread and not self.execution_thread.is_alive():
@@ -381,29 +432,43 @@ class PortiaGUI(App):
         log_widget = self.query_one("#log-output", RichLog)
         log_widget.clear()
 
+        # Clear outputs
+        self.clear_outputs()
+
         # Start execution in a separate thread
-        self.execution_thread = threading.Thread(target=self._run_portia)
+        self.execution_thread = threading.Thread(target=self._run_plan)
         self.execution_thread.daemon = True
         self.execution_thread.start()
 
+
     @on(Button.Pressed, "#stop-btn")
-    def stop_execution(self) -> None:
-        """Stop the execution."""
+    def run_execution(self) -> None:
+        """Run the execution."""
         self._stop_requested = True
 
         stop_btn = self.query_one("#stop-btn", Button)
         stop_btn.disabled = True
 
-        self.query_one(StatusText).set_status("[red]Execution stop requested by user[/red]")
+        self.query_one(StatusText).set_status("[red]Execution run requested by user[/red]")
 
     def set_status(self, message: str) -> None:
         """Set the status of the execution."""
         status_text = self.query_one(StatusText)
         self.call_from_thread(status_text.set_status, message)
 
+    def add_output(self, output: str) -> None:
+        """Add output to the outputs panel."""
+        outputs_panel = self.query_one("#outputs-panel OutputsPanel", OutputsPanel)
+        self.call_from_thread(outputs_panel.add_output, output)
+
+    def clear_outputs(self) -> None:
+        """Clear the outputs panel."""
+        outputs_panel = self.query_one("#outputs-panel OutputsPanel", OutputsPanel)
+        self.call_from_thread(outputs_panel.clear_outputs)
+
     @on(Button.Pressed, "#quit-btn")
-    def quit_app(self) -> None:
-        """Quit the application."""
+    def reset_app(self) -> None:
+        """Reset the application."""
         self._stop_requested = True
         self.exit()
 
