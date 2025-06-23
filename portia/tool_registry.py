@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field, ValidationError, create_model, model_seri
 from pydantic_core import PydanticUndefined
 
 from portia.cloud import PortiaCloudClient
-from portia.errors import DuplicateToolError, ToolNotFoundError
+from portia.errors import DuplicateToolError, InvalidToolDescriptionError, ToolNotFoundError
 from portia.logger import logger
 from portia.mcp_session import (
     McpClientConfig,
@@ -639,7 +639,7 @@ class McpToolRegistry(ToolRegistry):
                 output_schema=("str", "The response from the tool formatted as a JSON string"),
                 mcp_client_config=mcp_client_config,
             )
-        except ValidationError as e:
+        except (ValidationError, InvalidToolDescriptionError) as e:
             logger().warning(
                 f"Error creating Portia Tool object for tool from {mcp_client_config.server_name} "
                 f"with name {mcp_tool.name}: {e}"
