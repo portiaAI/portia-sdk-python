@@ -64,7 +64,7 @@ class StatusText(Static):
     """Panel to display the status of the execution."""
 
     def compose(self) -> ComposeResult:
-        yield PanelTitle("Status")
+        yield PanelTitle("Tools")
         yield Static("", id="status-text", markup=True)
 
     def set_status(self, message: str) -> None:
