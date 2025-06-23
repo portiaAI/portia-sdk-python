@@ -33,7 +33,7 @@ from typing import (
 
 import httpx
 from jsonref import replace_refs
-from pydantic import BaseModel, Field, create_model, model_serializer
+from pydantic import BaseModel, Field, ValidationError, create_model, model_serializer
 from pydantic_core import PydanticUndefined
 
 from portia.cloud import PortiaCloudClient
@@ -600,7 +600,15 @@ class McpToolRegistry(ToolRegistry):
                 tools = await session.list_tools()
                 logger().debug(f"Got {len(tools.tools)} tools from MCP server")
                 return [
-                    cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools
+                    portia_tool
+                    for tool in tools.tools
+                    if (
+                        portia_tool := cls._portia_tool_from_mcp_tool(
+                            tool,
+                            mcp_client_config,
+                        )
+                    )
+                    is not None
                 ]
 
         return await asyncio.wait_for(_inner(), timeout=read_timeout)
@@ -610,7 +618,7 @@ class McpToolRegistry(ToolRegistry):
         cls,
         mcp_tool: mcp.Tool,
         mcp_client_config: McpClientConfig,
-    ) -> PortiaMcpTool:
+    ) -> PortiaMcpTool | None:
         """Conversion of a remote MCP server tool to a Portia tool."""
         tool_name_snake_case = re.sub(r"[^a-zA-Z0-9]+", "_", mcp_tool.name)
 
@@ -619,18 +627,24 @@ class McpToolRegistry(ToolRegistry):
             if mcp_tool.description is not None
             else f"{mcp_tool.name} tool from {mcp_client_config.server_name}"
         )
-
-        return PortiaMcpTool(
-            id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
-            name=mcp_tool.name,
-            description=description,
-            args_schema=generate_pydantic_model_from_json_schema(
-                f"{tool_name_snake_case}_schema",
-                mcp_tool.inputSchema,
-            ),
-            output_schema=("str", "The response from the tool formatted as a JSON string"),
-            mcp_client_config=mcp_client_config,
-        )
+        try:
+            return PortiaMcpTool(
+                id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
+                name=mcp_tool.name,
+                description=description,
+                args_schema=generate_pydantic_model_from_json_schema(
+                    f"{tool_name_snake_case}_schema",
+                    mcp_tool.inputSchema,
+                ),
+                output_schema=("str", "The response from the tool formatted as a JSON string"),
+                mcp_client_config=mcp_client_config,
+            )
+        except ValidationError as e:
+            logger().warning(
+                f"Error creating Portia Tool object for tool from {mcp_client_config.server_name} "
+                f"with name {mcp_tool.name}: {e}"
+            )
+            return None
 
 
 class DefaultToolRegistry(ToolRegistry):
