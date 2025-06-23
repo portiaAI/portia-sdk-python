@@ -16,8 +16,8 @@ A Terminal GUI for visualizing Portia execution using the `textual` library. Thi
 - 🔄 Real-time updates during execution
 
 ### User Controls
-- **Start Execution**: Begin running the Portia query
-- **Stop Execution**: Request cancellation of running execution
+- **Plan Query**: Plan the Portia query
+- **Run Query**: Run the Portia query
 - **Quit**: Exit the application
 
 ## Installation
@@ -53,7 +53,7 @@ run_portia_gui(portia, query)
 ### Using the Example Script
 
 ```bash
-python example_gui.py
+python portia_gui.py
 ```
 
 This will present you with several example queries to choose from:
@@ -184,4 +184,4 @@ The GUI includes comprehensive error handling:
 
 ## Examples
 
-See `example_gui.py` for complete working examples with different types of queries and configurations. 
+See `portia_gui.py` for complete working examples with different types of queries and configurations. 

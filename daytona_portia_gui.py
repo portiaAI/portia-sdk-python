@@ -1,6 +1,6 @@
 import asyncio
 from time import sleep
-from daytona_sdk import Daytona, DaytonaConfig, SandboxResources, SessionExecuteRequest, CreateSandboxParams
+from daytona_sdk import Daytona, DaytonaConfig, SessionExecuteRequest, CreateSandboxBaseParams
 import os
 from dotenv import load_dotenv
 
@@ -10,7 +10,7 @@ daytona = Daytona(
     DaytonaConfig(api_key=os.getenv("DAYTONA_API_KEY"), target="eu")
 )
 IMG_NAME = "harbor-transient.internal.daytona.app/daytona/portia-gui-amd:0.3"
-sandbox = daytona.create(params=CreateSandboxParams(image=IMG_NAME), timeout=10 * 60)
+sandbox = daytona.create(params=CreateSandboxBaseParams(image=IMG_NAME), timeout=10 * 60)
 exec_session_id = "python-app-session"
 sandbox.process.create_session(exec_session_id)
 
@@ -24,5 +24,5 @@ command = sandbox.process.execute_session_command(exec_session_id, SessionExecut
 
 print(f"App is available at: {preview_url}?fontsize=12")
 print(f"\n----------------------------------------------\n")
-print("To view logs, run:")
-print(f"  `uv run python daytona_logs.py {sandbox.info().id} {command.cmd_id}`")
+# print("To view logs, run:")
+# print(f"  `uv run python daytona_logs.py {sandbox} {command.cmd_id}`")

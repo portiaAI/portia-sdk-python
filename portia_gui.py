@@ -57,10 +57,12 @@ class QueryText(Static):
         """Message to update the query."""
 
         def __init__(self, query: str) -> None:
+            """Initialize the query update message."""
             super().__init__()
             self.query = query
 
     def compose(self) -> ComposeResult:
+        """Compose the query panel."""
         yield PanelTitle("Query")
         yield TextArea(id="query-input")
 
@@ -77,11 +79,12 @@ class ToolsText(RichLog):
     """Panel to display the status of the execution."""
 
     def __init__(self) -> None:
+        """Initialize the tools text panel."""
         super().__init__()
 
     def compose(self) -> ComposeResult:
         """Compose the status panel."""
-        yield PanelTitle("Tools")
+        yield PanelTitle("Tools Available")
         yield RichLog(id="tools-text")
 
     def write(self, message: str) -> None:
@@ -150,6 +153,7 @@ class LogCapture:
     """Captures stdout, stderr, and logging output from loguru."""
 
     def __init__(self, log_widget: RichLog, level: str = "DEBUG") -> None:
+        """Initialize the log capture."""
         self.log_widget = log_widget
         self.handler_id = None
         self.level = level
@@ -242,7 +246,7 @@ class OutputsPanel(Vertical):
         output_widget.clear()
 
 
-class PortiaExit(Exception):
+class PortiaExitError(Exception):
     """Exception to signal that the Portia execution should be stopped."""
 
 
@@ -310,7 +314,7 @@ class PortiaGUI(App):
             yield Footer()
 
     def on_mount(self) -> None:
-        """Called when the app is mounted."""
+        """Call when the app is mounted."""
         self.title = "Portia Terminal GUI"
         for tool in self.portia.tool_registry._tools:
             self.query_one(ToolsText).write(tool)
@@ -325,7 +329,7 @@ class PortiaGUI(App):
 
     def _plan_query(self) -> None:
         """Plan the query."""
-        self.query_one(QueryText).update_status("Setting up Portia...")
+        self.query_one(QueryText).update_status("Planning...")
 
         try:
             with LogCapture(
@@ -356,7 +360,7 @@ class PortiaGUI(App):
                 "running"
             )
             if self._stop_requested:
-                raise PortiaExit()
+                raise PortiaExitError()
             return BeforeStepExecutionOutcome.CONTINUE
 
         def after_step_execution(_: Plan, plan_run: PlanRun, __: Step, ___: Output) -> None:
@@ -367,28 +371,28 @@ class PortiaGUI(App):
                 "completed"
             )
             if self._stop_requested:
-                raise PortiaExit()
+                raise PortiaExitError()
 
         def before_plan_run(_: Plan, plan_run: PlanRun) -> None:
             self.current_plan_run = plan_run
             if self._stop_requested:
-                raise PortiaExit()
+                raise PortiaExitError()
 
         def after_plan_run(_: Plan, plan_run: PlanRun, __: Output) -> None:
             self.current_plan_run = plan_run
             if self._stop_requested:
-                raise PortiaExit()
+                raise PortiaExitError()
 
         def before_tool_call(_: Tool, __: dict[str, Any], plan_run: PlanRun, ___: Step) -> Clarification | None:
             self.current_plan_run = plan_run
             if self._stop_requested:
-                raise PortiaExit()
+                raise PortiaExitError()
             return None
 
         def after_tool_call(_: Tool, __: Any, plan_run: PlanRun, ___: Step) -> Clarification | None:
             self.current_plan_run = plan_run
             if self._stop_requested:
-                raise PortiaExit
+                raise PortiaExitError
             return None
 
         exec_hooks = ExecutionHooks(
@@ -420,7 +424,7 @@ class PortiaGUI(App):
                 final_output = plan_run.outputs.final_output.summary if plan_run.outputs.final_output else "No output available"
                 self.set_status("[b][green]Execution complete[/green][/b]")
                 self.add_output(f"[b]Final Output:[/b]\n{final_output}")
-        except PortiaExit:
+        except PortiaExitError:
             self.set_status("[red]Portia exited after execution stop requested by user[/red]")
         except Exception as e: # noqa: BLE001
             self.set_status(f"[red]Execution failed: {e!s}[/red]")
@@ -516,6 +520,10 @@ class PortiaGUI(App):
         self._stop_requested = True
         self.execution_thread = None
         self.plan = None
+        plan_btn = self.query_one("#plan-btn", Button)
+        run_btn = self.query_one("#run-btn", Button)
+        plan_btn.disabled = False
+        run_btn.disabled = True
         self.query_one(QueryText).update_status("Ready")
         self.query_one(ToolsText).clear()
         self.query_one(PlanPanel).clear()

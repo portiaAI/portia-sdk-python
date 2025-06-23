@@ -2060,6 +2060,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "click" },
+    { name = "daytona-sdk" },
     { name = "instructor" },
     { name = "jinja2" },
     { name = "jsonref" },
@@ -2085,6 +2086,7 @@ dependencies = [
 all = [
     { name = "browser-use", marker = "python_full_version < '4.0'" },
     { name = "browserbase" },
+    { name = "daytona-sdk" },
     { name = "google-genai" },
     { name = "langchain-google-genai", marker = "python_full_version < '4.0'" },
     { name = "langchain-mistralai", marker = "python_full_version < '4.0'" },
@@ -2093,6 +2095,8 @@ all = [
     { name = "mistralai" },
     { name = "playwright" },
     { name = "redis" },
+    { name = "textual" },
+    { name = "textual-dev" },
 ]
 cache = [
     { name = "langchain-redis" },
@@ -2143,6 +2147,11 @@ dev = [
     { name = "pytest-xdist", extra = ["psutil"] },
     { name = "ruff" },
 ]
+gui = [
+    { name = "daytona-sdk" },
+    { name = "textual" },
+    { name = "textual-dev" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -2153,6 +2162,8 @@ requires-dist = [
     { name = "browserbase", marker = "extra == 'all'", specifier = ">=1.2.0,<2" },
     { name = "browserbase", marker = "extra == 'tools-browser-browserbase'", specifier = ">=1.2.0,<2" },
     { name = "click", specifier = ">=8.1.7,<9" },
+    { name = "daytona-sdk", specifier = ">=0.21.1" },
+    { name = "daytona-sdk", marker = "extra == 'all'", specifier = ">=0.10.5" },
     { name = "daytona-sdk", marker = "extra == 'gui'", specifier = ">=0.10.5" },
     { name = "google-genai", marker = "extra == 'all'", specifier = "==1.18.0" },
     { name = "google-genai", marker = "extra == 'google'", specifier = "==1.18.0" },
@@ -2194,7 +2205,9 @@ requires-dist = [
     { name = "redis", marker = "extra == 'all'", specifier = ">=5.2.1,<6" },
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
     { name = "testcontainers", extras = ["redis"], specifier = ">=4.10.0" },
+    { name = "textual", marker = "extra == 'all'", specifier = ">=3.2.0" },
     { name = "textual", marker = "extra == 'gui'", specifier = ">=3.2.0" },
+    { name = "textual-dev", marker = "extra == 'all'", specifier = ">=1.7.0" },
     { name = "textual-dev", marker = "extra == 'gui'", specifier = ">=1.7.0" },
 ]
 provides-extras = ["mistral", "mistralai", "google", "ollama", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "gui", "all"]
@@ -2210,6 +2223,11 @@ dev = [
     { name = "pytest-rerunfailures", specifier = "~=14.0" },
     { name = "pytest-xdist", extras = ["psutil"], specifier = ">=3.6.1,<4" },
     { name = "ruff", specifier = ">=0.8.0,<0.9" },
+]
+gui = [
+    { name = "daytona-sdk", specifier = ">=0.10.5" },
+    { name = "textual", specifier = ">=3.2.0" },
+    { name = "textual-dev", specifier = ">=1.7.0" },
 ]
 
 [[package]]

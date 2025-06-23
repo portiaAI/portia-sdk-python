@@ -34,7 +34,8 @@ dependencies = [
     "posthog>=3.23.0",
     "testcontainers[redis]>=4.10.0",
     "pytest-repeat>=0.9.4",
-    "instructor>=1.8.3"
+    "instructor>=1.8.3",
+    "daytona-sdk>=0.21.1",
 ]
 
 [project.optional-dependencies]
@@ -77,7 +78,10 @@ all = [
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
     "redis>=5.2.1,<6",
-    "langchain-redis>=0.1.2"
+    "langchain-redis>=0.1.2",
+    "textual>=3.2.0",
+    "textual-dev>=1.7.0",
+    "daytona-sdk>=0.10.5",
 ]
 
 [project.urls]
@@ -100,7 +104,11 @@ dev = [
     "pytest-asyncio>=0.25.3,<0.26",
     "pytest-httpx>=0.35.0",
 ]
-
+gui = [
+    "textual>=3.2.0",
+    "textual-dev>=1.7.0",
+    "daytona-sdk>=0.10.5",
+]
 [tool.hatch.build.targets.sdist]
 include = ["portia"]
 
