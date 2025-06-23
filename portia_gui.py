@@ -259,12 +259,6 @@ class PortiaGUI(App):
         Binding("ctrl+r", "plan_execution", "Plan execution", priority=True, show=True),
     ]
 
-    # Reactive variables for state management
-    current_plan: var[Plan | None] = var(None)
-    current_plan_run: var[PlanRun | None] = var(None)
-    planning_complete: var[bool] = var(False)
-    execution_complete: var[bool] = var(False)
-
     def __init__(
         self,
         query: str = "",
