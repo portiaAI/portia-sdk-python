@@ -385,7 +385,7 @@ class McpToolRegistry(ToolRegistry):
     """
 
     @classmethod
-    def from_sse_connection(  # noqa: PLR0913
+    def from_sse_connection(
         cls,
         server_name: str,
         url: str,
@@ -406,7 +406,7 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
-    async def from_sse_connection_async(  # noqa: PLR0913
+    async def from_sse_connection_async(
         cls,
         server_name: str,
         url: str,
@@ -427,7 +427,7 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
-    def from_stdio_connection(  # noqa: PLR0913
+    def from_stdio_connection(
         cls,
         server_name: str,
         command: str,
@@ -450,7 +450,7 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
-    async def from_stdio_connection_async(  # noqa: PLR0913
+    async def from_stdio_connection_async(
         cls,
         server_name: str,
         command: str,
@@ -473,7 +473,7 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
-    def from_streamable_http_connection(  # noqa: PLR0913
+    def from_streamable_http_connection(
         cls,
         server_name: str,
         url: str,
@@ -499,7 +499,7 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
-    async def from_streamable_http_connection_async(  # noqa: PLR0913
+    async def from_streamable_http_connection_async(
         cls,
         server_name: str,
         url: str,

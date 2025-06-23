@@ -43,7 +43,7 @@ class BaseExecutionAgent:
     performance.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         plan: Plan,
         plan_run: PlanRun,

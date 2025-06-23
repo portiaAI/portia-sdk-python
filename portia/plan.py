@@ -64,7 +64,7 @@ class PlanBuilder:
         self.plan_inputs = []
         self.structured_output_schema = structured_output_schema
 
-    def step(  # noqa: PLR0913
+    def step(
         self,
         task: str,
         tool_id: str | None = None,

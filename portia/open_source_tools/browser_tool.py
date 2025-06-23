@@ -382,7 +382,7 @@ class BrowserToolForUrl(BrowserTool):
         description="The URL to navigate to.",
     )
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         url: str,
         id: str | None = None,  # noqa: A002
