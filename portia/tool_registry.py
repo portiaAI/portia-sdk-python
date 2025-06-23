@@ -19,6 +19,7 @@ import asyncio
 import os
 import re
 import threading
+from datetime import timedelta
 from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
@@ -33,6 +34,7 @@ from typing import (
 
 import httpx
 from jsonref import replace_refs
+from mcp import types
 from pydantic import BaseModel, Field, create_model, model_serializer
 from pydantic_core import PydanticUndefined
 
@@ -383,13 +385,14 @@ class McpToolRegistry(ToolRegistry):
     """
 
     @classmethod
-    def from_sse_connection(
+    def from_sse_connection(  # noqa: PLR0913
         cls,
         server_name: str,
         url: str,
         headers: dict[str, Any] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Sync version)."""
         config = SseMcpClientConfig(
@@ -399,17 +402,18 @@ class McpToolRegistry(ToolRegistry):
             timeout=timeout,
             sse_read_timeout=sse_read_timeout,
         )
-        tools = cls._load_tools(config)
+        tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
-    async def from_sse_connection_async(
+    async def from_sse_connection_async(  # noqa: PLR0913
         cls,
         server_name: str,
         url: str,
         headers: dict[str, Any] | None = None,
         timeout: float = 5,  # noqa: ASYNC109
         sse_read_timeout: float = 60 * 5,
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Async version)."""
         config = SseMcpClientConfig(
@@ -419,7 +423,7 @@ class McpToolRegistry(ToolRegistry):
             timeout=timeout,
             sse_read_timeout=sse_read_timeout,
         )
-        tools = await cls._load_tools_async(config)
+        tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
@@ -431,6 +435,7 @@ class McpToolRegistry(ToolRegistry):
         env: dict[str, str] | None = None,
         encoding: str = "utf-8",
         encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection (Sync version)."""
         config = StdioMcpClientConfig(
@@ -441,7 +446,7 @@ class McpToolRegistry(ToolRegistry):
             encoding=encoding,
             encoding_error_handler=encoding_error_handler,
         )
-        tools = cls._load_tools(config)
+        tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
@@ -453,6 +458,7 @@ class McpToolRegistry(ToolRegistry):
         env: dict[str, str] | None = None,
         encoding: str = "utf-8",
         encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection (Async version)."""
         config = StdioMcpClientConfig(
@@ -463,7 +469,7 @@ class McpToolRegistry(ToolRegistry):
             encoding=encoding,
             encoding_error_handler=encoding_error_handler,
         )
-        tools = await cls._load_tools_async(config)
+        tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
@@ -477,6 +483,7 @@ class McpToolRegistry(ToolRegistry):
         *,
         terminate_on_close: bool = True,
         auth: httpx.Auth | None = None,
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a StreamableHTTP connection (Sync version)."""
         config = StreamableHttpMcpClientConfig(
@@ -488,7 +495,7 @@ class McpToolRegistry(ToolRegistry):
             terminate_on_close=terminate_on_close,
             auth=auth,
         )
-        tools = cls._load_tools(config)
+        tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
@@ -502,6 +509,7 @@ class McpToolRegistry(ToolRegistry):
         *,
         terminate_on_close: bool = True,
         auth: httpx.Auth | None = None,
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a StreamableHTTP connection (Async version)."""
         config = StreamableHttpMcpClientConfig(
@@ -513,11 +521,16 @@ class McpToolRegistry(ToolRegistry):
             terminate_on_close=terminate_on_close,
             auth=auth,
         )
-        tools = await cls._load_tools_async(config)
+        tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
-    def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
+    def _load_tools(
+        cls,
+        mcp_client_config: McpClientConfig,
+        *,
+        read_timeout: float | None = None,
+    ) -> list[PortiaMcpTool]:
         """Sync version to load tools from an MCP server."""
         T = TypeVar("T")
 
@@ -526,6 +539,7 @@ class McpToolRegistry(ToolRegistry):
 
             Args:
                 coro: The coroutine to execute.
+                read_timeout (float): The timeout for the request.
 
             Returns:
                 The result returned by the coroutine.
@@ -556,14 +570,41 @@ class McpToolRegistry(ToolRegistry):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        return _run_async_in_new_loop(cls._load_tools_async(mcp_client_config))
+        return _run_async_in_new_loop(cls._load_tools_async(mcp_client_config, read_timeout))
 
     @classmethod
-    async def _load_tools_async(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
-        """Async version to load tools from an MCP server."""
+    async def _load_tools_async(
+        cls,
+        mcp_client_config: McpClientConfig,
+        read_timeout: float | None = None,
+    ) -> list[PortiaMcpTool]:
+        """Async version to load tools from an MCP server.
+
+        The MCP client session doesn't support timeouts for list_tools, so we use
+        our own implementation to wrap the request in a timeout.
+
+        Args:
+            mcp_client_config (McpClientConfig): The MCP client configuration.
+            read_timeout (float): The timeout for the request.
+
+        Returns:
+            list[PortiaMcpTool]: The list of Portia MCP tools.
+
+        """
         async with get_mcp_session(mcp_client_config) as session:
             logger().debug("Fetching tools from MCP server")
-            tools = await session.list_tools()
+            tools = await session.send_request(
+                types.ClientRequest(
+                    types.ListToolsRequest(
+                        method="tools/list",
+                        params=None,
+                    )
+                ),
+                types.ListToolsResult,
+                request_read_timeout_seconds=(
+                    timedelta(seconds=read_timeout) if read_timeout is not None else None
+                ),
+            )
             logger().debug(f"Got {len(tools.tools)} tools from MCP server")
             return [cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools]
 

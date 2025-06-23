@@ -501,7 +501,7 @@ def test_tool_registry_reconfigure_llm_tool() -> None:
 def mock_get_mcp_session() -> Iterator[None]:
     """Fixture to mock the get_mcp_session function."""
     mock_session = MagicMock(spec=ClientSession)
-    mock_session.list_tools = AsyncMock(
+    mock_session.send_request = AsyncMock(
         return_value=mcp.ListToolsResult(
             tools=[
                 mcp.Tool(
