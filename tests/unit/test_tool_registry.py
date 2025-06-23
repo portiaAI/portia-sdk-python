@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import mcp
 import pytest
+import json
 from httpx import HTTPStatusError
 from mcp import ClientSession
 from pydantic import BaseModel

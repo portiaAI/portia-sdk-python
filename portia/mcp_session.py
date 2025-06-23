@@ -90,8 +90,6 @@ class StdioMcpClientConfig(BaseModel):
                 args=server_config["args"],
                 env=server_config.get("env", None),
             )
-        if "mcp" in json_config:
-            return cls.from_string(json_config["mcp"])
         raise ValueError(f"Invalid MCP client config: {config_str}")
 
 
