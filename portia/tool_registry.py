@@ -16,6 +16,7 @@ Classes:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import threading
@@ -458,9 +459,9 @@ class McpToolRegistry(ToolRegistry):
         return cls(tools)
 
     @classmethod
-    def from_stdio_connection_string(
+    def from_stdio_connection_raw(
         cls,
-        config_str: str,
+        config: str | dict[str, Any],
         tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection from a string.
@@ -468,15 +469,16 @@ class McpToolRegistry(ToolRegistry):
         Parses commonly used mcp client config formats.
 
         Args:
-            config_str: The string to parse.
+            config: The string or dict to parse.
             tool_list_read_timeout: The timeout for the request.
 
         Returns:
             A McpToolRegistry.
 
         """
-        config = StdioMcpClientConfig.from_string(config_str)
-        tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
+        config_str = json.dumps(config) if not isinstance(config, str) else config
+        parsed_config = StdioMcpClientConfig.from_string(config_str)
+        tools = cls._load_tools(parsed_config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod

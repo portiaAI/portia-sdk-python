@@ -880,7 +880,7 @@ def test_mcp_tool_registry_loads_from_string() -> None:
         }
     }"""
     with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
-        registry = McpToolRegistry.from_stdio_connection_string(config_str)
+        registry = McpToolRegistry.from_stdio_connection_raw(config_str)
         assert len(registry) == 1
         tool = next(iter(registry))
         assert tool.id == MOCK_TOOL_ID
@@ -894,15 +894,24 @@ def test_mcp_tool_registry_loads_from_string() -> None:
         }
     }"""
     with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
-        registry = McpToolRegistry.from_stdio_connection_string(config_str)
+        registry = McpToolRegistry.from_stdio_connection_raw(config_str)
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
+
+    config_dict = {
+        "mcpServers": {"basic-memory": {"command": "uvx", "args": ["basic-memory", "mcp"]}}
+    }
+    with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
+        registry = McpToolRegistry.from_stdio_connection_raw(config_dict)
         assert len(registry) == 1
         tool = next(iter(registry))
         assert tool.id == MOCK_TOOL_ID
 
     broken_config_str = "{"
     with pytest.raises(ValueError, match="Invalid JSON"):
-        McpToolRegistry.from_stdio_connection_string(broken_config_str)
+        McpToolRegistry.from_stdio_connection_raw(broken_config_str)
 
     invalid_config_str = """{}"""
     with pytest.raises(ValueError, match="Invalid MCP client config"):
-        McpToolRegistry.from_stdio_connection_string(invalid_config_str)
+        McpToolRegistry.from_stdio_connection_raw(invalid_config_str)
