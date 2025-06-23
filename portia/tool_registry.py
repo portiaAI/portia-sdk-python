@@ -219,7 +219,7 @@ class ToolRegistry:
             new_description = (
                 updated_description if overwrite else f"{tool.description}. {updated_description}"
             )
-            self.replace_tool(tool.model_copy(update={"description": new_description}, deep=True))
+            self.replace_tool(tool.model_copy(update={"description": new_description}, deep=False))
         except ToolNotFoundError:
             logger().warning(f"Unknown tool ID: {tool_id}. Description was not edited.")
         return self
