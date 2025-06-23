@@ -19,7 +19,6 @@ import asyncio
 import os
 import re
 import threading
-from datetime import timedelta
 from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
@@ -34,7 +33,6 @@ from typing import (
 
 import httpx
 from jsonref import replace_refs
-from mcp import types
 from pydantic import BaseModel, Field, create_model, model_serializer
 from pydantic_core import PydanticUndefined
 
@@ -594,22 +592,18 @@ class McpToolRegistry(ToolRegistry):
             list[PortiaMcpTool]: The list of Portia MCP tools.
 
         """
-        async with get_mcp_session(mcp_client_config) as session:
-            logger().debug("Fetching tools from MCP server")
-            tools = await session.send_request(
-                types.ClientRequest(
-                    types.ListToolsRequest(
-                        method="tools/list",
-                        params=None,
-                    )
-                ),
-                types.ListToolsResult,
-                request_read_timeout_seconds=(
-                    timedelta(seconds=read_timeout) if read_timeout is not None else None
-                ),
-            )
-            logger().debug(f"Got {len(tools.tools)} tools from MCP server")
-            return [cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools]
+
+        async def _inner() -> list[PortiaMcpTool]:
+            """Inner function to wrap in wait_for to implement timeout."""
+            async with get_mcp_session(mcp_client_config) as session:
+                logger().debug("Fetching tools from MCP server")
+                tools = await session.list_tools()
+                logger().debug(f"Got {len(tools.tools)} tools from MCP server")
+                return [
+                    cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools
+                ]
+
+        return await asyncio.wait_for(_inner(), timeout=read_timeout)
 
     @classmethod
     def _portia_tool_from_mcp_tool(
