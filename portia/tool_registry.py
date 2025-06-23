@@ -16,7 +16,6 @@ Classes:
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
 import threading
@@ -476,8 +475,7 @@ class McpToolRegistry(ToolRegistry):
             A McpToolRegistry.
 
         """
-        config_str = json.dumps(config) if not isinstance(config, str) else config
-        parsed_config = StdioMcpClientConfig.from_string(config_str)
+        parsed_config = StdioMcpClientConfig.from_raw(config)
         tools = cls._load_tools(parsed_config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 

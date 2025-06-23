@@ -51,14 +51,14 @@ class StdioMcpClientConfig(BaseModel):
     encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict"
 
     @classmethod
-    def from_string(cls, config_str: str) -> StdioMcpClientConfig:
+    def from_raw(cls, config: str | dict[str, Any]) -> StdioMcpClientConfig:
         """Create a StdioMcpClientConfig from a string.
 
         This method is used to create a StdioMcpClientConfig from a string. It supports
         mcpServers and servers keys methods commonly used in MCP client configs.
 
         Args:
-            config_str: The string to parse.
+            config: The string or dict to parse.
 
         Returns:
             A StdioMcpClientConfig.
@@ -67,10 +67,13 @@ class StdioMcpClientConfig(BaseModel):
             ValueError: If the string is not valid JSON or does not contain a valid MCP config.
 
         """
-        try:
-            json_config = json.loads(config_str)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON: {config_str}") from e
+        if isinstance(config, str):
+            try:
+                json_config = json.loads(config)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON: {config}") from e
+        else:
+            json_config = config
 
         if "mcpServers" in json_config:
             server_name = next(iter(json_config["mcpServers"].keys()))
@@ -90,7 +93,7 @@ class StdioMcpClientConfig(BaseModel):
                 args=server_config["args"],
                 env=server_config.get("env", None),
             )
-        raise ValueError(f"Invalid MCP client config: {config_str}")
+        raise ValueError(f"Invalid MCP client config: {config}")
 
 
 class StreamableHttpMcpClientConfig(BaseModel):
