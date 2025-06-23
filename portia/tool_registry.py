@@ -570,12 +570,15 @@ class McpToolRegistry(ToolRegistry):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        return _run_async_in_new_loop(cls._load_tools_async(mcp_client_config, read_timeout))
+        return _run_async_in_new_loop(
+            cls._load_tools_async(mcp_client_config, read_timeout=read_timeout),
+        )
 
     @classmethod
     async def _load_tools_async(
         cls,
         mcp_client_config: McpClientConfig,
+        *,
         read_timeout: float | None = None,
     ) -> list[PortiaMcpTool]:
         """Async version to load tools from an MCP server.
