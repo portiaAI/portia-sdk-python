@@ -18,15 +18,16 @@ from textual.binding import Binding, BindingType
 from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive, var
-from textual.widgets import Button, Footer, Header, Label, RichLog, Static, TextArea
+from textual.widgets import Button, Footer, Header, Label, RichLog, Static, TextArea, Link
 
 from portia import PlanRun, Portia
-from portia.clarification import Clarification
+from portia.clarification import ActionClarification, Clarification
 from portia.config import Config
 from portia.execution_agents.output import Output
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
 from portia.logger import default_logger
 from portia.plan import Plan, Step
+from portia.plan_run import PlanRunState
 from portia.tool import Tool
 
 
@@ -97,11 +98,12 @@ class PlanStepWidget(Static):
 
     status: reactive[str] = reactive("pending")
 
-    def __init__(self, step_index: int, step_task: str) -> None:
+    def __init__(self, step_index: int, step_task: str, step_tool_id: str) -> None:
         """Initialize the plan step widget."""
         super().__init__()
         self.step_index = step_index
         self.step_task = step_task
+        self.step_tool_id = step_tool_id
 
     def watch_status(self, _: str) -> None:
         """Render the step with status indicator."""
@@ -113,7 +115,7 @@ class PlanStepWidget(Static):
             "skipped": "⏭️",
         }
         icon = status_icons.get(self.status, "❓")
-        self.update(f"{icon} Step {self.step_index + 1}: {self.step_task}")
+        self.update(f"{icon} Step {self.step_index + 1}: {self.step_task}\n({self.step_tool_id})")
 
 
 class PlanPanel(Vertical):
@@ -138,7 +140,7 @@ class PlanPanel(Vertical):
         # Add new step widgets
         if plan and plan.steps:
             for i, step in enumerate(plan.steps):
-                step_widget = PlanStepWidget(i, step.task)
+                step_widget = PlanStepWidget(i, step.task, step.tool_id or "No tool specified")
                 steps_container.mount(step_widget)
 
     def update_step_status(self, step_index: int, status: str) -> None:
@@ -233,7 +235,22 @@ class OutputsPanel(Vertical):
     def compose(self) -> ComposeResult:
         """Compose the outputs panel."""
         yield PanelTitle("Outputs")
+        yield Link(id="authorize-link", text="⚠️   Authorize Tool to Proceed  ⚠️", url="", tooltip="Authorize this tool to continue execution by clicking this link, then click run again", disabled=True, classes="default-hidden")
         yield RichLog(id="outputs-display", auto_scroll=True, wrap=True, highlight=True, markup=True)
+
+    def add_link(self, link: str) -> None:
+        """Add a link to the panel."""
+        link_widget = self.query_one("#authorize-link", Link)
+        link_widget.url = link
+        link_widget.disabled = False
+        link_widget.styles.visibility = "visible"
+
+    def clear_link(self) -> None:
+        """Clear the link from the panel."""
+        link_widget = self.query_one("#authorize-link", Link)
+        link_widget.url = ""
+        link_widget.disabled = True
+        link_widget.styles.visibility = "hidden"
 
     def add_output(self, output: str) -> None:
         """Add output to the panel."""
@@ -276,7 +293,8 @@ class PortiaGUI(App):
 
         self.query = query
         self.execution_thread: threading.Thread | None = None
-        self.plan = None
+        self.plan: Plan | None = None
+        self.current_plan_run: PlanRun | None = None
         self._stop_requested = False
         self.portia = Portia(Config.from_default())
         # self.queue = queue
@@ -414,10 +432,35 @@ class PortiaGUI(App):
                 self.call_from_thread(plan_panel.set_plan, self.plan)
 
                 self.set_status("Executing...")
-                plan_run = self.portia.run_plan(self.plan)
-                final_output = plan_run.outputs.final_output.summary if plan_run.outputs.final_output else "No output available"
-                self.set_status("[b][green]Execution complete[/green][/b]")
-                self.add_output(f"[b]Final Output:[/b]\n{final_output}")
+                if self.current_plan_run:
+                    plan_run = self.portia.resume(self.current_plan_run)
+                else:
+                    plan_run = self.portia.run_plan(self.plan)
+                self.clear_link()
+                self.current_plan_run = plan_run
+                match plan_run.state:
+                    case PlanRunState.FAILED:
+                        self.set_status("[red]Execution failed[/red]")
+                        return
+                    case PlanRunState.COMPLETE:
+                        final_output = plan_run.outputs.final_output.summary if plan_run.outputs.final_output else "No output available"
+                        self.current_plan_run = None
+                        self.set_status("[b][green]Execution complete[/green][/b]")
+                        self.add_output(f"[b]Final Output:[/b]\n{final_output}")
+                    case PlanRunState.NEED_CLARIFICATION:
+                        self.set_status("[yellow]Execution needs clarification[/yellow]")
+                        clarifications = plan_run.get_outstanding_clarifications()
+                        action_urls = [str(clarification.action_url) for clarification in clarifications if isinstance(clarification, ActionClarification)]
+                        step = self.plan.steps[plan_run.current_step_index]
+                        tool_id = step.tool_id
+                        self.add_output(f"[b]Tool that needs action:[/b]\n{tool_id}")
+                        self.add_link(action_urls[0])
+                        run_btn = self.query_one("#run-btn", Button)
+                        run_btn.disabled = False
+                        return
+                    case _:
+                        self.set_status("[yellow]Execution halted unexpectedly[/yellow]")
+                        return
         except PortiaExitError:
             self.set_status("[red]Portia exited after execution stop requested by user[/red]")
         except Exception as e: # noqa: BLE001
@@ -504,6 +547,14 @@ class PortiaGUI(App):
         """Add output to the outputs panel."""
         self.query_one("#outputs-panel OutputsPanel", OutputsPanel).add_output(output)
 
+    def add_link(self, link: str) -> None:
+        """Add a link to the outputs panel."""
+        self.query_one("#outputs-panel OutputsPanel", OutputsPanel).add_link(link)
+
+    def clear_link(self) -> None:
+        """Clear the link from the panel."""
+        self.query_one("#outputs-panel OutputsPanel", OutputsPanel).clear_link()
+
     def clear_outputs(self) -> None:
         """Clear the outputs panel."""
         self.query_one("#outputs-panel OutputsPanel", OutputsPanel).clear_outputs()
@@ -523,6 +574,7 @@ class PortiaGUI(App):
         self.query_one(PlanPanel).clear()
         self.query_one(OutputsPanel).clear_outputs()
         self.query_one(LogPanel).clear()
+        self.query_one(OutputsPanel).clear_link()
 
     def _reset_buttons(self, plan_btn: Button, run_btn: Button) -> None:
         """Reset button states after execution."""
