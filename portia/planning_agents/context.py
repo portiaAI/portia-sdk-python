@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 
-def render_prompt_insert_defaults(  # noqa: PLR0913
+def render_prompt_insert_defaults(
     query: str,
     tool_list: list[Tool],
     end_user: EndUser,

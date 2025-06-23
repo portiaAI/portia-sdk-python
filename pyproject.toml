@@ -138,6 +138,9 @@ runtime-evaluated-base-classes = [
 [tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true  # Allows **kwargs: Any in type signatures.
 
+[tool.ruff.lint.pylint]
+max-args = 10
+
 [tool.setuptools.package-data]
 portia = ["templates/**/*.jinja"]
 
