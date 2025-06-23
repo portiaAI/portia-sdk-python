@@ -15,6 +15,7 @@ Classes:
 
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
@@ -48,6 +49,50 @@ class StdioMcpClientConfig(BaseModel):
     env: dict[str, str] | None = None
     encoding: str = "utf-8"
     encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict"
+
+    @classmethod
+    def from_string(cls, config_str: str) -> StdioMcpClientConfig:
+        """Create a StdioMcpClientConfig from a string.
+
+        This method is used to create a StdioMcpClientConfig from a string. It supports
+        mcpServers and servers keys methods commonly used in MCP client configs.
+
+        Args:
+            config_str: The string to parse.
+
+        Returns:
+            A StdioMcpClientConfig.
+
+        Raises:
+            ValueError: If the string is not valid JSON or does not contain a valid MCP config.
+
+        """
+        try:
+            json_config = json.loads(config_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {config_str}") from e
+
+        if "mcpServers" in json_config:
+            server_name = next(iter(json_config["mcpServers"].keys()))
+            server_config = json_config["mcpServers"][server_name]
+            return cls(
+                server_name=server_name,
+                command=server_config["command"],
+                args=server_config["args"],
+                env=server_config.get("env", None),
+            )
+        if "servers" in json_config:
+            server_name = next(iter(json_config["servers"].keys()))
+            server_config = json_config["servers"][server_name]
+            return cls(
+                server_name=server_name,
+                command=server_config["command"],
+                args=server_config["args"],
+                env=server_config.get("env", None),
+            )
+        if "mcp" in json_config:
+            return cls.from_string(json_config["mcp"])
+        raise ValueError(f"Invalid MCP client config: {config_str}")
 
 
 class StreamableHttpMcpClientConfig(BaseModel):

@@ -82,6 +82,24 @@ def test_tool_registry_get_tools() -> None:
     assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tools)
 
 
+def test_tool_registry_iter() -> None:
+    """Test iterating over a ToolRegistry."""
+    tool_registry = ToolRegistry(
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
+    )
+    assert len(list(tool_registry)) == 2
+    assert any(tool.id == MOCK_TOOL_ID for tool in tool_registry)
+    assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tool_registry)
+
+
+def test_tool_registry_len() -> None:
+    """Test the length of a ToolRegistry."""
+    tool_registry = ToolRegistry(
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
+    )
+    assert len(tool_registry) == 2
+
+
 def test_tool_registry_match_tools() -> None:
     """Test matching tools in the InMemoryToolRegistry."""
     tool_registry = ToolRegistry(
@@ -849,3 +867,42 @@ def test_mcp_tool_registry_load_tools_error_in_async() -> None:
             command="test",
             args=["test"],
         )
+
+
+def test_mcp_tool_registry_loads_from_string() -> None:
+    """Test that a McpToolRegistry can be loaded from a string."""
+    config_str = """{
+        "mcpServers": {
+            "basic-memory": {
+                "command": "uvx",
+                "args": ["basic-memory", "mcp"]
+            }
+        }
+    }"""
+    with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
+        registry = McpToolRegistry.from_stdio_connection_string(config_str)
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
+
+    config_str = """{
+        "servers": {
+            "basic-memory": {
+                "command": "uvx",
+                "args": ["basic-memory", "mcp"]
+            }
+        }
+    }"""
+    with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
+        registry = McpToolRegistry.from_stdio_connection_string(config_str)
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
+
+    broken_config_str = "{"
+    with pytest.raises(ValueError, match="Invalid JSON"):
+        McpToolRegistry.from_stdio_connection_string(broken_config_str)
+
+    invalid_config_str = """{}"""
+    with pytest.raises(ValueError, match="Invalid MCP client config"):
+        McpToolRegistry.from_stdio_connection_string(invalid_config_str)
