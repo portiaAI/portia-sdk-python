@@ -10,6 +10,18 @@
     height: 1fr;
 }
 
+#plan-outputs-container {
+    height: 100%;
+}
+
+#plan-outputs-container > #plan-panel {
+    height: 2fr;
+}
+
+#plan-outputs-container > #outputs-panel {
+    height: 1fr;
+}
+
 #controls-panel {
     align: center middle;
 }
