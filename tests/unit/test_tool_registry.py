@@ -501,7 +501,7 @@ def test_tool_registry_reconfigure_llm_tool() -> None:
 def mock_get_mcp_session() -> Iterator[None]:
     """Fixture to mock the get_mcp_session function."""
     mock_session = MagicMock(spec=ClientSession)
-    mock_session.send_request = AsyncMock(
+    mock_session.list_tools = AsyncMock(
         return_value=mcp.ListToolsResult(
             tools=[
                 mcp.Tool(
@@ -587,6 +587,39 @@ def test_mcp_tool_registry_get_tool(mcp_tool_registry: McpToolRegistry) -> None:
     assert tool.name == "test_tool"
     assert tool.description == "I am a tool"
     assert issubclass(tool.args_schema, BaseModel)
+
+
+def test_mcp_tool_registry_filters_bad_tools() -> None:
+    """Test that the MCPToolRegistry filters out tools that are not valid."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.list_tools = AsyncMock(
+        return_value=mcp.ListToolsResult(
+            tools=[
+                mcp.Tool(
+                    name="test_tool",
+                    description="I am a tool",
+                    inputSchema={"type": "object", "properties": {"input": {"type": "string"}}},
+                ),
+                mcp.Tool(
+                    name="test_tool_2",
+                    description="I am another tool," * 400,  # over 4096 characters
+                    inputSchema={"type": "object", "properties": {"input": {"type": "number"}}},
+                ),
+            ],
+        )
+    )
+
+    with patch(
+        "portia.tool_registry.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        registry = McpToolRegistry.from_stdio_connection(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        )
+        assert len(registry.get_tools()) == 1
+        assert registry.get_tool("mcp:mock_mcp:test_tool").description == "I am a tool"
 
 
 def test_generate_pydantic_model_from_json_schema() -> None:

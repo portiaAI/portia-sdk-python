@@ -19,7 +19,6 @@ import asyncio
 import os
 import re
 import threading
-from datetime import timedelta
 from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
@@ -34,12 +33,11 @@ from typing import (
 
 import httpx
 from jsonref import replace_refs
-from mcp import types
-from pydantic import BaseModel, Field, create_model, model_serializer
+from pydantic import BaseModel, Field, ValidationError, create_model, model_serializer
 from pydantic_core import PydanticUndefined
 
 from portia.cloud import PortiaCloudClient
-from portia.errors import DuplicateToolError, ToolNotFoundError
+from portia.errors import DuplicateToolError, InvalidToolDescriptionError, ToolNotFoundError
 from portia.logger import logger
 from portia.mcp_session import (
     McpClientConfig,
@@ -594,29 +592,33 @@ class McpToolRegistry(ToolRegistry):
             list[PortiaMcpTool]: The list of Portia MCP tools.
 
         """
-        async with get_mcp_session(mcp_client_config) as session:
-            logger().debug("Fetching tools from MCP server")
-            tools = await session.send_request(
-                types.ClientRequest(
-                    types.ListToolsRequest(
-                        method="tools/list",
-                        params=None,
+
+        async def _inner() -> list[PortiaMcpTool]:
+            """Inner function to wrap in wait_for to implement timeout."""
+            async with get_mcp_session(mcp_client_config) as session:
+                logger().debug("Fetching tools from MCP server")
+                tools = await session.list_tools()
+                logger().debug(f"Got {len(tools.tools)} tools from MCP server")
+                return [
+                    portia_tool
+                    for tool in tools.tools
+                    if (
+                        portia_tool := cls._portia_tool_from_mcp_tool(
+                            tool,
+                            mcp_client_config,
+                        )
                     )
-                ),
-                types.ListToolsResult,
-                request_read_timeout_seconds=(
-                    timedelta(seconds=read_timeout) if read_timeout is not None else None
-                ),
-            )
-            logger().debug(f"Got {len(tools.tools)} tools from MCP server")
-            return [cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools]
+                    is not None
+                ]
+
+        return await asyncio.wait_for(_inner(), timeout=read_timeout)
 
     @classmethod
     def _portia_tool_from_mcp_tool(
         cls,
         mcp_tool: mcp.Tool,
         mcp_client_config: McpClientConfig,
-    ) -> PortiaMcpTool:
+    ) -> PortiaMcpTool | None:
         """Conversion of a remote MCP server tool to a Portia tool."""
         tool_name_snake_case = re.sub(r"[^a-zA-Z0-9]+", "_", mcp_tool.name)
 
@@ -625,18 +627,24 @@ class McpToolRegistry(ToolRegistry):
             if mcp_tool.description is not None
             else f"{mcp_tool.name} tool from {mcp_client_config.server_name}"
         )
-
-        return PortiaMcpTool(
-            id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
-            name=mcp_tool.name,
-            description=description,
-            args_schema=generate_pydantic_model_from_json_schema(
-                f"{tool_name_snake_case}_schema",
-                mcp_tool.inputSchema,
-            ),
-            output_schema=("str", "The response from the tool formatted as a JSON string"),
-            mcp_client_config=mcp_client_config,
-        )
+        try:
+            return PortiaMcpTool(
+                id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
+                name=mcp_tool.name,
+                description=description,
+                args_schema=generate_pydantic_model_from_json_schema(
+                    f"{tool_name_snake_case}_schema",
+                    mcp_tool.inputSchema,
+                ),
+                output_schema=("str", "The response from the tool formatted as a JSON string"),
+                mcp_client_config=mcp_client_config,
+            )
+        except (ValidationError, InvalidToolDescriptionError) as e:
+            logger().warning(
+                f"Error creating Portia Tool object for tool from {mcp_client_config.server_name} "
+                f"with name {mcp_tool.name}: {e}"
+            )
+            return None
 
 
 class DefaultToolRegistry(ToolRegistry):
