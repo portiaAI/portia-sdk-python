@@ -584,5 +584,7 @@ class PortiaGUI(App):
 
 dotenv.load_dotenv(override=True)
 
-app = PortiaGUI()
-app.run()
+
+if __name__ == "__main__":
+    app = PortiaGUI(query="What is the capital of France?")
+    app.run()
