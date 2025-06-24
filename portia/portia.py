@@ -163,7 +163,7 @@ class Portia:
 
         return self.storage.save_end_user(end_user)
 
-    def run(  # noqa: PLR0913
+    def run(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
@@ -257,7 +257,7 @@ class Portia:
             return to_return
         raise ValueError("Invalid plan run inputs received")
 
-    def plan(  # noqa: PLR0913
+    def plan(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
@@ -317,7 +317,7 @@ class Portia:
             structured_output_schema,
         )
 
-    def _plan(  # noqa: PLR0913
+    def _plan(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,

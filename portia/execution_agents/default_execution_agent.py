@@ -602,7 +602,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
      1. This approach (as well as the other agents) could be improved for arguments that are lists
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         plan: Plan,
         plan_run: PlanRun,
