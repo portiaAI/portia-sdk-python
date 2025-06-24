@@ -56,7 +56,7 @@ from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine, Sequence
+    from collections.abc import Callable, Coroutine, Iterator, Sequence
 
     import mcp
     from pydantic_core.core_schema import SerializerFunctionWrapHandler
@@ -252,6 +252,14 @@ class ToolRegistry:
         """
         return self._add(other)
 
+    def __iter__(self) -> Iterator[Tool]:
+        """Iterate over the tools in the registry."""
+        return iter(self._tools.values())
+
+    def __len__(self) -> int:
+        """Return the number of tools in the registry."""
+        return len(self._tools)
+
     def _add(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Add a tool registry or Tool list to the current registry."""
         other_registry = other if isinstance(other, ToolRegistry) else ToolRegistry(other)
@@ -445,6 +453,28 @@ class McpToolRegistry(ToolRegistry):
             encoding_error_handler=encoding_error_handler,
         )
         tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
+        return cls(tools)
+
+    @classmethod
+    def from_stdio_connection_raw(
+        cls,
+        config: str | dict[str, Any],
+        tool_list_read_timeout: float | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a stdio connection from a string.
+
+        Parses commonly used mcp client config formats.
+
+        Args:
+            config: The string or dict to parse.
+            tool_list_read_timeout: The timeout for the request.
+
+        Returns:
+            A McpToolRegistry.
+
+        """
+        parsed_config = StdioMcpClientConfig.from_raw(config)
+        tools = cls._load_tools(parsed_config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
