@@ -10,7 +10,6 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 
 from portia.clarification import InputClarification
-from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED
 from portia.end_user import EndUser
 from portia.errors import InvalidAgentError
 from portia.execution_agents.context import StepInput
@@ -338,9 +337,7 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
         plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
-        config=get_test_config(
-            feature_flags={FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED: True}
-        ),
+        config=get_test_config(clarifications_enabled=True),
         agent_memory=InMemoryStorage(),
         tool=AdditionTool(),
     )

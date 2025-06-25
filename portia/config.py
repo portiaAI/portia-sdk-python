@@ -14,7 +14,6 @@ from collections.abc import Container
 from enum import Enum
 from typing import Any, NamedTuple, Self, TypeVar
 
-import tiktoken
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -31,9 +30,11 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    LangChainGenerativeModel,
     LLMProvider,
     OpenAIGenerativeModel,
 )
+from portia.token_counter import estimate_tokens
 
 T = TypeVar("T")
 
@@ -138,6 +139,14 @@ class LLMModel(Enum):
     MISTRAL_LARGE = Model(provider=LLMProvider.MISTRALAI, model_name="mistral-large-latest")
 
     # Google Generative AI
+    GEMINI_2_5_FLASH = Model(
+        provider=LLMProvider.GOOGLE,
+        model_name="gemini-2.5-flash-preview-04-17",
+    )
+    GEMINI_2_5_PRO = Model(
+        provider=LLMProvider.GOOGLE,
+        model_name="gemini-2.5-pro-preview-03-25",
+    )
     GEMINI_2_0_FLASH = Model(
         provider=LLMProvider.GOOGLE,
         model_name="gemini-2.0-flash",
@@ -248,9 +257,7 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
-FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED = (
-    "feature_flag_one_shot_agent_clarifications_enabled"
-)
+FEATURE_FLAG_GOOGLE_2_5_DEFAULTS = "feature_flag_google_2_5_defaults"
 
 
 E = TypeVar("E", bound=Enum)
@@ -292,6 +299,12 @@ EXECUTION_MODEL_KEY = "execution_model_name"
 INTROSPECTION_MODEL_KEY = "introspection_model_name"
 SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
+
+MODEL_EXTRA_KWARGS = {
+    "openai/o3-mini": {"reasoning_effort": "medium"},
+    "openai/o4-mini": {"reasoning_effort": "medium"},
+    "anthropic/claude-3-7-sonnet-latest": {"thinking": {"type": "enabled", "budget_tokens": 3000}},
+}
 
 
 class GenerativeModelsConfig(BaseModel):
@@ -380,6 +393,7 @@ class Config(BaseModel):
         planning_agent_type: The planning agent type.
         execution_agent_type: The execution agent type.
         feature_flags: A dictionary of feature flags for the SDK.
+        clarifications_enabled: Whether to enable clarifications for the execution agent.
 
     """
 
@@ -452,6 +466,13 @@ class Config(BaseModel):
         default={},
         description="A dictionary of feature flags for the SDK.",
     )
+    argument_clarifications_enabled: bool = Field(
+        default=True,
+        description=(
+            "Whether to enable clarifications for the execution agent which allows the agent to "
+            "ask clarifying questions to the user about the arguments to a tool call."
+        ),
+    )
 
     @model_validator(mode="after")
     def parse_feature_flags(self) -> Self:
@@ -460,9 +481,24 @@ class Config(BaseModel):
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
-            FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED: False,
+            FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: False,
             **self.feature_flags,
         }
+        return self
+
+    @model_validator(mode="after")
+    def setup_cache(self) -> Self:
+        """Set up LLM cache if Redis URL is provided."""
+        if self.llm_redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
+            from langchain_redis import RedisCache
+
+            cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
+            LangChainGenerativeModel.set_cache(cache)
+        elif self.llm_redis_cache_url:
+            logger().warning(  # pragma: no cover
+                "Not using cache as cache group is not installed. "  # pragma: no cover
+                "Install portia-sdk-python[caching] to use caching."  # pragma: no cover
+            )  # pragma: no cover
         return self
 
     # Storage Options
@@ -515,7 +551,7 @@ class Config(BaseModel):
     )
     # Agent Options
     execution_agent_type: ExecutionAgentType = Field(
-        default=ExecutionAgentType.DEFAULT,
+        default=ExecutionAgentType.ONE_SHOT,
         description="The default agent type to use.",
     )
 
@@ -547,10 +583,7 @@ class Config(BaseModel):
         """Determine whether the provided output value exceeds the large output threshold."""
         if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
             return False
-        # It doesn't really matter which model we use here, so choose gpt2 for speed.
-        # More details at https://chatgpt.com/share/67ee4931-a794-8007-9859-13aca611dba9
-        encoding = tiktoken.get_encoding("gpt2").encode(str(value))
-        return len(encoding) > self.large_output_threshold_tokens
+        return estimate_tokens(str(value)) > self.large_output_threshold_tokens
 
     def get_agent_default_model(  # noqa: C901, PLR0911, PLR0912
         self,
@@ -562,20 +595,14 @@ class Config(BaseModel):
             case "planning_model":
                 match llm_provider:
                     case LLMProvider.OPENAI:
-                        return OpenAIGenerativeModel(
-                            model_name="o3-mini",
-                            api_key=self.must_get_api_key("openai_api_key"),
-                            reasoning_effort="medium",
-                        )
+                        return "openai/o3-mini"
                     case LLMProvider.ANTHROPIC:
-                        return AnthropicGenerativeModel(
-                            model_name="claude-3-7-sonnet-latest",
-                            api_key=self.must_get_api_key("anthropic_api_key"),
-                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
-                        )
+                        return "anthropic/claude-3-7-sonnet-latest"
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
+                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
+                            return "google/gemini-2.5-pro-preview-03-25"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
@@ -583,20 +610,14 @@ class Config(BaseModel):
             case "introspection_model":
                 match llm_provider:
                     case LLMProvider.OPENAI:
-                        return OpenAIGenerativeModel(
-                            model_name="o4-mini",
-                            api_key=self.must_get_api_key("openai_api_key"),
-                            reasoning_effort="medium",
-                        )
+                        return "openai/o4-mini"
                     case LLMProvider.ANTHROPIC:
-                        return AnthropicGenerativeModel(
-                            model_name="claude-3-7-sonnet-latest",
-                            api_key=self.must_get_api_key("anthropic_api_key"),
-                            model_kwargs={"thinking": {"type": "enabled", "budget_tokens": 3000}},
-                        )
+                        return "anthropic/claude-3-7-sonnet-latest"
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
+                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
+                            return "google/gemini-2.5-flash-preview-04-17"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
@@ -610,9 +631,11 @@ class Config(BaseModel):
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
+                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
+                            return "google/gemini-2.5-flash-preview-04-17"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
-                        return "azure-openai/o3-mini"
+                        return "azure-openai/gpt-4.1"
                 return None
 
     @model_validator(mode="after")
@@ -663,19 +686,25 @@ class Config(BaseModel):
 
         # Check that all models passed as strings are instantiable, i.e. they have the
         # right API keys and other required configuration.
-        for model_getter in (
-            self.get_default_model,
-            self.get_planning_model,
-            self.get_execution_model,
-            self.get_introspection_model,
-            self.get_summarizer_model,
-        ):
+        for model_getter, label, value in [
+            (self.get_default_model, "default_model", self.models.default_model),
+            (self.get_planning_model, "planning_model", self.models.planning_model),
+            (self.get_execution_model, "execution_model", self.models.execution_model),
+            (self.get_introspection_model, "introspection_model", self.models.introspection_model),
+            (
+                self.get_summarizer_model,
+                "summarizer_model",
+                self.models.summarizer_model,
+            ),
+        ]:
             try:
                 model_getter()
             except Exception as e:
                 raise InvalidConfigError(
-                    f"models.{model_getter.__name__}",
-                    "All models must be instantiable",
+                    label,
+                    f"The value {value!s} is not valid for the the {label} model. "
+                    "This is usually either because of a typo in the model name or a missing "
+                    "API Key. Please review the docs here: https://docs.portialabs.ai/manage-config",
                 ) from e
         return self
 
@@ -812,7 +841,7 @@ class Config(BaseModel):
         Supported provider-prefixes are:
         - openai
         - anthropic
-        - mistral (requires portia-sdk-python[mistral] to be installed)
+        - mistralai (requires portia-sdk-python[mistral] to be installed)
         - google (requires portia-sdk-python[google] to be installed)
         - azure-openai
 
@@ -847,28 +876,18 @@ class Config(BaseModel):
             GenerativeModel: The constructed model.
 
         """
-        cache = None
-        if self.llm_redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
-            from langchain_redis import RedisCache
-
-            cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
-        elif self.llm_redis_cache_url:
-            logger().warning(  # pragma: no cover
-                "Not using cache as cache group is not installed. "  # pragma: no cover
-                "Install portia-sdk-python[caching] to use caching."  # pragma: no cover
-            )  # pragma: no cover
         match llm_provider:
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openai_api_key"),
-                    cache=cache,
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.ANTHROPIC:
                 return AnthropicGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("anthropic_api_key"),
-                    cache=cache,
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.MISTRALAI:
                 validate_extras_dependencies("mistralai")
@@ -877,7 +896,7 @@ class Config(BaseModel):
                 return MistralAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("mistralai_api_key"),
-                    cache=cache,
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
                 validate_extras_dependencies("google")
@@ -886,14 +905,14 @@ class Config(BaseModel):
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("google_api_key"),
-                    cache=cache,
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("azure_openai_api_key"),
                     azure_endpoint=self.must_get("azure_openai_endpoint", str),
-                    cache=cache,
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.OLLAMA:
                 validate_extras_dependencies("ollama")
@@ -902,7 +921,7 @@ class Config(BaseModel):
                 return OllamaGenerativeModel(
                     model_name=model_name,
                     base_url=self.ollama_base_url,
-                    cache=cache,
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")

@@ -100,7 +100,7 @@ class ProductTelemetry(BaseProductTelemetry):
         else:
             logger.info(
                 "Portia anonymized telemetry enabled. "
-                "See https://docs.portialabs.com/telemetry for more information."
+                "See https://docs.portialabs.ai/telemetry for more information."
             )
             self._posthog_client = Posthog(
                 project_api_key=self.PROJECT_API_KEY,

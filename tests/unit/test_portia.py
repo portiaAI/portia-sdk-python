@@ -842,7 +842,7 @@ def test_portia_run_query_with_memory(
 
     # Mock agent responses
     weather_summary = "sunny"
-    weather_output = LocalDataValue(value="Sunny and warm", summary=weather_summary)
+    weather_output = LocalDataValue(value="The weather is sunny and warm", summary=weather_summary)
     activities_summary = "picnic"
     activities_output = LocalDataValue(
         value="Visit Hyde Park and have a picnic",

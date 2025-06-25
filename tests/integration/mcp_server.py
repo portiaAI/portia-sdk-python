@@ -31,6 +31,6 @@ if __name__ == "__main__":
     logger.info("Starting MCP server with args: %s", sys.argv)
     server.run(
         transport=sys.argv[1]  # type: ignore[arg-type]
-        if len(sys.argv) > 1 and sys.argv[1] in ["stdio", "sse"]
+        if len(sys.argv) > 1 and sys.argv[1] in ["stdio", "sse", "streamable-http"]
         else "stdio",
     )
