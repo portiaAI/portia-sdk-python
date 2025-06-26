@@ -139,7 +139,7 @@ def template_in_required_inputs(
     return response
 
 
-def process_output(  # noqa: C901
+def process_output(  # noqa: C901 PLR0912
     messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
@@ -201,7 +201,14 @@ def process_output(  # noqa: C901
     summaries = []
 
     for output in output_values:
-        values.append(output.get_value())
+        if isinstance(output.get_value(), list):
+            values.extend(output.get_value())
+        else:
+            values.append(output.get_value())
         summaries.append(output.get_summary() or output.serialize_value())
 
-    return LocalDataValue(value=values, summary=", ".join(summaries))
+    # If there is multiple tool calls (unrolling), then the final summary for all tool calls are
+    # stored in the last tool call's summary.
+    final_summary = output_values[-1].get_summary() or ",".join(summaries)
+
+    return LocalDataValue(value=values, summary=final_summary)

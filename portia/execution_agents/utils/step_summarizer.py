@@ -43,18 +43,24 @@ class StepSummarizer:
         [
             SystemMessage(
                 content=(
-                    "You are a highly skilled summarizer. Your task is to create a textual summary"
-                    "of the provided tool output, make sure to follow the guidelines provided.\n"
-                    "- Focus on the key information and maintain accuracy.\n"
-                    "- Make sure to not exceed the max limit of {max_length} characters.\n"
-                    "- Don't produce an overly long summary if it doesn't make sense.\n"
+                    """You are a highly skilled summarizer. Your task is to create a textual summary
+                of the provided tool output, make sure to follow the guidelines provided.
+                - Focus on the key information and maintain accuracy.
+                - Don't produce an overly long summary if it doesn't make sense.
+                - Make sure you capture ALL important information including sources and references.
+                - You might have multiple tool executions separated by 'OUTPUT_SEPARATOR'   .
+                - DO NOT INCLUDE 'OUTPUT_SEPARATOR' IN YOUR SUMMARY."""
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
-                "Here is original task:\n{task_description}\n"
-                "Here is the description of the tool that produced "
-                "the output:\n{tool_description}\n"
-                "Please summarize the following output:\n{tool_output}\n",
+                """Here is original task:
+                {task_description}
+
+                - Make sure to not exceed the max limit of {max_length} characters.
+                - Here is the description of the tool that produced the output:
+                  {tool_description}
+                - Please summarize the following output:
+                {tool_output}""",
             ),
         ],
     )
@@ -109,7 +115,9 @@ class StepSummarizer:
             return {"messages": [last_message]}
 
         logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
-        tool_output = last_message.content
+        tool_output = " OUTPUT_SEPARATOR ".join(
+            msg.content for msg in messages if isinstance(msg, ToolMessage)
+        )
         if self.config.exceeds_output_threshold(tool_output):
             tool_output = (
                 f"This is a large value (full length: {len(str(tool_output))} characters) - it is "
