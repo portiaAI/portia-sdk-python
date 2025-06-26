@@ -402,7 +402,7 @@ class PortiaGUI(App):
                         plan_run.outputs.final_output
                     )
                     self.set_status("Execution complete")
-                    self.plan_run = None
+
                 else:
                     self.set_status("Something went wrong")
         except Exception as e:
