@@ -31,6 +31,7 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
+from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
@@ -166,6 +167,7 @@ class ParserModel:
                 "Your responses must clearly explain the source of each argument "
                 "(e.g., context, past messages, clarifications). "
                 "Avoid assumptions or fabricated information. "
+                "Pay attention to previous errors given and do not repeat them. "
                 "If any of the inputs is a large string and you want to use it verbatim, rather "
                 "than repeating it, you should provide the name in curly braces and it will be "
                 "templated in before the tool is called. "
@@ -199,6 +201,7 @@ class ParserModel:
                 "- Do not include references to any of the input values (e.g. 'as provided in "
                 "the input'): you must put the exact value the tool should be called with in "
                 "the value field\n"
+                "- If the tool has a list return it as a list, i.e. [1, 2, 3] not '[1, 2, 3]'"
                 "- Ensure arguments align with the tool's schema and intended use.\n\n"
                 "You must return the arguments in the following JSON format:\n"
                 "- If any of the inputs is a large string and you want to use it verbatim, rather "
@@ -418,7 +421,6 @@ class VerifierModel:
             schema=VerifiedToolInputs,
         )
         response = VerifiedToolInputs.model_validate(response)
-
         # Validate the arguments against the tool's schema
         response = self._validate_args_against_schema(response, state["step_inputs"])
         self.agent.verified_args = response
@@ -449,11 +451,16 @@ class VerifierModel:
             # Extract the arg names from the pydantic error to mark them as schema_invalid = True.
             # At this point we know the arguments are invalid, so we can trigger a clarification
             # request.
-            invalid_arg_names = {
-                error["loc"][0]
-                for error in e.errors()
-                if error.get("loc") and len(error["loc"]) > 0
-            }
+            invalid_arg_names = set()
+            for error in e.errors():
+                # Gemini often returns lists as '[1,2,3]', but downstream LLMs can handle this.
+                if error["msg"] == "Input should be a valid list" and error["input"].startswith(
+                    "["
+                ):
+                    continue
+                if error.get("loc") and len(error["loc"]) > 0:
+                    invalid_arg_names.add(error["loc"][0])
+
             [
                 setattr(arg, "schema_invalid", True)
                 for arg in tool_inputs.args
@@ -562,12 +569,14 @@ class ToolCallingModel:
             and self.agent.tool
         ):
             for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
+                logger().debug("Calling before_tool_call execution hook")
                 clarification = self.agent.execution_hooks.before_tool_call(
                     self.agent.tool,
                     tool_call.get("args"),
                     ReadOnlyPlanRun.from_plan_run(self.agent.plan_run),
                     ReadOnlyStep.from_step(self.agent.step),
                 )
+                logger().debug("Finished before_tool_call execution hook")
                 if clarification:
                     self.agent.new_clarifications.append(clarification)
                     return {"messages": []}
@@ -593,7 +602,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
      1. This approach (as well as the other agents) could be improved for arguments that are lists
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         plan: Plan,
         plan_run: PlanRun,

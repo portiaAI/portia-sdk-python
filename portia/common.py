@@ -11,6 +11,8 @@ import importlib.util
 from enum import Enum
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from pydantic import BaseModel
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -39,12 +41,30 @@ class PortiaEnum(str, Enum):
         return tuple((x.name, x.value) for x in cls)
 
 
+def _serialize_for_json(value: Any) -> Any:  # noqa: ANN401
+    """Serialize a value to be JSON-compatible.
+
+    This function serializes Pydantic models to dictionaries to ensure
+    they can be JSON serialized.
+
+    Args:
+        value: The value to serialize.
+
+    Returns:
+        A JSON-serializable version of the value.
+
+    """
+    if isinstance(value, BaseModel):
+        return value.model_dump()
+    return value
+
+
 def combine_args_kwargs(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
     """Combine Args + Kwargs into a single dictionary.
 
     This function takes arbitrary positional and keyword arguments and combines them into a single
     dictionary. Positional arguments are indexed as string keys (e.g., "0", "1", ...) while keyword
-    arguments retain their names.
+    arguments retain their names. Pydantic models are automatically serialized to dictionaries.
 
     Args:
         *args: Positional arguments to be included in the dictionary.
@@ -54,14 +74,15 @@ def combine_args_kwargs(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         dict: A dictionary combining both positional and keyword arguments.
 
     """
-    args_dict = {f"{i}": arg for i, arg in enumerate(args)}
-    return {**args_dict, **kwargs}
+    args_dict = {f"{i}": _serialize_for_json(arg) for i, arg in enumerate(args)}
+    kwargs_dict = {k: _serialize_for_json(v) for k, v in kwargs.items()}
+    return {**args_dict, **kwargs_dict}
 
 
 EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
     "mistralai": ["mistralai", "langchain_mistralai"],  # in process of refactoring
-    "google": ["google.generativeai", "langchain_google_genai"],
+    "google": ["google.genai", "langchain_google_genai"],
     "ollama": ["langchain_ollama"],
     "tools-browser-local": ["browser_use"],
     "tools-browser-browserbase": ["browser_use", "browserbase"],

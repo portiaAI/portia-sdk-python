@@ -125,11 +125,13 @@ def test_render_prompt() -> None:
         plan_inputs=[plan_input],
         previous_errors=[StepsOrError(steps=[], error="test error")],
     )
+
     overall_pattern = re.compile(
-        r"<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<PreviousErrors>(.*?)</PreviousErrors>.*?<Request>(.*?)</Request>.*?",
+        r"<PreviousErrors>(.*?)</PreviousErrors>.*?<SystemContext>(.*?)</SystemContext>.*?<Example>(.*?)</Example>.*?<Tools>(.*?)</Tools>.*?<Request>(.*?)</Request>.*?",
         re.DOTALL,
     )
-    example_match, tools_content, previous_errors_content, request_content = (
+
+    previous_errors_content, system_context, example_match, tools_content, request_content = (
         overall_pattern.findall(
             rendered_prompt,
         )[0]

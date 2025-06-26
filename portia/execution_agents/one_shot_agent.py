@@ -18,7 +18,6 @@ from langchain_core.prompts import (
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from portia.config import FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED, Config
 from portia.errors import InvalidAgentError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.clarification_tool import ClarificationTool
@@ -31,6 +30,7 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
+from portia.logger import logger
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.views import ToolCallTelemetryEvent
@@ -39,6 +39,7 @@ from portia.tool import Tool, ToolRunContext
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
+    from portia.config import Config
     from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.execution_hooks import ExecutionHooks
@@ -176,9 +177,7 @@ class OneShotToolCallingModel:
             tool_name=self.agent.tool.name,
             tool_args=self.agent.tool.args_json_schema(),
             tool_description=self.agent.tool.description,
-            use_clarification_tool=self.agent.config.feature_flags[
-                FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED
-            ],
+            use_clarification_tool=self.agent.config.argument_clarifications_enabled,
             clarification_tool_args=clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
         )
@@ -196,12 +195,14 @@ class OneShotToolCallingModel:
             and self.agent.tool
         ):
             for tool_call in response.tool_calls:  # pyright: ignore[reportAttributeAccessIssue]
+                logger().debug("Calling before_tool_call execution hook")
                 clarification = self.agent.execution_hooks.before_tool_call(
                     self.agent.tool,
                     tool_call.get("args"),
                     ReadOnlyPlanRun.from_plan_run(self.agent.plan_run),
                     ReadOnlyStep.from_step(self.agent.step),
                 )
+                logger().debug("Finished before_tool_call execution hook")
                 if clarification:
                     self.agent.new_clarifications.append(clarification)
                     return {"messages": []}
@@ -221,7 +222,7 @@ class OneShotAgent(BaseExecutionAgent):
 
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         plan: Plan,
         plan_run: PlanRun,
@@ -280,7 +281,7 @@ class OneShotAgent(BaseExecutionAgent):
             ),
         ]
         clarification_tool = ClarificationTool(step=self.plan_run.current_step_index)
-        if self.config.feature_flags[FEATURE_FLAG_ONE_SHOT_AGENT_CLARIFICATIONS_ENABLED]:
+        if self.config.argument_clarifications_enabled:
             tools.append(clarification_tool.to_langchain_with_artifact(ctx=tool_run_ctx))
         tool_node = ToolNode(tools)
 

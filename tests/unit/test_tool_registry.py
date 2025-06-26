@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import mcp
 import pytest
+from httpx import HTTPStatusError
 from mcp import ClientSession
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
@@ -15,6 +17,7 @@ from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.model import GenerativeModel
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import open_source_tool_registry
+from portia.tool import PortiaRemoteTool
 from portia.tool_registry import (
     InMemoryToolRegistry,
     McpToolRegistry,
@@ -27,6 +30,7 @@ from tests.utils import MockMcpSessionWrapper, MockTool, get_test_tool_context
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pytest_httpx import HTTPXMock
     from pytest_mock import MockerFixture
 
 
@@ -76,6 +80,24 @@ def test_tool_registry_get_tools() -> None:
     assert len(tools) == 2
     assert any(tool.id == MOCK_TOOL_ID for tool in tools)
     assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tools)
+
+
+def test_tool_registry_iter() -> None:
+    """Test iterating over a ToolRegistry."""
+    tool_registry = ToolRegistry(
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
+    )
+    assert len(list(tool_registry)) == 2
+    assert any(tool.id == MOCK_TOOL_ID for tool in tool_registry)
+    assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tool_registry)
+
+
+def test_tool_registry_len() -> None:
+    """Test the length of a ToolRegistry."""
+    tool_registry = ToolRegistry(
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
+    )
+    assert len(tool_registry) == 2
 
 
 def test_tool_registry_match_tools() -> None:
@@ -231,6 +253,253 @@ def test_portia_tool_registry_missing_required_args() -> None:
         PortiaToolRegistry()
 
 
+def test_portia_tool_registry_load_tools(httpx_mock: HTTPXMock) -> None:
+    """Test the _load_tools class method with HTTPXMock."""
+    # Create mock response data that matches the expected API format
+    mock_response_data = {
+        "tools": [
+            {
+                "tool_id": "test_tool_1",
+                "tool_name": "Test Tool 1",
+                "should_summarize": True,
+                "description": {
+                    "overview_description": "This is a test tool for unit testing",
+                    "overview": "Tool overview",
+                    "output_description": "Returns test data",
+                },
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "input_param": {"type": "string", "description": "Test input parameter"}
+                    },
+                    "required": ["input_param"],
+                },
+            },
+            {
+                "tool_id": "test_tool_2",
+                "tool_name": "Test Tool 2",
+                "should_summarize": False,
+                "description": {
+                    "overview_description": "This is another test tool",
+                    "overview": "Another overview",
+                    "output_description": "Returns different test data",
+                },
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "number_param": {"type": "integer", "description": "Test number parameter"}
+                    },
+                    "required": [],
+                },
+            },
+        ],
+        "errors": [{"app_name": "failing_app", "error": "Some error occurred"}],
+    }
+
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        json=mock_response_data,
+        status_code=200,
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test the PortiaToolRegistry initialization with the client
+    tools = PortiaToolRegistry(client=client)
+
+    # Verify the tools were created correctly
+    assert len(tools.get_tools()) == 2
+
+    # Check first tool
+    tool1 = tools.get_tool("test_tool_1")
+    assert isinstance(tool1, PortiaRemoteTool)
+    assert tool1.id == "test_tool_1"
+    assert tool1.name == "Test Tool 1"
+    assert tool1.should_summarize is True
+    assert tool1.description == "This is a test tool for unit testing"
+    assert tool1.output_schema == ("Tool overview", "Returns test data")
+
+    # Check second tool
+    tool2 = tools.get_tool("test_tool_2")
+    assert isinstance(tool2, PortiaRemoteTool)
+    assert tool2.id == "test_tool_2"
+    assert tool2.name == "Test Tool 2"
+    assert tool2.should_summarize is False
+    assert tool2.description == "This is another test tool"
+    assert tool2.output_schema == ("Another overview", "Returns different test data")
+
+
+def test_portia_tool_registry_load_tools_fallback_v1(httpx_mock: HTTPXMock) -> None:
+    """Test PortiaToolRegistry fallback to describe-tools v1 API on 404 of v2 API."""
+    mock_response_data = [
+        {
+            "tool_id": "test_tool_1",
+            "tool_name": "Test Tool 1",
+            "should_summarize": True,
+            "description": {
+                "overview_description": "This is a test tool for unit testing",
+                "overview": "Tool overview",
+                "output_description": "Returns test data",
+            },
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "input_param": {"type": "string", "description": "Test input parameter"}
+                },
+                "required": ["input_param"],
+            },
+        },
+        {
+            "tool_id": "test_tool_2",
+            "tool_name": "Test Tool 2",
+            "should_summarize": False,
+            "description": {
+                "overview_description": "This is another test tool",
+                "overview": "Another overview",
+                "output_description": "Returns different test data",
+            },
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "number_param": {"type": "integer", "description": "Test number parameter"}
+                },
+                "required": [],
+            },
+        },
+    ]
+
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        status_code=404,
+    )
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions/",
+        json=mock_response_data,
+        status_code=200,
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test the PortiaToolRegistry initialization with the client
+    tools = PortiaToolRegistry(client=client)
+
+    # Verify the tools were created correctly
+    assert len(tools.get_tools()) == 2
+
+
+def test_portia_tool_registry_load_tools_with_logger_warning(
+    httpx_mock: HTTPXMock, mocker: MockerFixture
+) -> None:
+    """Test the _load_tools method logs warnings for errors in the response."""
+    # Mock the logger
+    mock_logger = mocker.Mock()
+    mocker.patch("portia.tool_registry.logger", return_value=mock_logger)
+
+    # Create mock response data with errors
+    mock_response_data = {
+        "tools": [],
+        "errors": [
+            {"app_name": "failing_app_1", "error": "Connection timeout"},
+            {"app_name": "failing_app_2", "error": "Authentication failed"},
+        ],
+    }
+
+    # Mock the HTTP response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        json=mock_response_data,
+        status_code=200,
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test the PortiaToolRegistry initialization with the client
+    tools = PortiaToolRegistry(client=client)
+
+    # Verify no tools were created
+    assert len(tools.get_tools()) == 0
+
+    # Verify warnings were logged for each error
+    expected_calls = [
+        mocker.call("Error loading Portia Cloud tool for app: failing_app_1: Connection timeout"),
+        mocker.call(
+            "Error loading Portia Cloud tool for app: failing_app_2: Authentication failed"
+        ),
+    ]
+    mock_logger.warning.assert_has_calls(expected_calls)
+
+
+def test_portia_tool_registry_load_tools_http_error(httpx_mock: HTTPXMock) -> None:
+    """Test that PortiaToolRegistry handles HTTP errors properly."""
+    # Mock an HTTP error response
+    httpx_mock.add_response(
+        url="https://api.example.com/api/v0/tools/descriptions-v2/",
+        status_code=401,
+        text="Unauthorized",
+    )
+
+    # Create real client with base URL
+    client = httpx.Client(base_url="https://api.example.com")
+
+    # Test that HTTP errors are raised
+    with pytest.raises(HTTPStatusError) as exc_info:
+        PortiaToolRegistry(client=client)
+
+    assert exc_info.value.response.status_code == 401
+
+
+def test_tool_registry_with_tool_description() -> None:
+    """Test updating a tool registry with a new tool description."""
+    mock_tool_1 = MockTool(id=MOCK_TOOL_ID, description="mock tool 1")
+    mock_tool_2 = MockTool(id=OTHER_MOCK_TOOL_ID, description="mock tool 2")
+    tool_registry = ToolRegistry([mock_tool_1, mock_tool_2])
+
+    tool_registry.with_tool_description(MOCK_TOOL_ID, "A bit more description")
+
+    assert len(tool_registry.get_tools()) == 2
+    assert tool_registry.get_tool(MOCK_TOOL_ID).description == "mock tool 1. A bit more description"
+    assert tool_registry.get_tool(OTHER_MOCK_TOOL_ID).description == "mock tool 2"
+
+    # The updated tool description should not have affected the original tool
+    assert mock_tool_1.description == "mock tool 1"
+
+
+def test_tool_registry_with_tool_description_overwrite() -> None:
+    """Test updating a tool registry with a new tool description."""
+    mock_tool_1 = MockTool(id=MOCK_TOOL_ID, description="mock tool 1")
+    tool_registry = ToolRegistry(
+        [mock_tool_1, MockTool(id=OTHER_MOCK_TOOL_ID, description="mock tool 2")]
+    )
+
+    tool_registry.with_tool_description(MOCK_TOOL_ID, "A bit more description", overwrite=True)
+
+    assert len(tool_registry.get_tools()) == 2
+    assert tool_registry.get_tool(MOCK_TOOL_ID).description == "A bit more description"
+    assert tool_registry.get_tool(OTHER_MOCK_TOOL_ID).description == "mock tool 2"
+
+    # The updated tool description should not have affected the original tool
+    assert mock_tool_1.description == "mock tool 1"
+
+
+def test_tool_registry_with_tool_description_tool_id_not_found(mocker: MockerFixture) -> None:
+    """Test updating a tool registry with a description for a tool that wasn't found."""
+    mock_logger = mocker.Mock()
+    mocker.patch("portia.tool_registry.logger", return_value=mock_logger)
+
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
+    tool_registry.with_tool_description("unknown_id", "very descriptive")
+
+    mock_logger.warning.assert_called_once_with(
+        "Unknown tool ID: unknown_id. Description was not edited."
+    )
+    assert len(tool_registry.get_tools()) == 1
+
+
 def test_tool_registry_reconfigure_llm_tool() -> None:
     """Test replacing the LLMTool with a new LLMTool."""
     registry = ToolRegistry(open_source_tool_registry.get_tools())
@@ -336,6 +605,39 @@ def test_mcp_tool_registry_get_tool(mcp_tool_registry: McpToolRegistry) -> None:
     assert tool.name == "test_tool"
     assert tool.description == "I am a tool"
     assert issubclass(tool.args_schema, BaseModel)
+
+
+def test_mcp_tool_registry_filters_bad_tools() -> None:
+    """Test that the MCPToolRegistry filters out tools that are not valid."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.list_tools = AsyncMock(
+        return_value=mcp.ListToolsResult(
+            tools=[
+                mcp.Tool(
+                    name="test_tool",
+                    description="I am a tool",
+                    inputSchema={"type": "object", "properties": {"input": {"type": "string"}}},
+                ),
+                mcp.Tool(
+                    name="test_tool_2",
+                    description="I am another tool," * 400,  # over 4096 characters
+                    inputSchema={"type": "object", "properties": {"input": {"type": "number"}}},
+                ),
+            ],
+        )
+    )
+
+    with patch(
+        "portia.tool_registry.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        registry = McpToolRegistry.from_stdio_connection(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        )
+        assert len(registry.get_tools()) == 1
+        assert registry.get_tool("mcp:mock_mcp:test_tool").description == "I am a tool"
 
 
 def test_generate_pydantic_model_from_json_schema() -> None:
@@ -530,3 +832,119 @@ def test_generate_pydantic_model_from_json_schema_handles_omissible_fields() -> 
     assert deserialized.email is None  # pyright: ignore[reportAttributeAccessIssue]
     assert deserialized.phone is None  # pyright: ignore[reportAttributeAccessIssue]
     assert deserialized.model_dump() == {"name": "John", "phone": None}
+
+
+def test_generate_pydantic_model_from_json_schema_handles_omissible_fields_model_isolation() -> (
+    None
+):
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check that the generated base model is isolated for each tool.
+    """
+    model_1 = generate_pydantic_model_from_json_schema(
+        "TestOmissibleFields",
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "The name of the customer"},
+            },
+        },
+    )
+    model_2 = generate_pydantic_model_from_json_schema(
+        "TestOmissibleFields",
+        {
+            "type": "object",
+            "properties": {
+                "last_name": {"type": "string", "description": "The last name of the customer"},
+            },
+        },
+    )
+    assert model_1._fields_must_omit_none_on_serialize == ["name"]  # type: ignore  # noqa: PGH003, SLF001
+    assert model_2._fields_must_omit_none_on_serialize == ["last_name"]  # type: ignore  # noqa: PGH003, SLF001
+
+
+@pytest.mark.usefixtures("mock_get_mcp_session")
+def test_mcp_tool_registry_from_streamable_http_connection() -> None:
+    """Test constructing a McpToolRegistry from a StreamableHTTP connection."""
+    mcp_registry_streamable_http = McpToolRegistry.from_streamable_http_connection(
+        server_name="mock_mcp",
+        url="http://localhost:8000/mcp",
+    )
+    assert isinstance(mcp_registry_streamable_http, McpToolRegistry)
+
+
+@pytest.mark.usefixtures("mock_get_mcp_session")
+async def test_mcp_tool_registry_from_streamable_http_connection_async() -> None:
+    """Test constructing a McpToolRegistry from a StreamableHTTP connection (async)."""
+    mcp_registry_streamable_http = await McpToolRegistry.from_streamable_http_connection_async(
+        server_name="mock_mcp",
+        url="http://localhost:8000/mcp",
+    )
+    assert isinstance(mcp_registry_streamable_http, McpToolRegistry)
+
+
+def test_mcp_tool_registry_load_tools_error_in_async() -> None:
+    """Test that an error in the async _load_tools method is raised."""
+
+    class CustomError(Exception):
+        """Custom exception for testing."""
+
+    with (
+        patch.object(
+            McpToolRegistry, "_load_tools_async", side_effect=CustomError("test message 123")
+        ),
+        pytest.raises(CustomError, match="test message 123"),
+    ):
+        McpToolRegistry.from_stdio_connection(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        )
+
+
+def test_mcp_tool_registry_loads_from_string() -> None:
+    """Test that a McpToolRegistry can be loaded from a string."""
+    config_str = """{
+        "mcpServers": {
+            "basic-memory": {
+                "command": "uvx",
+                "args": ["basic-memory", "mcp"]
+            }
+        }
+    }"""
+    with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
+        registry = McpToolRegistry.from_stdio_connection_raw(config_str)
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
+
+    config_str = """{
+        "servers": {
+            "basic-memory": {
+                "command": "uvx",
+                "args": ["basic-memory", "mcp"]
+            }
+        }
+    }"""
+    with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
+        registry = McpToolRegistry.from_stdio_connection_raw(config_str)
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
+
+    config_dict = {
+        "mcpServers": {"basic-memory": {"command": "uvx", "args": ["basic-memory", "mcp"]}}
+    }
+    with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
+        registry = McpToolRegistry.from_stdio_connection_raw(config_dict)
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
+
+    broken_config_str = "{"
+    with pytest.raises(ValueError, match="Invalid JSON"):
+        McpToolRegistry.from_stdio_connection_raw(broken_config_str)
+
+    invalid_config_str = """{}"""
+    with pytest.raises(ValueError, match="Invalid MCP client config"):
+        McpToolRegistry.from_stdio_connection_raw(invalid_config_str)

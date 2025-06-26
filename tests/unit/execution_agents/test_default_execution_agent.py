@@ -1207,6 +1207,64 @@ def test_optional_args_with_none_values() -> None:
     assert updated_tool_inputs.args[0].made_up is False
 
 
+class ListToolSchema(BaseModel):
+    """List tool schema."""
+
+    list_arg: list[str] = Field(..., description="An optional argument")
+
+
+class ListToolAgent:
+    """ListTool agent."""
+
+    def __init__(self) -> None:
+        """Init mock agent."""
+        self.tool = ListTool()
+
+
+class ListTool(Tool):
+    """List tool."""
+
+    def __init__(self) -> None:
+        """Init List tool."""
+        super().__init__(
+            name="List Tool",
+            id="list_tool",
+            description="List tool description",
+            args_schema=ListToolSchema,
+            output_schema=("type", "A description of the output"),
+        )
+
+    def run(self, **kwargs: Any) -> Any:  # noqa: ANN401, ARG002
+        """Run mock tool."""
+        return "RUN_RESULT"
+
+
+def test_list_args_with_str_values() -> None:
+    """Test that list args with str values are handled correctly."""
+    (plan, plan_run) = get_test_plan_run()
+    agent = DefaultExecutionAgent(
+        plan=plan,
+        plan_run=plan_run,
+        end_user=EndUser(external_id="123"),
+        config=get_test_config(),
+        tool=ListTool(),
+        agent_memory=InMemoryStorage(),
+    )
+    model = VerifierModel(
+        model=LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name="test"),
+        agent=agent,
+        tool_context=get_test_tool_context(),
+    )
+
+    updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
+        VerifiedToolInputs(
+            args=[VerifiedToolArgument(name="list_arg", value="[1,2,3]", made_up=False)],
+        ),
+        [],
+    )
+    assert updated_tool_inputs.args[0].schema_invalid is False
+
+
 def test_verifier_model_edge_cases() -> None:
     """Tests edge cases are handled."""
     agent = SimpleNamespace(

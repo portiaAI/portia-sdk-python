@@ -63,6 +63,9 @@ only has access to the tool, task and inputs you provide it (as well as select o
 such as the end user block).
 
 IMPORTANT GUIDELINES:
+- Always prefer to use any other tool over the LLMTool if possible. For example use the
+ email tool to send an email rather than the LLMTool to output an email format or use the
+ github star tool to star a repo rather than the LLMTool to output instructions to star a repo.
 - When using multiple tools, pay attention to the tools to make sure the chain of steps works,
  but DO NOT provide any examples or assumptions in the task descriptions.
 - If you are missing information do not make up placeholder variables like example@example.com.

@@ -18,20 +18,32 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import threading
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
+import httpx
 from jsonref import replace_refs
-from pydantic import BaseModel, Field, create_model, model_serializer
+from pydantic import BaseModel, Field, ValidationError, create_model, model_serializer
 from pydantic_core import PydanticUndefined
 
 from portia.cloud import PortiaCloudClient
-from portia.errors import DuplicateToolError, ToolNotFoundError
+from portia.errors import DuplicateToolError, InvalidToolDescriptionError, ToolNotFoundError
 from portia.logger import logger
 from portia.mcp_session import (
     McpClientConfig,
     SseMcpClientConfig,
     StdioMcpClientConfig,
+    StreamableHttpMcpClientConfig,
     get_mcp_session,
 )
 from portia.open_source_tools.calculator_tool import CalculatorTool
@@ -44,9 +56,8 @@ from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Coroutine, Iterator, Sequence
 
-    import httpx
     import mcp
     from pydantic_core.core_schema import SerializerFunctionWrapHandler
 
@@ -64,15 +75,17 @@ class ToolRegistry:
         with_tool(tool: Tool, *, overwrite: bool = False) -> None:
             Inserts a new tool.
         replace_tool(tool: Tool) -> None:
-            Replaces a tool with a new tool.
+            Replaces a tool with a new tool in the current registry.
             NB. This is a shortcut for `with_tool(tool, overwrite=True)`.
         get_tool(tool_id: str) -> Tool:
             Retrieves a tool by its ID.
         get_tools() -> list[Tool]:
             Retrieves all tools in the registry.
         match_tools(query: str | None = None, tool_ids: list[str] | None = None) -> list[Tool]:
-            Optionally, retrieve tools that match a given query and tool_ids. Useful to implement
-            tool filtering.
+            Optionally, retrieve tools that match a given query and tool_ids.
+        filter_tools(predicate: Callable[[Tool], bool]) -> ToolRegistry:
+            Create a new tool registry with only the tools that match the predicate. Useful to
+            implement tool exclusions.
 
     """
 
@@ -181,6 +194,36 @@ class ToolRegistry:
         """
         return ToolRegistry({tool.id: tool for tool in self._tools.values() if predicate(tool)})
 
+    def with_tool_description(
+        self, tool_id: str, updated_description: str, *, overwrite: bool = False
+    ) -> ToolRegistry:
+        """Update a tool with an extension or override of the tool description.
+
+        Args:
+            tool_id (str): The id of the tool to update.
+            updated_description (str): The tool description to update. If `overwrite` is False, this
+                will extend the existing tool description, otherwise, the entire tool description
+                will be updated.
+            overwrite (bool): Whether to update or extend the existing tool description.
+
+        Returns:
+            Self: The tool registry is updated in place and returned.
+
+        Particularly useful for customising tools in MCP servers for usecases. A deep copy is made
+        of the underlying tool such that the tool description is only updated within this registry.
+        Logs a warning if the tool is not found.
+
+        """
+        try:
+            tool = self.get_tool(tool_id=tool_id)
+            new_description = (
+                updated_description if overwrite else f"{tool.description}. {updated_description}"
+            )
+            self.replace_tool(tool.model_copy(update={"description": new_description}, deep=False))
+        except ToolNotFoundError:
+            logger().warning(f"Unknown tool ID: {tool_id}. Description was not edited.")
+        return self
+
     def __add__(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Return an aggregated tool registry combining two registries or a registry and tool list.
 
@@ -208,6 +251,14 @@ class ToolRegistry:
 
         """
         return self._add(other)
+
+    def __iter__(self) -> Iterator[Tool]:
+        """Iterate over the tools in the registry."""
+        return iter(self._tools.values())
+
+    def __len__(self) -> int:
+        """Return the number of tools in the registry."""
+        return len(self._tools)
 
     def _add(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Add a tool registry or Tool list to the current registry."""
@@ -253,12 +304,7 @@ class PortiaToolRegistry(ToolRegistry):
     This class interacts with the Portia API to retrieve and manage tools.
     """
 
-    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset(
-        {
-            # Exclude Outlook by default as it clashes with Gmail
-            "portia:microsoft:outlook:*",
-        },
-    )
+    EXCLUDED_BY_DEFAULT_TOOL_REGEXS: frozenset[str] = frozenset()
 
     def __init__(
         self,
@@ -301,11 +347,23 @@ class PortiaToolRegistry(ToolRegistry):
     def _load_tools(cls, client: httpx.Client) -> dict[str, Tool]:
         """Load the tools from the API into the into the internal storage."""
         response = client.get(
-            url="/api/v0/tools/descriptions/",
+            url="/api/v0/tools/descriptions-v2/",
         )
-        response.raise_for_status()
+        if response.status_code == httpx.codes.NOT_FOUND:
+            response = client.get(
+                url="/api/v0/tools/descriptions/",
+            )
+            response_tools = response.json()
+        else:
+            response.raise_for_status()
+            response_tools = response.json().get("tools", [])
+            for error in response.json().get("errors", []):
+                logger().warning(
+                    f"Error loading Portia Cloud tool for app: {error['app_name']}: "
+                    f"{error['error']}"
+                )
         tools = {}
-        for raw_tool in response.json():
+        for raw_tool in response_tools:
             tool = PortiaRemoteTool(
                 id=raw_tool["tool_id"],
                 name=raw_tool["tool_name"],
@@ -340,6 +398,7 @@ class McpToolRegistry(ToolRegistry):
         headers: dict[str, Any] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Sync version)."""
         config = SseMcpClientConfig(
@@ -349,7 +408,7 @@ class McpToolRegistry(ToolRegistry):
             timeout=timeout,
             sse_read_timeout=sse_read_timeout,
         )
-        tools = cls._load_tools(config)
+        tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
@@ -360,6 +419,7 @@ class McpToolRegistry(ToolRegistry):
         headers: dict[str, Any] | None = None,
         timeout: float = 5,  # noqa: ASYNC109
         sse_read_timeout: float = 60 * 5,
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Async version)."""
         config = SseMcpClientConfig(
@@ -369,11 +429,11 @@ class McpToolRegistry(ToolRegistry):
             timeout=timeout,
             sse_read_timeout=sse_read_timeout,
         )
-        tools = await cls._load_tools_async(config)
+        tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
-    def from_stdio_connection(  # noqa: PLR0913
+    def from_stdio_connection(
         cls,
         server_name: str,
         command: str,
@@ -381,6 +441,7 @@ class McpToolRegistry(ToolRegistry):
         env: dict[str, str] | None = None,
         encoding: str = "utf-8",
         encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection (Sync version)."""
         config = StdioMcpClientConfig(
@@ -391,11 +452,33 @@ class McpToolRegistry(ToolRegistry):
             encoding=encoding,
             encoding_error_handler=encoding_error_handler,
         )
-        tools = cls._load_tools(config)
+        tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
-    async def from_stdio_connection_async(  # noqa: PLR0913
+    def from_stdio_connection_raw(
+        cls,
+        config: str | dict[str, Any],
+        tool_list_read_timeout: float | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a stdio connection from a string.
+
+        Parses commonly used mcp client config formats.
+
+        Args:
+            config: The string or dict to parse.
+            tool_list_read_timeout: The timeout for the request.
+
+        Returns:
+            A McpToolRegistry.
+
+        """
+        parsed_config = StdioMcpClientConfig.from_raw(config)
+        tools = cls._load_tools(parsed_config, read_timeout=tool_list_read_timeout)
+        return cls(tools)
+
+    @classmethod
+    async def from_stdio_connection_async(
         cls,
         server_name: str,
         command: str,
@@ -403,6 +486,7 @@ class McpToolRegistry(ToolRegistry):
         env: dict[str, str] | None = None,
         encoding: str = "utf-8",
         encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
+        tool_list_read_timeout: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection (Async version)."""
         config = StdioMcpClientConfig(
@@ -413,29 +497,158 @@ class McpToolRegistry(ToolRegistry):
             encoding=encoding,
             encoding_error_handler=encoding_error_handler,
         )
-        tools = await cls._load_tools_async(config)
+        tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
     @classmethod
-    def _load_tools(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
-        """Sync version to load tools from an MCP server."""
-        return asyncio.run(cls._load_tools_async(mcp_client_config))
+    def from_streamable_http_connection(
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 30,
+        sse_read_timeout: float = 60 * 5,
+        *,
+        terminate_on_close: bool = True,
+        auth: httpx.Auth | None = None,
+        tool_list_read_timeout: float | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a StreamableHTTP connection (Sync version)."""
+        config = StreamableHttpMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
+            terminate_on_close=terminate_on_close,
+            auth=auth,
+        )
+        tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
+        return cls(tools)
 
     @classmethod
-    async def _load_tools_async(cls, mcp_client_config: McpClientConfig) -> list[PortiaMcpTool]:
-        """Async version to load tools from an MCP server."""
-        async with get_mcp_session(mcp_client_config) as session:
-            logger().debug("Fetching tools from MCP server")
-            tools = await session.list_tools()
-            logger().debug(f"Got {len(tools.tools)} tools from MCP server")
-            return [cls._portia_tool_from_mcp_tool(tool, mcp_client_config) for tool in tools.tools]
+    async def from_streamable_http_connection_async(
+        cls,
+        server_name: str,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 30,  # noqa: ASYNC109
+        sse_read_timeout: float = 60 * 5,
+        *,
+        terminate_on_close: bool = True,
+        auth: httpx.Auth | None = None,
+        tool_list_read_timeout: float | None = None,
+    ) -> McpToolRegistry:
+        """Create a new MCPToolRegistry using a StreamableHTTP connection (Async version)."""
+        config = StreamableHttpMcpClientConfig(
+            server_name=server_name,
+            url=url,
+            headers=headers,
+            timeout=timeout,
+            sse_read_timeout=sse_read_timeout,
+            terminate_on_close=terminate_on_close,
+            auth=auth,
+        )
+        tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
+        return cls(tools)
+
+    @classmethod
+    def _load_tools(
+        cls,
+        mcp_client_config: McpClientConfig,
+        *,
+        read_timeout: float | None = None,
+    ) -> list[PortiaMcpTool]:
+        """Sync version to load tools from an MCP server."""
+        T = TypeVar("T")
+
+        def _run_async_in_new_loop(coro: Coroutine[Any, Any, T]) -> T:
+            """Run an asynchronous coroutine in a new event loop within a separate thread.
+
+            Args:
+                coro: The coroutine to execute.
+                read_timeout (float): The timeout for the request.
+
+            Returns:
+                The result returned by the coroutine.
+
+            """
+            result_container: dict[str, T | Exception] = {}
+
+            def runner() -> None:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result_container["result"] = loop.run_until_complete(coro)
+                except Exception as e:  # noqa: BLE001
+                    result_container["error"] = e
+                finally:
+                    loop.close()
+
+            thread = threading.Thread(target=runner)
+            thread.start()
+            thread.join()
+            if isinstance(result_container.get("error"), Exception):
+                raise result_container["error"]  # type: ignore  # noqa: PGH003
+            return result_container["result"]  # type: ignore  # noqa: PGH003
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:  # pragma: no cover
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        return _run_async_in_new_loop(
+            cls._load_tools_async(mcp_client_config, read_timeout=read_timeout),
+        )
+
+    @classmethod
+    async def _load_tools_async(
+        cls,
+        mcp_client_config: McpClientConfig,
+        *,
+        read_timeout: float | None = None,
+    ) -> list[PortiaMcpTool]:
+        """Async version to load tools from an MCP server.
+
+        The MCP client session doesn't support timeouts for list_tools, so we use
+        our own implementation to wrap the request in a timeout.
+
+        Args:
+            mcp_client_config (McpClientConfig): The MCP client configuration.
+            read_timeout (float): The timeout for the request.
+
+        Returns:
+            list[PortiaMcpTool]: The list of Portia MCP tools.
+
+        """
+
+        async def _inner() -> list[PortiaMcpTool]:
+            """Inner function to wrap in wait_for to implement timeout."""
+            async with get_mcp_session(mcp_client_config) as session:
+                logger().debug("Fetching tools from MCP server")
+                tools = await session.list_tools()
+                logger().debug(f"Got {len(tools.tools)} tools from MCP server")
+                return [
+                    portia_tool
+                    for tool in tools.tools
+                    if (
+                        portia_tool := cls._portia_tool_from_mcp_tool(
+                            tool,
+                            mcp_client_config,
+                        )
+                    )
+                    is not None
+                ]
+
+        return await asyncio.wait_for(_inner(), timeout=read_timeout)
 
     @classmethod
     def _portia_tool_from_mcp_tool(
         cls,
         mcp_tool: mcp.Tool,
         mcp_client_config: McpClientConfig,
-    ) -> PortiaMcpTool:
+    ) -> PortiaMcpTool | None:
         """Conversion of a remote MCP server tool to a Portia tool."""
         tool_name_snake_case = re.sub(r"[^a-zA-Z0-9]+", "_", mcp_tool.name)
 
@@ -444,18 +657,24 @@ class McpToolRegistry(ToolRegistry):
             if mcp_tool.description is not None
             else f"{mcp_tool.name} tool from {mcp_client_config.server_name}"
         )
-
-        return PortiaMcpTool(
-            id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
-            name=mcp_tool.name,
-            description=description,
-            args_schema=generate_pydantic_model_from_json_schema(
-                f"{tool_name_snake_case}_schema",
-                mcp_tool.inputSchema,
-            ),
-            output_schema=("str", "The response from the tool formatted as a JSON string"),
-            mcp_client_config=mcp_client_config,
-        )
+        try:
+            return PortiaMcpTool(
+                id=f"mcp:{mcp_client_config.server_name}:{tool_name_snake_case}",
+                name=mcp_tool.name,
+                description=description,
+                args_schema=generate_pydantic_model_from_json_schema(
+                    f"{tool_name_snake_case}_schema",
+                    mcp_tool.inputSchema,
+                ),
+                output_schema=("str", "The response from the tool formatted as a JSON string"),
+                mcp_client_config=mcp_client_config,
+            )
+        except (ValidationError, InvalidToolDescriptionError) as e:
+            logger().warning(
+                f"Error creating Portia Tool object for tool from {mcp_client_config.server_name} "
+                f"with name {mcp_tool.name}: {e}"
+            )
+            return None
 
 
 class DefaultToolRegistry(ToolRegistry):
@@ -497,6 +716,11 @@ class GeneratedBaseModel(BaseModel):
     """
 
     _fields_must_omit_none_on_serialize: ClassVar[list[str]] = []
+
+    def __init_subclass__(cls) -> None:
+        """Ensure omissible fields are isolated between models."""
+        super().__init_subclass__()
+        cls._fields_must_omit_none_on_serialize = []
 
     @model_serializer(mode="wrap")
     def serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
@@ -602,7 +826,7 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  #
             types = [
                 _map_single_pydantic_type(field_name, t, allow_nonetype=True) for t in union_types
             ]
-            return Union[*types]
+            return Union[*types]  # pyright: ignore[reportInvalidTypeForm, reportInvalidTypeArguments]
         case _:
             logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
             return Any

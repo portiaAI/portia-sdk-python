@@ -28,8 +28,31 @@ def test_portia_enum() -> None:
 
 def test_combine_args_kwargs() -> None:
     """Test combining args and kwargs into a single dictionary."""
-    result = combine_args_kwargs(1, 2, three=3, four=4)
-    assert result == {"0": 1, "1": 2, "three": 3, "four": 4}
+
+    class Comment(BaseModel):
+        """Test comment model."""
+
+        body: str
+        public: bool
+
+    comment = Comment(body="The issue is being reviewed.", public=True)
+    result = combine_args_kwargs(
+        98765,  # ticket_id as positional arg
+        comment,  # comment as positional arg
+        subject="Updated ticket subject",
+        priority="high",
+        status="in_progress",
+        assignee_id=12345,
+    )
+
+    assert result == {
+        "0": 98765,
+        "1": {"body": "The issue is being reviewed.", "public": True},
+        "subject": "Updated ticket subject",
+        "priority": "high",
+        "status": "in_progress",
+        "assignee_id": 12345,
+    }
 
 
 class TestPrefixedUUID:
