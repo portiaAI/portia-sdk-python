@@ -201,10 +201,11 @@ def process_output(  # noqa: C901 PLR0912
     summaries = []
 
     for output in output_values:
-        if isinstance(output.get_value(), list):
-            values.extend(output.get_value())
+        output_value = output.get_value()
+        if isinstance(output_value, list):
+            values.extend(output_value)
         else:
-            values.append(output.get_value())
+            values.append(output_value)
         summaries.append(output.get_summary() or output.serialize_value())
 
     # If there is multiple tool calls (unrolling), then the final summary for all tool calls are

@@ -116,7 +116,7 @@ class StepSummarizer:
 
         logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
         tool_output = " OUTPUT_SEPARATOR ".join(
-            msg.content for msg in messages if isinstance(msg, ToolMessage)
+            str(msg.content) for msg in messages if isinstance(msg, ToolMessage)
         )
         if self.config.exceeds_output_threshold(tool_output):
             tool_output = (
