@@ -15,13 +15,13 @@ import dotenv
 from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
 from textual.message import Message
 from textual.reactive import reactive, var
-from textual.widgets import Button, Footer, Header, Label, RichLog, Static, TextArea, ListView, ListItem
+from textual.widgets import Button, Footer, Header, Label, RichLog, Static, TextArea, ListView, ListItem, Link
 
 from portia import PlanRun, Portia
-from portia.clarification import Clarification
+from portia.clarification import ActionClarification, Clarification
 from portia.config import Config
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
@@ -58,7 +58,7 @@ class QueryText(Static):
             self.query_text = query_text
 
     def compose(self) -> ComposeResult:
-        yield PanelTitle("Query: Write your query here")
+        yield PanelTitle("Query: Write your query below")
         yield TextArea(id="query-input")
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
@@ -78,7 +78,9 @@ class ToolsList(Static):
         tools = portia.tool_registry
         for tool in tools:
             name = tool.name.replace("Portia ", "")
-            self.query_one("#tools-list", ListView).append(ListItem(Label(name)))
+            list_item = ListItem(Label(name))
+            list_item.tooltip = tool.description
+            self.query_one("#tools-list", ListView).append(list_item)
 
 class PlanStepWidget(Static):
     """Widget to display a single plan step."""
@@ -113,13 +115,14 @@ class PlanPanel(Vertical):
     def compose(self) -> ComposeResult:
         """Compose the plan panel."""
         yield PanelTitle("Plan Viewer")
-        yield Container(id="plan-steps")
-        yield Container(id="plan-output")
+        yield ScrollableContainer(id="plan-steps")
+        yield ScrollableContainer(id="clarification-container")
+        yield ScrollableContainer(id="plan-output")
 
     def set_plan(self, plan: Plan) -> None:
         """Set the plan to display."""
         # Clear existing widgets
-        steps_container = self.query_one("#plan-steps", Container)
+        steps_container = self.query_one("#plan-steps", ScrollableContainer)
         steps_container.remove_children()
 
         # Add new step widgets
@@ -130,26 +133,61 @@ class PlanPanel(Vertical):
 
     def update_step_status(self, step_index: int, status: str) -> None:
         """Update the status of a specific step."""
-        steps_container = self.query_one("#plan-steps", Container)
+        steps_container = self.query_one("#plan-steps", ScrollableContainer)
         if 0 <= step_index < len(steps_container.children):
             child: PlanStepWidget = cast(PlanStepWidget, steps_container.children[step_index])
             child.status = status
 
     def update_final_output(self, output: Output) -> None:
         """Update the final output."""
-        output_container = self.query_one("#plan-output", Container)
+        output_container = self.query_one("#plan-output", ScrollableContainer)
         output_container.remove_children()
-        rich_log = RichLog(id="plan-output-rich-log")
+        output_container.mount(Label("[b][green]Final output[/green][/b]"))
+        rich_log = RichLog(id="plan-output-rich-log", auto_scroll=True, wrap=True)
         output_container.mount(rich_log)
-        rich_log.write("[b][green]Final output[/green][/b]")
         if isinstance(output, LocalDataValue):
             rich_log.write(str(output.value))
         else:
             rich_log.write(output.summary)
 
+    def set_clarifications(self, clarifications: list[Clarification]) -> None:
+        """Set the clarifications."""
+        clarification_container = self.query_one("#clarification-container", ScrollableContainer)
+        self.clear_clarifications()
+        if not clarifications:
+            return
+        for clarification in clarifications:
+            match clarification:
+                case ActionClarification():
+                    clarification_container.mount(Link("A Tool needs authorization", url=str(clarification.action_url)))
+                case _:
+                    clarification_container.mount(Label("Sorry, other clarification types are not supported here yet"))
+
+    def clear_clarifications(self) -> None:
+        """Clear the clarifications."""
+        clarification_container = self.query_one("#clarification-container", ScrollableContainer)
+        clarification_container.remove_children()
+
+    def clear_plan(self) -> None:
+        """Clear the plan."""
+        plan_container = self.query_one("#plan-steps", ScrollableContainer)
+        plan_container.remove_children()
+
+    def clear_output(self) -> None:
+        """Clear the output."""
+        output_container = self.query_one("#plan-output", ScrollableContainer)
+        output_container.remove_children()
+
     def set_status(self, status: str) -> None:
         """Set the status."""
         self.query_one(PanelTitle).set_status(status)
+
+    def reset_panel(self) -> None:
+        """Reset the panel."""
+        self.clear_clarifications()
+        self.clear_plan()
+        self.clear_output()
+        self.set_status("Ready")
 
 class LogCapture:
     """Captures stdout, stderr, and logging output from loguru."""
@@ -221,10 +259,9 @@ class LogPanel(Vertical):
         yield PanelTitle("Logs")
         yield RichLog(id="log-output", auto_scroll=True, wrap=True, highlight=True, markup=True)
 
-
-class PortiaExit(Exception):
-    """Exception to signal that the Portia execution should be stopped."""
-
+    def clear(self) -> None:
+        """Clear the log."""
+        self.query_one("#log-output", RichLog).clear()
 
 class PortiaGUI(App):
     """Main Portia GUI application."""
@@ -253,7 +290,8 @@ class PortiaGUI(App):
 
         self.query_text = "What is the weather in Tokyo?"
         self.execution_thread: threading.Thread | None = None
-        self.plan = None
+        self.plan: Plan | None = None
+        self.plan_run: PlanRun | None = None
 
     def compose(self) -> ComposeResult:
         """Compose the main application layout."""
@@ -300,10 +338,10 @@ class PortiaGUI(App):
                 plan_panel = self.query_one("#plan-panel PlanPanel", PlanPanel)
                 self.call_from_thread(plan_panel.set_plan, self.plan)
                 self.set_status("Planning complete")
-        except PortiaExit:
-            self.set_status("[red]Portia exited after planning stop requested by user[/red]")
         except Exception as e:
             self.set_status(f"[red]Planning failed: {e!s}[/red]")
+        finally:
+            self.call_from_thread(self._reset_buttons, self.query_one("#plan-btn", Button), self.query_one("#run-btn", Button))
 
     def _run_plan(self) -> None:
         if not self.plan:
@@ -330,7 +368,6 @@ class PortiaGUI(App):
         exec_hooks = ExecutionHooks(
             before_step_execution=before_step_execution,
             after_step_execution=after_step_execution,
-            clarification_handler=None
         )
 
         portia = Portia(
@@ -343,14 +380,31 @@ class PortiaGUI(App):
                 self.query_one("#log-output", RichLog),
                 level=portia.config.default_log_level.value
             ):
-                self.set_status("Executing...")
-                plan_run = portia.run_plan(self.plan)
                 self.call_from_thread(
-                    self.query_one("#plan-panel PlanPanel", PlanPanel).update_final_output,
-                    plan_run.outputs.final_output
+                    self.query_one("#plan-panel PlanPanel", PlanPanel).clear_clarifications
                 )
-        except PortiaExit:
-            self.set_status("[red]Portia exited after execution stop requested by user[/red]")
+                if self.plan_run:
+                    self.set_status("Resuming execution...")
+                    plan_run = portia.resume(self.plan_run)
+                else:
+                    self.set_status("Beginning execution...")
+                    plan_run = portia.run_plan(self.plan)
+                self.plan_run = plan_run
+                if clarifications := plan_run.get_outstanding_clarifications():
+                    self.set_status("Waiting for clarifications...")
+                    self.call_from_thread(
+                        self.query_one("#plan-panel PlanPanel", PlanPanel).set_clarifications,
+                        clarifications
+                    )
+                elif plan_run.outputs.final_output:
+                    self.call_from_thread(
+                        self.query_one("#plan-panel PlanPanel", PlanPanel).update_final_output,
+                        plan_run.outputs.final_output
+                    )
+                    self.set_status("Execution complete")
+                    self.plan_run = None
+                else:
+                    self.set_status("Something went wrong")
         except Exception as e:
             self.set_status(f"[red]Execution failed: {e!s}[/red]")
         finally:
@@ -374,7 +428,7 @@ class PortiaGUI(App):
         plan_btn = self.query_one("#plan-btn", Button)
         run_btn = self.query_one("#run-btn", Button)
         plan_btn.disabled = True
-        run_btn.disabled = False
+        run_btn.disabled = True
 
         # Clear the log
         log_widget = self.query_one("#log-output", RichLog)
@@ -388,7 +442,7 @@ class PortiaGUI(App):
     @on(Button.Pressed, "#run-btn")
     def run_plan(self) -> None:
         """Stop the execution."""
-        if not self.plan:
+        if not self.plan or self.plan_run:
             return
         self.start_thread(execute=True)
 
@@ -400,11 +454,17 @@ class PortiaGUI(App):
     @on(Button.Pressed, "#reset-btn")
     def quit_app(self) -> None:
         """Quit the application."""
-        self.exit()
+        self.plan_run = None
+        self.plan = None
+        self.execution_thread = None
+        self.query_one(PlanPanel).reset_panel()
+        self.query_one(LogPanel).clear()
+        self._reset_buttons(self.query_one("#plan-btn", Button), self.query_one("#run-btn", Button))
 
     def _reset_buttons(self, plan_btn: Button, run_btn: Button) -> None:
         """Reset button states after execution."""
-        run_btn.disabled = not self.plan
+        plan_btn.disabled = False
+        run_btn.disabled = not self.plan and not self.plan_run
 
 
 dotenv.load_dotenv()
