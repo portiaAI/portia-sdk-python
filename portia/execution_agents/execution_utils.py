@@ -210,6 +210,6 @@ def process_output(  # noqa: C901 PLR0912
 
     # If there is multiple tool calls (unrolling), then the final summary for all tool calls are
     # stored in the last tool call's summary.
-    final_summary = output_values[-1].get_summary() or ",".join(summaries)
+    final_summary = output_values[-1].get_summary() or ", ".join(summaries)
 
     return LocalDataValue(value=values, summary=final_summary)
