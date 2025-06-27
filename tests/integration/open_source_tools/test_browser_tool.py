@@ -1,3 +1,5 @@
+"""Integration tests for the browser tool."""
+
 from __future__ import annotations
 
 import pytest
@@ -61,10 +63,8 @@ def test_portia_run_query_multi_step() -> None:
     portia = Portia(
         config=config,
         tools=(
-            open_source_tool_registry
-            + [  # noqa: RUF005
-                BrowserTool(infrastructure_option=BrowserInfrastructureOption.REMOTE)
-            ]
+            open_source_tool_registry  # type: ignore reportOperatorIssue
+            + ToolRegistry([BrowserTool(infrastructure_option=BrowserInfrastructureOption.REMOTE)])
         ),
     )  # type: ignore reportOperatorIssue
     query = (
@@ -92,17 +92,19 @@ def test_portia_multi_step_from_plan() -> None:
     portia = Portia(
         config=config,
         tools=(
-            open_source_tool_registry # type: ignore reportOperatorIssue
-            + [ # noqa: RUF005
-                BrowserToolForUrl(
-                    infrastructure_option=BrowserInfrastructureOption.REMOTE,
-                    url="https://www.portialabs.ai",
-                ),
-                BrowserToolForUrl(
-                    infrastructure_option=BrowserInfrastructureOption.REMOTE,
-                    url="https://blog.portialabs.ai",
-                ),
-            ]
+            open_source_tool_registry  # type: ignore reportOperatorIssue
+            + ToolRegistry(
+                [
+                    BrowserToolForUrl(
+                        infrastructure_option=BrowserInfrastructureOption.REMOTE,
+                        url="https://www.portialabs.ai",
+                    ),
+                    BrowserToolForUrl(
+                        infrastructure_option=BrowserInfrastructureOption.REMOTE,
+                        url="https://blog.portialabs.ai",
+                    ),
+                ]
+            )
         ),
     )
 
