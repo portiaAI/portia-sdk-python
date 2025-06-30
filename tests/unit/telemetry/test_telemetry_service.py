@@ -204,6 +204,11 @@ class TestProductTelemetry:
             user_id2 = telemetry.user_id
             assert user_id1 == user_id2
 
+            telemetry._curr_user_id = None  # noqa: SLF001
+            # Third call after reset should return the same ID
+            user_id3 = telemetry.user_id
+            assert user_id1 == user_id3
+
     def test_user_id_error_handling(self, telemetry: ProductTelemetry) -> None:  # type: ignore reportGeneralTypeIssues
         """Test user ID error handling with invalid path.
 
