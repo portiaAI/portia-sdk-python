@@ -160,9 +160,11 @@ class TestProductTelemetry:
             mock_logger.debug.assert_called_with("Telemetry event: test_event {'key': 'value'}")
             mock_client.capture.assert_called_once()
             args = mock_client.capture.call_args[0]
-            assert args[1] == "test_event"
-            assert args[2]["key"] == "value"
-            assert args[2]["process_person_profile"] is True
+            assert args[0] == "test_event"
+
+            kwargs = mock_client.capture.call_args[1]
+            assert kwargs["properties"]["key"] == "value"
+            assert kwargs["properties"]["process_person_profile"] is True
 
     def test_capture_when_enabled_with_exception(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is enabled and PostHog client raises an exception."""

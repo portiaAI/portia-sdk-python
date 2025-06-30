@@ -587,8 +587,8 @@ def test_portia_mcp_tool_call() -> None:
         ),
     )
     expected = (
-        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null}],'
-        '"isError":false}'
+        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null,"meta":null}],'  # noqa: E501
+        '"structuredContent":null,"isError":false}'
     )
 
     with patch(
@@ -596,6 +596,7 @@ def test_portia_mcp_tool_call() -> None:
         new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
         tool_result = tool.run(get_test_tool_context(), a=1, b=2)
+        print(tool_result)
         assert tool_result == expected
 
 
