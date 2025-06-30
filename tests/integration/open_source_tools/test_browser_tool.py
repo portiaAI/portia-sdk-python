@@ -23,6 +23,7 @@ STORAGE = [
 ]
 
 
+@pytest.mark.daily
 @pytest.mark.parametrize("storage", STORAGE)
 def test_portia_run_query(
     storage: StorageClass,
@@ -52,6 +53,7 @@ def test_portia_run_query(
         assert output.get_summary() is not None
 
 
+@pytest.mark.daily
 def test_portia_run_query_multi_step() -> None:
     """Test running a query that passes data to the browser tool."""
     config = Config.from_default(
@@ -81,6 +83,7 @@ def test_portia_run_query_multi_step() -> None:
         assert output.get_summary() is not None
 
 
+@pytest.mark.daily
 def test_portia_multi_step_from_plan() -> None:
     """Test running a query that requires the browser tool to be invoked multiple times."""
     config = Config.from_default(

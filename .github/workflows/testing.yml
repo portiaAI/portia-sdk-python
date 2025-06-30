@@ -54,4 +54,4 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           set -o pipefail
-          uv run pytest -n 8 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          uv run pytest -m "not daily" -n 8 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
