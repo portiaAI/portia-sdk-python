@@ -156,6 +156,9 @@ addopts = [
   "--import-mode=importlib"
 ]
 asyncio_mode = "auto"
+markers = [
+    "daily: marks tests as expensive daily tests (deselect with '-m \"not daily\"')",
+]
 
 [tool.coverage.run]
 omit = [

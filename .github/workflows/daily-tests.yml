@@ -1,0 +1,59 @@
+name: Daily Integration Tests
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # Run at 9 AM UTC daily
+  workflow_dispatch:  # Allow manual triggering
+
+# Add concurrency to cancel in-progress runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  daily-tests:
+    timeout-minutes: 20 
+    runs-on: ubuntu-latest-16core
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: install uv
+        run: pipx install uv
+
+      # https://github.com/pydantic/ollama-action
+      - uses: pydantic/ollama-action@v3
+        with:
+          model: qwen2.5:0.5b
+
+      - name: install dependencies
+        run: uv sync --all-extras
+
+      - name: Run daily expensive tests
+        env:
+          PORTIA_API_ENDPOINT: "https://api.porita.dev"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          PORTIA_API_KEY: ${{ secrets.PORTIA_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
+          BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
+        run: |
+          set -o pipefail
+          uv run pytest -m daily --log-cli-level=WARNING --junitxml=pytest-daily.xml | tee pytest-daily.txt 
+        
+      - name: Integration test failure alert
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: slackapi/slack-github-action@v2.1.0
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            channel: C07V8NK09RC
+            text: "Browser tool integration tests failed!"
