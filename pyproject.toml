@@ -26,14 +26,11 @@ dependencies = [
     "loguru>=0.7.3,<0.8 ; python_version >= '3.11' and python_version < '4.0'",
     "python-dotenv>=1.0.1,<2",
     "pandas>=2.2.3,<3",
-    "pytest-mock>=3.14.0,<4",
     "openpyxl>=3.1.5,<4",
     "mcp>=1.9.2,<2",
     "langsmith>=0.3.15,<0.4 ; python_version >= '3.11' and python_version < '4.0'",
     "jsonref>=1.1.0,<2",
     "posthog~=6.0",
-    "testcontainers[redis]>=4.10.0",
-    "instructor>=1.9.0",
 ]
 
 [project.optional-dependencies]
@@ -93,6 +90,8 @@ dev = [
     "pytest-xdist[psutil]>=3.6.1,<4",
     "pytest-asyncio>=0.25.3,<0.26",
     "pytest-httpx>=0.35.0",
+    "testcontainers[redis]>=4.10.0",
+    "pytest-mock>=3.14.0,<4",
 ]
 
 [tool.hatch.build.targets.sdist]
