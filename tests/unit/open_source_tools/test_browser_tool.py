@@ -770,26 +770,26 @@ def test_browser_tool_multiple_calls(
 
     # Test first browser tool call (should set up session and not clean up)
     mock_browserbase_provider.setup_browser(mock_ctx)
-    mock_browserbase_provider.bb.sessions.create.assert_called_once()  # pyright: ignore[reportFunctionMemberAccess]
-    mock_browserbase_provider.bb.sessions.create.reset_mock()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.assert_called_once()  # pyright: ignore[reportAttributeAccessIssue,reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.reset_mock()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
     mock_browserbase_provider.step_complete(mock_ctx)
-    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test middle browser tool call (should not set up or clean up)
     end_user.set_additional_data("bb_session_id", "session123")
     end_user.set_additional_data("bb_session_connect_url", "connect_url")
     mock_ctx.plan_run.current_step_index = 1
     mock_browserbase_provider.setup_browser(mock_ctx)
-    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
     mock_browserbase_provider.step_complete(mock_ctx)
-    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test final browser tool call (should not set up but should clean up)
     mock_ctx.plan_run.current_step_index = 2
     mock_browserbase_provider.setup_browser(mock_ctx)
-    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
     mock_browserbase_provider.step_complete(mock_ctx)
-    mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
         "session123",
         project_id="test_project",
         status="REQUEST_RELEASE",

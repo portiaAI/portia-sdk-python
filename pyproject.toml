@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.4.6"
+version = "0.4.7"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -34,7 +34,7 @@ dependencies = [
     "posthog>=3.23.0",
     "testcontainers[redis]>=4.10.0",
     "pytest-repeat>=0.9.4",
-    "instructor>=1.8.3",
+    "instructor>=1.9.0",
 ]
 
 [project.optional-dependencies]
@@ -85,7 +85,7 @@ portia-cli = "portia.cli:cli"
 
 [dependency-groups]
 dev = [
-    "pre-commit>=3.8.0,<4",
+    "pre-commit>=4.2.0,<5",
     "ruff>=0.8.0,<0.9",
     "pytest>=8.3.3",
     "pytest-rerunfailures~=14.0",
