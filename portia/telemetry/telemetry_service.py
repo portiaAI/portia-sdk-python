@@ -134,6 +134,7 @@ class ProductTelemetry(BaseProductTelemetry):
         try:
             self._posthog_client.capture(
                 event.name,
+                distinct_id=self.user_id,
                 properties={**event.properties, "process_person_profile": True},
             )
         except Exception:
