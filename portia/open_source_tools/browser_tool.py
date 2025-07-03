@@ -473,10 +473,10 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "end users and so will be ignored.",
             )
         return Browser(
-            config=BrowserConfig(
-                chrome_instance_path=self.chrome_path,
-                extra_chromium_args=self.extra_chromium_args or [],
+            browser_profile=BrowserConfig(
+                executable_path=self.chrome_path,
             ),
+            extra_launch_args=self.extra_chromium_args,
         )
 
     def construct_auth_clarification_url(
