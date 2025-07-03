@@ -167,11 +167,13 @@ def process_output(  # noqa: C901 PLR0912
         return LocalDataValue(value=clarifications)
 
     output_values: list[Output] = []
+    tool_soft_error = False
+    tool_hard_error = False
     for message in messages:
         if "ToolSoftError" in message.content and tool:
-            raise ToolRetryError(tool.id, str(message.content))
+            tool_soft_error = True
         if "ToolHardError" in message.content and tool:
-            raise ToolFailedError(tool.id, str(message.content))
+            tool_hard_error = True
         if isinstance(message, ToolMessage):
             try:
                 clarification = InputClarification.model_validate_json(message.content)  # pyright: ignore[reportArgumentType]
@@ -186,7 +188,12 @@ def process_output(  # noqa: C901 PLR0912
             else:
                 output_values.append(LocalDataValue(value=message.content))
 
+
     if len(output_values) == 0:
+        if tool_soft_error:
+            raise ToolRetryError(tool.id, str([message.content for message in messages]))
+        if tool_hard_error:
+            raise ToolFailedError(tool.id, str([message.content for message in messages]))
         raise InvalidAgentOutputError(str([message.content for message in messages]))
 
     # if there's only one output return just the value
