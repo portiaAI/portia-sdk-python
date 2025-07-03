@@ -1,15 +1,15 @@
 <p align="center">
-  <a href="https://www.producthunt.com/products/portia-ai?launch=portia-ai-2">
-    <img src="assets/ph_banner.jpg">
-  </a>
-</p>
-
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/Logo_Portia_Line_Black.png">
     <img alt="Portia AI logo" src="assets/Logo_Portia_Line_Black.png"  width="full">
   </picture>
+</p>
+
+<p align="center">
+  <a href="https://www.producthunt.com/products/portia-ai?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_source=badge-portia&#0045;ai&#0045;2" target="_blank">
+    <img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=983741&theme=light&period=daily&t=1751531459759" alt="Portia&#0032;AI - Secure&#0032;AI&#0032;agents&#0032;with&#0032;tools&#0044;&#0032;auth&#0044;&#0032;and&#0032;smart&#0032;control | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54"/>
+  </a>
 </p>
 
 <p align="center">
