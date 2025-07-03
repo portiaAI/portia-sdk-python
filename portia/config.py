@@ -145,7 +145,7 @@ class LLMModel(Enum):
     )
     GEMINI_2_5_PRO = Model(
         provider=LLMProvider.GOOGLE,
-        model_name="google/gemini-2.5-pro",
+        model_name="gemini-2.5-pro",
     )
     GEMINI_2_0_FLASH = Model(
         provider=LLMProvider.GOOGLE,
