@@ -39,8 +39,8 @@ def test_portia_run_query(
     )
     portia = Portia(config=config, tools=tool_registry)
     query = (
-        "Go to the Portia website (https://www.portialabs.ai) and retrieve the title of the "
-        " homepage."
+        "Go to the Portia website (https://www.portialabs.ai) and retrieve the title of the first "
+        "section of the homepage, it should contain the word 'environments'."
     )
 
     plan_run = portia.run(query)
@@ -72,7 +72,8 @@ def test_portia_run_query_multi_step() -> None:
     )  # type: ignore reportOperatorIssue
     query = (
         "Retrieve the website for Portia AI by using the Tavily search tool, and then use the "
-        "BrowserTool to go to the website and retrieve the title of the homepage."
+        "BrowserTool to go to the website and retrieve the title of the first section of the "
+        "homepage, it should contain the word 'environments'."
     )
 
     plan_run = portia.run(query)
@@ -117,7 +118,8 @@ def test_portia_multi_step_from_plan() -> None:
     plan = (
         PlanBuilder()
         .step(
-            "Retrieve the title of the homepage",
+            "Retrieve the title of the first section of the homepage, it should contain the "
+            "word 'environments'",
             "browser_tool_for_url_www_portialabs_ai",
             "page_title",
         )
@@ -134,5 +136,8 @@ def test_portia_multi_step_from_plan() -> None:
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output
     step_outputs = plan_run.outputs.step_outputs
-    assert "Build agents that are predictable" in step_outputs["page_title"].get_value()  # type: ignore reportOperatorIssue
+    assert (
+        "Build AI agents you can trust in regulated environments"
+        in step_outputs["page_title"].get_value()
+    )  # type: ignore reportOperatorIssue
     assert "Welcome" in step_outputs["blog_title"].get_value()  # type: ignore reportOperatorIssue
