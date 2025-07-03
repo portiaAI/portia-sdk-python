@@ -133,9 +133,9 @@ class ProductTelemetry(BaseProductTelemetry):
 
         try:
             self._posthog_client.capture(
-                self.user_id,
                 event.name,
-                {**event.properties, "process_person_profile": True},
+                distinct_id=self.user_id,
+                properties={**event.properties, "process_person_profile": True},
             )
         except Exception:
             logger.exception(f"Failed to send telemetry event {event.name}")  # noqa: G004

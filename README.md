@@ -1,8 +1,45 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
-  <source media="(prefers-color-scheme: light)" srcset="assets/Logo_Portia_Line_Black.png">
-  <img alt="Portia AI logo" src="assets/Logo_Portia_Line_Black.png"  width="full">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/Logo_Portia_Line_Black.png">
+    <img alt="Portia AI logo" src="assets/Logo_Portia_Line_Black.png"  width="full">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="https://www.producthunt.com/products/portia-ai?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_source=badge-portia&#0045;ai&#0045;2" target="_blank">
+    <img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=983741&theme=light&period=daily&t=1751531459759" alt="Portia&#0032;AI - Secure&#0032;AI&#0032;agents&#0032;with&#0032;tools&#0044;&#0032;auth&#0044;&#0032;and&#0032;smart&#0032;control | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54"/>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/@PortiaAI">
+    <img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white">
+  </a>
+  <a href="https://discord.gg/DvAJz9ffaR">
+    <img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white">
+  </a>
+  <a href="https://x.com/RealPortiaAI">
+    <img src="https://img.shields.io/badge/  X  -000000?logo=twitter&logoColor=white">
+  </a>
+  <a href="https://www.reddit.com/r/PortiaAI/">
+    <img src="https://img.shields.io/badge/Reddit-FF4500?logo=reddit&logoColor=white">
+  </a>
+  <a href="https://www.linkedin.com/company/portiaai">
+    <img src="https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white">
+  </a>
+  <br>
+  <a href="https://app.portialabs.ai">
+    <img src="https://img.shields.io/badge/Dashboard-059669">
+  </a>
+  <a href="https://docs.portialabs.ai">
+    <img src="https://img.shields.io/badge/Docs-38BDF8">
+  </a>
+  <a href="https://blog.portialabs.ai">
+    <img src="https://img.shields.io/badge/Blog-2D3748">
+  </a>
+</p>
+
 
 # Portia SDK Python
 
@@ -60,7 +97,9 @@ portia-cli run "add 1 + 2"
 **All set? Now let's explore some basic usage of the product 🚀**
 
 ### E2E example
-You will need a Portia API key for this one because we use one of our cloud tools to schedule a calendar event and send an email. We have a free tier so you do not need to share payment details to get started. Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will then need to set it as the env variable `PORTIA_API_KEY`.<br/>
+You will need a Portia API key for this one because we use one of our cloud tools to schedule a calendar event and send an email. 
+<br>**🙏🏼 We have a free tier so you do not need to share payment details to get started 🙏🏼.**<br>
+Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will then need to set it as the env variable `PORTIA_API_KEY`.<br/>
 
 The example below introduces **some** of the config options available with Portia AI (check out our <a href="https://docs.portialabs.ai/manage-config" target="_blank">**docs (↗)**</a> for more):
 - The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, runs and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
