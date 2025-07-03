@@ -1,5 +1,6 @@
 """Tests for portia classes."""
 
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -58,6 +59,11 @@ def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert c.default_log_level == LogLevel.CRITICAL
     assert c.execution_agent_type == ExecutionAgentType.ONE_SHOT
+    assert c.planning_agent_type == PlanningAgentType.DEFAULT
+    if os.getenv("PORTIA_API_KEY"):
+        assert c.storage_class == StorageClass.CLOUD
+    else:
+        assert c.storage_class == StorageClass.MEMORY
     assert c.llm_redis_cache_url is None
     assert _llm_cache.get() is None
 
