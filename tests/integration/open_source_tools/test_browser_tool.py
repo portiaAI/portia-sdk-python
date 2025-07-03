@@ -48,7 +48,10 @@ def test_portia_run_query(
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output
-    assert "Build agents that are predictable" in plan_run.outputs.final_output.get_value()  # type: ignore reportOperatorIssue
+    assert (
+        "Build AI agents you can trust in regulated environments"
+        in plan_run.outputs.final_output.get_value()
+    )  # type: ignore reportOperatorIssue
     for output in plan_run.outputs.step_outputs.values():
         assert output.get_summary() is not None
 
@@ -78,7 +81,10 @@ def test_portia_run_query_multi_step() -> None:
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output
-    assert "Build agents that are predictable" in plan_run.outputs.final_output.get_value()  # type: ignore reportOperatorIssue
+    assert (
+        "Build AI agents you can trust in regulated environments"
+        in plan_run.outputs.final_output.get_value()
+    )  # type: ignore reportOperatorIssue
     for output in plan_run.outputs.step_outputs.values():
         assert output.get_summary() is not None
 
