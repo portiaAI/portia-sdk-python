@@ -10,3 +10,4 @@ docs
 .vscode
 .portia
 scratch
+*.DS_Store
