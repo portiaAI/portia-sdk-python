@@ -24,11 +24,6 @@ jobs:
       - name: install uv
         run: pipx install uv
 
-      # https://github.com/pydantic/ollama-action
-      - uses: pydantic/ollama-action@v3
-        with:
-          model: qwen2.5:0.5b
-
       - name: install dependencies
         run: uv sync --all-extras
 
