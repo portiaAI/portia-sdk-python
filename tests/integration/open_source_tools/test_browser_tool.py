@@ -31,7 +31,6 @@ def test_portia_run_query(
     """Test running a simple query."""
     config = Config.from_default(
         llm_provider=LLMProvider.ANTHROPIC,
-        default_model="anthropic/claude-3-5-sonnet-latest",
         storage_class=storage,
     )
 
@@ -61,7 +60,6 @@ def test_portia_run_query_multi_step() -> None:
     """Test running a query that passes data to the browser tool."""
     config = Config.from_default(
         llm_provider=LLMProvider.ANTHROPIC,
-        default_model="anthropic/claude-3-5-sonnet-latest",
         storage_class=StorageClass.MEMORY,
     )
 
@@ -94,7 +92,6 @@ def test_portia_multi_step_from_plan() -> None:
     """Test running a query that requires the browser tool to be invoked multiple times."""
     config = Config.from_default(
         llm_provider=LLMProvider.ANTHROPIC,
-        default_model="anthropic/claude-3-5-sonnet-latest",
         storage_class=StorageClass.MEMORY,
     )
 
