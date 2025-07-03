@@ -57,6 +57,7 @@ def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
         openai_api_key=SecretStr("123"),
     )
     assert c.default_log_level == LogLevel.CRITICAL
+    assert c.execution_agent_type == ExecutionAgentType.ONE_SHOT
     assert c.llm_redis_cache_url is None
     assert _llm_cache.get() is None
 
