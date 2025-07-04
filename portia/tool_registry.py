@@ -846,7 +846,7 @@ def _map_single_pydantic_type(  # noqa: PLR0911
         case "integer":
             return int
         case "number":
-            return float
+            return float | int
         case "boolean":
             return bool
         case "array":
