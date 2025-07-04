@@ -170,9 +170,9 @@ def process_output(  # noqa: C901 PLR0912
     tool_soft_error = False
     tool_hard_error = False
     for message in messages:
-        if "ToolSoftError" in message.content and tool:
+        if "ToolSoftError" in message.content:
             tool_soft_error = True
-        if "ToolHardError" in message.content and tool:
+        if "ToolHardError" in message.content:
             tool_hard_error = True
         if isinstance(message, ToolMessage):
             try:
@@ -188,8 +188,7 @@ def process_output(  # noqa: C901 PLR0912
             else:
                 output_values.append(LocalDataValue(value=message.content))
 
-
-    if len(output_values) == 0:
+    if len(output_values) == 0 and tool:
         if tool_soft_error:
             raise ToolRetryError(tool.id, str([message.content for message in messages]))
         if tool_hard_error:
