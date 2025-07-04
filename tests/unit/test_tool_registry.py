@@ -674,7 +674,7 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert model.model_fields["age"].annotation is int
     assert model.model_fields["age"].default is PydanticUndefined
     assert model.model_fields["age"].description == "The age of the user"
-    assert model.model_fields["height"].annotation is float
+    assert model.model_fields["height"].annotation == float | int
     assert model.model_fields["height"].default == 185.2
     assert model.model_fields["height"].description == "The height of the user"
     assert model.model_fields["is_active"].annotation is bool
