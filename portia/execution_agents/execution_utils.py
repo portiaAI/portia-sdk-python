@@ -139,7 +139,7 @@ def template_in_required_inputs(
     return response
 
 
-def process_output(  # noqa: C901
+def process_output(  # noqa: C901 PLR0912
     messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
@@ -167,11 +167,13 @@ def process_output(  # noqa: C901
         return LocalDataValue(value=clarifications)
 
     output_values: list[Output] = []
+    tool_soft_error = False
+    tool_hard_error = False
     for message in messages:
-        if "ToolSoftError" in message.content and tool:
-            raise ToolRetryError(tool.id, str(message.content))
-        if "ToolHardError" in message.content and tool:
-            raise ToolFailedError(tool.id, str(message.content))
+        if "ToolSoftError" in message.content:
+            tool_soft_error = True
+        if "ToolHardError" in message.content:
+            tool_hard_error = True
         if isinstance(message, ToolMessage):
             try:
                 clarification = InputClarification.model_validate_json(message.content)  # pyright: ignore[reportArgumentType]
@@ -186,7 +188,11 @@ def process_output(  # noqa: C901
             else:
                 output_values.append(LocalDataValue(value=message.content))
 
-    if len(output_values) == 0:
+    if len(output_values) == 0 and tool:
+        if tool_soft_error:
+            raise ToolRetryError(tool.id, str([message.content for message in messages]))
+        if tool_hard_error:
+            raise ToolFailedError(tool.id, str([message.content for message in messages]))
         raise InvalidAgentOutputError(str([message.content for message in messages]))
 
     # if there's only one output return just the value
@@ -201,7 +207,15 @@ def process_output(  # noqa: C901
     summaries = []
 
     for output in output_values:
-        values.append(output.get_value())
+        output_value = output.get_value()
+        if isinstance(output_value, list):
+            values.extend(output_value)
+        else:
+            values.append(output_value)
         summaries.append(output.get_summary() or output.serialize_value())
 
-    return LocalDataValue(value=values, summary=", ".join(summaries))
+    # If there is multiple tool calls (unrolling), then the final summary for all tool calls are
+    # stored in the last tool call's summary.
+    final_summary = output_values[-1].get_summary() or ", ".join(summaries)
+
+    return LocalDataValue(value=values, summary=final_summary)

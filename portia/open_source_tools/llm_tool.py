@@ -41,7 +41,8 @@ class LLMTool(Tool[str | BaseModel]):
         "other tools, make general language model queries or to answer questions. This should be "
         "used only as a last resort when no other tool satisfies a step in a task, however if "
         "there are no other tools that can be used to complete a step or for steps that don't "
-        "require a tool call, this SHOULD be used"
+        "require a tool call, this SHOULD be used. "
+        "MAKE SURE the task_data includes ALL INPUT VARIABLES IN THE CONTEXT."
     )
     args_schema: type[BaseModel] = LLMToolSchema
     output_schema: tuple[str, str] = (
