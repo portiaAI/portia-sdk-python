@@ -709,13 +709,16 @@ class Config(BaseModel):
         return self
 
     @classmethod
-    def from_default(cls, **kwargs) -> Config:  # noqa: ANN003
+    def from_default(cls, use_dotenv: bool = False, **kwargs) -> Config:  # noqa: ANN003
         """Create a Config instance with default values, allowing overrides.
 
         Returns:
             Config: The default config
 
         """
+        if use_dotenv:
+            from dotenv import load_dotenv
+            load_dotenv(override=True)
         return default_config(**kwargs)
 
     def has_api_key(self, name: str) -> bool:

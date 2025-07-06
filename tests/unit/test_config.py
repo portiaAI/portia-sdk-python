@@ -1,6 +1,6 @@
 """Tests for portia classes."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.caches import InMemoryCache
@@ -710,3 +710,16 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
 def test_parse_str_to_enum(value: str, expected: LLMProvider) -> None:
     """Test parse_str_to_enum works."""
     assert parse_str_to_enum(value, LLMProvider) is expected
+
+
+def test_from_default_loads_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that from_default(use_dotenv=True) loads dotenv and picks up env vars."""
+    # Ensure the env var is not set
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # Patch dotenv.load_dotenv to simulate loading
+    with patch("dotenv.load_dotenv") as mock_load_dotenv:
+        # Set the env var after the patch, simulating dotenv loading
+        monkeypatch.setenv("OPENAI_API_KEY", "dotenv-key")
+        config = Config.from_default(use_dotenv=True)
+        mock_load_dotenv.assert_called_once_with(override=True)
+        assert config.openai_api_key == SecretStr("dotenv-key")

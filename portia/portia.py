@@ -117,7 +117,7 @@ class Portia:
             telemetry (BaseProductTelemetry | None): Anonymous telemetry service.
 
         """
-        self.config = config if config else Config.from_default()
+        self.config = config if config else Config.from_default(use_dotenv=True)
         logger_manager.configure_from_config(self.config)
         logger().info(f"Starting Portia v{version('portia-sdk-python')}")
         if self.config.portia_api_key and self.config.portia_api_endpoint:
