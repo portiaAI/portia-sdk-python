@@ -145,7 +145,7 @@ class LLMModel(Enum):
     )
     GEMINI_2_5_PRO = Model(
         provider=LLMProvider.GOOGLE,
-        model_name="gemini-2.5-pro-preview-03-25",
+        model_name="gemini-2.5-pro",
     )
     GEMINI_2_0_FLASH = Model(
         provider=LLMProvider.GOOGLE,
@@ -1038,6 +1038,6 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         feature_flags=kwargs.pop("feature_flags", {}),
         storage_class=kwargs.pop("storage_class", default_storage_class),
         planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
-        execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.DEFAULT),
+        execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
         **kwargs,
     )

@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.4.8"
+version = "0.4.9"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -155,6 +155,9 @@ addopts = [
   "--import-mode=importlib"
 ]
 asyncio_mode = "auto"
+markers = [
+    "daily: marks tests as expensive daily tests (deselect with '-m \"not daily\"')",
+]
 
 [tool.coverage.run]
 omit = [

@@ -871,7 +871,6 @@ def test_portia_run_query_with_memory(
 
         # Verify run completed successfully
         assert plan_run.state == PlanRunState.COMPLETE
-
         # Verify step outputs were stored correctly
         assert plan_run.outputs.step_outputs["$weather"] == AgentMemoryValue(
             output_name="$weather",
