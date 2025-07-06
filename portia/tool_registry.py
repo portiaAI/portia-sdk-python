@@ -47,10 +47,13 @@ from portia.mcp_session import (
     get_mcp_session,
 )
 from portia.open_source_tools.calculator_tool import CalculatorTool
+from portia.open_source_tools.crawl_tool import CrawlTool
+from portia.open_source_tools.extract_tool import ExtractTool
 from portia.open_source_tools.image_understanding_tool import ImageUnderstandingTool
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
+from portia.open_source_tools.map_tool import MapTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
@@ -682,7 +685,7 @@ class DefaultToolRegistry(ToolRegistry):
 
     This includes the following tools:
     - All open source tools that don't require API keys
-    - Search tool if you have a Tavily API key
+    - Search, map, extract, and crawl tools if you have a Tavily API key
     - Weather tool if you have an OpenWeatherMap API key
     - Portia cloud tools if you have a Portia cloud API key
     """
@@ -698,6 +701,9 @@ class DefaultToolRegistry(ToolRegistry):
         ]
         if os.getenv("TAVILY_API_KEY"):
             tools.append(SearchTool())
+            tools.append(MapTool())
+            tools.append(ExtractTool())
+            tools.append(CrawlTool())
         if os.getenv("OPENWEATHERMAP_API_KEY"):
             tools.append(WeatherTool())
 

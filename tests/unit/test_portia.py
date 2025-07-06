@@ -191,14 +191,15 @@ def test_portia_local_default_config_without_api_keys() -> None:
         portia = Portia()
         assert str(portia.config) == str(Config.from_default())
 
-        # BrowserTool, SerachTool + WeatherTool are in open_source_tool_registry but not in the
+        # BrowserTool, SerachTool, WeatherTool, CrawlTool, ExtractTool, MapTool
+        # are in open_source_tool_registry but not in the
         # default tool registry avaialble to the Portia instance. PDF reader is in
         # open_source_tool_registry if Mistral API key is set, and isn't in the default tool
         # registry Unfortunately this is determined when the registry file is imported, so we
         # can't just mock the Mistral API key here.
-        expected_diff = 3
+        expected_diff = 6
         if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 4
+            expected_diff = 7
 
         assert (
             len(portia.tool_registry.get_tools())
