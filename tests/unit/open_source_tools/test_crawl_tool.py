@@ -272,3 +272,168 @@ def test_crawl_tool_http_status_error() -> None:
 
             with pytest.raises(ToolSoftError, match="Crawl API error - HTTP 422:.*"):
                 tool.run(ctx, "https://example.com")
+
+
+def test_crawl_tool_exclude_paths_parameter() -> None:
+    """Test that CrawlTool correctly includes exclude_paths parameter when provided."""
+    tool = CrawlTool()
+    mock_api_key = "tvly-mock-api-key"
+    mock_response = {
+        "base_url": "example.com",
+        "results": [
+            {
+                "url": "https://example.com/public/page1",
+                "raw_content": "Public content",
+            }
+        ],
+    }
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
+
+            result = tool.run(
+                ctx,
+                "https://example.com",
+                exclude_paths=["/private/.*", "/admin/.*"],
+            )
+            assert "Crawled 1 pages:" in result
+            assert "https://example.com/public/page1" in result
+
+            # Verify the exclude_paths parameter is included in the payload
+            call_args = mock_post.call_args
+            payload = call_args[1]["json"]
+            assert "exclude_paths" in payload
+            assert payload["exclude_paths"] == ["/private/.*", "/admin/.*"]
+
+
+def test_crawl_tool_exclude_domains_parameter() -> None:
+    """Test that CrawlTool correctly includes exclude_domains parameter when provided."""
+    tool = CrawlTool()
+    mock_api_key = "tvly-mock-api-key"
+    mock_response = {
+        "base_url": "example.com",
+        "results": [
+            {
+                "url": "https://example.com/page1",
+                "raw_content": "Main domain content",
+            }
+        ],
+    }
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
+
+            result = tool.run(
+                ctx,
+                "https://example.com",
+                exclude_domains=["^private\\.example\\.com$", "^admin\\.example\\.com$"],
+            )
+            assert "Crawled 1 pages:" in result
+            assert "https://example.com/page1" in result
+
+            # Verify the exclude_domains parameter is included in the payload
+            call_args = mock_post.call_args
+            payload = call_args[1]["json"]
+            assert "exclude_domains" in payload
+            assert payload["exclude_domains"] == ["^private\\.example\\.com$", "^admin\\.example\\.com$"]
+
+
+def test_crawl_tool_all_optional_parameters() -> None:
+    """Test that CrawlTool correctly handles all optional parameters."""
+    tool = CrawlTool()
+    mock_api_key = "tvly-mock-api-key"
+    mock_response = {
+        "base_url": "example.com",
+        "results": [
+            {
+                "url": "https://example.com/docs/api",
+                "raw_content": "API documentation content",
+            }
+        ],
+    }
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
+
+            result = tool.run(
+                ctx,
+                "https://example.com",
+                instructions="Find API docs",
+                max_depth=2,
+                max_breadth=10,
+                limit=25,
+                select_paths=["/docs/.*", "/api/.*"],
+                select_domains=["^docs\\.example\\.com$"],
+                exclude_paths=["/private/.*"],
+                exclude_domains=["^private\\.example\\.com$"],
+                allow_external=True,
+            )
+            assert "Crawled 1 pages:" in result
+            assert "https://example.com/docs/api" in result
+
+            # Verify all parameters are included in the payload
+            call_args = mock_post.call_args
+            payload = call_args[1]["json"]
+            assert payload["instructions"] == "Find API docs"
+            assert payload["max_depth"] == 2
+            assert payload["max_breadth"] == 10
+            assert payload["limit"] == 25
+            assert payload["select_paths"] == ["/docs/.*", "/api/.*"]
+            assert payload["select_domains"] == ["^docs\\.example\\.com$"]
+            assert payload["exclude_paths"] == ["/private/.*"]
+            assert payload["exclude_domains"] == ["^private\\.example\\.com$"]
+            assert payload["allow_external"] is True
+
+
+def test_crawl_tool_http_status_error_with_json_response() -> None:
+    """Test that CrawlTool handles HTTP status errors with JSON response body correctly."""
+    tool = CrawlTool()
+    mock_api_key = "tvly-mock-api-key"
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        import httpx
+
+        mock_response = Mock()
+        mock_response.status_code = 422
+        mock_response.json.return_value = {"error": "Invalid parameters", "details": "URL is required"}
+        mock_response.text = '{"error": "Invalid parameters", "details": "URL is required"}'
+
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = mock_response
+            mock_post.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "422 Unprocessable Entity", request=None, response=mock_response
+            )
+
+            with pytest.raises(ToolSoftError, match="Crawl API error - HTTP 422:.*Invalid parameters.*"):
+                tool.run(ctx, "https://example.com")
+
+
+def test_crawl_tool_http_status_error_with_invalid_json() -> None:
+    """Test that CrawlTool handles HTTP status errors with invalid JSON response body correctly."""
+    tool = CrawlTool()
+    mock_api_key = "tvly-mock-api-key"
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        import httpx
+
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.json.side_effect = ValueError("Invalid JSON")
+        mock_response.text = "Internal Server Error"
+
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = mock_response
+            mock_post.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "500 Internal Server Error", request=None, response=mock_response
+            )
+
+            with pytest.raises(ToolSoftError, match="Crawl API error - HTTP 500: Internal Server Error"):
+                tool.run(ctx, "https://example.com")

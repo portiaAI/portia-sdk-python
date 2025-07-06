@@ -290,3 +290,75 @@ def test_map_tool_payload_structure() -> None:
             # Optional parameters should not be present when None
             assert "instructions" not in payload
             assert "select_paths" not in payload
+
+
+def test_map_tool_exclude_domains_parameter() -> None:
+    """Test that MapTool correctly includes exclude_domains parameter when provided."""
+    tool = MapTool()
+    mock_api_key = "tvly-mock-api-key"
+    mock_response = {
+        "base_url": "example.com",
+        "results": [
+            "https://example.com/",
+            "https://example.com/about",
+        ],
+    }
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
+
+            result = tool.run(
+                ctx,
+                "https://example.com",
+                exclude_domains=["^private\\.example\\.com$", "^admin\\.example\\.com$"],
+            )
+            assert result == mock_response["results"]
+
+            # Verify the exclude_domains parameter is included in the payload
+            call_args = mock_post.call_args
+            payload = call_args[1]["json"]
+            assert "exclude_domains" in payload
+            assert payload["exclude_domains"] == ["^private\\.example\\.com$", "^admin\\.example\\.com$"]
+
+
+def test_map_tool_all_optional_parameters() -> None:
+    """Test that MapTool correctly handles all optional parameters including exclude_domains."""
+    tool = MapTool()
+    mock_api_key = "tvly-mock-api-key"
+    mock_response = {
+        "base_url": "example.com",
+        "results": ["https://example.com/docs"],
+    }
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
+
+            result = tool.run(
+                ctx,
+                "https://example.com",
+                max_depth=2,
+                max_breadth=10,
+                limit=25,
+                instructions="Find documentation",
+                select_paths=["/docs/.*"],
+                select_domains=["^docs\\.example\\.com$"],
+                exclude_paths=["/private/.*"],
+                exclude_domains=["^private\\.example\\.com$"],
+                allow_external=True,
+                categories=["Documentation"],
+            )
+            assert result == mock_response["results"]
+
+            # Verify all parameters are included in the payload
+            call_args = mock_post.call_args
+            payload = call_args[1]["json"]
+            assert payload["instructions"] == "Find documentation"
+            assert payload["select_paths"] == ["/docs/.*"]
+            assert payload["select_domains"] == ["^docs\\.example\\.com$"]
+            assert payload["exclude_paths"] == ["/private/.*"]
+            assert payload["exclude_domains"] == ["^private\\.example\\.com$"]
+            assert payload["categories"] == ["Documentation"]
