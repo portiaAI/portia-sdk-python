@@ -475,8 +475,8 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         return Browser(
             browser_profile=BrowserConfig(
                 executable_path=self.chrome_path,
+                args=self.extra_chromium_args or [],
             ),
-            extra_launch_args=self.extra_chromium_args,
         )
 
     def construct_auth_clarification_url(
@@ -754,9 +754,7 @@ if BROWSERBASE_AVAILABLE:
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
             return Browser(
-                config=BrowserConfig(
-                    cdp_url=session_connect_url,
-                ),
+                cdp_url=session_connect_url
             )
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
