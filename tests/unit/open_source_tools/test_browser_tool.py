@@ -10,7 +10,6 @@ from browser_use import Browser
 from pydantic import BaseModel, Field, HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
-from portia.config import Config
 from portia.end_user import EndUser
 from portia.open_source_tools.browser_tool import (
     BrowserInfrastructureOption,
@@ -502,10 +501,10 @@ def test_browserbase_provider_setup_browser(
 
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
-    
+
     # Configure the bb mock to return specific values
-    mock_browserbase_provider.bb.contexts.create.return_value = mock_context
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     browser = mock_browserbase_provider.setup_browser(context)
 
@@ -770,17 +769,19 @@ def test_browser_tool_multiple_calls(
     )
     mock_tool_run_context.end_user = end_user
     mock_tool_run_context.plan = plan
-    mock_tool_run_context.plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
+    mock_tool_run_context.plan_run = PlanRun(
+        plan_id=plan.id, current_step_index=0, end_user_id="test"
+    )
     tool_run_context = mock_tool_run_context
 
-    mock_session = MagicMock()
-    mock_session.id = "test_session_id"
-    mock_session.connect_url = "test_connect_url"
+    mock_session = MagicMock()  # pyright: ignore[reportAttributeAccessIssue]
+    mock_session.id = "test_session_id"  # pyright: ignore[reportAttributeAccessIssue]
+    mock_session.connect_url = "test_connect_url"  # pyright: ignore[reportAttributeAccessIssue]
 
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
-    mock_browserbase_provider.bb.contexts.create.return_value = mock_context
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test first browser tool call (should set up session and not clean up)
     mock_browserbase_provider.setup_browser(tool_run_context)
