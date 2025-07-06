@@ -1,50 +1,33 @@
-name: Python Testing
+name: Daily Integration Tests
 
 on:
-  pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - labeled
+  schedule:
+    - cron: '0 9 * * *'  # Run at 9 AM UTC daily
+  workflow_dispatch:  # Allow manual triggering
 
 # Add concurrency to cancel in-progress runs
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
-  testing:
-    timeout-minutes: 15
+  daily-tests:
+    timeout-minutes: 20 
     runs-on: ubuntu-latest-16core
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: install uv
         run: pipx install uv
 
-      # https://github.com/pydantic/ollama-action
-      - uses: pydantic/ollama-action@v3
-        with:
-          model: qwen2.5:0.5b
-
       - name: install dependencies
         run: uv sync --all-extras
 
-      - name: unit_tests + coverage
-        env:
-          PORTIA_API_ENDPOINT: "https://api.porita.dev"
-        run: |
-          set -o pipefail
-          uv run pytest tests/unit
-
-      - name: tests + coverage
+      - name: Run daily expensive tests
         env:
           PORTIA_API_ENDPOINT: "https://api.porita.dev"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -54,7 +37,18 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
           BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: |
           set -o pipefail
-          uv run pytest -m "not daily" -n 8 --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          uv run pytest -m daily --log-cli-level=WARNING --junitxml=pytest-daily.xml | tee pytest-daily.txt 
+        
+      - name: Integration test failure alert
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: slackapi/slack-github-action@v2.1.0
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            channel: C07V8NK09RC
+            text: "Browser tool integration tests failed!"

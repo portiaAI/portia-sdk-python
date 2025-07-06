@@ -674,7 +674,7 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert model.model_fields["age"].annotation is int
     assert model.model_fields["age"].default is PydanticUndefined
     assert model.model_fields["age"].description == "The age of the user"
-    assert model.model_fields["height"].annotation is float
+    assert model.model_fields["height"].annotation == float | int
     assert model.model_fields["height"].default == 185.2
     assert model.model_fields["height"].description == "The height of the user"
     assert model.model_fields["is_active"].annotation is bool
@@ -861,6 +861,29 @@ def test_generate_pydantic_model_from_json_schema_handles_omissible_fields_model
     )
     assert model_1._fields_must_omit_none_on_serialize == ["name"]  # type: ignore  # noqa: PGH003, SLF001
     assert model_2._fields_must_omit_none_on_serialize == ["last_name"]  # type: ignore  # noqa: PGH003, SLF001
+
+
+def test_generate_pydantic_model_from_json_schema_handles_number_type() -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check that the generated base model can serialise a number type
+    as a float or an int.
+    """
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "number": {"type": "number", "description": "The number"},
+        },
+        "required": ["number"],
+    }
+    model = generate_pydantic_model_from_json_schema("TestNumberType", json_schema)
+    assert model.model_fields["number"].annotation == float | int
+    int_object = model.model_validate({"number": 1})
+    assert int_object.number == 1  # type: ignore  # noqa: PGH003
+    assert int_object.model_dump_json() == '{"number":1}'
+    float_object = model.model_validate({"number": 1.23})
+    assert float_object.number == 1.23  # type: ignore  # noqa: PGH003
+    assert float_object.model_dump_json() == '{"number":1.23}'
 
 
 @pytest.mark.usefixtures("mock_get_mcp_session")
