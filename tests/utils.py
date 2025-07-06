@@ -225,8 +225,8 @@ class ErrorTool(Tool):
         self,
         _: ToolRunContext,
         error_str: str,
-        return_uncaught_error: bool,  # noqa: FBT001
-        return_soft_error: bool,  # noqa: FBT001
+        return_uncaught_error: bool,
+        return_soft_error: bool,
     ) -> None:
         """Return the error."""
         if return_uncaught_error:

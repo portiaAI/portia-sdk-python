@@ -718,6 +718,7 @@ class Config(BaseModel):
         """
         if use_dotenv:
             from dotenv import load_dotenv
+
             load_dotenv(override=True)
         return default_config(**kwargs)
 

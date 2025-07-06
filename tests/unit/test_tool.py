@@ -298,7 +298,7 @@ def test_remote_tool_run_unhandled_error(httpx_mock: HTTPXMock) -> None:
         ({"ready": False, "clarifications": []}, False),
     ],
 )
-def test_remote_tool_ready(httpx_mock: HTTPXMock, response_json: dict, is_ready: bool) -> None:  # noqa: FBT001
+def test_remote_tool_ready(httpx_mock: HTTPXMock, response_json: dict, is_ready: bool) -> None:
     """Test remote tool ready."""
     endpoint = "https://api.fake-portia.test"
     httpx_mock.add_response(
@@ -336,7 +336,7 @@ def test_remote_tool_ready(httpx_mock: HTTPXMock, response_json: dict, is_ready:
     ("status_code", "is_ready"),
     [(500, False), (404, False), (200, True)],
 )
-def test_remote_tool_ready_error(httpx_mock: HTTPXMock, status_code: int, is_ready: bool) -> None:  # noqa: FBT001
+def test_remote_tool_ready_error(httpx_mock: HTTPXMock, status_code: int, is_ready: bool) -> None:
     """Test remote tool ready."""
     endpoint = "https://api.fake-portia.test"
     httpx_mock.add_response(

@@ -197,6 +197,7 @@ class PlanRun(BaseModel):
             f"final_output={'set' if self.outputs.final_output else 'unset'})"
         )
 
+
 class ReadOnlyPlanRun(PlanRun):
     """A read-only copy of a Plan Run passed to agents for reference.
 
