@@ -52,7 +52,7 @@ from portia.plan_run import (
     PlanRunState,
     PlanRunUUID,
 )
-from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX
+from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX, PLAN_UUID_PREFIX
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
@@ -106,6 +106,16 @@ class PlanStorage(ABC):
 
         """
         raise NotImplementedError("get_plan is not implemented")
+
+    @abstractmethod
+    def get_plan_by_query(self, query: str) -> Plan:
+        """Get a plan by query.
+
+        Args:
+            query (str): The query to get a plan for.
+
+        """
+        raise NotImplementedError("get_plan_by_query is not implemented")
 
     @abstractmethod
     def plan_exists(self, plan_id: PlanUUID) -> bool:
@@ -398,6 +408,19 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             return self.plans[plan_id]
         raise PlanNotFoundError(plan_id)
 
+    def get_plan_by_query(self, query: str) -> Plan:
+        """Get a plan by query.
+
+        Args:
+            query (str): The query to get a plan for.
+
+        """
+        plan: Plan | None = None
+        for plan in self.plans.values():
+            if plan.plan_context.query == query:
+                return plan
+        raise StorageError(f"No plan found for query: {query}")
+
     def plan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists in memory.
 
@@ -629,6 +652,29 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             return self._read(f"{plan_id}.json", Plan)
         except (ValidationError, FileNotFoundError) as e:
             raise PlanNotFoundError(plan_id) from e
+
+    def get_plan_by_query(self, query: str) -> Plan:
+        """Get a plan by query.
+
+        This method will return the most recent plan that matches the query.
+
+        Args:
+            query (str): The query to get a plan for.
+
+        """
+        # Get all plan files and sort by creation time (newest first)
+        plan_files = [
+            f
+            for f in Path(self.storage_dir).iterdir()
+            if f.is_file() and f.name.startswith(PLAN_UUID_PREFIX)
+        ]
+        plan_files.sort(key=lambda f: f.stat().st_ctime, reverse=True)
+
+        for f in plan_files:
+            plan = self._read(f.name, Plan)
+            if plan.plan_context.query == query:
+                return plan
+        raise StorageError(f"No plan found for query: {query}")
 
     def plan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists on disk.
@@ -931,6 +977,21 @@ class PortiaCloudStorage(Storage, AgentMemory):
             self.check_response(response)
             response_json = response.json()
             return Plan.from_response(response_json)
+
+    def get_plan_by_query(self, query: str) -> Plan:
+        """Get a plan by query.
+
+        Args:
+            query (str): The query to get a plan for.
+
+        """
+        try:
+            plans = self.get_similar_plans(query, threshold=0.99, limit=1)
+        except Exception as e:
+            raise StorageError(e) from e
+        if not plans:
+            raise StorageError(f"No plan found for query: {query}")
+        return plans[0]
 
     def plan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists in Portia Cloud.
