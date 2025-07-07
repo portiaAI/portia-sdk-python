@@ -859,8 +859,8 @@ def test_generate_pydantic_model_from_json_schema_handles_omissible_fields_model
             },
         },
     )
-    assert model_1._fields_must_omit_none_on_serialize == ["name"]  # type: ignore  # noqa: PGH003, SLF001
-    assert model_2._fields_must_omit_none_on_serialize == ["last_name"]  # type: ignore  # noqa: PGH003, SLF001
+    assert model_1._fields_must_omit_none_on_serialize == ["name"]  # type: ignore  # noqa: PGH003
+    assert model_2._fields_must_omit_none_on_serialize == ["last_name"]  # type: ignore  # noqa: PGH003
 
 
 def test_generate_pydantic_model_from_json_schema_handles_number_type() -> None:

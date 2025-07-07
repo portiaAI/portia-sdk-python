@@ -1189,7 +1189,7 @@ def test_optional_args_with_none_values() -> None:
     )
 
     #  Optional arg and made_up is True == not made_up
-    updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
+    updated_tool_inputs = model._validate_args_against_schema(
         VerifiedToolInputs(
             args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=True)],
         ),
@@ -1198,7 +1198,7 @@ def test_optional_args_with_none_values() -> None:
     assert updated_tool_inputs.args[0].made_up is False
 
     #  Optional arg and made_up is False == mnot ade_up
-    updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
+    updated_tool_inputs = model._validate_args_against_schema(
         VerifiedToolInputs(
             args=[VerifiedToolArgument(name="optional_arg", value=None, made_up=False)],
         ),
@@ -1256,7 +1256,7 @@ def test_list_args_with_str_values() -> None:
         tool_context=get_test_tool_context(),
     )
 
-    updated_tool_inputs = model._validate_args_against_schema(  # noqa: SLF001
+    updated_tool_inputs = model._validate_args_against_schema(
         VerifiedToolInputs(
             args=[VerifiedToolArgument(name="list_arg", value="[1,2,3]", made_up=False)],
         ),

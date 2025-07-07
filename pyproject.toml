@@ -120,6 +120,8 @@ ignore = [
   "EM101",   # Disables checks for missing exception message arguments. We prefer single-line exception statements for simplicity and terseness.
   "EM102",   # Disables checks for f-string usage in exception messages. We prefer single-line exception statements with f-strings for simplicity and terseness.
   "TRY003",  # Disables checks for long error messages. We prefer to provide as much context to users as possible but want to avoid a proliferation of error classes.
+  "FBT001",  # Disables checks for unused type parameters. We prefer booleans for simple parameters rather than unnecessary enums.
+  "FBT002",  # Disables checks for unused type parameters. We prefer booleans for simple parameters rather than unnecessary enums.
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -127,6 +129,8 @@ ignore = [
   "S101",    # Disables check for asserts. Asserts in test cases can be useful.
   "PLR2004", # Disables magic number checks. Its normal to assert using magic numbers for things like array length.
   "INP001",  # Disables checks for implicit namespace packages. Tests are not part of the package.
+  "SLF001",  # Disables checks for private member access. We call private methods in tests.
+  "C901",    # Disables checks for too many lines in function. Tests are allowed to be longer.
 ]
 
 [tool.ruff.lint.flake8-type-checking]

@@ -115,7 +115,7 @@ class TestProductTelemetry:
         ):
             telemetry = ProductTelemetry()
             mock_logger.debug.assert_called_once_with("Telemetry disabled")
-            assert telemetry._posthog_client is None  # noqa: SLF001
+            assert telemetry._posthog_client is None
             assert logging.getLogger("posthog").disabled
 
     def test_init_telemetry_enabled(self, mock_logger: MagicMock) -> None:
@@ -128,7 +128,7 @@ class TestProductTelemetry:
             telemetry = ProductTelemetry()
             mock_logger.info.assert_called_once()
             assert "Portia anonymized telemetry enabled" in mock_logger.info.call_args[0][0]
-            assert isinstance(telemetry._posthog_client, Posthog)  # noqa: SLF001
+            assert isinstance(telemetry._posthog_client, Posthog)
 
     def test_capture_when_disabled(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is disabled."""
@@ -152,7 +152,7 @@ class TestProductTelemetry:
         ):
             telemetry = ProductTelemetry()
             mock_client = MagicMock()
-            telemetry._posthog_client = mock_client  # noqa: SLF001
+            telemetry._posthog_client = mock_client
 
             event = TestTelemetryEvent("test_event", {"key": "value"})
             telemetry.capture(event)
@@ -176,7 +176,7 @@ class TestProductTelemetry:
             telemetry = ProductTelemetry()
             mock_client = MagicMock()
             mock_client.capture.side_effect = Exception("PostHog API error")
-            telemetry._posthog_client = mock_client  # noqa: SLF001
+            telemetry._posthog_client = mock_client
 
             event = TestTelemetryEvent("test_event", {"key": "value"})
             # Should not raise the exception
@@ -204,7 +204,7 @@ class TestProductTelemetry:
             user_id2 = telemetry.user_id
             assert user_id1 == user_id2
 
-            telemetry._curr_user_id = None  # noqa: SLF001
+            telemetry._curr_user_id = None
             # Third call after reset should return the same ID
             user_id3 = telemetry.user_id
             assert user_id1 == user_id3

@@ -891,7 +891,7 @@ def test_plan_exists_portia_cloud_storage() -> None:
 def test_get_plan_by_query_in_memory_storage() -> None:
     """Test get_plan_by_query method with InMemoryStorage."""
     storage = InMemoryStorage()
-    
+
     # Create test plans with different queries
     plan1 = Plan(
         plan_context=PlanContext(query="test query 1", tool_ids=[]),
@@ -902,30 +902,32 @@ def test_get_plan_by_query_in_memory_storage() -> None:
         steps=[],
     )
     plan3 = Plan(
-        plan_context=PlanContext(query="test query 1", tool_ids=["tool1"]),  # Same query, different tool_ids
+        plan_context=PlanContext(
+            query="test query 1", tool_ids=["tool1"]
+        ),  # Same query, different tool_ids
         steps=[],
     )
-    
+
     # Save plans
     storage.save_plan(plan1)
     storage.save_plan(plan2)
     storage.save_plan(plan3)
-    
+
     # Test finding existing plan
     found_plan = storage.get_plan_by_query("test query 1")
     assert found_plan.plan_context.query == "test query 1"
     # Should return the first one found (plan1 in this case)
     assert found_plan.id == plan1.id
-    
+
     # Test finding another existing plan
     found_plan = storage.get_plan_by_query("test query 2")
     assert found_plan.plan_context.query == "test query 2"
     assert found_plan.id == plan2.id
-    
+
     # Test finding non-existent plan
     with pytest.raises(StorageError, match="No plan found for query: non-existent query"):
         storage.get_plan_by_query("non-existent query")
-    
+
     # Test with empty storage
     empty_storage = InMemoryStorage()
     with pytest.raises(StorageError, match="No plan found for query: any query"):
@@ -935,7 +937,7 @@ def test_get_plan_by_query_in_memory_storage() -> None:
 def test_get_plan_by_query_disk_storage(tmp_path: Path) -> None:
     """Test get_plan_by_query method with DiskFileStorage."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
-    
+
     # Create test plans with different queries
     plan1 = Plan(
         plan_context=PlanContext(query="test query 1", tool_ids=[]),
@@ -946,45 +948,47 @@ def test_get_plan_by_query_disk_storage(tmp_path: Path) -> None:
         steps=[],
     )
     plan3 = Plan(
-        plan_context=PlanContext(query="test query 1", tool_ids=["tool1"]),  # Same query, different tool_ids
+        plan_context=PlanContext(
+            query="test query 1", tool_ids=["tool1"]
+        ),  # Same query, different tool_ids
         steps=[],
     )
-    
+
     # Save plans
     storage.save_plan(plan1)
     storage.save_plan(plan2)
     storage.save_plan(plan3)
-    
+
     # Test finding existing plan
     found_plan = storage.get_plan_by_query("test query 1")
     assert found_plan.plan_context.query == "test query 1"
     # Should return the most recent one (plan3 in this case due to sorting)
     assert found_plan.id == plan3.id
-    
+
     # Test finding another existing plan
     found_plan = storage.get_plan_by_query("test query 2")
     assert found_plan.plan_context.query == "test query 2"
     assert found_plan.id == plan2.id
-    
+
     # Test finding non-existent plan
     with pytest.raises(StorageError, match="No plan found for query: non-existent query"):
         storage.get_plan_by_query("non-existent query")
-    
+
     # Test with empty storage directory
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()  # Create the directory first
     empty_storage = DiskFileStorage(storage_dir=str(empty_dir))
     with pytest.raises(StorageError, match="No plan found for query: any query"):
         empty_storage.get_plan_by_query("any query")
-    
+
     # Test with directory containing non-plan files
     mixed_storage = DiskFileStorage(storage_dir=str(tmp_path / "mixed"))
     mixed_storage._ensure_storage()
-    
+
     # Create a non-plan file
     non_plan_file = tmp_path / "mixed" / "not_a_plan.txt"
     non_plan_file.write_text("This is not a plan file")
-    
+
     with pytest.raises(StorageError, match="No plan found for query: any query"):
         mixed_storage.get_plan_by_query("any query")
 
@@ -992,7 +996,7 @@ def test_get_plan_by_query_disk_storage(tmp_path: Path) -> None:
 def test_get_plan_by_query_disk_storage_creation_time_sorting(tmp_path: Path) -> None:
     """Test that get_plan_by_query returns the most recently created plan."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
-    
+
     # Create test plans with the same query
     plan1 = Plan(
         plan_context=PlanContext(query="same query", tool_ids=[]),
@@ -1006,12 +1010,12 @@ def test_get_plan_by_query_disk_storage_creation_time_sorting(tmp_path: Path) ->
         plan_context=PlanContext(query="same query", tool_ids=["tool1", "tool2"]),
         steps=[],
     )
-    
+
     # Save plans in order (plan1 first, then plan2, then plan3)
     storage.save_plan(plan1)
     storage.save_plan(plan2)
     storage.save_plan(plan3)
-    
+
     # Should return the most recently created plan (plan3)
     found_plan = storage.get_plan_by_query("same query")
     assert found_plan.id == plan3.id
@@ -1022,7 +1026,7 @@ def test_get_plan_by_query_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
     """Test get_plan_by_query method with PortiaCloudStorage."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
-    
+
     # Mock the get_similar_plans response
     mock_plan_response = {
         "id": "plan-00000000-0000-0000-0000-000000000000",
@@ -1030,7 +1034,7 @@ def test_get_plan_by_query_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
         "query": "test query",
         "tool_ids": ["tool1"],
     }
-    
+
     endpoint = config.portia_api_endpoint
     url = f"{endpoint}/api/v0/plans/embeddings/search/"
     httpx_mock.add_response(
@@ -1044,12 +1048,12 @@ def test_get_plan_by_query_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
         },
         json=[mock_plan_response],
     )
-    
+
     # Test finding existing plan
     found_plan = storage.get_plan_by_query("test query")
     assert found_plan.plan_context.query == "test query"
     assert found_plan.id == PlanUUID.from_string("plan-00000000-0000-0000-0000-000000000000")
-    
+
     # Test with no matching plans
     httpx_mock.add_response(
         url=url,
@@ -1062,7 +1066,7 @@ def test_get_plan_by_query_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
         },
         json=[],
     )
-    
+
     with pytest.raises(StorageError, match="No plan found for query: non-existent query"):
         storage.get_plan_by_query("non-existent query")
 
@@ -1071,33 +1075,35 @@ def test_get_plan_by_query_portia_cloud_storage_error(httpx_mock: HTTPXMock) -> 
     """Test get_plan_by_query method with PortiaCloudStorage when API fails."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
-    
+
     endpoint = config.portia_api_endpoint
     url = f"{endpoint}/api/v0/plans/embeddings/search/"
-    
+
     # Test with API error
     httpx_mock.add_response(
         url=url,
         status_code=500,
         method="POST",
     )
-    
+
     with pytest.raises(StorageError):
         storage.get_plan_by_query("test query")
-    
-    # Test with network error
-    httpx_mock.add_response(
+
+    # Test with network error - we need to use a callback to raise the exception
+    def raise_connection_error(_: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("Connection failed")
+
+    httpx_mock.add_callback(
+        raise_connection_error,
         url=url,
-        status_code=200,
         method="POST",
         match_json={
             "query": "test query",
             "threshold": 0.99,
             "limit": 1,
         },
-        exception=httpx.ConnectError("Connection failed"),
     )
-    
+
     with pytest.raises(StorageError):
         storage.get_plan_by_query("test query")
 
@@ -1111,10 +1117,10 @@ def test_get_plan_by_query_edge_cases() -> None:
         steps=[],
     )
     storage.save_plan(plan)
-    
+
     found_plan = storage.get_plan_by_query("")
     assert found_plan.plan_context.query == ""
-    
+
     # Test with very long query
     long_query = "a" * 1000
     plan2 = Plan(
@@ -1122,10 +1128,10 @@ def test_get_plan_by_query_edge_cases() -> None:
         steps=[],
     )
     storage.save_plan(plan2)
-    
+
     found_plan = storage.get_plan_by_query(long_query)
     assert found_plan.plan_context.query == long_query
-    
+
     # Test with special characters in query
     special_query = "test query with !@#$%^&*() characters"
     plan3 = Plan(
@@ -1133,6 +1139,6 @@ def test_get_plan_by_query_edge_cases() -> None:
         steps=[],
     )
     storage.save_plan(plan3)
-    
+
     found_plan = storage.get_plan_by_query(special_query)
     assert found_plan.plan_context.query == special_query
