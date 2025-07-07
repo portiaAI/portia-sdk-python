@@ -662,13 +662,14 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             query (str): The query to get a plan for.
 
         """
-        # Get all plan files and sort by creation time (newest first)
+        # Get all plan files and sort by modification time (newest first)
+        # Using st_mtime for cross-platform compatibility
         plan_files = [
             f
             for f in Path(self.storage_dir).iterdir()
             if f.is_file() and f.name.startswith(PLAN_UUID_PREFIX)
         ]
-        plan_files.sort(key=lambda f: f.stat().st_ctime, reverse=True)
+        plan_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
 
         for f in plan_files:
             plan = self._read(f.name, Plan)

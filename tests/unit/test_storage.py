@@ -993,8 +993,8 @@ def test_get_plan_by_query_disk_storage(tmp_path: Path) -> None:
         mixed_storage.get_plan_by_query("any query")
 
 
-def test_get_plan_by_query_disk_storage_creation_time_sorting(tmp_path: Path) -> None:
-    """Test that get_plan_by_query returns the most recently created plan."""
+def test_get_plan_by_query_disk_storage_modification_time_sorting(tmp_path: Path) -> None:
+    """Test that get_plan_by_query returns the most recently modified plan."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
 
     # Create test plans with the same query
@@ -1016,7 +1016,7 @@ def test_get_plan_by_query_disk_storage_creation_time_sorting(tmp_path: Path) ->
     storage.save_plan(plan2)
     storage.save_plan(plan3)
 
-    # Should return the most recently created plan (plan3)
+    # Should return the most recently modified plan (plan3)
     found_plan = storage.get_plan_by_query("same query")
     assert found_plan.id == plan3.id
     assert found_plan.plan_context.tool_ids == ["tool1", "tool2"]
