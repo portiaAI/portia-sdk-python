@@ -310,7 +310,7 @@ class BrowserTool(Tool[str | BaseModel]):
             ) -> BaseModel:
                 agent = Agent(
                     task=task_description,
-                    llm=llm,
+                    llm=llm,  # pyright: ignore[reportArgumentType]
                     browser=self.infrastructure_provider.setup_browser(ctx),
                     controller=Controller(output_model=output_model),
                 )
@@ -473,9 +473,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "end users and so will be ignored.",
             )
         return Browser(
-            config=BrowserConfig(
-                chrome_instance_path=self.chrome_path,
-                extra_chromium_args=self.extra_chromium_args or [],
+            browser_profile=BrowserConfig(
+                executable_path=self.chrome_path,
+                args=self.extra_chromium_args or [],
             ),
         )
 
@@ -753,11 +753,7 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
-            return Browser(
-                config=BrowserConfig(
-                    cdp_url=session_connect_url,
-                ),
-            )
+            return Browser(cdp_url=session_connect_url)
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
             """Check if the current call is the first browser call in the plan run.
