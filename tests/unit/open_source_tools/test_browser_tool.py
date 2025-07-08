@@ -494,19 +494,22 @@ def test_browserbase_provider_setup_browser(
     """Test setting up browser."""
     context = get_test_tool_context()
 
+    # Configure the mock to return specific values instead of nested mocks
     mock_session = MagicMock()
     mock_session.id = "test_session_id"
     mock_session.connect_url = "test_connect_url"
 
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
-    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
+
+    # Configure the bb mock to return specific values
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     browser = mock_browserbase_provider.setup_browser(context)
 
     assert isinstance(browser, Browser)
-    assert browser.config.cdp_url == "test_connect_url"
+    assert browser.cdp_url == "test_connect_url"  # This should now work
 
 
 def test_browser_tool_for_url_init_default_parameters() -> None:
@@ -750,6 +753,7 @@ def test_process_task_data() -> None:
 
 def test_browser_tool_multiple_calls(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+    mock_tool_run_context: ToolRunContext,
 ) -> None:
     """Test step_complete only cleans up on final browser tool call."""
     plan = (
@@ -763,32 +767,43 @@ def test_browser_tool_multiple_calls(
         external_id="123",
         additional_data={"bb_session_id": "session123", "bb_session_connect_url": "connect_url"},
     )
-    mock_ctx = MagicMock()
-    mock_ctx.end_user = end_user
-    mock_ctx.plan = plan
-    mock_ctx.plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
+    mock_tool_run_context.end_user = end_user
+    mock_tool_run_context.plan = plan
+    mock_tool_run_context.plan_run = PlanRun(
+        plan_id=plan.id, current_step_index=0, end_user_id="test"
+    )
+    tool_run_context = mock_tool_run_context
+
+    mock_session = MagicMock()  # pyright: ignore[reportAttributeAccessIssue]
+    mock_session.id = "test_session_id"  # pyright: ignore[reportAttributeAccessIssue]
+    mock_session.connect_url = "test_connect_url"  # pyright: ignore[reportAttributeAccessIssue]
+
+    mock_context = MagicMock()
+    mock_context.id = "test_context_id"
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test first browser tool call (should set up session and not clean up)
-    mock_browserbase_provider.setup_browser(mock_ctx)
+    mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_called_once()  # pyright: ignore[reportAttributeAccessIssue,reportFunctionMemberAccess]
     mock_browserbase_provider.bb.sessions.create.reset_mock()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test middle browser tool call (should not set up or clean up)
     end_user.set_additional_data("bb_session_id", "session123")
     end_user.set_additional_data("bb_session_connect_url", "connect_url")
-    mock_ctx.plan_run.current_step_index = 1
-    mock_browserbase_provider.setup_browser(mock_ctx)
+    tool_run_context.plan_run.current_step_index = 1
+    mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test final browser tool call (should not set up but should clean up)
-    mock_ctx.plan_run.current_step_index = 2
-    mock_browserbase_provider.setup_browser(mock_ctx)
+    tool_run_context.plan_run.current_step_index = 2
+    mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
         "session123",
         project_id="test_project",
