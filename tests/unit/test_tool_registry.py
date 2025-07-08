@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -884,6 +885,31 @@ def test_generate_pydantic_model_from_json_schema_handles_number_type() -> None:
     float_object = model.model_validate({"number": 1.23})
     assert float_object.number == 1.23  # type: ignore  # noqa: PGH003
     assert float_object.model_dump_json() == '{"number":1.23}'
+
+
+def test_generate_pydantic_model_from_json_schema_handles_empty_enum() -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check that the generated base model can serialise an empty enum as a str.
+    """
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "enum_field": {
+                "type": "string",
+                "enum": ["a", "b", ""],
+                "description": "An empty enum field",
+            },
+        },
+        "required": ["enum_field"],
+    }
+    model = generate_pydantic_model_from_json_schema("TestEmptyEnum", json_schema)
+    assert issubclass(type(model.model_fields["enum_field"].annotation), type(Enum))
+    assert model.model_fields["enum_field"].default is PydanticUndefined
+    assert model.model_fields["enum_field"].description == "An empty enum field"
+    assert model.model_validate({"enum_field": "a"}).model_dump() == {"enum_field": "a"}
+    assert model.model_validate({"enum_field": "b"}).model_dump() == {"enum_field": "b"}
+    assert model.model_validate({"enum_field": ""}).model_dump() == {"enum_field": ""}
 
 
 @pytest.mark.usefixtures("mock_get_mcp_session")

@@ -841,7 +841,10 @@ def _map_single_pydantic_type(  # noqa: PLR0911
     match field.get("type"):
         case "string":
             if field.get("enum"):
-                return StrEnum(field_name, {v.upper(): v for v in field.get("enum", [])})
+                return StrEnum(
+                    field_name,
+                    {v.upper() if v else "__EMPTY_STRING": v for v in field.get("enum", [])},
+                )
             return str
         case "integer":
             return int
