@@ -656,7 +656,8 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
     def get_plan_by_query(self, query: str) -> Plan:
         """Get a plan by query.
 
-        This method will return the most recent plan that matches the query.
+        This method will return the first plan that matches the query. This is not always the most
+        recent plan.
 
         Args:
             query (str): The query to get a plan for.
@@ -669,8 +670,6 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             for f in Path(self.storage_dir).iterdir()
             if f.is_file() and f.name.startswith(PLAN_UUID_PREFIX)
         ]
-        plan_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-
         for f in plan_files:
             plan = self._read(f.name, Plan)
             if plan.plan_context.query == query:

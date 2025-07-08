@@ -374,9 +374,7 @@ def test_portia_generate_plan_with_tools(
     assert plan.plan_context.tool_ids == ["add_tool"]
 
 
-def test_portia_plan_with_use_cached_plan_success(
-    portia: Portia
-) -> None:
+def test_portia_plan_with_use_cached_plan_success(portia: Portia) -> None:
     """Test planning with use_cached_plan=True when cached plan exists."""
     query = "example query"
 
@@ -399,7 +397,6 @@ def test_portia_plan_with_use_cached_plan_success(
         # Verify the cached plan was returned
         assert plan.id == cached_plan.id
         assert plan.plan_context.query == query
-
 
 
 def test_portia_plan_with_use_cached_plan_not_found(
@@ -425,10 +422,7 @@ def test_portia_plan_with_use_cached_plan_not_found(
         assert plan.id != "plan-00000000-0000-0000-0000-000000000000"  # Not a default UUID
 
 
-
-def test_portia_plan_with_use_cached_plan_false(
-    portia: Portia, planning_model: MagicMock
-) -> None:
+def test_portia_plan_with_use_cached_plan_false(portia: Portia, planning_model: MagicMock) -> None:
     """Test planning with use_cached_plan=False (default behavior)."""
     query = "example query"
 
@@ -454,9 +448,7 @@ def test_portia_plan_with_use_cached_plan_false(
         assert plan.id != cached_plan.id  # Should be a different plan
 
 
-def test_portia_run_with_use_cached_plan_success(
-    portia: Portia
-) -> None:
+def test_portia_run_with_use_cached_plan_success(portia: Portia) -> None:
     """Test running with use_cached_plan=True when cached plan exists."""
     query = "example query"
 
@@ -504,9 +496,7 @@ def test_portia_run_with_use_cached_plan_not_found(
         assert plan_run.plan_id != "plan-00000000-0000-0000-0000-000000000000"  # Not a default UUID
 
 
-def test_portia_run_with_use_cached_plan_false(
-    portia: Portia, planning_model: MagicMock
-) -> None:
+def test_portia_run_with_use_cached_plan_false(portia: Portia, planning_model: MagicMock) -> None:
     """Test running with use_cached_plan=False (default behavior)."""
     query = "example query"
 
@@ -532,10 +522,7 @@ def test_portia_run_with_use_cached_plan_false(
         assert plan_run.plan_id != cached_plan.id  # Should be a different plan
 
 
-
-def test_portia_plan_with_use_cached_plan_and_tools(
-    portia: Portia
-) -> None:
+def test_portia_plan_with_use_cached_plan_and_tools(portia: Portia) -> None:
     """Test planning with use_cached_plan=True and specific tools."""
     query = "example query"
     tools = ["add_tool", "clarification_tool"]
@@ -561,9 +548,7 @@ def test_portia_plan_with_use_cached_plan_and_tools(
         assert plan.plan_context.tool_ids == ["different_tool"]
 
 
-def test_portia_run_with_use_cached_plan_and_plan_run_inputs(
-    portia: Portia
-) -> None:
+def test_portia_run_with_use_cached_plan_and_plan_run_inputs(portia: Portia) -> None:
     """Test running with use_cached_plan=True and plan run inputs."""
     query = "example query"
     plan_run_inputs = [PlanInput(name="$num_a", value=5)]

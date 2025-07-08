@@ -993,17 +993,17 @@ def test_get_plan_by_query_disk_storage(tmp_path: Path) -> None:
         mixed_storage.get_plan_by_query("any query")
 
 
-def test_get_plan_by_query_disk_storage_modification_time_sorting(tmp_path: Path) -> None:
-    """Test that get_plan_by_query returns the most recently modified plan."""
+def test_get_plan_by_query_disk_storage_multiple_plans(tmp_path: Path) -> None:
+    """Test that get_plan_by_query returns the first plan that matches the query."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
 
     # Create test plans with the same query
     plan1 = Plan(
-        plan_context=PlanContext(query="same query", tool_ids=[]),
+        plan_context=PlanContext(query="different query", tool_ids=[]),
         steps=[],
     )
     plan2 = Plan(
-        plan_context=PlanContext(query="same query", tool_ids=["tool1"]),
+        plan_context=PlanContext(query="different query", tool_ids=["tool1"]),
         steps=[],
     )
     plan3 = Plan(
@@ -1016,10 +1016,12 @@ def test_get_plan_by_query_disk_storage_modification_time_sorting(tmp_path: Path
     storage.save_plan(plan2)
     storage.save_plan(plan3)
 
-    # Should return the most recently modified plan (plan3)
+    # Should return the first plan that matches the query, which might vary depending on the id
+    # This is not guaranteed to be the most recent plan. Unfortunately getting the file creation
+    # time is not supported on all platforms.
     found_plan = storage.get_plan_by_query("same query")
+    assert found_plan.plan_context.query == "same query"
     assert found_plan.id == plan3.id
-    assert found_plan.plan_context.tool_ids == ["tool1", "tool2"]
 
 
 def test_get_plan_by_query_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:

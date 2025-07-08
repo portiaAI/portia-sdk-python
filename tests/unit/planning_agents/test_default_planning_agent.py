@@ -236,7 +236,7 @@ def test_generate_steps_or_error_invalid_input_with_retry(mock_config: Config) -
     )
 
     mock_model = get_mock_generative_model(response=mock_response1)
-    mock_model._client.invoke.side_effect = [mock_response1, mock_response2]  #type:ignore[reportAttributeAccessIssue]
+    mock_model._client.invoke.side_effect = [mock_response1, mock_response2]  # type:ignore[reportAttributeAccessIssue]
     mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
