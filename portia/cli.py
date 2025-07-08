@@ -10,7 +10,6 @@ portia-cli list-tools
 from __future__ import annotations
 
 import builtins
-import importlib.metadata
 import sys
 from enum import Enum
 from functools import wraps
@@ -29,6 +28,7 @@ from portia.errors import InvalidConfigError
 from portia.logger import logger
 from portia.portia import ExecutionHooks, Portia
 from portia.tool_registry import DefaultToolRegistry
+from portia.version import get_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -164,7 +164,7 @@ def cli() -> None:
 @click.command()
 def version() -> None:
     """Print the CLI tool version."""
-    click.echo(importlib.metadata.version("portia-sdk-python"))
+    click.echo(get_version())
 
 
 @click.command()
