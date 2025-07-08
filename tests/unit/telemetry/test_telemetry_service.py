@@ -86,6 +86,12 @@ def test_get_project_id_key_default() -> None:
 class TestProductTelemetry:
     """Test suite for ProductTelemetry class."""
 
+    @pytest.fixture(autouse=True)
+    def mock_version(self) -> Any:  # noqa: ANN401
+        """Mock the version function for all tests in this class."""
+        with patch("portia.telemetry.telemetry_service.get_version", return_value="0.4.9"):
+            yield
+
     @pytest.fixture
     def telemetry(self) -> Any:  # noqa: ANN401
         """Create a fresh ProductTelemetry instance for each test.
@@ -165,6 +171,7 @@ class TestProductTelemetry:
             kwargs = mock_client.capture.call_args[1]
             assert kwargs["properties"]["key"] == "value"
             assert kwargs["properties"]["process_person_profile"] is True
+            assert kwargs["properties"]["sdk_version"] == "0.4.9"
 
     def test_capture_when_enabled_with_exception(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is enabled and PostHog client raises an exception."""
