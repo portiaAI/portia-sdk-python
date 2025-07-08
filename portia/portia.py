@@ -366,7 +366,7 @@ class Portia:
             try:
                 return self.storage.get_plan_by_query(query)
             except StorageError as e:
-                logger().warning(f"Error getting cached plan: {e}")
+                logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
         if isinstance(tools, list):
             tools = [
                 self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool

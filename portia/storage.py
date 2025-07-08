@@ -986,7 +986,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            plans = self.get_similar_plans(query, threshold=0.99, limit=1)
+            plans = self.get_similar_plans(query, threshold=1.0, limit=1)
         except Exception as e:
             raise StorageError(e) from e
         if not plans:
