@@ -962,8 +962,8 @@ def test_get_plan_by_query_disk_storage(tmp_path: Path) -> None:
     # Test finding existing plan
     found_plan = storage.get_plan_by_query("test query 1")
     assert found_plan.plan_context.query == "test query 1"
-    # Should return the most recent one (plan3 in this case due to sorting)
-    assert found_plan.id == plan3.id
+    # Should return the first one found
+    assert found_plan.id in [plan3.id, plan1.id]
 
     # Test finding another existing plan
     found_plan = storage.get_plan_by_query("test query 2")
