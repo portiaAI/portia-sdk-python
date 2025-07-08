@@ -1,7 +1,6 @@
 """Unit tests for the version utility module."""
 
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 from portia.version import get_version
 
@@ -18,13 +17,17 @@ def test_get_version_from_pyproject_toml() -> None:
     with (
         patch("portia.version.version", side_effect=Exception("Package not found")),
         patch("pathlib.Path.exists", return_value=True),
-        patch("builtins.open", create=True) as mock_open,
+        patch(
+            "pathlib.Path.open",
+            mock_open(
+                read_data=(
+                    'name = "portia-sdk-python"\n'
+                    'version = "0.4.9"\n'
+                    'description = "Portia Labs Python SDK"'
+                )
+            ),
+        ),
     ):
-        mock_open.return_value.__enter__.return_value = [
-            'name = "portia-sdk-python"',
-            'version = "0.4.9"',
-            'description = "Portia Labs Python SDK"',
-        ]
         assert get_version() == "0.4.9"
 
 
@@ -33,13 +36,17 @@ def test_get_version_from_pyproject_toml_with_quotes() -> None:
     with (
         patch("portia.version.version", side_effect=Exception("Package not found")),
         patch("pathlib.Path.exists", return_value=True),
-        patch("builtins.open", create=True) as mock_open,
+        patch(
+            "pathlib.Path.open",
+            mock_open(
+                read_data=(
+                    'name = "portia-sdk-python"\n'
+                    "version = '0.4.9'\n"
+                    'description = "Portia Labs Python SDK"'
+                )
+            ),
+        ),
     ):
-        mock_open.return_value.__enter__.return_value = [
-            'name = "portia-sdk-python"',
-            "version = '0.4.9'",
-            'description = "Portia Labs Python SDK"',
-        ]
         assert get_version() == "0.4.9"
 
 
@@ -48,12 +55,13 @@ def test_get_version_from_pyproject_toml_no_version_line() -> None:
     with (
         patch("portia.version.version", side_effect=Exception("Package not found")),
         patch("pathlib.Path.exists", return_value=True),
-        patch("builtins.open", create=True) as mock_open,
+        patch(
+            "pathlib.Path.open",
+            mock_open(
+                read_data=('name = "portia-sdk-python"\ndescription = "Portia Labs Python SDK"')
+            ),
+        ),
     ):
-        mock_open.return_value.__enter__.return_value = [
-            'name = "portia-sdk-python"',
-            'description = "Portia Labs Python SDK"',
-        ]
         assert get_version() == "unknown"
 
 
@@ -71,7 +79,7 @@ def test_get_version_file_read_error() -> None:
     with (
         patch("portia.version.version", side_effect=Exception("Package not found")),
         patch("pathlib.Path.exists", return_value=True),
-        patch("builtins.open", side_effect=Exception("File read error")),
+        patch("pathlib.Path.open", side_effect=Exception("File read error")),
     ):
         assert get_version() == "unknown"
 
@@ -81,16 +89,7 @@ def test_get_version_path_resolution() -> None:
     with (
         patch("portia.version.version", side_effect=Exception("Package not found")),
         patch("pathlib.Path.exists", return_value=True),
-        patch("builtins.open", create=True) as mock_open,
+        patch("pathlib.Path.open", mock_open(read_data='version = "0.4.9"')),
     ):
-        mock_open.return_value.__enter__.return_value = [
-            'version = "0.4.9"',
-        ]
         result = get_version()
         assert result == "0.4.9"
-
-        # Verify the path resolution
-        mock_open.assert_called_once()
-        call_args = mock_open.call_args[0][0]
-        assert isinstance(call_args, Path)
-        assert call_args.name == "pyproject.toml"

@@ -31,9 +31,7 @@ def get_version() -> str:
                         if line.strip().startswith("version = "):
                             # Extract version from "version = "0.4.9""
                             return line.split("=")[1].strip().strip("\"'")
-            else:
-                return "unknown"
+            return "unknown"  # noqa: TRY300
 
         except Exception:  # noqa: BLE001
             return "unknown"
-        return "unknown"
