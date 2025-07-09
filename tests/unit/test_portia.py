@@ -596,7 +596,7 @@ def test_portia_plan_with_use_cached_plan_storage_error_logging(
 
             # Verify warning was logged
             mock_logger().warning.assert_called_once_with(
-                "Error getting cached plan: Test storage error"
+                "Error getting cached plan. Using new plan instead: Test storage error"
             )
 
             # Verify a new plan was generated
@@ -625,7 +625,7 @@ def test_portia_run_with_use_cached_plan_storage_error_logging(
 
             # Verify warning was logged
             mock_logger().warning.assert_called_once_with(
-                "Error getting cached plan: Test storage error"
+                "Error getting cached plan. Using new plan instead: Test storage error"
             )
 
             # Verify a new plan was generated and run
