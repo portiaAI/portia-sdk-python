@@ -1101,7 +1101,7 @@ def test_get_plan_by_query_portia_cloud_storage_error(httpx_mock: HTTPXMock) -> 
         method="POST",
         match_json={
             "query": "test query",
-            "threshold": 0.99,
+            "threshold": 1.0,
             "limit": 1,
         },
     )
