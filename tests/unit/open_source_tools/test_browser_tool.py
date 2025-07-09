@@ -809,3 +809,114 @@ def test_browser_tool_multiple_calls(
         project_id="test_project",
         status="REQUEST_RELEASE",
     )
+
+
+# Tests for convert_model_to_browser_use_model function
+class TestConvertModelToBrowserUseModel:
+    """Test cases for convert_model_to_browser_use_model function."""
+
+    def test_convert_openai_model(self) -> None:
+        """Test converting OpenAI model to ChatOpenAI."""
+        from browser_use.llm import ChatOpenAI
+
+        from portia.model import OpenAIGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock OpenAI model
+        mock_model = MagicMock(spec=OpenAIGenerativeModel)
+        mock_model.model_name = "gpt-4"
+        mock_model.api_key = "test-api-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatOpenAI)
+        assert result.model == "gpt-4"
+        assert result.api_key == "test-api-key"
+
+    def test_convert_anthropic_model(self) -> None:
+        """Test converting Anthropic model to ChatAnthropic."""
+        from browser_use.llm import ChatAnthropic
+
+        from portia.model import AnthropicGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Anthropic model
+        mock_model = MagicMock(spec=AnthropicGenerativeModel)
+        mock_model.model_name = "claude-3-sonnet-20240229"
+        mock_model.api_key = "test-anthropic-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatAnthropic)
+        assert result.model == "claude-3-sonnet-20240229"
+        assert result.api_key == "test-anthropic-key"
+
+    def test_convert_azure_openai_model(self) -> None:
+        """Test converting Azure OpenAI model to ChatAzureOpenAI."""
+        from browser_use.llm import ChatAzureOpenAI
+
+        from portia.model import AzureOpenAIGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Azure OpenAI model
+        mock_model = MagicMock(spec=AzureOpenAIGenerativeModel)
+        mock_model.model_name = "gpt-4"
+        mock_model.api_key = "test-azure-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatAzureOpenAI)
+        assert result.model == "gpt-4"
+        assert result.api_key == "test-azure-key"
+
+    def test_convert_ollama_model(self) -> None:
+        """Test converting Ollama model to ChatOllama."""
+        from browser_use.llm import ChatOllama
+
+        from portia.model import OllamaGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Ollama model
+        mock_model = MagicMock(spec=OllamaGenerativeModel)
+        mock_model.model_name = "llama2"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatOllama)
+        assert result.model == "llama2"
+
+    def test_convert_google_genai_model(self) -> None:
+        """Test converting Google GenAI model to ChatGoogle."""
+        from browser_use.llm import ChatGoogle
+
+        from portia.model import GoogleGenAiGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Google GenAI model
+        mock_model = MagicMock(spec=GoogleGenAiGenerativeModel)
+        mock_model.model_name = "gemini-pro"
+        mock_model.api_key = "test-google-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatGoogle)
+        assert result.model == "gemini-pro"
+        assert result.api_key == "test-google-key"
+
+    def test_convert_with_string_model(self) -> None:
+        """Test converting string model raises TypeError."""
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Attempt to convert a string
+        with pytest.raises(TypeError, match="Model must be a supported model type."):
+            convert_model_to_browser_use_model("gpt-4")  # type: ignore[arg-type]

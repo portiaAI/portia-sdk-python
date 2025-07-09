@@ -26,6 +26,14 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
+from browser_use.llm import (
+    BaseChatModel,
+    ChatAnthropic,
+    ChatAzureOpenAI,
+    ChatGoogle,
+    ChatOllama,
+    ChatOpenAI,
+)
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
@@ -33,7 +41,14 @@ from portia import logger
 from portia.clarification import ActionClarification
 from portia.common import validate_extras_dependencies
 from portia.errors import ToolHardError
-from portia.model import GenerativeModel  # noqa: TC001 - used in Pydantic Schema
+from portia.model import (
+    AnthropicGenerativeModel,
+    AzureOpenAIGenerativeModel,
+    GenerativeModel,
+    GoogleGenAiGenerativeModel,
+    OllamaGenerativeModel,
+    OpenAIGenerativeModel,
+)
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -46,6 +61,22 @@ NotSet: Any = PydanticUndefined
 BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase", raise_error=False)
 
 T = TypeVar("T", bound=str | BaseModel)
+
+
+def convert_model_to_browser_use_model(model: GenerativeModel) -> BaseChatModel:
+    """Convert a Portia model to a BrowserUse model."""
+    if isinstance(model, OpenAIGenerativeModel):
+        return ChatOpenAI(model=model.model_name, api_key=model.api_key)
+    if isinstance(model, AnthropicGenerativeModel):
+        return ChatAnthropic(model=model.model_name, api_key=model.api_key)
+    if isinstance(model, AzureOpenAIGenerativeModel):
+        return ChatAzureOpenAI(model=model.model_name, api_key=model.api_key)
+    if isinstance(model, OllamaGenerativeModel):
+        return ChatOllama(model=model.model_name)
+    if isinstance(model, GoogleGenAiGenerativeModel):
+        return ChatGoogle(model=model.model_name, api_key=model.api_key)
+
+    raise TypeError("Model must be a supported model type.")
 
 
 class BrowserToolForUrlSchema(BaseModel):
@@ -279,7 +310,7 @@ class BrowserTool(Tool[str | BaseModel]):
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
-        llm = model.to_langchain()
+        llm = convert_model_to_browser_use_model(model)
 
         async def run_browser_tasks() -> str | BaseModel | ActionClarification:
             def handle_login_requirement(
@@ -310,7 +341,7 @@ class BrowserTool(Tool[str | BaseModel]):
             ) -> BaseModel:
                 agent = Agent(
                     task=task_description,
-                    llm=llm,  # pyright: ignore[reportArgumentType]
+                    llm=llm,
                     browser=self.infrastructure_provider.setup_browser(ctx),
                     controller=Controller(output_model=output_model),
                 )
