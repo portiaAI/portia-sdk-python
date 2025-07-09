@@ -337,7 +337,7 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
         plan=plan,
         plan_run=plan_run,
         end_user=EndUser(external_id="123"),
-        config=get_test_config(clarifications_enabled=True),
+        config=get_test_config(argument_clarifications_enabled=True),
         agent_memory=InMemoryStorage(),
         tool=AdditionTool(),
     )
