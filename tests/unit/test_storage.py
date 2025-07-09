@@ -1063,7 +1063,7 @@ def test_get_plan_by_query_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
         method="POST",
         match_json={
             "query": "non-existent query",
-            "threshold": 0.99,
+            "threshold": 1.0,
             "limit": 1,
         },
         json=[],
