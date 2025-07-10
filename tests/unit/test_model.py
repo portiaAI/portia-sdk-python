@@ -225,6 +225,75 @@ def test_anthropic_model_structured_output_returns_dict() -> None:
         assert result.test_field == "Response from model"
 
 
+def test_anthropic_model_get_response_list_content() -> None:
+    """Test that AnthropicGenerativeModel.get_response handles list content correctly."""
+    mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
+    mock_chat_anthropic.invoke.return_value = AIMessage(
+        content=[
+            {
+                "signature": "ErUBCkYIBRgCIkCHOW050nRsvKYRVKpDR2HQmAH9qGv",
+                "thinking": "Let me carefully analyze ...",
+                "type": "thinking",
+            },
+            {
+                "text": "This is a test summary",
+                "type": "text",
+            },
+        ],
+        additional_kwargs={},
+        response_metadata={
+            "id": "msg_01KKD1wL1Xq37ErPYxCpRwX7",
+            "model": "claude-3-7-sonnet-20250219",
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
+            "usage": {
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "input_tokens": 203,
+                "output_tokens": 392,
+                "server_tool_use": None,
+                "service_tier": "standard",
+            },
+            "model_name": "claude-3-7-sonnet-20250219",
+        },
+        id="run--0e5c64c3-ea97-4437-b672-4d0f812c981f-0",
+        usage_metadata={
+            "input_tokens": 203,
+            "output_tokens": 392,
+            "total_tokens": 595,
+            "input_token_details": {"cache_read": 0, "cache_creation": 0},
+        },
+    )
+
+    with mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls:
+        mock_chat_anthropic_cls.return_value = mock_chat_anthropic
+        model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        result = model.get_response(
+            messages=[Message(role="user", content="Hello")],
+        )
+        assert isinstance(result, Message)
+        assert result.role == "assistant"
+        assert result.content == "This is a test summary"
+
+
+def test_anthropic_model_get_response_with_human_message() -> None:
+    """Test that AnthropicGenerativeModel.get_response works with a simple user message."""
+    mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
+    mock_chat_anthropic.invoke.return_value = HumanMessage(content="This is a test summary")
+
+    with mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls:
+        mock_chat_anthropic_cls.return_value = mock_chat_anthropic
+        model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        # This will be converted to a HumanMessage internally
+        human_message = Message(role="user", content="Hello")
+        result = model.get_response(
+            messages=[human_message],
+        )
+        assert isinstance(result, Message)
+        assert result.role == "user"
+        assert result.content == "This is a test summary"
+
+
 def test_anthropic_model_structured_output_fallback_to_instructor() -> None:
     """Test that AnthropicModel.structured_output falls back to instructor when expected."""
     mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
