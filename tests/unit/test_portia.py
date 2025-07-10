@@ -64,6 +64,7 @@ from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, 
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import ExecutionHooks, Portia
 from portia.prefixed_uuid import ClarificationUUID
+from portia.storage import StorageError
 from portia.telemetry.telemetry_service import BaseProductTelemetry
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
 from portia.tool import (
@@ -371,6 +372,264 @@ def test_portia_generate_plan_with_tools(
 
     assert plan.plan_context.query == query
     assert plan.plan_context.tool_ids == ["add_tool"]
+
+
+def test_portia_plan_with_use_cached_plan_success(portia: Portia) -> None:
+    """Test planning with use_cached_plan=True when cached plan exists."""
+    query = "example query"
+
+    # Create a cached plan
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the storage.get_plan_by_query to return the cached plan
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", return_value=cached_plan
+    ) as mock_get_cached:
+        plan = portia.plan(query, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify the cached plan was returned
+        assert plan.id == cached_plan.id
+        assert plan.plan_context.query == query
+
+
+def test_portia_plan_with_use_cached_plan_not_found(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test planning with use_cached_plan=True when no cached plan exists."""
+    query = "example query"
+
+    # Mock the storage.get_plan_by_query to raise StorageError
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", side_effect=StorageError("No plan found for query")
+    ) as mock_get_cached:
+        # Mock the planning model to return a successful plan
+        planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+        plan = portia.plan(query, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify a new plan was generated (not the cached one)
+        assert plan.plan_context.query == query
+        assert plan.id != "plan-00000000-0000-0000-0000-000000000000"  # Not a default UUID
+
+
+def test_portia_plan_with_use_cached_plan_false(portia: Portia, planning_model: MagicMock) -> None:
+    """Test planning with use_cached_plan=False (default behavior)."""
+    query = "example query"
+
+    # Create a cached plan
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the planning model to return a successful plan
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+    # Mock the storage.get_plan_by_query to ensure it's not called
+    with mock.patch.object(portia.storage, "get_plan_by_query") as mock_get_cached:
+        plan = portia.plan(query, use_cached_plan=False)
+
+        # Verify get_plan_by_query was NOT called
+        mock_get_cached.assert_not_called()
+
+        # Verify a new plan was generated
+        assert plan.plan_context.query == query
+        assert plan.id != cached_plan.id  # Should be a different plan
+
+
+def test_portia_run_with_use_cached_plan_success(portia: Portia) -> None:
+    """Test running with use_cached_plan=True when cached plan exists."""
+    query = "example query"
+
+    # Create a cached plan
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the storage.get_plan_by_query to return the cached plan
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", return_value=cached_plan
+    ) as mock_get_cached:
+        plan_run = portia.run(query, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify the plan run was created from the cached plan
+        assert plan_run.plan_id == cached_plan.id
+        assert plan_run.state == PlanRunState.COMPLETE
+
+
+def test_portia_run_with_use_cached_plan_not_found(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test running with use_cached_plan=True when no cached plan exists."""
+    query = "example query"
+
+    # Mock the storage.get_plan_by_query to raise StorageError
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", side_effect=StorageError("No plan found for query")
+    ) as mock_get_cached:
+        # Mock the planning model to return a successful plan
+        planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+        plan_run = portia.run(query, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify a new plan was generated and run
+        assert plan_run.state == PlanRunState.COMPLETE
+        assert plan_run.plan_id != "plan-00000000-0000-0000-0000-000000000000"  # Not a default UUID
+
+
+def test_portia_run_with_use_cached_plan_false(portia: Portia, planning_model: MagicMock) -> None:
+    """Test running with use_cached_plan=False (default behavior)."""
+    query = "example query"
+
+    # Create a cached plan
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the planning model to return a successful plan
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+    # Mock the storage.get_plan_by_query to ensure it's not called
+    with mock.patch.object(portia.storage, "get_plan_by_query") as mock_get_cached:
+        plan_run = portia.run(query, use_cached_plan=False)
+
+        # Verify get_plan_by_query was NOT called
+        mock_get_cached.assert_not_called()
+
+        # Verify a new plan was generated and run
+        assert plan_run.state == PlanRunState.COMPLETE
+        assert plan_run.plan_id != cached_plan.id  # Should be a different plan
+
+
+def test_portia_plan_with_use_cached_plan_and_tools(portia: Portia) -> None:
+    """Test planning with use_cached_plan=True and specific tools."""
+    query = "example query"
+    tools = ["add_tool", "clarification_tool"]
+
+    # Create a cached plan with different tools
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["different_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the storage.get_plan_by_query to return the cached plan
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", return_value=cached_plan
+    ) as mock_get_cached:
+        plan = portia.plan(query, tools=tools, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify the cached plan was returned
+        assert plan.id == cached_plan.id
+        assert plan.plan_context.tool_ids == ["different_tool"]
+
+
+def test_portia_run_with_use_cached_plan_and_plan_run_inputs(portia: Portia) -> None:
+    """Test running with use_cached_plan=True and plan run inputs."""
+    query = "example query"
+    plan_run_inputs = [PlanInput(name="$num_a", value=5)]
+
+    # Create a cached plan
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the storage.get_plan_by_query to return the cached plan
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", return_value=cached_plan
+    ) as mock_get_cached:
+        plan_run = portia.run(query, plan_run_inputs=plan_run_inputs, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify the plan run was created from the cached plan
+        assert plan_run.plan_id == cached_plan.id
+        assert plan_run.state == PlanRunState.COMPLETE
+
+
+def test_portia_plan_with_use_cached_plan_storage_error_logging(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test that storage errors are logged when use_cached_plan=True."""
+    query = "example query"
+
+    # Mock the storage.get_plan_by_query to raise StorageError
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", side_effect=StorageError("Test storage error")
+    ) as mock_get_cached:
+        # Mock the planning model to return a successful plan
+        planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+        # Mock the logger to capture warning messages
+        with mock.patch("portia.portia.logger") as mock_logger:
+            plan = portia.plan(query, use_cached_plan=True)
+
+            # Verify get_plan_by_query was called
+            mock_get_cached.assert_called_once_with(query)
+
+            # Verify warning was logged
+            mock_logger().warning.assert_called_once_with(
+                "Error getting cached plan. Using new plan instead: Test storage error"
+            )
+
+            # Verify a new plan was generated
+            assert plan.plan_context.query == query
+
+
+def test_portia_run_with_use_cached_plan_storage_error_logging(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test that storage errors are logged when use_cached_plan=True in run method."""
+    query = "example query"
+
+    # Mock the storage.get_plan_by_query to raise StorageError
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", side_effect=StorageError("Test storage error")
+    ) as mock_get_cached:
+        # Mock the planning model to return a successful plan
+        planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+        # Mock the logger to capture warning messages
+        with mock.patch("portia.portia.logger") as mock_logger:
+            plan_run = portia.run(query, use_cached_plan=True)
+
+            # Verify get_plan_by_query was called
+            mock_get_cached.assert_called_once_with(query)
+
+            # Verify warning was logged
+            mock_logger().warning.assert_called_once_with(
+                "Error getting cached plan. Using new plan instead: Test storage error"
+            )
+
+            # Verify a new plan was generated and run
+            assert plan_run.state == PlanRunState.COMPLETE
 
 
 def test_portia_resume(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
@@ -734,7 +993,7 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
         return_value=mock_summarizer,
     ):
         last_step_output = LocalDataValue(value="Visit Hyde Park and have a picnic")
-        output = portia._get_final_output(plan, plan_run, last_step_output)  # noqa: SLF001
+        output = portia._get_final_output(plan, plan_run, last_step_output)
 
         # Verify the final output
         assert output is not None
@@ -795,7 +1054,7 @@ def test_portia_sets_final_output_with_structured_summary(portia: Portia) -> Non
         return_value=mock_summarizer,
     ):
         last_step_output = LocalDataValue(value=expected_output)
-        output = portia._get_final_output(plan, plan_run, last_step_output)  # noqa: SLF001
+        output = portia._get_final_output(plan, plan_run, last_step_output)
 
         # Verify the final output
         assert output is not None
@@ -910,7 +1169,7 @@ def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
         return_value=mock_agent,
     ):
         step_output = LocalDataValue(value="Some output")
-        final_output = portia._get_final_output(plan, plan_run, step_output)  # noqa: SLF001
+        final_output = portia._get_final_output(plan, plan_run, step_output)
 
         # Verify the final output is set without summary
         assert final_output is not None
@@ -1000,7 +1259,7 @@ def test_portia_get_tool_for_step_none_tool_id() -> None:
         tool_id=None,
     )
 
-    tool = portia._get_tool_for_step(step, plan_run)  # noqa: SLF001
+    tool = portia._get_tool_for_step(step, plan_run)
     assert tool is None
 
 
@@ -1017,9 +1276,9 @@ def test_get_llm_tool() -> None:
         tool_id=LLMTool.LLM_TOOL_ID,
     )
 
-    tool = portia._get_tool_for_step(step, plan_run)  # noqa: SLF001
+    tool = portia._get_tool_for_step(step, plan_run)
     assert tool is not None
-    assert isinstance(tool._child_tool, LLMTool)  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+    assert isinstance(tool._child_tool, LLMTool)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_portia_run_plan(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
@@ -1350,7 +1609,7 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     with mock.patch.object(portia, "_get_final_output", return_value=mock_final_output):
         # Call the actual method (not mocked)
         previous_output = LocalDataValue(value="Previous step result")
-        updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
+        updated_plan_run, outcome = portia._handle_introspection_outcome(
             introspection_agent=mock_introspection,
             plan=plan,
             plan_run=plan_run,
@@ -1393,7 +1652,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     )
 
     previous_output = LocalDataValue(value="Previous step result")
-    updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
+    updated_plan_run, outcome = portia._handle_introspection_outcome(
         introspection_agent=mock_introspection,
         plan=plan,
         plan_run=plan_run,
@@ -1428,7 +1687,7 @@ def test_handle_introspection_outcome_no_condition(portia: Portia) -> None:
 
     # Call the actual method
     previous_output = LocalDataValue(value="Previous step result")
-    updated_plan_run, outcome = portia._handle_introspection_outcome(  # noqa: SLF001
+    updated_plan_run, outcome = portia._handle_introspection_outcome(
         introspection_agent=mock_introspection,
         plan=plan,
         plan_run=plan_run,

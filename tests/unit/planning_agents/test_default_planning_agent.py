@@ -199,7 +199,7 @@ def test_generate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
     assert "Attempt 3" in result.error
     assert "Missing tools no_tool_1 from the provided tool_list" in result.error
     assert result.steps == []
-    assert mock_model._client.invoke.call_count == 3  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+    assert mock_model._client.invoke.call_count == 3  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_generate_steps_or_error_invalid_input_with_retry(mock_config: Config) -> None:
@@ -236,7 +236,7 @@ def test_generate_steps_or_error_invalid_input_with_retry(mock_config: Config) -
     )
 
     mock_model = get_mock_generative_model(response=mock_response1)
-    mock_model._client.invoke.side_effect = [mock_response1, mock_response2]  # noqa: SLF001 #type:ignore[reportAttributeAccessIssue]
+    mock_model._client.invoke.side_effect = [mock_response1, mock_response2]  # type:ignore[reportAttributeAccessIssue]
     mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
     planning_agent = DefaultPlanningAgent(mock_config)
     result = planning_agent.generate_steps_or_error(
@@ -248,7 +248,7 @@ def test_generate_steps_or_error_invalid_input_with_retry(mock_config: Config) -
 
     assert result.error is None
     assert result.steps == mock_response2.steps
-    assert mock_model._client.invoke.call_count == 2  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+    assert mock_model._client.invoke.call_count == 2  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_generate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
@@ -325,7 +325,7 @@ def test_generate_steps_with_plan_inputs(mock_config: Config) -> None:
     )
     assert result.error is None
 
-    assert mock_model._client.invoke.called  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
-    prompt_text = mock_model._client.invoke.call_args[0][0][1].content  # noqa: SLF001 # pyright: ignore[reportAttributeAccessIssue]
+    assert mock_model._client.invoke.called  # pyright: ignore[reportAttributeAccessIssue]
+    prompt_text = mock_model._client.invoke.call_args[0][0][1].content  # pyright: ignore[reportAttributeAccessIssue]
     assert "$user_id" in prompt_text
     assert "ID of the user" in prompt_text

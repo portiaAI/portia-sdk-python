@@ -658,15 +658,15 @@ def test_provider_default_models_with_reasoning(monkeypatch: pytest.MonkeyPatch)
     assert isinstance(planning_model, AnthropicGenerativeModel)
     assert planning_model.model_name == "claude-3-7-sonnet-latest"
     assert hasattr(planning_model, "_model_kwargs")
-    assert "thinking" in planning_model._model_kwargs  # noqa: SLF001
-    assert planning_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
+    assert "thinking" in planning_model._model_kwargs
+    assert planning_model._model_kwargs["thinking"]["type"] == "enabled"
 
     introspection_model = c.get_introspection_model()
     assert isinstance(introspection_model, AnthropicGenerativeModel)
     assert introspection_model.model_name == "claude-3-7-sonnet-latest"
     assert hasattr(introspection_model, "_model_kwargs")
-    assert "thinking" in introspection_model._model_kwargs  # noqa: SLF001
-    assert introspection_model._model_kwargs["thinking"]["type"] == "enabled"  # noqa: SLF001
+    assert "thinking" in introspection_model._model_kwargs
+    assert introspection_model._model_kwargs["thinking"]["type"] == "enabled"
 
     default_model = c.get_default_model()
     assert isinstance(default_model, AnthropicGenerativeModel)
@@ -685,14 +685,14 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
     planning_model = c.get_planning_model()
     assert isinstance(planning_model, OpenAIGenerativeModel)
     assert hasattr(planning_model, "_model_kwargs")
-    assert "reasoning_effort" in planning_model._model_kwargs  # noqa: SLF001
-    assert planning_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
+    assert "reasoning_effort" in planning_model._model_kwargs
+    assert planning_model._model_kwargs["reasoning_effort"] == "medium"
 
     introspection_model = c.get_introspection_model()
     assert isinstance(introspection_model, OpenAIGenerativeModel)
     assert hasattr(introspection_model, "_model_kwargs")
-    assert "reasoning_effort" in introspection_model._model_kwargs  # noqa: SLF001
-    assert introspection_model._model_kwargs["reasoning_effort"] == "medium"  # noqa: SLF001
+    assert "reasoning_effort" in introspection_model._model_kwargs
+    assert introspection_model._model_kwargs["reasoning_effort"] == "medium"
 
     default_model = c.get_default_model()
     assert isinstance(default_model, OpenAIGenerativeModel)
