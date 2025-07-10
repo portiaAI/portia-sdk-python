@@ -279,7 +279,7 @@ def test_anthropic_model_get_response_list_content() -> None:
 def test_anthropic_model_get_response_with_human_message() -> None:
     """Test that AnthropicGenerativeModel.get_response works with a simple user message."""
     mock_chat_anthropic = MagicMock(spec=ChatAnthropic)
-    mock_chat_anthropic.invoke.return_value = AIMessage(content="This is a test summary")
+    mock_chat_anthropic.invoke.return_value = HumanMessage(content="This is a test summary")
 
     with mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls:
         mock_chat_anthropic_cls.return_value = mock_chat_anthropic
@@ -290,7 +290,7 @@ def test_anthropic_model_get_response_with_human_message() -> None:
             messages=[human_message],
         )
         assert isinstance(result, Message)
-        assert result.role == "assistant"
+        assert result.role == "user"
         assert result.content == "This is a test summary"
 
 
