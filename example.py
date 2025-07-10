@@ -1,17 +1,18 @@
 """Simple Example."""
 
+from typing import Any
 from dotenv import load_dotenv
+import instructor
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import Secret, SecretStr
 
 from portia import Config, LogLevel, PlanRunState, Portia, example_tool_registry
 from portia.cli import CLIExecutionHooks
+from portia.config import GenerativeModelsConfig
 from portia.end_user import EndUser
+from portia.model import LangChainGenerativeModel, LLMProvider
 
 load_dotenv()
-
-portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
-)
 
 
 # Simple Example

@@ -141,7 +141,7 @@ class LLMModel(Enum):
     # Google Generative AI
     GEMINI_2_5_FLASH = Model(
         provider=LLMProvider.GOOGLE,
-        model_name="gemini-2.5-flash-preview-04-17",
+        model_name="gemini-2.5-flash",
     )
     GEMINI_2_5_PRO = Model(
         provider=LLMProvider.GOOGLE,
