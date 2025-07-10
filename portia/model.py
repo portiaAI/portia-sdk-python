@@ -506,7 +506,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             max_retries=max_retries,
             max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
             api_key=api_key,
-            model_kwargs=kwargs,
+            **kwargs,
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
@@ -516,6 +516,34 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             mode=instructor.Mode.ANTHROPIC_JSON,
         )
         self.max_tokens = max_tokens
+
+    def get_response(self, messages: list[Message]) -> Message:
+        """Get response from Anthropic model, handling list content."""
+        langchain_messages = [msg.to_langchain() for msg in messages]
+        response = self._client.invoke(langchain_messages)
+
+        if isinstance(response, HumanMessage):
+            return Message.model_validate(
+                {"role": "user", "content": response.content or ""},
+            )
+        if isinstance(response, AIMessage):
+            if isinstance(response.content, list):
+                # This is to extract the result from response of anthropic thinking models.
+                content = ", ".join(
+                    item.get("text", "")
+                    for item in response.content
+                    if isinstance(item, dict) and item.get("type") == "text"
+                )
+            else:
+                content = response.content
+            return Message.model_validate(
+                {"role": "assistant", "content": content or ""},
+            )
+        if isinstance(response, SystemMessage):
+            return Message.model_validate(
+                {"role": "system", "content": response.content or ""},
+            )
+        raise ValueError(f"Unsupported message type: {type(response)}")
 
     def get_structured_response(
         self,
