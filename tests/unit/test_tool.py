@@ -90,7 +90,7 @@ def test_run_method_with_uncaught_error() -> None:
     """Test the _run method wraps errors."""
     tool = ErrorTool()
     with pytest.raises(ToolSoftError):
-        tool._run(  # noqa: SLF001
+        tool._run(
             ctx=get_test_tool_context(),
             error_str="this is an error",
             return_uncaught_error=True,
@@ -298,7 +298,7 @@ def test_remote_tool_run_unhandled_error(httpx_mock: HTTPXMock) -> None:
         ({"ready": False, "clarifications": []}, False),
     ],
 )
-def test_remote_tool_ready(httpx_mock: HTTPXMock, response_json: dict, is_ready: bool) -> None:  # noqa: FBT001
+def test_remote_tool_ready(httpx_mock: HTTPXMock, response_json: dict, is_ready: bool) -> None:
     """Test remote tool ready."""
     endpoint = "https://api.fake-portia.test"
     httpx_mock.add_response(
@@ -336,7 +336,7 @@ def test_remote_tool_ready(httpx_mock: HTTPXMock, response_json: dict, is_ready:
     ("status_code", "is_ready"),
     [(500, False), (404, False), (200, True)],
 )
-def test_remote_tool_ready_error(httpx_mock: HTTPXMock, status_code: int, is_ready: bool) -> None:  # noqa: FBT001
+def test_remote_tool_ready_error(httpx_mock: HTTPXMock, status_code: int, is_ready: bool) -> None:
     """Test remote tool ready."""
     endpoint = "https://api.fake-portia.test"
     httpx_mock.add_response(
@@ -748,7 +748,7 @@ def test_structured_output_schema(add_tool: AdditionTool) -> None:
     structured_add_tool = StructuredAdditionTool()
     assert structured_add_tool.structured_output_schema is AdditionOutput
 
-    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)  # noqa: SLF001
+    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)
     assert output is not None
     assert isinstance(output, LocalDataValue)
     assert output.value == AdditionOutput(result=3)
@@ -770,7 +770,7 @@ def test_structured_output_schema_coercion(add_tool: AdditionTool) -> None:
     structured_add_tool = StructuredAdditionTool()
     assert structured_add_tool.structured_output_schema is AdditionOutput
 
-    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)  # noqa: SLF001
+    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)
     assert output is not None
     assert isinstance(output, LocalDataValue)
     assert output.value == AdditionOutput(result=3)
@@ -792,7 +792,7 @@ def test_structured_output_schema_coercion_error(add_tool: AdditionTool) -> None
     structured_add_tool = StructuredAdditionTool()
     assert structured_add_tool.structured_output_schema is AdditionOutput
 
-    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)  # noqa: SLF001
+    output = structured_add_tool._run(get_test_tool_context(), a=1, b=2)
     assert output is not None
     assert isinstance(output, LocalDataValue)
     assert output.value == {"result": "not an int"}

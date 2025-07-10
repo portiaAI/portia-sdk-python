@@ -153,7 +153,7 @@ def test_build_tasks_and_outputs_context(
     }
 
     summarizer = FinalOutputSummarizer(config=summarizer_config)
-    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+    context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
     )
@@ -181,7 +181,7 @@ def test_build_tasks_and_outputs_context_empty() -> None:
     plan_run.outputs.step_outputs = {}
 
     summarizer = FinalOutputSummarizer(config=get_test_config())
-    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+    context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
     )
@@ -213,7 +213,7 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
     }
 
     summarizer = FinalOutputSummarizer(config=get_test_config())
-    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+    context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
     )
@@ -261,7 +261,7 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
     }
 
     summarizer = FinalOutputSummarizer(config=get_test_config())
-    context = summarizer._build_tasks_and_outputs_context(  # noqa: SLF001
+    context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
     )
