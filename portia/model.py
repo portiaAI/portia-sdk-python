@@ -108,6 +108,7 @@ class GenerativeModel(ABC):
     """Base class for all generative model clients."""
 
     provider: LLMProvider
+    api_key: str | None = None
 
     def __init__(self, model_name: str) -> None:
         """Initialize the model.
@@ -289,7 +290,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
         """
         self._model_kwargs = kwargs.copy()
-
+        self.api_key = api_key.get_secret_value()
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
@@ -391,7 +392,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
 
         """
         self._model_kwargs = kwargs.copy()
-
+        self.api_key = api_key.get_secret_value()
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
@@ -498,13 +499,14 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             self._model_kwargs = kwargs["model_kwargs"].copy()
         else:
             self._model_kwargs = kwargs.copy()
+        self.api_key = api_key.get_secret_value()
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
             max_retries=max_retries,
             max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
             api_key=api_key,
-            model_kwargs=kwargs,
+            **kwargs,
         )
         super().__init__(client, model_name)
         self._instructor_client = instructor.from_anthropic(
@@ -514,6 +516,26 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             mode=instructor.Mode.ANTHROPIC_JSON,
         )
         self.max_tokens = max_tokens
+
+    def get_response(self, messages: list[Message]) -> Message:
+        """Get response from Anthropic model, handling list content."""
+        langchain_messages = [msg.to_langchain() for msg in messages]
+        response = self._client.invoke(langchain_messages)
+
+        if isinstance(response, AIMessage):
+            if isinstance(response.content, list):
+                # This is to extract the result from response of anthropic thinking models.
+                content = ", ".join(
+                    item.get("text", "")
+                    for item in response.content
+                    if isinstance(item, dict) and item.get("type") == "text"
+                )
+            else:
+                content = response.content
+            return Message.model_validate(
+                {"role": "assistant", "content": content or ""},
+            )
+        return Message.from_langchain(response)
 
     def get_structured_response(
         self,
@@ -601,6 +623,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
+            self.api_key = api_key.get_secret_value()
             super().__init__(client, model_name)
             self._instructor_client = instructor.from_mistral(
                 client=Mistral(api_key=api_key.get_secret_value()),
@@ -679,8 +702,9 @@ if validate_extras_dependencies("google", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
+            self.api_key = api_key.get_secret_value()
             # Configure genai with the api key
-            genai_client = genai.Client(api_key=api_key.get_secret_value())
+            genai_client = genai.Client(api_key=self.api_key)
 
             client = ChatGoogleGenerativeAI(
                 model=model_name,
@@ -720,6 +744,7 @@ if validate_extras_dependencies("ollama", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatOllama
 
             """
+            self.api_key = None
             super().__init__(
                 client=ChatOllama(model=model_name, **kwargs),
                 model_name=model_name,

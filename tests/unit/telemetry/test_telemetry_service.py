@@ -86,6 +86,12 @@ def test_get_project_id_key_default() -> None:
 class TestProductTelemetry:
     """Test suite for ProductTelemetry class."""
 
+    @pytest.fixture(autouse=True)
+    def mock_version(self) -> Any:  # noqa: ANN401
+        """Mock the version function for all tests in this class."""
+        with patch("portia.telemetry.telemetry_service.get_version", return_value="0.4.9"):
+            yield
+
     @pytest.fixture
     def telemetry(self) -> Any:  # noqa: ANN401
         """Create a fresh ProductTelemetry instance for each test.
@@ -115,7 +121,7 @@ class TestProductTelemetry:
         ):
             telemetry = ProductTelemetry()
             mock_logger.debug.assert_called_once_with("Telemetry disabled")
-            assert telemetry._posthog_client is None  # noqa: SLF001
+            assert telemetry._posthog_client is None
             assert logging.getLogger("posthog").disabled
 
     def test_init_telemetry_enabled(self, mock_logger: MagicMock) -> None:
@@ -128,7 +134,7 @@ class TestProductTelemetry:
             telemetry = ProductTelemetry()
             mock_logger.info.assert_called_once()
             assert "Portia anonymized telemetry enabled" in mock_logger.info.call_args[0][0]
-            assert isinstance(telemetry._posthog_client, Posthog)  # noqa: SLF001
+            assert isinstance(telemetry._posthog_client, Posthog)
 
     def test_capture_when_disabled(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is disabled."""
@@ -152,7 +158,7 @@ class TestProductTelemetry:
         ):
             telemetry = ProductTelemetry()
             mock_client = MagicMock()
-            telemetry._posthog_client = mock_client  # noqa: SLF001
+            telemetry._posthog_client = mock_client
 
             event = TestTelemetryEvent("test_event", {"key": "value"})
             telemetry.capture(event)
@@ -165,6 +171,7 @@ class TestProductTelemetry:
             kwargs = mock_client.capture.call_args[1]
             assert kwargs["properties"]["key"] == "value"
             assert kwargs["properties"]["process_person_profile"] is True
+            assert kwargs["properties"]["sdk_version"] == "0.4.9"
 
     def test_capture_when_enabled_with_exception(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is enabled and PostHog client raises an exception."""
@@ -176,7 +183,7 @@ class TestProductTelemetry:
             telemetry = ProductTelemetry()
             mock_client = MagicMock()
             mock_client.capture.side_effect = Exception("PostHog API error")
-            telemetry._posthog_client = mock_client  # noqa: SLF001
+            telemetry._posthog_client = mock_client
 
             event = TestTelemetryEvent("test_event", {"key": "value"})
             # Should not raise the exception
@@ -204,7 +211,7 @@ class TestProductTelemetry:
             user_id2 = telemetry.user_id
             assert user_id1 == user_id2
 
-            telemetry._curr_user_id = None  # noqa: SLF001
+            telemetry._curr_user_id = None
             # Third call after reset should return the same ID
             user_id3 = telemetry.user_id
             assert user_id1 == user_id3

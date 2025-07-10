@@ -428,8 +428,7 @@ class Config(BaseModel):
     )
     google_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("GOOGLE_API_KEY") or ""),
-        description="The API Key for Google Generative AI. Must be set if llm-provider is "
-        "GOOGLE_GENERATIVE_AI",
+        description="The API Key for Google Generative AI. Must be set if llm-provider is GOOGLE",
     )
     azure_openai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("AZURE_OPENAI_API_KEY") or ""),
@@ -467,7 +466,7 @@ class Config(BaseModel):
         description="A dictionary of feature flags for the SDK.",
     )
     argument_clarifications_enabled: bool = Field(
-        default=True,
+        default=False,
         description=(
             "Whether to enable clarifications for the execution agent which allows the agent to "
             "ask clarifying questions to the user about the arguments to a tool call."
@@ -844,8 +843,6 @@ class Config(BaseModel):
         - mistralai (requires portia-sdk-python[mistral] to be installed)
         - google (requires portia-sdk-python[google] to be installed)
         - azure-openai
-
-        The optional "reasoning" parameter enables reasoning mode for models that support it.
 
         Args:
             model_string (str): The model string to parse. E.G. "openai/gpt-4o"

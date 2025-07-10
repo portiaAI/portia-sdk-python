@@ -740,7 +740,7 @@ async def test_llm_caching(monkeypatch: pytest.MonkeyPatch) -> None:
         # Run the test again, but with the OpenAI client mocked out so we can check it isn't called
         original_model = cast("OpenAIGenerativeModel", config.get_planning_model())
         client_mock = MagicMock()
-        original_model._client = client_mock  # noqa: SLF001
+        original_model._client = client_mock
         monkeypatch.setattr(Config, "get_planning_model", lambda self: original_model)  # noqa: ARG005
 
         # Run the same query again

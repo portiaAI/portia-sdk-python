@@ -22,7 +22,6 @@ complex queries using various planning and execution agent configurations.
 from __future__ import annotations
 
 import time
-from importlib.metadata import version
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -73,6 +72,7 @@ from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
     PortiaCloudStorage,
+    StorageError,
 )
 from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
@@ -83,6 +83,7 @@ from portia.tool_registry import (
     ToolRegistry,
 )
 from portia.tool_wrapper import ToolCallWrapper
+from portia.version import get_version
 
 if TYPE_CHECKING:
     from portia.common import Serializable
@@ -119,7 +120,7 @@ class Portia:
         """
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
-        logger().info(f"Starting Portia v{version('portia-sdk-python')}")
+        logger().info(f"Starting Portia v{get_version()}")
         if self.config.portia_api_key and self.config.portia_api_endpoint:
             logger().info(f"Using Portia cloud API endpoint: {self.config.portia_api_endpoint}")
         self._log_models(self.config)
@@ -171,6 +172,7 @@ class Portia:
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
+        use_cached_plan: bool = False,
     ) -> PlanRun:
         """End-to-end function to generate a plan and then execute it.
 
@@ -191,6 +193,7 @@ class Portia:
                 for the query. This is passed on to plan runs created from this plan but will not be
                 stored with the plan itself if using cloud storage and must be re-attached to the
                 plan run if using cloud storage.
+            use_cached_plan (bool): Whether to use a cached plan if it exists.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -219,6 +222,7 @@ class Portia:
             end_user,
             coerced_plan_run_inputs,
             structured_output_schema,
+            use_cached_plan,
         )
         end_user = self.initialize_end_user(end_user)
         plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
@@ -265,6 +269,7 @@ class Portia:
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
+        use_cached_plan: bool = False,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples.
 
@@ -285,6 +290,7 @@ class Portia:
                 for the query. This is passed on to plan runs created from this plan but will be
                 not be stored with the plan itself if using cloud storage and must be re-attached
                 to the plan run if using cloud storage.
+            use_cached_plan (bool): Whether to use a cached plan if it exists.
 
         Returns:
             Plan: The plan for executing the query.
@@ -315,6 +321,7 @@ class Portia:
             end_user,
             plan_inputs,
             structured_output_schema,
+            use_cached_plan,
         )
 
     def _plan(
@@ -325,6 +332,7 @@ class Portia:
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
+        use_cached_plan: bool = False,
     ) -> Plan:
         """Plans how to do the query given the set of tools and any examples.
 
@@ -345,6 +353,7 @@ class Portia:
                 for the query. This is passed on to plan runs created from this plan but will be
                 not be stored with the plan itself if using cloud storage and must be re-attached
                 to the plan run if using cloud storage.
+            use_cached_plan (bool): Whether to use a cached plan if it exists.
 
         Returns:
             Plan: The plan for executing the query.
@@ -353,6 +362,11 @@ class Portia:
             PlanError: If there is an error while generating the plan.
 
         """
+        if use_cached_plan:
+            try:
+                return self.storage.get_plan_by_query(query)
+            except StorageError as e:
+                logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
         if isinstance(tools, list):
             tools = [
                 self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool

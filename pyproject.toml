@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.4.8"
+version = "0.4.11"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -47,16 +47,16 @@ mistralai = [
 ]
 google = [
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-genai==1.18.0",
+    "google-genai>=1.18.0",
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
 tools-browser-local = [
     "playwright>=1.49.0,<2",
-    "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
+    "browser-use>=0.4.2 ; python_version >= '3.11' and python_version < '4.0'",
 ]
 tools-browser-browserbase = [
     "playwright>=1.49.0,<2",
-    "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
+    "browser-use>=0.4.2 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
 ]
 tools-pdf-reader = ["mistralai>=1.2.5,<2"]
@@ -65,10 +65,10 @@ all = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
     "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-genai==1.18.0",
+    "google-genai>=1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "playwright>=1.49.0,<2",
-    "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
+    "browser-use>=0.4.2 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
     "redis>=5.2.1,<6",
     "langchain-redis>=0.1.2"
@@ -120,6 +120,8 @@ ignore = [
   "EM101",   # Disables checks for missing exception message arguments. We prefer single-line exception statements for simplicity and terseness.
   "EM102",   # Disables checks for f-string usage in exception messages. We prefer single-line exception statements with f-strings for simplicity and terseness.
   "TRY003",  # Disables checks for long error messages. We prefer to provide as much context to users as possible but want to avoid a proliferation of error classes.
+  "FBT001",  # Disables checks for unused type parameters. We prefer booleans for simple parameters rather than unnecessary enums.
+  "FBT002",  # Disables checks for unused type parameters. We prefer booleans for simple parameters rather than unnecessary enums.
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -127,6 +129,8 @@ ignore = [
   "S101",    # Disables check for asserts. Asserts in test cases can be useful.
   "PLR2004", # Disables magic number checks. Its normal to assert using magic numbers for things like array length.
   "INP001",  # Disables checks for implicit namespace packages. Tests are not part of the package.
+  "SLF001",  # Disables checks for private member access. We call private methods in tests.
+  "C901",    # Disables checks for too many lines in function. Tests are allowed to be longer.
 ]
 
 [tool.ruff.lint.flake8-type-checking]
@@ -155,6 +159,9 @@ addopts = [
   "--import-mode=importlib"
 ]
 asyncio_mode = "auto"
+markers = [
+    "daily: marks tests as expensive daily tests (deselect with '-m \"not daily\"')",
+]
 
 [tool.coverage.run]
 omit = [

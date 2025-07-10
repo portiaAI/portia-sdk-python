@@ -494,19 +494,22 @@ def test_browserbase_provider_setup_browser(
     """Test setting up browser."""
     context = get_test_tool_context()
 
+    # Configure the mock to return specific values instead of nested mocks
     mock_session = MagicMock()
     mock_session.id = "test_session_id"
     mock_session.connect_url = "test_connect_url"
 
     mock_context = MagicMock()
     mock_context.id = "test_context_id"
-    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
+
+    # Configure the bb mock to return specific values
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     browser = mock_browserbase_provider.setup_browser(context)
 
     assert isinstance(browser, Browser)
-    assert browser.config.cdp_url == "test_connect_url"
+    assert browser.cdp_url == "test_connect_url"  # This should now work
 
 
 def test_browser_tool_for_url_init_default_parameters() -> None:
@@ -750,6 +753,7 @@ def test_process_task_data() -> None:
 
 def test_browser_tool_multiple_calls(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
+    mock_tool_run_context: ToolRunContext,
 ) -> None:
     """Test step_complete only cleans up on final browser tool call."""
     plan = (
@@ -763,34 +767,156 @@ def test_browser_tool_multiple_calls(
         external_id="123",
         additional_data={"bb_session_id": "session123", "bb_session_connect_url": "connect_url"},
     )
-    mock_ctx = MagicMock()
-    mock_ctx.end_user = end_user
-    mock_ctx.plan = plan
-    mock_ctx.plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
+    mock_tool_run_context.end_user = end_user
+    mock_tool_run_context.plan = plan
+    mock_tool_run_context.plan_run = PlanRun(
+        plan_id=plan.id, current_step_index=0, end_user_id="test"
+    )
+    tool_run_context = mock_tool_run_context
+
+    mock_session = MagicMock()  # pyright: ignore[reportAttributeAccessIssue]
+    mock_session.id = "test_session_id"  # pyright: ignore[reportAttributeAccessIssue]
+    mock_session.connect_url = "test_connect_url"  # pyright: ignore[reportAttributeAccessIssue]
+
+    mock_context = MagicMock()
+    mock_context.id = "test_context_id"
+    mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test first browser tool call (should set up session and not clean up)
-    mock_browserbase_provider.setup_browser(mock_ctx)
+    mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_called_once()  # pyright: ignore[reportAttributeAccessIssue,reportFunctionMemberAccess]
     mock_browserbase_provider.bb.sessions.create.reset_mock()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test middle browser tool call (should not set up or clean up)
     end_user.set_additional_data("bb_session_id", "session123")
     end_user.set_additional_data("bb_session_connect_url", "connect_url")
-    mock_ctx.plan_run.current_step_index = 1
-    mock_browserbase_provider.setup_browser(mock_ctx)
+    tool_run_context.plan_run.current_step_index = 1
+    mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test final browser tool call (should not set up but should clean up)
-    mock_ctx.plan_run.current_step_index = 2
-    mock_browserbase_provider.setup_browser(mock_ctx)
+    tool_run_context.plan_run.current_step_index = 2
+    mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(mock_ctx)
+    mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
         "session123",
         project_id="test_project",
         status="REQUEST_RELEASE",
     )
+
+
+# Tests for convert_model_to_browser_use_model function
+class TestConvertModelToBrowserUseModel:
+    """Test cases for convert_model_to_browser_use_model function."""
+
+    def test_convert_openai_model(self) -> None:
+        """Test converting OpenAI model to ChatOpenAI."""
+        from browser_use.llm import ChatOpenAI
+
+        from portia.model import OpenAIGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock OpenAI model
+        mock_model = MagicMock(spec=OpenAIGenerativeModel)
+        mock_model.model_name = "gpt-4"
+        mock_model.api_key = "test-api-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatOpenAI)
+        assert result.model == "gpt-4"
+        assert result.api_key == "test-api-key"
+
+    def test_convert_anthropic_model(self) -> None:
+        """Test converting Anthropic model to ChatAnthropic."""
+        from browser_use.llm import ChatAnthropic
+
+        from portia.model import AnthropicGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Anthropic model
+        mock_model = MagicMock(spec=AnthropicGenerativeModel)
+        mock_model.model_name = "claude-3-sonnet-20240229"
+        mock_model.api_key = "test-anthropic-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatAnthropic)
+        assert result.model == "claude-3-sonnet-20240229"
+        assert result.api_key == "test-anthropic-key"
+
+    def test_convert_azure_openai_model(self) -> None:
+        """Test converting Azure OpenAI model to ChatAzureOpenAI."""
+        from browser_use.llm import ChatAzureOpenAI
+
+        from portia.model import AzureOpenAIGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Azure OpenAI model
+        mock_model = MagicMock(spec=AzureOpenAIGenerativeModel)
+        mock_model.model_name = "gpt-4"
+        mock_model.api_key = "test-azure-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatAzureOpenAI)
+        assert result.model == "gpt-4"
+        assert result.api_key == "test-azure-key"
+
+    def test_convert_ollama_model(self) -> None:
+        """Test converting Ollama model to ChatOllama."""
+        from browser_use.llm import ChatOllama
+
+        from portia.model import OllamaGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Ollama model
+        mock_model = MagicMock(spec=OllamaGenerativeModel)
+        mock_model.model_name = "llama2"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatOllama)
+        assert result.model == "llama2"
+
+    def test_convert_google_genai_model(self) -> None:
+        """Test converting Google GenAI model to ChatGoogle."""
+        from browser_use.llm import ChatGoogle
+
+        from portia.model import GoogleGenAiGenerativeModel
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Create mock Google GenAI model
+        mock_model = MagicMock(spec=GoogleGenAiGenerativeModel)
+        mock_model.model_name = "gemini-pro"
+        mock_model.api_key = "test-google-key"
+
+        # Convert the model
+        result = convert_model_to_browser_use_model(mock_model)
+
+        # Verify the result
+        assert isinstance(result, ChatGoogle)
+        assert result.model == "gemini-pro"
+        assert result.api_key == "test-google-key"
+
+    def test_convert_with_string_model(self) -> None:
+        """Test converting string model raises TypeError."""
+        from portia.open_source_tools.browser_tool import convert_model_to_browser_use_model
+
+        # Attempt to convert a string
+        with pytest.raises(TypeError, match="Model must be a supported model type."):
+            convert_model_to_browser_use_model("gpt-4")  # type: ignore[arg-type]

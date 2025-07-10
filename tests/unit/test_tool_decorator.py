@@ -139,7 +139,7 @@ def test_tool_raises_errors() -> None:
     """Test that decorated tools can raise Tool errors."""
 
     @tool
-    def failing_tool(should_fail: bool, error_type: str = "soft") -> str:  # noqa: FBT001
+    def failing_tool(should_fail: bool, error_type: str = "soft") -> str:
         """Fail in different ways."""
         if should_fail:
             if error_type == "hard":
@@ -241,7 +241,7 @@ def test_tool_args_schema_generation() -> None:
         required_str: str,
         required_float: float,
         optional_int: int = 42,
-        optional_bool: bool = True,  # noqa: FBT002 FBT001
+        optional_bool: bool = True,
     ) -> str:
         """Tool with various parameter types."""
         return f"{required_str}-{optional_int}-{optional_bool}-{required_float}"
@@ -386,7 +386,7 @@ def test_mixed_annotation_patterns() -> None:
         optional_annotated: Annotated[
             str, Field(description="An optional parameter", min_length=1)
         ] = "default",
-        optional_regular: bool = True,  # noqa: FBT002 FBT001
+        optional_regular: bool = True,
     ) -> str:
         """Test function with mixed annotation patterns."""
         return f"{required_annotated}-{required_regular}-{optional_annotated}-{optional_regular}"
