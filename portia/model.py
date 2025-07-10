@@ -522,10 +522,6 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = self._client.invoke(langchain_messages)
 
-        if isinstance(response, HumanMessage):
-            return Message.model_validate(
-                {"role": "user", "content": response.content or ""},
-            )
         if isinstance(response, AIMessage):
             if isinstance(response.content, list):
                 # This is to extract the result from response of anthropic thinking models.
@@ -539,11 +535,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             return Message.model_validate(
                 {"role": "assistant", "content": content or ""},
             )
-        if isinstance(response, SystemMessage):
-            return Message.model_validate(
-                {"role": "system", "content": response.content or ""},
-            )
-        raise ValueError(f"Unsupported message type: {type(response)}")
+        return Message.from_langchain(response)
 
     def get_structured_response(
         self,
