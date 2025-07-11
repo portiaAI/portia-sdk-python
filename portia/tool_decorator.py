@@ -146,6 +146,12 @@ def _create_args_schema(sig: inspect.Signature, func_name: str, func: Callable) 
 
         # First try to get annotation with extras (for Annotated support)
         param_annotation = type_hints_with_extras.get(param_name)
+        if param_annotation == ToolRunContext and param_name not in ("ctx", "context"):
+            raise ValueError(
+                f"Tool {func_name} has a ToolRunContext parameter that is not named 'ctx' "
+                f"or 'context'. This is not allowed as it causes errors when the tool the tool "
+                "inputs are validated."
+            )
 
         # Fall back to raw annotation from signature
         if param_annotation is None:
