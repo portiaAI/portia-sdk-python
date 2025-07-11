@@ -174,14 +174,14 @@ def process_output(  # noqa: C901 PLR0912
         if (
             message.content
             and isinstance(message.content, str)
-            and message.content.startswith("ToolSoftError")
+            and message.content.startswith("Error: ToolSoftError")
         ):
             tool_soft_error = str(message.content)
             continue
         if (
             message.content
             and isinstance(message.content, str)
-            and message.content.startswith("ToolHardError")
+            and message.content.startswith("Error: ToolHardError")
         ):
             tool_hard_error = str(message.content)
             continue
