@@ -49,7 +49,7 @@ tool output, make sure to follow the guidelines provided:
 - Focus on the key information and maintain accuracy.
 - Don't produce an overly long summary if it doesn't make sense.
 - Make sure you capture ALL important information including sources and references.
-- Large outputs will not be included. DO NOT try and summarise them, instead say that the result is a large output.
+- Large outputs will not be included. DO NOT summarise them but say that it is a large output.
 - You might have multiple tool executions separated by 'OUTPUT_SEPARATOR'   .
 - DO NOT INCLUDE 'OUTPUT_SEPARATOR' IN YOUR SUMMARY."""
                 ),
