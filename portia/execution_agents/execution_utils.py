@@ -167,13 +167,16 @@ def process_output(  # noqa: C901 PLR0912
         return LocalDataValue(value=clarifications)
 
     output_values: list[Output] = []
-    tool_soft_error = False
-    tool_hard_error = False
+    tool_soft_error = None
+    tool_hard_error = None
     for message in messages:
+        # prefer to override the error with the latest error.
         if "ToolSoftError" in message.content:
-            tool_soft_error = True
+            tool_soft_error = str(message.content)
+            continue
         if "ToolHardError" in message.content:
-            tool_hard_error = True
+            tool_hard_error = str(message.content)
+            continue
         if isinstance(message, ToolMessage):
             try:
                 clarification = InputClarification.model_validate_json(message.content)  # pyright: ignore[reportArgumentType]
@@ -188,11 +191,12 @@ def process_output(  # noqa: C901 PLR0912
             else:
                 output_values.append(LocalDataValue(value=message.content))
 
-    if len(output_values) == 0 and tool:
-        if tool_soft_error:
-            raise ToolRetryError(tool.id, str([message.content for message in messages]))
-        if tool_hard_error:
-            raise ToolFailedError(tool.id, str([message.content for message in messages]))
+    # Only raise errors if there are no output values (e.g. after retries).
+    if len(output_values) == 0:
+        if tool_soft_error and tool:
+            raise ToolRetryError(tool.id, tool_soft_error)
+        if tool_hard_error and tool:
+            raise ToolFailedError(tool.id, tool_hard_error)
         raise InvalidAgentOutputError(str([message.content for message in messages]))
 
     # if there's only one output return just the value
@@ -214,7 +218,7 @@ def process_output(  # noqa: C901 PLR0912
             values.append(output_value)
         summaries.append(output.get_summary() or output.serialize_value())
 
-    # If there is multiple tool calls (unrolling), then the final summary for all tool calls are
+    # If there are multiple tool calls (unrolling), then the final summary for all tool calls are
     # stored in the last tool call's summary.
     final_summary = output_values[-1].get_summary() or ", ".join(summaries)
 
