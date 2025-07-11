@@ -171,10 +171,18 @@ def process_output(  # noqa: C901 PLR0912
     tool_hard_error = None
     for message in messages:
         # prefer to override the error with the latest error.
-        if "ToolSoftError" in message.content:
+        if (
+            message.content
+            and isinstance(message.content, str)
+            and message.content.startswith("ToolSoftError")
+        ):
             tool_soft_error = str(message.content)
             continue
-        if "ToolHardError" in message.content:
+        if (
+            message.content
+            and isinstance(message.content, str)
+            and message.content.startswith("ToolHardError")
+        ):
             tool_hard_error = str(message.content)
             continue
         if isinstance(message, ToolMessage):

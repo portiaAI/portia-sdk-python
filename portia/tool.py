@@ -452,9 +452,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
         # Handle Tool Errors
         if isinstance(output_value, str):
-            if "ToolSoftError" in output_value:
+            if output_value.startswith("ToolSoftError"):
                 raise ToolSoftError(output_value)
-            if "ToolHardError" in output_value:
+            if output_value.startswith("ToolHardError"):
                 raise ToolHardError(output_value)
         # Handle Clarifications
         if isinstance(output_value, list) and output_value and "category" in output_value[0]:
