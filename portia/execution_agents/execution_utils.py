@@ -139,7 +139,7 @@ def template_in_required_inputs(
     return response
 
 
-def process_output(  # noqa: C901
+def process_output(  # noqa: C901 PLR0912
     messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
@@ -167,11 +167,24 @@ def process_output(  # noqa: C901
         return LocalDataValue(value=clarifications)
 
     output_values: list[Output] = []
+    tool_soft_error = None
+    tool_hard_error = None
     for message in messages:
-        if "ToolSoftError" in message.content and tool:
-            raise ToolRetryError(tool.id, str(message.content))
-        if "ToolHardError" in message.content and tool:
-            raise ToolFailedError(tool.id, str(message.content))
+        # prefer to override the error with the latest error.
+        if (
+            message.content
+            and isinstance(message.content, str)
+            and message.content.startswith("Error: ToolSoftError")
+        ):
+            tool_soft_error = str(message.content)
+            continue
+        if (
+            message.content
+            and isinstance(message.content, str)
+            and message.content.startswith("Error: ToolHardError")
+        ):
+            tool_hard_error = str(message.content)
+            continue
         if isinstance(message, ToolMessage):
             try:
                 clarification = InputClarification.model_validate_json(message.content)  # pyright: ignore[reportArgumentType]
@@ -186,7 +199,12 @@ def process_output(  # noqa: C901
             else:
                 output_values.append(LocalDataValue(value=message.content))
 
+    # Only raise errors if there are no output values (e.g. after retries).
     if len(output_values) == 0:
+        if tool_soft_error and tool:
+            raise ToolRetryError(tool.id, tool_soft_error)
+        if tool_hard_error and tool:
+            raise ToolFailedError(tool.id, tool_hard_error)
         raise InvalidAgentOutputError(str([message.content for message in messages]))
 
     # if there's only one output return just the value
@@ -201,7 +219,15 @@ def process_output(  # noqa: C901
     summaries = []
 
     for output in output_values:
-        values.append(output.get_value())
+        output_value = output.get_value()
+        if isinstance(output_value, list):
+            values.extend(output_value)
+        else:
+            values.append(output_value)
         summaries.append(output.get_summary() or output.serialize_value())
 
-    return LocalDataValue(value=values, summary=", ".join(summaries))
+    # If there are multiple tool calls (unrolling), then the final summary for all tool calls are
+    # stored in the last tool call's summary.
+    final_summary = output_values[-1].get_summary() or ", ".join(summaries)
+
+    return LocalDataValue(value=values, summary=final_summary)

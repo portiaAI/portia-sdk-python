@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from jinja2 import Template
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.graph import MessagesState  # noqa: TC002
 from pydantic import Field
 
@@ -43,18 +43,31 @@ class StepSummarizer:
         [
             SystemMessage(
                 content=(
-                    "You are a highly skilled summarizer. Your task is to create a textual summary"
-                    "of the provided tool output, make sure to follow the guidelines provided.\n"
-                    "- Focus on the key information and maintain accuracy.\n"
-                    "- Make sure to not exceed the max limit of {max_length} characters.\n"
-                    "- Don't produce an overly long summary if it doesn't make sense.\n"
+                    """
+You are a highly skilled summarizer. Your task is to create a textual summary of the provided
+tool output, make sure to follow the guidelines provided:
+- Focus on the key information and maintain accuracy.
+- Don't produce an overly long summary if it doesn't make sense.
+- Make sure you capture ALL important information including sources and references.
+- You might have multiple tool executions separated by 'OUTPUT_SEPARATOR'   .
+- DO NOT INCLUDE 'OUTPUT_SEPARATOR' IN YOUR SUMMARY."""
                 ),
             ),
             HumanMessagePromptTemplate.from_template(
-                "Here is original task:\n{task_description}\n"
-                "Here is the description of the tool that produced "
-                "the output:\n{tool_description}\n"
-                "Please summarize the following output:\n{tool_output}\n",
+                """
+Here is original task:
+
+{task_description}
+
+- Make sure to not exceed the max limit of {max_length} characters.
+- Here is the description of the tool that produced the output:
+
+    {tool_description}
+
+- Please summarize the following tool output:
+
+{tool_output}
+""",
             ),
         ],
     )
@@ -109,7 +122,25 @@ class StepSummarizer:
             return {"messages": [last_message]}
 
         logger().debug(f"Invoke SummarizerModel on the tool output of {last_message.name}.")
-        tool_output = last_message.content
+        tool_messages = {msg.tool_call_id: msg for msg in messages if isinstance(msg, ToolMessage)}
+        last_ai_message_with_tool_calls = next(
+            (msg for msg in reversed(messages) if isinstance(msg, AIMessage) and msg.tool_calls),
+            None,
+        )
+        tool_outputs = []
+        if last_ai_message_with_tool_calls:
+            for tool_call in last_ai_message_with_tool_calls.tool_calls:
+                if tool_call["id"] in tool_messages:
+                    tool_output_message = tool_messages[tool_call["id"]]
+                    output = (
+                        f"ToolCallName: {tool_call['name']}\n"
+                        f"ToolCallArgs: {tool_call['args']}\n"
+                        f"ToolCallOutput: {tool_output_message.content}"
+                    )
+                    tool_outputs.append(output)
+
+        tool_output = "\nOUTPUT_SEPARATOR\n".join(tool_outputs)
+
         if self.config.exceeds_output_threshold(tool_output):
             tool_output = (
                 f"This is a large value (full length: {len(str(tool_output))} characters) - it is "

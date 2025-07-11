@@ -138,23 +138,46 @@ def test_oneshot_agent_without_tool_raises() -> None:
         ).execute_sync()
 
 
-def test_oneshot_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that before_tool_call can interrupt execution by returning a clarification."""
+def test_oneshot_before_tool_call_with_clarifications(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that before_tool_call can interrupt execution by returning multiple clarifications."""
     model_response = AIMessage(content="")
     model_response.tool_calls = [
         {
             "name": "Send_Email_Tool",
             "type": "tool_call",
-            "id": "call_3z9rYHY6Rui7rTW0O7N7Wz51",
+            "id": "call_1",
             "args": {
-                "recipients": ["test@example.com"],
+                "recipients": ["test1@example.com"],
+                "email_title": "Hi",
+                "email_body": "Hi",
+            },
+        },
+        {
+            "name": "Send_Email_Tool",
+            "type": "tool_call",
+            "id": "call_2",
+            "args": {
+                "recipients": ["test2@example.com"],
+                "email_title": "Hi",
+                "email_body": "Hi",
+            },
+        },
+        {
+            "name": "Send_Email_Tool",
+            "type": "tool_call",
+            "id": "call_3",
+            "args": {
+                "recipients": ["test3@example.com"],
                 "email_title": "Hi",
                 "email_body": "Hi",
             },
         },
     ]
     mock_model = get_mock_generative_model(response=model_response)
-    monkeypatch.setattr("portia.config.Config.get_execution_model", lambda self: mock_model)  # noqa: ARG005
+    monkeypatch.setattr(
+        "portia.config.Config.get_execution_model",
+        lambda self: mock_model,  # noqa: ARG005
+    )
 
     tool_node_called = False
 
@@ -165,22 +188,36 @@ def test_oneshot_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyP
             "messages": ToolMessage(
                 content="3",
                 artifact=LocalDataValue(value=3),
-                tool_call_id="call_3z9rYHY6Rui7rTW0O7N7Wz51",
+                tool_call_id="call_1",
             ),
         }
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
+    call_count = 0
     return_clarification = True
 
     def before_tool_call(tool, args, plan_run, step) -> InputClarification | None:  # noqa: ANN001, ARG001
-        nonlocal return_clarification
-        if return_clarification:
+        nonlocal call_count, return_clarification
+        if not return_clarification:
+            call_count += 1
+            return None
+
+        call_count += 1
+        if call_count == 1:
             return InputClarification(
                 plan_run_id=plan_run.id,
-                user_guidance="Need clarification before tool call",
+                user_guidance="Need clarification for num1",
                 step=plan_run.current_step_index,
                 argument_name="num1",
+                source="Test oneshot agent",
+            )
+        if call_count == 2:
+            return InputClarification(
+                plan_run_id=plan_run.id,
+                user_guidance="Need clarification for num2",
+                step=plan_run.current_step_index,
+                argument_name="num2",
                 source="Test oneshot agent",
             )
         return None
@@ -202,18 +239,28 @@ def test_oneshot_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyP
     output = agent.execute_sync()
 
     assert tool_node_called is False
-    assert len(output.get_value()) == 1  # pyright: ignore[reportArgumentType]
-    output_value = output.get_value()[0]  # pyright: ignore[reportOptionalSubscript]
-    assert isinstance(output_value, InputClarification)
-    assert output_value.user_guidance == "Need clarification before tool call"
+    assert call_count == 3
+    output_values = output.get_value()
+    assert isinstance(output_values, list)
+    assert len(output_values) == 2
+    output_value_1 = output_values[0]
+    assert isinstance(output_value_1, InputClarification)
+    assert output_value_1.user_guidance == "Need clarification for num1"
+    assert output_value_1.argument_name == "num1"
+    output_value_2 = output_values[1]
+    assert isinstance(output_value_2, InputClarification)
+    assert output_value_2.user_guidance == "Need clarification for num2"
+    assert output_value_2.argument_name == "num2"
 
     # Second execution - should call the tool
     return_clarification = False
     tool_node_called = False
+    call_count = 0
     agent.new_clarifications = []
     output = agent.execute_sync()
 
     assert tool_node_called is True
+    assert call_count == 3
     assert output.get_value() == 3
 
 

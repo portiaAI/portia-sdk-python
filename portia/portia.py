@@ -1076,7 +1076,6 @@ class Portia:
                 logger().info(
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
-
             if (
                 len(
                     new_clarifications := self._get_clarifications_from_output(
@@ -1319,10 +1318,12 @@ class Portia:
         if isinstance(output_value, Clarification) or (
             isinstance(output_value, list)
             and len(output_value) > 0
-            and all(isinstance(item, Clarification) for item in output_value)
+            and any(isinstance(item, Clarification) for item in output_value)
         ):
             new_clarifications = (
-                [output_value] if isinstance(output_value, Clarification) else output_value
+                [output_value]
+                if isinstance(output_value, Clarification)
+                else list(filter(lambda x: isinstance(x, Clarification), output_value))
             )
             for clarification in new_clarifications:
                 clarification.step = plan_run.current_step_index

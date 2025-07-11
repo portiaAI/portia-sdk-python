@@ -60,8 +60,8 @@ def test_process_output_with_tool_errors() -> None:
     """Test process_output with tool errors."""
     tool = AdditionTool()
 
-    soft_error = ToolMessage(content="ToolSoftError: test", tool_call_id="1", name="test")
-    hard_error = ToolMessage(content="ToolHardError: test", tool_call_id="1", name="test")
+    soft_error = ToolMessage(content="Error: ToolSoftError(test)", tool_call_id="1", name="test")
+    hard_error = ToolMessage(content="Error: ToolHardError(test)", tool_call_id="1", name="test")
 
     with pytest.raises(ToolRetryError):
         process_output([soft_error], tool)
@@ -229,3 +229,75 @@ def test_template_in_required_inputs_missing_args() -> None:
 
     with pytest.raises(InvalidPlanRunStateError, match="Tool call missing args field"):
         template_in_required_inputs(message, step_inputs)
+
+
+def test_process_output_with_mixed_list_and_scalar_values() -> None:
+    """Test process_output with multiple outputs containing both list and scalar values."""
+    # Create multiple tool messages with different types of artifacts
+    message1 = ToolMessage(
+        tool_call_id="1",
+        content="",
+        artifact=LocalDataValue(value=["item1", "item2"], summary="First list output"),
+    )
+    message2 = ToolMessage(
+        tool_call_id="2",
+        content="",
+        artifact=LocalDataValue(value="scalar_value", summary="Second scalar output"),
+    )
+    message3 = ToolMessage(
+        tool_call_id="3",
+        content="",
+        artifact=LocalDataValue(value=["item3", "item4"], summary="Third list output"),
+    )
+
+    result = process_output([message1, message2, message3], clarifications=[])
+
+    assert isinstance(result, Output)
+    # The list values should be extended, scalar values should be appended
+    expected_values = ["item1", "item2", "scalar_value", "item3", "item4"]
+    assert result.get_value() == expected_values
+    # The final summary should use the last output's summary since it has one
+    assert result.get_summary() == "Third list output"
+
+
+def test_process_output_with_multiple_outputs_no_summaries() -> None:
+    """Test process_output with multiple outputs where none have summaries."""
+    message1 = ToolMessage(tool_call_id="1", content="", artifact=LocalDataValue(value=["a", "b"]))
+    message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalDataValue(value="c"))
+    message3 = ToolMessage(tool_call_id="3", content="", artifact=LocalDataValue(value=["d", "e"]))
+
+    result = process_output([message1, message2, message3], clarifications=[])
+
+    assert isinstance(result, Output)
+    expected_values = ["a", "b", "c", "d", "e"]
+    assert result.get_value() == expected_values
+    # When no summaries are provided, it should join the serialized values
+    expected_summary = '["a", "b"], c, ["d", "e"]'
+    assert result.get_summary() == expected_summary
+
+
+def test_process_output_with_nested_list_values() -> None:
+    """Test process_output with outputs containing nested list structures."""
+    message1 = ToolMessage(
+        tool_call_id="1",
+        content="",
+        artifact=LocalDataValue(value=[{"id": 1}, {"id": 2}], summary="User list"),
+    )
+    message2 = ToolMessage(
+        tool_call_id="2",
+        content="",
+        artifact=LocalDataValue(value={"status": "success"}, summary="Status update"),
+    )
+    message3 = ToolMessage(
+        tool_call_id="3",
+        content="",
+        artifact=LocalDataValue(value=[{"id": 3}, {"id": 4}], summary="Final user list"),
+    )
+
+    result = process_output([message1, message2, message3], clarifications=[])
+
+    assert isinstance(result, Output)
+    expected_values = [{"id": 1}, {"id": 2}, {"status": "success"}, {"id": 3}, {"id": 4}]
+    assert result.get_value() == expected_values
+    # Should use the last output's summary
+    assert result.get_summary() == "Final user list"
