@@ -587,8 +587,8 @@ def test_portia_mcp_tool_call() -> None:
         ),
     )
     expected = (
-        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null}],'
-        '"isError":false}'
+        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null,"meta":null}],'  # noqa: E501
+        '"structuredContent":null,"isError":false}'
     )
 
     with patch(

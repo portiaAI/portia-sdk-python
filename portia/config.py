@@ -145,7 +145,7 @@ class LLMModel(Enum):
     )
     GEMINI_2_5_PRO = Model(
         provider=LLMProvider.GOOGLE,
-        model_name="gemini-2.5-pro-preview-03-25",
+        model_name="gemini-2.5-pro",
     )
     GEMINI_2_0_FLASH = Model(
         provider=LLMProvider.GOOGLE,
@@ -467,7 +467,7 @@ class Config(BaseModel):
         description="A dictionary of feature flags for the SDK.",
     )
     argument_clarifications_enabled: bool = Field(
-        default=True,
+        default=False,
         description=(
             "Whether to enable clarifications for the execution agent which allows the agent to "
             "ask clarifying questions to the user about the arguments to a tool call."
@@ -602,7 +602,7 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "google/gemini-2.5-pro-preview-03-25"
+                            return "google/gemini-2.5-pro"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
@@ -617,7 +617,7 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "google/gemini-2.5-flash-preview-04-17"
+                            return "google/gemini-2.5-flash"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
@@ -632,7 +632,7 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "google/gemini-2.5-flash-preview-04-17"
+                            return "google/gemini-2.5-flash"
                         return "google/gemini-2.0-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
@@ -1035,6 +1035,6 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         feature_flags=kwargs.pop("feature_flags", {}),
         storage_class=kwargs.pop("storage_class", default_storage_class),
         planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
-        execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.DEFAULT),
+        execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
         **kwargs,
     )

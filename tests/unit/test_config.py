@@ -1,5 +1,6 @@
 """Tests for portia classes."""
 
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -57,6 +58,12 @@ def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
         openai_api_key=SecretStr("123"),
     )
     assert c.default_log_level == LogLevel.CRITICAL
+    assert c.execution_agent_type == ExecutionAgentType.ONE_SHOT
+    assert c.planning_agent_type == PlanningAgentType.DEFAULT
+    if os.getenv("PORTIA_API_KEY"):
+        assert c.storage_class == StorageClass.CLOUD
+    else:
+        assert c.storage_class == StorageClass.MEMORY
     assert c.llm_redis_cache_url is None
     assert _llm_cache.get() is None
 
@@ -463,16 +470,14 @@ def test_get_default_model_google_2_5(
         feature_flags={FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: True},
     )
     assert (
-        c.get_agent_default_model("planning_model", LLMProvider.GOOGLE)
-        == "google/gemini-2.5-pro-preview-03-25"
+        c.get_agent_default_model("planning_model", LLMProvider.GOOGLE) == "google/gemini-2.5-pro"
     )
     assert (
         c.get_agent_default_model("introspection_model", LLMProvider.GOOGLE)
-        == "google/gemini-2.5-flash-preview-04-17"
+        == "google/gemini-2.5-flash"
     )
     assert (
-        c.get_agent_default_model("default_model", LLMProvider.GOOGLE)
-        == "google/gemini-2.5-flash-preview-04-17"
+        c.get_agent_default_model("default_model", LLMProvider.GOOGLE) == "google/gemini-2.5-flash"
     )
 
 

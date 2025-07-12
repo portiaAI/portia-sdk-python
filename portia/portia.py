@@ -22,7 +22,6 @@ complex queries using various planning and execution agent configurations.
 from __future__ import annotations
 
 import time
-from importlib.metadata import version
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -83,6 +82,7 @@ from portia.tool_registry import (
     ToolRegistry,
 )
 from portia.tool_wrapper import ToolCallWrapper
+from portia.version import get_version
 
 if TYPE_CHECKING:
     from portia.common import Serializable
@@ -119,7 +119,7 @@ class Portia:
         """
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
-        logger().info(f"Starting Portia v{version('portia-sdk-python')}")
+        logger().info(f"Starting Portia v{get_version()}")
         if self.config.portia_api_key and self.config.portia_api_endpoint:
             logger().info(f"Using Portia cloud API endpoint: {self.config.portia_api_endpoint}")
         self._log_models(self.config)
@@ -1441,13 +1441,8 @@ class Portia:
     def _persist_step_state(self, plan_run: PlanRun, step: Step) -> None:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
-        if (
-            isinstance(step_output, LocalDataValue)
-            and self.config.exceeds_output_threshold(
-                step_output.serialize_value(),
-            )
-            # One-shot agent does not support pulling outputs from agent memory
-            and self.config.execution_agent_type != ExecutionAgentType.ONE_SHOT
+        if isinstance(step_output, LocalDataValue) and self.config.exceeds_output_threshold(
+            step_output.serialize_value(),
         ):
             step_output = self.storage.save_plan_run_output(step.output, step_output, plan_run.id)
             plan_run.outputs.step_outputs[step.output] = step_output

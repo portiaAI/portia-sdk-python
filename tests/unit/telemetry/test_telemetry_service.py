@@ -86,6 +86,12 @@ def test_get_project_id_key_default() -> None:
 class TestProductTelemetry:
     """Test suite for ProductTelemetry class."""
 
+    @pytest.fixture(autouse=True)
+    def mock_version(self) -> Any:  # noqa: ANN401
+        """Mock the version function for all tests in this class."""
+        with patch("portia.telemetry.telemetry_service.get_version", return_value="0.4.9"):
+            yield
+
     @pytest.fixture
     def telemetry(self) -> Any:  # noqa: ANN401
         """Create a fresh ProductTelemetry instance for each test.
@@ -160,9 +166,12 @@ class TestProductTelemetry:
             mock_logger.debug.assert_called_with("Telemetry event: test_event {'key': 'value'}")
             mock_client.capture.assert_called_once()
             args = mock_client.capture.call_args[0]
-            assert args[1] == "test_event"
-            assert args[2]["key"] == "value"
-            assert args[2]["process_person_profile"] is True
+            assert args[0] == "test_event"
+
+            kwargs = mock_client.capture.call_args[1]
+            assert kwargs["properties"]["key"] == "value"
+            assert kwargs["properties"]["process_person_profile"] is True
+            assert kwargs["properties"]["sdk_version"] == "0.4.9"
 
     def test_capture_when_enabled_with_exception(self, mock_logger: MagicMock) -> None:
         """Test event capture when telemetry is enabled and PostHog client raises an exception."""
@@ -201,6 +210,11 @@ class TestProductTelemetry:
             # Second call should return the same ID
             user_id2 = telemetry.user_id
             assert user_id1 == user_id2
+
+            telemetry._curr_user_id = None  # noqa: SLF001
+            # Third call after reset should return the same ID
+            user_id3 = telemetry.user_id
+            assert user_id1 == user_id3
 
     def test_user_id_error_handling(self, telemetry: ProductTelemetry) -> None:  # type: ignore reportGeneralTypeIssues
         """Test user ID error handling with invalid path.

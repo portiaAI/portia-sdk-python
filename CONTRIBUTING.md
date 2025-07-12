@@ -3,7 +3,7 @@
 Thank you for your interest in contributing to Portia SDK! We welcome contributions that improve the library and help us build a great experience for the community.
 
 ## What to contribute
-* **Paid issue contributions** We post paid contributions to our issues list for which we will remunerate contributions. Please see the guidelines [below]((https://github.com/portiaAI/portia-sdk-python/CONTRIBUTING.md#paid-contributions).
+* **Paid issue contributions** We post paid contributions to our issues list for which we will remunerate contributions. Please see the guidelines [below](https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md#paid-contributions).
 * **Documentation** Tutorials, how-to guides and revisions to our existing docs go a long way in making our repo easier to setup and use
 * **Examples** Show our community what you can do with our SDK. We particularly encourage end-to-end, real-world applications
 * **Bug reports** Please include a detailed method to reproduce any bugs you spot. We would be grateful if you give the [Issue Tracker](https://github.com/portiaAI/portia-sdk-python/issues) a quick skim first to avoid duplicates 🙌
