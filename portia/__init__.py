@@ -63,9 +63,12 @@ from portia.model import (
     LLMProvider,
     Message,
 )
+from portia.open_source_tools.crawl_tool import CrawlTool
+from portia.open_source_tools.extract_tool import ExtractTool
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
+from portia.open_source_tools.map_tool import MapTool
 from portia.open_source_tools.registry import (
     example_tool_registry,
     open_source_tool_registry,

@@ -269,7 +269,7 @@ def test_crawl_tool_http_status_error() -> None:
         with patch("httpx.post") as mock_post:
             mock_post.return_value = mock_response
             mock_post.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "422 Unprocessable Entity", request=None, response=mock_response
+                "422 Unprocessable Entity", request=Mock(), response=mock_response
             )
 
             with pytest.raises(ToolSoftError, match="Crawl API error - HTTP 422:.*"):
@@ -447,7 +447,7 @@ def test_crawl_tool_http_status_error_with_invalid_json() -> None:
         with patch("httpx.post") as mock_post:
             mock_post.return_value = mock_response
             mock_post.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "500 Internal Server Error", request=None, response=mock_response
+                "500 Internal Server Error", request=Mock(), response=mock_response
             )
 
             with pytest.raises(

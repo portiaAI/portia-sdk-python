@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any, NoReturn
 
 import httpx
 from pydantic import BaseModel, Field
@@ -144,9 +145,9 @@ class CrawlTool(Tool[str]):
         exclude_paths: list[str] | None,
         exclude_domains: list[str] | None,
         allow_external: bool,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Build the API payload with optional parameters."""
-        payload = {"url": url}
+        payload: dict[str, Any] = {"url": url}
 
         # Add optional parameters only when provided
         if instructions is not None:
@@ -170,7 +171,7 @@ class CrawlTool(Tool[str]):
 
         return payload
 
-    def _make_api_request(self, api_key: str, payload: dict) -> str:
+    def _make_api_request(self, api_key: str, payload: dict[str, Any]) -> str:
         """Make the API request and process the response."""
         api_url = "https://api.tavily.com/crawl"
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
@@ -192,7 +193,7 @@ class CrawlTool(Tool[str]):
         except Exception as e:
             raise ToolSoftError(f"Crawl request failed: {e!s}") from e
 
-    def _format_results(self, results: list) -> str:
+    def _format_results(self, results: list[Any]) -> str:
         """Format the crawl results into a readable string."""
         formatted_results = []
         for result in results:
@@ -202,11 +203,11 @@ class CrawlTool(Tool[str]):
 
         return f"Crawled {len(results)} pages:\n\n" + "\n---\n".join(formatted_results)
 
-    def _raise_crawl_error(self, json_response: dict) -> None:
+    def _raise_crawl_error(self, json_response: dict[str, Any]) -> NoReturn:
         """Raise a ToolSoftError for crawl failures."""
         raise ToolSoftError(f"Failed to crawl website: {json_response}")
 
-    def _handle_http_error(self, e: httpx.HTTPStatusError) -> None:
+    def _handle_http_error(self, e: httpx.HTTPStatusError) -> NoReturn:
         """Handle HTTP errors with detailed error information."""
         error_detail = f"HTTP {e.response.status_code}"
         try:
