@@ -1,4 +1,4 @@
-"""Tool to extract web page content from one or more URLs"""
+"""Tool to extract web page content from one or more URLs."""
 
 from __future__ import annotations
 
@@ -30,7 +30,9 @@ class ExtractToolSchema(BaseModel):
             "extraction costs 2 credits per 5 successful URL extractions."
         )
     )
-    format: str = Field(default="markdown", description="Output format: 'markdown' or 'text'")
+    format: str = Field(
+        default="markdown", description="Output format: 'markdown' or 'text'"
+    )
 
 
 class ExtractTool(Tool[str]):
@@ -54,7 +56,7 @@ class ExtractTool(Tool[str]):
         include_images: bool = True,
         include_favicon: bool = True,
         extract_depth: str = "basic",
-        format: str = "markdown",
+        format: str = "markdown",  # noqa: A002, API requires 'format' field name
     ) -> str:
         """Run the extract tool."""
         api_key = os.getenv("TAVILY_API_KEY")
@@ -77,6 +79,5 @@ class ExtractTool(Tool[str]):
         json_response = response.json()
 
         if "results" in json_response:
-            results = json_response["results"]
-            return results
+            return json_response["results"]
         raise ToolSoftError(f"Failed to extract content: {json_response}")

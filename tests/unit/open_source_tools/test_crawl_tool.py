@@ -185,11 +185,13 @@ def test_crawl_tool_http_error() -> None:
     tool = CrawlTool()
     mock_api_key = "tvly-mock-api-key"
 
-    with patch("os.getenv", return_value=mock_api_key):
-        with patch("httpx.post", side_effect=Exception("HTTP Error")):
-            ctx = get_test_tool_context()
-            with pytest.raises(ToolSoftError, match="Crawl request failed:.*"):
-                tool.run(ctx, "https://example.com")
+    with (
+        patch("os.getenv", return_value=mock_api_key),
+        patch("httpx.post", side_effect=Exception("HTTP Error")),
+    ):
+        ctx = get_test_tool_context()
+        with pytest.raises(ToolSoftError, match="Crawl request failed:.*"):
+            tool.run(ctx, "https://example.com")
 
 
 def test_crawl_tool_authorization_header() -> None:
@@ -339,7 +341,10 @@ def test_crawl_tool_exclude_domains_parameter() -> None:
             call_args = mock_post.call_args
             payload = call_args[1]["json"]
             assert "exclude_domains" in payload
-            assert payload["exclude_domains"] == ["^private\\.example\\.com$", "^admin\\.example\\.com$"]
+            assert payload["exclude_domains"] == [
+                "^private\\.example\\.com$",
+                "^admin\\.example\\.com$",
+            ]
 
 
 def test_crawl_tool_all_optional_parameters() -> None:
@@ -402,16 +407,26 @@ def test_crawl_tool_http_status_error_with_json_response() -> None:
 
         mock_response = Mock()
         mock_response.status_code = 422
-        mock_response.json.return_value = {"error": "Invalid parameters", "details": "URL is required"}
+        mock_response.json.return_value = {
+            "error": "Invalid parameters",
+            "details": "URL is required",
+        }
         mock_response.text = '{"error": "Invalid parameters", "details": "URL is required"}'
 
-        with patch("httpx.post") as mock_post:
-            mock_post.return_value = mock_response
-            mock_post.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "422 Unprocessable Entity", request=None, response=mock_response
-            )
+        with (
+            patch("os.getenv", return_value=mock_api_key),
+            patch("httpx.post", side_effect=httpx.HTTPStatusError(
+                message="Unprocessable Entity",
+                request=Mock(),
+                response=mock_response,
+            )),
+        ):
+            ctx = get_test_tool_context()
 
-            with pytest.raises(ToolSoftError, match="Crawl API error - HTTP 422:.*Invalid parameters.*"):
+            with pytest.raises(
+                ToolSoftError,
+                match="Crawl API error - HTTP 422:.*Invalid parameters.*",
+            ):
                 tool.run(ctx, "https://example.com")
 
 
@@ -435,5 +450,8 @@ def test_crawl_tool_http_status_error_with_invalid_json() -> None:
                 "500 Internal Server Error", request=None, response=mock_response
             )
 
-            with pytest.raises(ToolSoftError, match="Crawl API error - HTTP 500: Internal Server Error"):
+            with pytest.raises(
+                ToolSoftError,
+                match="Crawl API error - HTTP 500: Internal Server Error",
+            ):
                 tool.run(ctx, "https://example.com")

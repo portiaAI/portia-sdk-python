@@ -320,7 +320,10 @@ def test_map_tool_exclude_domains_parameter() -> None:
             call_args = mock_post.call_args
             payload = call_args[1]["json"]
             assert "exclude_domains" in payload
-            assert payload["exclude_domains"] == ["^private\\.example\\.com$", "^admin\\.example\\.com$"]
+            assert payload["exclude_domains"] == [
+                "^private\\.example\\.com$",
+                "^admin\\.example\\.com$",
+            ]
 
 
 def test_map_tool_all_optional_parameters() -> None:

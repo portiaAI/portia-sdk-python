@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
@@ -17,7 +18,10 @@ class MapToolSchema(BaseModel):
     url: str = Field(..., description="The root URL to begin the mapping (e.g., 'docs.tavily.com')")
     max_depth: int = Field(
         default=1,
-        description="Max depth of the mapping. Defines how far from the base URL the crawler can explore",
+        description=(
+            "Max depth of the mapping. Defines how far from the base URL "
+            "the crawler can explore"
+        ),
     )
     max_breadth: int = Field(
         default=20,
@@ -33,26 +37,40 @@ class MapToolSchema(BaseModel):
     )
     select_paths: list[str] | None = Field(
         default=None,
-        description="Regex patterns to select only URLs with specific path patterns (e.g., ['/docs/.*', '/api/v1.*'])",
+        description=(
+            "Regex patterns to select only URLs with specific path patterns "
+            "(e.g., ['/docs/.*', '/api/v1.*'])"
+        ),
     )
     select_domains: list[str] | None = Field(
         default=None,
-        description="Regex patterns to select crawling to specific domains or subdomains (e.g., ['^docs\\.example\\.com$'])",
+        description=(
+            "Regex patterns to select crawling to specific domains or subdomains "
+            "(e.g., ['^docs\\.example\\.com$'])"
+        ),
     )
     exclude_paths: list[str] | None = Field(
         default=None,
-        description="Regex patterns to exclude URLs with specific path patterns (e.g., ['/private/.*', '/admin/.*'])",
+        description=(
+            "Regex patterns to exclude URLs with specific path patterns "
+            "(e.g., ['/private/.*', '/admin/.*'])"
+        ),
     )
     exclude_domains: list[str] | None = Field(
         default=None,
-        description="Regex patterns to exclude specific domains or subdomains from crawling (e.g., ['^private\\.example\\.com$'])",
+        description=(
+            "Regex patterns to exclude specific domains or subdomains from crawling "
+            "(e.g., ['^private\\.example\\.com$'])"
+        ),
     )
     allow_external: bool = Field(
         default=False, description="Whether to allow following links that go to external domains"
     )
     categories: list[str] | None = Field(
         default=None,
-        description="Filter URLs using predefined categories like 'Documentation', 'Blog', 'API', etc.",
+        description=(
+            "Filter URLs using predefined categories like 'Documentation', 'Blog', 'API', etc."
+        ),
     )
 
 
@@ -63,10 +81,10 @@ class MapTool(Tool[str]):
     name: str = "Map Tool"
     description: str = (
         "Maps websites using graph-based traversal that can explore hundreds of paths "
-        "in parallel with intelligent discovery to generate comprehensive site maps. Provide a URL "
-        "and the tool will discover and return all accessible pages on that website. Supports depth "
-        "control, domain filtering, path selection, and various mapping options for comprehensive "
-        "site reconnaissance and URL discovery."
+        "in parallel with intelligent discovery to generate comprehensive site maps. "
+        "Provide a URL and the tool will discover and return all accessible pages on that website. "
+        "Supports depth control, domain filtering, path selection, and various mapping options "
+        "for comprehensive site reconnaissance and URL discovery."
     )
     args_schema: type[BaseModel] = MapToolSchema
     output_schema: tuple[str, str] = ("str", "str: list of discovered URLs on the website")
@@ -79,41 +97,66 @@ class MapTool(Tool[str]):
         max_breadth: int = 20,
         limit: int = 50,
         instructions: str | None = None,
-        select_paths: list[str] | None = None,
-        select_domains: list[str] | None = None,
-        exclude_paths: list[str] | None = None,
-        exclude_domains: list[str] | None = None,
-        allow_external: bool = False,
-        categories: list[str] | None = None,
+        **kwargs: Any,
     ) -> str:
         """Run the map tool."""
+        return self._execute_map_request(
+            url=url,
+            max_depth=max_depth,
+            max_breadth=max_breadth,
+            limit=limit,
+            instructions=instructions,
+            **kwargs,
+        )
+
+    def _execute_map_request(self, url: str, max_depth: int, max_breadth: int, limit: int,
+                           instructions: str | None, **kwargs: Any) -> str:
+        """Execute the map request with the given parameters."""
         api_key = os.getenv("TAVILY_API_KEY")
         if not api_key or api_key == "":
             raise ToolHardError("TAVILY_API_KEY is required to use map")
 
-        api_url = "https://api.tavily.com/map"
+        payload = self._build_payload(
+            url=url,
+            max_depth=max_depth,
+            max_breadth=max_breadth,
+            limit=limit,
+            instructions=instructions,
+            **kwargs,
+        )
 
+        return self._make_api_request(api_key, payload)
+
+    def _build_payload(self, url: str, max_depth: int, max_breadth: int, limit: int,
+                      instructions: str | None, **kwargs: Any) -> dict:
+        """Build the API payload."""
         payload = {
             "url": url,
             "max_depth": max_depth,
             "max_breadth": max_breadth,
             "limit": limit,
-            "allow_external": allow_external,
+            "allow_external": kwargs.get("allow_external", False),
         }
 
         if instructions is not None:
             payload["instructions"] = instructions
-        if select_paths is not None:
-            payload["select_paths"] = select_paths
-        if select_domains is not None:
-            payload["select_domains"] = select_domains
-        if exclude_paths is not None:
-            payload["exclude_paths"] = exclude_paths
-        if exclude_domains is not None:
-            payload["exclude_domains"] = exclude_domains
-        if categories is not None:
-            payload["categories"] = categories
 
+        optional_keys = [
+            "select_paths",
+            "select_domains",
+            "exclude_paths",
+            "exclude_domains",
+            "categories"
+        ]
+        for key in optional_keys:
+            if key in kwargs and kwargs[key] is not None:
+                payload[key] = kwargs[key]
+
+        return payload
+
+    def _make_api_request(self, api_key: str, payload: dict) -> str:
+        """Make the API request."""
+        api_url = "https://api.tavily.com/map"
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
         response = httpx.post(api_url, headers=headers, json=payload, timeout=60.0)
@@ -121,6 +164,5 @@ class MapTool(Tool[str]):
         json_response = response.json()
 
         if "results" in json_response:
-            results = json_response["results"]
-            return results
+            return json_response["results"]
         raise ToolSoftError(f"Failed to map website: {json_response}")
