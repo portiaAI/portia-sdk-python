@@ -22,7 +22,13 @@ class ExtractToolSchema(BaseModel):
         default=False, description="Whether to include favicon in the extraction"
     )
     extract_depth: str = Field(
-        default="basic", description="Depth of extraction: 'basic' or 'advanced'"
+        default="basic",
+        description=(
+            "The depth of the extraction process. Advanced extraction retrieves more data, "
+            "including tables and embedded content, with higher success but may increase latency. "
+            "Basic extraction costs 1 credit per 5 successful URL extractions, while advanced "
+            "extraction costs 2 credits per 5 successful URL extractions."
+        )
     )
     format: str = Field(default="markdown", description="Output format: 'markdown' or 'text'")
 
@@ -66,7 +72,7 @@ class ExtractTool(Tool[str]):
         }
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
-        response = httpx.post(url, headers=headers, json=payload)
+        response = httpx.post(url, headers=headers, json=payload, timeout=60.0)
         response.raise_for_status()
         json_response = response.json()
 

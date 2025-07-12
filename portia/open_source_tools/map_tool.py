@@ -116,7 +116,7 @@ class MapTool(Tool[str]):
 
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
-        response = httpx.post(api_url, headers=headers, json=payload)
+        response = httpx.post(api_url, headers=headers, json=payload, timeout=60.0)
         response.raise_for_status()
         json_response = response.json()
 

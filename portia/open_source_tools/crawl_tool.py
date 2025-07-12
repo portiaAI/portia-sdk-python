@@ -134,15 +134,10 @@ class CrawlTool(Tool[str]):
                 formatted_results = []
                 for result in results:
                     url_info = f"URL: {result.get('url', 'N/A')}"
-                    content_preview = (
-                        result.get("raw_content", "")[:500] + "..."
-                        if len(result.get("raw_content", "")) > 500
-                        else result.get("raw_content", "")
-                    )
+                    content_preview = result.get("raw_content", "")
                     formatted_results.append(f"{url_info}\nContent: {content_preview}\n")
 
                 return f"Crawled {len(results)} pages:\n\n" + "\n---\n".join(formatted_results)
-
             raise ToolSoftError(f"Failed to crawl website: {json_response}")
 
         except httpx.HTTPStatusError as e:
