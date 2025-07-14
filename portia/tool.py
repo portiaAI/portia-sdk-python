@@ -20,7 +20,7 @@ import inspect
 import json
 from abc import abstractmethod
 from functools import partial
-from typing import Any, Generic, Self, get_type_hints
+from typing import Any, Generic, Self
 
 import httpx
 from jsonref import replace_refs
@@ -324,7 +324,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     @model_validator(mode="after")
     def check_run_method_signature(self) -> Self:
         """Ensure the run method signature matches the args_schema."""
-        sig = inspect.signature(self.__class__.run)
+        sig = inspect.signature(self.__class__.run, eval_str=True)
         params = list(sig.parameters.values())
 
         if params and params[0].name == "self":
@@ -345,15 +345,17 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
         }
 
-        schema_types = get_type_hints(self.args_schema)
-        if set(param_map) != set(schema_types):
-            raise ValueError("Run method arguments must match args_schema fields")
-
-        for name, expected in schema_types.items():
-            actual = param_map.get(name, inspect.Signature.empty)
-            if actual is inspect.Signature.empty or actual != expected:
+        for arg_name, arg_annotation in param_map.items():
+            pydantic_field = self.args_schema.model_fields.get(arg_name)
+            if pydantic_field is None:
+                raise ValueError(f"Unknown argument '{arg_name}' in run method")
+            if (
+                arg_annotation is not inspect.Signature.empty
+                and arg_annotation != pydantic_field.annotation
+            ):
                 raise ValueError(
-                    f"Run method argument '{name}' type {actual} does not match expected {expected}"
+                    f"Run method argument '{arg_name}' type {arg_annotation} does not match "
+                    f"args_schema field type: {pydantic_field.annotation}"
                 )
 
         return self
