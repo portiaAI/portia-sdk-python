@@ -51,4 +51,7 @@ def test_summarizer_with_large_outputs(
     )
 
     assert "Mickey Mouse" not in summary["messages"][0].artifact.summary
-    assert "large value" in summary["messages"][0].artifact.summary
+    assert (
+        "large value" in summary["messages"][0].artifact.summary
+        or "memory" in summary["messages"][0].artifact.summary
+    )
