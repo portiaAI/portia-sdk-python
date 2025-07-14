@@ -20,6 +20,7 @@ import inspect
 import json
 from abc import abstractmethod
 from functools import partial
+import os
 from typing import Any, Generic, Self
 
 import httpx
@@ -324,6 +325,12 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     @model_validator(mode="after")
     def check_run_method_signature(self) -> Self:
         """Ensure the run method signature matches the args_schema."""
+        # Only validate the run method signature if the PORTIA_VALIDATE_TOOL_RUN_SIGNATURE
+        # environment variable is set. This is to be a bit conservative about the validation
+        # as it could break existing tools.
+        if not os.getenv("PORTIA_VALIDATE_TOOL_RUN_SIGNATURE"):
+            return self
+
         sig = inspect.signature(self.__class__.run, eval_str=True)
         params = list(sig.parameters.values())
 
