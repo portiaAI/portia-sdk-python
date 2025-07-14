@@ -149,7 +149,7 @@ def _create_args_schema(sig: inspect.Signature, func_name: str, func: Callable) 
         if param_annotation == ToolRunContext and param_name not in ("ctx", "context"):
             raise ValueError(
                 f"Tool {func_name} has a ToolRunContext parameter that is not named 'ctx' "
-                f"or 'context'. This is not allowed as it causes errors when the tool the tool "
+                f"or 'context'. This is not allowed as it causes errors when the tool "
                 "inputs are validated."
             )
 
