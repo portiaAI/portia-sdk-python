@@ -188,8 +188,3 @@ Here is original task:
             logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
 
         return {"messages": [last_message]}
-
-    def _truncate(self, content: str | dict | list[str | dict], max_len_chars: int) -> str:
-        """Truncate a value so it is no longer than max_len_chars."""
-        content_str = Template("{{ content }}").render(content=str(content))
-        return content_str[:max_len_chars]
