@@ -160,6 +160,7 @@ def test_safe_logger_successful_logs() -> None:
     safe_logger.warning("warning message", "arg1", kwarg1="value1")  # noqa: PLE1205
     safe_logger.error("error message", "arg1", kwarg1="value1")  # noqa: PLE1205
     safe_logger.critical("critical message", "arg1", kwarg1="value1")  # noqa: PLE1205
+    safe_logger.exception("exception message", "arg1", kwarg1="value1")  # noqa: PLE1205
 
     # Verify each method was called with correct arguments
     mock_logger.debug.assert_called_once_with("debug message", "arg1", kwarg1="value1")
@@ -167,6 +168,7 @@ def test_safe_logger_successful_logs() -> None:
     mock_logger.warning.assert_called_once_with("warning message", "arg1", kwarg1="value1")
     mock_logger.error.assert_called_once_with("error message", "arg1", kwarg1="value1")
     mock_logger.critical.assert_called_once_with("critical message", "arg1", kwarg1="value1")
+    mock_logger.exception.assert_called_once_with("exception message", "arg1", kwarg1="value1")
 
 
 def test_safe_logger_error_handling() -> None:
@@ -179,6 +181,7 @@ def test_safe_logger_error_handling() -> None:
     mock_logger.info.side_effect = Exception("info error")
     mock_logger.warning.side_effect = Exception("warning error")
     mock_logger.critical.side_effect = Exception("critical error")
+    mock_logger.exception.side_effect = Exception("exception error")
     # Test error log separately as all the other methods call the error log on exception
     mock_logger.error.side_effect = None
 
@@ -186,6 +189,7 @@ def test_safe_logger_error_handling() -> None:
     safe_logger.info("info message")
     safe_logger.warning("warning message")
     safe_logger.critical("critical message")
+    safe_logger.exception("exception message")
 
     mock_logger.error.side_effect = [Exception("error error"), None]
     safe_logger.error("error message")
@@ -194,10 +198,12 @@ def test_safe_logger_error_handling() -> None:
     assert mock_logger.info.call_count == 1
     assert mock_logger.warning.call_count == 1
     assert mock_logger.critical.call_count == 1
-    assert mock_logger.error.call_count == 6
+    assert mock_logger.exception.call_count == 1
+    assert mock_logger.error.call_count == 7
 
     mock_logger.error.assert_any_call("Failed to log: debug error")
     mock_logger.error.assert_any_call("Failed to log: info error")
     mock_logger.error.assert_any_call("Failed to log: warning error")
     mock_logger.error.assert_any_call("Failed to log: error error")
     mock_logger.error.assert_any_call("Failed to log: critical error")
+    mock_logger.error.assert_any_call("Failed to log: exception error")
