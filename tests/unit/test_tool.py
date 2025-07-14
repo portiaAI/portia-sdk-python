@@ -80,8 +80,13 @@ def test_run_signature_validation() -> None:
         def run(self, ctx: ToolRunContext, foo: int) -> str:  # noqa: ARG002
             return "bad"
 
-    with pytest.raises(ValueError, match="Run method argument"):
+    # test the logs
+    with patch("portia.tool.logger") as mock_logger:
         BadTool()
+        mock_logger.return_value.warning.assert_called_once_with(
+            "Run method argument 'foo' type <class 'int'> does not match "
+            "args_schema field type: <class 'str'>"
+        )
 
 
 def test_run_signature_validation_complex_type() -> None:
@@ -100,8 +105,12 @@ def test_run_signature_validation_complex_type() -> None:
         def run(self, ctx: ToolRunContext, foo: list[str]) -> str:  # noqa: ARG002
             return "bad"
 
-    with pytest.raises(ValueError, match="Run method argument"):
+    with patch("portia.tool.logger") as mock_logger:
         BadTool()
+        mock_logger.return_value.warning.assert_called_once_with(
+            "Run method argument 'foo' type list[str] does not match "
+            "args_schema field type: dict[str, list[int]]"
+        )
 
 
 def test_run_signature_context_type_required() -> None:
@@ -120,8 +129,11 @@ def test_run_signature_context_type_required() -> None:
         def run(self, ctx: int, foo: str) -> str:  # type: ignore[no-redef]  # noqa: ARG002
             return "bad"
 
-    with pytest.raises(ValueError, match="annotated as ToolRunContext"):
+    with patch("portia.tool.logger") as mock_logger:
         BadTool()
+        mock_logger.return_value.warning.assert_called_once_with(
+            "First argument of run must be annotated as ToolRunContext"
+        )
 
 
 def test_tool_to_langchain() -> None:
