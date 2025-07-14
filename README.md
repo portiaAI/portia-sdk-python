@@ -57,7 +57,8 @@ If you want to dive straight in with an example, dive into one of our examples i
 ✋🏼 Add deterministic tasks through an [`ExecutionHook`](https://docs.portialabs.ai/execution-hooks). Use a [`clarification`](https://docs.portialabs.ai/understand-clarifications) for human:agent interactions.</br>
 
 **Extensive tool support including MCP support**</br>
-🔧 Connect [tool registries](https://docs.portialabs.ai/extend-run-tools) from any MCP server, local tools, Portia cloud tools or another AI tool provider (e.g. ACI.dev).</br>
+🔧 Connect [tool registries](https://docs.portialabs.ai/extend-run-tools) from any MCP server, local tools or another AI tool provider (e.g. ACI.dev).</br>
+🫆 Leverage Portia cloud's prebuilt [1000+ cloud and MCP tools](https://docs.portialabs.ai/cloud-tool-registry) with out-of-the-box authentication.</br>
 🌐 Navigate the web and cope with captchas and logins using our [open source browser tool](https://docs.portialabs.ai/browser-tools).</br>
 
 **Authentication for API and web agents**</br>
@@ -97,8 +98,8 @@ portia-cli run "add 1 + 2"
 **All set? Now let's explore some basic usage of the product 🚀**
 
 ### E2E example
-You will need a Portia API key for this one because we use one of our cloud tools to schedule a calendar event and send an email. 
-<br>**🙏🏼 We have a free tier so you do not need to share payment details to get started 🙏🏼.**<br>
+You will need a Portia API key* for this one because we use one of our cloud tools to schedule a calendar event and send an email. 
+<br>**🙏🏼 *We have a free tier so you do not need to share payment details to get started 🙏🏼.**<br>
 Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a> and get your Portia API key. You will then need to set it as the env variable `PORTIA_API_KEY`.<br/>
 
 The example below introduces **some** of the config options available with Portia AI (check out our <a href="https://docs.portialabs.ai/manage-config" target="_blank">**docs (↗)**</a> for more):
