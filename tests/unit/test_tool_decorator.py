@@ -560,3 +560,19 @@ def test_tool_description_length_validation() -> None:
     # The error should be raised when we instantiate the tool
     with pytest.raises(InvalidToolDescriptionError):
         tool_class()  # pyright: ignore[reportCallIssue]
+
+
+def test_tool_with_context_parameter_name_invalid() -> None:
+    """Test that tool with context parameter name invalid raises an error."""
+    with pytest.raises(
+        ValueError,
+        match="Tool tool_with_context_parameter_name_invalid has a ToolRunContext parameter that "
+        "is not named 'ctx' or 'context'. This is not allowed as it causes errors when the tool "
+        "inputs are validated."
+    ):
+        @tool
+        def tool_with_context_parameter_name_invalid(
+            tool_context: ToolRunContext, arg1: str  # noqa: ARG001
+        ) -> str:
+            """Tool with context parameter name invalid."""
+            return "test"
