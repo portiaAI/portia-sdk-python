@@ -568,11 +568,13 @@ def test_tool_with_context_parameter_name_invalid() -> None:
         ValueError,
         match="Tool tool_with_context_parameter_name_invalid has a ToolRunContext parameter that "
         "is not named 'ctx' or 'context'. This is not allowed as it causes errors when the tool "
-        "inputs are validated."
+        "inputs are validated.",
     ):
+
         @tool
         def tool_with_context_parameter_name_invalid(
-            tool_context: ToolRunContext, arg1: str  # noqa: ARG001
+            tool_context: ToolRunContext,  # noqa: ARG001
+            arg1: str,  # noqa: ARG001
         ) -> str:
             """Tool with context parameter name invalid."""
             return "test"
