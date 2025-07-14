@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from jinja2 import Template
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 from langchain_core.messages import AIMessage, ToolMessage
@@ -49,6 +48,7 @@ tool output, make sure to follow the guidelines provided:
 - Focus on the key information and maintain accuracy.
 - Don't produce an overly long summary if it doesn't make sense.
 - Make sure you capture ALL important information including sources and references.
+- Large outputs will not be included. DO NOT summarise them but say that it is a large output.
 - You might have multiple tool executions separated by 'OUTPUT_SEPARATOR'   .
 - DO NOT INCLUDE 'OUTPUT_SEPARATOR' IN YOUR SUMMARY."""
                 ),
@@ -143,9 +143,8 @@ Here is original task:
 
         if self.config.exceeds_output_threshold(tool_output):
             tool_output = (
-                f"This is a large value (full length: {len(str(tool_output))} characters) - it is "
-                "too long to provide the full value, but it starts with:"
-                f"{self._truncate(tool_output, self.config.large_output_threshold_tokens)}"
+                f"This is a large value (full length: {len(str(tool_output))} characters) "
+                "which is held in agent memory."
             )
         messages = [
             Message.from_langchain(m)
@@ -188,8 +187,3 @@ Here is original task:
             logger().error("Error in SummarizerModel invoke (Skipping summaries): " + str(e))
 
         return {"messages": [last_message]}
-
-    def _truncate(self, content: str | dict | list[str | dict], max_len_chars: int) -> str:
-        """Truncate a value so it is no longer than max_len_chars."""
-        content_str = Template("{{ content }}").render(content=str(content))
-        return content_str[:max_len_chars]
