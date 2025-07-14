@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import re
 import sys
+import traceback
 from typing import TYPE_CHECKING, Any, Protocol
 
 from loguru import logger as default_logger
@@ -58,6 +59,7 @@ class LoggerInterface(Protocol):
     def warning(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
     def error(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
     def critical(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
+    def exception(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
 
 
 class Formatter:
@@ -110,6 +112,9 @@ class Formatter:
             f"<{function_color}>{record['line']}</{function_color}> - "
             f"<level>{msg}</level>"
         )
+        if record.get("exception") and hasattr(record["exception"], "value"):
+            formatted_stack_trace = "".join(traceback.format_exception(record["exception"].value))
+            result += f"\n{formatted_stack_trace}"
 
         # Add extra information if present
         if record["extra"]:
@@ -192,6 +197,13 @@ class SafeLogger(LoggerInterface):
         """Wrap the child logger's error method to catch exceptions."""
         try:
             self.child_logger.error(msg, *args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
+
+    def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Wrap the child logger's exception method to catch exceptions."""
+        try:
+            self.child_logger.exception(msg, *args, **kwargs)
         except Exception as e:  # noqa: BLE001
             self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
 
