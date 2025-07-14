@@ -325,12 +325,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     @model_validator(mode="after")
     def check_run_method_signature(self) -> Self:
         """Ensure the run method signature matches the args_schema."""
-        # Only validate the run method signature if the PORTIA_VALIDATE_TOOL_RUN_SIGNATURE
-        # environment variable is set. This is to be a bit conservative about the validation
-        # as it could break existing tools.
-        if not os.getenv("PORTIA_VALIDATE_TOOL_RUN_SIGNATURE"):
-            return self
-
         sig = inspect.signature(self.__class__.run, eval_str=True)
         params = list(sig.parameters.values())
 
@@ -344,7 +338,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             ToolRunContext,
             inspect.Signature.empty,
         ):
-            raise ValueError("First argument of run must be annotated as ToolRunContext")
+            logger().warning("First argument of run must be annotated as ToolRunContext")
 
         param_map = {
             p.name: p.annotation
@@ -355,12 +349,12 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         for arg_name, arg_annotation in param_map.items():
             pydantic_field = self.args_schema.model_fields.get(arg_name)
             if pydantic_field is None:
-                raise ValueError(f"Unknown argument '{arg_name}' in run method")
-            if (
+                logger().warning(f"Unknown argument '{arg_name}' in run method")
+            elif (
                 arg_annotation is not inspect.Signature.empty
                 and arg_annotation != pydantic_field.annotation
             ):
-                raise ValueError(
+                logger().warning(
                     f"Run method argument '{arg_name}' type {arg_annotation} does not match "
                     f"args_schema field type: {pydantic_field.annotation}"
                 )
