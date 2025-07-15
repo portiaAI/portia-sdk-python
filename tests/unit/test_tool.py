@@ -136,6 +136,20 @@ def test_run_signature_context_type_required() -> None:
         )
 
 
+def test_run_signature_validation_no_args() -> None:
+    """Check that no args is valid."""
+    class TestTool(Tool):
+        id: str = "test_tool"
+        name: str = "Test Tool"
+        description: str = "test"
+        output_schema: tuple[str, str] = ("str", "out")
+        def run(self, _: ToolRunContext) -> str:
+            return "test"
+    with patch("portia.tool.logger") as mock_logger:
+        TestTool()
+        mock_logger.return_value.warning.assert_not_called()
+
+
 def test_tool_to_langchain() -> None:
     """Test langchain rep of a Tool."""
     tool = AdditionTool()
