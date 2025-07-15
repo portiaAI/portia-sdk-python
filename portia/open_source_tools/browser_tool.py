@@ -512,6 +512,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 executable_path=self.chrome_path,
                 args=self.extra_chromium_args or [],
                 keep_alive=True,
+                storage_state=f".browser_storage_{ctx.plan_run.id}.json",
             ),
         )
 
