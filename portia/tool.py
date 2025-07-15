@@ -324,7 +324,14 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     @model_validator(mode="after")
     def check_run_method_signature(self) -> Self:
         """Ensure the run method signature matches the args_schema."""
-        sig = inspect.signature(self.__class__.run, eval_str=True)
+        try:
+            sig = inspect.signature(self.__class__.run, eval_str=True)
+        except NameError:
+            # Dont fail if the types cannot be extracted. This can happen with eval_str=True
+            # if the class is not defined in a global scope. Since this validator is only
+            # for warnings we can just exit here.
+            return self
+
         params = list(sig.parameters.values())
 
         if params and params[0].name == "self":
