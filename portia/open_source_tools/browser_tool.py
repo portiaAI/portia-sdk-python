@@ -595,6 +595,8 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
     async def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g release the session."""
         browser = self._get_browser(ctx)
+        if browser.playwright:
+            await browser.playwright.stop()
         await browser.kill()
         ctx.end_user.remove_additional_data("browser_pid")
 
