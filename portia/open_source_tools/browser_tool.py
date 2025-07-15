@@ -26,6 +26,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
+from browser_use.browser.profile import BrowserChannel
 from browser_use.llm import (
     BaseChatModel,
     ChatAnthropic,
@@ -510,6 +511,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         return Browser(
             browser_profile=BrowserConfig(
                 executable_path=self.chrome_path,
+                channel=BrowserChannel.CHROME,
                 args=self.extra_chromium_args or [],
             ),
         )
