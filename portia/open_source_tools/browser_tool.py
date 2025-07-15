@@ -343,13 +343,15 @@ class BrowserTool(Tool[str | BaseModel]):
                 task_description: str,
                 output_model: type[BaseModel],
             ) -> BaseModel:
+                browser = self.infrastructure_provider.setup_browser(ctx)
                 agent = Agent(
                     task=task_description,
                     llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx),
+                    browser=browser,
                     controller=Controller(output_model=output_model),
                 )
                 result = await agent.run()
+                self.infrastructure_provider.post_agent_run(ctx, browser)
                 return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
 
             # Main task
@@ -468,6 +470,10 @@ class BrowserInfrastructureProvider(ABC):
         This is called at the start of every step using this tool.
         """
 
+    def post_agent_run(self, ctx: ToolRunContext, browser: Browser) -> None:  # noqa: ARG002
+        """Called after the agent has been setup."""  # noqa: D401
+        return
+
     @abstractmethod
     def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:
         """Construct the URL for the auth clarification."""
@@ -508,7 +514,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "end users and so will be ignored.",
             )
         browser_pid_str = ctx.end_user.get_additional_data("browser_pid")
-        browser = Browser(
+        return Browser(
             browser_pid=int(browser_pid_str) if browser_pid_str else None,
             browser_profile=BrowserConfig(
                 executable_path=self.chrome_path,
@@ -516,8 +522,11 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 keep_alive=True,
             ),
         )
-        ctx.end_user.set_additional_data("browser_pid", str(browser.browser_pid))
-        return browser
+
+    def post_agent_run(self, ctx: ToolRunContext, browser: Browser) -> None:
+        """Called after the agent has been setup."""  # noqa: D401
+        if browser.browser_pid:
+            ctx.end_user.set_additional_data("browser_pid", str(browser.browser_pid))
 
     def construct_auth_clarification_url(
         self,
