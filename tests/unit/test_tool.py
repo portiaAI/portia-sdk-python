@@ -145,7 +145,7 @@ def test_run_signature_validation_no_args() -> None:
         description: str = "test"
         output_schema: tuple[str, str] = ("str", "out")
 
-        def run(self, _: ToolRunContext) -> str:
+        def run(self) -> str:
             return "test"
 
     with patch("portia.tool.logger") as mock_logger:
