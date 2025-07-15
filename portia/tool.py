@@ -16,6 +16,7 @@ while relying on common functionality provided by the base class.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from abc import abstractmethod
 from functools import partial
@@ -318,6 +319,52 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         description_length = len(self._generate_tool_description())
         if description_length > MAX_TOOL_DESCRIPTION_LENGTH:
             raise InvalidToolDescriptionError(self.id)
+        return self
+
+    @model_validator(mode="after")
+    def check_run_method_signature(self) -> Self:
+        """Ensure the run method signature matches the args_schema."""
+        try:
+            sig = inspect.signature(self.__class__.run, eval_str=True)
+        except NameError:
+            # Dont fail if the types cannot be extracted. This can happen with eval_str=True
+            # if the class is not defined in a global scope. Since this validator is only
+            # for warnings we can just exit here.
+            return self
+
+        params = list(sig.parameters.values())
+
+        if params and params[0].name == "self":
+            params = params[1:]
+        if not params:
+            return self
+
+        ctx_param = params[0]
+        if ctx_param.annotation not in (
+            ToolRunContext,
+            inspect.Signature.empty,
+        ):
+            logger().warning("First argument of run must be annotated as ToolRunContext")
+
+        param_map = {
+            p.name: p.annotation
+            for p in params[1:]
+            if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+        }
+
+        for arg_name, arg_annotation in param_map.items():
+            pydantic_field = self.args_schema.model_fields.get(arg_name)
+            if pydantic_field is None:
+                logger().warning(f"Unknown argument '{arg_name}' in run method")
+            elif (
+                arg_annotation is not inspect.Signature.empty
+                and arg_annotation != pydantic_field.annotation
+            ):
+                logger().warning(
+                    f"Run method argument '{arg_name}' type {arg_annotation} does not match "
+                    f"args_schema field type: {pydantic_field.annotation}"
+                )
+
         return self
 
     def to_langchain(self, ctx: ToolRunContext) -> StructuredTool:
