@@ -36,8 +36,8 @@ class LLMTool(Tool[str | BaseModel]):
     description: str = (
         "Jack of all trades tool to respond to a prompt by relying solely on LLM capabilities. "
         "YOU NEVER CALL OTHER TOOLS. You use your native capabilities as an LLM only. "
-        "This includes using your general knowledge, your in-built reasoning "
-        "and your code interpreter capabilities. This tool can be used to summarize the outputs of "
+        "This includes using your general knowledge and your in-built reasoning. "
+        "This tool can be used to summarize the outputs of "
         "other tools, make general language model queries or to answer questions. This should be "
         "used only as a last resort when no other tool satisfies a step in a task, however if "
         "there are no other tools that can be used to complete a step or for steps that don't "
