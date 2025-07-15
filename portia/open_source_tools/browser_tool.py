@@ -367,7 +367,7 @@ class BrowserTool(Tool[str | BaseModel]):
 
             task_result = await run_agent_task(task_to_complete, output_model)
             if task_result.human_login_required:  # type: ignore reportCallIssue
-                return handle_login_requirement(task_result)  # type: ignore reportCallIssue
+                return await ghandle_login_requirement(task_result)  # type: ignore reportCallIssue
 
             await self.infrastructure_provider.step_complete(ctx)
             return task_result.task_output  # type: ignore reportCallIssue
