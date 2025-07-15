@@ -415,11 +415,14 @@ def test_crawl_tool_http_status_error_with_json_response() -> None:
 
         with (
             patch("os.getenv", return_value=mock_api_key),
-            patch("httpx.post", side_effect=httpx.HTTPStatusError(
-                message="Unprocessable Entity",
-                request=Mock(),
-                response=mock_response,
-            )),
+            patch(
+                "httpx.post",
+                side_effect=httpx.HTTPStatusError(
+                    message="Unprocessable Entity",
+                    request=Mock(),
+                    response=mock_response,
+                ),
+            ),
         ):
             ctx = get_test_tool_context()
 
