@@ -513,7 +513,11 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        browser_pid_str = ctx.end_user.get_additional_data("browser_pid")
+        browser_pid_str = (
+            ctx.end_user.get_additional_data("browser_pid")
+            if str(ctx.end_user.get_additional_data("browser_pid")).isdigit()
+            else None
+        )
         return Browser(
             browser_pid=int(browser_pid_str) if browser_pid_str else None,
             browser_profile=BrowserConfig(
