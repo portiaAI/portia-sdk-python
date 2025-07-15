@@ -511,6 +511,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             browser_profile=BrowserConfig(
                 executable_path=self.chrome_path,
                 args=self.extra_chromium_args or [],
+                keep_alive=True,
             ),
         )
 
