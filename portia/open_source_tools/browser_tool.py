@@ -488,6 +488,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         """Initialize the BrowserInfrastructureProviderLocal."""
         self.chrome_path = chrome_path or self.get_chrome_instance_path()
         self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
+        self._browser_pid: int | None = None
 
     def setup_browser(self, ctx: ToolRunContext) -> Browser:
         """Get a Browser instance.
@@ -507,14 +508,16 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        return Browser(
+        browser = Browser(
+            browser_pid=self._browser_pid,
             browser_profile=BrowserConfig(
                 executable_path=self.chrome_path,
                 args=self.extra_chromium_args or [],
                 keep_alive=True,
-                storage_state=f".browser_storage_{ctx.plan_run.id}.json",
             ),
         )
+        self._browser_pid = browser.browser_pid
+        return browser
 
     def construct_auth_clarification_url(
         self,
