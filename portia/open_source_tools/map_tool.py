@@ -19,8 +19,7 @@ class MapToolSchema(BaseModel):
     max_depth: int = Field(
         default=1,
         description=(
-            "Max depth of the mapping. Defines how far from the base URL "
-            "the crawler can explore"
+            "Max depth of the mapping. Defines how far from the base URL the crawler can explore"
         ),
     )
     max_breadth: int = Field(
@@ -109,8 +108,15 @@ class MapTool(Tool[str]):
             **kwargs,
         )
 
-    def _execute_map_request(self, url: str, max_depth: int, max_breadth: int, limit: int,
-                           instructions: str | None, **kwargs: Any) -> str:
+    def _execute_map_request(
+        self,
+        url: str,
+        max_depth: int,
+        max_breadth: int,
+        limit: int,
+        instructions: str | None,
+        **kwargs: Any,
+    ) -> str:
         """Execute the map request with the given parameters."""
         api_key = os.getenv("TAVILY_API_KEY")
         if not api_key or api_key == "":
@@ -127,8 +133,15 @@ class MapTool(Tool[str]):
 
         return self._make_api_request(api_key, payload)
 
-    def _build_payload(self, url: str, max_depth: int, max_breadth: int, limit: int,
-                      instructions: str | None, **kwargs: Any) -> dict:
+    def _build_payload(
+        self,
+        url: str,
+        max_depth: int,
+        max_breadth: int,
+        limit: int,
+        instructions: str | None,
+        **kwargs: Any,
+    ) -> dict:
         """Build the API payload."""
         payload = {
             "url": url,
@@ -146,7 +159,7 @@ class MapTool(Tool[str]):
             "select_domains",
             "exclude_paths",
             "exclude_domains",
-            "categories"
+            "categories",
         ]
         for key in optional_keys:
             if key in kwargs and kwargs[key] is not None:

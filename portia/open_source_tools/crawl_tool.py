@@ -33,8 +33,7 @@ class CrawlToolSchema(BaseModel):
     max_depth: int = Field(
         default=DEFAULT_MAX_DEPTH,
         description=(
-            "Max depth of the crawl. Defines how far from the base URL "
-            "the crawler can explore"
+            "Max depth of the crawl. Defines how far from the base URL the crawler can explore"
         ),
         ge=1,
         le=5,
