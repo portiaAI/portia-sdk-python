@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, MessagesState
@@ -12,6 +14,7 @@ from portia.errors import (
     InvalidPlanRunStateError,
     ToolFailedError,
     ToolRetryError,
+    ToolSoftError,
 )
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import (
@@ -228,6 +231,29 @@ def test_template_in_required_inputs_missing_args() -> None:
     message.tool_calls = [{"name": "test_tool", "type": "tool_call", "id": "call_123"}]  # pyright: ignore[reportAttributeAccessIssue]
 
     with pytest.raises(InvalidPlanRunStateError, match="Tool call missing args field"):
+        template_in_required_inputs(message, step_inputs)
+
+
+def test_template_in_required_inputs_extra_var_raises_error() -> None:
+    """Test template_in_required_inputs with an extra variable in the template."""
+    step_inputs = [
+        StepInput(name="$name", value="John", description="User's name"),
+    ]
+    message = AIMessage(content="")
+    message.tool_calls = [
+        {
+            "name": "test_tool",
+            "type": "tool_call",
+            "id": "call_123",
+            "args": {"greeting": "Hello {{$name}}, you are {{$age}} years old"},
+        }
+    ]  # pyright: ignore[reportAttributeAccessIssue]
+    with pytest.raises(
+        ToolSoftError,
+        match=re.escape(
+            "Templated variables found in input that are not valid inputs for step: $age"
+        ),
+    ):
         template_in_required_inputs(message, step_inputs)
 
 
