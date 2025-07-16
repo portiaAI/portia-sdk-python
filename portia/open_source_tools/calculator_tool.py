@@ -67,8 +67,10 @@ class CalculatorTool(Tool[float]):
 
     id: str = "calculator_tool"
     name: str = "Calculator Tool"
-    description: str = "Takes a basic maths question and returns the result."
-    "Works best for maths expressions containing only numbers and the operators +, -, *, x, /."
+    description: str = (
+        "Calculates the result of basic mathematical expressions and returns the result. "
+        "Works for maths expressions containing only numbers and the operators +, -, *, /."
+    )
     args_schema: type[BaseModel] = CalculatorToolSchema
     output_schema: tuple[str, str] = ("str", "A string dump of the computed result")
 
