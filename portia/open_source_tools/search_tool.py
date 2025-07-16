@@ -51,9 +51,8 @@ class SearchTool(Tool[str]):
         payload = {
             "query": search_query,
             "include_answer": True,
-            "api_key": api_key,
         }
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
         response = httpx.post(url, headers=headers, json=payload)
         response.raise_for_status()
