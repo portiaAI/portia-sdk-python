@@ -123,13 +123,13 @@ def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]
         arg_value = arg_value.replace(step_input.name, input_name)
         template_args[input_name] = step_input.value
 
-        untemplated_var_matches = re.findall(r"\{\{(\$[^\}]*)\}\}", arg_value)
-        if len(untemplated_var_matches) > 0:
-            extra_vars = ", ".join(list(untemplated_var_matches))
-            raise ToolSoftError(
-                "Templated variables found in input that are not valid "
-                f"inputs for step: {extra_vars}"
-            )
+    untemplated_var_matches = re.findall(r"\{\{(\$[^\}]*)\}\}", arg_value)
+    if len(untemplated_var_matches) > 0:
+        extra_vars = ", ".join(list(untemplated_var_matches))
+        raise ToolSoftError(
+            "Templated variables found in input that are not valid "
+            f"inputs for step: {extra_vars}"
+        )
 
     return Template(arg_value).render(**template_args)
 
