@@ -76,15 +76,19 @@ def mock_browserbase_provider(
 class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
     """Mock browser infrastructure provider."""
 
-    def setup_browser(self, _: ToolRunContext) -> Browser:  # type: ignore reportIncompatibleMethodOverride
+    async def setup_browser(self, _: ToolRunContext) -> Browser:  # type: ignore reportIncompatibleMethodOverride
         """Create the browser with a mock for testing."""
         return MagicMock()
 
-    def construct_auth_clarification_url(self, _: ToolRunContext, sign_in_url: str) -> HttpUrl:  # type: ignore reportIncompatibleMethodOverride
+    async def construct_auth_clarification_url(
+        self,
+        ctx: ToolRunContext,  # noqa: ARG002
+        sign_in_url: str,
+    ) -> HttpUrl:  # type: ignore reportIncompatibleMethodOverride
         """Construct the auth clarification for testing."""
         return HttpUrl(sign_in_url)
 
-    def step_complete(self, _: ToolRunContext) -> None:  # type: ignore reportIncompatibleMethodOverride
+    async def step_complete(self, _: ToolRunContext) -> None:  # type: ignore reportIncompatibleMethodOverride
         """Call when the step is complete to e.g release the session."""
 
 
@@ -312,7 +316,7 @@ def test_browser_infra_local_get_extra_chromium_args_default(
         assert local_browser_provider.get_extra_chromium_args() is None
 
 
-def test_browser_infra_local_setup_browser(
+async def test_browser_infra_local_setup_browser(
     local_browser_provider: BrowserInfrastructureProviderLocal,
 ) -> None:
     """Test browser setup."""
@@ -322,7 +326,7 @@ def test_browser_infra_local_setup_browser(
     mock_logger_instance = MagicMock()
     mock_logger = MagicMock(return_value=mock_logger_instance)
     with patch("portia.open_source_tools.browser_tool.logger", mock_logger):
-        browser = local_browser_provider.setup_browser(context)
+        browser = await local_browser_provider.setup_browser(context)
 
         # Verify warning was logged for end_user
         mock_logger.assert_called_once()
@@ -333,14 +337,14 @@ def test_browser_infra_local_setup_browser(
         assert isinstance(browser, Browser)
 
 
-def test_browser_infra_local_construct_auth_clarification_url(
+async def test_browser_infra_local_construct_auth_clarification_url(
     local_browser_provider: BrowserInfrastructureProviderLocal,
 ) -> None:
     """Test auth clarification URL construction."""
     context = get_test_tool_context()
     sign_in_url = "https://example.com/login"
 
-    result = local_browser_provider.construct_auth_clarification_url(context, sign_in_url)
+    result = await local_browser_provider.construct_auth_clarification_url(context, sign_in_url)
     assert isinstance(result, HttpUrl)
     assert str(result) == sign_in_url
 
@@ -457,7 +461,7 @@ def test_browserbase_provider_get_or_create_session_new(
     assert context.end_user.get_additional_data("bb_context_id") == "test_context_id"
 
 
-def test_browserbase_provider_construct_auth_clarification_url(
+async def test_browserbase_provider_construct_auth_clarification_url(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
     """Test constructing auth clarification URL."""
@@ -468,7 +472,7 @@ def test_browserbase_provider_construct_auth_clarification_url(
     mock_debug.pages = [MagicMock(debugger_fullscreen_url="https://debug.example.com")]
     mock_browserbase_provider.bb.sessions.debug.return_value = mock_debug  # type: ignore reportFunctionMemberAccess
 
-    url = mock_browserbase_provider.construct_auth_clarification_url(
+    url = await mock_browserbase_provider.construct_auth_clarification_url(
         context, "https://example.com/login"
     )
 
@@ -476,19 +480,19 @@ def test_browserbase_provider_construct_auth_clarification_url(
     assert str(url) == "https://debug.example.com/"
 
 
-def test_browserbase_provider_construct_auth_clarification_url_no_session(
+async def test_browserbase_provider_construct_auth_clarification_url_no_session(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
     """Test constructing auth clarification URL with no session ID."""
     context = get_test_tool_context()
 
     with pytest.raises(ToolHardError, match="Session ID not found"):
-        mock_browserbase_provider.construct_auth_clarification_url(
+        await mock_browserbase_provider.construct_auth_clarification_url(
             context, "https://example.com/login"
         )
 
 
-def test_browserbase_provider_setup_browser(
+async def test_browserbase_provider_setup_browser(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
     """Test setting up browser."""
@@ -506,7 +510,7 @@ def test_browserbase_provider_setup_browser(
     mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
     mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
-    browser = mock_browserbase_provider.setup_browser(context)
+    browser = await mock_browserbase_provider.setup_browser(context)
 
     assert isinstance(browser, Browser)
     assert browser.cdp_url == "test_connect_url"  # This should now work
@@ -660,7 +664,7 @@ def test_browser_tool_with_structured_output_schema_auth_required(
         )
 
 
-def test_browserbase_provider_step_complete_with_session(
+async def test_browserbase_provider_step_complete_with_session(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
     """Test step_complete calls sessions.update when session_id is present."""
@@ -668,7 +672,7 @@ def test_browserbase_provider_step_complete_with_session(
     end_user = EndUser(external_id="123", additional_data={"bb_session_id": "session123"})
     mock_ctx.end_user = end_user
 
-    mock_browserbase_provider.step_complete(mock_ctx)
+    await mock_browserbase_provider.step_complete(mock_ctx)
 
     mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # type: ignore reportFunctionMemberAccess
         "session123",
@@ -677,7 +681,7 @@ def test_browserbase_provider_step_complete_with_session(
     )
 
 
-def test_browserbase_provider_step_complete_without_session(
+async def test_browserbase_provider_step_complete_without_session(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
     """Test step_complete does nothing when session_id is missing."""
@@ -685,7 +689,7 @@ def test_browserbase_provider_step_complete_without_session(
     end_user = EndUser(external_id="123", additional_data={})
     mock_ctx.end_user = end_user
 
-    mock_browserbase_provider.step_complete(mock_ctx)
+    await mock_browserbase_provider.step_complete(mock_ctx)
 
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # type: ignore reportFunctionMemberAccess
 
@@ -751,7 +755,7 @@ def test_process_task_data() -> None:
     assert BrowserTool.process_task_data(task_data) == "\n".join(task_data)
 
 
-def test_browser_tool_multiple_calls(
+async def test_browser_tool_multiple_calls(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
     mock_tool_run_context: ToolRunContext,
 ) -> None:
@@ -784,26 +788,26 @@ def test_browser_tool_multiple_calls(
     mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test first browser tool call (should set up session and not clean up)
-    mock_browserbase_provider.setup_browser(tool_run_context)
+    await mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_called_once()  # pyright: ignore[reportAttributeAccessIssue,reportFunctionMemberAccess]
     mock_browserbase_provider.bb.sessions.create.reset_mock()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(tool_run_context)
+    await mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test middle browser tool call (should not set up or clean up)
     end_user.set_additional_data("bb_session_id", "session123")
     end_user.set_additional_data("bb_session_connect_url", "connect_url")
     tool_run_context.plan_run.current_step_index = 1
-    mock_browserbase_provider.setup_browser(tool_run_context)
+    await mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(tool_run_context)
+    await mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
 
     # Test final browser tool call (should not set up but should clean up)
     tool_run_context.plan_run.current_step_index = 2
-    mock_browserbase_provider.setup_browser(tool_run_context)
+    await mock_browserbase_provider.setup_browser(tool_run_context)
     mock_browserbase_provider.bb.sessions.create.assert_not_called()  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
-    mock_browserbase_provider.step_complete(tool_run_context)
+    await mock_browserbase_provider.step_complete(tool_run_context)
     mock_browserbase_provider.bb.sessions.update.assert_called_once_with(  # pyright: ignore[reportAttributeAccessIssue, reportFunctionMemberAccess]
         "session123",
         project_id="test_project",
