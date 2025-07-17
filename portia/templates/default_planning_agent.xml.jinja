@@ -14,6 +14,7 @@ Use the following information to construct a plan in response to the following u
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
      - Additional information about the caller can be provided in the EndUser section. You can use this if the query refers to the end user, i.e. Send me an email.
      - IMPORTANT: MAKE SURE to not provide examples or assumptions in the task description.
+     - IMPORTANT: Do not generate structure output schema yourself.
     IMPORTANT: If you can't come up with a plan provide a descriptive error instead - DO NOT create a plan with zero steps. When returning an error, return only the JSON object with the error message filled in plus an empty list of steps - DO NOT include text (explaining the error or otherwise) outside the JSON object.
     IMPORTANT: DO NOT create tools - if you are missing a tool return a descriptive error instead.
     {% if plan_inputs %}IMPORTANT: Values for plan inputs will be provided when the plan is executed, so make sure to use them in your steps appropriately.{% endif %}

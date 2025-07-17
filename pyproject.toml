@@ -46,7 +46,7 @@ mistralai = [
     "mistralai>=1.2.5,<2",
 ]
 google = [
-    "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
+    "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
     "google-genai>=1.18.0",
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
@@ -64,7 +64,7 @@ cache = ["redis>=5.2.1,<6", "langchain-redis>=0.1.2" ]
 all = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
-    "langchain-google-genai>=2.0.10,<3 ; python_version >= '3.11' and python_version < '4.0'",
+    "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
     "google-genai>=1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "playwright>=1.49.0,<2",
