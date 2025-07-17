@@ -480,7 +480,7 @@ class Config(BaseModel):
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
-            FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: False,
+            FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: True,
             **self.feature_flags,
         }
         return self
