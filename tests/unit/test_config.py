@@ -9,7 +9,6 @@ from pydantic import SecretStr
 
 from portia.config import (
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
-    FEATURE_FLAG_GOOGLE_2_5_DEFAULTS,
     SUPPORTED_OPENAI_MODELS,
     Config,
     ExecutionAgentType,
@@ -459,26 +458,6 @@ def test_set_model_from_llm_model_raises_deprecation_warning(
         )
     assert c.models.default_model == "openai/gpt-4o"
     assert c.models.planning_model == "openai/o3-mini"
-
-
-def test_get_default_model_google_2_5(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Test setting model from LLMModel raises a warning."""
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-openai-api-key")
-    c = Config.from_default(
-        feature_flags={FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: True},
-    )
-    assert (
-        c.get_agent_default_model("planning_model", LLMProvider.GOOGLE) == "google/gemini-2.5-pro"
-    )
-    assert (
-        c.get_agent_default_model("introspection_model", LLMProvider.GOOGLE)
-        == "google/gemini-2.5-flash"
-    )
-    assert (
-        c.get_agent_default_model("default_model", LLMProvider.GOOGLE) == "google/gemini-2.5-flash"
-    )
 
 
 def test_check_model_supported_raises_deprecation_warning() -> None:
