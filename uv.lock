@@ -2235,9 +2235,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.41.0,<=0.55.0" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.4.2" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-browserbase'", specifier = ">=0.4.2" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-local'", specifier = ">=0.4.2" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.5.5" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-browserbase'", specifier = ">=0.5.5" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-local'", specifier = ">=0.5.5" },
     { name = "browserbase", marker = "extra == 'all'", specifier = ">=1.2.0,<2" },
     { name = "browserbase", marker = "extra == 'tools-browser-browserbase'", specifier = ">=1.2.0,<2" },
     { name = "click", specifier = ">=8.1.7,<9" },
