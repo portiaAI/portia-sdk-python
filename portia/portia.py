@@ -64,10 +64,9 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.logger import logger, logger_manager
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, PlanInput, ReadOnlyPlan, ReadOnlyStep, Step
+from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
-from portia.prefixed_uuid import PlanUUID
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
@@ -168,7 +167,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan] | None = None,
+        example_plans: list[Plan | PlanUUID | UUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -182,8 +181,11 @@ class Portia:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan] | None): Optional list of example plans. If not
-            provide a default set of example plans will be used.
+            example_plans (list[Plan | PlanUUID | UUID | str] | None): Optional list of example
+            plans or plan IDs. This can include Plan objects, PlanUUID objects, raw UUID
+            objects,
+            or plan ID strings (starting with "plan-"). Plan IDs and UUIDs will be loaded from
+            storage. If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
                 Provides input values for the run. This can be a list of PlanInput objects, a list
@@ -265,7 +267,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan] | None = None,
+        example_plans: list[Plan | PlanUUID | UUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -277,8 +279,11 @@ class Portia:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan] | None): Optional list of example plans. If not
-            provide a default set of example plans will be used.
+            example_plans (list[Plan | PlanUUID | UUID | str] | None): Optional list of example
+            plans or plan IDs.
+            This can include Plan objects, PlanUUID objects, raw UUID objects, or plan ID strings
+            (starting with "plan-"). Plan IDs and UUIDs will be loaded from storage.
+            If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
             plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
                 of inputs required for the plan.
@@ -324,11 +329,81 @@ class Portia:
             use_cached_plan,
         )
 
+    def _resolve_example_plans(
+        self, example_plans: list[Plan | PlanUUID | UUID | str] | None
+    ) -> list[Plan] | None:
+        """Resolve example plans from Plan objects, PlanUUIDs, UUID strings, and planID strings.
+
+        Args:
+            example_plans (list[Plan | PlanUUID | UUID | str] | None): List of example plans or
+            plan IDs.
+                - Plan objects are used directly
+                - PlanUUID objects are loaded from storage
+                - UUID objects are converted to PlanUUID and loaded from storage
+                - String objects must be plan ID strings (starting with "plan-")
+
+        Returns:
+            list[Plan] | None: List of resolved Plan objects, or None if input was None.
+
+        Raises:
+            PlanNotFoundError: If a plan ID cannot be found in storage.
+            ValueError: If a string is not a plan ID string.
+            TypeError: If an invalid type is provided.
+
+        """
+        if example_plans is None:
+            return None
+
+        resolved_plans = []
+        for example_plan in example_plans:
+            resolved_plan = self._resolve_single_example_plan(example_plan)
+            resolved_plans.append(resolved_plan)
+
+        return resolved_plans
+
+    def _resolve_single_example_plan(self, example_plan: Plan | PlanUUID | UUID | str) -> Plan:
+        """Resolve a single example plan from various input types."""
+        if isinstance(example_plan, Plan):
+            return example_plan
+        if isinstance(example_plan, PlanUUID):
+            return self._load_plan_by_uuid(example_plan)
+        if isinstance(example_plan, UUID):
+            plan_uuid = PlanUUID(uuid=example_plan)
+            return self._load_plan_by_uuid(plan_uuid)
+        if isinstance(example_plan, str):
+            return self._resolve_string_example_plan(example_plan)
+        raise TypeError(
+            f"Invalid example plan type: {type(example_plan)}. "
+            "Expected Plan, PlanUUID, UUID, or str."
+        )
+
+    def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
+        """Load a plan from storage by UUID."""
+        try:
+            return self.storage.get_plan(plan_uuid)
+        except Exception as e:
+            raise PlanNotFoundError(plan_uuid) from e
+
+    def _resolve_string_example_plan(self, example_plan: str) -> Plan:
+        """Resolve a string example plan - must be a plan ID string."""
+        # Only support plan ID strings, not query strings
+        if not example_plan.startswith("plan-"):
+            raise ValueError(
+                f"String '{example_plan}' must be a plan ID (starting with 'plan-'). "
+                "Query strings are not supported."
+            )
+
+        plan_uuid = PlanUUID.from_string(example_plan)
+        try:
+            return self._load_plan_by_uuid(plan_uuid)
+        except Exception as e:
+            raise PlanNotFoundError(plan_uuid) from e
+
     def _plan(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan] | None = None,
+        example_plans: list[Plan | PlanUUID | UUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -340,8 +415,11 @@ class Portia:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan] | None): Optional list of example plans. If not
-            provide a default set of example plans will be used.
+            example_plans (list[Plan | PlanUUID | UUID | str] | None): Optional list of example
+            plans or plan IDs.
+            This can include Plan objects, PlanUUID objects, raw UUID objects, or plan ID strings
+            (starting with "plan-"). Plan IDs and UUIDs will be loaded from storage.
+            If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
             plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
                 of inputs required for the plan.
@@ -376,6 +454,9 @@ class Portia:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
+        # Resolve example plans from PlanUUIDs to Plan objects
+        resolved_example_plans = self._resolve_example_plans(example_plans)
+
         end_user = self.initialize_end_user(end_user)
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
@@ -384,7 +465,7 @@ class Portia:
             query=query,
             tool_list=tools,
             end_user=end_user,
-            examples=example_plans,
+            examples=resolved_example_plans,
             plan_inputs=coerced_plan_inputs,
         )
         if outcome.error:
@@ -396,7 +477,7 @@ class Portia:
                     outcome.error,
                     query,
                     end_user,
-                    example_plans,
+                    resolved_example_plans,
                 )
             logger().error(f"Error in planning - {outcome.error}")
             raise PlanError(outcome.error)
