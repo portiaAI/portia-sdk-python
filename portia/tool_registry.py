@@ -203,6 +203,26 @@ class ToolRegistry:
 
         """
         return ToolRegistry({tool.id: tool for tool in self._tools.values() if predicate(tool)})
+    def with_tool_description_regex(
+        self, regex: str, updated_description: str, *, overwrite: bool = False
+    ) -> ToolRegistry:
+        """Update tools that fit the regex expression with an extension or override of the tool description
+
+        Args:
+            regex (str): A regex expression to describe the tools to update.
+            updated_description (str): The tool description to update. If `overwrite` is False, this
+                will extend the existing tool description, otherwise, the entire tool description
+                will be updated.
+            overwrite (bool): Whether to update or extend the existing tool description.
+        """
+        try:
+            filtered_tools = self.filter_tools(lambda tool: re.match(regex, tool.id) is not None)
+            for tool in filtered_tools:
+                self.with_tool_description(tool.id, updated_description, overwrite=overwrite)
+        except ToolNotFoundError:
+            logger().warning(f"No tools found that match the regex: {regex}")
+        return self
+
 
     def with_tool_description(
         self, tool_id: str, updated_description: str, *, overwrite: bool = False
