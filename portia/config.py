@@ -257,7 +257,6 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
-FEATURE_FLAG_GOOGLE_2_5_DEFAULTS = "feature_flag_google_2_5_defaults"
 
 
 E = TypeVar("E", bound=Enum)
@@ -480,7 +479,6 @@ class Config(BaseModel):
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
-            FEATURE_FLAG_GOOGLE_2_5_DEFAULTS: False,
             **self.feature_flags,
         }
         return self
@@ -600,9 +598,7 @@ class Config(BaseModel):
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
-                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "google/gemini-2.5-pro"
-                        return "google/gemini-2.0-flash"
+                        return "google/gemini-2.5-pro"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
                 return None
@@ -615,9 +611,7 @@ class Config(BaseModel):
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
-                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "google/gemini-2.5-flash"
-                        return "google/gemini-2.0-flash"
+                        return "google/gemini-2.5-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
                 return None
@@ -630,9 +624,7 @@ class Config(BaseModel):
                     case LLMProvider.MISTRALAI:
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
-                        if self.feature_flags[FEATURE_FLAG_GOOGLE_2_5_DEFAULTS]:
-                            return "google/gemini-2.5-flash"
-                        return "google/gemini-2.0-flash"
+                        return "google/gemini-2.5-flash"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
                 return None

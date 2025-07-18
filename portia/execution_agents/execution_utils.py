@@ -5,6 +5,7 @@ This module contains utility functions for managing agent execution flow.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -19,6 +20,7 @@ from portia.errors import (
     InvalidPlanRunStateError,
     ToolFailedError,
     ToolRetryError,
+    ToolSoftError,
 )
 from portia.execution_agents.output import LocalDataValue, Output
 
@@ -120,6 +122,14 @@ def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]
         input_name = input_name.lstrip("$")
         arg_value = arg_value.replace(step_input.name, input_name)
         template_args[input_name] = step_input.value
+
+    untemplated_var_matches = re.findall(r"\{\{(\$[^\}]*)\}\}", arg_value)
+    if len(untemplated_var_matches) > 0:
+        extra_vars = ", ".join(list(untemplated_var_matches))
+        raise ToolSoftError(
+            "Templated variables found in input that are not valid "
+            f"inputs for step: {extra_vars}"
+        )
 
     return Template(arg_value).render(**template_args)
 
