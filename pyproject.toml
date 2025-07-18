@@ -52,11 +52,11 @@ google = [
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
 tools-browser-local = [
     "playwright>=1.49.0,<2",
-    "browser-use>=0.4.2 ; python_version >= '3.11' and python_version < '4.0'",
+    "browser-use>=0.5.5 ; python_version >= '3.11' and python_version < '4.0'",
 ]
 tools-browser-browserbase = [
     "playwright>=1.49.0,<2",
-    "browser-use>=0.4.2 ; python_version >= '3.11' and python_version < '4.0'",
+    "browser-use>=0.5.5 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
 ]
 tools-pdf-reader = ["mistralai>=1.2.5,<2"]
@@ -68,7 +68,7 @@ all = [
     "google-genai>=1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "playwright>=1.49.0,<2",
-    "browser-use>=0.4.2 ; python_version >= '3.11' and python_version < '4.0'",
+    "browser-use>=0.5.5 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
     "redis>=5.2.1,<6",
     "langchain-redis>=0.1.2 ; python_version >= '3.11' and python_version < '3.14'"
