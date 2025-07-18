@@ -815,6 +815,134 @@ async def test_browser_tool_multiple_calls(
     )
 
 
+async def test_browser_infra_local_get_browser_no_browser_pid(
+    local_browser_provider: BrowserInfrastructureProviderLocal,
+) -> None:
+    """Test _get_browser when browser_pid is not set in end_user."""
+    context = get_test_tool_context()
+    # Ensure no browser_pid is set in additional_data
+    context.end_user.additional_data = {}
+
+    with patch("portia.open_source_tools.browser_tool.Browser") as mock_browser:
+        await local_browser_provider.setup_browser(context)
+
+        # Verify Browser was called with browser_pid=None
+        mock_browser.assert_called_once()
+        call_args = mock_browser.call_args
+        assert call_args.kwargs["browser_pid"] is None
+
+        # Verify BrowserConfig was created with correct parameters
+        browser_profile = call_args.kwargs["browser_profile"]
+        assert browser_profile.executable_path == local_browser_provider.chrome_path
+        assert browser_profile.args == (local_browser_provider.extra_chromium_args or [])
+        assert browser_profile.keep_alive is True
+
+
+async def test_browser_infra_local_get_browser_with_browser_pid(
+    local_browser_provider: BrowserInfrastructureProviderLocal,
+) -> None:
+    """Test _get_browser when browser_pid is set in end_user."""
+    context = get_test_tool_context()
+    test_pid = 12345
+    # Set browser_pid in additional_data
+    context.end_user.additional_data = {"browser_pid": str(test_pid)}
+
+    with (
+        patch("portia.open_source_tools.browser_tool.Browser") as mock_browser,
+        patch("psutil.pid_exists", return_value=True) as mock_pid_exists,
+    ):
+        await local_browser_provider.setup_browser(context)
+
+        # Verify psutil.pid_exists was called with the test_pid
+        mock_pid_exists.assert_called_once_with(test_pid)
+
+        # Verify Browser was called with browser_pid=test_pid
+        mock_browser.assert_called_once()
+        call_args = mock_browser.call_args
+        assert call_args.kwargs["browser_pid"] == test_pid
+
+        # Verify BrowserConfig was created with correct parameters
+        browser_profile = call_args.kwargs["browser_profile"]
+        assert browser_profile.executable_path == local_browser_provider.chrome_path
+        assert browser_profile.args == (local_browser_provider.extra_chromium_args or [])
+        assert browser_profile.keep_alive is True
+
+
+@pytest.mark.parametrize(
+    ("browser_pid", "expected_additional_data"),
+    [
+        (67890, "67890"),  # Browser has PID - should set additional_data
+        (None, None),  # Browser has no PID - should not set additional_data
+    ],
+)
+async def test_browser_infra_local_post_agent_run(
+    local_browser_provider: BrowserInfrastructureProviderLocal,
+    browser_pid: int | None,
+    expected_additional_data: str | None,
+) -> None:
+    """Test post_agent_run sets browser_pid in end_user additional_data based on browser state."""
+    context = get_test_tool_context()
+
+    # Create mock browser with specified browser_pid
+    mock_browser = MagicMock()
+    mock_browser.browser_pid = browser_pid
+
+    await local_browser_provider.post_agent_run(context, mock_browser)
+
+    # Verify that browser_pid was set (or not set) as expected in additional_data
+    assert context.end_user.get_additional_data("browser_pid") == expected_additional_data
+
+
+async def test_browser_infra_local_step_complete(
+    local_browser_provider: BrowserInfrastructureProviderLocal,
+) -> None:
+    """Test step_complete removes browser_pid and cleans up browser resources."""
+    context = get_test_tool_context()
+    # Set initial browser_pid in additional_data
+    context.end_user.set_additional_data("browser_pid", "12345")
+
+    # Create mock browser with playwright
+    mock_browser = MagicMock()
+    mock_playwright = AsyncMock()
+    mock_browser.playwright = mock_playwright
+    mock_browser.kill = AsyncMock()
+
+    with patch.object(local_browser_provider, "_get_browser", return_value=mock_browser):
+        await local_browser_provider.step_complete(context)
+
+    # Verify playwright.stop() was called
+    mock_playwright.stop.assert_called_once()
+
+    # Verify browser.kill() was called
+    mock_browser.kill.assert_called_once()
+
+    # Verify browser_pid was removed from additional_data
+    assert context.end_user.get_additional_data("browser_pid") is None
+
+
+async def test_browser_infra_local_step_complete_no_playwright(
+    local_browser_provider: BrowserInfrastructureProviderLocal,
+) -> None:
+    """Test step_complete handles case where browser has no playwright instance."""
+    context = get_test_tool_context()
+    # Set initial browser_pid in additional_data
+    context.end_user.set_additional_data("browser_pid", "12345")
+
+    # Create mock browser without playwright
+    mock_browser = MagicMock()
+    mock_browser.playwright = None
+    mock_browser.kill = AsyncMock()
+
+    with patch.object(local_browser_provider, "_get_browser", return_value=mock_browser):
+        await local_browser_provider.step_complete(context)
+
+    # Verify browser.kill() was still called
+    mock_browser.kill.assert_called_once()
+
+    # Verify browser_pid was removed from additional_data
+    assert context.end_user.get_additional_data("browser_pid") is None
+
+
 # Tests for convert_model_to_browser_use_model function
 class TestConvertModelToBrowserUseModel:
     """Test cases for convert_model_to_browser_use_model function."""
