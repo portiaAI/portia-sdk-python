@@ -226,7 +226,7 @@ wheels = [
 
 [[package]]
 name = "browser-use"
-version = "0.5.3"
+version = "0.5.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles", marker = "python_full_version < '4'" },
@@ -241,6 +241,7 @@ dependencies = [
     { name = "google-genai", marker = "python_full_version < '4'" },
     { name = "groq", marker = "python_full_version < '4'" },
     { name = "httpx", marker = "python_full_version < '4'" },
+    { name = "markdown-pdf", marker = "python_full_version < '4'" },
     { name = "markdownify", marker = "python_full_version < '4'" },
     { name = "mcp", marker = "python_full_version < '4'" },
     { name = "ollama", marker = "python_full_version < '4'" },
@@ -260,9 +261,9 @@ dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '4'" },
     { name = "uuid7", marker = "python_full_version < '4'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d7/a7/8a790fa803c48763f770184187614af4099236d943454a3329b089a3f395/browser_use-0.5.3.tar.gz", hash = "sha256:9c4ffbfd91a9df41091f70635f499d0061569000695a773107b589d20fa588c2", size = 233391, upload-time = "2025-07-09T05:36:20.704Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/ff/88113c9fcf722cc140578b56d790d64cee56c0e248d175c4c5fb610fce6c/browser_use-0.5.5.tar.gz", hash = "sha256:cecca95576623a269ab0880fe295c7db98787fbcd33c8a6d3cd7a277d0e3ec5f", size = 240819, upload-time = "2025-07-16T17:37:39.995Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/08/95459e7d93561914a5f048a8812aaf899f3838f3237186d45f10dfd2a371/browser_use-0.5.3-py3-none-any.whl", hash = "sha256:379592173946f8dcafef138417108f45e36d67f51917af0cc154abbad3d05500", size = 284041, upload-time = "2025-07-09T05:36:19.111Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/b0/ab4a0b76935257bd07af98b6b073ec1610ce843402b9e08ef5d8625f4337/browser_use-0.5.5-py3-none-any.whl", hash = "sha256:ad65b0c8e67e14537bb898745deea674e11fcb662433f072febf81d77587b29c", size = 297158, upload-time = "2025-07-16T17:37:38.693Z" },
 ]
 
 [[package]]
@@ -1311,7 +1312,7 @@ wheels = [
 
 [[package]]
 name = "langchain-google-genai"
-version = "2.1.7"
+version = "2.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filetype", marker = "python_full_version < '4'" },
@@ -1319,9 +1320,9 @@ dependencies = [
     { name = "langchain-core", marker = "python_full_version < '4'" },
     { name = "pydantic", marker = "python_full_version < '4'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/03/5ff9f00f942a3ea695a8e250b0ae681c50c8eacee21f716d7668a8bd0a82/langchain_google_genai-2.1.7.tar.gz", hash = "sha256:a0e77f06175843e527d7bcde195cc0332bf538416038e7de8e5a4bd256801181", size = 43917, upload-time = "2025-07-09T15:38:57.164Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/63/36/2cfc5d13c02f781674c376b67106fee92d960d39283f1acc393388e1b054/langchain_google_genai-2.1.8.tar.gz", hash = "sha256:dfdc491f66880ed85f88dc117f84d3feb19108ad4b8c408ad1d0efb27b7c9dd6", size = 44298, upload-time = "2025-07-15T15:36:18.408Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/54/159d13ef38dea4a16ecfb51ccc213912b1ac9fdbc2f84f556b7bca5e495e/langchain_google_genai-2.1.7-py3-none-any.whl", hash = "sha256:df90736536d71d5a2eb3117ed9df9c86e10bcf03b51d883ee5d2a727771f4bc3", size = 47433, upload-time = "2025-07-09T15:38:56.108Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/cb/8fa53aa0837b366496e3b97527682aa41cb4825dea8c2464591eddd2f508/langchain_google_genai-2.1.8-py3-none-any.whl", hash = "sha256:b1a38c00f9554c846e03877cf07f6fa865d16df5600ba8deca6647b00238963a", size = 47794, upload-time = "2025-07-15T15:36:17.458Z" },
 ]
 
 [[package]]
@@ -1489,6 +1490,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/38/71/3b932df36c1a044d397a1f92d1cf91ee0a503d91e470cbd670aa66b07ed0/markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb", size = 74596, upload-time = "2023-06-03T06:41:14.443Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/42/d7/1ec15b46af6af88f19b8e5ffea08fa375d433c998b8a7639e76935c14f1f/markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1", size = 87528, upload-time = "2023-06-03T06:41:11.019Z" },
+]
+
+[[package]]
+name = "markdown-pdf"
+version = "1.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py", marker = "python_full_version < '4'" },
+    { name = "pymupdf", marker = "python_full_version < '4'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/be/79/0d03f40cf12170b098a30d64ba1a86ae7b5087d6a98d215c399c5ea48bc0/markdown_pdf-1.7.tar.gz", hash = "sha256:92258102198b5b94c82b837a51f0b4b8f102e2b3bfcd5ab99761ea544fdc2a6a", size = 17110, upload-time = "2025-04-17T16:19:04.255Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/84/e9/c21ceb65683375d0b329e29de8acc51d12598ded720642df23251bc6a3fb/markdown_pdf-1.7-py3-none-any.whl", hash = "sha256:8022945f3e05f4ba4bf80c5d51c71bccf12d153ffdbe96ef4b49c01d6aabec72", size = 17254, upload-time = "2025-04-17T16:19:02.785Z" },
 ]
 
 [[package]]
@@ -2135,7 +2149,7 @@ wheels = [
 
 [[package]]
 name = "portia-sdk-python"
-version = "0.4.12"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -2221,9 +2235,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.41.0,<=0.55.0" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.4.2" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-browserbase'", specifier = ">=0.4.2" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-local'", specifier = ">=0.4.2" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.5.5" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-browserbase'", specifier = ">=0.5.5" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-local'", specifier = ">=0.5.5" },
     { name = "browserbase", marker = "extra == 'all'", specifier = ">=1.2.0,<2" },
     { name = "browserbase", marker = "extra == 'tools-browser-browserbase'", specifier = ">=1.2.0,<2" },
     { name = "click", specifier = ">=8.1.7,<9" },
@@ -2236,8 +2250,8 @@ requires-dist = [
     { name = "langchain", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.17,<0.4" },
     { name = "langchain-anthropic", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.0,<0.4" },
     { name = "langchain-core", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.25,<0.4" },
-    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=2.0.10,<3" },
-    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'google'", specifier = ">=2.0.10,<3" },
+    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=2.1.8,<3" },
+    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'google'", specifier = ">=2.1.8,<3" },
     { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.2.3,<0.3" },
     { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'mistral'", specifier = ">=0.2.3,<0.3" },
     { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'mistralai'", specifier = ">=0.2.3,<0.3" },
@@ -2594,6 +2608,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1a/0a/c06b542ac108bfc73200677309cd9188a3a01b127a63f20cadc18d873d88/pymdown_extensions-10.16.tar.gz", hash = "sha256:71dac4fca63fabeffd3eb9038b756161a33ec6e8d230853d3cecf562155ab3de", size = 853197, upload-time = "2025-06-21T17:56:36.974Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/98/d4/10bb14004d3c792811e05e21b5e5dcae805aacb739bd12a0540967b99592/pymdown_extensions-10.16-py3-none-any.whl", hash = "sha256:f5dd064a4db588cb2d95229fc4ee63a1b16cc8b4d0e6145c0899ed8723da1df2", size = 266143, upload-time = "2025-06-21T17:56:35.356Z" },
+]
+
+[[package]]
+name = "pymupdf"
+version = "1.25.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/47/b61c1c44b87cbdaeecdec3f43ce524ed6b3c72172bc6184eb82c94fbc43d/pymupdf-1.25.3.tar.gz", hash = "sha256:b640187c64c5ac5d97505a92e836da299da79c2f689f3f94a67a37a493492193", size = 67259841, upload-time = "2025-02-06T13:06:03.067Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/9b/98ef4b98309e9db3baa9fe572f0e61b6130bb9852d13189970f35b703499/pymupdf-1.25.3-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:96878e1b748f9c2011aecb2028c5f96b5a347a9a91169130ad0133053d97915e", size = 19343576, upload-time = "2025-02-06T13:03:51.663Z" },
+    { url = "https://files.pythonhosted.org/packages/14/62/4e12126db174c8cfbf692281cda971cc4046c5f5226032c2cfaa6f83e08d/pymupdf-1.25.3-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:6ef753005b72ebfd23470f72f7e30f61e21b0b5e748045ec5b8f89e6e3068d62", size = 18580114, upload-time = "2025-02-06T13:03:25.619Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/c5/cf7ecf005e4f8ba3664d6aaa0613adeba4c2ab524832c452c69857e7184f/pymupdf-1.25.3-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cbff443d899f37b17f1e67563cc03673d50b4bf33ccc237e73d34f18f3a07ccf", size = 19442580, upload-time = "2025-03-12T11:47:22.196Z" },
+    { url = "https://files.pythonhosted.org/packages/52/de/bd1418e31f73d37b8381cd5deacfd681e6be702b8890e123e83724569ee1/pymupdf-1.25.3-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:46d90c4f9e62d1856e8db4b9f04a202ff4a7f086a816af73abdc86adb7f5e25a", size = 19999825, upload-time = "2025-02-06T13:04:39.487Z" },
+    { url = "https://files.pythonhosted.org/packages/42/ee/3c449b0de061440ba1ac984aa845315e9e2dca0ff2003c5adfc6febff203/pymupdf-1.25.3-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:a5de51efdbe4d486b6c1111c84e8a231cbfb426f3d6ff31ab530ad70e6f39756", size = 21123157, upload-time = "2025-02-06T13:03:06.966Z" },
+    { url = "https://files.pythonhosted.org/packages/83/53/71faaaf91c56f2883b13f3dd849bf2697f012eb35eb7b952d62734cff41f/pymupdf-1.25.3-cp39-abi3-win32.whl", hash = "sha256:bca72e6089f985d800596e22973f79cc08af6cbff1d93e5bda9248326a03857c", size = 15094211, upload-time = "2025-02-06T13:04:52.08Z" },
+    { url = "https://files.pythonhosted.org/packages/09/e0/d72e88a1d5e23aa381fd463057dc3d0fb29090e1e7308a870c334716579c/pymupdf-1.25.3-cp39-abi3-win_amd64.whl", hash = "sha256:4fb357438c9129fbf939b5af85323434df64e36759c399c376b62ad6da95498c", size = 16542949, upload-time = "2025-02-06T13:04:22.444Z" },
 ]
 
 [[package]]
