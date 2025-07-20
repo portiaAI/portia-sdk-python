@@ -27,7 +27,7 @@ from portia.execution_agents.execution_utils import (
     get_arg_value_with_templating,
     process_output,
     template_in_required_inputs,
-    tool_call_or_end,
+    tool_call_or_summarise,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
@@ -783,7 +783,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         )
         graph.add_conditional_edges(
             AgentNode.TOOL_AGENT,
-            tool_call_or_end,
+            tool_call_or_summarise,
         )
         graph.add_edge(AgentNode.SUMMARIZER, END)
 

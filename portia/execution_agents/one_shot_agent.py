@@ -26,7 +26,7 @@ from portia.execution_agents.execution_utils import (
     AgentNode,
     process_output,
     template_in_required_inputs,
-    tool_call_or_end,
+    tool_call_or_summarise,
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
@@ -305,7 +305,7 @@ class OneShotAgent(BaseExecutionAgent):
         # Use execution manager for state transitions
         graph.add_conditional_edges(
             AgentNode.TOOL_AGENT,
-            tool_call_or_end,
+            tool_call_or_summarise,
         )
         graph.add_conditional_edges(
             AgentNode.TOOLS,
