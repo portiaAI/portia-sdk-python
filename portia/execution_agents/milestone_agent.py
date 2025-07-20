@@ -38,6 +38,20 @@ if TYPE_CHECKING:
     from portia.plan_run import PlanRun
 
 
+class ExitTool(Tool):
+    """Tool that exits the milestone agent."""
+
+    id: str = "exit"
+    name: str = "exit"
+    description: str = ("Use this tool to exit the milestone agent. This is useful "
+    "if you have completed the milestone, or if you have reached a dead end.")
+    output_schema: tuple[str, str] = ("None", "No output")
+
+    def run(self, ctx: ToolRunContext, **kwargs: Any) -> None:
+        """Exit the milestone agent."""
+        raise NotImplementedError("This tool is not implemented.")
+
+
 class MilestoneExecutionState(MessagesState):
     """State for the execution agent."""
 
@@ -456,7 +470,7 @@ if __name__ == "__main__":
         milestone=milestone,
         config=config,
         end_user=end_user,
-        tools=tool_registry.get_tools(),
+        tools=[tool_registry.get_tool("llm_tool"), ExitTool()],
         plan_run=plan_run,
         plan=plan,
         previous_milestone_outputs=previous_milestone_outputs,
