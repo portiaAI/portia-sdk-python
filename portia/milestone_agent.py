@@ -8,9 +8,11 @@ be more successful than the OneShotAgent.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
-from langchain_core.messages import AIMessage, BaseMessage
+import dotenv
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -19,12 +21,21 @@ from langchain_core.prompts import (
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
+from portia import logger
+from portia.clarification import ActionClarification
+from portia.config import Config
+from portia.end_user import EndUser
 from portia.errors import InvalidAgentError
 from portia.execution_agents.execution_utils import (
     AgentNode,
 )
 from portia.execution_agents.output import LocalDataValue
-from portia.tool import Tool, ToolRunContext
+from portia.milestone_plan import Milestone, MilestonePlan, MilestonePlanBuilder
+from portia.open_source_tools.browser_tool import BrowserTool
+from portia.plan import Plan, PlanBuilder
+from portia.plan_run import PlanRun
+from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
+from portia.tool_registry import DefaultToolRegistry, ToolRegistry
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -37,6 +48,8 @@ if TYPE_CHECKING:
     from portia.plan import Plan
     from portia.plan_run import PlanRun
 
+
+dotenv.load_dotenv()
 
 class ExitTool(Tool):
     """Tool that exits the milestone agent."""
@@ -54,72 +67,7 @@ class ExitTool(Tool):
 
 class MilestoneExecutionState(MessagesState):
     """State for the execution agent."""
-
-
-class SelectToolNode:
-    """Node for selecting a tool to call."""
-
-    select_tool_prompt = ChatPromptTemplate.from_messages(
-        [
-            # SYSTEM_PROMPT: generic guidance for a ReAct-style tool-selection loop
-            SystemMessagePromptTemplate.from_template(
-                (
-                    "You are an autonomous reasoning-and-acting (ReAct) agent operating inside "
-                    "a loop. In each turn your ONLY responsibility is to choose exactly one tool "
-                    "(and its arguments) from the list provided by the system that will best "
-                    "progress the user toward their goal. Think about what you already know and "
-                    "what information or action is required next. If the goal has already been "
-                    "met or no tool is helpful, call the special `exit` tool. "
-                    "Output ONLY a valid tool call in the format expected by the system—"
-                    "do not output any additional text or explanation."
-                ),
-                template_format="jinja2",
-            ),
-            # MAIN_PROMPT: milestone-specific context for tool selection
-            HumanMessagePromptTemplate.from_template(
-                (
-                    "Current milestone objective:\n"
-                    "{{ milestone_task }}\n\n"
-                    "Given the conversation so far, select the single best next tool to call "
-                    "(and its arguments) that will most effectively progress toward completing "
-                    "this milestone. Think step-by-step before deciding, but return ONLY the "
-                    "tool call as your response.\n"
-                    "Conversation so far (for context):\n<conversation>\n{{ conversation }}\n</conversation>\n\n"  # noqa: E501"
-                ),
-                template_format="jinja2",
-            ),
-        ],
-    )
-
-    def __init__(
-        self,
-        model: GenerativeModel,
-        tools: list[StructuredTool],
-        milestone: Milestone,
-    ) -> None:
-        """Initialize the SelectToolNode."""
-        self.model = model
-        self.tools = tools
-        self.milestone = milestone
-
-    def invoke(self, state: MilestoneExecutionState) -> dict[str, Any]:
-        """Invoke the model with the given message state."""
-        model = self.model.to_langchain().bind_tools(self.tools)
-        prior_messages: list[BaseMessage] = list(state.get("messages", []))  # type: ignore[arg-type]
-        conversation_snippets: list[str] = []
-        for msg in prior_messages[-10:]:  # limit context to last 10 messages for brevity
-            role = "assistant" if isinstance(msg, AIMessage) else "user"
-            conversation_snippets.append(f"[{role}] {msg.content}")
-        conversation_text = (
-            "\n".join(conversation_snippets) if conversation_snippets else "(no prior conversation)"
-        )
-        # past_errors = [str(msg) for msg in messages if "Error: ToolSoftError" in msg.content]
-        formatted_messages = self.select_tool_prompt.format_messages(
-            milestone_task=self.milestone.task,
-            conversation=conversation_text,
-        )
-        response = model.invoke(formatted_messages)
-        return {"messages": [response]}
+    plan: str
 
 
 class PlanNode:
@@ -131,9 +79,9 @@ class PlanNode:
             SystemMessagePromptTemplate.from_template(
                 (
                     "You are a professional task planner. Your task is to break the given "
-                    "milestone objective into a concise, high-level plan. The plan MUST be a "
-                    "series of short bullet points (each bullet on a new line starting with '-'). "
-                    "Do not include any additional commentary - only the bullet list."
+                    "milestone objective into a concise, high-level plan. The plan consist of "
+                    "a high level summary presented in clear, concise language, followed by a "
+                    "series of bullet points for the likely steps needed (each bullet on a new line starting with '-'). "  # noqa: E501
                 ),
                 template_format="jinja2",
             ),
@@ -160,6 +108,7 @@ class PlanNode:
                     "</tool>\n"
                     "{% endfor %}\n"
                     "</tools>\n\n"
+                    "As context, the current UTC date is {{ current_date }}. The current UTC time is {{ current_time }}."  # noqa: E501
                     "Create the high-level plan now."
                 ),
                 template_format="jinja2",
@@ -187,8 +136,81 @@ class PlanNode:
             milestone_task=self.milestone.task,
             tools=self.tools,
             previous_milestone_outputs=self.previous_milestone_outputs,
+            current_date=datetime.now(tz=UTC).strftime("%Y-%m-%d"),
+            current_time=datetime.now(tz=UTC).strftime("%H:%M:%S"),
         )
         response = model.invoke(formatted_messages)
+        logger().info(f"📋 Plan: {response.text()}")
+        return {"messages": [response], "plan": response.text()}
+
+
+class SelectToolNode:
+    """Node for selecting a tool to call."""
+
+    select_tool_prompt = ChatPromptTemplate.from_messages(
+        [
+            # SYSTEM_PROMPT: generic guidance for a ReAct-style tool-selection loop
+            SystemMessagePromptTemplate.from_template(
+                (
+                    "You are an autonomous reasoning-and-acting (ReAct) agent operating inside "
+                    "a loop. In each turn your ONLY responsibility is to choose exactly one tool "
+                    "(and its arguments) from the list provided by the system that will best "
+                    "progress the user toward their goal. Think about what you already know and "
+                    "what information or action is required next. If the goal has already been "
+                    "met or no tool is helpful, call the special `exit` tool. "
+                    "Output ONLY a valid tool call in the format expected by the system—"
+                    "do not output any additional text or explanation."
+                ),
+                template_format="jinja2",
+            ),
+            # MAIN_PROMPT: milestone-specific context for tool selection
+            HumanMessagePromptTemplate.from_template(
+                (
+                    "Current milestone objective:\n"
+                    "{{ milestone_task }}\n\n"
+                    "The high level plan for the milestone is:\n"
+                    "<plan>\n{{ initial_plan }}\n</plan>\n\n"
+                    "The conversation so far is:\n"
+                    "<conversation>\n{{ conversation }}\n</conversation>\n\n"
+                    "Given the conversation so far, select the single best next tool to call "
+                    "(and its arguments) that will most effectively progress toward completing "
+                    "this milestone. Think step-by-step before deciding, but return ONLY the "
+                    "tool call as your response."
+                ),
+                template_format="jinja2",
+            ),
+        ],
+    )
+
+    def __init__(
+        self,
+        model: GenerativeModel,
+        tools: list[StructuredTool],
+        milestone: Milestone,
+    ) -> None:
+        """Initialize the SelectToolNode."""
+        self.model = model
+        self.tools = tools
+        self.milestone = milestone
+
+    def invoke(self, state: MilestoneExecutionState) -> dict[str, Any]:
+        """Invoke the model with the given message state."""
+        model = self.model.to_langchain().bind_tools(self.tools)
+        prior_messages: list[BaseMessage] = list(state.get("messages", []))  # type: ignore[arg-type]
+        conversation_text = get_conversation_text(prior_messages, include_last_message=True)
+        # past_errors = [str(msg) for msg in messages if "Error: ToolSoftError" in msg.content]
+        formatted_messages = self.select_tool_prompt.format_messages(
+            initial_plan=state.get("plan", ""),
+            milestone_task=self.milestone.task,
+            conversation=conversation_text,
+        )
+        response = model.invoke(formatted_messages)
+        if isinstance(response, AIMessage) and response.tool_calls:
+            logger().info(f"🛠️ Calling tool: {response.tool_calls[0]['name']}")
+        elif isinstance(response, AIMessage) and not response.tool_calls:
+            logger().info("👋 No tool calls, exiting")
+        else:
+            logger().info(f"❌ Unexpected response: {response}")
         return {"messages": [response]}
 
 
@@ -201,8 +223,10 @@ class ReasonNode:
             SystemMessagePromptTemplate.from_template(
                 (
                     "You are an autonomous agent working towards a milestone. Your role is to "
-                    "think step-by-step about the current progress, what is still missing, and "
-                    "possible next actions. Output your chain-of-thought reasoning in plain text. "
+                    "think step-by-step about the current progress towards the milestone, what "
+                    "is still missing, and what actions can be taken to get closer to the milestone. "
+                    "If you think the goal has been achieved, explain why. "
+                    "Output your chain-of-thought reasoning in plain text. Be clear and concise. "
                     "Do NOT select a tool here - just reason about options."
                 ),
                 template_format="jinja2",
@@ -210,8 +234,10 @@ class ReasonNode:
             HumanMessagePromptTemplate.from_template(
                 (
                     "Milestone objective:\n"
-                    "{{ milestone_task }}\n\n"
-                    "Conversation so far (for context):\n<conversation>\n{{ conversation }}\n</conversation>\n\n"  # noqa: E501
+                    "{{ milestone_task }}\n"
+                    "The high level plan for the milestone is:\n"
+                    "<plan>\n{{ initial_plan }}\n</plan>\n\n"
+                    "Summary of the conversation so far (for context):\n<conversation>\n{{ conversation }}\n</conversation>\n\n"  # noqa: E501
                     "Available tools for the next step to select from:\n"
                     "{% for tool in tools %}"
                     "<tool>\n"
@@ -242,21 +268,17 @@ class ReasonNode:
         """Return a chain-of-thought AI message based on current state messages."""
         # Combine previous messages into a short textual summary for context.
         prior_messages: list[BaseMessage] = list(state.get("messages", []))  # type: ignore[arg-type]
-        conversation_snippets: list[str] = []
-        for msg in prior_messages[-10:]:  # limit context to last 10 messages for brevity
-            role = "assistant" if isinstance(msg, AIMessage) else "user"
-            conversation_snippets.append(f"[{role}] {msg.content}")
-        conversation_text = (
-            "\n".join(conversation_snippets) if conversation_snippets else "(no prior conversation)"
-        )
+        conversation_text = get_conversation_text(prior_messages)
 
         model = self.model.to_langchain()
         formatted_messages = self.reason_prompt.format_messages(
+            initial_plan=state.get("plan", ""),
             milestone_task=self.milestone.task,
             conversation=conversation_text,
             tools=self.tools,
         )
         response = model.invoke(formatted_messages)
+        logger().info(f"💭 Reasoning: {response.text()}")
         return {"messages": [response]}
 
 
@@ -280,6 +302,7 @@ class SummarizerNode:
                 (
                     "The milestone objective was:\n"
                     "{{ milestone_task }}\n\n"
+                    "The initial to achieve the milestone was:\n<plan>\n{{ initial_plan }}\n</plan>\n\n"  # noqa: E501
                     "The conversation so far was:\n<conversation>\n{{ conversation }}\n</conversation>\n\n"  # noqa: E501
                     "Write the summary now."
                 ),
@@ -301,21 +324,39 @@ class SummarizerNode:
         """Generate a concise summary message based on the accumulated conversation."""
         # Prepare conversation context
         prior_messages: list[BaseMessage] = list(state.get("messages", []))  # type: ignore[arg-type]
-        conversation_snippets: list[str] = []
-        for msg in prior_messages[-15:]:
-            role = "assistant" if isinstance(msg, AIMessage) else "user"
-            conversation_snippets.append(f"[{role}] {msg.content}")
-        conversation_text = (
-            "\n".join(conversation_snippets) if conversation_snippets else "(no prior conversation)"
-        )
+        conversation_text = get_conversation_text(prior_messages)
 
         lang_model = self.model.to_langchain()
         formatted_messages = self.summarizer_prompt.format_messages(
+            initial_plan=state.get("plan", ""),
             milestone_task=self.milestone.task,
             conversation=conversation_text,
         )
         response = lang_model.invoke(formatted_messages)
+        logger().info(f"📝 Summarizer: {response.text()}")
         return {"messages": [response]}
+
+
+def get_conversation_text(messages: list[BaseMessage], include_last_message: bool = False) -> str:
+    """Get the conversation text from the messages."""
+    conversation_snippets: list[str] = []
+    for i, msg in enumerate(messages):
+        should_include = (
+            (isinstance(msg, AIMessage) and msg.tool_calls)
+            or isinstance(msg, ToolMessage)
+            or (include_last_message and i == len(messages) - 1)
+        )
+        if not should_include:
+            continue
+        tag = (
+            "ToolCall"
+            if isinstance(msg, AIMessage) and msg.tool_calls
+            else "ToolOutput"
+            if isinstance(msg, ToolMessage)
+            else "Message"
+        )
+        conversation_snippets.append(f"<{tag}>{msg.content}</{tag}>")
+    return "\n".join(conversation_snippets) if conversation_snippets else "(no prior conversation)"
 
 
 class MilestoneAgent:
@@ -345,7 +386,7 @@ class MilestoneAgent:
         self.milestone = milestone
         self.config = config
         self.end_user = end_user
-        self.tools = tools
+        self.tools = [*tools, ExitTool()]
         self.plan_run = plan_run
         self.plan = plan
         self.previous_milestone_outputs = previous_milestone_outputs
@@ -406,6 +447,10 @@ class MilestoneAgent:
                 milestone=self.milestone,
             ).invoke,
         )
+        graph.add_node(
+            "log_tool_response",
+            log_tool_response,
+        )
 
         graph.add_edge(START, AgentNode.PLAN_AGENT)
         graph.add_edge(AgentNode.PLAN_AGENT, AgentNode.REASON)
@@ -416,12 +461,13 @@ class MilestoneAgent:
         )
         graph.add_edge(
             AgentNode.TOOL_CALL,
-            AgentNode.REASON,
+            "log_tool_response",
         )
+        graph.add_edge("log_tool_response", AgentNode.REASON)
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
         app = graph.compile()
-        invocation_result = app.invoke({"messages": []})
+        invocation_result = app.invoke({"messages": []}, config={"recursion_limit": 50})
 
         return process_output(invocation_result["messages"])
 
@@ -432,6 +478,13 @@ def process_output(messages: list[BaseMessage]) -> Output:
         summary=str(messages[-1].content) if messages[-1].content else "",
         value=messages[-1].content,
     )
+
+
+def log_tool_response(state: MessagesState) -> dict[str, Any]:
+    """Log the tool response."""
+    if isinstance(state["messages"][-1], ToolMessage):
+        logger().info(f"🛠️ Tool response: {state['messages'][-1].text()}")
+    return {}
 
 
 def tool_call_or_summarise(
@@ -447,33 +500,78 @@ def tool_call_or_summarise(
     return AgentNode.TOOL_CALL
 
 
+class Runner:
+    """Runner for the milestone agent."""
+
+    def __init__(self, config: Config, end_user: EndUser, tools: list[Tool]) -> None:
+        """Initialize the Runner."""
+        self.config = config
+        self.end_user = end_user
+        self.tools = tools
+
+    def run(self, milestone_plan: MilestonePlan) -> Any:
+        """Run the milestone agent."""
+        plan = PlanBuilder().build()
+        plan_run = PlanRun(plan_id=plan.id, end_user_id=self.end_user.external_id)
+
+        ready_response = PortiaRemoteTool.batch_ready_check(
+            self.config,
+            {tool_id for tool_id in milestone_plan.all_tool_ids if tool_id.startswith("portia:")},
+            ToolRunContext(
+                end_user=self.end_user,
+                plan_run=plan_run,
+                plan=plan,
+                config=self.config,
+                clarifications=[],
+            ),
+        )
+        if not ready_response.ready:
+            logger().info("Tools need authorisation:")
+            for clarification in ready_response.clarifications:
+                logger().info(f"  {clarification.user_guidance}: {clarification.action_url if isinstance(clarification, ActionClarification) else ''}")  # noqa: E501
+            input("Press Enter to continue...")
+
+        prev_milestone_outputs = {}
+        for milestone in milestone_plan.milestones:
+            logger().info(f"🎯 Running milestone: {milestone.name}")
+            agent = MilestoneAgent(
+                milestone=milestone,
+                config=self.config,
+                end_user=self.end_user,
+                tools=[tool for tool in self.tools if tool.id in milestone.allowed_tool_ids],
+                plan_run=plan_run,
+                plan=plan,
+                previous_milestone_outputs=prev_milestone_outputs,
+            )
+            result = agent.execute_sync()
+            prev_milestone_outputs[milestone.name] = (milestone.task, result.get_value())
+        return result.get_value()
+
+
+
 if __name__ == "__main__":
-    from portia.config import Config
-    from portia.end_user import EndUser
-    from portia.milestone_plan import Milestone
-    from portia.plan import Plan, PlanBuilder
-    from portia.plan_run import PlanRun
-    from portia.tool import Tool
-    from portia.tool_registry import DefaultToolRegistry
-    import dotenv
-    dotenv.load_dotenv()
-
-    config = Config.from_default()
-    tool_registry = DefaultToolRegistry(config=config)
-    end_user = EndUser(external_id="test")
-    plan = PlanBuilder().build()
-    plan_run = PlanRun(plan_id=plan.id, end_user_id=end_user.external_id)
-    milestone = Milestone(name="test", task="Write a chapter of a book about a magic frog, then summarise the chapter")
-    previous_milestone_outputs = {}
-
-    agent = MilestoneAgent(
-        milestone=milestone,
-        config=config,
-        end_user=end_user,
-        tools=[tool_registry.get_tool("llm_tool"), ExitTool()],
-        plan_run=plan_run,
-        plan=plan,
-        previous_milestone_outputs=previous_milestone_outputs,
+    milestone_plan = (
+        MilestonePlanBuilder()
+        .milestone(
+            name="find_restaurant",
+            task="Find me a restaurant in London that serves vegan Italian food",
+            allowed_tool_ids=["search_tool"],
+        )
+        .milestone(
+            name="get_availability",
+            task="Get my availability in August",
+            allowed_tool_ids=["portia:google:gcalendar:check_availability"],
+        )
+        .milestone(
+            name="search_for_availability",
+            task="Search the restaurant's website for availability",
+            allowed_tool_ids=["browser_tool"],
+        )
+        .starting_milestone("find_restaurant")
+        .build()
     )
-    result = agent.execute_sync()
-    print(result)
+    config = Config.from_default(default_model="anthropic/claude-sonnet-4-20250514")
+    tool_registry = DefaultToolRegistry(config=config) + ToolRegistry(tools=[BrowserTool()])
+    end_user = EndUser(external_id="test")
+    runner = Runner(config=config, end_user=end_user, tools=tool_registry.get_tools())
+    print(runner.run(milestone_plan))

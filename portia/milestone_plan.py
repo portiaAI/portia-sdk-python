@@ -183,20 +183,12 @@ class MilestonePlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the milestone plan.")
-    plan_context: MilestonePlanContext = Field(
-        description="The context for when the plan was created."
-    )
     milestones: list[Milestone] = Field(description="The set of milestones that make up the plan.")
     plan_inputs: list[MilestonePlanInput] = Field(
         default=[], description="The inputs required by the plan."
     )
     starting_milestone: str = Field(
         description="The name of the milestone to start execution with."
-    )
-    structured_output_schema: type[BaseModel] | None = Field(
-        default=None,
-        exclude=True,
-        description="The optional structured output schema for the query.",
     )
 
     def __str__(self) -> str:
@@ -208,7 +200,6 @@ class MilestonePlan(BaseModel):
         """
         return (
             f"MilestonePlan(id={self.id!r}, "
-            f"plan_context={self.plan_context!r}, "
             f"milestones={self.milestones!r}, "
             f"inputs={self.plan_inputs!r}, "
             f"starting_milestone={self.starting_milestone!r})"
@@ -221,34 +212,9 @@ class MilestonePlan(BaseModel):
             str: A pretty print representation of the plan's details.
 
         """
-        portia_tools = [
-            tool for tool in self.plan_context.all_tool_ids if tool.startswith("portia:")
-        ]
-        other_tools = [
-            tool for tool in self.plan_context.all_tool_ids if not tool.startswith("portia:")
-        ]
-        tools_summary = f"{len(portia_tools)} portia tools, {len(other_tools)} other tools"
-
-        inputs_section = ""
-        if self.plan_inputs:
-            inputs_section = (
-                "Inputs:\n    "
-                + "\n    ".join([input_.pretty_print() for input_ in self.plan_inputs])
-                + "\n"
-            )
-
         return (
-            f"Task: {self.plan_context.query}\n"
-            f"Tools Available Summary: {tools_summary}\n"
-            f"Starting Milestone: {self.starting_milestone}\n"
-            f"{inputs_section}"
             f"Milestones:\n"
             + "\n".join([milestone.pretty_print() for milestone in self.milestones])
-            + (
-                f"\nStructured Output Schema: {self.structured_output_schema.__name__}"
-                if self.structured_output_schema
-                else ""
-            )
         )
 
     @model_validator(mode="after")
@@ -306,6 +272,19 @@ class MilestonePlan(BaseModel):
                 return milestone
         return None
 
+    @property
+    def all_tool_ids(self) -> list[str]:
+        """Get all tool IDs across all milestones.
+
+        Returns:
+            list[str]: All tool IDs across all milestones.
+        """
+        return list({
+            tool_id
+            for milestone in self.milestones
+            for tool_id in milestone.allowed_tool_ids
+        })
+
 
 class MilestonePlanBuilder:
     """A builder for creating milestone plans.
@@ -323,7 +302,7 @@ class MilestonePlanBuilder:
 
     """
 
-    def __init__(self, query: str, structured_output_schema: type[BaseModel] | None = None) -> None:
+    def __init__(self) -> None:
         """Initialize the builder with the plan query.
 
         Args:
@@ -332,11 +311,9 @@ class MilestonePlanBuilder:
                 schema.
 
         """
-        self.query = query
         self.milestones: list[Milestone] = []
         self.plan_inputs: list[MilestonePlanInput] = []
         self.starting_milestone_name: str | None = None
-        self.structured_output_schema = structured_output_schema
 
     def milestone(
         self, name: str, task: str, allowed_tool_ids: list[str] | None = None
@@ -354,6 +331,7 @@ class MilestonePlanBuilder:
         """
         if allowed_tool_ids is None:
             allowed_tool_ids = []
+        allowed_tool_ids.append("llm_tool")
 
         self.milestones.append(Milestone(name=name, task=task, allowed_tool_ids=allowed_tool_ids))
         return self
@@ -401,15 +379,8 @@ class MilestonePlanBuilder:
         if self.starting_milestone_name is None:
             raise ValueError("Starting milestone must be set")
 
-        # Collect all unique tool IDs across all milestones
-        all_tool_ids = list(
-            {tool_id for milestone in self.milestones for tool_id in milestone.allowed_tool_ids}
-        )
-
         return MilestonePlan(
-            plan_context=MilestonePlanContext(query=self.query, all_tool_ids=all_tool_ids),
             milestones=self.milestones,
             plan_inputs=self.plan_inputs,
             starting_milestone=self.starting_milestone_name,
-            structured_output_schema=self.structured_output_schema,
         )
