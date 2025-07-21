@@ -169,8 +169,8 @@ def test_get_arg_value_with_templating_no_templating() -> None:
 def test_get_arg_value_with_templating_string_with_templating() -> None:
     """Test get_arg_value_with_templating with a string arg that needs 2 values templated in."""
     step_inputs = [
-        StepInput(name="$name", value="John", description="User's name"),
-        StepInput(name="$age", value="30", description="User's age"),
+        StepInput(name="$name", value="John", full_value="John", description="User's name"),
+        StepInput(name="$age", value="30", full_value="30", description="User's age"),
     ]
     arg = "Hello {{$name}}, you are {{$age}} years old"
 
@@ -181,7 +181,7 @@ def test_get_arg_value_with_templating_string_with_templating() -> None:
 def test_get_arg_value_with_templating_list_with_templating() -> None:
     """Test get_arg_value_with_templating with a list of strings that needs a value templated in."""
     step_inputs = [
-        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$name", value="John", full_value="John", description="User's name"),
     ]
     arg = ["Hello {{$name}}", "Goodbye {{$name}}"]
 
@@ -192,7 +192,7 @@ def test_get_arg_value_with_templating_list_with_templating() -> None:
 def test_get_arg_value_with_templating_dict_with_templating() -> None:
     """Test get_arg_value_with_templating with a dict of strings that needs a value templated in."""
     step_inputs = [
-        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$name", value="John", full_value="John", description="User's name"),
     ]
     arg = {"greeting": "Hello {{$name}}", "farewell": "Goodbye {{$name}}"}
 
@@ -203,8 +203,8 @@ def test_get_arg_value_with_templating_dict_with_templating() -> None:
 def test_template_in_required_inputs_multiple_args() -> None:
     """Test template_in_required_inputs with two different args that need templating."""
     step_inputs = [
-        StepInput(name="$name", value="John", description="User's name"),
-        StepInput(name="$age", value="30", description="User's age"),
+        StepInput(name="$name", value="John", full_value="John", description="User's name"),
+        StepInput(name="$age", value="30", full_value="30", description="User's age"),
     ]
     message = AIMessage(content="")
     message.tool_calls = [
@@ -225,7 +225,7 @@ def test_template_in_required_inputs_multiple_args() -> None:
 def test_template_in_required_inputs_missing_args() -> None:
     """Test template_in_required_inputs with error case of a tool_call with no args field."""
     step_inputs = [
-        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$name", value="John", full_value="John", description="User's name"),
     ]
     message = AIMessage(content="")
     message.tool_calls = [{"name": "test_tool", "type": "tool_call", "id": "call_123"}]  # pyright: ignore[reportAttributeAccessIssue]
