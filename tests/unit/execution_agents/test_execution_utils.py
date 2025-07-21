@@ -237,7 +237,7 @@ def test_template_in_required_inputs_missing_args() -> None:
 def test_template_in_required_inputs_extra_var_raises_error() -> None:
     """Test template_in_required_inputs with an extra variable in the template."""
     step_inputs = [
-        StepInput(name="$name", value="John", description="User's name"),
+        StepInput(name="$name", value="John", full_value="John", description="User's name"),
     ]
     message = AIMessage(content="")
     message.tool_calls = [
