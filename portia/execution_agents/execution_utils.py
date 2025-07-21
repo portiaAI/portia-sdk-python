@@ -121,7 +121,7 @@ def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]
         # which does happen (e.g. it uses {{input_name}} instead of {{$input_name}}
         input_name = input_name.lstrip("$")
         arg_value = arg_value.replace(step_input.name, input_name)
-        template_args[input_name] = step_input.value
+        template_args[input_name] = step_input.full_value
 
     untemplated_var_matches = re.findall(r"\{\{(\$[^\}]*)\}\}", arg_value)
     if len(untemplated_var_matches) > 0:

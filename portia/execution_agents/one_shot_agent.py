@@ -207,6 +207,8 @@ class OneShotToolCallingModel:
                     self.agent.new_clarifications.append(clarification)
             if self.agent.new_clarifications:
                 return {"messages": []}
+
+        print(result)
         return {"messages": [result]}
 
 
