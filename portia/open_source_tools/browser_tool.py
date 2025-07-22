@@ -545,16 +545,6 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         """Called after the agent has been setup."""  # noqa: D401
         if browser.browser_pid:
             ctx.end_user.set_additional_data("browser_pid", str(browser.browser_pid))
-        if browser.playwright:
-            # We use the browseruse keep_alive=True option within a step so that we
-            # leave the browser open for user authentication. This option means the browser
-            # AND the playwright process are both left running. When we resume the step,
-            # we create a new BrowserSession object and pass the browser_pid, which reconnects
-            # us to the same browser process, but NOT the same playwright instance - a new
-            # instance is created.
-            # To avoid creating many playwright instances, we stop the playwright process
-            # NB this does not kill the browser process.
-            await browser.playwright.stop()
 
     async def construct_auth_clarification_url(
         self,

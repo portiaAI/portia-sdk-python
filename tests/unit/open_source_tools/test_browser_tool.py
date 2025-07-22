@@ -885,14 +885,12 @@ async def test_browser_infra_local_post_agent_run(
 
     # Create mock browser with specified browser_pid
     mock_browser = MagicMock()
-    mock_browser.playwright = AsyncMock()
     mock_browser.browser_pid = browser_pid
 
     await local_browser_provider.post_agent_run(context, mock_browser)
 
     # Verify that browser_pid was set (or not set) as expected in additional_data
     assert context.end_user.get_additional_data("browser_pid") == expected_additional_data
-    assert mock_browser.playwright.stop.call_count == 1
 
 
 async def test_browser_infra_local_step_complete(
