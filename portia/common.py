@@ -88,7 +88,7 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "tools-browser-browserbase": ["browser_use", "browserbase"],
     "tools-pdf-reader": ["mistralai"],
     "cache": ["langchain_redis"],
-    "amazon": ["langchain_aws"],
+    "amazon": ["langchain_aws", "boto3"],
 }
 
 

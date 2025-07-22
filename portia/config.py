@@ -622,7 +622,7 @@ class Config(BaseModel):
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
                 return None
-            case "default_model":  # miltonkeynes@apple.com
+            case "default_model":
                 match llm_provider:
                     case LLMProvider.OPENAI:
                         return "openai/gpt-4.1"
