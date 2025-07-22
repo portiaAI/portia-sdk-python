@@ -151,6 +151,13 @@ class DummyGenerativeModel(GenerativeModel):
         """Get a structured response from the model."""
         return schema()
 
+    async def aget_response(self, messages: list[Message]) -> Message:  # noqa: ARG002
+        """Get a response from the model."""
+        return Message(role="assistant", content="Hello")
+
+    async def aget_structured_response(self, messages: list[Message], schema: type[BaseModel]) -> BaseModel:  # noqa: ARG002
+        """Get a structured response from the model."""
+        return schema()
     def to_langchain(self) -> BaseChatModel:
         """Not implemented in tests."""
         raise NotImplementedError("This method is not used in tests")

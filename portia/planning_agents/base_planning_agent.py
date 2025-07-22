@@ -73,6 +73,32 @@ class BasePlanningAgent(ABC):
         """
         raise NotImplementedError("generate_steps_or_error is not implemented")
 
+    async def agenerate_steps_or_error(
+        self,
+        query: str,
+        tool_list: list[Tool],
+        end_user: EndUser,
+        examples: list[Plan] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
+    ) -> StepsOrError:
+        """Generate a list of steps for the given query asynchronously.
+
+        This method should be implemented to generate a list of steps to accomplish the query based
+        on the provided query and tools.
+
+        Args:
+            query (str): The user query to generate a list of steps for.
+            tool_list (list[Tool]): A list of tools available for the plan.
+            end_user (EndUser): The end user for this plan
+            examples (list[Plan] | None): Optional list of example plans to guide the PlanningAgent.
+            plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
+                the inputs required for the plan.
+
+        Returns:
+            StepsOrError: A StepsOrError instance containing either the generated steps or an error.
+
+        """
+        raise NotImplementedError("async generate_steps_or_error is not implemented")
 
 class StepsOrError(BaseModel):
     """A list of steps or an error.

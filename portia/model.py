@@ -10,14 +10,14 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import instructor
-from anthropic import Anthropic
+from anthropic import Anthropic, AsyncAnthropic
 from langchain.globals import set_llm_cache
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import Generation
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
-from openai import AzureOpenAI, OpenAI
+from openai import AzureOpenAI, OpenAI, AsyncOpenAI, AsyncAzureOpenAI
 from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
@@ -148,6 +148,29 @@ class GenerativeModel(ABC):
 
         """
 
+    @abstractmethod
+    async def aget_response(self, messages: list[Message]) -> Message:
+        """Given a list of messages, call the model and return its response as a new message asynchronously.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+        """
+        raise NotImplementedError("async get_response is not implemented")
+
+    @abstractmethod
+    async def aget_structured_response(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+    ) -> BaseModelT:
+        """Get a structured response from the model, given a Pydantic model asynchronously.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+            schema (type[BaseModelT]): The Pydantic model to use for the response.
+        """
+        raise NotImplementedError("async get_structured_response is not implemented")
+
     def __str__(self) -> str:
         """Get the string representation of the model."""
         return f"{self.provider.value}/{self.model_name}"
@@ -215,6 +238,37 @@ class LangChainGenerativeModel(GenerativeModel):
             return response
         return schema.model_validate(response)
 
+
+    async def aget_response(self, messages: list[Message]) -> Message:
+        """Get response using LangChain model asynchronously.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+        """
+        langchain_messages = [msg.to_langchain() for msg in messages]
+        response = await self._client.ainvoke(langchain_messages)
+        return Message.from_langchain(response)
+
+    async def aget_structured_response(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+        **kwargs: Any,
+    ) -> BaseModelT:
+        """Get structured response using LangChain model asynchronously.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+            schema (type[BaseModelT]): The Pydantic model to use for the response.
+            **kwargs: Additional keyword arguments to pass to the with_structured_output method.
+        """
+        langchain_messages = [msg.to_langchain() for msg in messages]
+        structured_client = self._client.with_structured_output(schema, **kwargs)
+        response = await structured_client.ainvoke(langchain_messages)
+        if isinstance(response, schema):
+            return response
+        return schema.model_validate(response)
+
     def _cached_instructor_call(
         self,
         client: instructor.Instructor,
@@ -254,6 +308,47 @@ class LangChainGenerativeModel(GenerativeModel):
             response_model=schema, messages=messages, **kwargs
         )
         cache.update(prompt, llm_string, [Generation(text=response.model_dump_json())])
+        return response
+
+    async def _acached_instructor_call(
+        self,
+        client: instructor.AsyncInstructor,
+        messages: list[ChatCompletionMessageParam],
+        schema: type[BaseModelT],
+        provider: str,
+        model: str | None = None,
+        **kwargs: Any,
+    ) -> BaseModelT:
+        """Call an instructor client with caching enabled if it is set up asynchronously."""
+        if model is not None:
+            kwargs["model"] = model
+
+        cache = _llm_cache.get()
+        if cache is None:
+            return await client.chat.completions.create(
+                response_model=schema, messages=messages, **kwargs
+            )
+
+        cache_data = {
+            "schema": schema.model_json_schema(),
+            **kwargs,
+        }
+        data_hash = hashlib.md5(  # nosec B324  # noqa: S324
+            json.dumps(cache_data, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        llm_string = f"{provider}:{model}:{data_hash}"
+        prompt = json.dumps(messages)
+        try:
+            cached = await cache.alookup(prompt, llm_string)
+            if cached and len(cached) > 0:
+                return schema.model_validate_json(cached[0].text) # pyright: ignore[reportArgumentType]
+        except (ValidationError, RedisError, AttributeError):
+            # On validation errors, re-fetch and update the entry in the cache
+            pass
+        response = await client.chat.completions.create(
+            response_model=schema, messages=messages, **kwargs
+        )
+        await cache.aupdate(prompt, llm_string, [Generation(text=response.model_dump_json())])
         return response
 
     @classmethod
@@ -314,6 +409,10 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             client=wrappers.wrap_openai(OpenAI(api_key=api_key.get_secret_value())),
             mode=instructor.Mode.JSON,
         )
+        self._instructor_client_async = instructor.from_openai(
+            client=wrappers.wrap_openai(AsyncOpenAI(api_key=api_key.get_secret_value())),
+            mode=instructor.Mode.JSON,
+        )
         self._seed = seed
 
     def get_structured_response(
@@ -352,6 +451,50 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
+            messages=instructor_messages,
+            schema=schema,
+            model=self.model_name,
+            provider=self.provider.value,
+            seed=self._seed,
+            **self._model_kwargs,
+        )
+
+    async def aget_structured_response(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+        **kwargs: Any,
+    ) -> BaseModelT:
+        """Call the model in structured output mode targeting the given Pydantic model.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+            schema (type[BaseModelT]): The Pydantic model to use for the response.
+            **kwargs: Additional keyword arguments to pass to the model.
+
+        Returns:
+            BaseModelT: The structured response from the model.
+
+        """
+        if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
+            return await self.aget_structured_response_instructor(messages, schema)
+
+        return await super().aget_structured_response(
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
+        )
+
+    async def aget_structured_response_instructor(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+    ) -> BaseModelT:
+        """Get structured response using instructor asynchronously."""
+        instructor_messages = [map_message_to_instructor(msg) for msg in messages]
+        return await self._acached_instructor_call(
+            client=self._instructor_client_async,
             messages=instructor_messages,
             schema=schema,
             model=self.model_name,
