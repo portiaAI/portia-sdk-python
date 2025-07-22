@@ -212,7 +212,7 @@ def _clarify_on_tool_call_hook(
         previous_clarification.category == ClarificationCategory.USER_VERIFICATION
         and previous_clarification.response is False
     ):
-        raise ToolHardError("User rejected tool call to {tool.name} with args {args}")
+        raise ToolHardError(f"User rejected tool call to {tool.name} with args {args}")
 
     return None
 
