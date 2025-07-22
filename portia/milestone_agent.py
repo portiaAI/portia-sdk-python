@@ -40,24 +40,24 @@ from portia.tool_registry import DefaultToolRegistry, ToolRegistry
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
 
-    from portia.config import Config
-    from portia.end_user import EndUser
     from portia.execution_agents.output import Output
     from portia.milestone_plan import Milestone
     from portia.model import GenerativeModel
     from portia.plan import Plan
-    from portia.plan_run import PlanRun
 
 
 dotenv.load_dotenv()
+
 
 class ExitTool(Tool):
     """Tool that exits the milestone agent."""
 
     id: str = "exit"
     name: str = "exit"
-    description: str = ("Use this tool to exit the milestone agent. This is useful "
-    "if you have completed the milestone, or if you have reached a dead end.")
+    description: str = (
+        "Use this tool to exit the milestone agent. This is useful "
+        "if you have completed the milestone, or if you have reached a dead end."
+    )
     output_schema: tuple[str, str] = ("None", "No output")
 
     def run(self, ctx: ToolRunContext, **kwargs: Any) -> None:
@@ -65,8 +65,23 @@ class ExitTool(Tool):
         raise NotImplementedError("This tool is not implemented.")
 
 
+class PreviousMilestoneOutputTool(Tool):
+    """Tool that returns the output of a previous milestone."""
+
+    id: str
+    name: str
+    description: str
+    output_schema: tuple[str, str] = ("None", "The output of the milestone")
+    content: str
+
+    def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+        """Return the output of the previous milestone."""
+        return self.content
+
+
 class MilestoneExecutionState(MessagesState):
     """State for the execution agent."""
+
     plan: str
 
 
@@ -289,12 +304,10 @@ class SummarizerNode:
         [
             SystemMessagePromptTemplate.from_template(
                 (
-                    "You are a summarizer agent. Your job is to write a concise summary of the "
-                    "work completed towards the milestone. The summary should comprehensively cover "
-                    "relevant details for the execution of future miletones that depend on the output "
-                    "of this milestone. The length of the summary will depend on the complexity "
-                    "of the milestone and the tools used. The summary should be at most a "
-                    "couple of sentences and suitable for presenting to an end-user."
+                    "You are a presentation agent. Your job is to read the outputs of the various "
+                    "tools that have been called to achieve the current milestone and write up the "
+                    "final output in a way that can be used in the downstream milestones. Your final "  # noqa: E501
+                    "output should be a comprehensive write-up that satisfies the milestone objective."  # noqa: E501
                 ),
                 template_format="jinja2",
             ),
@@ -302,9 +315,9 @@ class SummarizerNode:
                 (
                     "The milestone objective was:\n"
                     "{{ milestone_task }}\n\n"
-                    "The initial to achieve the milestone was:\n<plan>\n{{ initial_plan }}\n</plan>\n\n"  # noqa: E501
-                    "The conversation so far was:\n<conversation>\n{{ conversation }}\n</conversation>\n\n"  # noqa: E501
-                    "Write the summary now."
+                    "The initial plan to achieve the milestone was:\n<plan>\n{{ initial_plan }}\n</plan>\n\n"  # noqa: E501
+                    "The conversation so far including all tool outputs was:\n<conversation>\n{{ conversation }}\n</conversation>\n\n"  # noqa: E501
+                    "Present the final output now."
                 ),
                 template_format="jinja2",
             ),
@@ -513,10 +526,20 @@ class Runner:
         """Run the milestone agent."""
         plan = PlanBuilder().build()
         plan_run = PlanRun(plan_id=plan.id, end_user_id=self.end_user.external_id)
+        all_allowed_prefixes = {
+            prefix
+            for milestone in milestone_plan.milestones
+            for prefix in milestone.allowed_tool_prefixes
+        }
+        all_allowed_portia_tools = {
+            tool.id
+            for tool in self.tools
+            if tool.id.startswith("portia:") and tool.id.startswith(tuple(all_allowed_prefixes))
+        }
 
         ready_response = PortiaRemoteTool.batch_ready_check(
             self.config,
-            {tool_id for tool_id in milestone_plan.all_tool_ids if tool_id.startswith("portia:")},
+            all_allowed_portia_tools,
             ToolRunContext(
                 end_user=self.end_user,
                 plan_run=plan_run,
@@ -528,50 +551,64 @@ class Runner:
         if not ready_response.ready:
             logger().info("Tools need authorisation:")
             for clarification in ready_response.clarifications:
-                logger().info(f"  {clarification.user_guidance}: {clarification.action_url if isinstance(clarification, ActionClarification) else ''}")  # noqa: E501
+                logger().info(
+                    f"  {clarification.user_guidance}: {clarification.action_url if isinstance(clarification, ActionClarification) else ''}"
+                )
             input("Press Enter to continue...")
 
         prev_milestone_outputs = {}
+        prev_milestone_tools = []
         for milestone in milestone_plan.milestones:
             logger().info(f"🎯 Running milestone: {milestone.name}")
             agent = MilestoneAgent(
                 milestone=milestone,
                 config=self.config,
                 end_user=self.end_user,
-                tools=[tool for tool in self.tools if tool.id in milestone.allowed_tool_ids],
+                tools=[
+                    tool
+                    for tool in self.tools
+                    if tool.id.startswith(tuple(milestone.allowed_tool_prefixes))
+                ]
+                + prev_milestone_tools,
                 plan_run=plan_run,
                 plan=plan,
                 previous_milestone_outputs=prev_milestone_outputs,
             )
             result = agent.execute_sync()
             prev_milestone_outputs[milestone.name] = (milestone.task, result.get_value())
+            prev_milestone_tools.append(
+                PreviousMilestoneOutputTool(
+                    id=f"previous_milestone_output_{milestone.name}",
+                    name=milestone.name,
+                    description=f"Call to get the result of the previous milestone task <task>{milestone.task}</task>",  # noqa: E501
+                    content=str(result.get_value()),
+                )
+            )
         return result.get_value()
-
 
 
 if __name__ == "__main__":
     milestone_plan = (
         MilestonePlanBuilder()
         .milestone(
-            name="find_restaurant",
-            task="Find me a restaurant in London that serves vegan Italian food",
-            allowed_tool_ids=["search_tool"],
+            name="download_doc",
+            task="Download the 'Portia Evals' doc from Google Drive and extract the Work Items section",
+            allowed_tool_prefixes=["portia:google:"],
         )
         .milestone(
-            name="get_availability",
-            task="Get my availability in August",
-            allowed_tool_ids=["portia:google:gcalendar:check_availability"],
+            name="add_tickets",
+            task="""Convert the bullet points in the Work Items section into Linear tickets
+
+and add them to the Linear project `Evals and Prompts`.
+
+NB the team ID is 0d6ebd77-2755-4bf2-a654-13e252e61ac6
+""",
+            allowed_tool_prefixes=["portia:mcp:mcp.linear.app:"],
         )
-        .milestone(
-            name="search_for_availability",
-            task="Search the restaurant's website for availability",
-            allowed_tool_ids=["browser_tool"],
-        )
-        .starting_milestone("find_restaurant")
+        .starting_milestone("download_doc")
         .build()
     )
-    config = Config.from_default(default_model="anthropic/claude-sonnet-4-20250514")
+    config = Config.from_default(default_model="openai/gpt-4.1")
     tool_registry = DefaultToolRegistry(config=config) + ToolRegistry(tools=[BrowserTool()])
     end_user = EndUser(external_id="test")
     runner = Runner(config=config, end_user=end_user, tools=tool_registry.get_tools())
-    print(runner.run(milestone_plan))

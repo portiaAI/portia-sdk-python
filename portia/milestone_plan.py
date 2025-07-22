@@ -76,7 +76,7 @@ class Milestone(BaseModel):
     task: str = Field(
         description="Description of what the sub-agent needs to achieve in this milestone."
     )
-    allowed_tool_ids: list[str] = Field(
+    allowed_tool_prefixes: list[str] = Field(
         default=[], description="List of tool IDs that are allowed for this milestone."
     )
 
@@ -87,7 +87,7 @@ class Milestone(BaseModel):
             str: A pretty print representation of the milestone's details.
 
         """
-        tools_summary = f"{len(self.allowed_tool_ids)} allowed tools"
+        tools_summary = f"{len(self.allowed_tool_prefixes)} allowed tools"
         # next_summary = (
         #     "\n      ".join([n.pretty_print() for n in self.next])
         #     if self.next
@@ -212,9 +212,8 @@ class MilestonePlan(BaseModel):
             str: A pretty print representation of the plan's details.
 
         """
-        return (
-            f"Milestones:\n"
-            + "\n".join([milestone.pretty_print() for milestone in self.milestones])
+        return "Milestones:\n" + "\n".join(
+            [milestone.pretty_print() for milestone in self.milestones]
         )
 
     @model_validator(mode="after")
@@ -278,12 +277,15 @@ class MilestonePlan(BaseModel):
 
         Returns:
             list[str]: All tool IDs across all milestones.
+
         """
-        return list({
-            tool_id
-            for milestone in self.milestones
-            for tool_id in milestone.allowed_tool_ids
-        })
+        return list(
+            {
+                tool_id
+                for milestone in self.milestones
+                for tool_id in milestone.allowed_tool_prefixes
+            }
+        )
 
 
 class MilestonePlanBuilder:
@@ -316,7 +318,7 @@ class MilestonePlanBuilder:
         self.starting_milestone_name: str | None = None
 
     def milestone(
-        self, name: str, task: str, allowed_tool_ids: list[str] | None = None
+        self, name: str, task: str, allowed_tool_prefixes: list[str] | None = None
     ) -> MilestonePlanBuilder:
         """Add a milestone to the plan.
 
@@ -329,11 +331,13 @@ class MilestonePlanBuilder:
             MilestonePlanBuilder: The builder instance with the new milestone added.
 
         """
-        if allowed_tool_ids is None:
-            allowed_tool_ids = []
-        allowed_tool_ids.append("llm_tool")
+        if allowed_tool_prefixes is None:
+            allowed_tool_prefixes = []
+        allowed_tool_prefixes.append("llm_tool")
 
-        self.milestones.append(Milestone(name=name, task=task, allowed_tool_ids=allowed_tool_ids))
+        self.milestones.append(
+            Milestone(name=name, task=task, allowed_tool_prefixes=allowed_tool_prefixes)
+        )
         return self
 
     def plan_input(self, name: str, description: str) -> MilestonePlanBuilder:
