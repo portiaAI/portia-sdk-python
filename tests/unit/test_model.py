@@ -84,7 +84,7 @@ def test_message_to_langchain_unsupported_role() -> None:
     """Test that converting to LangChain message with unsupported role raises ValueError."""
     message = Message(role="user", content="test")
     # Force an invalid role to test the to_langchain method
-    message.role = "invalid"  # type: ignore[assignment]
+    object.__setattr__(message, "role", "invalid")
     with pytest.raises(ValueError, match="Unsupported role"):
         message.to_langchain()
 
@@ -103,7 +103,9 @@ def test_message_to_langchain_unsupported_role() -> None:
         ),
     ],
 )
-def test_map_message_to_instructor(message: Message, expected_instructor_message: dict) -> None:
+def test_map_message_to_instructor(
+    message: Message, expected_instructor_message: dict[str, str]
+) -> None:
     """Test mapping a Message to an Instructor message."""
     assert map_message_to_instructor(message) == expected_instructor_message
 
@@ -233,13 +235,18 @@ def test_amazon_bedrock_model_structured_output_returns_dict() -> None:
     mock_chat_bedrock.with_structured_output.return_value = structured_output
     structured_output.invoke.return_value = {"test_field": "Response from model"}
 
-    with mock.patch("portia.model.ChatBedrock") as mock_chat_bedrock_cls:
+    mock_instructor_client = MagicMock()
+    with (
+        mock.patch("portia.model.ChatBedrock") as mock_chat_bedrock_cls,
+        mock.patch("portia.model.instructor.from_provider") as mock_from_provider,
+    ):
         mock_chat_bedrock_cls.return_value = mock_chat_bedrock
+        mock_from_provider.return_value = mock_instructor_client
         model = AmazonBedrockGenerativeModel(
-            model_id="test",
+            model_id="eu.anthropic.claude-3-7-sonnet-20250219-v1:0",
             aws_access_key_id="test",
             aws_secret_access_key="test",  # noqa: S106
-            region_name="us-east-1",
+            region_name="eu-east-1",
         )
         result = model.get_structured_response(
             messages=[Message(role="user", content="Hello")],

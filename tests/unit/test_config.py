@@ -635,6 +635,14 @@ def test_llm_provider_default_from_api_keys_env_vars(
             },
             LLMProvider.AZURE_OPENAI,
         ),
+        (
+            {
+                "aws_access_key_id": "test-aws-access-key-id",
+                "aws_secret_access_key": "test-aws-secret-access-key",
+                "aws_default_region": "eu-east-1",
+            },
+            LLMProvider.AMAZON,
+        ),
     ],
 )
 def test_llm_provider_default_from_api_keys_config_kwargs(
