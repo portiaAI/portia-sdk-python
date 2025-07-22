@@ -108,7 +108,6 @@ class GenerativeModel(ABC):
     """Base class for all generative model clients."""
 
     provider: LLMProvider
-    api_key: str | None = None
 
     def __init__(self, model_name: str) -> None:
         """Initialize the model.
@@ -290,7 +289,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
         """
         self._model_kwargs = kwargs.copy()
-        self.api_key = api_key.get_secret_value()
+
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
@@ -392,7 +391,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
 
         """
         self._model_kwargs = kwargs.copy()
-        self.api_key = api_key.get_secret_value()
+
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
@@ -499,7 +498,6 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             self._model_kwargs = kwargs["model_kwargs"].copy()
         else:
             self._model_kwargs = kwargs.copy()
-        self.api_key = api_key.get_secret_value()
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
@@ -623,7 +621,6 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 max_retries=max_retries,
                 **kwargs,
             )
-            self.api_key = api_key.get_secret_value()
             super().__init__(client, model_name)
             self._instructor_client = instructor.from_mistral(
                 client=Mistral(api_key=api_key.get_secret_value()),
@@ -702,9 +699,8 @@ if validate_extras_dependencies("google", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
-            self.api_key = api_key.get_secret_value()
             # Configure genai with the api key
-            genai_client = genai.Client(api_key=self.api_key)
+            genai_client = genai.Client(api_key=api_key.get_secret_value())
 
             client = ChatGoogleGenerativeAI(
                 model=model_name,
@@ -744,7 +740,6 @@ if validate_extras_dependencies("ollama", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatOllama
 
             """
-            self.api_key = None
             super().__init__(
                 client=ChatOllama(model=model_name, **kwargs),
                 model_name=model_name,
