@@ -38,7 +38,14 @@ def test_base_agent_default_context() -> None:
     )
     context = agent.get_system_context(
         get_test_tool_context(),
-        [StepInput(name="$output1", value="test1", description="Previous output 1")],
+        [
+            StepInput(
+                name="$output1",
+                value="test1",
+                full_value="test1",
+                description="Previous output 1",
+            )
+        ],
     )
     assert context is not None
     assert "test1" in context

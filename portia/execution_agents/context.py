@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -47,6 +47,7 @@ class StepInput(BaseModel):
 
     name: str
     value: Serializable | None
+    full_value: Any
     description: str
 
 

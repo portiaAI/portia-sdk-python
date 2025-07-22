@@ -40,7 +40,10 @@ class MemoryExtractionStep:
         step_inputs = [
             StepInput(
                 name=input_variable.name,
-                value=potential_inputs[input_variable.name].full_value(self.agent.agent_memory),
+                value=potential_inputs[input_variable.name].get_value(),
+                full_value=potential_inputs[input_variable.name].full_value(
+                    self.agent.agent_memory
+                ),
                 description=input_variable.description,
             )
             for input_variable in self.agent.step.inputs

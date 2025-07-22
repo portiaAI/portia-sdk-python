@@ -45,6 +45,7 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
                 StepInput(
                     name="previous_input",
                     value="previous value",
+                    full_value="previous value",
                     description="Previous step input",
                 )
             ]

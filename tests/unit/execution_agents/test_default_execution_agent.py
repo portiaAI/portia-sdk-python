@@ -324,10 +324,16 @@ def test_parser_model_schema_validation_success_with_templating() -> None:
         {
             "messages": [],
             "step_inputs": [
-                StepInput(name="$user_email", value="user@example.com", description="User's email"),
+                StepInput(
+                    name="$user_email",
+                    value="user@example.com",
+                    full_value="user@example.com",
+                    description="User's email",
+                ),
                 StepInput(
                     name="$user_config",
                     value={"api_key": "abc123", "timeout": "30"},
+                    full_value={"api_key": "abc123", "timeout": "30"},
                     description="User's configuration",
                 ),
             ],
@@ -386,7 +392,10 @@ def test_parser_model_schema_validation_failure_with_templating() -> None:
             "messages": [],
             "step_inputs": [
                 StepInput(
-                    name="$user_email_invalid", value="not-an-email", description="User's email"
+                    name="$user_email_invalid",
+                    value="not-an-email",
+                    full_value="not-an-email",
+                    description="User's email",
                 ),
             ],
         }
@@ -496,17 +505,17 @@ def test_verifier_model_schema_validation() -> None:
 
     required_field1 = next(arg for arg in result_inputs.args if arg.name == "required_field1")
     required_field2 = next(arg for arg in result_inputs.args if arg.name == "required_field2")
-    assert (
-        required_field1.schema_invalid
-    ), "required_field1 should be marked as missing when validation fails"
-    assert (
-        required_field2.schema_invalid
-    ), "required_field2 should be marked as missing when validation fails"
+    assert required_field1.schema_invalid, (
+        "required_field1 should be marked as missing when validation fails"
+    )
+    assert required_field2.schema_invalid, (
+        "required_field2 should be marked as missing when validation fails"
+    )
 
     optional_field = next(arg for arg in result_inputs.args if arg.name == "optional_field")
-    assert (
-        not optional_field.schema_invalid
-    ), "optional_field should not be marked as missing when validation fails"
+    assert not optional_field.schema_invalid, (
+        "optional_field should not be marked as missing when validation fails"
+    )
 
 
 def test_verifier_model_validates_schema_with_templating() -> None:
@@ -550,7 +559,10 @@ def test_verifier_model_validates_schema_with_templating() -> None:
             "messages": [AIMessage(content=verified_tool_inputs.model_dump_json(indent=2))],
             "step_inputs": [
                 StepInput(
-                    name="$invalid_email", value="not-valid@email", description="User's email"
+                    name="$invalid_email",
+                    value="not-valid@email",
+                    full_value="not-valid@email",
+                    description="User's email",
                 ),
             ],
         },
@@ -725,7 +737,12 @@ def test_tool_calling_model_templates_inputs() -> None:
     mock_model = get_mock_generative_model(templated_response)
     mock_telemetry = mock.MagicMock()
     step_inputs = [
-        StepInput(name="$input_value", value="templated value", description="Input value"),
+        StepInput(
+            name="$input_value",
+            value="templated value",
+            full_value="templated value",
+            description="Input value",
+        ),
     ]
     verified_tool_inputs = VerifiedToolInputs(
         args=[

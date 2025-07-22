@@ -76,7 +76,11 @@ def test_context_execution_context() -> None:
             clarifications=[],
         ),
         plan_run,
-        [StepInput(name="$output1", value="test1", description="Previous output 1")],
+        [
+            StepInput(
+                name="$output1", value="test1", full_value="test1", description="Previous output 1"
+            )
+        ],
     )
     assert "System Context:" in context
     assert "user_id" in context
@@ -159,16 +163,19 @@ def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> Non
             StepInput(
                 name="$email_address",
                 value="test@example.com",
+                full_value="test@example.com",
                 description="Target recipient for email",
             ),
             StepInput(
                 name="$email_body",
                 value="The body of the email",
+                full_value="The body of the email",
                 description="Content for email",
             ),
             StepInput(
                 name="$email_title",
                 value="Example email",
+                full_value="Example email",
                 description="Title for email",
             ),
         ],
@@ -212,7 +219,7 @@ end_user_phone:
 end_user_attributes:{{"email": "hello@world.com"}}
 ----------
 System Context:
-Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""
+Today's date is {datetime.now(UTC).strftime("%Y-%m-%d")}"""
     )
 
 

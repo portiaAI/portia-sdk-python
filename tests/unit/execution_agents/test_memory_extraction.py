@@ -70,10 +70,10 @@ def test_memory_extraction_step_with_inputs() -> None:
 
     assert len(result["step_inputs"]) == 2
     assert result["step_inputs"][0].name == "$local_output"
-    assert result["step_inputs"][0].value == "local_value"
+    assert result["step_inputs"][0].full_value == "local_value"
     assert result["step_inputs"][0].description == "Local input description"
     assert result["step_inputs"][1].name == "$memory_output"
-    assert result["step_inputs"][1].value == "memory_value"
+    assert result["step_inputs"][1].full_value == "memory_value"
     assert result["step_inputs"][1].description == "Memory input description"
 
 
