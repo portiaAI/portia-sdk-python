@@ -25,7 +25,6 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-import psutil
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browser_use.llm import (
     BaseChatModel,
@@ -318,7 +317,7 @@ class BrowserTool(Tool[str | BaseModel]):
         llm = convert_model_to_browser_use_model(model)
 
         async def run_browser_tasks() -> str | BaseModel | ActionClarification:
-            async def handle_login_requirement(
+            def handle_login_requirement(
                 result: BrowserTaskOutput,
             ) -> ActionClarification:
                 """Handle cases where login is required with an ActionClarification."""
@@ -328,7 +327,7 @@ class BrowserTool(Tool[str | BaseModel]):
                     )
                 return ActionClarification(
                     user_guidance=result.user_login_guidance,
-                    action_url=await self.infrastructure_provider.construct_auth_clarification_url(
+                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
                         ctx,
                         result.login_url,
                     ),
@@ -344,15 +343,13 @@ class BrowserTool(Tool[str | BaseModel]):
                 task_description: str,
                 output_model: type[BaseModel],
             ) -> BaseModel:
-                browser = await self.infrastructure_provider.setup_browser(ctx)
                 agent = Agent(
                     task=task_description,
                     llm=llm,
-                    browser=browser,
+                    browser=self.infrastructure_provider.setup_browser(ctx),
                     controller=Controller(output_model=output_model),
                 )
                 result = await agent.run()
-                await self.infrastructure_provider.post_agent_run(ctx, browser)
                 return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
 
             # Main task
@@ -367,9 +364,9 @@ class BrowserTool(Tool[str | BaseModel]):
 
             task_result = await run_agent_task(task_to_complete, output_model)
             if task_result.human_login_required:  # type: ignore reportCallIssue
-                return await handle_login_requirement(task_result)  # type: ignore reportCallIssue
+                return handle_login_requirement(task_result)  # type: ignore reportCallIssue
 
-            await self.infrastructure_provider.step_complete(ctx)
+            self.infrastructure_provider.step_complete(ctx)
             return task_result.task_output  # type: ignore reportCallIssue
 
         try:
@@ -465,24 +462,18 @@ class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
 
     @abstractmethod
-    async def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(self, ctx: ToolRunContext) -> Browser:
         """Get a Browser instance.
 
         This is called at the start of every step using this tool.
         """
 
-    async def post_agent_run(self, ctx: ToolRunContext, browser: Browser) -> None:  # noqa: ARG002
-        """Called after the agent has been setup."""  # noqa: D401
-        return
-
     @abstractmethod
-    async def construct_auth_clarification_url(
-        self, ctx: ToolRunContext, sign_in_url: str
-    ) -> HttpUrl:
+    def construct_auth_clarification_url(self, ctx: ToolRunContext, sign_in_url: str) -> HttpUrl:
         """Construct the URL for the auth clarification."""
 
     @abstractmethod
-    async def step_complete(self, ctx: ToolRunContext) -> None:
+    def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g. release the session if needed."""
 
 
@@ -498,7 +489,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         self.chrome_path = chrome_path or self.get_chrome_instance_path()
         self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
 
-    async def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(self, ctx: ToolRunContext) -> Browser:
         """Get a Browser instance.
 
         Note: This provider does not support end_user_id.
@@ -516,37 +507,14 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        return self._get_browser(ctx)
-
-    def _get_browser(self, ctx: ToolRunContext) -> Browser:
-        """Get a Browser instance."""
         return Browser(
-            browser_pid=self._get_or_reset_browser_pid(ctx),
             browser_profile=BrowserConfig(
                 executable_path=self.chrome_path,
                 args=self.extra_chromium_args or [],
-                keep_alive=True,
             ),
         )
 
-    def _get_or_reset_browser_pid(self, ctx: ToolRunContext) -> int | None:
-        """Get the browser pid from the context or reset it."""
-        browser_pid_str = ctx.end_user.get_additional_data("browser_pid")
-        if (
-            browser_pid_str is not None
-            and browser_pid_str.isdigit()
-            and psutil.pid_exists(int(browser_pid_str))
-        ):
-            return int(browser_pid_str)
-        ctx.end_user.remove_additional_data("browser_pid")
-        return None
-
-    async def post_agent_run(self, ctx: ToolRunContext, browser: Browser) -> None:
-        """Called after the agent has been setup."""  # noqa: D401
-        if browser.browser_pid:
-            ctx.end_user.set_additional_data("browser_pid", str(browser.browser_pid))
-
-    async def construct_auth_clarification_url(
+    def construct_auth_clarification_url(
         self,
         ctx: ToolRunContext,  # noqa: ARG002
         sign_in_url: str,
@@ -592,13 +560,8 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             case _:
                 raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-    async def step_complete(self, ctx: ToolRunContext) -> None:
+    def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g release the session."""
-        browser = self._get_browser(ctx)
-        if browser.playwright:
-            await browser.playwright.stop()
-        await browser.kill()
-        ctx.end_user.remove_additional_data("browser_pid")
 
     def get_extra_chromium_args(self) -> list[str] | None:
         """Get the extra Chromium arguments.
@@ -664,7 +627,7 @@ if BROWSERBASE_AVAILABLE:
 
             self.bb = Browserbase(api_key=api_key)
 
-        async def step_complete(self, ctx: ToolRunContext) -> None:
+        def step_complete(self, ctx: ToolRunContext) -> None:
             """Call when the step is complete closes the session to persist context."""
             # Only clean up the session on the final browser tool call
             if any(
@@ -783,7 +746,7 @@ if BROWSERBASE_AVAILABLE:
 
             return session_connect_url
 
-        async def construct_auth_clarification_url(
+        def construct_auth_clarification_url(
             self,
             ctx: ToolRunContext,
             sign_in_url: str,  # noqa: ARG002
@@ -810,7 +773,7 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(session_id)
             return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
 
-        async def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        def setup_browser(self, ctx: ToolRunContext) -> Browser:
             """Set up a Browser instance connected to BrowserBase.
 
             Creates or retrieves a BrowserBase session and configures a Browser instance
