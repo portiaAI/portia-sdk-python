@@ -45,6 +45,8 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    GoogleGenAiGenerativeModel,
+    OllamaGenerativeModel,
     OpenAIGenerativeModel,
 )
 from portia.tool import Tool, ToolRunContext
@@ -69,16 +71,10 @@ def convert_model_to_browser_use_model(model: GenerativeModel) -> BaseChatModel:
         return ChatAnthropic(model=model.model_name, api_key=model.api_key)
     if isinstance(model, AzureOpenAIGenerativeModel):
         return ChatAzureOpenAI(model=model.model_name, api_key=model.api_key)
-    if validate_extras_dependencies("ollama", raise_error=False):
-        from portia.model import OllamaGenerativeModel
-
-        if isinstance(model, OllamaGenerativeModel):
-            return ChatOllama(model=model.model_name)
-    if validate_extras_dependencies("google", raise_error=False):
-        from portia.model import GoogleGenAiGenerativeModel
-
-        if isinstance(model, GoogleGenAiGenerativeModel):
-            return ChatGoogle(model=model.model_name, api_key=model.api_key)
+    if isinstance(model, OllamaGenerativeModel):
+        return ChatOllama(model=model.model_name)
+    if isinstance(model, GoogleGenAiGenerativeModel):
+        return ChatGoogle(model=model.model_name, api_key=model.api_key)
 
     raise TypeError("Model must be a supported model type.")
 
