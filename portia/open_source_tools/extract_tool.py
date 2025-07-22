@@ -28,11 +28,9 @@ class ExtractToolSchema(BaseModel):
             "including tables and embedded content, with higher success but may increase latency. "
             "Basic extraction costs 1 credit per 5 successful URL extractions, while advanced "
             "extraction costs 2 credits per 5 successful URL extractions."
-        )
+        ),
     )
-    format: str = Field(
-        default="markdown", description="Output format: 'markdown' or 'text'"
-    )
+    format: str = Field(default="markdown", description="Output format: 'markdown' or 'text'")
 
 
 class ExtractTool(Tool[str]):
