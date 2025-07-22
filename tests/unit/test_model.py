@@ -13,6 +13,7 @@ from langchain_core.outputs import Generation
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from portia.model import (
+    AmazonBedrockGenerativeModel,
     AnthropicGenerativeModel,
     GenerativeModel,
     LangChainGenerativeModel,
@@ -217,6 +218,29 @@ def test_anthropic_model_structured_output_returns_dict() -> None:
     with mock.patch("portia.model.ChatAnthropic") as mock_chat_anthropic_cls:
         mock_chat_anthropic_cls.return_value = mock_chat_anthropic
         model = AnthropicGenerativeModel(model_name="test", api_key=SecretStr("test"))
+        result = model.get_structured_response(
+            messages=[Message(role="user", content="Hello")],
+            schema=StructuredOutputTestModel,
+        )
+        assert isinstance(result, StructuredOutputTestModel)
+        assert result.test_field == "Response from model"
+
+
+def test_amazon_bedrock_model_structured_output_returns_dict() -> None:
+    """Test that AmazonBedrockGenerativeModel.structured_output returns a dict."""
+    mock_chat_bedrock = MagicMock(spec=BaseChatModel)
+    structured_output = MagicMock()
+    mock_chat_bedrock.with_structured_output.return_value = structured_output
+    structured_output.invoke.return_value = {"test_field": "Response from model"}
+
+    with mock.patch("portia.model.ChatBedrock") as mock_chat_bedrock_cls:
+        mock_chat_bedrock_cls.return_value = mock_chat_bedrock
+        model = AmazonBedrockGenerativeModel(
+            model_id="test",
+            aws_access_key_id="test",
+            aws_secret_access_key="test",  # noqa: S106
+            region_name="us-east-1",
+        )
         result = model.get_structured_response(
             messages=[Message(role="user", content="Hello")],
             schema=StructuredOutputTestModel,

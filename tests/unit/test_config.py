@@ -21,6 +21,7 @@ from portia.config import (
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
+    AmazonBedrockGenerativeModel,
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
@@ -39,6 +40,9 @@ PROVIDER_ENV_VARS = [
     "AZURE_OPENAI_API_KEY",
     "AZURE_OPENAI_ENDPOINT",
     "OLLAMA_BASE_URL",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_DEFAULT_REGION",
 ]
 
 
@@ -167,6 +171,11 @@ def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
         ("anthropic/claude-3-5-haiku-latest", AnthropicGenerativeModel, ["ANTHROPIC_API_KEY"]),
         ("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"]),
         ("google/gemini-2.5-preview", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]),
+        (
+            "amazon/anthropic.claude-3-sonnet-v1:0",
+            AmazonBedrockGenerativeModel,
+            ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"],
+        ),
         (
             "azure-openai/gpt-4",
             AzureOpenAIGenerativeModel,
@@ -576,6 +585,14 @@ def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
         ({"GOOGLE_API_KEY": "test-google-api-key"}, LLMProvider.GOOGLE),
         (
             {
+                "AWS_ACCESS_KEY_ID": "test-aws-access-key-id",
+                "AWS_SECRET_ACCESS_KEY": "test-aws-secret-access-key",
+                "AWS_DEFAULT_REGION": "us-east-1",
+            },
+            LLMProvider.AMAZON,
+        ),
+        (
+            {
                 "AZURE_OPENAI_API_KEY": "test-azure-openai-api-key",
                 "AZURE_OPENAI_ENDPOINT": "test-azure-openai-endpoint",
             },
@@ -603,6 +620,14 @@ def test_llm_provider_default_from_api_keys_env_vars(
         ({"anthropic_api_key": "test-anthropic-api-key"}, LLMProvider.ANTHROPIC),
         ({"mistralai_api_key": "test-mistral-api-key"}, LLMProvider.MISTRALAI),
         ({"google_api_key": "test-google-api-key"}, LLMProvider.GOOGLE),
+        (
+            {
+                "aws_access_key_id": "test-aws-access-key-id",
+                "aws_secret_access_key": "test-aws-secret-access-key",
+                "aws_default_region": "us-east-1",
+            },
+            LLMProvider.AMAZON,
+        ),
         (
             {
                 "azure_openai_api_key": "test-azure-openai-api-key",
@@ -691,6 +716,7 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
         ("anthropic", LLMProvider.ANTHROPIC),
         ("mistralai", LLMProvider.MISTRALAI),
         ("openai", LLMProvider.OPENAI),
+        ("amazon", LLMProvider.AMAZON),
     ],
 )
 def test_parse_str_to_enum(value: str, expected: LLMProvider) -> None:

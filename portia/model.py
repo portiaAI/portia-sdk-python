@@ -95,6 +95,7 @@ class LLMProvider(Enum):
     ANTHROPIC = "anthropic"
     MISTRALAI = "mistralai"
     GOOGLE = "google"
+    AMAZON = "amazon"
     AZURE_OPENAI = "azure-openai"
     CUSTOM = "custom"
     OLLAMA = "ollama"
@@ -669,6 +670,63 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 schema=schema,
                 model=self.model_name,
                 provider=self.provider.value,
+            )
+
+
+if validate_extras_dependencies("amazon", raise_error=False):
+    from langchain_aws import ChatBedrock
+
+    class AmazonBedrockGenerativeModel(LangChainGenerativeModel):
+        """Amazon Bedrock model implementation."""
+
+        provider: LLMProvider = LLMProvider.AMAZON
+
+        def __init__(
+            self,
+            *,
+            model_id: str = "eu.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            credentials_profile_name: str | None = None,
+            aws_access_key_id: str | None = None,
+            aws_secret_access_key: str | None = None,
+            temperature: float | None = None,
+            region_name: str | None = None,
+            provider: str | None = None,
+            **kwargs: Any,
+        ) -> None:
+            """Initialize with Amazon Bedrock client.
+
+            Args:
+                model_id: Name of the Amazon Bedrock model or the urn of the model.
+                credentials_profile_name: Name of the AWS credentials profile to use
+                  (loaded from ~/.aws/credentials), if not provided, both aws keys must be provided.
+                aws_access_key_id: AWS access key ID is used, if credentials_profile_name
+                 is not provided
+                aws_secret_access_key: AWS secret access key is used, if aws_access_key_id
+                 is provided.
+                region_name: AWS region name, if not provided will be loaded
+                 from the credentials profile.
+                temperature: Temperature parameter for model sampling
+                provider: Provider name if urn is provided in model_id
+                 (e.g. "anthropic", "amazon", "meta"..etc)
+                **kwargs: Additional keyword arguments to pass to ChatBedrock
+
+            """
+            client = ChatBedrock(
+                model=model_id,
+                credentials_profile_name=credentials_profile_name,
+                aws_access_key_id=SecretStr(aws_access_key_id) if aws_access_key_id else None,
+                aws_secret_access_key=SecretStr(aws_secret_access_key)
+                if aws_secret_access_key
+                else None,
+                region=region_name,
+                provider=provider,
+                temperature=temperature or 0,
+                **kwargs,
+            )
+            super().__init__(client, model_id)
+
+            self._instructor_client = instructor.from_provider(
+                "bedrock/" + model_id, mode=instructor.Mode.BEDROCK_JSON
             )
 
 
