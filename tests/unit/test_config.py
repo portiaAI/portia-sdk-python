@@ -587,7 +587,7 @@ def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
             {
                 "AWS_ACCESS_KEY_ID": "test-aws-access-key-id",
                 "AWS_SECRET_ACCESS_KEY": "test-aws-secret-access-key",
-                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_DEFAULT_REGION": "eu-east-1",
             },
             LLMProvider.AMAZON,
         ),
@@ -624,7 +624,7 @@ def test_llm_provider_default_from_api_keys_env_vars(
             {
                 "aws_access_key_id": "test-aws-access-key-id",
                 "aws_secret_access_key": "test-aws-secret-access-key",
-                "aws_default_region": "us-east-1",
+                "aws_default_region": "eu-east-1",
             },
             LLMProvider.AMAZON,
         ),
@@ -634,14 +634,6 @@ def test_llm_provider_default_from_api_keys_env_vars(
                 "azure_openai_endpoint": "test-azure-openai-endpoint",
             },
             LLMProvider.AZURE_OPENAI,
-        ),
-        (
-            {
-                "aws_access_key_id": "test-aws-access-key-id",
-                "aws_secret_access_key": "test-aws-secret-access-key",
-                "aws_default_region": "eu-east-1",
-            },
-            LLMProvider.AMAZON,
         ),
     ],
 )

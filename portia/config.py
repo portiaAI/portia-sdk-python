@@ -442,6 +442,18 @@ class Config(BaseModel):
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
         description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
     )
+    aws_access_key_id: str = Field(
+        default_factory=lambda: os.getenv("AWS_ACCESS_KEY_ID") or "",
+        description="The AWS access key ID. Must be set if llm-provider is AMAZON",
+    )
+    aws_secret_access_key: str = Field(
+        default_factory=lambda: os.getenv("AWS_SECRET_ACCESS_KEY") or "",
+        description="The AWS secret access key. Must be set if llm-provider is AMAZON",
+    )
+    aws_default_region: str = Field(
+        default_factory=lambda: os.getenv("AWS_DEFAULT_REGION") or "",
+        description="The AWS default region. Must be set if llm-provider is AMAZON",
+    )
 
     llm_redis_cache_url: str | None = Field(
         default_factory=lambda: os.getenv("LLM_REDIS_CACHE_URL"),
@@ -913,6 +925,9 @@ class Config(BaseModel):
                 set_amazon_logging_level(level=logging.WARNING)
                 return AmazonBedrockGenerativeModel(
                     model_id=model_name,
+                    aws_access_key_id=self.aws_access_key_id,
+                    aws_secret_access_key=self.aws_secret_access_key,
+                    region_name=self.aws_default_region,
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.AZURE_OPENAI:
