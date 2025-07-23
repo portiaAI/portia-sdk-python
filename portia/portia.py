@@ -531,11 +531,11 @@ class Portia:
 
         if outcome.error:
             message = self._generate_planning_error_message(
-                    outcome.error,
-                    query,
-                    end_user,
-                    resolved_example_plans,
-                )
+                outcome.error,
+                query,
+                end_user,
+                resolved_example_plans,
+            )
             logger().error(message)
             raise PlanError(outcome.error)
 
@@ -632,11 +632,11 @@ class Portia:
 
         if outcome.error:
             message = self._generate_planning_error_message(
-                    outcome.error,
-                    query,
-                    end_user,
-                    resolved_example_plans,
-                )
+                outcome.error,
+                query,
+                end_user,
+                resolved_example_plans,
+            )
             logger().error(message)
             raise PlanError(outcome.error)
 
@@ -1658,10 +1658,7 @@ class Portia:
         example_plans: list[Plan] | None = None,
     ) -> str:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
-        if (
-            not isinstance(self.tool_registry, DefaultToolRegistry)
-            or self.config.portia_api_key
-        ):
+        if not isinstance(self.tool_registry, DefaultToolRegistry) or self.config.portia_api_key:
             return original_error
         unauthenticated_client = PortiaCloudClient.new_client(
             self.config,
