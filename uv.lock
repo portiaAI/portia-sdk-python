@@ -2248,7 +2248,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.4,<4" },
     { name = "jsonref", specifier = ">=1.1.0,<2" },
     { name = "langchain", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.17,<0.4" },
-    { name = "langchain-anthropic", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.0,<0.4" },
+    { name = "langchain-anthropic", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.16,<0.4" },
     { name = "langchain-core", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.25,<0.4" },
     { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=2.1.8,<3" },
     { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'google'", specifier = ">=2.1.8,<3" },
