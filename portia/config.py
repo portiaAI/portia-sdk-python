@@ -379,6 +379,10 @@ class Config(BaseModel):
         anthropic_api_key: The API key for Anthropic.
         mistralai_api_key: The API key for MistralAI.
         google_api_key: The API key for Google Generative AI.
+        aws_access_key_id: The AWS access key ID.
+        aws_secret_access_key: The AWS secret access key.
+        aws_default_region: The AWS default region.
+        aws_credentials_profile_name: The AWS credentials profile name.
         azure_openai_api_key: The API key for Azure OpenAI.
         azure_openai_endpoint: The endpoint for Azure OpenAI.
         llm_provider: The LLM provider. If set, Portia uses this to select the best models
@@ -452,6 +456,13 @@ class Config(BaseModel):
     aws_default_region: str = Field(
         default_factory=lambda: os.getenv("AWS_DEFAULT_REGION") or "",
         description="The AWS default region. Must be set if llm-provider is AMAZON",
+    )
+    aws_credentials_profile_name: str | None = Field(
+        default_factory=lambda: os.getenv("AWS_CREDENTIALS_PROFILE_NAME") or None,
+        description=(
+            "The AWS credentials profile name. Must be set if llm-provider is AMAZON, "
+            "if not provided, aws_access_key_id and aws_secret_access_key must be provided"
+        ),
     )
 
     llm_redis_cache_url: str | None = Field(
@@ -923,6 +934,7 @@ class Config(BaseModel):
                     aws_access_key_id=self.aws_access_key_id,
                     aws_secret_access_key=self.aws_secret_access_key,
                     region_name=self.aws_default_region,
+                    credentials_profile_name=self.aws_credentials_profile_name,
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.AZURE_OPENAI:
