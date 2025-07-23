@@ -530,17 +530,13 @@ class Portia:
         )
 
         if outcome.error:
-            if (
-                isinstance(self.tool_registry, DefaultToolRegistry)
-                and not self.config.portia_api_key
-            ):
-                self._log_replan_with_portia_cloud_tools(
+            message = self._generate_planning_error_message(
                     outcome.error,
                     query,
                     end_user,
                     resolved_example_plans,
                 )
-            logger().error(f"Error in planning - {outcome.error}")
+            logger().error(message)
             raise PlanError(outcome.error)
 
         plan = Plan(
@@ -635,17 +631,13 @@ class Portia:
         )
 
         if outcome.error:
-            if (
-                isinstance(self.tool_registry, DefaultToolRegistry)
-                and not self.config.portia_api_key
-            ):
-                self._log_replan_with_portia_cloud_tools(
+            message = self._generate_planning_error_message(
                     outcome.error,
                     query,
                     end_user,
                     resolved_example_plans,
                 )
-            logger().error(f"Error in planning - {outcome.error}")
+            logger().error(message)
             raise PlanError(outcome.error)
 
         plan = Plan(
@@ -1658,14 +1650,19 @@ class Portia:
             execution_hooks=self.execution_hooks,
         )
 
-    def _log_replan_with_portia_cloud_tools(
+    def _generate_planning_error_message(
         self,
         original_error: str,
         query: str,
         end_user: EndUser,
         example_plans: list[Plan] | None = None,
-    ) -> None:
+    ) -> str:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
+        if (
+            not isinstance(self.tool_registry, DefaultToolRegistry)
+            or self.config.portia_api_key
+        ):
+            return original_error
         unauthenticated_client = PortiaCloudClient.new_client(
             self.config,
             allow_unauthenticated=True,
@@ -1684,15 +1681,13 @@ class Portia:
         )
         if not replan_outcome.error:
             tools_used = ", ".join([str(step.tool_id) for step in replan_outcome.steps])
-            logger().error(
-                f"Error in planning - {original_error.rstrip('.')}.\n"
-                f"Replanning with Portia cloud tools would successfully generate a plan using "
-                f"tools: {tools_used}.\n"
-                f"Go to https://app.portialabs.ai to sign up.",
-            )
-            raise PlanError(
-                "PORTIA_API_KEY is required to use Portia cloud tools.",
-            ) from PlanError(original_error)
+            message = f"Error in planning - {original_error.rstrip('.')}.\n"
+            message += "Replanning with Portia cloud tools would successfully generate a plan using"
+            message += f" tools: {tools_used}.\n"
+            message += "Go to https://app.portialabs.ai to sign up."
+            logger().error(message)
+            return message
+        return original_error
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config, self.storage)

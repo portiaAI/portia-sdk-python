@@ -156,7 +156,7 @@ class GenerativeModel(ABC):
             messages (list[Message]): The list of messages to send to the model.
 
         """
-        raise NotImplementedError("async get_response is not implemented")
+        raise NotImplementedError("async is not implemented")  # pragma: no cover
 
     @abstractmethod
     async def aget_structured_response(
@@ -171,7 +171,7 @@ class GenerativeModel(ABC):
             schema (type[BaseModelT]): The Pydantic model to use for the response.
 
         """
-        raise NotImplementedError("async get_structured_response is not implemented")
+        raise NotImplementedError("async is not implemented")  # pragma: no cover
 
     def __str__(self) -> str:
         """Get the string representation of the model."""
@@ -643,23 +643,6 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             schema,
             method="function_calling",
             **kwargs,
-        )
-
-    async def aget_structured_response_instructor(
-        self,
-        messages: list[Message],
-        schema: type[BaseModelT],
-    ) -> BaseModelT:
-        """Get structured response using instructor asynchronously."""
-        instructor_messages = [map_message_to_instructor(msg) for msg in messages]
-        return await self._acached_instructor_call(
-            client=self._instructor_client_async,
-            messages=instructor_messages,
-            schema=schema,
-            model=self.model_name,
-            provider=self.provider.value,
-            seed=self._seed,
-            **self._model_kwargs,
         )
 
 

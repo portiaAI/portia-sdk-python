@@ -98,7 +98,7 @@ class BasePlanningAgent(ABC):
             StepsOrError: A StepsOrError instance containing either the generated steps or an error.
 
         """
-        raise NotImplementedError("async generate_steps_or_error is not implemented")
+        raise NotImplementedError("async is not implemented")  # pragma: no cover
 
 
 class StepsOrError(BaseModel):

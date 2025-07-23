@@ -918,6 +918,16 @@ async def test_mistralai_model_async_methods_if_available() -> None:
             result = await model.aget_structured_response(messages, StructuredOutputTestModel)
             assert isinstance(result, StructuredOutputTestModel)
             assert result.test_field == "Mistral structured response"
+            
+            # Test aget_structured_response with non dict response
+            async def mock_structured_ainvoke_non_dict(*_: Any, **__: Any) -> StructuredOutputTestModel:
+                return StructuredOutputTestModel(test_field="Mistral structured response")
+
+            structured_output.ainvoke = mock_structured_ainvoke_non_dict
+            mock_chat_mistral.with_structured_output.return_value = structured_output
+            with pytest.raises(TypeError):
+                await model.aget_structured_response(messages, StructuredOutputTestModel)
+
 
     except ImportError:
         pytest.skip("MistralAI package not available")
