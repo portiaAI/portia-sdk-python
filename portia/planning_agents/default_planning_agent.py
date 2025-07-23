@@ -59,10 +59,14 @@ IMPORTANT GUIDELINES:
 - If plan inputs are provided, make sure you specify them as inputs to the appropriate steps.
 - Only use plan inputs if they are provided - DO NOT make any up
 """
+
+
 class DefaultPlanningAgent(BasePlanningAgent):
     """DefaultPlanningAgent class."""
 
-    def __init__(self, config: Config, planning_prompt: str | None = None, retries: int = 3) -> None:
+    def __init__(
+        self, config: Config, planning_prompt: str | None = None, retries: int = 3
+    ) -> None:
         """Init with the config."""
         self.model = config.get_planning_model()
         self.planning_prompt = planning_prompt or DEFAULT_PLANNING_PROMPT
@@ -108,7 +112,13 @@ class DefaultPlanningAgent(BasePlanningAgent):
             error="\n".join(str(error) for error in set(previous_errors)),
         )
 
-    def _process_response(self, response: StepsOrError, tool_list: list[Tool], plan_inputs: list[PlanInput] | None = None, i: int = 0) -> StepsOrError:
+    def _process_response(
+        self,
+        response: StepsOrError,
+        tool_list: list[Tool],
+        plan_inputs: list[PlanInput] | None = None,
+        i: int = 0,
+    ) -> StepsOrError:
         """Process the response from the LLM."""
         # Check for errors in the response
         if response.error:
@@ -121,16 +131,16 @@ class DefaultPlanningAgent(BasePlanningAgent):
         tool_error = self._validate_tools_in_response(response.steps, tool_list)
         if tool_error:
             return StepsOrError(
-                    steps=response.steps,
-                    error=f"Attempt {i+1}: {tool_error}",
-                )
+                steps=response.steps,
+                error=f"Attempt {i+1}: {tool_error}",
+            )
 
         input_error = self._validate_inputs_in_response(response.steps, plan_inputs)
         if input_error:
             return StepsOrError(
-                    steps=response.steps,
-                    error=f"Attempt {i+1}: {input_error}",
-                )
+                steps=response.steps,
+                error=f"Attempt {i+1}: {input_error}",
+            )
 
         # If we get here, we've processed the response successfully
         # Add LLMTool to the steps that don't have a tool_id

@@ -17,7 +17,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.outputs import Generation
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
-from openai import AsyncOpenAI, AzureOpenAI, OpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
 from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
@@ -240,7 +240,6 @@ class LangChainGenerativeModel(GenerativeModel):
             return response
         return schema.model_validate(response)
 
-
     async def aget_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model asynchronously.
 
@@ -345,7 +344,7 @@ class LangChainGenerativeModel(GenerativeModel):
         try:
             cached = await cache.alookup(prompt, llm_string)
             if cached and len(cached) > 0:
-                return schema.model_validate_json(cached[0].text) # pyright: ignore[reportArgumentType]
+                return schema.model_validate_json(cached[0].text)  # pyright: ignore[reportArgumentType]
         except (ValidationError, RedisError, AttributeError):
             # On validation errors, re-fetch and update the entry in the cache
             pass
@@ -569,6 +568,16 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             ),
             mode=instructor.Mode.JSON,
         )
+        self._instructor_client_async = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                AsyncAzureOpenAI(
+                    api_key=api_key.get_secret_value(),
+                    azure_endpoint=azure_endpoint,
+                    api_version=api_version,
+                )
+            ),
+            mode=instructor.Mode.JSON,
+        )
         self._seed = seed
 
     def get_structured_response(
@@ -606,6 +615,49 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
+            messages=instructor_messages,
+            schema=schema,
+            model=self.model_name,
+            provider=self.provider.value,
+            seed=self._seed,
+            **self._model_kwargs,
+        )
+
+    async def aget_structured_response(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+        **kwargs: Any,
+    ) -> BaseModelT:
+        """Call the model in structured output mode targeting the given Pydantic model.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+            schema (type[BaseModelT]): The Pydantic model to use for the response.
+            **kwargs: Additional keyword arguments to pass to the model.
+
+        Returns:
+            BaseModelT: The structured response from the model.
+
+        """
+        if schema.__name__ == "StepsOrError":
+            return await self.aget_structured_response_instructor(messages, schema)
+        return await super().aget_structured_response(
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
+        )
+
+    async def aget_structured_response_instructor(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+    ) -> BaseModelT:
+        """Get structured response using instructor asynchronously."""
+        instructor_messages = [map_message_to_instructor(msg) for msg in messages]
+        return await self._acached_instructor_call(
+            client=self._instructor_client_async,
             messages=instructor_messages,
             schema=schema,
             model=self.model_name,
@@ -1005,6 +1057,7 @@ if validate_extras_dependencies("google", raise_error=False):
             self._instructor_client_async = instructor.from_genai(
                 client=wrapped_gemini_client,
                 mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
+                use_async=True,
             )
 
         def get_structured_response(

@@ -100,6 +100,7 @@ class BasePlanningAgent(ABC):
         """
         raise NotImplementedError("async generate_steps_or_error is not implemented")
 
+
 class StepsOrError(BaseModel):
     """A list of steps or an error.
 
