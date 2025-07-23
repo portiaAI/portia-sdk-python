@@ -159,7 +159,9 @@ class DummyGenerativeModel(GenerativeModel):
         return Message(role="assistant", content="Hello")
 
     async def aget_structured_response(
-        self, _: list[Message], schema: type[BaseModel]
+        self,
+        messages: list[Message],  # noqa: ARG002
+        schema: type[BaseModel],
     ) -> BaseModel:
         """Get a structured response from the model."""
         return schema(test_field="test")
