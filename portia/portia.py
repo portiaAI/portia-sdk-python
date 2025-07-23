@@ -359,7 +359,7 @@ class Portia:
 
         return resolved_plans
 
-    def _resolve_single_example_plan(self, example_plan: Plan | PlanUUID | UUID | str) -> Plan:
+    def _resolve_single_example_plan(self, example_plan: Plan | PlanUUID | str) -> Plan:
         """Resolve a single example plan from various input types."""
         if isinstance(example_plan, Plan):
             return example_plan
@@ -369,7 +369,7 @@ class Portia:
             return self._resolve_string_example_plan(example_plan)
         raise TypeError(
             f"Invalid example plan type: {type(example_plan)}. "
-            "Expected Plan, PlanUUID, UUID, or str."
+            "Expected Plan, PlanUUID, or str."
         )
 
     def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:

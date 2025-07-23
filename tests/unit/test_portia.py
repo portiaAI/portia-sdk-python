@@ -2835,7 +2835,7 @@ def test_portia_tool_readiness_rechecked_after_raised_clarification(
 
 
 def test_portia_run_plan_with_all_plan_types(portia: Portia, telemetry: MagicMock) -> None:
-    """Test that run_plan works with Plan, PlanUUID, and raw UUID types."""
+    """Test that run_plan works with Plan and PlanUUID types."""
     # Create a test plan
     plan = Plan(
         plan_context=PlanContext(query="test all plan types", tool_ids=["add_tool"]),
@@ -2864,7 +2864,7 @@ def test_portia_run_plan_with_all_plan_types(portia: Portia, telemetry: MagicMoc
         plan_run_2 = portia.run_plan(plan.id)
         assert plan_run_2.plan_id == plan.id
 
-        # Verify resume was called 3 times
+        # Verify resume was called 2 times
         assert mock_resume.call_count == 2
 
         # Verify all plan runs have the same plan_id
@@ -2901,7 +2901,7 @@ def test_portia_run_plan_with_all_plan_types_error_handling(portia: Portia) -> N
 
 
 def test_portia_example_plans_with_all_types(portia: Portia, planning_model: MagicMock) -> None:
-    """Test that example_plans parameter works with Plan, PlanUUID, UUID, and string types."""
+    """Test that example_plans parameter works with Plan, PlanUUID, and string types."""
     # Create example plans
     example_plan_1 = Plan(
         plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
@@ -2919,7 +2919,7 @@ def test_portia_example_plans_with_all_types(portia: Portia, planning_model: Mag
     # Mock planning model
     planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
 
-    # Test with mixed example_plans types: Plan, PlanUUID, UUID, string
+    # Test with mixed example_plans types: Plan, PlanUUID, string
     example_plans = [
         example_plan_1,  # Plan object
         example_plan_2.id,  # PlanUUID
@@ -2959,7 +2959,7 @@ def test_portia_resolve_example_plans_error_handling(portia: Portia) -> None:
 
     # Test with raw UUID, should raise TypeError
     with pytest.raises(TypeError, match="Invalid example plan type"):
-        portia._resolve_example_plans([UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05")])
+        portia._resolve_example_plans([UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05")])  # type: ignore[arg-type]
 
 
 
@@ -2982,8 +2982,7 @@ def test_portia_run_with_example_plans_all_types(portia: Portia, planning_model:
     # Mock planning model
     planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
 
-    # Test with mixed example_plans types: Plan, PlanUUID, UUID
-    # We'll test string queries separately since they need special handling
+    # Test with mixed example_plans types: Plan, PlanUUID
     example_plans = [
         example_plan_1,  # Plan object
         example_plan_2.id,  # PlanUUID
@@ -3013,7 +3012,7 @@ def test_portia_resolve_example_plans_with_all_types(portia: Portia) -> None:
     portia.storage.save_plan(example_plan_1)
     portia.storage.save_plan(example_plan_2)
 
-    # Test with all supported types: Plan, PlanUUID, UUID, plan ID string
+    # Test with all supported types: Plan, PlanUUID, plan ID string
     example_plans = [
         example_plan_1,  # Plan object
         example_plan_2.id,  # PlanUUID
@@ -3084,7 +3083,7 @@ def test_portia_resolve_example_plans_with_plan_id_strings(portia: Portia) -> No
     plan_id_string_1 = str(example_plan_1.id)  # "plan-uuid"
     plan_id_string_2 = str(example_plan_2.id)  # "plan-uuid"
 
-    example_plans: list[Plan | PlanUUID | UUID | str] = [plan_id_string_1, plan_id_string_2]
+    example_plans: list[Plan | PlanUUID | str] = [plan_id_string_1, plan_id_string_2]
 
     resolved_plans = portia._resolve_example_plans(example_plans)
 
