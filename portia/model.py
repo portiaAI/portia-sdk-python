@@ -638,8 +638,6 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
-        if schema.__name__ == "StepsOrError":
-            return await self.aget_structured_response_instructor(messages, schema)
         return await super().aget_structured_response(
             messages,
             schema,
