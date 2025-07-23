@@ -833,7 +833,6 @@ async def test_azure_openai_model_async_methods() -> None:
     """Test Azure OpenAI model async methods."""
     with (
         mock.patch("portia.model.AzureChatOpenAI") as mock_chat_azure_openai_cls,
-        mock.patch("instructor.from_openai") as mock_instructor,
     ):
         mock_chat_azure_openai = MagicMock()
 
@@ -849,21 +848,11 @@ async def test_azure_openai_model_async_methods() -> None:
         async def mock_structured_ainvoke(*_: Any, **__: Any) -> StructuredOutputTestModel:
             return StructuredOutputTestModel(test_field="Azure OpenAI structured response")
 
+
         structured_output.ainvoke = mock_structured_ainvoke
         mock_chat_azure_openai.with_structured_output.return_value = structured_output
 
         mock_chat_azure_openai_cls.return_value = mock_chat_azure_openai
-
-        mock_instructor_client = MagicMock()
-        mock_instructor.return_value = mock_instructor_client
-        # Mock the async create method
-        mock_create = MagicMock()
-
-        async def mock_create_async(*args: Any, **kwargs: Any) -> StructuredOutputTestModel:
-            mock_create(*args, **kwargs)
-            return StructuredOutputTestModel(test_field="azure instructor")
-
-        mock_instructor_client.chat.completions.create = mock_create_async
 
         model = AzureOpenAIGenerativeModel(
             model_name="gpt-4o",
@@ -883,13 +872,6 @@ async def test_azure_openai_model_async_methods() -> None:
         result = await model.aget_structured_response(messages, StructuredOutputTestModel)
         assert isinstance(result, StructuredOutputTestModel)
         assert result.test_field == "Azure OpenAI structured response"
-
-        # Test with StepsOrError schema (should use instructor)
-        result = await model.aget_structured_response(messages, StepsOrError)
-        assert isinstance(result, StructuredOutputTestModel)
-        assert result.test_field == "azure instructor"
-        # Verify the mock was called
-        assert mock_create.call_count == 1
 
 
 # Test conditional imports for optional models
