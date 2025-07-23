@@ -302,7 +302,9 @@ DEFAULT_MODEL_KEY = "default_model_name"
 MODEL_EXTRA_KWARGS = {
     "openai/o3-mini": {"reasoning_effort": "medium"},
     "openai/o4-mini": {"reasoning_effort": "medium"},
-    "anthropic/claude-3-7-sonnet-latest": {"thinking": {"type": "enabled", "budget_tokens": 3000}},
+    "anthropic/claude-3-7-sonnet-latest": {
+        "model_kwargs": {"thinking": {"type": "enabled", "budget_tokens": 3000}}
+    },
 }
 
 
