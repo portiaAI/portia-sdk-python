@@ -929,7 +929,7 @@ async def test_google_model_async_methods_if_available() -> None:
             structured_output = MagicMock()
 
             async def mock_structured_ainvoke(*_: Any, **__: Any) -> dict[str, Any]:
-                return {"parsed": {"test_field": "Google structured response"}}
+                return {"test_field": "Google structured response"}
 
             structured_output.ainvoke = mock_structured_ainvoke
             mock_chat_google.with_structured_output.return_value = structured_output
