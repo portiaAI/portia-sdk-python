@@ -150,9 +150,7 @@ class GenerativeModel(ABC):
 
     @abstractmethod
     async def aget_response(self, messages: list[Message]) -> Message:
-        """Given a list of messages, call the model and return its response as a new message
-        asynchronously.
-
+        """Given a list of messages, call the model and return its response as a new message async.
 
         Args:
             messages (list[Message]): The list of messages to send to the model.
@@ -771,8 +769,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
         **kwargs: Any,
     ) -> BaseModelT:
-        """Call the model in structured output mode targeting the given Pydantic model
-        asynchronously.
+        """Call the model in structured output mode targeting the given Pydantic model async.
 
         Args:
             messages (list[Message]): The list of messages to send to the model.
@@ -916,8 +913,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             schema: type[BaseModelT],
             **kwargs: Any,
         ) -> BaseModelT:
-            """Call the model in structured output mode targeting the given Pydantic model
-            asynchronously.
+            """Call the model in structured output mode targeting the given Pydantic model async.
 
             Args:
                 messages (list[Message]): The list of messages to send to the model.
@@ -1064,8 +1060,7 @@ if validate_extras_dependencies("google", raise_error=False):
             schema: type[BaseModelT],
             **kwargs: Any,
         ) -> BaseModelT:
-            """Call the model in structured output mode targeting the given Pydantic model
-            asynchronously.
+            """Call the model in structured output mode targeting the given Pydantic model async.
 
             Args:
                 messages (list[Message]): The list of messages to send to the model.

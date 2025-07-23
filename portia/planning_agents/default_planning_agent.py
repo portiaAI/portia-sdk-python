@@ -172,12 +172,12 @@ class DefaultPlanningAgent(BasePlanningAgent):
             steps_or_error = self._process_response(response, tool_list, plan_inputs, i)
             if steps_or_error.error is None:
                 return steps_or_error
-            previous_errors.append(steps_or_error)
+            previous_errors.append(steps_or_error.error)
 
         # If we get here, we've exhausted all retries
         return StepsOrError(
             steps=[],
-            error="\n".join(str(error) for error in previous_errors),
+            error="\n".join(str(error) for error in set(previous_errors)),
         )
 
     def _validate_tools_in_response(self, steps: list[Step], tool_list: list[Tool]) -> str | None:
