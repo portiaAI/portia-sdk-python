@@ -2864,38 +2864,29 @@ def test_portia_run_plan_with_all_plan_types(portia: Portia, telemetry: MagicMoc
         plan_run_2 = portia.run_plan(plan.id)
         assert plan_run_2.plan_id == plan.id
 
-        # Test 3: Run with raw UUID
-        plan_run_3 = portia.run_plan(plan.id.uuid)
-        assert plan_run_3.plan_id == plan.id
-
         # Verify resume was called 3 times
-        assert mock_resume.call_count == 3
+        assert mock_resume.call_count == 2
 
         # Verify all plan runs have the same plan_id
-        assert plan_run_1.plan_id == plan_run_2.plan_id == plan_run_3.plan_id
+        assert plan_run_1.plan_id == plan_run_2.plan_id
 
     # Verify telemetry captured the correct plan types
     telemetry_calls = telemetry.capture.call_args_list
-    assert len(telemetry_calls) == 3
+    assert len(telemetry_calls) == 2
 
     # Check telemetry for each plan type
     assert telemetry_calls[0][0][0].function_call_details["plan_type"] == "Plan"
     assert telemetry_calls[1][0][0].function_call_details["plan_type"] == "PlanUUID"
-    assert telemetry_calls[2][0][0].function_call_details["plan_type"] == "UUID"
 
 
 def test_portia_run_plan_with_all_plan_types_error_handling(portia: Portia) -> None:
     """Test error handling for all plan ID types when plan doesn't exist."""
     # Plan objects are automatically saved to storage, so they never raise PlanNotFoundError
-    # Only PlanUUID and UUID objects can raise PlanNotFoundError
+    # Only PlanUUID can raise PlanNotFoundError
 
     # Test with non-existent PlanUUID
     with pytest.raises(PlanNotFoundError):
         portia.run_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
-
-    # Test with non-existent raw UUID
-    with pytest.raises(PlanNotFoundError):
-        portia.run_plan(UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05"))
 
     # Test that Plan objects work (they get auto-saved, no error)
     non_existent_plan = Plan(
@@ -2932,13 +2923,12 @@ def test_portia_example_plans_with_all_types(portia: Portia, planning_model: Mag
     example_plans = [
         example_plan_1,  # Plan object
         example_plan_2.id,  # PlanUUID
-        example_plan_1.id.uuid,  # raw UUID
         "example query 2",  # string query
     ]
 
     with mock.patch.object(portia, "_resolve_example_plans") as mock_resolve:
         # Mock the resolve method to return the expected plans
-        mock_resolve.return_value = [example_plan_1, example_plan_2, example_plan_1, example_plan_2]
+        mock_resolve.return_value = [example_plan_1, example_plan_2, example_plan_2]
 
         plan = portia.plan("test query", example_plans=example_plans)
 
@@ -2955,10 +2945,6 @@ def test_portia_resolve_example_plans_error_handling(portia: Portia) -> None:
     with pytest.raises(PlanNotFoundError):
         portia._resolve_example_plans([PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")])
 
-    # Test with non-existent raw UUID
-    with pytest.raises(PlanNotFoundError):
-        portia._resolve_example_plans([UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05")])
-
     # Test with non-existent plan ID string
     with pytest.raises(PlanNotFoundError):
         portia._resolve_example_plans(["plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"])
@@ -2970,6 +2956,11 @@ def test_portia_resolve_example_plans_error_handling(portia: Portia) -> None:
     # Test with invalid type
     with pytest.raises(TypeError, match="Invalid example plan type"):
         portia._resolve_example_plans([123])  # type: ignore[arg-type]  # Invalid type
+
+    # Test with raw UUID, should raise TypeError
+    with pytest.raises(TypeError, match="Invalid example plan type"):
+        portia._resolve_example_plans([UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05")])
+
 
 
 def test_portia_run_with_example_plans_all_types(portia: Portia, planning_model: MagicMock) -> None:
@@ -2996,7 +2987,6 @@ def test_portia_run_with_example_plans_all_types(portia: Portia, planning_model:
     example_plans = [
         example_plan_1,  # Plan object
         example_plan_2.id,  # PlanUUID
-        example_plan_1.id.uuid,  # raw UUID
     ]
 
     # Test the run method with all example plan types
@@ -3027,7 +3017,6 @@ def test_portia_resolve_example_plans_with_all_types(portia: Portia) -> None:
     example_plans = [
         example_plan_1,  # Plan object
         example_plan_2.id,  # PlanUUID
-        example_plan_1.id.uuid,  # raw UUID
         str(example_plan_2.id),  # plan ID string
     ]
 
@@ -3035,11 +3024,10 @@ def test_portia_resolve_example_plans_with_all_types(portia: Portia) -> None:
 
     # Verify all plans were resolved correctly
     assert resolved_plans is not None
-    assert len(resolved_plans) == 4
+    assert len(resolved_plans) == 3
     assert resolved_plans[0].id == example_plan_1.id  # Plan object
     assert resolved_plans[1].id == example_plan_2.id  # PlanUUID
-    assert resolved_plans[2].id == example_plan_1.id  # UUID converted to plan
-    assert resolved_plans[3].id == example_plan_2.id  # Plan ID string resolved to plan
+    assert resolved_plans[2].id == example_plan_2.id  # Plan ID string resolved to plan
 
 
 def test_portia_example_plans_with_plan_id_strings(
@@ -3069,7 +3057,6 @@ def test_portia_example_plans_with_plan_id_strings(
 
     example_plans = [plan_id_1, plan_id_2]
 
-    # This should work now
     plan_run = portia.run("Get the weather in Paris", example_plans=example_plans)
 
     # Verify the run completed successfully

@@ -167,7 +167,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | UUID | str] | None = None,
+        example_plans: list[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -181,10 +181,9 @@ class Portia:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan | PlanUUID | UUID | str] | None): Optional list of example
-            plans or plan IDs. This can include Plan objects, PlanUUID objects, raw UUID
-            objects,
-            or plan ID strings (starting with "plan-"). Plan IDs and UUIDs will be loaded from
+            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
+            plans or plan IDs. This can include Plan objects, PlanUUID objects,
+            or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
             storage. If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
@@ -267,7 +266,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | UUID | str] | None = None,
+        example_plans: list[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -279,10 +278,10 @@ class Portia:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan | PlanUUID | UUID | str] | None): Optional list of example
+            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
             plans or plan IDs.
-            This can include Plan objects, PlanUUID objects, raw UUID objects, or plan ID strings
-            (starting with "plan-"). Plan IDs and UUIDs will be loaded from storage.
+            This can include Plan objects, PlanUUID objects, or plan ID strings
+            (starting with "plan-"). Plan IDs will be loaded from storage.
             If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
             plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
@@ -330,16 +329,15 @@ class Portia:
         )
 
     def _resolve_example_plans(
-        self, example_plans: list[Plan | PlanUUID | UUID | str] | None
+        self, example_plans: list[Plan | PlanUUID | str] | None
     ) -> list[Plan] | None:
-        """Resolve example plans from Plan objects, PlanUUIDs, UUID strings, and planID strings.
+        """Resolve example plans from Plan objects, PlanUUIDs and planID strings.
 
         Args:
-            example_plans (list[Plan | PlanUUID | UUID | str] | None): List of example plans or
+            example_plans (list[Plan | PlanUUID | str] | None): List of example plans or
             plan IDs.
                 - Plan objects are used directly
                 - PlanUUID objects are loaded from storage
-                - UUID objects are converted to PlanUUID and loaded from storage
                 - String objects must be plan ID strings (starting with "plan-")
 
         Returns:
@@ -367,9 +365,6 @@ class Portia:
             return example_plan
         if isinstance(example_plan, PlanUUID):
             return self._load_plan_by_uuid(example_plan)
-        if isinstance(example_plan, UUID):
-            plan_uuid = PlanUUID(uuid=example_plan)
-            return self._load_plan_by_uuid(plan_uuid)
         if isinstance(example_plan, str):
             return self._resolve_string_example_plan(example_plan)
         raise TypeError(
@@ -403,7 +398,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | UUID | str] | None = None,
+        example_plans: list[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -415,10 +410,10 @@ class Portia:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan | PlanUUID | UUID | str] | None): Optional list of example
+            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
             plans or plan IDs.
-            This can include Plan objects, PlanUUID objects, raw UUID objects, or plan ID strings
-            (starting with "plan-"). Plan IDs and UUIDs will be loaded from storage.
+            This can include Plan objects, PlanUUID objects or plan ID strings
+            (starting with "plan-"). Plan IDs will be loaded from storage.
             If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
             plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
@@ -454,7 +449,6 @@ class Portia:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
-        # Resolve example plans from PlanUUIDs to Plan objects
         resolved_example_plans = self._resolve_example_plans(example_plans)
 
         end_user = self.initialize_end_user(end_user)
