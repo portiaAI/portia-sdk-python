@@ -674,12 +674,21 @@ if validate_extras_dependencies("mistralai", raise_error=False):
 
 
 if validate_extras_dependencies("amazon", raise_error=False):
+    import logging
+
+    import boto3
     from langchain_aws import ChatBedrock
+
+    def set_amazon_logging_level(level: int) -> None:
+        """Set the logging level for boto3 client."""
+        boto3.set_stream_logger(name="botocore.credentials", level=level)
+        boto3.set_stream_logger(name="langchain_aws.llms.bedrock", level=level)
 
     class AmazonBedrockGenerativeModel(LangChainGenerativeModel):
         """Amazon Bedrock model implementation."""
 
         provider: LLMProvider = LLMProvider.AMAZON
+        set_amazon_logging_level(logging.WARNING)
 
         def __init__(
             self,
@@ -724,10 +733,16 @@ if validate_extras_dependencies("amazon", raise_error=False):
                 **kwargs,
             )
             super().__init__(client, model_id)
-
-            self._instructor_client = instructor.from_provider(
-                "bedrock/" + model_id, mode=instructor.Mode.BEDROCK_JSON
+            bedrock_client = boto3.client(
+                "bedrock-runtime",
+                region_name=region_name,
+                aws_access_key_id=SecretStr(aws_access_key_id) if aws_access_key_id else None,
+                aws_secret_access_key=SecretStr(aws_secret_access_key)
+                if aws_secret_access_key
+                else None,
             )
+
+            self._instructor_client = instructor.from_bedrock(bedrock_client)
 
 
 if validate_extras_dependencies("google", raise_error=False):

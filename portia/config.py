@@ -8,7 +8,6 @@ default settings.
 
 from __future__ import annotations
 
-import logging
 import os
 import warnings
 from collections.abc import Container
@@ -613,7 +612,6 @@ class Config(BaseModel):
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.5-pro"
                     case LLMProvider.AMAZON:
-                        set_amazon_logging_level(level=logging.WARNING)
                         return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
@@ -629,7 +627,6 @@ class Config(BaseModel):
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.5-flash"
                     case LLMProvider.AMAZON:
-                        set_amazon_logging_level(level=logging.WARNING)
                         return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
@@ -645,7 +642,6 @@ class Config(BaseModel):
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.5-flash"
                     case LLMProvider.AMAZON:
-                        set_amazon_logging_level(level=logging.WARNING)
                         return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
@@ -922,7 +918,6 @@ class Config(BaseModel):
                 validate_extras_dependencies("amazon")
                 from portia.model import AmazonBedrockGenerativeModel
 
-                set_amazon_logging_level(level=logging.WARNING)
                 return AmazonBedrockGenerativeModel(
                     model_id=model_name,
                     aws_access_key_id=self.aws_access_key_id,
@@ -948,14 +943,6 @@ class Config(BaseModel):
                 )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
-
-
-def set_amazon_logging_level(level: int) -> None:
-    """Set the logging level for boto3 client."""
-    import boto3
-
-    boto3.set_stream_logger(name="botocore.credentials", level=level)
-    boto3.set_stream_logger(name="langchain_aws.llms.bedrock", level=level)
 
 
 def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911
