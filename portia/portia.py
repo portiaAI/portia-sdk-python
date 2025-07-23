@@ -537,7 +537,7 @@ class Portia:
                 resolved_example_plans,
             )
             logger().error(message)
-            raise PlanError(outcome.error)
+            raise PlanError(message)
 
         plan = Plan(
             plan_context=PlanContext(
@@ -638,7 +638,7 @@ class Portia:
                 resolved_example_plans,
             )
             logger().error(message)
-            raise PlanError(outcome.error)
+            raise PlanError(message)
 
         plan = Plan(
             plan_context=PlanContext(
@@ -1676,15 +1676,14 @@ class Portia:
             end_user=end_user,
             examples=example_plans,
         )
+        message = original_error
         if not replan_outcome.error:
             tools_used = ", ".join([str(step.tool_id) for step in replan_outcome.steps])
             message = f"Error in planning - {original_error.rstrip('.')}.\n"
             message += "Replanning with Portia cloud tools would successfully generate a plan using"
             message += f" tools: {tools_used}.\n"
             message += "Go to https://app.portialabs.ai to sign up."
-            logger().error(message)
-            return message
-        return original_error
+        return message
 
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config, self.storage)
