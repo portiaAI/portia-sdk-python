@@ -49,6 +49,10 @@ google = [
     "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
     "google-genai>=1.18.0",
 ]
+amazon = [
+    "langchain-aws>=0.2.28 ; python_version >= '3.11' and python_version < '4.0'",
+    "boto3>=1.39.9"
+]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
 tools-browser-local = [
     "playwright>=1.49.0,<2",
@@ -71,7 +75,8 @@ all = [
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
     "redis>=5.2.1,<6",
-    "langchain-redis>=0.1.2 ; python_version >= '3.11' and python_version < '3.14'"
+    "langchain-redis>=0.1.2 ; python_version >= '3.11' and python_version < '3.14'",
+    "langchain-aws>=0.2.28 ; python_version >= '3.11' and python_version < '4.0'"
 ]
 
 [project.urls]

@@ -379,6 +379,10 @@ class Config(BaseModel):
         anthropic_api_key: The API key for Anthropic.
         mistralai_api_key: The API key for MistralAI.
         google_api_key: The API key for Google Generative AI.
+        aws_access_key_id: The AWS access key ID.
+        aws_secret_access_key: The AWS secret access key.
+        aws_default_region: The AWS default region.
+        aws_credentials_profile_name: The AWS credentials profile name.
         azure_openai_api_key: The API key for Azure OpenAI.
         azure_openai_endpoint: The endpoint for Azure OpenAI.
         llm_provider: The LLM provider. If set, Portia uses this to select the best models
@@ -440,6 +444,25 @@ class Config(BaseModel):
     ollama_base_url: str = Field(
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
         description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
+    )
+    aws_access_key_id: str = Field(
+        default_factory=lambda: os.getenv("AWS_ACCESS_KEY_ID") or "",
+        description="The AWS access key ID. Must be set if llm-provider is AMAZON",
+    )
+    aws_secret_access_key: str = Field(
+        default_factory=lambda: os.getenv("AWS_SECRET_ACCESS_KEY") or "",
+        description="The AWS secret access key. Must be set if llm-provider is AMAZON",
+    )
+    aws_default_region: str = Field(
+        default_factory=lambda: os.getenv("AWS_DEFAULT_REGION") or "",
+        description="The AWS default region. Must be set if llm-provider is AMAZON",
+    )
+    aws_credentials_profile_name: str | None = Field(
+        default_factory=lambda: os.getenv("AWS_CREDENTIALS_PROFILE_NAME") or None,
+        description=(
+            "The AWS credentials profile name. Must be set if llm-provider is AMAZON, "
+            "if not provided, aws_access_key_id and aws_secret_access_key must be provided"
+        ),
     )
 
     llm_redis_cache_url: str | None = Field(
@@ -599,6 +622,8 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.5-pro"
+                    case LLMProvider.AMAZON:
+                        return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
                 return None
@@ -612,6 +637,8 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.5-flash"
+                    case LLMProvider.AMAZON:
+                        return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
                 return None
@@ -625,6 +652,8 @@ class Config(BaseModel):
                         return "mistralai/mistral-large-latest"
                     case LLMProvider.GOOGLE:
                         return "google/gemini-2.5-flash"
+                    case LLMProvider.AMAZON:
+                        return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
                 return None
@@ -850,7 +879,7 @@ class Config(BaseModel):
         llm_provider = LLMProvider(provider)
         return self._construct_model_from_name(llm_provider, model_name)
 
-    def _construct_model_from_name(
+    def _construct_model_from_name(  # noqa: PLR0911
         self,
         llm_provider: LLMProvider,
         model_name: str,
@@ -896,6 +925,18 @@ class Config(BaseModel):
                     api_key=self.must_get_api_key("google_api_key"),
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
+            case LLMProvider.AMAZON:
+                validate_extras_dependencies("amazon")
+                from portia.model import AmazonBedrockGenerativeModel
+
+                return AmazonBedrockGenerativeModel(
+                    model_id=model_name,
+                    aws_access_key_id=self.aws_access_key_id,
+                    aws_secret_access_key=self.aws_secret_access_key,
+                    region_name=self.aws_default_region,
+                    credentials_profile_name=self.aws_credentials_profile_name,
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
+                )
             case LLMProvider.AZURE_OPENAI:
                 return AzureOpenAIGenerativeModel(
                     model_name=model_name,
@@ -916,7 +957,7 @@ class Config(BaseModel):
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
 
-def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003
+def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911
     """Get the default LLM provider from the API keys.
 
     Returns:
@@ -932,6 +973,13 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.MISTRALAI
     if os.getenv("GOOGLE_API_KEY") or kwargs.get("google_api_key"):
         return LLMProvider.GOOGLE
+    if (
+        os.getenv("AWS_ACCESS_KEY_ID")
+        or kwargs.get("aws_access_key_id")
+        or kwargs.get("aws_credentials_profile_name")
+        or os.getenv("AWS_CREDENTIALS_PROFILE_NAME")
+    ):
+        return LLMProvider.AMAZON
     if (os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT")) or (
         kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
     ):
