@@ -627,7 +627,7 @@ class Portia:
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
         coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
-        outcome = planning_agent.generate_steps_or_error(
+        outcome = await planning_agent.agenerate_steps_or_error(
             query=query,
             tool_list=tools,
             end_user=end_user,
@@ -658,7 +658,7 @@ class Portia:
             plan_inputs=coerced_plan_inputs or [],
             structured_output_schema=structured_output_schema,
         )
-        
+
         self.storage.save_plan(plan)
         logger().info(
             f"Plan created with {len(plan.steps)} steps",
