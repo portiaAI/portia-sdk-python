@@ -569,12 +569,10 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
             mode=instructor.Mode.JSON,
         )
         self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                AsyncAzureOpenAI(
-                    api_key=api_key.get_secret_value(),
-                    azure_endpoint=azure_endpoint,
-                    api_version=api_version,
-                )
+            AsyncAzureOpenAI(
+                api_key=api_key.get_secret_value(),
+                azure_endpoint=azure_endpoint,
+                api_version=api_version,
             ),
             mode=instructor.Mode.JSON,
         )
