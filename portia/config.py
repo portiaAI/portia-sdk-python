@@ -973,7 +973,12 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.MISTRALAI
     if os.getenv("GOOGLE_API_KEY") or kwargs.get("google_api_key"):
         return LLMProvider.GOOGLE
-    if os.getenv("AWS_ACCESS_KEY_ID") or kwargs.get("aws_access_key_id"):
+    if (
+        os.getenv("AWS_ACCESS_KEY_ID")
+        or kwargs.get("aws_access_key_id")
+        or kwargs.get("aws_credentials_profile_name")
+        or os.getenv("AWS_CREDENTIALS_PROFILE_NAME")
+    ):
         return LLMProvider.AMAZON
     if (os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT")) or (
         kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
