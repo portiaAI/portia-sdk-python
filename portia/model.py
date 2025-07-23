@@ -688,7 +688,6 @@ if validate_extras_dependencies("amazon", raise_error=False):
         """Amazon Bedrock model implementation."""
 
         provider: LLMProvider = LLMProvider.AMAZON
-        set_amazon_logging_level(logging.WARNING)
 
         def __init__(
             self,
@@ -720,6 +719,7 @@ if validate_extras_dependencies("amazon", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatBedrock
 
             """
+            set_amazon_logging_level(logging.WARNING)
             client = ChatBedrock(
                 model=model_id,
                 credentials_profile_name=credentials_profile_name,
