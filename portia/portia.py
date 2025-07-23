@@ -1658,10 +1658,7 @@ class Portia:
         example_plans: list[Plan] | None = None,
     ) -> None:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
-        if (
-            not isinstance(self.tool_registry, DefaultToolRegistry)
-            or self.config.portia_api_key
-        ):
+        if not isinstance(self.tool_registry, DefaultToolRegistry) or self.config.portia_api_key:
             return
         unauthenticated_client = PortiaCloudClient.new_client(
             self.config,
