@@ -368,8 +368,7 @@ class Portia:
         if isinstance(example_plan, str):
             return self._resolve_string_example_plan(example_plan)
         raise TypeError(
-            f"Invalid example plan type: {type(example_plan)}. "
-            "Expected Plan, PlanUUID, or str."
+            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
         )
 
     def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:

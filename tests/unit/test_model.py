@@ -1,6 +1,7 @@
 """Unit tests for the Message class in portia.model."""
 
 from types import SimpleNamespace
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -158,7 +159,7 @@ class DummyGenerativeModel(GenerativeModel):
         return Message(role="assistant", content="Hello")
 
     async def aget_structured_response(
-        self, messages: list[Message], schema: type[BaseModel]
+        self, _: list[Message], schema: type[BaseModel]
     ) -> BaseModel:
         """Get a structured response from the model."""
         return schema(test_field="test")
@@ -407,7 +408,7 @@ async def test_langchain_model_async_structured_output_returns_dict() -> None:
     base_chat_model.with_structured_output.return_value = structured_output
 
     # Mock the async invoke to return a proper response
-    async def mock_ainvoke(*args, **kwargs):
+    async def mock_ainvoke(*_: Any, **__: Any) -> StructuredOutputTestModel:
         return StructuredOutputTestModel(test_field="Response from model")
 
     structured_output.ainvoke = mock_ainvoke
@@ -447,7 +448,7 @@ async def test_anthropic_model_async_structured_output_returns_invalid_data(
     mock_chat_anthropic.with_structured_output.return_value = structured_output
 
     # Mock the async invoke to return None
-    async def mock_ainvoke(*args, **kwargs):
+    async def mock_ainvoke(*_: Any, **__: Any) -> None:
         return None
 
     structured_output.ainvoke = mock_ainvoke
@@ -471,7 +472,7 @@ async def test_anthropic_model_async_structured_output_returns_dict() -> None:
     mock_chat_anthropic.with_structured_output.return_value = structured_output
 
     # Mock the async invoke to return a proper response
-    async def mock_ainvoke(*args, **kwargs):
+    async def mock_ainvoke(*_: Any, **__: Any) -> dict[str, Any]:
         return {"parsed": {"test_field": "Response from model"}}
 
     structured_output.ainvoke = mock_ainvoke
@@ -566,7 +567,7 @@ async def test_anthropic_model_async_structured_output_fallback_to_instructor() 
     mock_chat_anthropic.with_structured_output.return_value = structured_output
 
     # Mock the async invoke to return a response that triggers fallback
-    async def mock_ainvoke(*args, **kwargs):
+    async def mock_ainvoke(*_: Any, **__: Any) -> dict[str, Any]:
         return {
             "parsing_error": ValidationError("Test error", []),
             "raw": AIMessage(content=" ".join("portia" for _ in range(10000))),
@@ -578,13 +579,13 @@ async def test_anthropic_model_async_structured_output_fallback_to_instructor() 
     mock_cache = MagicMock()
 
     # Mock the async lookup method
-    async def mock_alookup(*args, **kwargs):
+    async def mock_alookup(*_: Any, **__: Any) -> None:
         return None
 
     mock_cache.alookup = mock_alookup
 
     # Mock the async update method
-    async def mock_aupdate(*args, **kwargs):
+    async def mock_aupdate(*_: Any, **__: Any) -> None:
         pass
 
     mock_cache.aupdate = mock_aupdate
@@ -598,7 +599,7 @@ async def test_anthropic_model_async_structured_output_fallback_to_instructor() 
         mock_instructor_client = MagicMock()
         mock_create = MagicMock()
 
-        async def mock_create_async(*args, **kwargs):
+        async def mock_create_async(*args: Any, **kwargs: Any) -> StructuredOutputTestModel:
             mock_create(*args, **kwargs)
             return StructuredOutputTestModel(test_field="")
 
@@ -631,7 +632,7 @@ async def test_instructor_async_manual_cache(monkeypatch: pytest.MonkeyPatch) ->
     )
 
     # Mock the async create method
-    async def mock_create(*args, **kwargs):
+    async def mock_create(*_: Any, **__: Any) -> DummyModel:
         return DummyModel()
 
     mock_instructor_client.chat.completions.create = mock_create
@@ -723,7 +724,7 @@ async def test_openai_model_async_methods() -> None:
         mock_chat_openai = MagicMock()
 
         # Mock the async invoke method
-        async def mock_ainvoke(*args, **kwargs):
+        async def mock_ainvoke(*_: Any, **__: Any) -> AIMessage:
             return AIMessage(content="OpenAI response")
 
         mock_chat_openai.ainvoke = mock_ainvoke
@@ -731,7 +732,7 @@ async def test_openai_model_async_methods() -> None:
         # Mock the structured output
         structured_output = MagicMock()
 
-        async def mock_structured_ainvoke(*args, **kwargs):
+        async def mock_structured_ainvoke(*_: Any, **__: Any) -> StructuredOutputTestModel:
             return StructuredOutputTestModel(test_field="OpenAI structured response")
 
         structured_output.ainvoke = mock_structured_ainvoke
@@ -773,7 +774,7 @@ async def test_openai_model_async_instructor_fallback() -> None:
         # Mock the async create method
         mock_create = MagicMock()
 
-        async def mock_create_async(*args, **kwargs):
+        async def mock_create_async(*args: Any, **kwargs: Any) -> StructuredOutputTestModel:
             mock_create(*args, **kwargs)
             return StructuredOutputTestModel(test_field="instructor")
 
@@ -804,7 +805,7 @@ async def test_azure_openai_model_async_methods() -> None:
         mock_chat_azure_openai = MagicMock()
 
         # Mock the async invoke method
-        async def mock_ainvoke(*args, **kwargs):
+        async def mock_ainvoke(*_: Any, **__: Any) -> AIMessage:
             return AIMessage(content="Azure OpenAI response")
 
         mock_chat_azure_openai.ainvoke = mock_ainvoke
@@ -812,7 +813,7 @@ async def test_azure_openai_model_async_methods() -> None:
         # Mock the structured output
         structured_output = MagicMock()
 
-        async def mock_structured_ainvoke(*args, **kwargs):
+        async def mock_structured_ainvoke(*_: Any, **__: Any) -> StructuredOutputTestModel:
             return StructuredOutputTestModel(test_field="Azure OpenAI structured response")
 
         structured_output.ainvoke = mock_structured_ainvoke
@@ -825,7 +826,7 @@ async def test_azure_openai_model_async_methods() -> None:
         # Mock the async create method
         mock_create = MagicMock()
 
-        async def mock_create_async(*args, **kwargs):
+        async def mock_create_async(*args: Any, **kwargs: Any) -> StructuredOutputTestModel:
             mock_create(*args, **kwargs)
             return StructuredOutputTestModel(test_field="azure instructor")
 
@@ -869,7 +870,7 @@ async def test_mistralai_model_async_methods_if_available() -> None:
             mock_chat_mistral = MagicMock()
 
             # Mock the async invoke method
-            async def mock_ainvoke(*args, **kwargs):
+            async def mock_ainvoke(*_: Any, **__: Any) -> AIMessage:
                 return AIMessage(content="Mistral response")
 
             mock_chat_mistral.ainvoke = mock_ainvoke
@@ -877,7 +878,7 @@ async def test_mistralai_model_async_methods_if_available() -> None:
             # Mock the structured output
             structured_output = MagicMock()
 
-            async def mock_structured_ainvoke(*args, **kwargs):
+            async def mock_structured_ainvoke(*_: Any, **__: Any) -> dict[str, Any]:
                 return {"parsed": {"test_field": "Mistral structured response"}}
 
             structured_output.ainvoke = mock_structured_ainvoke
@@ -917,7 +918,7 @@ async def test_google_model_async_methods_if_available() -> None:
             mock_chat_google = MagicMock()
 
             # Mock the async invoke method
-            async def mock_ainvoke(*args, **kwargs):
+            async def mock_ainvoke(*_: Any, **__: Any) -> AIMessage:
                 return AIMessage(content="Google response")
 
             mock_chat_google.ainvoke = mock_ainvoke
@@ -925,7 +926,7 @@ async def test_google_model_async_methods_if_available() -> None:
             # Mock the structured output
             structured_output = MagicMock()
 
-            async def mock_structured_ainvoke(*args, **kwargs):
+            async def mock_structured_ainvoke(*_: Any, **__: Any) -> dict[str, Any]:
                 return {"parsed": {"test_field": "Google structured response"}}
 
             structured_output.ainvoke = mock_structured_ainvoke
@@ -965,7 +966,7 @@ async def test_ollama_model_async_methods_if_available() -> None:
             mock_chat_ollama = MagicMock()
 
             # Mock the async invoke method
-            async def mock_ainvoke(*args, **kwargs):
+            async def mock_ainvoke(*_: Any, **__: Any) -> AIMessage:
                 return AIMessage(content="Ollama response")
 
             mock_chat_ollama.ainvoke = mock_ainvoke
@@ -990,7 +991,7 @@ async def test_ollama_model_async_methods_if_available() -> None:
                 mock_instructor.return_value = mock_instructor_client
 
                 # Mock the async create method
-                async def mock_create(*args, **kwargs):
+                async def mock_create(*_: Any, **__: Any) -> StructuredOutputTestModel:
                     return StructuredOutputTestModel(test_field="ollama")
 
                 mock_instructor_client.chat.completions.create = mock_create

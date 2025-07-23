@@ -2943,7 +2943,9 @@ def test_portia_resolve_example_plans_error_handling(portia: Portia) -> None:
     """Test error handling in _resolve_example_plans method."""
     # Test with non-existent PlanUUID
     with pytest.raises(PlanNotFoundError):
-        portia._resolve_example_plans([PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")])
+        portia._resolve_example_plans(
+            [PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")]
+        )
 
     # Test with non-existent plan ID string
     with pytest.raises(PlanNotFoundError):
@@ -2960,7 +2962,6 @@ def test_portia_resolve_example_plans_error_handling(portia: Portia) -> None:
     # Test with raw UUID, should raise TypeError
     with pytest.raises(TypeError, match="Invalid example plan type"):
         portia._resolve_example_plans([UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05")])  # type: ignore[arg-type]
-
 
 
 def test_portia_run_with_example_plans_all_types(portia: Portia, planning_model: MagicMock) -> None:
