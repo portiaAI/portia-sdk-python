@@ -794,7 +794,7 @@ def generate_pydantic_model_from_json_schema(
     )
 
     # Create the Pydantic model dynamically
-    model = create_model(model_name, __base__=GeneratedBaseModel, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
+    model = create_model(model_name, __base__=GeneratedBaseModel, **fields)
     model.extend_exclude_unset_fields(non_nullable_omissible_fields)
     return model
 
@@ -819,14 +819,21 @@ def _generate_field(
     field_type = _map_pydantic_type(field_name, field)
     if force_nullable:
         field_type = field_type | None
+
+    field_kwargs: dict[str, Any] = {
+        "default": ... if required else default_from_schema,
+        "description": field.get("description", ""),
+    }
+    if "minLength" in field:
+        field_kwargs["min_length"] = field["minLength"]
+    if "maxLength" in field:
+        field_kwargs["max_length"] = field["maxLength"]
+
     return (
         field_name,
         (
             field_type,
-            Field(
-                default=... if required else default_from_schema,
-                description=field.get("description", ""),
-            ),
+            Field(**field_kwargs),
         ),
     )
 
