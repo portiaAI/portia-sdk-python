@@ -17,7 +17,7 @@ from portia.telemetry.telemetry_service import (
 from portia.telemetry.views import BaseTelemetryEvent
 
 
-class TestTelemetryEvent(BaseTelemetryEvent):
+class TelemetryEvent(BaseTelemetryEvent):
     """Test implementation of BaseTelemetryEvent for testing purposes."""
 
     def __init__(self, name: str, properties: dict) -> None:
@@ -144,7 +144,7 @@ class TestProductTelemetry:
             patch("portia.telemetry.telemetry_service.logger", mock_logger),
         ):
             telemetry = ProductTelemetry()
-            event = TestTelemetryEvent("test_event", {})
+            event = TelemetryEvent("test_event", {})
             # Should not raise any exceptions
             telemetry.capture(event)
             mock_logger.debug.assert_called_once_with("Telemetry disabled")
@@ -160,7 +160,7 @@ class TestProductTelemetry:
             mock_client = MagicMock()
             telemetry._posthog_client = mock_client
 
-            event = TestTelemetryEvent("test_event", {"key": "value"})
+            event = TelemetryEvent("test_event", {"key": "value"})
             telemetry.capture(event)
 
             mock_logger.debug.assert_called_with("Telemetry event: test_event {'key': 'value'}")
@@ -185,7 +185,7 @@ class TestProductTelemetry:
             mock_client.capture.side_effect = Exception("PostHog API error")
             telemetry._posthog_client = mock_client
 
-            event = TestTelemetryEvent("test_event", {"key": "value"})
+            event = TelemetryEvent("test_event", {"key": "value"})
             # Should not raise the exception
             telemetry.capture(event)
 

@@ -104,11 +104,33 @@ def test_get_response(model_str: str, messages: list[Message]) -> None:
 
 
 @pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
+@pytest.mark.asyncio
+async def test_aget_response(model_str: str, messages: list[Message]) -> None:
+    """Test aget_response for each model type."""
+    model = Config.from_default(default_model=model_str).get_default_model()
+    response = await model.aget_response(messages)
+    assert isinstance(response, Message)
+    assert response.role is not None
+    assert response.content is not None
+
+
+@pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
 @pytest.mark.flaky(reruns=4)
 def test_get_structured_response(model_str: str, messages: list[Message]) -> None:
     """Test get_structured_response for each model type."""
     model = Config.from_default(default_model=model_str).get_default_model()
     response = model.get_structured_response(messages, Response)
+    assert isinstance(response, Response)
+    assert response.message is not None
+
+
+@pytest.mark.parametrize("model_str", MODELS + LOW_CAPABILITY_MODELS)
+@pytest.mark.flaky(reruns=4)
+@pytest.mark.asyncio
+async def test_aget_structured_response(model_str: str, messages: list[Message]) -> None:
+    """Test aget_structured_response for each model type."""
+    model = Config.from_default(default_model=model_str).get_default_model()
+    response = await model.aget_structured_response(messages, Response)
     assert isinstance(response, Response)
     assert response.message is not None
 
@@ -125,6 +147,21 @@ def test_get_structured_response_steps_or_error(model_str: str, messages: list[M
     assert isinstance(response, StepsOrError)
 
 
+@pytest.mark.parametrize("model_str", MODELS)
+@pytest.mark.asyncio
+async def test_aget_structured_response_steps_or_error(
+    model_str: str, messages: list[Message]
+) -> None:
+    """Test aget_structured_response with StepsOrError for each model type.
+
+    Skip Ollama models because the small models we used for integration testing aren't
+    good enough for complex schemas.
+    """
+    model = Config.from_default(default_model=model_str).get_default_model()
+    response = await model.aget_structured_response(messages, StepsOrError)
+    assert isinstance(response, StepsOrError)
+
+
 def test_google_gemini_temperature(messages: list[Message]) -> None:
     """Test that GoogleGenAiGenerativeModel supports setting temperature."""
     config = Config.from_default(llm_provider=LLMProvider.GOOGLE)
@@ -134,5 +171,19 @@ def test_google_gemini_temperature(messages: list[Message]) -> None:
         temperature=0.5,
     )
     response = model.get_response(messages)
+    assert isinstance(response, Message)
+    assert response.content is not None
+
+
+@pytest.mark.asyncio
+async def test_google_gemini_temperature_async(messages: list[Message]) -> None:
+    """Test that GoogleGenAiGenerativeModel supports setting temperature in async mode."""
+    config = Config.from_default(llm_provider=LLMProvider.GOOGLE)
+    model = GoogleGenAiGenerativeModel(
+        model_name="gemini-2.0-flash",
+        api_key=config.google_api_key,
+        temperature=0.5,
+    )
+    response = await model.aget_response(messages)
     assert isinstance(response, Message)
     assert response.content is not None

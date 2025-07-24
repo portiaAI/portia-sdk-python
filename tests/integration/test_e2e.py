@@ -136,6 +136,80 @@ def test_portia_generate_plan(
 
 
 @pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
+@pytest.mark.flaky(reruns=4)
+@pytest.mark.asyncio
+async def test_portia_agenerate_plan(
+    llm_provider: LLMProvider,
+    default_model_name: str,
+) -> None:
+    """Test async planning a simple query."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        default_model=default_model_name,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    tool_registry = ToolRegistry([AdditionTool()])
+    portia = Portia(config=config, tools=tool_registry)
+    query = "Add 1 + 2"
+
+    plan = await portia.aplan(query)
+
+    assert len(plan.steps) == 1
+    assert plan.steps[0].tool_id == "add_tool"
+
+
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), PLANNING_PROVIDERS)
+@pytest.mark.flaky(reruns=4)
+@pytest.mark.asyncio
+async def test_portia_aplan_steps_inputs_dependencies(
+    llm_provider: LLMProvider,
+    default_model_name: str,
+) -> None:
+    """Test async planning with steps, inputs, and dependencies."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        default_model=default_model_name,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    class AdditionNumbers(BaseModel):
+        num_a: int = Field(description="First number to add")
+        num_b: int = Field(description="Second number to add")
+
+    class AdditionTool(Tool):
+        """A tool that adds two numbers."""
+
+        id: str = "add_tool"
+        name: str = "Addition Tool"
+        description: str = "Adds two numbers together"
+        args_schema: type[BaseModel] = AdditionNumbers
+        output_schema: tuple[str, str] = ("int", "The sum of the two numbers")
+
+        def run(self, _: ToolRunContext, num_a: int, num_b: int) -> int:
+            """Add two numbers."""
+            return num_a + num_b
+
+    tool_registry = ToolRegistry([AdditionTool()])
+    portia = Portia(config=config, tools=tool_registry)
+    query = "Add two numbers"
+
+    plan = await portia.aplan(
+        query,
+        plan_inputs=[
+            PlanInput(name="$num_a", description="First number to add"),
+            PlanInput(name="$num_b", description="Second number to add"),
+        ],
+    )
+
+    assert len(plan.steps) == 1
+    assert plan.steps[0].tool_id == "add_tool"
+    assert len(plan.plan_inputs) == 2
+    assert plan.plan_inputs[0].name == "$num_a"
+    assert plan.plan_inputs[1].name == "$num_b"
+
+
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.parametrize("storage", STORAGE)
 @pytest.mark.flaky(reruns=3)

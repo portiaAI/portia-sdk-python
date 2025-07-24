@@ -395,6 +395,69 @@ class Portia:
         except Exception as e:
             raise PlanNotFoundError(plan_uuid) from e
 
+    async def aplan(
+        self,
+        query: str,
+        tools: list[Tool] | list[str] | None = None,
+        example_plans: list[Plan | PlanUUID | str] | None = None,
+        end_user: str | EndUser | None = None,
+        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+        use_cached_plan: bool = False,
+    ) -> Plan:
+        """Plans how to do the query given the set of tools and any examples asynchronously.
+
+        Args:
+            query (str): The query to generate the plan for.
+            tools (list[Tool] | list[str] | None): List of tools to use for the query.
+            If not provided all tools in the registry will be used.
+            example_plans (list[Plan] | None): Optional list of example plans. If not
+            provide a default set of example plans will be used.
+            end_user (str | EndUser | None = None): The optional end user for this plan.
+            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
+                of inputs required for the plan.
+                This can be a list of Planinput objects, a list of dicts with keys "name" and
+                "description" (optional), or a list of plan run input names. If a value is provided
+                with a PlanInput object or in a dictionary, it will be ignored as values are only
+                used when running the plan.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query. This is passed on to plan runs created from this plan but will be
+                not be stored with the plan itself if using cloud storage and must be re-attached
+                to the plan run if using cloud storage.
+            use_cached_plan (bool): Whether to use a cached plan if it exists.
+
+        Returns:
+            Plan: The plan for executing the query.
+
+        Raises:
+            PlanError: If there is an error while generating the plan.
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_aplan",
+                function_call_details={
+                    "tools": (
+                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
+                        if tools
+                        else None
+                    ),
+                    "example_plans_provided": example_plans is not None,
+                    "end_user_provided": end_user is not None,
+                    "plan_inputs_provided": plan_inputs is not None,
+                },
+            )
+        )
+        return await self._aplan(
+            query,
+            tools,
+            example_plans,
+            end_user,
+            plan_inputs,
+            structured_output_schema,
+            use_cached_plan,
+        )
+
     def _plan(
         self,
         query: str,
@@ -405,7 +468,9 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
     ) -> Plan:
-        """Plans how to do the query given the set of tools and any examples.
+        """Implement synchronous planning logic.
+
+        This is used when we're already in an event loop and can't use asyncio.run().
 
         Args:
             query (str): The query to generate the plan for.
@@ -441,6 +506,7 @@ class Portia:
                 return self.storage.get_plan_by_query(query)
             except StorageError as e:
                 logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
+
         if isinstance(tools, list):
             tools = [
                 self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
@@ -456,6 +522,7 @@ class Portia:
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
         coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
+
         outcome = planning_agent.generate_steps_or_error(
             query=query,
             tool_list=tools,
@@ -463,19 +530,17 @@ class Portia:
             examples=resolved_example_plans,
             plan_inputs=coerced_plan_inputs,
         )
+
         if outcome.error:
-            if (
-                isinstance(self.tool_registry, DefaultToolRegistry)
-                and not self.config.portia_api_key
-            ):
-                self._log_replan_with_portia_cloud_tools(
-                    outcome.error,
-                    query,
-                    end_user,
-                    resolved_example_plans,
-                )
+            self._log_replan_with_portia_cloud_tools(
+                outcome.error,
+                query,
+                end_user,
+                resolved_example_plans,
+            )
             logger().error(f"Error in planning - {outcome.error}")
             raise PlanError(outcome.error)
+
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
@@ -485,6 +550,108 @@ class Portia:
             plan_inputs=coerced_plan_inputs or [],
             structured_output_schema=structured_output_schema,
         )
+
+        self.storage.save_plan(plan)
+        logger().info(
+            f"Plan created with {len(plan.steps)} steps",
+            plan=str(plan.id),
+        )
+        logger().debug(plan.pretty_print())
+
+        return plan
+
+    async def _aplan(
+        self,
+        query: str,
+        tools: list[Tool] | list[str] | None = None,
+        example_plans: list[Plan | PlanUUID | str] | None = None,
+        end_user: str | EndUser | None = None,
+        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+        use_cached_plan: bool = False,
+    ) -> Plan:
+        """Async implementation of planning logic.
+
+        This is the core async implementation that both sync and async methods use.
+
+        Args:
+            query (str): The query to generate the plan for.
+            tools (list[Tool] | list[str] | None): List of tools to use for the query.
+            If not provided all tools in the registry will be used.
+            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
+            plans or plan IDs.
+            This can include Plan objects, PlanUUID objects or plan ID strings
+            (starting with "plan-"). Plan IDs will be loaded from storage.
+            If not provided, a default set of example plans will be used.
+            end_user (str | EndUser | None = None): The optional end user for this plan.
+            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
+                of inputs required for the plan.
+                This can be a list of Planinput objects, a list of dicts with keys "name" and
+                "description" (optional), or a list of plan run input names. If a value is provided
+                with a PlanInput object or in a dictionary, it will be ignored as values are only
+                used when running the plan.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query. This is passed on to plan runs created from this plan but will be
+                not be stored with the plan itself if using cloud storage and must be re-attached
+                to the plan run if using cloud storage.
+            use_cached_plan (bool): Whether to use a cached plan if it exists.
+
+        Returns:
+            Plan: The plan for executing the query.
+
+        Raises:
+            PlanError: If there is an error while generating the plan.
+
+        """
+        if use_cached_plan:
+            try:
+                return self.storage.get_plan_by_query(query)
+            except StorageError as e:
+                logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
+
+        if isinstance(tools, list):
+            tools = [
+                self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
+                for tool in tools
+            ]
+
+        if not tools:
+            tools = self.tool_registry.match_tools(query)
+
+        resolved_example_plans = self._resolve_example_plans(example_plans)
+
+        end_user = self.initialize_end_user(end_user)
+        logger().info(f"Running planning_agent for query - {query}")
+        planning_agent = self._get_planning_agent()
+        coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
+        outcome = await planning_agent.agenerate_steps_or_error(
+            query=query,
+            tool_list=tools,
+            end_user=end_user,
+            examples=resolved_example_plans,
+            plan_inputs=coerced_plan_inputs,
+        )
+
+        if outcome.error:
+            self._log_replan_with_portia_cloud_tools(
+                outcome.error,
+                query,
+                end_user,
+                resolved_example_plans,
+            )
+            logger().error(f"Error in planning - {outcome.error}")
+            raise PlanError(outcome.error)
+
+        plan = Plan(
+            plan_context=PlanContext(
+                query=query,
+                tool_ids=[tool.id for tool in tools],
+            ),
+            steps=outcome.steps,
+            plan_inputs=coerced_plan_inputs or [],
+            structured_output_schema=structured_output_schema,
+        )
+
         self.storage.save_plan(plan)
         logger().info(
             f"Plan created with {len(plan.steps)} steps",
@@ -1493,6 +1660,8 @@ class Portia:
         example_plans: list[Plan] | None = None,
     ) -> None:
         """Generate a plan using Portia cloud tools for users who's plans fail without them."""
+        if not isinstance(self.tool_registry, DefaultToolRegistry) or self.config.portia_api_key:
+            return
         unauthenticated_client = PortiaCloudClient.new_client(
             self.config,
             allow_unauthenticated=True,

@@ -99,7 +99,7 @@ dev = [
     "pytest-cov>=5.0.0,<6",
     "pyright>=1.1.382,<2",
     "pytest-xdist[psutil]>=3.6.1,<4",
-    "pytest-asyncio>=0.25.3,<0.26",
+    "pytest-asyncio>=1.1.0",
     "pytest-httpx>=0.35.0",
 ]
 
