@@ -22,3 +22,10 @@ jobs:
           token: ${{ secrets.DEPLOY_PAT_TOKEN }}
           repository: portiaAI/docs
           event-type: bump-sdk-version
+
+      - name: Trigger Portia Platform Repository Dispatch
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DEPLOY_PAT_TOKEN }}
+          repository: portiaAI/platform
+          event-type: bump-sdk-version

@@ -700,6 +700,29 @@ def test_generate_pydantic_model_from_json_schema() -> None:
     assert model.model_fields["address"].description == "The address of the user"
 
 
+def test_generate_pydantic_model_from_json_schema_min_max_length() -> None:
+    """Test generating a Pydantic model from a JSON schema with minLength and maxLength."""
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "The name of the user",
+                "minLength": 3,
+                "maxLength": 10,
+            },
+        },
+        "required": ["name"],
+    }
+    model = generate_pydantic_model_from_json_schema("TestMinMaxModel", json_schema)
+    assert any(
+        hasattr(m, "min_length") and m.min_length == 3 for m in model.model_fields["name"].metadata
+    )
+    assert any(
+        hasattr(m, "max_length") and m.max_length == 10 for m in model.model_fields["name"].metadata
+    )
+
+
 def test_generate_pydantic_model_from_json_schema_union_types() -> None:
     """Test generating a Pydantic model from a JSON schema with union types."""
     json_schema = {
