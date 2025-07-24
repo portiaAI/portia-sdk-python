@@ -819,14 +819,21 @@ def _generate_field(
     field_type = _map_pydantic_type(field_name, field)
     if force_nullable:
         field_type = field_type | None
+
+    field_kwargs: dict[str, Any] = {
+        "default": ... if required else default_from_schema,
+        "description": field.get("description", ""),
+    }
+    if "minLength" in field:
+        field_kwargs["min_length"] = field["minLength"]
+    if "maxLength" in field:
+        field_kwargs["max_length"] = field["maxLength"]
+
     return (
         field_name,
         (
             field_type,
-            Field(
-                default=... if required else default_from_schema,
-                description=field.get("description", ""),
-            ),
+            Field(**field_kwargs),
         ),
     )
 
