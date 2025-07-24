@@ -794,7 +794,7 @@ def generate_pydantic_model_from_json_schema(
     )
 
     # Create the Pydantic model dynamically
-    model = create_model(model_name, __base__=GeneratedBaseModel, **fields)
+    model = create_model(model_name, __base__=GeneratedBaseModel, **fields # type: ignore # noqa: PGH003 - We want to use default config
     model.extend_exclude_unset_fields(non_nullable_omissible_fields)
     return model
 
