@@ -22,7 +22,7 @@ complex queries using various planning and execution agent configurations.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -167,7 +167,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -181,7 +181,7 @@ class Portia:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
             plans or plan IDs. This can include Plan objects, PlanUUID objects,
             or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
             storage. If not provided, a default set of example plans will be used.
@@ -266,7 +266,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -278,7 +278,7 @@ class Portia:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
             plans or plan IDs.
             This can include Plan objects, PlanUUID objects, or plan ID strings
             (starting with "plan-"). Plan IDs will be loaded from storage.
@@ -329,12 +329,12 @@ class Portia:
         )
 
     def _resolve_example_plans(
-        self, example_plans: list[Plan | PlanUUID | str] | None
+        self, example_plans: Sequence[Plan | PlanUUID | str] | None
     ) -> list[Plan] | None:
         """Resolve example plans from Plan objects, PlanUUIDs and planID strings.
 
         Args:
-            example_plans (list[Plan | PlanUUID | str] | None): List of example plans or
+            example_plans (Sequence[Plan | PlanUUID | str] | None): List of example plans or
             plan IDs.
                 - Plan objects are used directly
                 - PlanUUID objects are loaded from storage
@@ -368,8 +368,7 @@ class Portia:
         if isinstance(example_plan, str):
             return self._resolve_string_example_plan(example_plan)
         raise TypeError(
-            f"Invalid example plan type: {type(example_plan)}. "
-            "Expected Plan, PlanUUID, or str."
+            f"Invalid example plan type: {type(example_plan)}. " "Expected Plan, PlanUUID, or str."
         )
 
     def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
@@ -398,7 +397,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -410,7 +409,7 @@ class Portia:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
             plans or plan IDs.
             This can include Plan objects, PlanUUID objects or plan ID strings
             (starting with "plan-"). Plan IDs will be loaded from storage.
