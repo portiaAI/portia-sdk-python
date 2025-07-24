@@ -22,7 +22,7 @@ complex queries using various planning and execution agent configurations.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -85,6 +85,8 @@ from portia.tool_wrapper import ToolCallWrapper
 from portia.version import get_version
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
@@ -368,7 +370,7 @@ class Portia:
         if isinstance(example_plan, str):
             return self._resolve_string_example_plan(example_plan)
         raise TypeError(
-            f"Invalid example plan type: {type(example_plan)}. " "Expected Plan, PlanUUID, or str."
+            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
         )
 
     def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
