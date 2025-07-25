@@ -211,8 +211,56 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
                 raise ToolSoftError(e) from e
             raise
+        return self._parse_output(output)
 
-        # handle clarifications cleanly
+    async def arun(
+        self,
+        ctx: ToolRunContext,
+        *args: Any,
+        **kwargs: Any,
+    ) -> SERIALIZABLE_TYPE_VAR | Clarification:
+        """Async run the tool.
+
+        Args:
+            ctx (ToolRunContext): The context for the tool.
+            *args (Any): Additional positional arguments for the tool function.
+            **kwargs (Any): Additional keyword arguments for the tool function.
+
+        Returns:
+            SERIALIZABLE_TYPE_VAR | Clarification: The result of the tool's execution which can be
+            any serializable type or a clarification.
+
+        """
+        raise NotImplementedError("Async run is not implemented")
+
+    async def _arun(
+        self,
+        ctx: ToolRunContext,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Output:
+        """Async run the tool.
+
+        This method must be implemented by subclasses to define the tool's specific behavior.
+        """
+        try:
+            output = await self.arun(ctx, *args, **kwargs)
+        except NotImplementedError:
+            # if the subclass does not implement arun, we can just call the sync run method
+            return await asyncio.to_thread(self._run, ctx, *args, **kwargs)
+        except Exception as e:
+            # check if error is wrapped as a Hard or Soft Tool Error.
+            # if not wrap as ToolSoftError
+            if not isinstance(e, ToolHardError) and not isinstance(e, ToolSoftError):
+                raise ToolSoftError(e) from e
+            raise
+        return self._parse_output(output)
+
+    def _parse_output(self, output: SERIALIZABLE_TYPE_VAR | Clarification) -> Output:
+        """Parse the output of the tool.
+
+        This method handles the output of the tool and converts it to an Output object.
+        """
         if is_clarification(output):
             clarifications = output if isinstance(output, list) else [output]
             return LocalDataValue(
@@ -227,7 +275,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 return LocalDataValue(value=self.structured_output_schema.model_validate(output))
             except ValidationError:
                 pass
-
         return LocalDataValue(value=output)  # type: ignore  # noqa: PGH003
 
     def _run_with_artifacts(
@@ -252,6 +299,30 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         """
         intermediate_output = self._run(ctx, *args, **kwargs)
+        return (intermediate_output.get_value(), intermediate_output)  # type: ignore  # noqa: PGH003
+
+    async def _arun_with_artifacts(
+        self,
+        ctx: ToolRunContext,
+        *args: Any,
+        **kwargs: Any,
+    ) -> tuple[str, Output]:
+        """Async run the tool with artifacts.
+
+        This function returns a tuple consisting of the output and an Output object, as expected by
+        langchain tools. It captures the output (artifact) directly instead of serializing
+        it to a string first.
+
+        Args:
+            ctx (ToolRunContext): The context for the tool.
+            *args (Any): Additional positional arguments for the tool function.
+            **kwargs (Any): Additional keyword arguments for the tool function.
+
+        Returns:
+            tuple[str, Output]: A tuple containing the output and the Output.
+
+        """
+        intermediate_output = await self._arun(ctx, *args, **kwargs)
         return (intermediate_output.get_value(), intermediate_output)  # type: ignore  # noqa: PGH003
 
     def _generate_tool_description(self) -> str:
@@ -367,7 +438,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         return self
 
-    def to_langchain(self, ctx: ToolRunContext) -> StructuredTool:
+    def to_langchain(self, ctx: ToolRunContext, sync: bool = True) -> StructuredTool:
         """Return a LangChain representation of this tool.
 
         This function provides a LangChain-compatible version of the tool. The response format is
@@ -376,6 +447,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         Args:
             ctx (ToolRunContext): The context for the tool.
+            sync (bool): Whether to use the sync or async version of the tool.
 
         Returns:
             StructuredTool: The LangChain-compatible representation of the tool, including the
@@ -383,14 +455,25 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             into the function.
 
         """
-        return StructuredTool(
-            name=self.name.replace(" ", "_"),
-            description=self._generate_tool_description(),
-            args_schema=self.args_schema,
-            func=partial(self._run, ctx),
+        return (
+            StructuredTool(
+                name=self.name.replace(" ", "_"),
+                description=self._generate_tool_description(),
+                args_schema=self.args_schema,
+                func=partial(self._run, ctx),
+                return_direct=True,
+            )
+            if sync
+            else StructuredTool(
+                name=self.name.replace(" ", "_"),
+                description=self._generate_tool_description(),
+                args_schema=self.args_schema,
+                coroutine=partial(self._arun, ctx),
+                return_direct=True,
+            )
         )
 
-    def to_langchain_with_artifact(self, ctx: ToolRunContext) -> StructuredTool:
+    def to_langchain_with_artifact(self, ctx: ToolRunContext, sync: bool = True) -> StructuredTool:
         """Return a LangChain representation of this tool with content and artifact.
 
         This function provides a LangChain-compatible version of the tool, where the response format
@@ -399,6 +482,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
         Args:
             ctx (ToolRunContext): The context for the tool.
+            sync (bool): Whether to use the sync or async version of the tool.
 
         Returns:
             StructuredTool: The LangChain-compatible representation of the tool, including the
@@ -406,13 +490,23 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             and artifact.
 
         """
-        return StructuredTool(
-            name=self.name.replace(" ", "_"),
-            description=self._generate_tool_description(),
-            args_schema=self.args_schema,
-            func=partial(self._run_with_artifacts, ctx),
-            return_direct=True,
-            response_format="content_and_artifact",
+        return (
+            StructuredTool(
+                name=self.name.replace(" ", "_"),
+                description=self._generate_tool_description(),
+                args_schema=self.args_schema,
+                func=partial(self._run_with_artifacts, ctx),
+                return_direct=True,
+                response_format="content_and_artifact",
+            )
+            if sync
+            else StructuredTool(
+                name=self.name.replace(" ", "_"),
+                description=self._generate_tool_description(),
+                args_schema=self.args_schema,
+                coroutine=partial(self._arun_with_artifacts, ctx),
+                return_direct=True,
+            )
         )
 
     def args_json_schema(self) -> dict[str, Any]:
