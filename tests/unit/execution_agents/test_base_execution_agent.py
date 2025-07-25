@@ -109,6 +109,7 @@ def test_next_state_after_tool_call_no_error() -> None:
             content="Success message",
             tool_call_id="123",
             name="test_tool",
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -139,6 +140,7 @@ def test_next_state_after_tool_call_with_summarize() -> None:
             content="Success message",
             tool_call_id="123",
             name="test_tool",
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -171,6 +173,7 @@ def test_next_state_after_tool_call_with_large_output() -> None:
             content="Test" * 1000,
             tool_call_id="123",
             name="test_tool",
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -199,6 +202,7 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
                 content=f"ToolSoftError: Error {j}",
                 tool_call_id=str(j),
                 name="test_tool",
+                status="error",
             )
             for j in range(1, i + 1)
         ]
@@ -238,6 +242,7 @@ def test_next_state_after_tool_call_with_clarification_artifact() -> None:
             tool_call_id="123",
             name="test_tool",
             artifact=clarification,
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -285,6 +290,7 @@ def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
             tool_call_id="123",
             name="test_tool",
             artifact=clarifications,
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
