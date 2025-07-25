@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from portia.clarification import InputClarification
 from portia.errors import ToolHardError, ToolSoftError
@@ -18,8 +18,25 @@ from tests.utils import (
 )
 
 
-class AsyncAdditionTool(AdditionTool):
+class AdditionToolSchema(BaseModel):
+    """Input for AdditionTool."""
+
+    a: int = Field(..., description="The first number to add")
+    b: int = Field(..., description="The second number to add")
+
+
+class AsyncAdditionTool(Tool):
     """Async version of AdditionTool for testing."""
+
+    id: str = "add_tool"
+    name: str = "Add Tool"
+    description: str = "Use this tool to add two numbers together, it takes two numbers a + b"
+    args_schema: type[BaseModel] = AdditionToolSchema
+    output_schema: tuple[str, str] = ("int", "int: The value of the addition")
+
+    def run(self, _: ToolRunContext, a: int, b: int) -> int:
+        """Add the numbers."""
+        return a + b
 
     async def arun(
         self,
@@ -210,9 +227,7 @@ async def test_async_internal_run_with_artifacts_clarification(
     tool_context: ToolRunContext,
 ) -> None:
     """Test async run with artifacts returning clarification."""
-    content, artifact = await async_clarification_tool._arun_with_artifacts(
-        tool_context, "test"
-    )
+    content, artifact = await async_clarification_tool._arun_with_artifacts(tool_context, "test")
     # get_value() returns the actual list, not string representation
     assert isinstance(content, list)
     assert len(content) == 1
@@ -303,9 +318,7 @@ def test_to_langchain_async(
     assert langchain_tool.func is None
 
 
-def test_to_langchain_sync(
-    async_add_tool: AsyncAdditionTool, tool_context: ToolRunContext
-) -> None:
+def test_to_langchain_sync(async_add_tool: AsyncAdditionTool, tool_context: ToolRunContext) -> None:
     """Test creating sync LangChain tool from async tool."""
     langchain_tool = async_add_tool.to_langchain(tool_context, sync=True)
     assert langchain_tool.name == "Add_Tool"
@@ -365,10 +378,23 @@ class AdditionOutput(BaseModel):
     result: int
 
 
-class StructuredAsyncAdditionTool(AsyncAdditionTool):
+class StructuredAsyncAdditionTool(Tool):
     """Async addition tool with structured output."""
 
+    id: str = "structured_async_addition_tool"
+    name: str = "Structured Async Addition Tool"
+    description: str = "A tool that adds two numbers together and returns a structured output"
+    args_schema: type[BaseModel] = AdditionToolSchema
+    output_schema: tuple[str, str] = (
+        "AdditionOutput",
+        "AdditionOutput: The result of the addition",
+    )
+
     structured_output_schema: type[BaseModel] | None = AdditionOutput
+
+    def run(self, _: ToolRunContext, a: int, b: int) -> AdditionOutput:
+        """Sync add the numbers with structured output."""
+        return AdditionOutput(result=a + b)
 
     async def arun(
         self,
@@ -404,7 +430,17 @@ async def test_async_structured_output_coercion(tool_context: ToolRunContext) ->
     """Test async tool with structured output coercion."""
 
     # Create a new tool instance with different arun method that returns a dict
-    class CoercionTestTool(StructuredAsyncAdditionTool):
+    class CoercionTestTool(Tool):
+        id: str = "coercion_test_tool"
+        name: str = "Coercion Test Tool"
+        description: str = "A tool that returns a dict"
+        args_schema: type[BaseModel] = AdditionToolSchema
+        output_schema: tuple[str, str] = ("dict", "dict: The result of the addition")
+        structured_output_schema: type[BaseModel] | None = AdditionOutput
+
+        def run(self, _: ToolRunContext, a: int, b: int) -> dict[str, int]:
+            return {"result": a + b}
+
         async def arun(self, _: ToolRunContext, a: int, b: int) -> dict[str, int]:
             return {"result": a + b}
 
