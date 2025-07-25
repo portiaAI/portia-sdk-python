@@ -12,7 +12,12 @@ from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.execution_agents.context import StepInput, build_context
-from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
+from portia.execution_agents.execution_utils import (
+    MAX_RETRIES,
+    AgentNode,
+    is_clarification,
+    is_soft_tool_error,
+)
 from portia.execution_agents.output import LocalDataValue
 from portia.logger import logger
 from portia.plan import Plan, ReadOnlyStep, Step
@@ -144,9 +149,9 @@ class BaseExecutionAgent:
         """
         messages = state["messages"]
         last_message = messages[-1]
-        errors = [msg for msg in messages if "ToolSoftError" in msg.content]
+        errors = [msg for msg in messages if is_soft_tool_error(msg)]
 
-        if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
+        if is_soft_tool_error(last_message) and len(errors) < MAX_RETRIES:
             return AgentNode.TOOL_AGENT
 
         for message in messages:
