@@ -506,6 +506,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 args_schema=self.args_schema,
                 coroutine=partial(self._arun_with_artifacts, ctx),
                 return_direct=True,
+                response_format="content_and_artifact",
             )
         )
 
