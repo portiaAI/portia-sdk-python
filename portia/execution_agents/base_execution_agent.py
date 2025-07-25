@@ -96,6 +96,19 @@ class BaseExecutionAgent:
             Output: The output of the task execution.
 
         """
+        raise NotImplementedError("execute_sync is not implemented")
+
+    async def execute_async(self) -> Output:
+        """Run the core execution logic of the task asynchronously.
+
+        Implementation of this function is deferred to individual agent implementations,
+        making it simple to write new ones.
+
+        Returns:
+            Output: The output of the task execution.
+
+        """
+        raise NotImplementedError("execute_async is not implemented")
 
     def get_system_context(self, ctx: ToolRunContext, step_inputs: list[StepInput]) -> str:
         """Build a generic system context string from the step and run provided.

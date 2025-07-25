@@ -137,3 +137,38 @@ Return the outcome and reason in the given format.
         return "\n".join(
             [f"Step {i+1}: {step.pretty_print()}" for i, step in enumerate(plan.steps)]
         )
+
+    async def apre_step_introspection(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+    ) -> PreStepIntrospection:
+        """Async implementation of pre_step_introspection."""
+        introspection_condition = plan.steps[plan_run.current_step_index].condition
+
+        memory_outputs = [
+            self.agent_memory.get_plan_run_output(output.output_name, plan_run.id)
+            for output in plan_run.outputs.step_outputs.values()
+            if isinstance(output, AgentMemoryValue)
+            and introspection_condition
+            and output.output_name in introspection_condition
+        ]
+
+        return await self.config.get_introspection_model().aget_structured_response(
+            schema=PreStepIntrospection,
+            messages=[
+                Message.from_langchain(m)
+                for m in self.prompt.format_messages(
+                    current_date=datetime.now(UTC).strftime("%Y-%m-%d"),
+                    current_day_of_week=datetime.now(UTC).strftime("%A"),
+                    prev_step_outputs=plan_run.outputs.model_dump_json(),
+                    plan_run_inputs=plan_run.plan_run_inputs,
+                    memory_outputs=memory_outputs,
+                    query=plan.plan_context.query,
+                    condition=plan.steps[plan_run.current_step_index].condition,
+                    current_step_idex=plan_run.current_step_index + 1,
+                    total_steps_count=len(plan.steps),
+                    plan=self._get_plan_steps_pretty(plan),
+                )
+            ],
+        )

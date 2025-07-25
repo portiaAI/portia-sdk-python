@@ -38,6 +38,9 @@ from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
+    from langchain_core.language_models.base import LanguageModelInput
+    from langchain_core.messages import BaseMessage
+    from langchain_core.runnables import Runnable
 
     from portia.config import Config
     from portia.end_user import EndUser
@@ -164,9 +167,17 @@ class OneShotToolCallingModel:
             dict[str, Any]: A dictionary containing the model's generated response.
 
         """
+        model, formatted_messages = self._setup_model(state)
+        response = model.invoke(formatted_messages)
+        result = template_in_required_inputs(response, state["step_inputs"])
+        return self._handle_execution_hooks(response) or {"messages": [result]}
+
+    def _setup_model(
+        self, state: ExecutionState
+    ) -> tuple[Runnable[LanguageModelInput, BaseMessage], list[BaseMessage]]:
+        """Set up the model for the agent."""
         if not self.agent.tool:
             raise InvalidAgentError("Parser model has no tool")
-
         model = self.model.to_langchain().bind_tools(self.tools)
         messages = state["messages"]
         past_errors = [str(msg) for msg in messages if "ToolSoftError" in msg.content]
@@ -186,9 +197,10 @@ class OneShotToolCallingModel:
                 tool_id=self.agent.tool.id if self.agent.tool else None,
             )
         )
-        response = model.invoke(formatted_messages)
-        result = template_in_required_inputs(response, state["step_inputs"])
+        return model, formatted_messages
 
+    def _handle_execution_hooks(self, response: BaseMessage) -> dict[str, Any] | None:
+        """Handle the execution hooks."""
         if (
             self.agent.execution_hooks
             and self.agent.execution_hooks.before_tool_call
@@ -207,7 +219,25 @@ class OneShotToolCallingModel:
                     self.agent.new_clarifications.append(clarification)
             if self.agent.new_clarifications:
                 return {"messages": []}
-        return {"messages": [result]}
+        return None
+
+    async def ainvoke(self, state: ExecutionState) -> dict[str, Any]:
+        """Async implementation of invoke.
+
+        This method formats the input for the language model using the query, context,
+        and past errors, then generates a response by invoking the model.
+
+        Args:
+            state (ExecutionState): The state containing the messages and other necessary data.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the model's generated response.
+
+        """
+        model, formatted_messages = self._setup_model(state)
+        response = await model.ainvoke(formatted_messages)
+        result = template_in_required_inputs(response, state["step_inputs"])
+        return self._handle_execution_hooks(response) or {"messages": [result]}
 
 
 class OneShotAgent(BaseExecutionAgent):
@@ -264,6 +294,26 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        app = self._setup_graph(sync=True).compile()
+        invocation_result = app.invoke({"messages": [], "step_inputs": []})
+
+        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
+
+    async def execute_async(self) -> Output:
+        """Run the core execution logic of the task.
+
+        This method will invoke the tool with arguments
+
+        Returns:
+            Output: The result of the agent's execution, containing the tool call result.
+
+        """
+        app = self._setup_graph(sync=False).compile()
+        invocation_result = await app.ainvoke({"messages": [], "step_inputs": []})
+        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
+
+    def _setup_graph(self, sync: bool) -> StateGraph:
+        """Set up the graph for the agent."""
         if not self.tool:
             raise InvalidAgentError("No tool available")
 
@@ -292,14 +342,18 @@ class OneShotAgent(BaseExecutionAgent):
 
         graph.add_node(
             AgentNode.TOOL_AGENT,
-            OneShotToolCallingModel(model, tools, self, tool_run_ctx).invoke,
+            OneShotToolCallingModel(model, tools, self, tool_run_ctx).ainvoke
+            if not sync
+            else OneShotToolCallingModel(model, tools, self, tool_run_ctx).invoke,
         )
         graph.add_edge(AgentNode.MEMORY_EXTRACTION, AgentNode.TOOL_AGENT)
 
         graph.add_node(AgentNode.TOOLS, tool_node)
         graph.add_node(
             AgentNode.SUMMARIZER,
-            StepSummarizer(self.config, model, self.tool, self.step).invoke,
+            StepSummarizer(self.config, model, self.tool, self.step).ainvoke
+            if not sync
+            else StepSummarizer(self.config, model, self.tool, self.step).invoke,
         )
 
         # Use execution manager for state transitions
@@ -313,7 +367,4 @@ class OneShotAgent(BaseExecutionAgent):
         )
         graph.add_edge(AgentNode.SUMMARIZER, END)
 
-        app = graph.compile()
-        invocation_result = app.invoke({"messages": [], "step_inputs": []})
-
-        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
+        return graph

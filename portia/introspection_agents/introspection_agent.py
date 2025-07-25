@@ -65,3 +65,11 @@ class BaseIntrospectionAgent(ABC):
     ) -> PreStepIntrospection:
         """pre_step_introspection is introspection run before a plan happens.."""
         raise NotImplementedError("pre_step_introspection is not implemented")
+
+    async def apre_step_introspection(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+    ) -> PreStepIntrospection:
+        """Async implementation of pre_step_introspection."""
+        raise NotImplementedError("apre_step_introspection is not implemented")
