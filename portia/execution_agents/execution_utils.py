@@ -180,22 +180,14 @@ def process_output(  # noqa: C901 PLR0912
     tool_soft_error = None
     tool_hard_error = None
     for message in messages:
-        # prefer to override the error with the latest error.
-        if (
-            message.content
-            and isinstance(message.content, str)
-            and message.content.startswith("Error: ToolSoftError")
-        ):
-            tool_soft_error = str(message.content)
-            continue
-        if (
-            message.content
-            and isinstance(message.content, str)
-            and message.content.startswith("Error: ToolHardError")
-        ):
-            tool_hard_error = str(message.content)
-            continue
         if isinstance(message, ToolMessage):
+            if message.status == "error":
+                # prefer to override the error with the latest error.
+                if isinstance(message.content, str) and "ToolSoftError" in message.content:
+                    tool_soft_error = str(message.content)
+                elif isinstance(message.content, str) and "ToolHardError" in message.content:
+                    tool_hard_error = str(message.content)
+                continue
             try:
                 clarification = InputClarification.model_validate_json(message.content)  # pyright: ignore[reportArgumentType]
                 return LocalDataValue(value=[clarification])
@@ -241,3 +233,12 @@ def process_output(  # noqa: C901 PLR0912
     final_summary = output_values[-1].get_summary() or ", ".join(summaries)
 
     return LocalDataValue(value=values, summary=final_summary)
+
+
+def is_soft_tool_error(message: BaseMessage) -> bool:
+    """Check if the message is a soft tool error."""
+    return (
+        isinstance(message, ToolMessage)
+        and message.status == "error"
+        and "ToolSoftError" in message.content
+    )

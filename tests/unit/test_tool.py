@@ -250,7 +250,7 @@ def test_remote_tool_soft_error(httpx_mock: HTTPXMock) -> None:
     endpoint = "https://api.fake-portia.test"
     httpx_mock.add_response(
         url=f"{endpoint}/api/v0/tools/test/run/",
-        json={"output": {"value": "ToolSoftError: An error occurred."}},
+        json={"output": {"value": "ToolSoftError: An error occurred."}, "soft_error": True},
     )
 
     tool = PortiaRemoteTool(
@@ -312,44 +312,6 @@ def test_remote_tool_bad_response(httpx_mock: HTTPXMock) -> None:
         },
     }
 
-    assert (
-        httpx_mock.get_request(
-            method="POST",
-            url=f"{endpoint}/api/v0/tools/test/run/",
-            match_json=content,
-        )
-        is not None
-    )
-
-
-def test_remote_tool_hard_error(httpx_mock: HTTPXMock) -> None:
-    """Test remote hard errors come back to hard errors."""
-    endpoint = "https://api.fake-portia.test"
-    httpx_mock.add_response(
-        url=f"{endpoint}/api/v0/tools/test/run/",
-        json={"output": {"value": "ToolHardError: An error occurred."}},
-    )
-
-    tool = PortiaRemoteTool(
-        id="test",
-        name="test",
-        description="",
-        output_schema=("", ""),
-        client=httpx.Client(base_url=endpoint),
-    )
-
-    ctx = get_test_tool_context()
-    with pytest.raises(ToolHardError):
-        tool.run(ctx)
-
-    content = {
-        "arguments": {},
-        "execution_context": {
-            "end_user_id": ctx.end_user.external_id,
-            "plan_run_id": str(ctx.plan_run.id),
-            "additional_data": ctx.end_user.additional_data,
-        },
-    }
     assert (
         httpx_mock.get_request(
             method="POST",

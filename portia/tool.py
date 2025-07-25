@@ -498,11 +498,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         output_value = output.get_value()
 
         # Handle Tool Errors
-        if isinstance(output_value, str):
-            if "ToolSoftError" in output_value:
-                raise ToolSoftError(output_value)
-            if "ToolHardError" in output_value:
-                raise ToolHardError(output_value)
+        if "soft_error" in response:
+            raise ToolSoftError(str(output_value))
+
         # Handle Clarifications
         if isinstance(output_value, list) and output_value and "category" in output_value[0]:
             clarification = output_value[0]

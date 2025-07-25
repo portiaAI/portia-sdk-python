@@ -24,6 +24,7 @@ from portia.execution_agents.clarification_tool import ClarificationTool
 from portia.execution_agents.context import StepInput  # noqa: TC001
 from portia.execution_agents.execution_utils import (
     AgentNode,
+    is_soft_tool_error,
     process_output,
     template_in_required_inputs,
     tool_call_or_end,
@@ -169,7 +170,7 @@ class OneShotToolCallingModel:
 
         model = self.model.to_langchain().bind_tools(self.tools)
         messages = state["messages"]
-        past_errors = [str(msg) for msg in messages if "ToolSoftError" in msg.content]
+        past_errors = [str(msg) for msg in messages if is_soft_tool_error(msg)]
         clarification_tool = ClarificationTool(step=self.agent.plan_run.current_step_index)
         formatted_messages = self.arg_parser_prompt.format_messages(
             context=self.agent.get_system_context(self.tool_context, state["step_inputs"]),
