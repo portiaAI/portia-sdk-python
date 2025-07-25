@@ -4,7 +4,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/Logo_Portia_Line_Black.png">
-    <img alt="Portia AI logo" src="assets/Logo_Portia_Line_Black.png"  width="full">
+    <img alt="Portia AI logo" src="https://raw.githubusercontent.com/portiaAI/portia-sdk-python/main/assets/Logo_Portia_Line_Black.png"  width="full">
   </picture>
 </p>
 
