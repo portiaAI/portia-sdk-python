@@ -187,3 +187,13 @@ jobs:
             echo "One or more evaluations failed."
             exit 1
           fi
+
+
+      - name: Setup Redis CLI
+        if: failure()
+        uses: shogo82148/actions-setup-redis@v1
+      - name: Clear LLM cache
+        if: failure()
+        run: |
+          echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
+          ./.github/scripts/clear_llm_cache.sh
