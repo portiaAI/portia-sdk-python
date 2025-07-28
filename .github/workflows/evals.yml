@@ -197,4 +197,4 @@ jobs:
         working-directory: ./platform
         run: |
           echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
-          ./.github/scripts/clear_llm_cache.sh
+          ./scripts/clear_llm_cache.sh
