@@ -18,41 +18,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-class DefaultPlanningAgent(BasePlanningAgent):
-    """DefaultPlanningAgent class."""
-
-    def __init__(self, config: Config) -> None:
-        """Init with the config."""
-        self.model = config.get_planning_model()
-
-    def generate_steps_or_error(
-        self,
-        query: str,
-        tool_list: list[Tool],
-        end_user: EndUser,
-        examples: list[Plan] | None = None,
-        plan_inputs: list[PlanInput] | None = None,
-    ) -> StepsOrError:
-        """Generate a plan or error using an LLM from a query and a list of tools."""
-        retries_remaining = 2
-        previous_errors = []
-
-        while retries_remaining >= 0:
-            prompt = render_prompt_insert_defaults(
-                query,
-                tool_list,
-                end_user,
-                examples,
-                plan_inputs,
-                previous_errors,
-            )
-            response = self.model.get_structured_response(
-                schema=StepsOrError,
-                messages=[
-                    Message(
-                        role="system",
-                        content="""
+DEFAULT_PLANNING_PROMPT = """
 You are an outstanding task planner. Your job is to provide a detailed plan of action in the form
 of a set of steps in response to a user's query. You work in combination with an execution agent
 that executes the steps and an introspection agent that checks the conditions on the steps.
@@ -91,57 +57,138 @@ IMPORTANT GUIDELINES:
   2. Condition field: Write the condition in concise natural language.
 - Do not use the condition field for non-conditional steps.
 - If plan inputs are provided, make sure you specify them as inputs to the appropriate steps.
-- Only use plan inputs if they are provided - DO NOT make any up
-                    """,
+- Only use plan inputs if they are provided - DO NOT make any up. Use the error field if you do not
+have the correct plan inputs to generate a plan.
+"""
+
+
+class DefaultPlanningAgent(BasePlanningAgent):
+    """DefaultPlanningAgent class."""
+
+    def __init__(
+        self, config: Config, planning_prompt: str | None = None, retries: int = 3
+    ) -> None:
+        """Init with the config."""
+        self.model = config.get_planning_model()
+        self.planning_prompt = planning_prompt or DEFAULT_PLANNING_PROMPT
+        self.max_retries = retries
+
+    def generate_steps_or_error(
+        self,
+        query: str,
+        tool_list: list[Tool],
+        end_user: EndUser,
+        examples: list[Plan] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
+    ) -> StepsOrError:
+        """Generate a plan or error using an LLM from a query and a list of tools."""
+        previous_errors = []
+        for i in range(self.max_retries):
+            prompt = render_prompt_insert_defaults(
+                query,
+                tool_list,
+                end_user,
+                examples,
+                plan_inputs,
+                previous_errors,
+            )
+            response = self.model.get_structured_response(
+                schema=StepsOrError,
+                messages=[
+                    Message(
+                        role="system",
+                        content=self.planning_prompt,
                     ),
                     Message(role="user", content=prompt),
                 ],
             )
-
-            # Check for errors in the response
-            if response.error:
-                # We don't retry LLM errors as we have no new useful information to provide
-                return StepsOrError(
-                    steps=response.steps,
-                    error=response.error,
-                )
-
-            tool_error = self._validate_tools_in_response(response.steps, tool_list)
-            if tool_error:
-                previous_errors.append(
-                    StepsOrError(
-                        steps=response.steps,
-                        error=f"Attempt {3-retries_remaining}: {tool_error}",
-                    )
-                )
-                retries_remaining -= 1
-                continue
-
-            input_error = self._validate_inputs_in_response(response.steps, plan_inputs)
-            if input_error:
-                previous_errors.append(
-                    StepsOrError(
-                        steps=response.steps,
-                        error=f"Attempt {3-retries_remaining}: {input_error}",
-                    )
-                )
-                retries_remaining -= 1
-                continue
-
-            # Add LLMTool to the steps that don't have a tool_id
-            for step in response.steps:
-                if step.tool_id is None:
-                    step.tool_id = LLMTool.LLM_TOOL_ID
-
-            return StepsOrError(
-                steps=response.steps,
-                error=None,
-            )
+            steps_or_error = self._process_response(response, tool_list, plan_inputs, i)
+            if steps_or_error.error is None:
+                return steps_or_error
+            previous_errors.append(steps_or_error.error)
 
         # If we get here, we've exhausted all retries
         return StepsOrError(
             steps=[],
-            error="\n".join(str(error) for error in previous_errors),
+            error="\n".join(str(error) for error in set(previous_errors)),
+        )
+
+    def _process_response(
+        self,
+        response: StepsOrError,
+        tool_list: list[Tool],
+        plan_inputs: list[PlanInput] | None = None,
+        i: int = 0,
+    ) -> StepsOrError:
+        """Process the response from the LLM."""
+        # Check for errors in the response
+        if response.error:
+            # We don't retry LLM errors as we have no new useful information to provide
+            return StepsOrError(
+                steps=response.steps,
+                error=response.error,
+            )
+
+        tool_error = self._validate_tools_in_response(response.steps, tool_list)
+        if tool_error:
+            return StepsOrError(
+                steps=response.steps,
+                error=f"Attempt {i+1}: {tool_error}",
+            )
+
+        input_error = self._validate_inputs_in_response(response.steps, plan_inputs)
+        if input_error:
+            return StepsOrError(
+                steps=response.steps,
+                error=f"Attempt {i+1}: {input_error}",
+            )
+
+        # If we get here, we've processed the response successfully
+        # Add LLMTool to the steps that don't have a tool_id
+        for step in response.steps:
+            if step.tool_id is None:
+                step.tool_id = LLMTool.LLM_TOOL_ID
+
+        return StepsOrError(
+            steps=response.steps,
+            error=None,
+        )
+
+    async def agenerate_steps_or_error(
+        self,
+        query: str,
+        tool_list: list[Tool],
+        end_user: EndUser,
+        examples: list[Plan] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
+    ) -> StepsOrError:
+        """Generate a plan or error using an LLM from a query and a list of tools."""
+        previous_errors = []
+        for i in range(self.max_retries):
+            prompt = render_prompt_insert_defaults(
+                query,
+                tool_list,
+                end_user,
+                examples,
+                plan_inputs,
+                previous_errors,
+            )
+            response = await self.model.aget_structured_response(
+                schema=StepsOrError,
+                messages=[
+                    Message(role="system", content=self.planning_prompt),
+                    Message(role="user", content=prompt),
+                ],
+            )
+            steps_or_error = self._process_response(response, tool_list, plan_inputs, i)
+            if steps_or_error.error is None:
+                return steps_or_error
+            previous_errors.append(steps_or_error.error)
+
+        # If we get here, we've exhausted all retries
+        return StepsOrError(
+            steps=[],
+            error="\n".join(str(error) for error in set(previous_errors)),
         )
 
     def _validate_tools_in_response(self, steps: list[Step], tool_list: list[Tool]) -> str | None:

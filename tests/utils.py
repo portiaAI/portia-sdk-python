@@ -292,6 +292,11 @@ def get_mock_base_chat_model(
         assert response is not None
         return response
 
+    async def ainvoke(*_: Any, **__: Any) -> BaseMessage:
+        """Mock async invoke."""
+        assert response is not None
+        return response
+
     def with_structured_output(_: BaseModel, *__: Any, **___: Any) -> BaseChatModel:
         """Mock with structured output."""
         return model
@@ -301,6 +306,7 @@ def get_mock_base_chat_model(
         return model
 
     model.invoke.side_effect = invoke
+    model.ainvoke.side_effect = ainvoke
     model.with_structured_output.side_effect = with_structured_output
     model.bind_tools.side_effect = bind_tools
     return model

@@ -329,3 +329,217 @@ def test_generate_steps_with_plan_inputs(mock_config: Config) -> None:
     prompt_text = mock_model._client.invoke.call_args[0][0][1].content  # pyright: ignore[reportAttributeAccessIssue]
     assert "$user_id" in prompt_text
     assert "ID of the user" in prompt_text
+
+
+@pytest.mark.asyncio
+async def test_agenerate_steps_or_error_success(mock_config: Config) -> None:
+    """Test successful async plan generation with valid inputs."""
+    query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
+
+    # Mock the Model response to simulate a successful plan generation
+    mock_model = get_mock_generative_model(
+        response=StepsOrError(
+            steps=[],
+            error=None,
+        ),
+    )
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+
+    result = await planning_agent.agenerate_steps_or_error(
+        query=query,
+        tool_list=[],
+        end_user=EndUser(external_id="123"),
+    )
+
+    assert result.steps == []
+    assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_agenerate_steps_or_error_failure(mock_config: Config) -> None:
+    """Test handling of error when async plan generation fails."""
+    query = "Send hello@portialabs.ai an email with a summary of the latest news on AI"
+
+    # Mock the Model response to simulate an error in plan generation
+    mock_model = get_mock_generative_model(
+        response=StepsOrError(
+            steps=[],
+            error="Unable to generate a plan",
+        ),
+    )
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = await planning_agent.agenerate_steps_or_error(
+        query=query,
+        tool_list=[],
+        end_user=EndUser(external_id="123"),
+    )
+
+    assert result.error == "Unable to generate a plan"
+
+
+@pytest.mark.asyncio
+async def test_agenerate_steps_or_error_invalid_tool_id(mock_config: Config) -> None:
+    """Test handling of invalid tool ID in async generated steps."""
+    query = "Calculate something"
+
+    mock_response = StepsOrError(
+        steps=[
+            Step(
+                task="Calculate sum",
+                tool_id="no_tool_1",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+        error=None,
+    )
+    mock_model = get_mock_generative_model(response=mock_response)
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = await planning_agent.agenerate_steps_or_error(
+        query=query,
+        tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
+    )
+
+    assert result.error is not None
+    assert "Attempt 1" in result.error
+    assert "Attempt 2" in result.error
+    assert "Attempt 3" in result.error
+    assert "Missing tools no_tool_1 from the provided tool_list" in result.error
+    assert result.steps == []
+    assert mock_model._client.ainvoke.call_count == 3  # pyright: ignore[reportAttributeAccessIssue]
+
+
+@pytest.mark.asyncio
+async def test_agenerate_steps_or_error_invalid_input_with_retry(mock_config: Config) -> None:
+    """Test handling of invalid input in async generated steps."""
+    query = "Calculate something"
+    plan_inputs = [
+        PlanInput(
+            name="$valid_input",
+            description="A valid input",
+        ),
+    ]
+
+    mock_response1 = StepsOrError(
+        steps=[
+            Step(
+                task="Calculate sum",
+                tool_id="add_tool",
+                inputs=[Variable(name="$invalid_input", description="An invalid input")],
+                output="$result",
+            ),
+        ],
+        error=None,
+    )
+    mock_response2 = StepsOrError(
+        steps=[
+            Step(
+                task="Calculate sum",
+                tool_id="add_tool",
+                inputs=[Variable(name="$valid_input", description="A valid input")],
+                output="$result",
+            ),
+        ],
+        error=None,
+    )
+
+    mock_model = get_mock_generative_model(response=mock_response1)
+    mock_model._client.ainvoke.side_effect = [mock_response1, mock_response2]  # type:ignore[reportAttributeAccessIssue]
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = await planning_agent.agenerate_steps_or_error(
+        query=query,
+        tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
+        plan_inputs=plan_inputs,
+    )
+
+    assert result.error is None
+    assert result.steps == mock_response2.steps
+    assert mock_model._client.ainvoke.call_count == 2  # pyright: ignore[reportAttributeAccessIssue]
+
+
+@pytest.mark.asyncio
+async def test_agenerate_steps_assigns_llm_tool_id(mock_config: Config) -> None:
+    """Test that async steps without tool_id get assigned to LLMTool."""
+    query = "Generate a creative story"
+
+    # Mock response with steps that have no tool_id
+    mock_response = StepsOrError(
+        steps=[
+            Step(
+                task="Write a story opening",
+                tool_id=None,
+                inputs=[],
+                output="$story_opening",
+            ),
+            Step(
+                task="Write story conclusion",
+                tool_id=None,
+                inputs=[],
+                output="$story_conclusion",
+            ),
+        ],
+        error=None,
+    )
+    mock_model = get_mock_generative_model(
+        response=mock_response,
+    )
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+    result = await planning_agent.agenerate_steps_or_error(
+        query=query,
+        tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
+    )
+
+    assert all(step.tool_id == LLMTool.LLM_TOOL_ID for step in result.steps)
+    assert len(result.steps) == 2
+    assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_agenerate_steps_with_plan_inputs(mock_config: Config) -> None:
+    """Test async plan generation with plan inputs."""
+    plan_inputs = [
+        PlanInput(
+            name="$username",
+            description="Username for the service",
+        ),
+        PlanInput(
+            name="$user_id",
+            description="ID of the user",
+        ),
+    ]
+
+    mock_response = StepsOrError(
+        steps=[
+            Step(
+                task="Process user addition",
+                tool_id="add_tool",
+                inputs=[Variable(name="$user_id", description="ID of the user")],
+                output="$output",
+            ),
+        ],
+        error=None,
+    )
+    mock_model = get_mock_generative_model(response=mock_response)
+    mock_config.get_planning_model.return_value = mock_model  # type: ignore[reportFunctionMemberAccess]
+    planning_agent = DefaultPlanningAgent(mock_config)
+
+    result = await planning_agent.agenerate_steps_or_error(
+        query="Process user addition",
+        tool_list=[AdditionTool()],
+        end_user=EndUser(external_id="123"),
+        plan_inputs=plan_inputs,
+    )
+    assert result.error is None
+
+    assert mock_model._client.ainvoke.called  # pyright: ignore[reportAttributeAccessIssue]
+    prompt_text = mock_model._client.ainvoke.call_args[0][0][1].content  # pyright: ignore[reportAttributeAccessIssue]
+    assert "$user_id" in prompt_text
+    assert "ID of the user" in prompt_text

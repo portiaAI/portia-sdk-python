@@ -2832,3 +2832,540 @@ def test_portia_tool_readiness_rechecked_after_raised_clarification(
     assert isinstance(outstanding_clarification, ActionClarification)
     assert outstanding_clarification.resolved is False
     assert str(outstanding_clarification.action_url) == str(action_url)
+
+
+def test_portia_run_plan_with_all_plan_types(portia: Portia, telemetry: MagicMock) -> None:
+    """Test that run_plan works with Plan and PlanUUID types."""
+    # Create a test plan
+    plan = Plan(
+        plan_context=PlanContext(query="test all plan types", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Simple task",
+                tool_id="add_tool",
+                inputs=[],
+                output="$result",
+            ),
+        ],
+    )
+
+    # Save the plan to storage
+    portia.storage.save_plan(plan)
+
+    # Mock the resume method to verify it gets called correctly
+    with mock.patch.object(portia, "_resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+
+        # Test 1: Run with Plan object
+        plan_run_1 = portia.run_plan(plan)
+        assert plan_run_1.plan_id == plan.id
+
+        # Test 2: Run with PlanUUID
+        plan_run_2 = portia.run_plan(plan.id)
+        assert plan_run_2.plan_id == plan.id
+
+        # Verify resume was called 2 times
+        assert mock_resume.call_count == 2
+
+        # Verify all plan runs have the same plan_id
+        assert plan_run_1.plan_id == plan_run_2.plan_id
+
+    # Verify telemetry captured the correct plan types
+    telemetry_calls = telemetry.capture.call_args_list
+    assert len(telemetry_calls) == 2
+
+    # Check telemetry for each plan type
+    assert telemetry_calls[0][0][0].function_call_details["plan_type"] == "Plan"
+    assert telemetry_calls[1][0][0].function_call_details["plan_type"] == "PlanUUID"
+
+
+def test_portia_run_plan_with_all_plan_types_error_handling(portia: Portia) -> None:
+    """Test error handling for all plan ID types when plan doesn't exist."""
+    # Plan objects are automatically saved to storage, so they never raise PlanNotFoundError
+    # Only PlanUUID can raise PlanNotFoundError
+
+    # Test with non-existent PlanUUID
+    with pytest.raises(PlanNotFoundError):
+        portia.run_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
+
+    # Test that Plan objects work (they get auto-saved, no error)
+    non_existent_plan = Plan(
+        plan_context=PlanContext(query="non-existent", tool_ids=["add_tool"]),
+        steps=[Step(task="Task", tool_id="add_tool", inputs=[], output="$result")],
+    )
+    # This should succeed because Plan objects are auto-saved
+    with mock.patch.object(portia, "_resume") as mock_resume:
+        mock_resume.side_effect = lambda x: x
+        plan_run = portia.run_plan(non_existent_plan)
+        assert plan_run.plan_id == non_existent_plan.id
+
+
+def test_portia_example_plans_with_all_types(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that example_plans parameter works with Plan, PlanUUID, and string types."""
+    # Create example plans
+    example_plan_1 = Plan(
+        plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 1", tool_id="add_tool", inputs=[], output="$result1")],
+    )
+    example_plan_2 = Plan(
+        plan_context=PlanContext(query="example query 2", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 2", tool_id="add_tool", inputs=[], output="$result2")],
+    )
+
+    # Save plans to storage
+    portia.storage.save_plan(example_plan_1)
+    portia.storage.save_plan(example_plan_2)
+
+    # Mock planning model
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+    # Test with mixed example_plans types: Plan, PlanUUID, string
+    example_plans = [
+        example_plan_1,  # Plan object
+        example_plan_2.id,  # PlanUUID
+        "example query 2",  # string query
+    ]
+
+    with mock.patch.object(portia, "_resolve_example_plans") as mock_resolve:
+        # Mock the resolve method to return the expected plans
+        mock_resolve.return_value = [example_plan_1, example_plan_2, example_plan_2]
+
+        plan = portia.plan("test query", example_plans=example_plans)
+
+        # Verify _resolve_example_plans was called with all types
+        mock_resolve.assert_called_once_with(example_plans)
+
+        # Verify plan was created successfully
+        assert plan.plan_context.query == "test query"
+
+
+def test_portia_resolve_example_plans_error_handling(portia: Portia) -> None:
+    """Test error handling in _resolve_example_plans method."""
+    # Test with non-existent PlanUUID
+    with pytest.raises(PlanNotFoundError):
+        portia._resolve_example_plans(
+            [PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")]
+        )
+
+    # Test with non-existent plan ID string
+    with pytest.raises(PlanNotFoundError):
+        portia._resolve_example_plans(["plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"])
+
+    # Test with non-plan-ID string (should raise ValueError, not PlanNotFoundError)
+    with pytest.raises(ValueError, match="must be a plan ID.*Query strings are not supported"):
+        portia._resolve_example_plans(["regular query string"])
+
+    # Test with invalid type
+    with pytest.raises(TypeError, match="Invalid example plan type"):
+        portia._resolve_example_plans([123])  # type: ignore[arg-type]  # Invalid type
+
+    # Test with raw UUID, should raise TypeError
+    with pytest.raises(TypeError, match="Invalid example plan type"):
+        portia._resolve_example_plans([UUID("99fc470b-4cbd-489b-b251-7076bf7e8f05")])  # type: ignore[arg-type]
+
+
+def test_portia_run_with_example_plans_all_types(portia: Portia, planning_model: MagicMock) -> None:
+    """Test that run method works with example_plans of all types."""
+    # Create example plans
+    example_plan_1 = Plan(
+        plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 1", tool_id="add_tool", inputs=[], output="$result1")],
+    )
+    example_plan_2 = Plan(
+        plan_context=PlanContext(query="example query 2", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 2", tool_id="add_tool", inputs=[], output="$result2")],
+    )
+
+    # Save plans to storage
+    portia.storage.save_plan(example_plan_1)
+    portia.storage.save_plan(example_plan_2)
+
+    # Mock planning model
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+    # Test with mixed example_plans types: Plan, PlanUUID
+    example_plans = [
+        example_plan_1,  # Plan object
+        example_plan_2.id,  # PlanUUID
+    ]
+
+    # Test the run method with all example plan types
+    plan_run = portia.run("test query with examples", example_plans=example_plans)
+
+    # Verify the run completed successfully
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.plan_id is not None
+
+
+def test_portia_resolve_example_plans_with_all_types(portia: Portia) -> None:
+    """Test the _resolve_example_plans method with all supported types."""
+    # Create example plans
+    example_plan_1 = Plan(
+        plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 1", tool_id="add_tool", inputs=[], output="$result1")],
+    )
+    example_plan_2 = Plan(
+        plan_context=PlanContext(query="example query 2", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 2", tool_id="add_tool", inputs=[], output="$result2")],
+    )
+
+    # Save plans to storage
+    portia.storage.save_plan(example_plan_1)
+    portia.storage.save_plan(example_plan_2)
+
+    # Test with all supported types: Plan, PlanUUID, plan ID string
+    example_plans = [
+        example_plan_1,  # Plan object
+        example_plan_2.id,  # PlanUUID
+        str(example_plan_2.id),  # plan ID string
+    ]
+
+    resolved_plans = portia._resolve_example_plans(example_plans)
+
+    # Verify all plans were resolved correctly
+    assert resolved_plans is not None
+    assert len(resolved_plans) == 3
+    assert resolved_plans[0].id == example_plan_1.id  # Plan object
+    assert resolved_plans[1].id == example_plan_2.id  # PlanUUID
+    assert resolved_plans[2].id == example_plan_2.id  # Plan ID string resolved to plan
+
+
+def test_portia_example_plans_with_plan_id_strings(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test that example_plans works with plan ID strings (like 'plan-uuid')."""
+    # Create example plans
+    example_plan_1 = Plan(
+        plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 1", tool_id="add_tool", inputs=[], output="$result1")],
+    )
+    example_plan_2 = Plan(
+        plan_context=PlanContext(query="example query 2", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 2", tool_id="add_tool", inputs=[], output="$result2")],
+    )
+
+    # Save plans to storage
+    portia.storage.save_plan(example_plan_1)
+    portia.storage.save_plan(example_plan_2)
+
+    # Mock planning model
+    planning_model.get_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+    # Test with plan ID strings (like the user's example)
+    plan_id_1 = PlanUUID.from_string(str(example_plan_1.id))
+    plan_id_2 = str(example_plan_2.id)  # This is a plan ID string
+
+    example_plans = [plan_id_1, plan_id_2]
+
+    plan_run = portia.run("Get the weather in Paris", example_plans=example_plans)
+
+    # Verify the run completed successfully
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.plan_id is not None
+
+
+def test_portia_resolve_example_plans_with_plan_id_strings(portia: Portia) -> None:
+    """Test the _resolve_example_plans method with plan ID strings."""
+    # Create example plans
+    example_plan_1 = Plan(
+        plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 1", tool_id="add_tool", inputs=[], output="$result1")],
+    )
+    example_plan_2 = Plan(
+        plan_context=PlanContext(query="example query 2", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 2", tool_id="add_tool", inputs=[], output="$result2")],
+    )
+
+    # Save plans to storage
+    portia.storage.save_plan(example_plan_1)
+    portia.storage.save_plan(example_plan_2)
+
+    # Test with plan ID strings
+    plan_id_string_1 = str(example_plan_1.id)  # "plan-uuid"
+    plan_id_string_2 = str(example_plan_2.id)  # "plan-uuid"
+
+    example_plans: list[Plan | PlanUUID | str] = [plan_id_string_1, plan_id_string_2]
+
+    resolved_plans = portia._resolve_example_plans(example_plans)
+
+    # Verify plans were resolved correctly
+    assert resolved_plans is not None
+    assert len(resolved_plans) == 2
+    assert resolved_plans[0].id == example_plan_1.id
+    assert resolved_plans[1].id == example_plan_2.id
+
+
+@pytest.mark.asyncio
+async def test_portia_agenerate_plan(
+    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+) -> None:
+    """Test async planning a query."""
+    query = "example query"
+
+    planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan = await portia.aplan(query)
+
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_aplan",
+            function_call_details={
+                "tools": None,
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
+
+    assert plan.plan_context.query == query
+
+
+@pytest.mark.asyncio
+async def test_portia_agenerate_plan_error(
+    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+) -> None:
+    """Test async planning a query that returns an error."""
+    query = "example query"
+
+    planning_model.aget_structured_response.return_value = StepsOrError(
+        steps=[],
+        error="could not plan",
+    )
+    with pytest.raises(PlanError):
+        await portia.aplan(query)
+
+    # Check that the telemetry event was captured despite the error.
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_aplan",
+            function_call_details={
+                "tools": None,
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_portia_agenerate_plan_with_tools(
+    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+) -> None:
+    """Test async planning a query with tools."""
+    query = "example query"
+
+    planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
+    plan = await portia.aplan(query, tools=["add_tool"])
+
+    telemetry.capture.assert_called_once_with(
+        PortiaFunctionCallTelemetryEvent(
+            function_name="portia_aplan",
+            function_call_details={
+                "tools": "add_tool",
+                "example_plans_provided": False,
+                "end_user_provided": False,
+                "plan_inputs_provided": False,
+            },
+            name="portia_function_call",
+        )
+    )
+
+    assert plan.plan_context.query == query
+    assert plan.plan_context.tool_ids == ["add_tool"]
+
+
+@pytest.mark.asyncio
+async def test_portia_aplan_with_use_cached_plan_success(portia: Portia) -> None:
+    """Test async planning with use_cached_plan=True when cached plan exists."""
+    query = "example query"
+
+    # Create a cached plan
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the storage.get_plan_by_query to return the cached plan
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", return_value=cached_plan
+    ) as mock_get_cached:
+        plan = await portia.aplan(query, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify the cached plan was returned
+        assert plan.id == cached_plan.id
+        assert plan.plan_context.query == query
+
+
+@pytest.mark.asyncio
+async def test_portia_aplan_with_use_cached_plan_not_found(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test async planning with use_cached_plan=True when no cached plan exists."""
+    query = "example query"
+
+    # Mock the storage.get_plan_by_query to raise StorageError
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", side_effect=StorageError("No plan found for query")
+    ) as mock_get_cached:
+        # Mock the planning model to return a successful plan
+        planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+        plan = await portia.aplan(query, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify a new plan was generated (not the cached one)
+        assert plan.plan_context.query == query
+        assert plan.id != "plan-00000000-0000-0000-0000-000000000000"  # Not a default UUID
+
+
+@pytest.mark.asyncio
+async def test_portia_aplan_with_use_cached_plan_false(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test async planning with use_cached_plan=False (default behavior)."""
+    query = "example query"
+
+    # Create a cached plan
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the planning model to return a successful plan
+    planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+    # Mock the storage.get_plan_by_query to ensure it's not called
+    with mock.patch.object(portia.storage, "get_plan_by_query") as mock_get_cached:
+        plan = await portia.aplan(query, use_cached_plan=False)
+
+        # Verify get_plan_by_query was NOT called
+        mock_get_cached.assert_not_called()
+
+        # Verify a new plan was generated
+        assert plan.plan_context.query == query
+        assert plan.id != cached_plan.id  # Should be a different plan
+
+
+@pytest.mark.asyncio
+async def test_portia_aplan_with_use_cached_plan_and_tools(portia: Portia) -> None:
+    """Test async planning with use_cached_plan=True and tools when cached plan exists."""
+    query = "example query"
+
+    # Create a cached plan with tools
+    cached_plan = Plan(
+        plan_context=PlanContext(query=query, tool_ids=["add_tool", "subtract_tool"]),
+        steps=[],
+    )
+    portia.storage.save_plan(cached_plan)
+
+    # Mock the storage.get_plan_by_query to return the cached plan
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", return_value=cached_plan
+    ) as mock_get_cached:
+        plan = await portia.aplan(query, tools=["add_tool"], use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify the cached plan was returned (tools parameter should be ignored when using
+        # cached plan)
+        assert plan.id == cached_plan.id
+        assert plan.plan_context.query == query
+        assert plan.plan_context.tool_ids == ["add_tool", "subtract_tool"]  # Original cached tools
+
+
+@pytest.mark.asyncio
+async def test_portia_aplan_with_use_cached_plan_storage_error_logging(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test async planning with use_cached_plan=True when storage error occurs."""
+    query = "example query"
+
+    # Mock the storage.get_plan_by_query to raise StorageError
+    with mock.patch.object(
+        portia.storage, "get_plan_by_query", side_effect=StorageError("Storage error")
+    ) as mock_get_cached:
+        # Mock the planning model to return a successful plan
+        planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+        plan = await portia.aplan(query, use_cached_plan=True)
+
+        # Verify get_plan_by_query was called
+        mock_get_cached.assert_called_once_with(query)
+
+        # Verify a new plan was generated despite the storage error
+        assert plan.plan_context.query == query
+        assert plan.id != "plan-00000000-0000-0000-0000-000000000000"  # Not a default UUID
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "plan_inputs",
+    [
+        [
+            PlanInput(name="$num_a", description="Number A"),
+            PlanInput(name="$num_b", description="Number B"),
+        ],
+        [
+            {"name": "$num_a", "description": "Number A"},
+            {"name": "$num_b"},
+        ],
+        ["$num_a", "$num_b"],
+        [
+            {"incorrect_key": "$num_a", "error": "Error"},
+        ],
+        "error",
+    ],
+)
+async def test_portia_aplan_with_plan_inputs(
+    portia: Portia,
+    planning_model: MagicMock,
+    plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str],
+    telemetry: MagicMock,
+) -> None:
+    """Test async planning with various plan input formats."""
+    query = "example query"
+
+    # Mock the planning model to return a successful plan
+    planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
+
+    if plan_inputs == "error":
+        with pytest.raises(ValueError, match="Invalid plan inputs received"):
+            await portia.aplan(query, plan_inputs=plan_inputs)
+    elif (
+        isinstance(plan_inputs, list)
+        and plan_inputs
+        and isinstance(plan_inputs[0], dict)
+        and "incorrect_key" in plan_inputs[0]
+    ):
+        with pytest.raises(ValueError, match="Plan input must have a name and description"):
+            await portia.aplan(query, plan_inputs=plan_inputs)
+    else:
+        plan = await portia.aplan(query, plan_inputs=plan_inputs)
+
+        telemetry.capture.assert_called_once_with(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_aplan",
+                function_call_details={
+                    "tools": None,
+                    "example_plans_provided": False,
+                    "end_user_provided": False,
+                    "plan_inputs_provided": True,
+                },
+                name="portia_function_call",
+            )
+        )
+
+        assert plan.plan_context.query == query
+        # Should have plan inputs
+        assert len(plan.plan_inputs) > 0
