@@ -194,6 +194,7 @@ jobs:
         uses: shogo82148/actions-setup-redis@v1
       - name: Clear LLM cache
         if: failure()
+        working-directory: ./platform
         run: |
           echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
           ./.github/scripts/clear_llm_cache.sh
