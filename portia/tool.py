@@ -498,7 +498,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         output_value = output.get_value()
 
         # Handle Tool Errors
-        if "soft_error" in response:
+        if response.get("soft_error", False):
             raise ToolSoftError(str(output_value))
 
         # Handle Clarifications
