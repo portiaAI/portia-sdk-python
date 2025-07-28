@@ -231,7 +231,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             any serializable type or a clarification.
 
         """
-        raise NotImplementedError("Async run is not implemented")
+        raise NotImplementedError("Async run is not implemented") # pragma: no cover
 
     async def _arun(
         self,
