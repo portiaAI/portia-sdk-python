@@ -105,7 +105,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
             steps_or_error = self._process_response(response, tool_list, plan_inputs, i)
             if steps_or_error.error is None:
                 return steps_or_error
-            previous_errors.append(steps_or_error.error)
+            previous_errors.append(steps_or_error)
 
         # If we get here, we've exhausted all retries
         return StepsOrError(
