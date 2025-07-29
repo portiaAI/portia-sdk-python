@@ -231,7 +231,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             any serializable type or a clarification.
 
         """
-        raise NotImplementedError("Async run is not implemented")
+        raise NotImplementedError("Async run is not implemented") # pragma: no cover
 
     async def _arun(
         self,
@@ -506,6 +506,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
                 args_schema=self.args_schema,
                 coroutine=partial(self._arun_with_artifacts, ctx),
                 return_direct=True,
+                response_format="content_and_artifact",
             )
         )
 
@@ -592,11 +593,9 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         output_value = output.get_value()
 
         # Handle Tool Errors
-        if isinstance(output_value, str):
-            if "ToolSoftError" in output_value:
-                raise ToolSoftError(output_value)
-            if "ToolHardError" in output_value:
-                raise ToolHardError(output_value)
+        if response.get("soft_error", False):
+            raise ToolSoftError(str(output_value))
+
         # Handle Clarifications
         if isinstance(output_value, list) and output_value and "category" in output_value[0]:
             clarification = output_value[0]

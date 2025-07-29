@@ -63,8 +63,18 @@ def test_process_output_with_tool_errors() -> None:
     """Test process_output with tool errors."""
     tool = AdditionTool()
 
-    soft_error = ToolMessage(content="Error: ToolSoftError(test)", tool_call_id="1", name="test")
-    hard_error = ToolMessage(content="Error: ToolHardError(test)", tool_call_id="1", name="test")
+    soft_error = ToolMessage(
+        content="Error: ToolSoftError(test)",
+        tool_call_id="1",
+        name="test",
+        status="error",
+    )
+    hard_error = ToolMessage(
+        content="Error: ToolHardError(test)",
+        tool_call_id="1",
+        name="test",
+        status="error",
+    )
 
     with pytest.raises(ToolRetryError):
         process_output([soft_error], tool)
