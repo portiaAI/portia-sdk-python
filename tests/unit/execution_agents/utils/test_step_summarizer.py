@@ -420,7 +420,7 @@ async def test_summarizer_model_structured_output_schema_error_fallback_async() 
 
     tool.structured_output_schema = BaseModel
 
-            # Create async mocks
+    # Create async mocks
     async def mock_aget_structured_response(*_args: Any, **_kwargs: Any) -> None:
         raise TestError("Test error")
 
