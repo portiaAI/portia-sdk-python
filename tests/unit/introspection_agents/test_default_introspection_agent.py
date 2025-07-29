@@ -295,3 +295,137 @@ def test_retrieves_outputs_from_memory_correctly(
         "Task 1 result"
         in mock_introspection_model.get_structured_response.call_args[1]["messages"][1].content
     )
+
+
+# Async test versions for apre_step_introspection
+
+
+@pytest.mark.asyncio
+async def test_apre_step_introspection_continue(
+    introspection_agent: DefaultIntrospectionAgent,
+    mock_introspection_model: MagicMock,
+    mock_plan: Plan,
+    mock_plan_run: PlanRun,
+) -> None:
+    """Test apre_step_introspection returns CONTINUE when conditions are met."""
+    # Mock the Model response response to simulate a CONTINUE outcome
+    mock_introspection_model.aget_structured_response.return_value = PreStepIntrospection(
+        outcome=PreStepIntrospectionOutcome.CONTINUE,
+        reason="All conditions are met.",
+    )
+    result = await introspection_agent.apre_step_introspection(
+        plan=mock_plan,
+        plan_run=mock_plan_run,
+    )
+
+    assert result.outcome == PreStepIntrospectionOutcome.CONTINUE
+    assert result.reason == "All conditions are met."
+
+
+@pytest.mark.asyncio
+async def test_apre_step_introspection_skip(
+    introspection_agent: DefaultIntrospectionAgent,
+    mock_plan: Plan,
+    mock_plan_run: PlanRun,
+    mock_introspection_model: MagicMock,
+) -> None:
+    """Test apre_step_introspection returns SKIP when condition is false."""
+    mock_introspection_model.aget_structured_response.return_value = PreStepIntrospection(
+        outcome=PreStepIntrospectionOutcome.SKIP,
+        reason="Condition is false.",
+    )
+
+    result = await introspection_agent.apre_step_introspection(
+        plan=mock_plan,
+        plan_run=mock_plan_run,
+    )
+
+    assert result.outcome == PreStepIntrospectionOutcome.SKIP
+    assert result.reason == "Condition is false."
+
+
+@pytest.mark.asyncio
+async def test_apre_step_introspection_stop(
+    introspection_agent: DefaultIntrospectionAgent,
+    mock_plan: Plan,
+    mock_plan_run: PlanRun,
+    mock_introspection_model: MagicMock,
+) -> None:
+    """Test apre_step_introspection returns STOP when remaining steps cannot be executed."""
+    mock_introspection_model.aget_structured_response.return_value = PreStepIntrospection(
+        outcome=PreStepIntrospectionOutcome.COMPLETE,
+        reason="Remaining steps cannot be executed.",
+    )
+
+    result = await introspection_agent.apre_step_introspection(
+        plan=mock_plan,
+        plan_run=mock_plan_run,
+    )
+
+    assert result.outcome == PreStepIntrospectionOutcome.COMPLETE
+    assert result.reason == "Remaining steps cannot be executed."
+
+
+@pytest.mark.asyncio
+async def test_apre_step_introspection_passes_correct_data(
+    introspection_agent: DefaultIntrospectionAgent,
+    mock_plan: Plan,
+    mock_plan_run: PlanRun,
+    mock_introspection_model: MagicMock,
+) -> None:
+    """Test apre_step_introspection passes correct data to LLM."""
+    mock_messages = [HumanMessage(content="Test message")]
+
+    mock_introspection_model.aget_structured_response.return_value = PreStepIntrospection(
+        outcome=PreStepIntrospectionOutcome.CONTINUE,
+        reason="Test reason",
+    )
+
+    with patch(
+        "langchain.prompts.ChatPromptTemplate.format_messages",
+        return_value=mock_messages,
+    ):
+        result = await introspection_agent.apre_step_introspection(
+            plan=mock_plan,
+            plan_run=mock_plan_run,
+        )
+
+        mock_introspection_model.aget_structured_response.assert_called_once_with(
+            schema=PreStepIntrospection,
+            messages=[Message(role="user", content="Test message")],
+        )
+
+        assert result.outcome == PreStepIntrospectionOutcome.CONTINUE
+        assert result.reason == "Test reason"
+
+
+@pytest.mark.asyncio
+async def test_apre_step_introspection_retrieves_outputs_from_memory_correctly(
+    introspection_agent: DefaultIntrospectionAgent,
+    mock_introspection_model: MagicMock,
+    mock_plan: Plan,
+    mock_plan_run: PlanRun,
+) -> None:
+    """Test apre_step_introspection returns CONTINUE when conditions are met."""
+    stored_output = introspection_agent.agent_memory.save_plan_run_output(
+        "$result1",
+        mock_plan_run.outputs.step_outputs["$result1"],
+        mock_plan_run.id,
+    )
+    mock_plan_run.outputs.step_outputs["$result1"] = stored_output
+
+    mock_introspection_model.aget_structured_response.return_value = PreStepIntrospection(
+        outcome=PreStepIntrospectionOutcome.CONTINUE,
+        reason="All conditions are met.",
+    )
+    result = await introspection_agent.apre_step_introspection(
+        plan=mock_plan,
+        plan_run=mock_plan_run,
+    )
+
+    assert result.outcome == PreStepIntrospectionOutcome.CONTINUE
+    assert result.reason == "All conditions are met."
+    assert (
+        "Task 1 result"
+        in mock_introspection_model.aget_structured_response.call_args[1]["messages"][1].content
+    )
