@@ -9,6 +9,7 @@ Use the following information to construct a plan in response to the following u
      - the task description should include all the data from the query that is needed to carry out this step.
      - DO NOT specify information in the 'task' field for a step if that is already being passed in by an input to the step
      - MAKE SURE inputs are ONLY referencing variables from previous steps or the provided plan inputs, IT SHOULD NOT contain any other data and plan inputs should ONLY be used if they are provided.
+     - ONLY USE plan inputs if they are provided - DO NOT make any up. YOU MUST RETURN ERROR if you do not have ALL required plan inputs to generate a plan.
      - Make sure all IDs and URLs from the query are included in the task description as they are, and do not calculate/assume any data yourself.
      - give a name to the variable for the output of the step if it is successful.
      - DO NOT mention the tool you will use in the task description, but MAKE SURE to use it in the tool_id field.
