@@ -1610,7 +1610,7 @@ def test_handle_introspection_outcome_complete(portia: Portia) -> None:
     with mock.patch.object(portia, "_get_final_output", return_value=mock_final_output):
         # Call the actual method (not mocked)
         previous_output = LocalDataValue(value="Previous step result")
-        updated_plan_run, outcome = portia._handle_introspection_outcome(
+        updated_plan_run, outcome = portia._generate_introspection_outcome(
             introspection_agent=mock_introspection,
             plan=plan,
             plan_run=plan_run,
@@ -1653,7 +1653,7 @@ def test_handle_introspection_outcome_skip(portia: Portia) -> None:
     )
 
     previous_output = LocalDataValue(value="Previous step result")
-    updated_plan_run, outcome = portia._handle_introspection_outcome(
+    updated_plan_run, outcome = portia._generate_introspection_outcome(
         introspection_agent=mock_introspection,
         plan=plan,
         plan_run=plan_run,
@@ -1688,7 +1688,7 @@ def test_handle_introspection_outcome_no_condition(portia: Portia) -> None:
 
     # Call the actual method
     previous_output = LocalDataValue(value="Previous step result")
-    updated_plan_run, outcome = portia._handle_introspection_outcome(
+    updated_plan_run, outcome = portia._generate_introspection_outcome(
         introspection_agent=mock_introspection,
         plan=plan,
         plan_run=plan_run,

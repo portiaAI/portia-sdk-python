@@ -37,6 +37,14 @@ class PortiaBaseError(Exception):
     """Base class for all our errors."""
 
 
+class SkipExecutionError(PortiaBaseError):
+    """Raised when a step should be skipped."""
+
+    def __init__(self, reason: str) -> None:
+        """Set custom error message."""
+        super().__init__(f"Skipping step: {reason}")
+
+
 class ConfigNotFoundError(PortiaBaseError):
     """Raised when a required configuration value is not found.
 
