@@ -40,8 +40,11 @@ class PortiaBaseError(Exception):
 class SkipExecutionError(PortiaBaseError):
     """Raised when a step should be skipped."""
 
-    def __init__(self, reason: str) -> None:
+    should_return: bool
+
+    def __init__(self, reason: str, should_return: bool = False) -> None:
         """Set custom error message."""
+        self.should_return = should_return
         super().__init__(f"Skipping step: {reason}")
 
 

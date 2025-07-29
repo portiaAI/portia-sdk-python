@@ -1566,7 +1566,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
         )
 
     with (
-        mock.patch.object(portia, "_handle_introspection_outcome", custom_handle_introspection),
+        mock.patch.object(portia, "_generate_introspection_outcome", custom_handle_introspection),
         mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
     ):
         # Run the test
