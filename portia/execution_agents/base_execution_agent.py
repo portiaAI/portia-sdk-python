@@ -5,6 +5,7 @@ The BaseAgent class is the base class that all agents must extend.
 
 from __future__ import annotations
 
+import asyncio
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
@@ -114,6 +115,19 @@ class BaseExecutionAgent:
 
         """
         raise NotImplementedError("execute_async is not implemented")
+
+    async def execute_async(self) -> Output:
+        """Run the core execution logic of the task asynchronously.
+
+        Implementation of this function is deferred to individual agent implementations,
+        making it simple to write new ones. If not implemented, the agent will return a threaded
+        version of the execute_sync method.
+
+        Returns:
+            Output: The output of the task execution.
+
+        """
+        return await asyncio.to_thread(self.execute_sync)
 
     def get_system_context(self, ctx: ToolRunContext, step_inputs: list[StepInput]) -> str:
         """Build a generic system context string from the step and run provided.
