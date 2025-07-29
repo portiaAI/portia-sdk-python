@@ -328,10 +328,7 @@ class OneShotAgent(BaseExecutionAgent):
 
         model = self.config.get_execution_model()
         tools = [
-            self.tool.to_langchain_with_artifact(
-                ctx=tool_run_ctx,
-                sync=sync
-            ),
+            self.tool.to_langchain_with_artifact(ctx=tool_run_ctx, sync=sync),
         ]
         clarification_tool = ClarificationTool(step=self.plan_run.current_step_index)
         if self.config.argument_clarifications_enabled:
