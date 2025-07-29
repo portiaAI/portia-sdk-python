@@ -24,8 +24,7 @@ Use the following information to construct a plan in response to the following u
 {% if previous_errors %}
 <PreviousErrors>{% for error in previous_errors %}
     <PreviousError>
-        Encountered following error with the plan steps below: {{error.error}}
-        Steps: {{error.steps}}
+        Encountered following error in previous run: {{error.error}}
     </PreviousError>{% endfor %}
 </PreviousErrors>
 {% endif %}
