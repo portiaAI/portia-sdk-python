@@ -200,8 +200,12 @@ class OneShotToolCallingModel:
         )
         return model, formatted_messages
 
-    def _handle_execution_hooks(self, response: BaseMessage) -> dict[str, Any] | None:
-        """Handle the execution hooks."""
+    def _handle_execution_hooks(self, response: BaseMessage) -> dict[str, list] | None:
+        """Handle the before tool call execution hooks.
+
+        Returns an empty messages list if the before_tool_call hook returns a clarification.
+        Otherwise None if no new clarifications are needed.
+        """
         if (
             self.agent.execution_hooks
             and self.agent.execution_hooks.before_tool_call
