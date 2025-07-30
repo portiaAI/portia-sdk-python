@@ -28,26 +28,6 @@ from portia.planning_agents.base_planning_agent import StepsOrError
 from tests.utils import get_mock_base_chat_model
 
 
-def _is_mistral_available() -> bool:
-    """Check if MistralAI package is available."""
-    try:
-        from portia.model import MistralAIGenerativeModel  # noqa: F401
-    except ImportError:
-        return False
-    else:
-        return True
-
-
-def _is_google_available() -> bool:
-    """Check if Google package is available."""
-    try:
-        from portia.model import GoogleGenAiGenerativeModel  # noqa: F401
-    except ImportError:
-        return False
-    else:
-        return True
-
-
 @pytest.mark.parametrize(
     ("langchain_message", "expected_role", "expected_content"),
     [
@@ -1056,19 +1036,19 @@ async def test_ollama_model_async_methods_if_available() -> None:
     [
         (
             "gpt-4o",
-            16384,
+            128000,
         ),
         (
             "o1-preview",
-            32768,
+            128000,
         ),
         (
             "claude-3-5-haiku-latest",
-            8192,
+            200000,
         ),
         (
             "gemini-2.5-pro",
-            65535,
+            1048576,
         ),
         (
             "unknown-model-xyz",

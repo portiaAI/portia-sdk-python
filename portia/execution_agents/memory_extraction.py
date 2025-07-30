@@ -38,27 +38,17 @@ class MemoryExtractionStep:
 
         """
         potential_inputs = self.agent.plan_run.get_potential_step_inputs()
-        step_inputs = []
-        for input_variable in self.agent.step.inputs:
-            if input_variable.name not in potential_inputs:
-                continue
-
-            potential_input = potential_inputs[input_variable.name]
-            # If the value is too large to fit in the execution agent's context window, just use the
-            # summary.
-            # Note that it is still possible to over-flow the context window if there are multiple
-            # large inputs. We do not expect to see this regularly - if we do, we should add more compl
-            value = potential_input.full_value(self.agent.agent_memory)
-            if exceeds_context_threshold(value, self.agent.config.get_execution_model(), 0.9):
-                value = potential_input.get_summary()
-
-            step_inputs.append(
-                StepInput(
-                    name=input_variable.name,
-                    value=value,
-                    description=input_variable.description,
-                )
+        step_inputs = [
+            StepInput(
+                name=input_variable.name,
+                value=potential_inputs[input_variable.name].full_value(self.agent.agent_memory),
+                description=input_variable.description,
             )
+            for input_variable in self.agent.step.inputs
+            if input_variable.name in potential_inputs
+        ]
+        if exceeds_context_threshold(step_inputs, self.agent.config.get_execution_model(), 0.9):
+            self._truncate_inputs(step_inputs)
 
         if len(step_inputs) != len(self.agent.step.inputs):
             expected_inputs = {input_.name for input_ in self.agent.step.inputs}
@@ -67,3 +57,13 @@ class MemoryExtractionStep:
                 f"Received unknown step input(s): {expected_inputs - known_inputs}"
             )
         return {"step_inputs": step_inputs}
+
+    def _truncate_inputs(self, inputs: list[StepInput]) -> None:
+        """Truncate the step inputs so they fit in the context window."""
+        # Replace input values with their description one by one (largest to smallest) until the
+        # inputs fit
+        inputs.sort(key=lambda x: len(str(x.value)) if x.value is not None else 0, reverse=True)
+        for input_ in inputs:
+            if not exceeds_context_threshold(inputs, self.agent.config.get_execution_model(), 0.9):
+                return
+            input_.value = input_.description

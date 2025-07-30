@@ -142,12 +142,10 @@ def test_memory_extraction_step_uses_summary_when_value_too_large() -> None:
     """Test MemoryExtractionStep uses summary when value exceeds context threshold."""
     (_, plan_run) = get_test_plan_run()
 
-    large_value = "x" * 10000  # Large value that would exceed threshold
-    summary_text = "This is a summary of the large value"
-    large_output = LocalDataValue(value=large_value, summary=summary_text)
-
     plan_run.outputs.step_outputs = {
-        "$large_output": large_output,
+        "$large_output": LocalDataValue(
+            value="x" * 10000, summary="This is a summary of the large value"
+        ),
     }
 
     agent = BaseExecutionAgent(
@@ -176,5 +174,53 @@ def test_memory_extraction_step_uses_summary_when_value_too_large() -> None:
 
     assert result["step_inputs"][0].name == "$large_output"
     # The value should be the summary, not the original large value
-    assert result["step_inputs"][0].value == summary_text
+    assert result["step_inputs"][0].value == "Large output description"
     assert result["step_inputs"][0].description == "Large output description"
+
+
+def test_memory_extraction_step_uses_summaries_when_multiple_values_too_large() -> None:
+    """Test MemoryExtractionStep handles multiple large inputs."""
+    (_, plan_run) = get_test_plan_run()
+
+    plan_run.outputs.step_outputs = {
+        "$large_output_1": LocalDataValue(value="x" * 10000, summary="Summary of largest value"),
+        "$large_output_2": LocalDataValue(
+            value="y" * 8000, summary="Summary of second largest value"
+        ),
+        "$small_output": LocalDataValue(value="z", summary="Summary of small value"),
+    }
+
+    agent = BaseExecutionAgent(
+        plan=PlanBuilder()
+        .step(
+            task="DESCRIPTION_STRING",
+            output="$out",
+            inputs=[
+                Variable(name="$large_output_1", description="First large output description"),
+                Variable(name="$large_output_2", description="Second large output description"),
+                Variable(name="$small_output", description="Small output description"),
+            ],
+        )
+        .build(),
+        plan_run=plan_run,
+        config=get_test_config(),
+        tool=None,
+        agent_memory=InMemoryStorage(),
+        end_user=EndUser(external_id="123"),
+    )
+
+    with mock.patch(
+        "portia.execution_agents.memory_extraction.exceeds_context_threshold"
+    ) as mock_threshold:
+        # Mock so that we exceed threshold on initial check + first 2 replacement checks, but pass
+        # after replacing the 2 large values
+        mock_threshold.side_effect = [True, True, True, False]
+        memory_extraction_step = MemoryExtractionStep(agent=agent)
+        result = memory_extraction_step.invoke({})
+
+    assert result["step_inputs"][0].name == "$large_output_1"
+    assert result["step_inputs"][0].value == "First large output description"
+    assert result["step_inputs"][1].name == "$large_output_2"
+    assert result["step_inputs"][1].value == "Second large output description"
+    assert result["step_inputs"][2].name == "$small_output"
+    assert result["step_inputs"][2].value == "z"

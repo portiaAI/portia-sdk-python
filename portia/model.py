@@ -180,9 +180,8 @@ class GenerativeModel(ABC):
         Falls back to 100k tokens if the model is not found.
         """
         try:
-            return litellm.model_cost[self.model_name]["max_tokens"]
+            return litellm.model_cost[self.model_name]["max_input_tokens"]
         except (KeyError, TypeError):
-            # Fall back to 100k tokens if model not found or max_tokens key missing
             return 100_000
 
     def __str__(self) -> str:
