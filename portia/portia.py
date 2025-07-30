@@ -44,6 +44,7 @@ from portia.errors import (
     InvalidPlanRunStateError,
     PlanError,
     PlanNotFoundError,
+    SkipExecutionError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
@@ -1177,7 +1178,7 @@ class Portia:
         self.storage.save_plan_run(plan_run)
         return plan_run
 
-    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
+    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:
         """Execute the run steps, updating the run state as needed.
 
         Args:
@@ -1189,30 +1190,7 @@ class Portia:
 
         """
         self._set_plan_run_state(plan_run, PlanRunState.IN_PROGRESS)
-
-        dashboard_url = self.config.must_get("portia_dashboard_url", str)
-
-        dashboard_message = (
-            (
-                f" View in your Portia AI dashboard: "
-                f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
-            )
-            if self.config.storage_class == StorageClass.CLOUD
-            else ""
-        )
-
-        logger().info(
-            f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
-        )
-
-        if self.execution_hooks.before_plan_run and plan_run.current_step_index == 0:
-            logger().debug("Calling before_plan_run execution hook")
-            self.execution_hooks.before_plan_run(
-                ReadOnlyPlan.from_plan(plan),
-                ReadOnlyPlanRun.from_plan_run(plan_run),
-            )
-            logger().debug("Finished before_plan_run execution hook")
-
+        self._log_execute_start(plan_run, plan)
         last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
         introspection_agent = self._get_introspection_agent()
         for index in range(plan_run.current_step_index, len(plan.steps)):
@@ -1220,158 +1198,182 @@ class Portia:
             plan_run.current_step_index = index
 
             try:
-                # Handle the introspection outcome
-                (plan_run, pre_step_outcome) = self._handle_introspection_outcome(
-                    introspection_agent=introspection_agent,
-                    plan=plan,
-                    plan_run=plan_run,
-                    last_executed_step_output=last_executed_step_output,
+                last_executed_step_output = self._execute_step(
+                    plan, plan_run, step, last_executed_step_output, introspection_agent
                 )
-                if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
-                    continue
-                if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
-                    self._log_final_output(plan_run, plan)
-                    if self.execution_hooks.after_plan_run and plan_run.outputs.final_output:
-                        logger().debug("Calling after_plan_run execution hook")
-                        self.execution_hooks.after_plan_run(
-                            ReadOnlyPlan.from_plan(plan),
-                            ReadOnlyPlanRun.from_plan_run(plan_run),
-                            plan_run.outputs.final_output,
-                        )
-                        logger().debug("Finished after_plan_run execution hook")
+            except SkipExecutionError as e:
+                logger().info(f"Skipping step {index}: {e}")
+                if e.should_return:
                     return plan_run
-
-                logger().info(
-                    f"Executing step {index}: {step.task}",
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
-                )
-
-                if (
-                    self.execution_hooks.before_step_execution
-                    # Don't call before_step_execution if we've already executed the step and
-                    # raised a clarification
-                    and len(plan_run.get_clarifications_for_step()) == 0
-                ):
-                    logger().debug("Calling before_step_execution execution hook")
-                    outcome = self.execution_hooks.before_step_execution(
-                        ReadOnlyPlan.from_plan(plan),
-                        ReadOnlyPlanRun.from_plan_run(plan_run),
-                        ReadOnlyStep.from_step(step),
-                    )
-                    logger().debug("Finished before_step_execution execution hook")
-                    if outcome == BeforeStepExecutionOutcome.SKIP:
-                        continue
-
-                # we pass read only copies of the state to the agent so that the portia remains
-                # responsible for handling the output of the agent and updating the state.
-                agent = self._get_agent_for_step(
-                    step=ReadOnlyStep.from_step(step),
-                    plan=ReadOnlyPlan.from_plan(plan),
-                    plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
-                )
-                logger().debug(
-                    f"Using agent: {type(agent).__name__}",
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
-                )
-                last_executed_step_output = agent.execute_sync()
-            except Exception as e:  # noqa: BLE001 - We want to capture all failures here
-                logger().exception(f"Error executing step {index}: {e}")
-                error_output = LocalDataValue(value=str(e))
-                self._set_step_output(error_output, plan_run, step)
-                plan_run.outputs.final_output = error_output
-                self._set_plan_run_state(plan_run, PlanRunState.FAILED)
-                logger().error(
-                    "error: {error}",
-                    error=e,
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
-                )
-                logger().debug(
-                    f"Final run status: {plan_run.state!s}",
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
-                )
-
-                if self.execution_hooks.after_step_execution:
-                    logger().debug("Calling after_step_execution execution hook")
-                    self.execution_hooks.after_step_execution(
-                        ReadOnlyPlan.from_plan(plan),
-                        ReadOnlyPlanRun.from_plan_run(plan_run),
-                        ReadOnlyStep.from_step(step),
-                        error_output,
-                    )
-                    logger().debug("Finished after_step_execution execution hook")
-
-                if self.execution_hooks.after_plan_run:
-                    logger().debug("Calling after_plan_run execution hook")
-                    self.execution_hooks.after_plan_run(
-                        ReadOnlyPlan.from_plan(plan),
-                        ReadOnlyPlanRun.from_plan_run(plan_run),
-                        plan_run.outputs.final_output,
-                    )
-                    logger().debug("Finished after_plan_run execution hook")
-
-                return plan_run
+                continue
+            except Exception as e:  # noqa: BLE001 - We want to capture all other failures here
+                return self._handle_execution_error(plan_run, plan, index, step, e)
             else:
                 self._set_step_output(last_executed_step_output, plan_run, step)
                 logger().info(
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
-            if (
-                len(
-                    new_clarifications := self._get_clarifications_from_output(
-                        last_executed_step_output,
-                        plan_run,
-                    )
-                )
-                > 0
+            if clarified_plan_run := self._handle_post_step_execution(
+                plan, plan_run, index, step, last_executed_step_output
             ):
-                # If execution raised a clarification, re-check readiness of subsequent tools
-                # If the clarification raised is an action clarification for a PortiaRemoteTool
-                # (i.e. the tool is not ready), run a combined readiness check for this step and
-                # all subsequent steps.
-                # Otherwise, combine the new clarifications with the ready clarifications from the
-                # next step.
-                if (
-                    len(new_clarifications) == 1
-                    and isinstance(
-                        self.tool_registry.get_tool(step.tool_id or ""), PortiaRemoteTool
-                    )
-                    and new_clarifications[0].category == ClarificationCategory.ACTION
-                ):
-                    combined_clarifications = self._check_remaining_tool_readiness(
-                        plan,
-                        plan_run,
-                        start_index=index,
-                    )
-                else:
-                    ready_clarifications = self._check_remaining_tool_readiness(
-                        plan,
-                        plan_run,
-                        start_index=index + 1,
-                    )
-                    combined_clarifications = new_clarifications + ready_clarifications
                 # No after_plan_run call here as the plan run will be resumed later
-                return self._raise_clarifications(combined_clarifications, plan_run)
+                return clarified_plan_run
 
-            if self.execution_hooks.after_step_execution:
-                logger().debug("Calling after_step_execution execution hook")
-                self.execution_hooks.after_step_execution(
-                    ReadOnlyPlan.from_plan(plan),
-                    ReadOnlyPlanRun.from_plan_run(plan_run),
-                    ReadOnlyStep.from_step(step),
-                    last_executed_step_output,
-                )
-                logger().debug("Finished after_step_execution execution hook")
+        return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
 
-            # persist at the end of each step
-            self.storage.save_plan_run(plan_run)
-            logger().debug(
-                f"New PlanRun State: {plan_run.model_dump_json(indent=4)}",
+    def _handle_post_step_execution(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        index: int,
+        step: Step,
+        last_executed_step_output: Output,
+    ) -> PlanRun | None:
+        """Handle the post step execution.
+
+        Returns a new plan run if the step output raised clarifications.
+        """
+        if new_clarifications := self._get_clarifications_from_output(
+            last_executed_step_output, plan_run
+        ):
+            combined_clarifications = self._handle_new_clarifications(
+                plan, plan_run, index, step, new_clarifications
             )
 
+            return self._raise_clarifications(combined_clarifications, plan_run)
+
+        self._handle_after_step_execution_hook(plan, plan_run, step, last_executed_step_output)
+
+        # persist at the end of each step
+        self.storage.save_plan_run(plan_run)
+        logger().debug(
+            f"New PlanRun State: {plan_run.model_dump_json(indent=4)}",
+        )
+        return None
+
+    def _handle_after_step_execution_hook(
+        self, plan: Plan, plan_run: PlanRun, step: Step, last_executed_step_output: Output
+    ) -> None:
+        """Handle the after step execution hook."""
+        if self.execution_hooks.after_step_execution:
+            logger().debug("Calling after_step_execution execution hook")
+            self.execution_hooks.after_step_execution(
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
+                ReadOnlyStep.from_step(step),
+                last_executed_step_output,
+            )
+            logger().debug("Finished after_step_execution execution hook")
+
+    def _execute_step(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        step: Step,
+        last_executed_step_output: Output | None,
+        introspection_agent: BaseIntrospectionAgent,
+    ) -> Output:
+        """Attempt to execute a step.
+
+        Args:
+            plan (Plan): The plan being executed.
+            plan_run (PlanRun): The plan run being executed.
+            step (Step): The step being executed.
+            last_executed_step_output (Output | None): The output of the last executed step.
+            introspection_agent (BaseIntrospectionAgent): The introspection agent.
+
+        Returns:
+            Output: The output of the step.
+
+        Raises:
+            SkipExecutionError: If the step should be skipped.
+
+        """
+        # Handle the introspection outcome
+        (plan_run, pre_step_outcome) = self._generate_introspection_outcome(
+            introspection_agent=introspection_agent,
+            plan=plan,
+            plan_run=plan_run,
+            last_executed_step_output=last_executed_step_output,
+        )
+        self._handle_pre_step_outcome(plan, plan_run, pre_step_outcome)
+        self._handle_before_step_execution_hook(plan, plan_run, step)
+
+        # we pass read only copies of the state to the agent so that the portia remains
+        # responsible for handling the output of the agent and updating the state.
+        agent = self._get_agent_for_step(
+            step=ReadOnlyStep.from_step(step),
+            plan=ReadOnlyPlan.from_plan(plan),
+            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+        )
+        return agent.execute_sync()
+
+    def _handle_before_step_execution_hook(self, plan: Plan, plan_run: PlanRun, step: Step) -> None:
+        """Handle the before step execution hook.
+
+        Args:
+            plan (Plan): The plan being executed.
+            plan_run (PlanRun): The plan run being executed.
+            step (Step): The step being executed.
+
+        """
+        logger().info(
+            f"Executing step {plan_run.current_step_index}: {step.task}",
+            plan=str(plan.id),
+            plan_run=str(plan_run.id),
+        )
+
+        if (
+            self.execution_hooks.before_step_execution
+            # Don't call before_step_execution if we've already executed the step and
+            # raised a clarification
+            and len(plan_run.get_clarifications_for_step()) == 0
+        ):
+            logger().debug("Calling before_step_execution execution hook")
+            outcome = self.execution_hooks.before_step_execution(
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
+                ReadOnlyStep.from_step(step),
+            )
+            logger().debug("Finished before_step_execution execution hook")
+            if outcome == BeforeStepExecutionOutcome.SKIP:
+                raise SkipExecutionError(outcome.value)
+
+    def _handle_pre_step_outcome(
+        self, plan: Plan, plan_run: PlanRun, pre_step_outcome: PreStepIntrospection
+    ) -> None:
+        """Handle the outcome of the pre-step introspection.
+
+        Args:
+            plan (Plan): The plan being executed.
+            plan_run (PlanRun): The plan run being executed.
+            pre_step_outcome (PreStepIntrospection): The outcome of the pre-step introspection.
+
+        Returns:
+            bool: True if the pre-step outcome should be handled, False otherwise.
+
+        Raises:
+            SkipExecutionError: If the pre-step outcome is SKIP.
+
+        """
+        if pre_step_outcome.outcome == PreStepIntrospectionOutcome.SKIP:
+            raise SkipExecutionError(pre_step_outcome.reason)
+        if pre_step_outcome.outcome != PreStepIntrospectionOutcome.CONTINUE:
+            self._log_final_output(plan_run, plan)
+            if self.execution_hooks.after_plan_run and plan_run.outputs.final_output:
+                logger().debug("Calling after_plan_run execution hook")
+                self.execution_hooks.after_plan_run(
+                    ReadOnlyPlan.from_plan(plan),
+                    ReadOnlyPlanRun.from_plan_run(plan_run),
+                    plan_run.outputs.final_output,
+                )
+                logger().debug("Finished after_plan_run execution hook")
+            raise SkipExecutionError(pre_step_outcome.reason, should_return=True)
+
+    def _post_plan_run_execution(
+        self, plan: Plan, plan_run: PlanRun, last_executed_step_output: Output | None
+    ) -> PlanRun:
+        """Post-execution actions for a plan run."""
         if last_executed_step_output:
             plan_run.outputs.final_output = self._get_final_output(
                 plan,
@@ -1390,6 +1392,101 @@ class Portia:
             )
             logger().debug("Finished after_plan_run execution hook")
 
+        return plan_run
+
+    def _handle_new_clarifications(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        index: int,
+        step: Step,
+        new_clarifications: list[Clarification],
+    ) -> list[Clarification]:
+        """Handle new clarifications from the output of the last step executed."""
+        # If execution raised a clarification, re-check readiness of subsequent tools
+        # If the clarification raised is an action clarification for a PortiaRemoteTool
+        # (i.e. the tool is not ready), run a combined readiness check for this step and
+        # all subsequent steps.
+        # Otherwise, combine the new clarifications with the ready clarifications from the
+        # next step.
+        if (
+            len(new_clarifications) == 1
+            and isinstance(self.tool_registry.get_tool(step.tool_id or ""), PortiaRemoteTool)
+            and new_clarifications[0].category == ClarificationCategory.ACTION
+        ):
+            combined_clarifications = self._check_remaining_tool_readiness(
+                plan,
+                plan_run,
+                start_index=index,
+            )
+        else:
+            ready_clarifications = self._check_remaining_tool_readiness(
+                plan,
+                plan_run,
+                start_index=index + 1,
+            )
+            combined_clarifications = new_clarifications + ready_clarifications
+        return combined_clarifications
+
+    def _log_execute_start(self, plan_run: PlanRun, plan: Plan) -> None:
+        dashboard_url = self.config.must_get("portia_dashboard_url", str)
+        dashboard_message = (
+            (
+                f" View in your Portia AI dashboard: "
+                f"{dashboard_url}/dashboard/plan-runs?plan_run_id={plan_run.id!s}"
+            )
+            if self.config.storage_class == StorageClass.CLOUD
+            else ""
+        )
+        logger().info(
+            f"Plan Run State is updated to {plan_run.state!s}.{dashboard_message}",
+        )
+        if self.execution_hooks.before_plan_run and plan_run.current_step_index == 0:
+            logger().debug("Calling before_plan_run execution hook")
+            self.execution_hooks.before_plan_run(
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
+            )
+            logger().debug("Finished before_plan_run execution hook")
+
+    def _handle_execution_error(
+        self, plan_run: PlanRun, plan: Plan, index: int, step: Step, error: Exception
+    ) -> PlanRun:
+        logger().exception(f"Error executing step {index}: {error}")
+        error_output = LocalDataValue(value=str(error))
+        self._set_step_output(error_output, plan_run, step)
+        plan_run.outputs.final_output = error_output
+        self._set_plan_run_state(plan_run, PlanRunState.FAILED)
+        logger().error(
+            "error: {error}",
+            error=error,
+            plan=str(plan.id),
+            plan_run=str(plan_run.id),
+        )
+        logger().debug(
+            f"Final run status: {plan_run.state!s}",
+            plan=str(plan.id),
+            plan_run=str(plan_run.id),
+        )
+
+        if self.execution_hooks.after_step_execution:
+            logger().debug("Calling after_step_execution execution hook")
+            self.execution_hooks.after_step_execution(
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
+                ReadOnlyStep.from_step(step),
+                error_output,
+            )
+            logger().debug("Finished after_step_execution execution hook")
+
+        if self.execution_hooks.after_plan_run:
+            logger().debug("Calling after_plan_run execution hook")
+            self.execution_hooks.after_plan_run(
+                ReadOnlyPlan.from_plan(plan),
+                ReadOnlyPlanRun.from_plan_run(plan_run),
+                plan_run.outputs.final_output,
+            )
+            logger().debug("Finished after_plan_run execution hook")
         return plan_run
 
     def _log_final_output(self, plan_run: PlanRun, plan: Plan) -> None:
@@ -1426,14 +1523,14 @@ class Portia:
             None,
         )
 
-    def _handle_introspection_outcome(
+    def _generate_introspection_outcome(
         self,
         introspection_agent: BaseIntrospectionAgent,
         plan: Plan,
         plan_run: PlanRun,
         last_executed_step_output: Output | None,
     ) -> tuple[PlanRun, PreStepIntrospection]:
-        """Handle the outcome of the pre-step introspection.
+        """Generate the outcome of the pre-step introspection.
 
         Args:
             introspection_agent (BaseIntrospectionAgent): The introspection agent to use.
@@ -1446,9 +1543,7 @@ class Portia:
                 outcome of the introspection.
 
         """
-        current_step_index = plan_run.current_step_index
-        step = plan.steps[current_step_index]
-        if not step.condition:
+        if not self._should_introspect(plan, plan_run):
             return (
                 plan_run,
                 PreStepIntrospection(
@@ -1456,24 +1551,45 @@ class Portia:
                     reason="No condition to evaluate.",
                 ),
             )
-
-        logger().info(
-            f"Evaluating condition for Step #{current_step_index}: #{step.condition}",
-        )
-
         pre_step_outcome = introspection_agent.pre_step_introspection(
             plan=ReadOnlyPlan.from_plan(plan),
             plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
         )
+        self._update_introspection_step_output_and_state(
+            pre_step_outcome,
+            plan,
+            plan_run,
+            plan.steps[plan_run.current_step_index],
+            last_executed_step_output,
+        )
+        return (plan_run, pre_step_outcome)
 
+    def _should_introspect(self, plan: Plan, plan_run: PlanRun) -> bool:
+        """Determine if the step should be introspected."""
+        step = plan.steps[plan_run.current_step_index]
+        if not step.condition:
+            return False
+        logger().info(
+            f"Evaluating condition for Step #{plan_run.current_step_index}: #{step.condition}",
+        )
+        return True
+
+    def _update_introspection_step_output_and_state(
+        self,
+        pre_step_outcome: PreStepIntrospection,
+        plan: Plan,
+        plan_run: PlanRun,
+        step: Step,
+        last_executed_step_output: Output | None,
+    ) -> None:
+        """Update the step output and state based on the pre-step introspection outcome."""
         log_message = (
-            f"Condition Evaluation Outcome for Step #{current_step_index} is "
+            f"Condition Evaluation Outcome for Step #{plan_run.current_step_index} is "
             f"{pre_step_outcome.outcome.value}. "
             f"Reason: {pre_step_outcome.reason}",
         )
 
         logger().info(*log_message)
-
         match pre_step_outcome.outcome:
             case PreStepIntrospectionOutcome.SKIP:
                 output = LocalDataValue(
@@ -1494,7 +1610,6 @@ class Portia:
                         last_executed_step_output,
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
-        return (plan_run, pre_step_outcome)
 
     def _get_planning_agent(self) -> BasePlanningAgent:
         """Get the planning_agent based on the configuration.
@@ -1642,6 +1757,11 @@ class Portia:
             case ExecutionAgentType.DEFAULT:
                 cls = DefaultExecutionAgent
         cls = OneShotAgent if isinstance(tool, LLMTool) else cls
+        logger().debug(
+            f"Using agent: {type(cls).__name__}",
+            plan=str(plan.id),
+            plan_run=str(plan_run.id),
+        )
         return cls(
             plan,
             plan_run,
