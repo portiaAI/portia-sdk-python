@@ -1216,6 +1216,7 @@ class Portia:
             if clarified_plan_run := self._handle_post_step_execution(
                 plan, plan_run, index, step, last_executed_step_output
             ):
+                # No after_plan_run call here as the plan run will be resumed later
                 return clarified_plan_run
 
         return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
@@ -1238,6 +1239,7 @@ class Portia:
             combined_clarifications = self._handle_new_clarifications(
                 plan, plan_run, index, step, new_clarifications
             )
+
             return self._raise_clarifications(combined_clarifications, plan_run)
 
         self._handle_after_step_execution_hook(plan, plan_run, step, last_executed_step_output)
