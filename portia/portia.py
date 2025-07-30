@@ -41,10 +41,10 @@ from portia.config import (
 )
 from portia.end_user import EndUser
 from portia.errors import (
-    SkipExecutionError,
     InvalidPlanRunStateError,
     PlanError,
     PlanNotFoundError,
+    SkipExecutionError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
@@ -1178,7 +1178,7 @@ class Portia:
         self.storage.save_plan_run(plan_run)
         return plan_run
 
-    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
+    def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:
         """Execute the run steps, updating the run state as needed.
 
         Args:
@@ -1198,7 +1198,9 @@ class Portia:
             plan_run.current_step_index = index
 
             try:
-                last_executed_step_output = self._execute_step(plan, plan_run, step, last_executed_step_output, introspection_agent)
+                last_executed_step_output = self._execute_step(
+                    plan, plan_run, step, last_executed_step_output, introspection_agent
+                )
             except SkipExecutionError as e:
                 logger().info(f"Skipping step {index}: {e}")
                 if e.should_return:
@@ -1211,18 +1213,31 @@ class Portia:
                 logger().info(
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
-            if clarified_plan_run := self._handle_post_step_execution(plan, plan_run, index, step, last_executed_step_output):
+            if clarified_plan_run := self._handle_post_step_execution(
+                plan, plan_run, index, step, last_executed_step_output
+            ):
                 return clarified_plan_run
 
         return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
 
-    def _handle_post_step_execution(self, plan: Plan, plan_run: PlanRun, index: int, step: Step, last_executed_step_output: Output) -> PlanRun | None:
+    def _handle_post_step_execution(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        index: int,
+        step: Step,
+        last_executed_step_output: Output,
+    ) -> PlanRun | None:
         """Handle the post step execution.
 
         Returns a new plan run if the step output raised clarifications.
         """
-        if new_clarifications := self._get_clarifications_from_output(last_executed_step_output, plan_run):
-            combined_clarifications = self._handle_new_clarifications(plan, plan_run, index, step, new_clarifications)
+        if new_clarifications := self._get_clarifications_from_output(
+            last_executed_step_output, plan_run
+        ):
+            combined_clarifications = self._handle_new_clarifications(
+                plan, plan_run, index, step, new_clarifications
+            )
             return self._raise_clarifications(combined_clarifications, plan_run)
 
         self._handle_after_step_execution_hook(plan, plan_run, step, last_executed_step_output)
@@ -1234,7 +1249,9 @@ class Portia:
         )
         return None
 
-    def _handle_after_step_execution_hook(self, plan: Plan, plan_run: PlanRun, step: Step, last_executed_step_output: Output) -> None:
+    def _handle_after_step_execution_hook(
+        self, plan: Plan, plan_run: PlanRun, step: Step, last_executed_step_output: Output
+    ) -> None:
         """Handle the after step execution hook."""
         if self.execution_hooks.after_step_execution:
             logger().debug("Calling after_step_execution execution hook")
@@ -1246,7 +1263,14 @@ class Portia:
             )
             logger().debug("Finished after_step_execution execution hook")
 
-    def _execute_step(self, plan: Plan, plan_run: PlanRun, step: Step, last_executed_step_output: Output | None, introspection_agent: BaseIntrospectionAgent) -> Output:
+    def _execute_step(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        step: Step,
+        last_executed_step_output: Output | None,
+        introspection_agent: BaseIntrospectionAgent,
+    ) -> Output:
         """Attempt to execute a step.
 
         Args:
@@ -1313,7 +1337,9 @@ class Portia:
             if outcome == BeforeStepExecutionOutcome.SKIP:
                 raise SkipExecutionError(outcome.value)
 
-    def _handle_pre_step_outcome(self, plan: Plan, plan_run: PlanRun, pre_step_outcome: PreStepIntrospection) -> None:
+    def _handle_pre_step_outcome(
+        self, plan: Plan, plan_run: PlanRun, pre_step_outcome: PreStepIntrospection
+    ) -> None:
         """Handle the outcome of the pre-step introspection.
 
         Args:
@@ -1342,7 +1368,9 @@ class Portia:
                 logger().debug("Finished after_plan_run execution hook")
             raise SkipExecutionError(pre_step_outcome.reason, should_return=True)
 
-    def _post_plan_run_execution(self, plan: Plan, plan_run: PlanRun, last_executed_step_output: Output | None) -> PlanRun:
+    def _post_plan_run_execution(
+        self, plan: Plan, plan_run: PlanRun, last_executed_step_output: Output | None
+    ) -> PlanRun:
         """Post-execution actions for a plan run."""
         if last_executed_step_output:
             plan_run.outputs.final_output = self._get_final_output(
@@ -1364,7 +1392,14 @@ class Portia:
 
         return plan_run
 
-    def _handle_new_clarifications(self, plan: Plan, plan_run: PlanRun, index: int, step: Step, new_clarifications: list[Clarification]) -> list[Clarification]:
+    def _handle_new_clarifications(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        index: int,
+        step: Step,
+        new_clarifications: list[Clarification],
+    ) -> list[Clarification]:
         """Handle new clarifications from the output of the last step executed."""
         # If execution raised a clarification, re-check readiness of subsequent tools
         # If the clarification raised is an action clarification for a PortiaRemoteTool
@@ -1374,9 +1409,7 @@ class Portia:
         # next step.
         if (
             len(new_clarifications) == 1
-            and isinstance(
-                self.tool_registry.get_tool(step.tool_id or ""), PortiaRemoteTool
-            )
+            and isinstance(self.tool_registry.get_tool(step.tool_id or ""), PortiaRemoteTool)
             and new_clarifications[0].category == ClarificationCategory.ACTION
         ):
             combined_clarifications = self._check_remaining_tool_readiness(
@@ -1414,8 +1447,9 @@ class Portia:
             )
             logger().debug("Finished before_plan_run execution hook")
 
-    def _handle_execution_error(self, plan_run: PlanRun, plan: Plan, index: int, step: Step, error: Exception) -> PlanRun:
-
+    def _handle_execution_error(
+        self, plan_run: PlanRun, plan: Plan, index: int, step: Step, error: Exception
+    ) -> PlanRun:
         logger().exception(f"Error executing step {index}: {error}")
         error_output = LocalDataValue(value=str(error))
         self._set_step_output(error_output, plan_run, step)
