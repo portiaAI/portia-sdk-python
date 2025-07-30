@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel
 
 from portia.config import Config, GenerativeModelsConfig
-from portia.execution_agents.output import LocalDataValue
+from portia.execution_agents.output import AgentMemoryValue, LocalDataValue
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
@@ -14,6 +14,7 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.model import GenerativeModel, Message
 from portia.plan import Step
+from portia.storage import InMemoryStorage
 from tests.utils import get_test_config, get_test_plan_run
 
 
@@ -60,7 +61,7 @@ def test_summarizer_agent_execute_sync(
         role="assistant",
     )
 
-    summarizer = FinalOutputSummarizer(config=summarizer_config)
+    summarizer = FinalOutputSummarizer(config=summarizer_config, agent_memory=InMemoryStorage())
     output = summarizer.create_summary(plan=plan, plan_run=plan_run)
 
     assert output == expected_summary
@@ -97,7 +98,7 @@ def test_summarizer_agent_empty_plan_run(
         role="assistant",
     )
 
-    summarizer = FinalOutputSummarizer(config=summarizer_config)
+    summarizer = FinalOutputSummarizer(config=summarizer_config, agent_memory=InMemoryStorage())
 
     output = summarizer.create_summary(plan=plan, plan_run=plan_run)
 
@@ -121,7 +122,7 @@ def test_summarizer_agent_handles_empty_response(
 
     mock_summarizer_model.get_response.return_value = Message(content="", role="assistant")
 
-    summarizer = FinalOutputSummarizer(config=summarizer_config)
+    summarizer = FinalOutputSummarizer(config=summarizer_config, agent_memory=InMemoryStorage())
     output = summarizer.create_summary(plan=plan, plan_run=plan_run)
 
     # Verify None handling
@@ -152,7 +153,7 @@ def test_build_tasks_and_outputs_context(
         "$activities": LocalDataValue(value="Visit Hyde Park and have a picnic"),
     }
 
-    summarizer = FinalOutputSummarizer(config=summarizer_config)
+    summarizer = FinalOutputSummarizer(config=summarizer_config, agent_memory=InMemoryStorage())
     context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
@@ -180,7 +181,7 @@ def test_build_tasks_and_outputs_context_empty() -> None:
     plan.steps = []
     plan_run.outputs.step_outputs = {}
 
-    summarizer = FinalOutputSummarizer(config=get_test_config())
+    summarizer = FinalOutputSummarizer(config=get_test_config(), agent_memory=InMemoryStorage())
     context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
@@ -212,7 +213,7 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
         "$london_weather": LocalDataValue(value="Sunny and warm"),
     }
 
-    summarizer = FinalOutputSummarizer(config=get_test_config())
+    summarizer = FinalOutputSummarizer(config=get_test_config(), agent_memory=InMemoryStorage())
     context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
@@ -260,7 +261,7 @@ def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
         ),
     }
 
-    summarizer = FinalOutputSummarizer(config=get_test_config())
+    summarizer = FinalOutputSummarizer(config=get_test_config(), agent_memory=InMemoryStorage())
     context = summarizer._build_tasks_and_outputs_context(
         plan=plan,
         plan_run=plan_run,
@@ -317,7 +318,7 @@ def test_summarizer_agent_handles_structured_output_with_fo_summary(
     mock_response = SchemaWithSummary(mock_field="mock_value", fo_summary="mock_summary")
     mock_summarizer_model.get_structured_response.return_value = mock_response
 
-    summarizer = FinalOutputSummarizer(config=summarizer_config)
+    summarizer = FinalOutputSummarizer(config=summarizer_config, agent_memory=InMemoryStorage())
     output = summarizer.create_summary(plan=plan, plan_run=plan_run)
 
     assert isinstance(output, SchemaWithSummary)
@@ -342,3 +343,56 @@ def test_summarizer_agent_handles_structured_output_with_fo_summary(
         [Message(content=expected_prompt, role="user")],
         mock.ANY,  # Use mock.ANY since we can't predict the exact dynamic class
     )
+
+
+def test_summarizer_agent_handles_large_response(
+    summarizer_config: Config,
+    mock_summarizer_model: mock.MagicMock,
+) -> None:
+    """Test that the agent handles large response from the tool correctly."""
+    (plan, plan_run) = get_test_plan_run()
+    plan.steps = [
+        Step(
+            task="Process very large dataset",
+            output="$large_output",
+        ),
+    ]
+    large_memory_output = AgentMemoryValue(
+        output_name="large_data",
+        plan_run_id=plan_run.id,
+        summary="Summary of large value",
+    )
+    plan_run.outputs.step_outputs = {
+        "$large_output": large_memory_output,
+    }
+
+    mock_memory = mock.MagicMock()
+    large_retrieved_output = LocalDataValue(
+        value="A" * 50000,
+        summary="Summary of large value",
+    )
+    mock_memory.get_plan_run_output.return_value = large_retrieved_output
+
+    with mock.patch(
+        "portia.execution_agents.utils.final_output_summarizer.exceeds_context_threshold"
+    ) as mock_threshold:
+        mock_threshold.return_value = True
+
+        mock_summarizer_model.get_response.return_value = Message(
+            content="Summary of large processing",
+            role="assistant",
+        )
+
+        summarizer = FinalOutputSummarizer(config=summarizer_config, agent_memory=mock_memory)
+        output = summarizer.create_summary(plan=plan, plan_run=plan_run)
+        assert output == "Summary of large processing"
+
+        mock_threshold.assert_called_once_with(
+            large_retrieved_output.value, summarizer_config.get_summarizer_model()
+        )
+        assert mock_summarizer_model.get_response.call_count == 1
+        assert (
+            "Summary of large value"
+            in mock_summarizer_model.get_response.call_args[0][0][0].content
+        )
+        assert "AAAAA" not in mock_summarizer_model.get_response.call_args[0][0][0].content

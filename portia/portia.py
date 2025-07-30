@@ -1524,7 +1524,7 @@ class Portia:
             summary=None,
         )
         try:
-            summarizer = FinalOutputSummarizer(config=self.config)
+            summarizer = FinalOutputSummarizer(config=self.config, agent_memory=self.storage)
             output = summarizer.create_summary(
                 plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
                 plan=ReadOnlyPlan.from_plan(plan),

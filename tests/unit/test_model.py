@@ -25,6 +25,27 @@ from portia.model import (
     map_message_to_instructor,
 )
 from portia.planning_agents.base_planning_agent import StepsOrError
+from tests.utils import get_mock_base_chat_model
+
+
+def _is_mistral_available() -> bool:
+    """Check if MistralAI package is available."""
+    try:
+        from portia.model import MistralAIGenerativeModel  # noqa: F401
+    except ImportError:
+        return False
+    else:
+        return True
+
+
+def _is_google_available() -> bool:
+    """Check if Google package is available."""
+    try:
+        from portia.model import GoogleGenAiGenerativeModel  # noqa: F401
+    except ImportError:
+        return False
+    else:
+        return True
 
 
 @pytest.mark.parametrize(
@@ -1028,3 +1049,36 @@ async def test_ollama_model_async_methods_if_available() -> None:
 
     except ImportError:
         pytest.skip("Ollama package not available")
+
+
+@pytest.mark.parametrize(
+    ("model_name", "expected_result"),
+    [
+        (
+            "gpt-4o",
+            16384,
+        ),
+        (
+            "o1-preview",
+            32768,
+        ),
+        (
+            "claude-3-5-haiku-latest",
+            8192,
+        ),
+        (
+            "gemini-2.5-pro",
+            65535,
+        ),
+        (
+            "unknown-model-xyz",
+            100000,  # Fallback value
+        ),
+    ],
+)
+def test_get_context_window_size(model_name: str, expected_result: int) -> None:
+    """Test get_context_window_size returns correct value."""
+    model = LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name=model_name)
+    result = model.get_context_window_size()
+
+    assert result == expected_result

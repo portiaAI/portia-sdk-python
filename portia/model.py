@@ -10,6 +10,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import instructor
+import litellm
 from anthropic import Anthropic, AsyncAnthropic
 from langchain.globals import set_llm_cache
 from langchain_anthropic import ChatAnthropic
@@ -22,7 +23,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
 from portia.common import validate_extras_dependencies
-from portia.token_counter import estimate_tokens
+from portia.token_check import estimate_tokens
 
 if TYPE_CHECKING:
     from langchain_core.caches import BaseCache
@@ -172,6 +173,17 @@ class GenerativeModel(ABC):
 
         """
         raise NotImplementedError("async is not implemented")  # pragma: no cover
+
+    def get_context_window_size(self) -> int:
+        """Get the context window size of the model.
+
+        Falls back to 100k tokens if the model is not found.
+        """
+        try:
+            return litellm.model_cost[self.model_name]["max_tokens"]
+        except (KeyError, TypeError):
+            # Fall back to 100k tokens if model not found or max_tokens key missing
+            return 100_000
 
     def __str__(self) -> str:
         """Get the string representation of the model."""

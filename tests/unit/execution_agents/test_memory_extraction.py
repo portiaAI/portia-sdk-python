@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 
 from portia.end_user import EndUser
@@ -134,3 +136,45 @@ def test_memory_extraction_step_with_plan_run_inputs() -> None:
     assert result["step_inputs"][0].name == "$plan_run_input"
     assert result["step_inputs"][0].value == "plan_run_input_value"
     assert result["step_inputs"][0].description == "Plan run input description"
+
+
+def test_memory_extraction_step_uses_summary_when_value_too_large() -> None:
+    """Test MemoryExtractionStep uses summary when value exceeds context threshold."""
+    (_, plan_run) = get_test_plan_run()
+
+    large_value = "x" * 10000  # Large value that would exceed threshold
+    summary_text = "This is a summary of the large value"
+    large_output = LocalDataValue(value=large_value, summary=summary_text)
+
+    plan_run.outputs.step_outputs = {
+        "$large_output": large_output,
+    }
+
+    agent = BaseExecutionAgent(
+        plan=PlanBuilder()
+        .step(
+            task="DESCRIPTION_STRING",
+            output="$out",
+            inputs=[
+                Variable(name="$large_output", description="Large output description"),
+            ],
+        )
+        .build(),
+        plan_run=plan_run,
+        config=get_test_config(),
+        tool=None,
+        agent_memory=InMemoryStorage(),
+        end_user=EndUser(external_id="123"),
+    )
+
+    with mock.patch(
+        "portia.execution_agents.memory_extraction.exceeds_context_threshold"
+    ) as mock_threshold:
+        mock_threshold.return_value = True
+        memory_extraction_step = MemoryExtractionStep(agent=agent)
+        result = memory_extraction_step.invoke({})
+
+    assert result["step_inputs"][0].name == "$large_output"
+    # The value should be the summary, not the original large value
+    assert result["step_inputs"][0].value == summary_text
+    assert result["step_inputs"][0].description == "Large output description"

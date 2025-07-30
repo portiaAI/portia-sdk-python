@@ -34,7 +34,7 @@ from portia.model import (
     LLMProvider,
     OpenAIGenerativeModel,
 )
-from portia.token_counter import estimate_tokens
+from portia.token_check import estimate_tokens
 
 T = TypeVar("T")
 
