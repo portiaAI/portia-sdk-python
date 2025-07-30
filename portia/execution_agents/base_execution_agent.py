@@ -5,6 +5,7 @@ The BaseAgent class is the base class that all agents must extend.
 
 from __future__ import annotations
 
+import asyncio
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
@@ -12,7 +13,12 @@ from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
 
 from portia.execution_agents.context import StepInput, build_context
-from portia.execution_agents.execution_utils import MAX_RETRIES, AgentNode, is_clarification
+from portia.execution_agents.execution_utils import (
+    MAX_RETRIES,
+    AgentNode,
+    is_clarification,
+    is_soft_tool_error,
+)
 from portia.execution_agents.output import LocalDataValue
 from portia.logger import logger
 from portia.plan import Plan, ReadOnlyStep, Step
@@ -97,6 +103,19 @@ class BaseExecutionAgent:
 
         """
 
+    async def execute_async(self) -> Output:
+        """Run the core execution logic of the task asynchronously.
+
+        Implementation of this function is deferred to individual agent implementations,
+        making it simple to write new ones. If not implemented, the agent will return a threaded
+        version of the execute_sync method.
+
+        Returns:
+            Output: The output of the task execution.
+
+        """
+        return await asyncio.to_thread(self.execute_sync)
+
     def get_system_context(self, ctx: ToolRunContext, step_inputs: list[StepInput]) -> str:
         """Build a generic system context string from the step and run provided.
 
@@ -144,9 +163,9 @@ class BaseExecutionAgent:
         """
         messages = state["messages"]
         last_message = messages[-1]
-        errors = [msg for msg in messages if "ToolSoftError" in msg.content]
+        errors = [msg for msg in messages if is_soft_tool_error(msg)]
 
-        if "ToolSoftError" in last_message.content and len(errors) < MAX_RETRIES:
+        if is_soft_tool_error(last_message) and len(errors) < MAX_RETRIES:
             return AgentNode.TOOL_AGENT
 
         for message in messages:

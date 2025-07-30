@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 from langchain_core.messages import ToolMessage
 from langgraph.graph import END, MessagesState
 from openai import BaseModel
@@ -18,11 +19,21 @@ from portia.end_user import EndUser
 from portia.execution_agents.base_execution_agent import MAX_RETRIES, BaseExecutionAgent
 from portia.execution_agents.context import StepInput
 from portia.execution_agents.execution_utils import AgentNode
-from portia.execution_agents.output import LocalDataValue
+from portia.execution_agents.output import LocalDataValue, Output
 from portia.execution_hooks import ExecutionHooks
 from portia.prefixed_uuid import PlanRunUUID
 from portia.storage import InMemoryStorage
 from tests.utils import AdditionTool, get_test_config, get_test_plan_run, get_test_tool_context
+
+
+class TestBaseExecutionAgent(BaseExecutionAgent):
+    """A concrete implementation of BaseExecutionAgent for testing purposes."""
+
+    def execute_sync(self) -> Output:
+        """Test implementation of execute_sync."""
+        return LocalDataValue(
+            value="test_output",
+        )
 
 
 def test_base_agent_default_context() -> None:
@@ -42,6 +53,27 @@ def test_base_agent_default_context() -> None:
     )
     assert context is not None
     assert "test1" in context
+
+
+@pytest.mark.asyncio
+async def test_base_agent_execute_async_calls_sync() -> None:
+    """Test that execute_async calls execute_sync when no async override is provided."""
+    plan, plan_run = get_test_plan_run()
+    agent = TestBaseExecutionAgent(
+        plan,
+        plan_run,
+        get_test_config(),
+        EndUser(external_id="test"),
+        InMemoryStorage(),
+        None,
+    )
+
+    # Call execute_async
+    result = await agent.execute_async()
+
+    # Verify that the result is the same as what execute_sync would return
+    assert isinstance(result, LocalDataValue)
+    assert result.get_value() == "test_output"
 
 
 def test_output_serialize() -> None:
@@ -109,6 +141,7 @@ def test_next_state_after_tool_call_no_error() -> None:
             content="Success message",
             tool_call_id="123",
             name="test_tool",
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -139,6 +172,7 @@ def test_next_state_after_tool_call_with_summarize() -> None:
             content="Success message",
             tool_call_id="123",
             name="test_tool",
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -171,6 +205,7 @@ def test_next_state_after_tool_call_with_large_output() -> None:
             content="Test" * 1000,
             tool_call_id="123",
             name="test_tool",
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -199,6 +234,7 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
                 content=f"ToolSoftError: Error {j}",
                 tool_call_id=str(j),
                 name="test_tool",
+                status="error",
             )
             for j in range(1, i + 1)
         ]
@@ -238,6 +274,7 @@ def test_next_state_after_tool_call_with_clarification_artifact() -> None:
             tool_call_id="123",
             name="test_tool",
             artifact=clarification,
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003
@@ -285,6 +322,7 @@ def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
             tool_call_id="123",
             name="test_tool",
             artifact=clarifications,
+            status="success",
         ),
     ]
     state: MessagesState = {"messages": messages}  # type: ignore  # noqa: PGH003

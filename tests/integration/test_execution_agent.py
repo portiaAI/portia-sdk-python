@@ -72,6 +72,10 @@ class QuantumEntanglementSimulatorTool(Tool):
         """Run the tool."""
         return {"result": 42}
 
+    async def arun(self, _: ToolRunContext, **__: Any) -> dict[str, Any]:
+        """Run the tool asynchronously."""
+        return {"result": "async"}
+
 
 @pytest.mark.parametrize(
     "model",
@@ -126,3 +130,59 @@ def test_execution_agent_with_long_tool_description(model: str) -> None:
     # Assert Output
     assert isinstance(output, LocalDataValue)
     assert output.value == {"result": 42}
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "openai/gpt-4o",
+        "anthropic/claude-3-5-sonnet-latest",
+        "google/gemini-2.0-flash",
+    ],
+)
+@pytest.mark.asyncio
+async def test_execution_agent_with_long_tool_description_async(model: str) -> None:
+    """Test the execution agent with a tool with a long description (async version)."""
+    config = Config.from_default(
+        default_model=model,
+    )
+    tool = QuantumEntanglementSimulatorTool()
+    end_user = EndUser(external_id="test_user")
+
+    # Create Plan
+    plan = (
+        PlanBuilder("Simulate quantum entanglement")
+        .step(
+            task="Run the quantum simulator for a 3-qubit system (particle_count=3) for 500 "
+            "femtoseconds (simulation_time_femtoseconds=500.0). Use an initial state vector "
+            "representing the GHZ state [0.707, 0, 0, 0, 0, 0, 0, 0.707] (initial_state_vector"
+            "=[0.707, 0, 0, 0, 0, 0, 0, 0.707]). Use the 'computational' measurement basis "
+            "and 'gaussian' noise model with an amplitude of 0.05 (noise_amplitude=0.05).",
+            tool_id=tool.id,
+            output="$result",
+        )
+        .build()
+    )
+
+    # Create PlanRun
+    plan_run = PlanRun(plan_id=plan.id, end_user_id=end_user.external_id)
+
+    # Create AgentMemory
+    agent_memory = InMemoryStorage()
+
+    # Instantiate Agent
+    agent = OneShotAgent(
+        plan=plan,
+        plan_run=plan_run,
+        config=config,
+        agent_memory=agent_memory,
+        end_user=end_user,
+        tool=tool,
+    )
+
+    # Execute Agent
+    output = await agent.execute_async()
+
+    # Assert Output
+    assert isinstance(output, LocalDataValue)
+    assert output.value == {"result": "async"}

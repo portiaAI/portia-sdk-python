@@ -8,12 +8,14 @@ This is the portia-sdk-python repository, a python package for managing agentic 
 - `uv run <command>`: runs a command, like `python`, `pytest`
 - `uv add <package>`: adds a package to the pyproject.toml, lock file and also installs it to the virtual environment
 
+A number of the functions and classes have async versions, which are typically copies of the sync versions, normally noted with an `a` prefix, example `portia.plan` -> `portia.aplan`, When updating any existing functions, make sure to update the async version as well if they exist.
+
 This project uses ruff to lint, pyright to do static typechecking and pytest for tests. Tests are split between unit and integration under the tests/unit and tests/integration folders. Don't call pytest directly, always call via the seperate folders. 
 
 Whenever making changes, make sure to run, in order
 - `uv run ruff format`
 - `uv run ruff check --fix`
 - `uv run pyright`
-- `uv run pytest tests/unit`
-- `uv run pytest tests/integration`
+- `uv run pytest tests/unit -n auto`
+- `uv run pytest tests/integration -n auto`
 and then resolve any issues. 
