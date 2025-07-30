@@ -1575,47 +1575,6 @@ class Portia:
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
 
-    async def _ahandle_introspection_outcome(
-        self,
-        introspection_agent: BaseIntrospectionAgent,
-        plan: Plan,
-        plan_run: PlanRun,
-        last_executed_step_output: Output | None,
-    ) -> tuple[PlanRun, PreStepIntrospection]:
-        """Handle the outcome of the pre-step introspection asynchronously.
-
-        Args:
-            introspection_agent (BaseIntrospectionAgent): The introspection agent to use.
-            plan (Plan): The plan being executed.
-            plan_run (PlanRun): The plan run being executed.
-            last_executed_step_output (Output | None): The output of the last step executed.
-
-        Returns:
-            tuple[PlanRun, PreStepIntrospectionOutcome]: The updated plan run and the
-                outcome of the introspection.
-
-        """
-        if not self._should_introspect(plan, plan_run):
-            return (
-                plan_run,
-                PreStepIntrospection(
-                    outcome=PreStepIntrospectionOutcome.CONTINUE,
-                    reason="No condition to evaluate.",
-                ),
-            )
-        pre_step_outcome = await introspection_agent.apre_step_introspection(
-            plan=ReadOnlyPlan.from_plan(plan),
-            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
-        )
-        self._update_introspection_step_output_and_state(
-            pre_step_outcome,
-            plan,
-            plan_run,
-            plan.steps[plan_run.current_step_index],
-            last_executed_step_output,
-        )
-        return (plan_run, pre_step_outcome)
-
     def _get_planning_agent(self) -> BasePlanningAgent:
         """Get the planning_agent based on the configuration.
 
