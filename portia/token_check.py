@@ -41,5 +41,4 @@ def exceeds_context_threshold(
     estimated_tokens = estimate_tokens(value_str)
     context_window_size = model.get_context_window_size()
     threshold_tokens = int(context_window_size * threshold_percentage)
-
     return estimated_tokens > threshold_tokens

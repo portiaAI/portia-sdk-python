@@ -184,7 +184,7 @@ def test_summarizer_model_large_output() -> None:
     )
     base_chat_model = mock_model.to_langchain()
     with mock.patch(
-        "portia.execution_agents.utils.final_output_summarizer.exceeds_context_threshold"
+        "portia.execution_agents.utils.step_summarizer.exceeds_context_threshold"
     ) as mock_threshold:
         mock_threshold.return_value = True
         result = summarizer_model.invoke({"messages": [ai_message, tool_message]})
@@ -227,7 +227,7 @@ async def test_summarizer_model_large_output_async() -> None:
     )
     base_chat_model = mock_model.to_langchain()
     with mock.patch(
-        "portia.execution_agents.utils.final_output_summarizer.exceeds_context_threshold"
+        "portia.execution_agents.utils.step_summarizer.exceeds_context_threshold"
     ) as mock_threshold:
         mock_threshold.return_value = True
         result = await summarizer_model.ainvoke({"messages": [ai_message, tool_message]})

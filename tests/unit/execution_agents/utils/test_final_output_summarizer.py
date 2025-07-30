@@ -21,7 +21,9 @@ from tests.utils import get_test_config, get_test_plan_run
 @pytest.fixture
 def mock_summarizer_model() -> mock.MagicMock:
     """Mock the summarizer model."""
-    return mock.MagicMock(spec=GenerativeModel)
+    model = mock.MagicMock(spec=GenerativeModel)
+    model.get_context_window_size.return_value = 100000
+    return model
 
 
 @pytest.fixture
@@ -388,7 +390,7 @@ def test_summarizer_agent_handles_large_response(
         assert output == "Summary of large processing"
 
         mock_threshold.assert_called_once_with(
-            large_retrieved_output.value, summarizer_config.get_summarizer_model()
+            large_retrieved_output.value, summarizer_config.get_summarizer_model(), 0.9
         )
         assert mock_summarizer_model.get_response.call_count == 1
         assert (

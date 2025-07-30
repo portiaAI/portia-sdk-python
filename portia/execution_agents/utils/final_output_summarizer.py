@@ -89,7 +89,7 @@ class FinalOutputSummarizer:
         if value in (SKIPPED_OUTPUT, COMPLETED_OUTPUT):
             return output.get_summary()
         if exceeds_context_threshold(value, self.config.get_summarizer_model(), 0.9):
-            return output.get_value()
+            return output.get_summary()
         return value
 
     def create_summary(self, plan: Plan, plan_run: PlanRun) -> str | BaseModel | None:
