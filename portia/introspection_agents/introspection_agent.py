@@ -1,5 +1,6 @@
 """BaseIntrospectionAgent is the interface for all introspection agents."""
 
+import asyncio
 from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field
@@ -65,3 +66,13 @@ class BaseIntrospectionAgent(ABC):
     ) -> PreStepIntrospection:
         """pre_step_introspection is introspection run before a plan happens.."""
         raise NotImplementedError("pre_step_introspection is not implemented")
+
+    async def apre_step_introspection(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+    ) -> PreStepIntrospection:
+        """pre_step_introspection is introspection run before a plan happens.."""
+        return await asyncio.to_thread(
+            self.pre_step_introspection, plan, plan_run
+        )  # pragma: no cover
