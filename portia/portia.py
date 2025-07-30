@@ -1242,9 +1242,11 @@ class Portia:
                     return plan_run
 
                 logger().info(
-                    f"Executing step {index}: {step.task}",
-                    plan=str(plan.id),
-                    plan_run=str(plan_run.id),
+                    f"Executing step {index}: {step.task.replace('{', '{{').replace('}', '}}')}",
+                    extra={
+                        "plan_id": str(plan.id),
+                        "plan_run_id": str(plan_run.id),
+                    },
                 )
 
                 if (
