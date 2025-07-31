@@ -15,5 +15,7 @@ Portia implements a three-agent architecture to ensure robust and reliable execu
 You can run linting in the codebase by running the following commands, but only do this if asked:
 * uv run pyright
 * uv run ruff check --fix
+* uv run pytest {command} -n auto
+All python commands should be run with `uv run`
 
-If this doesn't work, you may need to install uv with pip install uv
+If this doesn't work, you may need to install uv with pip install uv, making sure to run `uv sync --all-extras --all-groups` after to ensure all dependencies are installed.

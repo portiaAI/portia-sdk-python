@@ -271,7 +271,7 @@ class Portia:
         """
         self.telemetry.capture(
             PortiaFunctionCallTelemetryEvent(
-                function_name="portia_run",
+                function_name="portia_arun",
                 function_call_details={
                     "tools": (
                         ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
@@ -948,7 +948,7 @@ class Portia:
         """
         self.telemetry.capture(
             PortiaFunctionCallTelemetryEvent(
-                function_name="portia_resume",
+                function_name="portia_aresume",
                 function_call_details={
                     "plan_run_provided": plan_run is not None,
                     "plan_run_id_provided": plan_run_id is not None,
