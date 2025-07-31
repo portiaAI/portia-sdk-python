@@ -10,6 +10,8 @@ Portia implements a three-agent architecture to ensure robust and reliable execu
 2. **Execution Agent**: Executes individual steps of the plan, focusing on the implementation details and concrete actions required.
 3. **Introspection Agent**: Operates between execution steps to check which step is needed next.
 
+The Portia interface has both synchronous and asynchronous methods, typically denoted with an `a` prefix, eg portia.plan() -> portia.aplan(). These should be kept in line with each other, so if you make changes to one, you should make similar changes to the other. 
+
 ## Developing
 
 You can run linting in the codebase by running the following commands, but only do this if asked:
