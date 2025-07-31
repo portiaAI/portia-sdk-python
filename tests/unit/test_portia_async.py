@@ -33,8 +33,6 @@ from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.open_source_tools.llm_tool import LLMTool
-from portia.open_source_tools.registry import example_tool_registry
 from portia.plan import (
     Plan,
     PlanBuilder,
@@ -58,7 +56,6 @@ from tests.utils import (
     ClarificationTool,
     TestClarificationHandler,
     get_test_config,
-    get_test_plan_run,
 )
 
 
@@ -1336,7 +1333,6 @@ async def test_portia_agenerate_introspection_outcome_no_condition(portia: Porti
     # Plan run should be unchanged (no step outputs added)
     assert "$test_output" not in updated_plan_run.outputs.step_outputs
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS
-
 
 
 @pytest.mark.asyncio
