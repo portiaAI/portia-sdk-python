@@ -19,7 +19,12 @@ from portia.clarification import (
 )
 from portia.config import Config, GenerativeModelsConfig, StorageClass
 from portia.end_user import EndUser
-from portia.errors import InvalidPlanRunStateError, PlanError, PlanRunNotFoundError
+from portia.errors import (
+    InvalidPlanRunStateError,
+    PlanError,
+    PlanNotFoundError,
+    PlanRunNotFoundError,
+)
 from portia.execution_agents.output import LocalDataValue
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
 from portia.introspection_agents.introspection_agent import (
@@ -1709,3 +1714,24 @@ async def test_portia_acustom_tool_ready_resume_multiple_custom_tools() -> None:
     assert str(outstanding_clarifications[1].action_url) == ready_tool_2.auth_url
     assert outstanding_clarifications[1].resolved is False
 
+
+@pytest.mark.asyncio
+async def test_portia_arun_plan_with_all_plan_types_error_handling(portia: Portia) -> None:
+    """Test error handling for all plan ID types when plan doesn't exist."""
+    # Plan objects are automatically saved to storage, so they never raise PlanNotFoundError
+    # Only PlanUUID can raise PlanNotFoundError
+
+    # Test with non-existent PlanUUID
+    with pytest.raises(PlanNotFoundError):
+        await portia.arun_plan(PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"))
+
+    # Test that Plan objects work (they get auto-saved, no error)
+    non_existent_plan = Plan(
+        plan_context=PlanContext(query="non-existent", tool_ids=["add_tool"]),
+        steps=[Step(task="Task", tool_id="add_tool", inputs=[], output="$result")],
+    )
+    # This should succeed because Plan objects are auto-saved
+    with mock.patch.object(portia, "_aresume") as mock_aresume:
+        mock_aresume.side_effect = lambda x: x
+        plan_run = await portia.arun_plan(non_existent_plan)
+        assert plan_run.plan_id == non_existent_plan.id
