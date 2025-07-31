@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 from pydantic import BaseModel
 
-from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED
 from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.plan import Step
@@ -177,19 +177,17 @@ def test_summarizer_model_large_output() -> None:
     )
 
     summarizer_model = StepSummarizer(
-        # Set a low threshold so the above output is considered large
-        config=get_test_config(
-            large_output_threshold_tokens=100,
-            feature_flags={
-                FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
-            },
-        ),
+        config=get_test_config(),
         model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
     base_chat_model = mock_model.to_langchain()
-    result = summarizer_model.invoke({"messages": [ai_message, tool_message]})
+    with mock.patch(
+        "portia.execution_agents.utils.step_summarizer.exceeds_context_threshold"
+    ) as mock_threshold:
+        mock_threshold.return_value = True
+        result = summarizer_model.invoke({"messages": [ai_message, tool_message]})
 
     assert base_chat_model.invoke.called  # type: ignore[reportFunctionMemberAccess]
     messages = base_chat_model.invoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
@@ -222,19 +220,17 @@ async def test_summarizer_model_large_output_async() -> None:
     )
 
     summarizer_model = StepSummarizer(
-        # Set a low threshold so the above output is considered large
-        config=get_test_config(
-            large_output_threshold_tokens=100,
-            feature_flags={
-                FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
-            },
-        ),
+        config=get_test_config(),
         model=mock_model,
         tool=AdditionTool(),
         step=Step(task="Test task", output="$output"),
     )
     base_chat_model = mock_model.to_langchain()
-    result = await summarizer_model.ainvoke({"messages": [ai_message, tool_message]})
+    with mock.patch(
+        "portia.execution_agents.utils.step_summarizer.exceeds_context_threshold"
+    ) as mock_threshold:
+        mock_threshold.return_value = True
+        result = await summarizer_model.ainvoke({"messages": [ai_message, tool_message]})
 
     assert base_chat_model.ainvoke.called  # type: ignore[reportFunctionMemberAccess]
     messages = base_chat_model.ainvoke.call_args[0][0]  # type: ignore[reportFunctionMemberAccess]
