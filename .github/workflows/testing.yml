@@ -42,9 +42,9 @@ jobs:
           PORTIA_API_ENDPOINT: "https://api.porita.dev"
         run: |
           set -o pipefail
-          uv run pytest tests/unit -n auto
+          uv run pytest tests/unit -n auto --cov
 
-      - name: tests + coverage
+      - name: integration_tests + coverage
         env:
           PORTIA_API_ENDPOINT: "https://api.porita.dev"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -57,4 +57,4 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: |
           set -o pipefail
-          uv run pytest -m "not daily" -n auto --cov --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          uv run pytest tests/integration -m "not daily" -n auto --cov --cov-append --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
