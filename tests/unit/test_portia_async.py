@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest import mock
-from unittest.mock import MagicMock
 
 import pytest
 
 from portia.errors import PlanError
 from portia.plan import Plan, PlanContext, PlanInput
 from portia.planning_agents.base_planning_agent import StepsOrError
-from portia.portia import Portia
 from portia.storage import StorageError
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
+
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from portia.portia import Portia
 
 
 @pytest.mark.asyncio
