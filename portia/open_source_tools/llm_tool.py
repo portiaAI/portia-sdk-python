@@ -99,7 +99,26 @@ class LLMTool(Tool[str | BaseModel]):
     ) -> str | BaseModel:
         """Run the LLMTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+        messages = self._get_messages(task, task_data)
+        if self.structured_output_schema:
+            return model.get_structured_response(messages, self.structured_output_schema)
 
+        response = model.get_response(messages)
+        return str(response.content)
+
+    async def arun(
+        self, ctx: ToolRunContext, task: str, task_data: list[Any] | str | None = None
+    ) -> str | BaseModel:
+        """Run the LLMTool asynchronously."""
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+        messages = self._get_messages(task, task_data)
+        if self.structured_output_schema:
+            return await model.aget_structured_response(messages, self.structured_output_schema)
+        response = await model.aget_response(messages)
+        return str(response.content)
+
+    def _get_messages(self, task: str, task_data: list[Any] | str | None = None) -> list[Message]:
+        """Get the messages for the LLMTool."""
         context = (
             "Additional context for the LLM tool to use to complete the task, provided by the "
             "run information and results of other tool calls. Use this to resolve any "
@@ -114,13 +133,7 @@ class LLMTool(Tool[str | BaseModel]):
         if self.tool_context:
             context += f"\nTool context: {self.tool_context}"
         content = task_str if not len(context.split("\n")) > 1 else f"{context}\n\n{task_str}"
-        messages = [
+        return [
             Message(role="user", content=self.prompt),
             Message(role="user", content=content),
         ]
-
-        if self.structured_output_schema:
-            return model.get_structured_response(messages, self.structured_output_schema)
-
-        response = model.get_response(messages)
-        return str(response.content)

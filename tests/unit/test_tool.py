@@ -685,6 +685,155 @@ def test_portia_mcp_tool_call_with_error() -> None:
         tool.run(get_test_tool_context(), a=1, b=2)
 
 
+# Async tests for PortiaMcpTool
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_async_call() -> None:
+    """Test invoking a tool via MCP asynchronously."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[mcp.types.TextContent(type="text", text="Hello, world!")],
+        isError=False,
+    )
+
+    class MyEnum(str, Enum):
+        A = "A"
+
+    class TestArgSchema(BaseModel):
+        a: MyEnum
+        b: int
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        args_schema=TestArgSchema,
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        ),
+    )
+    expected = (
+        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null,"meta":null}],'  # noqa: E501
+        '"structuredContent":null,"isError":false}'
+    )
+
+    with patch(
+        "portia.tool.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        tool_result = await tool.arun(get_test_tool_context(), a=1, b=2)
+        assert tool_result == expected
+
+
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_async_call_with_error() -> None:
+    """Test invoking a tool via MCP asynchronously with error."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[],
+        isError=True,
+    )
+
+    class TestArgSchema(BaseModel):
+        a: int
+        b: int
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        args_schema=TestArgSchema,
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        ),
+    )
+
+    with (
+        patch(
+            "portia.tool.get_mcp_session",
+            new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+        ),
+        pytest.raises(ToolHardError),
+    ):
+        await tool.arun(get_test_tool_context(), a=1, b=2)
+
+
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_async_call_with_complex_response() -> None:
+    """Test invoking a tool via MCP asynchronously with complex response."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[
+            mcp.types.TextContent(type="text", text="Result: 42"),
+            mcp.types.TextContent(type="text", text="Additional info"),
+        ],
+        isError=False,
+    )
+
+    class TestArgSchema(BaseModel):
+        query: str
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:complex_tool",
+        name="complex_tool",
+        description="A tool that returns complex content",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        args_schema=TestArgSchema,
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        ),
+    )
+
+    with patch(
+        "portia.tool.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        tool_result = await tool.arun(get_test_tool_context(), query="test query")
+        # Verify the result contains both text content items
+        assert "Result: 42" in tool_result
+        assert "Additional info" in tool_result
+
+
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_async_call_with_no_args() -> None:
+    """Test invoking a tool via MCP asynchronously with no arguments."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[mcp.types.TextContent(type="text", text="No args tool result")],
+        isError=False,
+    )
+
+    class EmptyArgSchema(BaseModel):
+        """Empty schema for tools with no arguments."""
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:no_args_tool",
+        name="no_args_tool",
+        description="A tool that takes no arguments",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        args_schema=EmptyArgSchema,
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        ),
+    )
+
+    with patch(
+        "portia.tool.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        tool_result = await tool.arun(get_test_tool_context())
+        assert "No args tool result" in tool_result
+
+
 def test_remote_tool_batch_ready_check(httpx_mock: HTTPXMock) -> None:
     """Test batch_ready_check classmethod."""
     endpoint = "https://api.fake-portia.test"

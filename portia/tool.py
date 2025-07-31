@@ -798,6 +798,10 @@ class PortiaMcpTool(Tool[str]):
         logger().debug(f"Calling tool {self.name} with arguments {kwargs}")
         return asyncio.run(self.call_remote_mcp_tool(self.name, kwargs))
 
+    async def arun(self, _: ToolRunContext, **kwargs: Any) -> str:
+        """Invoke the tool by dispatching to the MCP server asynchronously."""
+        return await self.call_remote_mcp_tool(self.name, kwargs)
+
     async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
         """Call a tool using the MCP session."""
         async with get_mcp_session(self.mcp_client_config) as session:
