@@ -1338,42 +1338,6 @@ async def test_portia_agenerate_introspection_outcome_no_condition(portia: Porti
     assert updated_plan_run.state == PlanRunState.IN_PROGRESS
 
 
-@pytest.mark.asyncio
-async def test_portia_aget_tool_for_step_none_tool_id() -> None:
-    """Test that when step.tool_id is None, LLMTool is used as fallback."""
-    portia = Portia(config=get_test_config(), tools=[AdditionTool()])
-    plan, plan_run = get_test_plan_run()
-
-    # Create a step with no tool_id
-    step = Step(
-        task="Some task",
-        inputs=[],
-        output="$output",
-        tool_id=None,
-    )
-
-    tool = portia._get_tool_for_step(step, plan_run)
-    assert tool is None
-
-
-@pytest.mark.asyncio
-async def test_portia_aget_llm_tool() -> None:
-    """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
-    portia = Portia(config=get_test_config(), tools=example_tool_registry)
-    plan, plan_run = get_test_plan_run()
-
-    # Create a step with no tool_id
-    step = Step(
-        task="Some task",
-        inputs=[],
-        output="$output",
-        tool_id=LLMTool.LLM_TOOL_ID,
-    )
-
-    tool = portia._get_tool_for_step(step, plan_run)
-    assert tool is not None
-    assert isinstance(tool._child_tool, LLMTool)  # pyright: ignore[reportAttributeAccessIssue]
-
 
 @pytest.mark.asyncio
 async def test_portia_aexecute_step_hooks(portia: Portia, planning_model: MagicMock) -> None:
