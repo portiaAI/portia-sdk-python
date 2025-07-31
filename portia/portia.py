@@ -790,32 +790,9 @@ class Portia:
                 },
             )
         )
-        # ensure we have the plan in storage.
-        # we won't if for example the user used PlanBuilder instead of dynamic planning.
-        plan_id = (
-            plan
-            if isinstance(plan, PlanUUID)
-            else PlanUUID(uuid=plan)
-            if isinstance(plan, UUID)
-            else plan.id
+        plan_run = self._get_plan_run_from_plan(
+            plan, end_user, plan_run_inputs, structured_output_schema
         )
-
-        structured_output_schema = (
-            structured_output_schema
-            if structured_output_schema
-            else (plan.structured_output_schema if isinstance(plan, Plan) else None)
-        )
-        if self.storage.plan_exists(plan_id):
-            plan = self.storage.get_plan(plan_id)
-            plan.structured_output_schema = structured_output_schema
-        elif isinstance(plan, Plan):
-            self.storage.save_plan(plan)
-        else:
-            raise PlanNotFoundError(plan_id) from None
-
-        end_user = self.initialize_end_user(end_user)
-        coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
         return self._resume(plan_run)
 
     async def arun_plan(
@@ -855,6 +832,22 @@ class Portia:
                 },
             )
         )
+        plan_run = self._get_plan_run_from_plan(
+            plan, end_user, plan_run_inputs, structured_output_schema
+        )
+        return await self._aresume(plan_run)
+
+    def _get_plan_run_from_plan(
+        self,
+        plan: Plan | PlanUUID | UUID,
+        end_user: str | EndUser | None,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None,
+        structured_output_schema: type[BaseModel] | None = None,
+    ) -> PlanRun:
+        """Get a plan run from storage."""
         # ensure we have the plan in storage.
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
         plan_id = (
@@ -880,8 +873,7 @@ class Portia:
 
         end_user = self.initialize_end_user(end_user)
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
-        return await self._aresume(plan_run)
+        return self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
 
     def resume(
         self,
