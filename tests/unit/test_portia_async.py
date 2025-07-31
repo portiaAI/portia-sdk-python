@@ -1524,7 +1524,9 @@ async def test_portia_aresume_with_skipped_steps(portia: Portia) -> None:
 
 
 @pytest.mark.asyncio
-async def test_portia_aexecute_step_hooks_with_error(portia: Portia, planning_model: MagicMock) -> None:
+async def test_portia_aexecute_step_hooks_with_error(
+    portia: Portia, planning_model: MagicMock
+) -> None:
     """Test that execution hooks are called correctly when an error occurs."""
     execution_hooks = ExecutionHooks(
         before_plan_run=MagicMock(),
@@ -1552,7 +1554,9 @@ async def test_portia_aexecute_step_hooks_with_error(portia: Portia, planning_mo
 
 
 @pytest.mark.asyncio
-async def test_portia_aexecute_step_hooks_with_skip(portia: Portia, planning_model: MagicMock) -> None:
+async def test_portia_aexecute_step_hooks_with_skip(
+    portia: Portia, planning_model: MagicMock
+) -> None:
     """Test that execution hooks can skip steps when before_step_execution returns SKIP."""
     step1 = Step(task="Step 1", tool_id="add_tool", output="$step1_result")
     step2 = Step(task="Step 2", tool_id="add_tool", output="$step2_result")

@@ -84,6 +84,38 @@ STORAGE = [
 @pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
 @pytest.mark.parametrize("storage", STORAGE)
 @pytest.mark.flaky(reruns=4)
+@pytest.mark.asyncio
+async def test_portia_arun_query(
+    llm_provider: LLMProvider,
+    default_model_name: str,
+    storage: StorageClass,
+) -> None:
+    """Test running a simple query asynchronously."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        default_model=default_model_name,
+        storage_class=storage,
+    )
+
+    addition_tool = AdditionTool()
+    addition_tool.should_summarize = True
+
+    tool_registry = ToolRegistry([addition_tool])
+    portia = Portia(config=config, tools=tool_registry)
+    query = "Add 1 + 2"
+
+    plan_run = await portia.arun(query)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output
+    assert plan_run.outputs.final_output.get_value() == 3
+    for output in plan_run.outputs.step_outputs.values():
+        assert output.get_summary() is not None
+
+
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize("storage", STORAGE)
+@pytest.mark.flaky(reruns=4)
 def test_portia_run_query(
     llm_provider: LLMProvider,
     default_model_name: str,
@@ -213,13 +245,14 @@ async def test_portia_aplan_steps_inputs_dependencies(
 @pytest.mark.parametrize("agent", AGENTS)
 @pytest.mark.parametrize("storage", STORAGE)
 @pytest.mark.flaky(reruns=3)
-def test_portia_run_query_with_clarifications(
+@pytest.mark.asyncio
+async def test_portia_arun_query_with_clarifications(
     llm_provider: LLMProvider,
     default_model_name: str,
     agent: ExecutionAgentType,
     storage: StorageClass,
 ) -> None:
-    """Test running a query with clarification."""
+    """Test running a query with clarification asynchronously."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=llm_provider,
@@ -250,7 +283,7 @@ def test_portia_run_query_with_clarifications(
     )
     portia.storage.save_plan(plan)
 
-    plan_run = portia.run_plan(plan)
+    plan_run = await portia.arun_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
     assert test_clarification_handler.received_clarification is not None
     assert (
@@ -299,14 +332,57 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     assert plan_run.state == PlanRunState.COMPLETE
 
 
+@pytest.mark.asyncio
+async def test_portia_arun_query_with_clarifications_no_handler() -> None:
+    """Test running a query with clarification using Portia asynchronously."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        llm_provider=LLMProvider.OPENAI,
+        default_model="openai/gpt-4o-mini",
+        execution_agent_type=ExecutionAgentType.DEFAULT,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    tool_registry = ToolRegistry([ClarificationTool()])
+    portia = Portia(config=config, tools=tool_registry)
+    clarification_step = Step(
+        tool_id="clarification_tool",
+        task="raise a clarification with a user guidance 'Return a clarification'",
+        output="",
+        inputs=[],
+    )
+    plan = Plan(
+        plan_context=PlanContext(
+            query="Raise a clarification",
+            tool_ids=["clarification_tool"],
+        ),
+        steps=[clarification_step],
+    )
+    portia.storage.save_plan(plan)
+
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.NEED_CLARIFICATION
+    assert plan_run.get_outstanding_clarifications()[0].user_guidance == "Return a clarification"
+
+    plan_run = portia.resolve_clarification(
+        plan_run.get_outstanding_clarifications()[0],
+        "False",
+    )
+
+    portia.resume(plan_run)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+
 @pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
 @pytest.mark.parametrize("agent", AGENTS)
-def test_portia_run_query_with_hard_error(
+@pytest.mark.asyncio
+async def test_portia_arun_query_with_hard_error(
     llm_provider: LLMProvider,
     default_model_name: str,
     agent: ExecutionAgentType,
 ) -> None:
-    """Test running a query with error."""
+    """Test running a query with error asynchronously."""
     config = Config.from_default(
         llm_provider=llm_provider,
         default_model=default_model_name,
@@ -330,7 +406,7 @@ def test_portia_run_query_with_hard_error(
         steps=[clarification_step],
     )
     portia.storage.save_plan(plan)
-    plan_run = portia.run_plan(plan)
+    plan_run = await portia.arun_plan(plan)
 
     assert plan_run.state == PlanRunState.FAILED
     assert plan_run.outputs.final_output
@@ -384,15 +460,62 @@ def test_portia_run_query_with_soft_error(
     assert "Tool add_tool failed after retries" in final_output
 
 
-@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
 @pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
 @pytest.mark.flaky(reruns=3)
-def test_portia_run_query_with_multiple_clarifications(
+@pytest.mark.asyncio
+async def test_portia_arun_query_with_soft_error(
     llm_provider: LLMProvider,
     default_model_name: str,
     agent: ExecutionAgentType,
 ) -> None:
-    """Test running a query with multiple clarification."""
+    """Test running a query with error asynchronously."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        default_model=default_model_name,
+        execution_agent_type=agent,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    class MyAdditionTool(AdditionTool):
+        def run(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
+            raise ToolSoftError("Server Timeout")
+
+    tool_registry = ToolRegistry([MyAdditionTool()])
+    portia = Portia(config=config, tools=tool_registry)
+    clarification_step = Step(
+        tool_id="add_tool",
+        task="Add 1 + 2",
+        output="",
+        inputs=[],
+    )
+    plan = Plan(
+        plan_context=PlanContext(
+            query="raise an error",
+            tool_ids=["add_tool"],
+        ),
+        steps=[clarification_step],
+    )
+    portia.storage.save_plan(plan)
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.FAILED
+    assert plan_run.outputs.final_output
+    final_output = plan_run.outputs.final_output.get_value()
+    assert isinstance(final_output, str)
+    assert "Tool add_tool failed after retries" in final_output
+
+
+@pytest.mark.parametrize(("llm_provider", "default_model_name"), CORE_PROVIDERS)
+@pytest.mark.parametrize("agent", AGENTS)
+@pytest.mark.flaky(reruns=3)
+@pytest.mark.asyncio
+async def test_portia_arun_query_with_multiple_clarifications(
+    llm_provider: LLMProvider,
+    default_model_name: str,
+    agent: ExecutionAgentType,
+) -> None:
+    """Test running a query with multiple clarification asynchronously."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=llm_provider,
@@ -455,7 +578,7 @@ def test_portia_run_query_with_multiple_clarifications(
     )
     portia.storage.save_plan(plan)
 
-    plan_run = portia.run_plan(plan)
+    plan_run = await portia.arun_plan(plan)
 
     assert plan_run.state == PlanRunState.COMPLETE
     # 498 = 456 (clarification for value a in step 1) + 2 (value b in step 1)
@@ -558,8 +681,9 @@ def test_portia_run_query_with_multiple_async_clarifications(
 
 
 @pytest.mark.flaky(reruns=3)
-def test_portia_run_query_with_conditional_steps() -> None:
-    """Test running a query with conditional steps."""
+@pytest.mark.asyncio
+async def test_portia_arun_query_with_conditional_steps() -> None:
+    """Test running a query with conditional steps asynchronously."""
     config = Config.from_default(storage_class=StorageClass.MEMORY)
     portia = Portia(config=config, tools=example_tool_registry)
     query = (
@@ -567,7 +691,7 @@ def test_portia_run_query_with_conditional_steps() -> None:
         "otherwise sum 1 + 2 and give me that as the answer"
     )
 
-    plan_run = portia.run(query)
+    plan_run = await portia.arun(query)
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
     assert "9" in str(plan_run.outputs.final_output.get_value())
@@ -600,8 +724,9 @@ def test_portia_run_query_with_example_registry_and_hooks() -> None:
     assert execution_hooks.after_tool_call.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
 
-def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
-    """Test that running a query requiring cloud tools fails but points user to sign up."""
+@pytest.mark.asyncio
+async def test_portia_arun_query_requiring_cloud_tools_not_authenticated() -> None:
+    """Test that running a query requiring cloud tools fails but points user to sign up asynchronously."""
     config = Config.from_default(
         portia_api_key=None,
         storage_class=StorageClass.MEMORY,
@@ -615,7 +740,7 @@ def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
     )
 
     with pytest.raises(PlanError) as e:
-        portia.plan(query)
+        await portia.aplan(query)
     assert "PORTIA_API_KEY is required to use Portia cloud tools." in str(e.value)
 
 
@@ -704,8 +829,44 @@ def test_plan_inputs() -> None:
     assert plan_run.plan_run_inputs["$numbers"].get_value().num_b == 7  # pyright: ignore[reportOptionalMemberAccess]
 
 
-def test_run_plan_with_large_step_input() -> None:
-    """Test running a plan with a large step input."""
+@pytest.mark.asyncio
+async def test_aplan_inputs() -> None:
+    """Test running a plan with plan inputs asynchronously."""
+
+    class AdditionNumbers(BaseModel):
+        num_a: int = Field(description="First number to add")
+        num_b: int = Field(description="Second number to add")
+
+    numbers_input = PlanInput(
+        name="$numbers",
+        description="Numbers to add",
+        value=AdditionNumbers(num_a=5, num_b=7),
+    )
+    plan_inputs = [numbers_input]
+
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+    )
+    portia = Portia(config=config, tools=ToolRegistry([AdditionTool()]))
+    plan = await portia.aplan(
+        "Use the addition tool to add together the two provided numbers",
+        plan_inputs=plan_inputs,
+    )
+    plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_inputs)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == 12  # 5 + 7 = 12
+
+    # Check that plan inputs were stored correctly
+    assert "$numbers" in plan_run.plan_run_inputs
+    assert plan_run.plan_run_inputs["$numbers"].get_value().num_a == 5  # pyright: ignore[reportOptionalMemberAccess]
+    assert plan_run.plan_run_inputs["$numbers"].get_value().num_b == 7  # pyright: ignore[reportOptionalMemberAccess]
+
+
+@pytest.mark.asyncio
+async def test_arun_plan_with_large_step_input() -> None:
+    """Test running a plan with a large step input asynchronously."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         storage_class=StorageClass.MEMORY,
@@ -780,7 +941,7 @@ def test_run_plan_with_large_step_input() -> None:
     )
 
     portia = Portia(config=config, tools=ToolRegistry([StoryTool(), EmailTool()]))
-    plan_run = portia.run_plan(plan)
+    plan_run = await portia.arun_plan(plan)
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert email_tool_called
