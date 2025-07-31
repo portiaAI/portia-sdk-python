@@ -17,6 +17,7 @@ from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.planning_agents.context import get_tool_descriptions_for_tools
+from portia.token_check import exceeds_context_threshold
 
 if TYPE_CHECKING:
     from portia.config import Config
@@ -66,6 +67,7 @@ Here is original task:
 {task_description}
 
 - Make sure to not exceed the max limit of {max_length} characters.
+- Do not reject the summary, even if the output is large - just do you best to provide a summary.
 - Here is the description of the tool that produced the output:
 
     {tool_description}
@@ -179,7 +181,7 @@ Here is original task:
 
         tool_output = "\nOUTPUT_SEPARATOR\n".join(tool_outputs)
 
-        if self.config.exceeds_output_threshold(tool_output):
+        if exceeds_context_threshold(tool_output, self.config.get_summarizer_model(), 0.9):
             tool_output = (
                 f"This is a large value (full length: {len(str(tool_output))} characters) "
                 "which is held in agent memory."

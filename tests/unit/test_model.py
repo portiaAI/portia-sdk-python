@@ -25,6 +25,7 @@ from portia.model import (
     map_message_to_instructor,
 )
 from portia.planning_agents.base_planning_agent import StepsOrError
+from tests.utils import get_mock_base_chat_model
 
 
 @pytest.mark.parametrize(
@@ -1028,3 +1029,36 @@ async def test_ollama_model_async_methods_if_available() -> None:
 
     except ImportError:
         pytest.skip("Ollama package not available")
+
+
+@pytest.mark.parametrize(
+    ("model_name", "expected_result"),
+    [
+        (
+            "gpt-4o",
+            128000,
+        ),
+        (
+            "o1-preview",
+            128000,
+        ),
+        (
+            "claude-3-5-haiku-latest",
+            200000,
+        ),
+        (
+            "gemini-2.5-pro",
+            1048576,
+        ),
+        (
+            "unknown-model-xyz",
+            100000,  # Fallback value
+        ),
+    ],
+)
+def test_get_context_window_size(model_name: str, expected_result: int) -> None:
+    """Test get_context_window_size returns correct value."""
+    model = LangChainGenerativeModel(client=get_mock_base_chat_model(), model_name=model_name)
+    result = model.get_context_window_size()
+
+    assert result == expected_result
