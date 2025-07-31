@@ -819,7 +819,7 @@ class Portia:
         return self._resume(plan_run)
 
     async def arun_plan(
-                self,
+        self,
         plan: Plan | PlanUUID | UUID,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput]
@@ -1014,7 +1014,6 @@ class Portia:
                 return plan_run
 
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
-
 
     async def _aresume(
         self,
@@ -1643,7 +1642,6 @@ class Portia:
             plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
         )
         return await agent.execute_async()
-
 
     def _handle_before_step_execution_hook(self, plan: Plan, plan_run: PlanRun, step: Step) -> None:
         """Handle the before step execution hook.
