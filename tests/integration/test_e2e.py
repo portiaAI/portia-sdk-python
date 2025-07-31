@@ -935,7 +935,7 @@ def test_portia_run_query_requiring_cloud_tools_not_authenticated() -> None:
 
 @pytest.mark.asyncio
 async def test_portia_arun_query_requiring_cloud_tools_not_authenticated() -> None:
-    """Test that running a query requiring cloud tools fails but points user to sign up asynchronously."""
+    """Test that running a query requiring cloud tools fails but points user to sign up."""
     config = Config.from_default(
         portia_api_key=None,
         storage_class=StorageClass.MEMORY,
