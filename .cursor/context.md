@@ -16,6 +16,6 @@ You can run linting in the codebase by running the following commands, but only 
 * uv run pyright
 * uv run ruff check --fix
 * uv run pytest {command} -n auto
-All python commands should be run with `uv run`
+All python commands should be run with `uv run` and python should never be called directly for anything. 
 
 If this doesn't work, you may need to install uv with pip install uv, making sure to run `uv sync --all-extras --all-groups` after to ensure all dependencies are installed.
