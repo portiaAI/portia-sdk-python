@@ -1471,6 +1471,49 @@ class Portia:
 
         return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
 
+    async def _aexecute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:
+        """Execute the run steps, updating the run state as needed asynchronously.
+
+        Args:
+            plan (Plan): The plan to execute.
+            plan_run (PlanRun): The plan run to execute.
+
+        Returns:
+            Run: The updated run after execution.
+
+        """
+        self._set_plan_run_state(plan_run, PlanRunState.IN_PROGRESS)
+        self._log_execute_start(plan_run, plan)
+        last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
+        introspection_agent = self._get_introspection_agent()
+        for index in range(plan_run.current_step_index, len(plan.steps)):
+            step = plan.steps[index]
+            plan_run.current_step_index = index
+
+            try:
+                last_executed_step_output = await self._aexecute_step(
+                    plan, plan_run, step, last_executed_step_output, introspection_agent
+                )
+            except SkipExecutionError as e:
+                logger().info(f"Skipping step {index}: {e}")
+                if e.should_return:
+                    return plan_run
+                continue
+            except Exception as e:  # noqa: BLE001 - We want to capture all other failures here
+                return self._handle_execution_error(plan_run, plan, index, step, e)
+            else:
+                self._set_step_output(last_executed_step_output, plan_run, step)
+                logger().info(
+                    f"Step output - {last_executed_step_output.get_summary()!s}",
+                )
+            if clarified_plan_run := self._handle_post_step_execution(
+                plan, plan_run, index, step, last_executed_step_output
+            ):
+                # No after_plan_run call here as the plan run will be resumed later
+                return clarified_plan_run
+
+        return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
+
     def _handle_post_step_execution(
         self,
         plan: Plan,
@@ -1557,6 +1600,50 @@ class Portia:
             plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
         )
         return agent.execute_sync()
+
+    async def _aexecute_step(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        step: Step,
+        last_executed_step_output: Output | None,
+        introspection_agent: BaseIntrospectionAgent,
+    ) -> Output:
+        """Attempt to execute a step.
+
+        Args:
+            plan (Plan): The plan being executed.
+            plan_run (PlanRun): The plan run being executed.
+            step (Step): The step being executed.
+            last_executed_step_output (Output | None): The output of the last executed step.
+            introspection_agent (BaseIntrospectionAgent): The introspection agent.
+
+        Returns:
+            Output: The output of the step.
+
+        Raises:
+            SkipExecutionError: If the step should be skipped.
+
+        """
+        # Handle the introspection outcome
+        (plan_run, pre_step_outcome) = await self._agenerate_introspection_outcome(
+            introspection_agent=introspection_agent,
+            plan=plan,
+            plan_run=plan_run,
+            last_executed_step_output=last_executed_step_output,
+        )
+        self._handle_pre_step_outcome(plan, plan_run, pre_step_outcome)
+        self._handle_before_step_execution_hook(plan, plan_run, step)
+
+        # we pass read only copies of the state to the agent so that the portia remains
+        # responsible for handling the output of the agent and updating the state.
+        agent = self._get_agent_for_step(
+            step=ReadOnlyStep.from_step(step),
+            plan=ReadOnlyPlan.from_plan(plan),
+            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+        )
+        return await agent.execute_async()
+
 
     def _handle_before_step_execution_hook(self, plan: Plan, plan_run: PlanRun, step: Step) -> None:
         """Handle the before step execution hook.
