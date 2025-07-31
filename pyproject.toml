@@ -36,6 +36,7 @@ dependencies = [
     "posthog~=6.0",
     "testcontainers[redis]>=4.10.0 ; python_version >= '3.9' and python_version < '4.0'",
     "instructor>=1.9.0 ; python_version >= '3.9' and python_version < '4.0'",
+    "litellm>=1.74.9.post1",
 ]
 
 [project.optional-dependencies]

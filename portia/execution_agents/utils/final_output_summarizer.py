@@ -11,11 +11,14 @@ from portia.introspection_agents.introspection_agent import (
     SKIPPED_OUTPUT,
 )
 from portia.model import Message
+from portia.token_check import exceeds_context_threshold
 
 if TYPE_CHECKING:
     from portia.config import Config
+    from portia.execution_agents.output import Output
     from portia.plan import Plan
     from portia.plan_run import PlanRun
+    from portia.storage import AgentMemory
 
 
 class FinalOutputSummarizer:
@@ -23,6 +26,7 @@ class FinalOutputSummarizer:
 
     Attributes:
         config (Config): The configuration for the llm.
+        agent_memory (AgentMemory): The agent memory to use for the summarizer.
 
     """
 
@@ -41,14 +45,16 @@ class FinalOutputSummarizer:
         "the output schema.\n"
     )
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, agent_memory: AgentMemory) -> None:
         """Initialize the summarizer agent.
 
         Args:
             config (Config): The configuration for the llm.
+            agent_memory (AgentMemory): The agent memory to use for the summarizer.
 
         """
         self.config = config
+        self.agent_memory = agent_memory
 
     def _build_tasks_and_outputs_context(self, plan: Plan, plan_run: PlanRun) -> str:
         """Build the query, tasks and outputs context.
@@ -67,19 +73,24 @@ class FinalOutputSummarizer:
         outputs = plan_run.outputs.step_outputs
         for step in plan.steps:
             if step.output in outputs:
-                output_value = (
-                    outputs[step.output].get_summary()
-                    if outputs[step.output].get_value()
-                    in (
-                        SKIPPED_OUTPUT,
-                        COMPLETED_OUTPUT,
-                    )
-                    else outputs[step.output].get_value()
-                )
+                output_value = self.get_output_value(outputs[step.output])
                 context.append(f"Task: {step.task}")
                 context.append(f"Output: {output_value}")
                 context.append("----------")
         return "\n".join(context)
+
+    def get_output_value(self, output: Output) -> str | None:
+        """Get the value to use for the specified output.
+
+        This ensures that introspection outputs and outputs that are too large for the LLM context
+        window are handled correctly.
+        """
+        value = output.full_value(self.agent_memory)
+        if value in (SKIPPED_OUTPUT, COMPLETED_OUTPUT):
+            return output.get_summary()
+        if exceeds_context_threshold(value, self.config.get_summarizer_model(), 0.9):
+            return output.get_summary()
+        return value
 
     def create_summary(self, plan: Plan, plan_run: PlanRun) -> str | BaseModel | None:
         """Execute the summarizer llm and return the summary as a string.
