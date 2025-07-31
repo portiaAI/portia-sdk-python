@@ -5,6 +5,13 @@ from portia.plan import Plan, PlanContext, Step, Variable
 DEFAULT_EXAMPLE_PLANS: list[Plan] = [
     Plan(
         plan_context=PlanContext(
+            query="Get the temperatures in the two provided cities and then add the two temperatures together",  # noqa: E501
+            tool_ids=["weather_tool", "llm_tool"],
+        ),
+        steps=[],
+    ),
+    Plan(
+        plan_context=PlanContext(
             query="Compare the weather of a city in the Southern hemisphere with that of a city in the Northern hemisphere. Email the results to hello@portialabs.ai.",  # noqa: E501
             tool_ids=[
                 "search_tool",
