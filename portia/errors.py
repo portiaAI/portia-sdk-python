@@ -38,12 +38,21 @@ class PortiaBaseError(Exception):
 
 
 class SkipExecutionError(PortiaBaseError):
-    """Raised when a step should be skipped."""
+    """Raised when a Portia execution should be stopped or a step should be skipped."""
 
+    # If True, the execution should be stopped and the plan run should be returned
+    # If False, only the step should be skipped
     should_return: bool
 
     def __init__(self, reason: str, should_return: bool = False) -> None:
-        """Set custom error message."""
+        """Set custom error message.
+
+        Args:
+            reason (str): The reason for skipping the step.
+            should_return (bool): Whether to return the plan run and stop execution entirely,
+                or just skip the step.
+
+        """
         self.should_return = should_return
         super().__init__(f"Skipping step: {reason}")
 
