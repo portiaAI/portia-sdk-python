@@ -28,13 +28,28 @@ class WeatherTool(Tool[str]):
 
     def run(self, _: ToolRunContext, city: str) -> str:
         """Run the WeatherTool."""
+        url = self._prep_run(city)
+        response = httpx.get(url)
+        return self._parse_weather_data(response, city)
+
+    async def arun(self, _: ToolRunContext, city: str) -> str:
+        """Run the WeatherTool asynchronously."""
+        url = self._prep_run(city)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+        return self._parse_weather_data(response, city)
+
+    def _prep_run(self, city: str) -> str:
+        """Prepare the run for the WeatherTool."""
         api_key = os.getenv("OPENWEATHERMAP_API_KEY")
         if not api_key or api_key == "":
             raise ToolHardError("OPENWEATHERMAP_API_KEY is required")
-        url = (
+        return (
             f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
         )
-        response = httpx.get(url)
+
+    def _parse_weather_data(self, response: httpx.Response, city: str) -> str:
+        """Parse the weather data from the response."""
         response.raise_for_status()
         data = response.json()
         if "weather" not in data:
