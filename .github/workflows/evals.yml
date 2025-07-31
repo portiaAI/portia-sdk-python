@@ -72,11 +72,12 @@ jobs:
           LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           LLM_REDIS_CACHE_URL: ${{ secrets.LLM_REDIS_CACHE_URL }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py query-planner eval --provider=anthropic --threshold_file=query_planner/thresholds/claude-3-7-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk" --slice_name main  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py query-planner eval --provider=google --threshold_file=query_planner/thresholds/gemini-2.5-pro/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk" --slice_name main  --max_concurrency 25)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o '${LANGCHAIN_ENDPOINT}/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then
@@ -95,11 +96,12 @@ jobs:
           LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           LLM_REDIS_CACHE_URL: ${{ secrets.LLM_REDIS_CACHE_URL }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --provider=anthropic --threshold_file=execution/thresholds/claude-3-5-sonnet-latest/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk"  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py agent eval --slice_name=main --provider=google --threshold_file=execution/thresholds/gemini-2.5-flash/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk"  --max_concurrency 25)
           echo $EVAL_OUTPUT
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
@@ -121,11 +123,12 @@ jobs:
           LANGCHAIN_PROJECT: ${{ vars.LANGCHAIN_PROJECT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           LLM_REDIS_CACHE_URL: ${{ secrets.LLM_REDIS_CACHE_URL }}
         run: |
-          EVAL_OUTPUT=$(uv run cli.py introspection eval --slice_name=main --provider=anthropic --threshold_file=introspection/thresholds/claude-3-7-sonnet-latest/thresholds_local.yaml --reps 2 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk"  --max_concurrency 32)
+          EVAL_OUTPUT=$(uv run cli.py introspection eval --slice_name=main --provider=google --threshold_file=introspection/thresholds/gemini-2.5-flash/thresholds_local.yaml --reps 1 --metadata "pr=${{ github.event.pull_request.number }},author=${{ github.event.pull_request.user.login || github.actor }},run=${{ github.event_name == 'push' && 'main' || 'pr' }},env=local,repo=sdk"  --max_concurrency 25)
           echo "eval_url=$(echo "$EVAL_OUTPUT" | grep -o 'https://smith.langchain.com/.*')" >> $GITHUB_OUTPUT
           echo "eval_name=$(echo "$EVAL_OUTPUT" | grep -oP "experiment:\s*'\K[^']+")" >> $GITHUB_OUTPUT
           if echo "$EVAL_OUTPUT" | grep -q "EVAL BREACH"; then

@@ -123,7 +123,7 @@ def test_render_prompt() -> None:
         examples=plans,
         end_user=EndUser(external_id="123"),
         plan_inputs=[plan_input],
-        previous_errors=[StepsOrError(steps=[], error="test error")],
+        previous_errors=["test error"],
     )
 
     overall_pattern = re.compile(
