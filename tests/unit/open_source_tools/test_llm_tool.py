@@ -143,3 +143,175 @@ def test_process_task_data_with_complex_objects() -> None:
 
     result = LLMTool.process_task_data([TestObject(), {"nested": "value"}])
     assert result == "TestObject\n{'nested': 'value'}"
+
+
+# Async tests for LLMTool.arun function
+@pytest.mark.asyncio
+async def test_llm_tool_async_plan_run(
+    mock_llm_tool: LLMTool,
+    mock_tool_run_context: ToolRunContext,
+    mock_model: MagicMock,
+) -> None:
+    """Test that LLMTool runs successfully asynchronously and returns a response."""
+    # Setup mock responses
+    mock_model.aget_response.return_value = Message(
+        role="user", content="Test async response content"
+    )
+    # Define task input
+    task = "What is the capital of France?"
+
+    # Run the tool asynchronously
+    result = await mock_llm_tool.arun(mock_tool_run_context, task)
+
+    mock_model.aget_response.assert_called_once_with(
+        [Message(role="user", content=mock_llm_tool.prompt), Message(role="user", content=task)],
+    )
+
+    # Assert the result is the expected response
+    assert result == "Test async response content"
+
+
+@pytest.mark.asyncio
+async def test_llm_tool_async_structured_output_run(
+    mock_llm_tool: LLMTool,
+    mock_tool_run_context: ToolRunContext,
+    mock_model: MagicMock,
+) -> None:
+    """Test that LLMTool runs successfully asynchronously and returns a structured response."""
+
+    class TestStructuredOutput(BaseModel):
+        capital: str
+
+    # Setup mock responses
+    mock_model.aget_structured_response.return_value = TestStructuredOutput(capital="Paris")
+    # Define task input
+    task = "What is the capital of France?"
+
+    mock_llm_tool.structured_output_schema = TestStructuredOutput
+
+    # Run the tool asynchronously
+    result = await mock_llm_tool.arun(mock_tool_run_context, task)
+
+    mock_model.aget_structured_response.assert_called_once_with(
+        [Message(role="user", content=mock_llm_tool.prompt), Message(role="user", content=task)],
+        TestStructuredOutput,
+    )
+
+    # Assert the result is the expected response
+    assert result == TestStructuredOutput(capital="Paris")
+
+
+@pytest.mark.asyncio
+async def test_llm_tool_async_run_with_context(
+    mock_llm_tool: LLMTool,
+    mock_tool_run_context: ToolRunContext,
+    mock_model: MagicMock,
+) -> None:
+    """Test that LLMTool runs successfully asynchronously when a context is provided."""
+    # Setup mock responses
+    mock_model.aget_response.return_value = Message(
+        role="user", content="Test async response content"
+    )
+
+    # Define task and context
+    mock_llm_tool.tool_context = "Context for task"
+    task = "What is the capital of France?"
+
+    # Run the tool asynchronously
+    result = await mock_llm_tool.arun(mock_tool_run_context, task)
+
+    # Verify that the Model's aget_response method is called
+    called_with = mock_model.aget_response.call_args_list[0].args[0]
+    assert len(called_with) == 2
+    assert isinstance(called_with[0], Message)
+    assert isinstance(called_with[1], Message)
+    assert mock_llm_tool.tool_context in called_with[1].content
+    assert task in called_with[1].content
+    # Assert the result is the expected response
+    assert result == "Test async response content"
+
+
+@pytest.mark.asyncio
+async def test_llm_tool_async_run_with_task_data(
+    mock_llm_tool: LLMTool,
+    mock_tool_run_context: ToolRunContext,
+    mock_model: MagicMock,
+) -> None:
+    """Test that LLMTool runs successfully asynchronously with task data."""
+    # Setup mock responses
+    mock_model.aget_response.return_value = Message(
+        role="user", content="Test async response with data"
+    )
+    # Define task input with task data
+    task = "Analyze this data"
+    task_data = ["Data point 1", "Data point 2", {"key": "value"}]
+
+    # Run the tool asynchronously
+    result = await mock_llm_tool.arun(mock_tool_run_context, task, task_data)
+
+    # Verify that the Model's aget_response method is called with the correct messages
+    called_with = mock_model.aget_response.call_args_list[0].args[0]
+    assert len(called_with) == 2
+    assert isinstance(called_with[0], Message)
+    assert isinstance(called_with[1], Message)
+    assert "Task data: Data point 1\nData point 2\n{'key': 'value'}" in called_with[1].content
+    assert task in called_with[1].content
+    # Assert the result is the expected response
+    assert result == "Test async response with data"
+
+
+@pytest.mark.asyncio
+async def test_llm_tool_async_run_with_string_task_data(
+    mock_llm_tool: LLMTool,
+    mock_tool_run_context: ToolRunContext,
+    mock_model: MagicMock,
+) -> None:
+    """Test that LLMTool runs successfully asynchronously with string task data."""
+    # Setup mock responses
+    mock_model.aget_response.return_value = Message(
+        role="user", content="Test async response with string data"
+    )
+    # Define task input with string task data
+    task = "Analyze this text"
+    task_data = "This is a string of text data"
+
+    # Run the tool asynchronously
+    result = await mock_llm_tool.arun(mock_tool_run_context, task, task_data)
+
+    # Verify that the Model's aget_response method is called with the correct messages
+    called_with = mock_model.aget_response.call_args_list[0].args[0]
+    assert len(called_with) == 2
+    assert isinstance(called_with[0], Message)
+    assert isinstance(called_with[1], Message)
+    assert "Task data: This is a string of text data" in called_with[1].content
+    assert task in called_with[1].content
+    # Assert the result is the expected response
+    assert result == "Test async response with string data"
+
+
+@pytest.mark.asyncio
+async def test_llm_tool_async_run_with_none_task_data(
+    mock_llm_tool: LLMTool,
+    mock_tool_run_context: ToolRunContext,
+    mock_model: MagicMock,
+) -> None:
+    """Test that LLMTool runs successfully asynchronously with None task data."""
+    # Setup mock responses
+    mock_model.aget_response.return_value = Message(
+        role="user", content="Test async response with no data"
+    )
+    # Define task input with None task data
+    task = "Answer this question"
+
+    # Run the tool asynchronously
+    result = await mock_llm_tool.arun(mock_tool_run_context, task, None)
+
+    # Verify that the Model's aget_response method is called with the correct messages
+    called_with = mock_model.aget_response.call_args_list[0].args[0]
+    assert len(called_with) == 2
+    assert isinstance(called_with[0], Message)
+    assert isinstance(called_with[1], Message)
+    assert "Task data:" not in called_with[1].content  # Should not include task data section
+    assert task in called_with[1].content
+    # Assert the result is the expected response
+    assert result == "Test async response with no data"
