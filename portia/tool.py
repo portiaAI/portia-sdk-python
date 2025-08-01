@@ -140,6 +140,11 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "enabled. If not provided, the output will be the default output schema of the tool.run() "
         "method.",
     )
+    aliases: list[str] = Field(
+        default_factory=list,
+        description="Alternative identifiers for this tool. Tools can be retrieved by either "
+        "their primary ID or any of their aliases.",
+    )
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
         """Check whether the tool can be plan_run.
@@ -536,7 +541,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             f"ToolModel(id={self.id!r}, name={self.name!r}, "
             f"description={self.description!r}, "
             f"args_schema={self.args_schema.__name__!r}, "
-            f"output_schema={self.output_schema!r})"
+            f"output_schema={self.output_schema!r}, "
+            f"aliases={self.aliases!r})"
         )
 
     @field_serializer("args_schema")

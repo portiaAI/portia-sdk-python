@@ -125,9 +125,45 @@ class ToolRegistry:
             None: The tool registry is updated in place.
 
         """
-        if tool.id in self._tools and not overwrite:
-            raise DuplicateToolError(tool.id)
+        if not overwrite:
+            self._validate_tool_conflicts(tool)
+
+        if overwrite:
+            self._handle_overwrite_conflicts(tool)
+
         self._tools[tool.id] = tool
+
+    def _validate_tool_conflicts(self, tool: Tool) -> None:
+        """Validate that the tool doesn't conflict with existing tools."""
+        if tool.id in self._tools:
+            raise DuplicateToolError(tool.id)
+
+        for existing_tool in self._tools.values():
+            if tool.id in existing_tool.aliases:
+                raise DuplicateToolError(tool.id)
+
+        for alias in tool.aliases:
+            if alias in self._tools:
+                raise DuplicateToolError(alias)
+            for existing_tool in self._tools.values():
+                if alias in existing_tool.aliases and existing_tool.id != tool.id:
+                    raise DuplicateToolError(alias)
+
+        for existing_id in self._tools:
+            if existing_id in tool.aliases:
+                raise DuplicateToolError(existing_id)
+
+    def _handle_overwrite_conflicts(self, tool: Tool) -> None:
+        """Handle conflicts when overwrite is True."""
+        for existing_tool in list(self._tools.values()):
+            if tool.id in existing_tool.aliases:
+                existing_tool.aliases = [a for a in existing_tool.aliases if a != tool.id]
+
+            for alias in tool.aliases:
+                if alias in existing_tool.aliases:
+                    existing_tool.aliases = [a for a in existing_tool.aliases if a != alias]
+                if alias in self._tools:
+                    del self._tools[alias]
 
     def replace_tool(self, tool: Tool) -> None:
         """Replace a tool with a new tool.
@@ -145,18 +181,22 @@ class ToolRegistry:
         """Retrieve a tool's information.
 
         Args:
-            tool_id (str): The ID of the tool to retrieve.
+            tool_id (str): The ID or alias of the tool to retrieve.
 
         Returns:
             Tool: The requested tool.
 
         Raises:
-            ToolNotFoundError: If the tool with the given ID does not exist.
+            ToolNotFoundError: If the tool with the given ID or alias does not exist.
 
         """
-        if tool_id not in self._tools:
-            raise ToolNotFoundError(tool_id)
-        return self._tools[tool_id]
+        if tool_id in self._tools:
+            return self._tools[tool_id]
+
+        for tool in self._tools.values():
+            if tool_id in tool.aliases:
+                return tool
+        raise ToolNotFoundError(tool_id)
 
     def get_tools(self) -> list[Tool]:
         """Get all tools registered with the registry.
