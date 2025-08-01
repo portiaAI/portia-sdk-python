@@ -139,6 +139,10 @@ class ToolRegistry:
                 if alias in existing_tool.aliases and existing_tool.id != tool.id and not overwrite:
                     raise DuplicateToolError(alias)
 
+        for existing_id in self._tools:
+            if existing_id in tool.aliases and not overwrite:
+                raise DuplicateToolError(existing_id)
+
         if overwrite:
             for existing_tool in list(self._tools.values()):
                 if tool.id in existing_tool.aliases:
