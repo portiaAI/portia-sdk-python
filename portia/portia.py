@@ -232,6 +232,72 @@ class Portia:
         plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
         return self._resume(plan_run)
 
+    async def arun(
+        self,
+        query: str,
+        tools: list[Tool] | list[str] | None = None,
+        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
+        end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+        use_cached_plan: bool = False,
+    ) -> PlanRun:
+        """End-to-end function to generate a plan and then execute it.
+
+        This is the simplest way to plan and execute a query using the SDK.
+
+        Args:
+            query (str): The query to be executed.
+            tools (list[Tool] | list[str] | None): List of tools to use for the query.
+            If not provided all tools in the registry will be used.
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
+            plans or plan IDs. This can include Plan objects, PlanUUID objects,
+            or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
+            storage. If not provided, a default set of example plans will be used.
+            end_user (str | EndUser | None = None): The end user for this plan run.
+            plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
+                Provides input values for the run. This can be a list of PlanInput objects, a list
+                of dicts with keys "name", "description" (optional) and "value", or a dict of
+                plan run input name to value.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the query. This is passed on to plan runs created from this plan but will not be
+                stored with the plan itself if using cloud storage and must be re-attached to the
+                plan run if using cloud storage.
+            use_cached_plan (bool): Whether to use a cached plan if it exists.
+
+        Returns:
+            PlanRun: The run resulting from executing the query.
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_arun",
+                function_call_details={
+                    "tools": (
+                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
+                        if tools
+                        else None
+                    ),
+                    "example_plans_provided": example_plans is not None,
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
+        coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
+        plan = await self._aplan(
+            query,
+            tools,
+            example_plans,
+            end_user,
+            coerced_plan_run_inputs,
+            structured_output_schema,
+            use_cached_plan,
+        )
+        end_user = self.initialize_end_user(end_user)
+        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
+        return await self._aresume(plan_run)
+
     def _coerce_plan_run_inputs(
         self,
         plan_run_inputs: list[PlanInput]
@@ -400,7 +466,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -565,7 +631,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: list[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -724,6 +790,64 @@ class Portia:
                 },
             )
         )
+        plan_run = self._get_plan_run_from_plan(
+            plan, end_user, plan_run_inputs, structured_output_schema
+        )
+        return self._resume(plan_run)
+
+    async def arun_plan(
+        self,
+        plan: Plan | PlanUUID | UUID,
+        end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+    ) -> PlanRun:
+        """Run a plan asynchronously.
+
+        Args:
+            plan (Plan | PlanUUID | UUID): The plan to run, or the ID of the plan to load from
+              storage.
+            end_user (str | EndUser | None = None): The end user to use.
+            plan_run_inputs (list[PlanInput] | list[dict[str, Serializable]] | dict[str, Serializable] | None):
+              Provides input values for the run. This can be a list of PlanInput objects, a list
+              of dicts with keys "name", "description" (optional) and "value", or a dict of
+              plan run input name to value.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema
+                for the plan run. This is passed on to plan runs created from this plan but will be
+
+        Returns:
+            PlanRun: The resulting PlanRun object.
+
+        """  # noqa: E501
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_arun_plan",
+                function_call_details={
+                    "plan_type": type(plan).__name__,
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
+        plan_run = self._get_plan_run_from_plan(
+            plan, end_user, plan_run_inputs, structured_output_schema
+        )
+        return await self._aresume(plan_run)
+
+    def _get_plan_run_from_plan(
+        self,
+        plan: Plan | PlanUUID | UUID,
+        end_user: str | EndUser | None,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None,
+        structured_output_schema: type[BaseModel] | None = None,
+    ) -> PlanRun:
+        """Get a plan run from storage."""
         # ensure we have the plan in storage.
         # we won't if for example the user used PlanBuilder instead of dynamic planning.
         plan_id = (
@@ -749,8 +873,7 @@ class Portia:
 
         end_user = self.initialize_end_user(end_user)
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
-        return self._resume(plan_run)
+        return self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
 
     def resume(
         self,
@@ -788,6 +911,43 @@ class Portia:
             )
         )
         return self._resume(plan_run, plan_run_id)
+
+    async def aresume(
+        self,
+        plan_run: PlanRun | None = None,
+        plan_run_id: PlanRunUUID | str | None = None,
+    ) -> PlanRun:
+        """Resume a PlanRun.
+
+        If a clarification handler was provided as part of the execution hooks, it will be used
+        to handle any clarifications that are raised during the execution of the plan run.
+        If no clarification handler was provided and a clarification is raised, the run will be
+        returned in the `NEED_CLARIFICATION` state. The clarification will then need to be handled
+        by the caller before the plan run is resumed.
+
+        Args:
+            plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
+            plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
+                None.
+
+        Returns:
+            PlanRun: The resulting PlanRun after execution.
+
+        Raises:
+            ValueError: If neither plan_run nor plan_run_id is provided.
+            InvalidPlanRunStateError: If the plan run is not in a valid state to be resumed.
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_aresume",
+                function_call_details={
+                    "plan_run_provided": plan_run is not None,
+                    "plan_run_id_provided": plan_run_id is not None,
+                },
+            )
+        )
+        return await self._aresume(plan_run, plan_run_id)
 
     def _resume(
         self,
@@ -846,6 +1006,64 @@ class Portia:
                 return plan_run
 
         return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
+
+    async def _aresume(
+        self,
+        plan_run: PlanRun | None = None,
+        plan_run_id: PlanRunUUID | str | None = None,
+    ) -> PlanRun:
+        """Resume a PlanRun asynchronously.
+
+        If a clarification handler was provided as part of the execution hooks, it will be used
+        to handle any clarifications that are raised during the execution of the plan run.
+        If no clarification handler was provided and a clarification is raised, the run will be
+        returned in the `NEED_CLARIFICATION` state. The clarification will then need to be handled
+        by the caller before the plan run is resumed.
+
+        Args:
+            plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
+            plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
+                None.
+
+        Returns:
+            PlanRun: The resulting PlanRun after execution.
+
+        Raises:
+            ValueError: If neither plan_run nor plan_run_id is provided.
+            InvalidPlanRunStateError: If the plan run is not in a valid state to be resumed.
+
+        """
+        if not plan_run:
+            if not plan_run_id:
+                raise ValueError("Either plan_run or plan_run_id must be provided")
+
+            parsed_id = (
+                PlanRunUUID.from_string(plan_run_id)
+                if isinstance(plan_run_id, str)
+                else plan_run_id
+            )
+            plan_run = self.storage.get_plan_run(parsed_id)
+
+        if plan_run.state not in [
+            PlanRunState.NOT_STARTED,
+            PlanRunState.IN_PROGRESS,
+            PlanRunState.NEED_CLARIFICATION,
+            PlanRunState.READY_TO_RESUME,
+        ]:
+            raise InvalidPlanRunStateError(plan_run.id)
+
+        plan = self.storage.get_plan(plan_id=plan_run.plan_id)
+
+        # Perform initial readiness check
+        outstanding_clarifications = plan_run.get_outstanding_clarifications()
+        ready_clarifications = self._check_remaining_tool_readiness(plan, plan_run)
+        if len(clarifications_to_raise := outstanding_clarifications + ready_clarifications):
+            plan_run = self._raise_clarifications(clarifications_to_raise, plan_run)
+            plan_run = self._handle_clarifications(plan_run)
+            if len(plan_run.get_outstanding_clarifications()) > 0:
+                return plan_run
+
+        return await self.aexecute_plan_run_and_handle_clarifications(plan, plan_run)
 
     def _process_plan_input_values(
         self,
@@ -908,6 +1126,29 @@ class Portia:
                 PlanRunState.FAILED,
             ]:
                 plan_run = self._execute_plan_run(plan, plan_run)
+
+                plan_run = self._handle_clarifications(plan_run)
+                if len(plan_run.get_outstanding_clarifications()) > 0:
+                    return plan_run
+
+        except KeyboardInterrupt:
+            logger().info("Execution interrupted by user. Setting plan run state to FAILED.")
+            self._set_plan_run_state(plan_run, PlanRunState.FAILED)
+
+        return plan_run
+
+    async def aexecute_plan_run_and_handle_clarifications(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+    ) -> PlanRun:
+        """Execute a plan run and handle any clarifications that are raised."""
+        try:
+            while plan_run.state not in [
+                PlanRunState.COMPLETE,
+                PlanRunState.FAILED,
+            ]:
+                plan_run = await self._aexecute_plan_run(plan, plan_run)
 
                 plan_run = self._handle_clarifications(plan_run)
                 if len(plan_run.get_outstanding_clarifications()) > 0:
@@ -1221,6 +1462,49 @@ class Portia:
 
         return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
 
+    async def _aexecute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:
+        """Execute the run steps, updating the run state as needed asynchronously.
+
+        Args:
+            plan (Plan): The plan to execute.
+            plan_run (PlanRun): The plan run to execute.
+
+        Returns:
+            Run: The updated run after execution.
+
+        """
+        self._set_plan_run_state(plan_run, PlanRunState.IN_PROGRESS)
+        self._log_execute_start(plan_run, plan)
+        last_executed_step_output = self._get_last_executed_step_output(plan, plan_run)
+        introspection_agent = self._get_introspection_agent()
+        for index in range(plan_run.current_step_index, len(plan.steps)):
+            step = plan.steps[index]
+            plan_run.current_step_index = index
+
+            try:
+                last_executed_step_output = await self._aexecute_step(
+                    plan, plan_run, step, last_executed_step_output, introspection_agent
+                )
+            except SkipExecutionError as e:
+                logger().info(f"Skipping step {index}: {e}")
+                if e.should_return:
+                    return plan_run
+                continue
+            except Exception as e:  # noqa: BLE001 - We want to capture all other failures here
+                return self._handle_execution_error(plan_run, plan, index, step, e)
+            else:
+                self._set_step_output(last_executed_step_output, plan_run, step)
+                logger().info(
+                    f"Step output - {last_executed_step_output.get_summary()!s}",
+                )
+            if clarified_plan_run := self._handle_post_step_execution(
+                plan, plan_run, index, step, last_executed_step_output
+            ):
+                # No after_plan_run call here as the plan run will be resumed later
+                return clarified_plan_run
+
+        return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
+
     def _handle_post_step_execution(
         self,
         plan: Plan,
@@ -1307,6 +1591,49 @@ class Portia:
             plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
         )
         return agent.execute_sync()
+
+    async def _aexecute_step(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        step: Step,
+        last_executed_step_output: Output | None,
+        introspection_agent: BaseIntrospectionAgent,
+    ) -> Output:
+        """Attempt to execute a step.
+
+        Args:
+            plan (Plan): The plan being executed.
+            plan_run (PlanRun): The plan run being executed.
+            step (Step): The step being executed.
+            last_executed_step_output (Output | None): The output of the last executed step.
+            introspection_agent (BaseIntrospectionAgent): The introspection agent.
+
+        Returns:
+            Output: The output of the step.
+
+        Raises:
+            SkipExecutionError: If the step should be skipped.
+
+        """
+        # Handle the introspection outcome
+        (plan_run, pre_step_outcome) = await self._agenerate_introspection_outcome(
+            introspection_agent=introspection_agent,
+            plan=plan,
+            plan_run=plan_run,
+            last_executed_step_output=last_executed_step_output,
+        )
+        self._handle_pre_step_outcome(plan, plan_run, pre_step_outcome)
+        self._handle_before_step_execution_hook(plan, plan_run, step)
+
+        # we pass read only copies of the state to the agent so that the portia remains
+        # responsible for handling the output of the agent and updating the state.
+        agent = self._get_agent_for_step(
+            step=ReadOnlyStep.from_step(step),
+            plan=ReadOnlyPlan.from_plan(plan),
+            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+        )
+        return await agent.execute_async()
 
     def _handle_before_step_execution_hook(self, plan: Plan, plan_run: PlanRun, step: Step) -> None:
         """Handle the before step execution hook.
@@ -1552,6 +1879,47 @@ class Portia:
                 ),
             )
         pre_step_outcome = introspection_agent.pre_step_introspection(
+            plan=ReadOnlyPlan.from_plan(plan),
+            plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
+        )
+        self._update_introspection_step_output_and_state(
+            pre_step_outcome,
+            plan,
+            plan_run,
+            plan.steps[plan_run.current_step_index],
+            last_executed_step_output,
+        )
+        return (plan_run, pre_step_outcome)
+
+    async def _agenerate_introspection_outcome(
+        self,
+        introspection_agent: BaseIntrospectionAgent,
+        plan: Plan,
+        plan_run: PlanRun,
+        last_executed_step_output: Output | None,
+    ) -> tuple[PlanRun, PreStepIntrospection]:
+        """Generate the outcome of the pre-step introspection asynchronously.
+
+        Args:
+            introspection_agent (BaseIntrospectionAgent): The introspection agent to use.
+            plan (Plan): The plan being executed.
+            plan_run (PlanRun): The plan run being executed.
+            last_executed_step_output (Output | None): The output of the last step executed.
+
+        Returns:
+            tuple[PlanRun, PreStepIntrospectionOutcome]: The updated plan run and the
+                outcome of the introspection.
+
+        """
+        if not self._should_introspect(plan, plan_run):
+            return (
+                plan_run,
+                PreStepIntrospection(
+                    outcome=PreStepIntrospectionOutcome.CONTINUE,
+                    reason="No condition to evaluate.",
+                ),
+            )
+        pre_step_outcome = await introspection_agent.apre_step_introspection(
             plan=ReadOnlyPlan.from_plan(plan),
             plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
         )
