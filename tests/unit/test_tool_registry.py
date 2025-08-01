@@ -1024,7 +1024,7 @@ def test_mcp_tool_registry_loads_from_string() -> None:
 
 def test_tool_registry_aliases_basic_functionality() -> None:
     """Test basic alias functionality in ToolRegistry."""
-    tool_with_aliases = MockTool(id="primary_id", aliases=["alias1", "alias2"])
+    tool_with_aliases = MockTool(tool_id="primary_id", aliases=["alias1", "alias2"])
     registry = ToolRegistry([tool_with_aliases])
 
     assert registry.get_tool("primary_id").id == "primary_id"
@@ -1049,8 +1049,8 @@ def test_tool_registry_alias_uniqueness_validation() -> None:
 
 def test_tool_registry_alias_conflicts_with_ids() -> None:
     """Test that aliases cannot conflict with existing tool IDs."""
-    tool1 = MockTool(id="existing_id")
-    tool2 = MockTool(id="tool2", aliases=["existing_id"])
+    tool1 = MockTool(tool_id="existing_id")
+    tool2 = MockTool(tool_id="tool2", aliases=["existing_id"])
 
     registry = ToolRegistry([tool1])
 
@@ -1060,8 +1060,8 @@ def test_tool_registry_alias_conflicts_with_ids() -> None:
 
 def test_tool_registry_id_conflicts_with_aliases() -> None:
     """Test that tool IDs cannot conflict with existing aliases."""
-    tool1 = MockTool(id="tool1", aliases=["existing_alias"])
-    tool2 = MockTool(id="existing_alias")
+    tool1 = MockTool(tool_id="tool1", aliases=["existing_alias"])
+    tool2 = MockTool(tool_id="existing_alias")
 
     registry = ToolRegistry([tool1])
 
@@ -1083,14 +1083,14 @@ def test_tool_registry_aliases_with_overwrite() -> None:
 
 def test_tool_string_representation_includes_aliases() -> None:
     """Test that Tool.__str__ includes aliases."""
-    tool = MockTool(id="test_id", aliases=["alias1", "alias2"])
+    tool = MockTool(tool_id="test_id", aliases=["alias1", "alias2"])
     str_repr = str(tool)
     assert "aliases=['alias1', 'alias2']" in str_repr
 
 
 def test_tool_registry_aliases_empty_by_default() -> None:
     """Test that tools have empty aliases by default."""
-    tool = MockTool(id="test_id")
+    tool = MockTool(tool_id="test_id")
     assert tool.aliases == []
 
     registry = ToolRegistry([tool])
@@ -1099,7 +1099,7 @@ def test_tool_registry_aliases_empty_by_default() -> None:
 
 def test_tool_registry_multiple_aliases_same_tool() -> None:
     """Test that a tool can have multiple aliases and all work."""
-    tool = MockTool(id="main_id", aliases=["alias1", "alias2", "alias3"])
+    tool = MockTool(tool_id="main_id", aliases=["alias1", "alias2", "alias3"])
     registry = ToolRegistry([tool])
 
     for identifier in ["main_id", "alias1", "alias2", "alias3"]:
@@ -1110,8 +1110,8 @@ def test_tool_registry_multiple_aliases_same_tool() -> None:
 
 def test_tool_registry_aliases_in_combined_registries() -> None:
     """Test that aliases work correctly in combined registries."""
-    tool1 = MockTool(id="tool1", aliases=["alias1"])
-    tool2 = MockTool(id="tool2", aliases=["alias2"])
+    tool1 = MockTool(tool_id="tool1", aliases=["alias1"])
+    tool2 = MockTool(tool_id="tool2", aliases=["alias2"])
 
     registry1 = ToolRegistry([tool1])
     registry2 = ToolRegistry([tool2])

@@ -193,9 +193,9 @@ class MockTool(Tool):
     args_schema: type[BaseModel] = MockToolSchema
     output_schema: tuple[str, str] = ("None", "None: returns nothing")
 
-    def __init__(self, id: str = "mock_tool", aliases: list[str] | None = None, **kwargs) -> None:
+    def __init__(self, tool_id: str = "mock_tool", aliases: list[str] | None = None, **kwargs: Any) -> None:
         """Initialize MockTool with optional aliases."""
-        super().__init__(id=id, aliases=aliases or [], **kwargs)
+        super().__init__(id=tool_id, aliases=aliases or [], **kwargs)
 
     def run(
         self,

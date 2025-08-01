@@ -125,36 +125,45 @@ class ToolRegistry:
             None: The tool registry is updated in place.
 
         """
-        if tool.id in self._tools and not overwrite:
+        if not overwrite:
+            self._validate_tool_conflicts(tool)
+
+        if overwrite:
+            self._handle_overwrite_conflicts(tool)
+
+        self._tools[tool.id] = tool
+
+    def _validate_tool_conflicts(self, tool: Tool) -> None:
+        """Validate that the tool doesn't conflict with existing tools."""
+        if tool.id in self._tools:
             raise DuplicateToolError(tool.id)
 
         for existing_tool in self._tools.values():
-            if tool.id in existing_tool.aliases and not overwrite:
+            if tool.id in existing_tool.aliases:
                 raise DuplicateToolError(tool.id)
 
         for alias in tool.aliases:
-            if alias in self._tools and not overwrite:
+            if alias in self._tools:
                 raise DuplicateToolError(alias)
             for existing_tool in self._tools.values():
-                if alias in existing_tool.aliases and existing_tool.id != tool.id and not overwrite:
+                if alias in existing_tool.aliases and existing_tool.id != tool.id:
                     raise DuplicateToolError(alias)
 
         for existing_id in self._tools:
-            if existing_id in tool.aliases and not overwrite:
+            if existing_id in tool.aliases:
                 raise DuplicateToolError(existing_id)
 
-        if overwrite:
-            for existing_tool in list(self._tools.values()):
-                if tool.id in existing_tool.aliases:
-                    existing_tool.aliases = [a for a in existing_tool.aliases if a != tool.id]
-                
-                for alias in tool.aliases:
-                    if alias in existing_tool.aliases:
-                        existing_tool.aliases = [a for a in existing_tool.aliases if a != alias]
-                    if alias in self._tools:
-                        del self._tools[alias]
+    def _handle_overwrite_conflicts(self, tool: Tool) -> None:
+        """Handle conflicts when overwrite is True."""
+        for existing_tool in list(self._tools.values()):
+            if tool.id in existing_tool.aliases:
+                existing_tool.aliases = [a for a in existing_tool.aliases if a != tool.id]
 
-        self._tools[tool.id] = tool
+            for alias in tool.aliases:
+                if alias in existing_tool.aliases:
+                    existing_tool.aliases = [a for a in existing_tool.aliases if a != alias]
+                if alias in self._tools:
+                    del self._tools[alias]
 
     def replace_tool(self, tool: Tool) -> None:
         """Replace a tool with a new tool.
