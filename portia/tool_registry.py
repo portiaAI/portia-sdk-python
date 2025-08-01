@@ -147,6 +147,8 @@ class ToolRegistry:
                 for alias in tool.aliases:
                     if alias in existing_tool.aliases:
                         existing_tool.aliases = [a for a in existing_tool.aliases if a != alias]
+                    if alias in self._tools:
+                        del self._tools[alias]
 
         self._tools[tool.id] = tool
 
