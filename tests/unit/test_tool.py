@@ -200,7 +200,8 @@ def test_tool_serialization() -> None:
         f"ToolModel(id={tool.id!r}, name={tool.name!r}, "
         f"description={tool.description!r}, "
         f"args_schema={tool.args_schema.__name__!r}, "
-        f"output_schema={tool.output_schema!r})"
+        f"output_schema={tool.output_schema!r}, "
+        f"aliases={tool.aliases!r})"
     )
     # check we can also serialize to JSON
     AdditionTool().model_dump_json()

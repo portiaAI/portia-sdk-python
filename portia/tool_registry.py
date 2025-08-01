@@ -127,18 +127,17 @@ class ToolRegistry:
         """
         if tool.id in self._tools and not overwrite:
             raise DuplicateToolError(tool.id)
-        
+
         for alias in tool.aliases:
             if alias in self._tools and not overwrite:
                 raise DuplicateToolError(alias)
             for existing_tool in self._tools.values():
                 if alias in existing_tool.aliases and existing_tool.id != tool.id and not overwrite:
                     raise DuplicateToolError(alias)
-        
+
         for existing_id in self._tools:
-            if existing_id in tool.aliases and existing_id != tool.id and not overwrite:
+            if existing_id in tool.aliases and not overwrite:
                 raise DuplicateToolError(existing_id)
-        
         self._tools[tool.id] = tool
 
     def replace_tool(self, tool: Tool) -> None:
@@ -168,11 +167,10 @@ class ToolRegistry:
         """
         if tool_id in self._tools:
             return self._tools[tool_id]
-        
+
         for tool in self._tools.values():
             if tool_id in tool.aliases:
                 return tool
-        
         raise ToolNotFoundError(tool_id)
 
     def get_tools(self) -> list[Tool]:

@@ -1026,12 +1026,12 @@ def test_tool_registry_aliases_basic_functionality() -> None:
     """Test basic alias functionality in ToolRegistry."""
     tool_with_aliases = MockTool(id="primary_id", aliases=["alias1", "alias2"])
     registry = ToolRegistry([tool_with_aliases])
-    
+
     assert registry.get_tool("primary_id").id == "primary_id"
-    
+
     assert registry.get_tool("alias1").id == "primary_id"
     assert registry.get_tool("alias2").id == "primary_id"
-    
+
     with pytest.raises(ToolNotFoundError):
         registry.get_tool("non_existent")
 
@@ -1040,9 +1040,9 @@ def test_tool_registry_alias_uniqueness_validation() -> None:
     """Test that aliases must be unique across tools."""
     tool1 = MockTool(id="tool1", aliases=["shared_alias"])
     tool2 = MockTool(id="tool2", aliases=["shared_alias"])
-    
+
     registry = ToolRegistry([tool1])
-    
+
     with pytest.raises(DuplicateToolError):
         registry.with_tool(tool2)
 
