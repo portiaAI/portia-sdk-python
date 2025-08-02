@@ -83,6 +83,11 @@ Use the following information to construct a plan in response to the following u
         {{query}}
     </Query>
 </Request>
+
+<FinalTaskReminder>
+    Remember, your goal is to construct a detailed plan for the following query: {{query}}
+    Make sure every step directly contributes to addressing this specific request.
+</FinalTaskReminder>
 {% if non_default_examples_provided %}
 Use the example plans as a scaffold to build this plan, following the same structure and steps. 
 You must use the example plans as a template if at all applicable and they are similar to the query.
