@@ -621,7 +621,7 @@ def test_mcp_tool_registry_filters_bad_tools() -> None:
                 ),
                 mcp.Tool(
                     name="test_tool_2",
-                    description="I am another tool," * 400,  # over 4096 characters
+                    description="I am another tool," * 1000,  # over 16384 characters
                     inputSchema={"type": "object", "properties": {"input": {"type": "number"}}},
                 ),
             ],
