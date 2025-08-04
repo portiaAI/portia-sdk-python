@@ -769,7 +769,7 @@ def _additional_properties_validator(
 ) -> BaseModelT:
     """Validate that extra properties against a schema."""
     if self.model_extra is None:
-        return self
+        return self  # pragma: no cover
     for key, value in self.model_extra.items():  # all unknowns live here
         try:
             extras_schema.model_validate({field_name: value})

@@ -282,6 +282,30 @@ def test_remote_tool_hard_error_from_server(httpx_mock: HTTPXMock) -> None:
     )
 
 
+def test_remote_tool_run_with_unserializable_object() -> None:
+    """Test remote tool run with unserializable object."""
+    endpoint = "https://api.fake-portia.test"
+
+    class UnserializableObject:
+        pass
+
+    tool = PortiaRemoteTool(
+        id="test",
+        name="test",
+        description="",
+        output_schema=("", ""),
+        client=httpx.Client(base_url=endpoint),
+    )
+    ctx = get_test_tool_context()
+    with pytest.raises(
+        ToolHardError,
+        match="Object of type <class 'tests.unit.test_tool."
+        "test_remote_tool_run_with_unserializable_object"
+        ".<locals>.UnserializableObject'> is not JSON serializable",
+    ):
+        tool.run(ctx, some_object=UnserializableObject())
+
+
 def test_remote_tool_soft_error(httpx_mock: HTTPXMock) -> None:
     """Test remote soft errors come back to soft errors."""
     endpoint = "https://api.fake-portia.test"
