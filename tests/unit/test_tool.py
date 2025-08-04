@@ -58,7 +58,7 @@ def test_tool_initialization_long_description() -> None:
     """Test initialization of a Tool."""
 
     class FakeAdditionTool(AdditionTool):
-        description: str = "this is a description" * 250
+        description: str = "this is a description" * 1000
 
     with pytest.raises(InvalidToolDescriptionError):
         FakeAdditionTool()

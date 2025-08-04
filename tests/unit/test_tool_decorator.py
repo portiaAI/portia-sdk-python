@@ -554,7 +554,7 @@ def test_tool_description_length_validation() -> None:
     def tool_with_long_description() -> str:
         return "result"
 
-    tool_with_long_description.__doc__ = "x" * 4097
+    tool_with_long_description.__doc__ = "x" * 16385
     tool_class = tool(tool_with_long_description)
 
     # The error should be raised when we instantiate the tool

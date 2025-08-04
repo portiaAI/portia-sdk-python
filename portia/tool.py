@@ -59,7 +59,7 @@ from portia.plan_run import PlanRun
 from portia.templates.render import render_template
 
 """MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
-MAX_TOOL_DESCRIPTION_LENGTH = 4096
+MAX_TOOL_DESCRIPTION_LENGTH = 16384
 
 
 class ToolRunContext(BaseModel):
@@ -375,9 +375,9 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
 
     @model_validator(mode="after")
     def check_description_length(self) -> Self:
-        """Check that the description is less than 1024 characters.
+        """Check that the description is less than 16384 characters.
 
-        OpenAI has a maximum function description length of 1024 characters. This validator
+        OpenAI has a maximum function description length of 16384 characters. This validator
         ensures that the tool description does not exceed this limit.
 
         Returns:
