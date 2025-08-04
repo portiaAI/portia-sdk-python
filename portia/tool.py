@@ -711,6 +711,14 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
 
         """
         try:
+            # Default function for JSON serialization of Pydantic models
+            def default_serializer(
+                obj: Any,  # noqa: ANN401
+            ) -> dict[str, Any] | list[Any] | str | int | float | bool | None:
+                if isinstance(obj, BaseModel):
+                    return json.loads(obj.model_dump_json())
+                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")  # noqa: TRY301
+
             # Send to Cloud
             response = self.client.post(
                 url=f"/api/v0/tools/{self.id}/run/",
@@ -723,6 +731,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                             "additional_data": ctx.end_user.additional_data,
                         },
                     },
+                    default=default_serializer,
                 ),
             )
             response.raise_for_status()

@@ -11,7 +11,7 @@ import mcp
 import pytest
 from httpx import HTTPStatusError
 from mcp import ClientSession
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticUndefined
 
 from portia.errors import DuplicateToolError, ToolNotFoundError
@@ -933,6 +933,55 @@ def test_generate_pydantic_model_from_json_schema_handles_empty_enum() -> None:
     assert model.model_validate({"enum_field": "a"}).model_dump() == {"enum_field": "a"}
     assert model.model_validate({"enum_field": "b"}).model_dump() == {"enum_field": "b"}
     assert model.model_validate({"enum_field": ""}).model_dump() == {"enum_field": ""}
+
+
+@pytest.fixture
+def additional_properties_dict_json_schema() -> dict[str, Any]:
+    """JSON schema with additionalProperties."""
+    return {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "The name of the customer"},
+        },
+        "additionalProperties": {
+            "type": ["string", "number", "null"],
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "input_json_object",
+    [
+        {"name": "John", "height": 185.2},
+        {"name": "John", "height": 185.2, "age": 30},
+        {"name": "John", "height": 185.2, "age": 30, "pets": None},
+    ],
+)
+def test_generate_pydantic_model_from_json_schema_handles_additional_properties_dict(
+    input_json_object: dict[str, Any],
+    additional_properties_dict_json_schema: dict[str, Any],
+) -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check that the generated base model can serialise an additionalProperties as a dict.
+    """
+    json_schema = additional_properties_dict_json_schema
+    model = generate_pydantic_model_from_json_schema("TestAdditionalPropertiesDict", json_schema)
+    deserialized = model.model_validate(input_json_object)
+    assert deserialized.model_dump() == input_json_object
+
+
+def test_generate_pydantic_model_from_json_schema_handles_additional_properties_dict_with_invalid_extra(  # noqa: E501
+    additional_properties_dict_json_schema: dict[str, Any],
+) -> None:
+    """Test for generate_pydantic_model_from_json_schema.
+
+    Check that the generated base model can serialise an additionalProperties as a dict.
+    """
+    json_schema = additional_properties_dict_json_schema
+    model = generate_pydantic_model_from_json_schema("TestAdditionalPropertiesDict", json_schema)
+    with pytest.raises(ValidationError, match="Extra field 'pets' must match the schema"):
+        model.model_validate({"name": "John", "height": 185.2, "age": 30, "pets": ["dog", "cat"]})
 
 
 @pytest.mark.usefixtures("mock_get_mcp_session")

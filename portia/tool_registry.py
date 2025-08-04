@@ -20,6 +20,7 @@ import os
 import re
 import threading
 from enum import StrEnum
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -33,7 +34,15 @@ from typing import (
 
 import httpx
 from jsonref import replace_refs
-from pydantic import BaseModel, Field, ValidationError, create_model, model_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    create_model,
+    model_serializer,
+    model_validator,
+)
 from pydantic_core import PydanticUndefined
 
 from portia.cloud import PortiaCloudClient
@@ -750,6 +759,25 @@ class GeneratedBaseModel(BaseModel):
         cls._fields_must_omit_none_on_serialize.extend(fields)
 
 
+BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
+
+
+def _additional_properties_validator(
+    self: BaseModelT,
+    extras_schema: type[BaseModel],
+    field_name: str,
+) -> BaseModelT:
+    """Validate that extra properties against a schema."""
+    if self.model_extra is None:
+        return self
+    for key, value in self.model_extra.items():  # all unknowns live here
+        try:
+            extras_schema.model_validate({field_name: value})
+        except ValidationError as e:
+            raise ValueError(f"Extra field {key!r} must match the schema: {e}") from e
+    return self
+
+
 def generate_pydantic_model_from_json_schema(
     model_name: str,
     json_schema: dict[str, Any],
@@ -779,6 +807,26 @@ def generate_pydantic_model_from_json_schema(
             and not _is_nullable_field(field_name, field)
         )
     ]
+    additional_properties: bool | dict[str, Any] = schema_without_refs.get(  # type: ignore  # noqa: PGH003
+        "additionalProperties", False
+    )
+    extra_allowed = additional_properties is True or isinstance(additional_properties, dict)
+    config_dict: ConfigDict | None = None
+    pydantic_validator: Any = None
+    if extra_allowed:
+        config_dict = ConfigDict(extra="allow")
+    if isinstance(additional_properties, dict):
+        # additionalProperties as a dict is a JSON schema which any additional properties must match
+        extras_schema = generate_pydantic_model_from_json_schema(
+            f"{model_name}_extras",
+            {"type": "object", "properties": {"extra_property": additional_properties}},
+        )
+        validator = partial(
+            _additional_properties_validator,
+            extras_schema=extras_schema,
+            field_name="extra_property",
+        )
+        pydantic_validator = model_validator(mode="after")(validator)
 
     # Define fields for the model
     fields = dict(
@@ -794,7 +842,13 @@ def generate_pydantic_model_from_json_schema(
     )
 
     # Create the Pydantic model dynamically
-    model = create_model(model_name, __base__=GeneratedBaseModel, **fields)  # type: ignore  # noqa: PGH003 - We want to use default config
+    model = create_model(
+        model_name,
+        __base__=GeneratedBaseModel,
+        __config__=config_dict,
+        __validators__={"extra": pydantic_validator} if pydantic_validator else None,
+        **fields,  # type: ignore  # noqa: PGH003
+    )
     model.extend_exclude_unset_fields(non_nullable_omissible_fields)
     return model
 
@@ -852,7 +906,7 @@ def _map_pydantic_type(field_name: str, field: dict[str, Any]) -> type | Any:  #
             return Any
 
 
-def _map_single_pydantic_type(  # noqa: PLR0911
+def _map_single_pydantic_type(  # noqa: C901, PLR0911
     field_name: str,
     field: dict[str, Any],
     *,
@@ -882,6 +936,16 @@ def _map_single_pydantic_type(  # noqa: PLR0911
                 return None
             logger().debug(f"Null type is not allowed for a non-union field: {field_name}")
             return Any
+        case [*types]:
+            types = [
+                _map_single_pydantic_type(
+                    field_name,
+                    {"type": t} if isinstance(t, str) else t,
+                    allow_nonetype=True,
+                )
+                for t in types
+            ]
+            return Union[*types]  # pyright: ignore[reportInvalidTypeForm, reportInvalidTypeArguments]
         case _:
             logger().debug(f"Unsupported JSON schema type: {field.get('type')}: {field}")
             return Any

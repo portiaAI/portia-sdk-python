@@ -206,6 +206,43 @@ def test_tool_serialization() -> None:
     AdditionTool().model_dump_json()
 
 
+def test_remote_tool_run_with_pydantic_model(httpx_mock: HTTPXMock) -> None:
+    """Test remote tool run with Pydantic model."""
+    endpoint = "https://api.fake-portia.test"
+    httpx_mock.add_response(
+        url=f"{endpoint}/api/v0/tools/test/run/",
+        json={"output": {"value": "Success"}},
+    )
+
+    class DoubleNestedSchema(BaseModel):
+        d: int
+
+    class NestedSchema(BaseModel):
+        c: int
+        double_nested: DoubleNestedSchema
+
+    class TestArgSchema(BaseModel):
+        a: int
+        b: int
+        sub: NestedSchema
+
+    tool = PortiaRemoteTool(
+        id="test",
+        name="test",
+        description="",
+        args_schema=TestArgSchema,
+        output_schema=("", ""),
+        client=httpx.Client(base_url=endpoint),
+    )
+    res = tool.run(
+        get_test_tool_context(),
+        a=1,
+        b=2,
+        sub={"c": 3, "double_nested": DoubleNestedSchema(d=4)},
+    )
+    assert res == "Success"
+
+
 def test_remote_tool_hard_error_from_server(httpx_mock: HTTPXMock) -> None:
     """Test http errors come back to hard errors."""
     endpoint = "https://api.fake-portia.test"
