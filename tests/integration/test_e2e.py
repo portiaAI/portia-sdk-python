@@ -60,10 +60,6 @@ PLANNING_PROVIDERS = [
 PROVIDER_MODELS = [
     *CORE_PROVIDERS,
     (
-        LLMProvider.MISTRALAI,
-        "mistralai/mistral-large-latest",
-    ),
-    (
         LLMProvider.GOOGLE,
         "google/gemini-2.0-flash",
     ),
