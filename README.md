@@ -1,5 +1,3 @@
-## 🏆 Our [online hackathon](https://github.com/portiaAI/portia-sdk-python/issues/576) is live! Throw your hat in for a chance to win **£500!**
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
