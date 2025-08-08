@@ -407,7 +407,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
         # Unfortunately you get errors from o3 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
-        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini") else temperature
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini", "gpt-5") else temperature
 
         client = ChatOpenAI(
             name=model_name,
