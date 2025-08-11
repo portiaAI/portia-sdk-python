@@ -398,6 +398,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
 
         """
+        self.api_key = api_key.get_secret_value()
         self._model_kwargs = kwargs.copy()
 
         if "disabled_params" not in kwargs:
@@ -550,6 +551,10 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         """
         self._model_kwargs = kwargs.copy()
 
+        self.azure_endpoint = azure_endpoint
+        self.api_version = api_version
+        self.api_key = api_key.get_secret_value()
+
         if "disabled_params" not in kwargs:
             # This is a workaround for o3 mini to avoid parallel tool calls.
             # See https://github.com/langchain-ai/langchain/issues/25357
@@ -688,6 +693,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             self._model_kwargs = kwargs["model_kwargs"].copy()
         else:
             self._model_kwargs = kwargs.copy()
+        self.api_key = api_key.get_secret_value()
         client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
@@ -884,6 +890,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatMistralAI
 
             """
+            self.api_key = api_key.get_secret_value()
             client = ChatMistralAI(
                 model_name=model_name,
                 api_key=api_key,
@@ -1040,6 +1047,12 @@ if validate_extras_dependencies("amazon", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatBedrock
 
             """
+            self.aws_access_key_id = aws_access_key_id
+            self.aws_secret_access_key = aws_secret_access_key
+            self.region_name = region_name
+            self.model_provider = provider
+            self.credentials_profile_name = credentials_profile_name
+
             set_amazon_logging_level(logging.WARNING)
             client = ChatBedrock(
                 model=model_id,
@@ -1096,6 +1109,7 @@ if validate_extras_dependencies("google", raise_error=False):
                 **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
             """
+            self.api_key = api_key.get_secret_value()
             # Configure genai with the api key
             genai_client = genai.Client(api_key=api_key.get_secret_value())
 
