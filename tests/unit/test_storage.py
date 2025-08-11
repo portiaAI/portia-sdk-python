@@ -561,7 +561,7 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
     # Test saving an output
     httpx_mock.add_response(
         method="PUT",
-        url=f"https://api.portialabs.ai/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        url=f"{config.portia_api_endpoint}/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         status_code=200,
     )
 
@@ -597,7 +597,7 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
     # Mock the metadata response
     httpx_mock.add_response(
         method="GET",
-        url=f"https://api.portialabs.ai/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        url=f"{config.portia_api_endpoint}/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
         status_code=200,
         json={
             "summary": "test summary",
