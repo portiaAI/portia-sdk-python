@@ -1,5 +1,7 @@
 """Tests for logging functions."""
 
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -207,3 +209,42 @@ def test_safe_logger_error_handling() -> None:
     mock_logger.error.assert_any_call("Failed to log: error error")
     mock_logger.error.assert_any_call("Failed to log: critical error")
     mock_logger.error.assert_any_call("Failed to log: exception error")
+
+
+def test_formatter_sanitizes_stack_trace() -> None:
+    """Test that the formatter sanitizes stack traces (escapes <, > and doubles braces)."""
+
+    # Produce an exception with special characters in the message
+    def will_fail() -> None:
+        raise ValueError("boom <tag> and {value}")
+
+    captured_exc = None
+    try:
+        will_fail()
+    except Exception as exc:  # noqa: BLE001
+        captured_exc = exc
+
+    logger_formatter = Formatter()
+
+    record = {
+        "message": "test message",
+        "extra": {},
+        "time": datetime.now(tz=UTC),
+        "level": LogLevel.ERROR,
+        "name": "portia.portia",
+        "function": "plan",
+        "line": 123,
+        "exception": SimpleNamespace(value=captured_exc),
+    }
+
+    formatted = logger_formatter.format(record)
+
+    # Ensure stack trace is appended and sanitized
+    assert "\\<tag\\>" in formatted
+    assert "{{value}}" in formatted
+    # Original unsanitized characters should not appear
+    assert "<tag>" not in formatted
+    # Note space before first open curly brace
+    assert " {value}" not in formatted
+    # Stack traces should not be truncated by sanitizer when formatting exceptions
+    assert "(truncated" not in formatted

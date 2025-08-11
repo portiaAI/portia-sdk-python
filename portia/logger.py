@@ -114,6 +114,7 @@ class Formatter:
         )
         if record.get("exception") and hasattr(record["exception"], "value"):
             formatted_stack_trace = "".join(traceback.format_exception(record["exception"].value))
+            formatted_stack_trace = self._sanitize_message_(formatted_stack_trace, truncate=False)
             result += f"\n{formatted_stack_trace}"
 
         # Add extra information if present
@@ -123,7 +124,7 @@ class Formatter:
         result += "\n"
         return result
 
-    def _sanitize_message_(self, msg: str) -> str:
+    def _sanitize_message_(self, msg: str, truncate: bool = True) -> str:
         """Sanitize a message to be used in a log record."""
         # doubles opening curly braces in a string { -> {{
         msg = re.sub(r"(?<!\{)\{(?!\{)", "{{", msg)
@@ -132,7 +133,7 @@ class Formatter:
         # escapes < and > in a string
         msg = msg.replace("<", r"\<").replace(">", r"\>")
 
-        return self._truncated_message_(msg)
+        return self._truncated_message_(msg) if truncate else msg
 
     def _get_function_color_(self, record: Any) -> str:  # noqa: ANN401
         """Get color based on function/module name. Default is white."""
