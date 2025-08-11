@@ -30,11 +30,11 @@ from browser_use import Agent, Browser, BrowserConfig, Controller
 from browser_use.llm import (
     BaseChatModel,
     ChatAnthropic,
+    ChatAWSBedrock,
     ChatAzureOpenAI,
     ChatGoogle,
     ChatOllama,
     ChatOpenAI,
-    ChatAWSBedrock,
 )
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
