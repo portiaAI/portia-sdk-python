@@ -499,6 +499,7 @@ class Portia:
         raise TypeError(
             f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
         )
+
     def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
         """Load a plan from storage by UUID."""
         try:
