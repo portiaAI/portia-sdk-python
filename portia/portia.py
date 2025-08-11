@@ -2006,13 +2006,13 @@ class Portia:
     def _handle_execution_error(
         self, plan_run: PlanRun, plan: Plan, index: int, step: Step, error: Exception
     ) -> PlanRun:
-        logger().exception(f"Error executing step {index}: {error}")
         error_output = LocalDataValue(value=str(error))
         self._set_step_output(error_output, plan_run, step)
         plan_run.outputs.final_output = error_output
         self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         logger().error(
-            "error: {error}",
+            "Error executing step {index}: {error}",
+            index=index,
             error=error,
             plan=str(plan.id),
             plan_run=str(plan_run.id),
