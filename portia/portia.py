@@ -166,6 +166,24 @@ class Portia:
 
         return self.storage.save_end_user(end_user)
 
+    async def ainitialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
+        """Handle initializing the end_user based on the provided type."""
+        default_external_id = "portia:default_user"
+        if isinstance(end_user, str):
+            if end_user == "":
+                end_user = default_external_id
+            end_user_instance = await self.storage.aget_end_user(external_id=end_user)
+            if end_user_instance:
+                return end_user_instance
+            end_user_instance = EndUser(external_id=end_user or default_external_id)
+            return await self.storage.asave_end_user(end_user_instance)
+
+        if not end_user:
+            end_user = EndUser(external_id=default_external_id)
+            return await self.storage.asave_end_user(end_user)
+
+        return await self.storage.asave_end_user(end_user)
+
     def run(
         self,
         query: str,
@@ -294,8 +312,8 @@ class Portia:
             structured_output_schema,
             use_cached_plan,
         )
-        end_user = self.initialize_end_user(end_user)
-        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
+        end_user = await self.ainitialize_end_user(end_user)
+        plan_run = await self._acreate_plan_run(plan, end_user, coerced_plan_run_inputs)
         return await self._aresume(plan_run)
 
     def _coerce_plan_run_inputs(
@@ -428,6 +446,37 @@ class Portia:
 
         return resolved_plans
 
+    async def _aresolve_example_plans(
+        self, example_plans: Sequence[Plan | PlanUUID | str] | None
+    ) -> list[Plan] | None:
+        """Resolve example plans from Plan objects, PlanUUIDs and planID strings.
+
+        Args:
+            example_plans (Sequence[Plan | PlanUUID | str] | None): List of example plans or
+            plan IDs.
+                - Plan objects are used directly
+                - PlanUUID objects are loaded from storage
+                - String objects must be plan ID strings (starting with "plan-")
+
+        Returns:
+            list[Plan] | None: List of resolved Plan objects, or None if input was None.
+
+        Raises:
+            PlanNotFoundError: If a plan ID cannot be found in storage.
+            ValueError: If a string is not a plan ID string.
+            TypeError: If an invalid type is provided.
+
+        """
+        if example_plans is None:
+            return None
+
+        resolved_plans = []
+        for example_plan in example_plans:
+            resolved_plan = await self._aresolve_single_example_plan(example_plan)
+            resolved_plans.append(resolved_plan)
+
+        return resolved_plans
+
     def _resolve_single_example_plan(self, example_plan: Plan | PlanUUID | str) -> Plan:
         """Resolve a single example plan from various input types."""
         if isinstance(example_plan, Plan):
@@ -440,10 +489,27 @@ class Portia:
             f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
         )
 
+    async def _aresolve_single_example_plan(self, example_plan: Plan | PlanUUID | str) -> Plan:
+        if isinstance(example_plan, Plan):
+            return example_plan
+        if isinstance(example_plan, PlanUUID):
+            return await self._aload_plan_by_uuid(example_plan)
+        if isinstance(example_plan, str):
+            return await self._aresolve_string_example_plan(example_plan)
+        raise TypeError(
+            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
+        )
     def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
         """Load a plan from storage by UUID."""
         try:
             return self.storage.get_plan(plan_uuid)
+        except Exception as e:
+            raise PlanNotFoundError(plan_uuid) from e
+
+    async def _aload_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
+        """Load a plan from storage by UUID asynchronously."""
+        try:
+            return await self.storage.aget_plan(plan_uuid)
         except Exception as e:
             raise PlanNotFoundError(plan_uuid) from e
 
@@ -459,6 +525,21 @@ class Portia:
         plan_uuid = PlanUUID.from_string(example_plan)
         try:
             return self._load_plan_by_uuid(plan_uuid)
+        except Exception as e:
+            raise PlanNotFoundError(plan_uuid) from e
+
+    async def _aresolve_string_example_plan(self, example_plan: str) -> Plan:
+        """Resolve a string example plan - must be a plan ID string."""
+        # Only support plan ID strings, not query strings
+        if not example_plan.startswith("plan-"):
+            raise ValueError(
+                f"String '{example_plan}' must be a plan ID (starting with 'plan-'). "
+                "Query strings are not supported."
+            )
+
+        plan_uuid = PlanUUID.from_string(example_plan)
+        try:
+            return await self._aload_plan_by_uuid(plan_uuid)
         except Exception as e:
             raise PlanNotFoundError(plan_uuid) from e
 
@@ -672,7 +753,7 @@ class Portia:
         """
         if use_cached_plan:
             try:
-                return self.storage.get_plan_by_query(query)
+                return await self.storage.aget_plan_by_query(query)
             except StorageError as e:
                 logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
 
@@ -685,9 +766,9 @@ class Portia:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
-        resolved_example_plans = self._resolve_example_plans(example_plans)
+        resolved_example_plans = await self._aresolve_example_plans(example_plans)
 
-        end_user = self.initialize_end_user(end_user)
+        end_user = await self.ainitialize_end_user(end_user)
         logger().info(f"Running planning_agent for query - {query}")
         planning_agent = self._get_planning_agent()
         coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
@@ -719,7 +800,7 @@ class Portia:
             structured_output_schema=structured_output_schema,
         )
 
-        self.storage.save_plan(plan)
+        await self.storage.asave_plan(plan)
         logger().info(
             f"Plan created with {len(plan.steps)} steps",
             plan=str(plan.id),
@@ -832,7 +913,7 @@ class Portia:
                 },
             )
         )
-        plan_run = self._get_plan_run_from_plan(
+        plan_run = await self._aget_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
         )
         return await self._aresume(plan_run)
@@ -874,6 +955,44 @@ class Portia:
         end_user = self.initialize_end_user(end_user)
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
         return self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
+
+    async def _aget_plan_run_from_plan(
+        self,
+        plan: Plan | PlanUUID | UUID,
+        end_user: str | EndUser | None,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None,
+        structured_output_schema: type[BaseModel] | None = None,
+    ) -> PlanRun:
+        """Get a plan run from storage."""
+        # ensure we have the plan in storage.
+        # we won't if for example the user used PlanBuilder instead of dynamic planning.
+        plan_id = (
+            plan
+            if isinstance(plan, PlanUUID)
+            else PlanUUID(uuid=plan)
+            if isinstance(plan, UUID)
+            else plan.id
+        )
+
+        structured_output_schema = (
+            structured_output_schema
+            if structured_output_schema
+            else (plan.structured_output_schema if isinstance(plan, Plan) else None)
+        )
+        if await self.storage.aplan_exists(plan_id):
+            plan = await self.storage.aget_plan(plan_id)
+            plan.structured_output_schema = structured_output_schema
+        elif isinstance(plan, Plan):
+            await self.storage.asave_plan(plan)
+        else:
+            raise PlanNotFoundError(plan_id) from None
+
+        end_user = await self.ainitialize_end_user(end_user)
+        coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
+        return await self._acreate_plan_run(plan, end_user, coerced_plan_run_inputs)
 
     def resume(
         self,
@@ -1042,7 +1161,7 @@ class Portia:
                 if isinstance(plan_run_id, str)
                 else plan_run_id
             )
-            plan_run = self.storage.get_plan_run(parsed_id)
+            plan_run = await self.storage.aget_plan_run(parsed_id)
 
         if plan_run.state not in [
             PlanRunState.NOT_STARTED,
@@ -1052,7 +1171,7 @@ class Portia:
         ]:
             raise InvalidPlanRunStateError(plan_run.id)
 
-        plan = self.storage.get_plan(plan_id=plan_run.plan_id)
+        plan = await self.storage.aget_plan(plan_id=plan_run.plan_id)
 
         # Perform initial readiness check
         outstanding_clarifications = plan_run.get_outstanding_clarifications()
@@ -1113,6 +1232,55 @@ class Portia:
                     logger().warning(f"Ignoring unknown plan input: {input_obj.name}")
 
             self.storage.save_plan_run(plan_run)
+
+    async def _aprocess_plan_input_values(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        plan_run_inputs: list[PlanInput] | None = None,
+    ) -> None:
+        """Process plan input values and add them to the plan run.
+
+        Args:
+            plan (Plan): The plan containing required inputs.
+            plan_run (PlanRun): The plan run to update with input values.
+            plan_run_inputs (list[PlanInput] | None): Values for plan inputs.
+
+        Raises:
+            ValueError: If required plan inputs are missing.
+
+        """
+        if plan.plan_inputs and not plan_run_inputs:
+            raise ValueError("Inputs are required for this plan but have not been specified")
+        if plan_run_inputs and not plan.plan_inputs:
+            logger().warning(
+                "Inputs are not required for this plan but plan inputs were provided",
+            )
+
+        if plan_run_inputs and plan.plan_inputs:
+            input_values_by_name = {input_obj.name: input_obj for input_obj in plan_run_inputs}
+
+            # Validate all required inputs are provided
+            missing_inputs = [
+                input_obj.name
+                for input_obj in plan.plan_inputs
+                if input_obj.name not in input_values_by_name
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+
+            for plan_input in plan.plan_inputs:
+                if plan_input.name in input_values_by_name:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=input_values_by_name[plan_input.name].value
+                    )
+
+            # Check for unknown inputs
+            for input_obj in plan_run_inputs:
+                if not any(plan_input.name == input_obj.name for plan_input in plan.plan_inputs):
+                    logger().warning(f"Ignoring unknown plan input: {input_obj.name}")
+
+            await self.storage.asave_plan_run(plan_run)
 
     def execute_plan_run_and_handle_clarifications(
         self,
@@ -1389,6 +1557,35 @@ class Portia:
         )
         return self._create_plan_run(plan, end_user, plan_run_inputs)
 
+    async def acreate_plan_run(
+        self,
+        plan: Plan,
+        end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput] | None = None,
+    ) -> PlanRun:
+        """Create a PlanRun from a Plan.
+
+        Args:
+            plan (Plan): The plan to create a plan run from.
+            end_user (str | EndUser | None = None): The end user this plan run is for.
+            plan_run_inputs (list[PlanInput] | None = None): The plan inputs for the
+              plan run with their values.
+
+        Returns:
+            PlanRun: The created PlanRun object.
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_create_plan_run",
+                function_call_details={
+                    "end_user_provided": end_user is not None,
+                    "plan_run_inputs_provided": plan_run_inputs is not None,
+                },
+            )
+        )
+        return await self._acreate_plan_run(plan, end_user, plan_run_inputs)
+
     def _create_plan_run(
         self,
         plan: Plan,
@@ -1417,6 +1614,36 @@ class Portia:
         self._process_plan_input_values(plan, plan_run, plan_run_inputs)
         # Ensure the plan is saved before the plan run
         self.storage.save_plan_run(plan_run)
+        return plan_run
+
+    async def _acreate_plan_run(
+        self,
+        plan: Plan,
+        end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput] | None = None,
+    ) -> PlanRun:
+        """Create a PlanRun from a Plan.
+
+        Args:
+            plan (Plan): The plan to create a plan run from.
+            end_user (str | EndUser | None = None): The end user this plan run is for.
+            plan_run_inputs (list[PlanInput] | None = None): The plan inputs for the
+              plan run with their values.
+
+        Returns:
+            PlanRun: The created PlanRun object.
+
+        """
+        end_user = await self.ainitialize_end_user(end_user)
+        plan_run = PlanRun(
+            plan_id=plan.id,
+            state=PlanRunState.NOT_STARTED,
+            end_user_id=end_user.external_id,
+            structured_output_schema=plan.structured_output_schema,
+        )
+        await self._aprocess_plan_input_values(plan, plan_run, plan_run_inputs)
+        # Ensure the plan is saved before the plan run
+        await self.storage.asave_plan_run(plan_run)
         return plan_run
 
     def _execute_plan_run(self, plan: Plan, plan_run: PlanRun) -> PlanRun:

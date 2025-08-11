@@ -151,11 +151,11 @@ async def test_portia_aplan_with_use_cached_plan_success(portia: Portia) -> None
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan = await portia.aplan(query, use_cached_plan=True)
 
@@ -176,7 +176,7 @@ async def test_portia_aplan_with_use_cached_plan_not_found(
 
     # Mock the storage.get_plan_by_query to raise StorageError
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", side_effect=StorageError("No plan found for query")
+        portia.storage, "aget_plan_by_query", side_effect=StorageError("No plan found for query")
     ) as mock_get_cached:
         # Mock the planning model to return a successful plan
         planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -203,13 +203,13 @@ async def test_portia_aplan_with_use_cached_plan_false(
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the planning model to return a successful plan
     planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
 
     # Mock the storage.get_plan_by_query to ensure it's not called
-    with mock.patch.object(portia.storage, "get_plan_by_query") as mock_get_cached:
+    with mock.patch.object(portia.storage, "aget_plan_by_query") as mock_get_cached:
         plan = await portia.aplan(query, use_cached_plan=False)
 
         # Verify get_plan_by_query was NOT called
@@ -230,11 +230,11 @@ async def test_portia_aplan_with_use_cached_plan_and_tools(portia: Portia) -> No
         plan_context=PlanContext(query=query, tool_ids=["add_tool", "subtract_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan = await portia.aplan(query, tools=["add_tool"], use_cached_plan=True)
 
@@ -439,11 +439,11 @@ async def test_portia_arun_with_use_cached_plan_success(portia: Portia) -> None:
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan_run = await portia.arun(query, use_cached_plan=True)
 
@@ -464,7 +464,7 @@ async def test_portia_arun_with_use_cached_plan_not_found(
 
     # Mock the storage.get_plan_by_query to raise StorageError
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", side_effect=StorageError("No plan found for query")
+        portia.storage, "aget_plan_by_query", side_effect=StorageError("No plan found for query")
     ) as mock_get_cached:
         # Mock the planning model to return a successful plan
         planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -491,13 +491,13 @@ async def test_portia_arun_with_use_cached_plan_false(
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the planning model to return a successful plan
     planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
 
     # Mock the storage.get_plan_by_query to ensure it's not called
-    with mock.patch.object(portia.storage, "get_plan_by_query") as mock_get_cached:
+    with mock.patch.object(portia.storage, "aget_plan_by_query") as mock_get_cached:
         plan_run = await portia.arun(query, use_cached_plan=False)
 
         # Verify get_plan_by_query was NOT called
@@ -519,11 +519,11 @@ async def test_portia_arun_with_use_cached_plan_and_plan_run_inputs(portia: Port
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan_run = await portia.arun(query, plan_run_inputs=plan_run_inputs, use_cached_plan=True)
 
@@ -544,7 +544,7 @@ async def test_portia_arun_with_use_cached_plan_storage_error_logging(
 
     # Mock the storage.get_plan_by_query to raise StorageError
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", side_effect=StorageError("Test storage error")
+        portia.storage, "aget_plan_by_query", side_effect=StorageError("Test storage error")
     ) as mock_get_cached:
         # Mock the planning model to return a successful plan
         planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -595,7 +595,7 @@ async def test_portia_arun_plan(
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -717,11 +717,11 @@ async def test_portia_arun_plan_with_plan_uuid(portia: Portia, telemetry: MagicM
         plan_context=PlanContext(query="Test query", tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(plan)
+    await portia.storage.asave_plan(plan)
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -766,7 +766,7 @@ async def test_portia_arun_plan_with_new_plan(portia: Portia, planning_model: Ma
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -793,11 +793,11 @@ async def test_portia_arun_plan_with_uuid(portia: Portia) -> None:
         plan_context=PlanContext(query="Test query", tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(plan)
+    await portia.storage.asave_plan(plan)
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -1376,7 +1376,7 @@ async def test_portia_aexecute_step_hooks(portia: Portia, planning_model: MagicM
     assert execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
     assert execution_hooks.after_plan_run.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
-    plan = portia.storage.get_plan(plan_run.plan_id)
+    plan = await portia.storage.aget_plan(plan_run.plan_id)
     execution_hooks.before_plan_run.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY
     )
@@ -1433,8 +1433,8 @@ async def test_portia_aresume_with_skipped_steps(portia: Portia) -> None:
     )
 
     # Mock the storage to return our plan
-    portia.storage.save_plan(plan)
-    portia.storage.save_plan_run(plan_run)
+    await portia.storage.asave_plan(plan)
+    await portia.storage.asave_plan_run(plan_run)
 
     # Mock introspection agent to SKIP steps 3 and 4
     mock_introspection = MagicMock()
@@ -1613,8 +1613,8 @@ async def test_portia_acustom_tool_ready_not_ready() -> None:
         tools=[ready_tool],
     )
     plan = PlanBuilder().step("", ready_tool.id).build()
-    plan_run = portia.create_plan_run(plan, end_user="123")
-    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    plan_run = await portia.acreate_plan_run(plan, end_user="123")
+    await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = await portia.aresume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -1638,8 +1638,8 @@ async def test_portia_acustom_tool_ready_resume_multiple_instances_of_same_tool(
         tools=[ready_tool, ready_tool],
     )
     plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool.id).build()
-    plan_run = portia.create_plan_run(plan, end_user="123")
-    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    plan_run = await portia.acreate_plan_run(plan, end_user="123")
+    await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = await portia.aresume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -1658,8 +1658,8 @@ async def test_portia_acustom_tool_ready_resume_multiple_custom_tools() -> None:
     ready_tool_2 = ReadyTool(id="ready_tool_2", auth_url="https://fake.portiaai.test/auth2")
     portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool_2])
     plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
-    plan_run = portia.create_plan_run(plan, end_user="123")
-    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    plan_run = await portia.acreate_plan_run(plan, end_user="123")
+    await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = await portia.aresume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
