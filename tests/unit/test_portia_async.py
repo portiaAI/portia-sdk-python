@@ -1568,6 +1568,33 @@ async def test_portia_aexecute_step_hooks_with_skip(
     )
 
 
+@pytest.mark.asyncio
+async def test_portia_aexecute_step_hooks_after_step_exception(
+    portia: Portia, planning_model: MagicMock
+) -> None:
+    """Test after_step_execution hook exception handling asynchronously."""
+
+    def failing_after_step_hook(plan, plan_run, step, output):  # noqa: ANN202, ARG001, ANN001
+        raise ValueError("Test after_step_execution hook exception")
+
+    execution_hooks = ExecutionHooks(
+        after_step_execution=failing_after_step_hook,
+    )
+    portia.execution_hooks = execution_hooks
+
+    step1 = Step(task="Step 1", tool_id="add_tool", output="$step1_result")
+    planning_model.aget_structured_response.return_value = StepsOrError(steps=[step1], error=None)
+    mock_agent = MagicMock()
+    step_1_result = LocalDataValue(value="Step 1 result")
+    mock_agent.execute_async = mock.AsyncMock(return_value=step_1_result)
+
+    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+        plan_run = await portia.arun("Test after_step_execution hook exception")
+
+    assert plan_run.state == PlanRunState.FAILED
+    assert plan_run.outputs.final_output.get_value() == "Test after_step_execution hook exception"  # pyright: ignore[reportOptionalMemberAccess]
+
+
 class ReadyTool(Tool):
     """A dummy tool that can be set to ready or not ready."""
 
