@@ -16,7 +16,7 @@ dependencies = [
     "pydantic>=2.11.5,<3",
     "jinja2>=3.1.4,<4",
     "instructor>=1.9.0,<2 ; python_version >= '3.11' and python_version < '4.0'",
-    "anthropic>=0.41.0,<=0.55.0",
+    "anthropic>=0.41.0",
     # We fixate langchain-anthropic to this version because of browser-use version conflicts.
     # Once we upgrade browser-use, we should upgrade this dependency to latest.
     "langchain-anthropic==0.3.3 ; python_version >= '3.11' and python_version < '4.0'", #
@@ -37,6 +37,7 @@ dependencies = [
     "testcontainers[redis]>=4.10.0 ; python_version >= '3.9' and python_version < '4.0'",
     "instructor>=1.9.0 ; python_version >= '3.9' and python_version < '4.0'",
     "litellm>=1.74.9.post1",
+    "browser-use>=0.5.10",
 ]
 
 [project.optional-dependencies]
