@@ -20,7 +20,7 @@ class PortiaCloudClient:
 
     @classmethod
     def get_async_client(cls, config: Config) -> httpx.AsyncClient:
-        """Return the async client using a singleton pattern to help manage limits across the SDK."""
+        """Return the async client using a singleton pattern."""
         if cls._async_client is None:
             cls._async_client = cls.new_async_client(config, allow_unauthenticated=False)
         return cls._async_client

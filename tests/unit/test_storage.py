@@ -557,41 +557,33 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
         end_user_id="test123",
     )
     output = LocalDataValue(value="test value", summary="test summary")
-    mock_success_response = MagicMock()
-    mock_success_response.is_success = True
 
     # Test saving an output
-    with (
-        patch.object(
-            agent_memory.form_client,
-            "put",
-            return_value=mock_success_response,
-        ) as mock_put,
-    ):
-        result = agent_memory.save_plan_run_output("test_output", output, plan_run.id)
+    httpx_mock.add_response(
+        method="PUT",
+        url=f"https://api.portialabs.ai/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        status_code=200,
+    )
 
-        mock_put.assert_called_once_with(
-            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
-            files={
-                "value": (
-                    "output",
-                    ANY,
-                ),
-            },
-            data={
-                "summary": output.get_summary(),
-            },
-        )
-        assert isinstance(result, AgentMemoryValue)
-        assert result.output_name == "test_output"
-        assert result.plan_run_id == plan_run.id
-        assert result.summary == output.get_summary()
-        assert Path(f".portia/cache/agent_memory/{plan_run.id}/test_output.json").is_file()
+    result = agent_memory.save_plan_run_output("test_output", output, plan_run.id)
+
+    # Verify the PUT request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    put_request = httpx_mock.get_requests()[0]
+    assert put_request.method == "PUT"
+    assert (
+        put_request.url.path == f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/"
+    )
+
+    # Verify the result
+    assert isinstance(result, AgentMemoryValue)
+    assert result.output_name == "test_output"
+    assert result.plan_run_id == plan_run.id
+    assert result.summary == output.get_summary()
+    assert Path(f".portia/cache/agent_memory/{plan_run.id}/test_output.json").is_file()
 
     # Test getting an output when it is cached locally
-    with (
-        patch.object(agent_memory.client, "get") as mock_get,
-    ):
+    with patch.object(agent_memory.client, "get") as mock_get:
         result = agent_memory.get_plan_run_output("test_output", plan_run.id)
 
         # Verify that we didn't call Portia Cloud because we have a cached value
@@ -602,13 +594,20 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
         assert result.get_value() == output.get_value()
 
     # Test getting an output when it is not cached locally
-    mock_output_response = MagicMock()
-    mock_output_response.is_success = True
-    mock_output_response.json.return_value = {
-        "summary": "test summary",
-        "url": "https://example.com/output",
-    }
+    # Mock the metadata response
     httpx_mock.add_response(
+        method="GET",
+        url=f"https://api.portialabs.ai/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        status_code=200,
+        json={
+            "summary": "test summary",
+            "url": "https://example.com/output",
+        },
+    )
+
+    # Mock the value response
+    httpx_mock.add_response(
+        method="GET",
         url="https://example.com/output",
         status_code=200,
         content=b"test value",
@@ -616,18 +615,25 @@ def test_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
 
     with (
         patch.object(agent_memory, "_read_from_cache", side_effect=FileNotFoundError),
-        patch.object(agent_memory.client, "get", return_value=mock_output_response) as mock_get,
         patch.object(agent_memory, "_write_to_cache") as mock_write_cache,
     ):
         result = agent_memory.get_plan_run_output("test_output", plan_run.id)
 
-        # Verify that it fetched from Portia Cloud
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        # Verify that both HTTP requests were made
+        assert len(httpx_mock.get_requests()) == 3  # 1 from save + 2 from get
+
+        # Verify the metadata request
+        metadata_request = httpx_mock.get_requests()[1]
+        assert metadata_request.method == "GET"
+        assert (
+            metadata_request.url.path
+            == f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/"
         )
 
-        # Verify that it fetched the value from the URL using the httpx client
-        assert len(httpx_mock.get_requests()) == 1
+        # Verify the value request
+        value_request = httpx_mock.get_requests()[2]
+        assert value_request.method == "GET"
+        assert value_request.url == "https://example.com/output"
 
         # Verify that it wrote to the local cache
         mock_write_cache.assert_called_once()

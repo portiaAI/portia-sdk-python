@@ -483,6 +483,7 @@ class AgentMemory(ABC):
         """
         return await asyncio.to_thread(self.get_plan_run_output, output_name, plan_run_id)
 
+
 MAX_STORAGE_OBJECT_BYTES = 32_000_000
 
 
@@ -794,8 +795,6 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         """
         self._write(f"{plan.id}.json", plan)
 
-
-
     def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a Plan object by its ID.
 
@@ -1005,7 +1004,9 @@ class PortiaCloudStorage(Storage, AgentMemory):
         self.client: httpx.Client = PortiaCloudClient().get_client(config)
         self.form_client: httpx.Client = PortiaCloudClient().new_client(config, json_headers=False)
         self.async_client: httpx.AsyncClient = PortiaCloudClient().get_async_client(config)
-        self.async_form_client: httpx.AsyncClient = PortiaCloudClient().new_async_client(config, json_headers=False)
+        self.async_form_client: httpx.AsyncClient = PortiaCloudClient().new_async_client(
+            config, json_headers=False
+        )
         self.cache_dir: str = cache_dir or ".portia/cache/agent_memory"
         self.max_cache_size: int = max_cache_size
         self._ensure_cache_dir()
@@ -1442,6 +1443,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 current_page=response_json["current_page"],
                 total_pages=response_json["total_pages"],
             )
+
     async def aget_plan_runs(
         self,
         run_state: PlanRunState | None = None,
@@ -1796,7 +1798,9 @@ class PortiaCloudStorage(Storage, AgentMemory):
         except Exception as e:
             raise StorageError(e) from e
 
-    async def aget_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 5) -> list[Plan]:
+    async def aget_similar_plans(
+        self, query: str, threshold: float = 0.5, limit: int = 5
+    ) -> list[Plan]:
         """Get similar plans to the query.
 
         Args:
