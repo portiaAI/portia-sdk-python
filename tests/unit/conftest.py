@@ -8,6 +8,7 @@ import pytest
 
 from portia.config import FEATURE_FLAG_AGENT_MEMORY_ENABLED, GenerativeModelsConfig
 from portia.model import GenerativeModel
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.portia import Portia
 from portia.telemetry.telemetry_service import BaseProductTelemetry
 from portia.tool_registry import ToolRegistry
@@ -41,7 +42,7 @@ def portia(planning_model: MagicMock, default_model: MagicMock, telemetry: Magic
             default_model=default_model,
         ),
     )
-    tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
+    tool_registry = ToolRegistry([AdditionTool(), ClarificationTool(), LLMTool()])
     return Portia(config=config, tools=tool_registry, telemetry=telemetry)
 
 
