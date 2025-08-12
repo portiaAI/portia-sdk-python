@@ -1454,11 +1454,24 @@ class Portia:
                 logger().info(
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
-            if clarified_plan_run := self._handle_post_step_execution(
-                plan, plan_run, index, step, last_executed_step_output
-            ):
-                # No after_plan_run call here as the plan run will be resumed later
-                return clarified_plan_run
+            try:
+                if clarified_plan_run := self._handle_post_step_execution(
+                    plan, plan_run, index, step, last_executed_step_output
+                ):
+                    # No after_plan_run call here as the plan run will be resumed later
+                    return clarified_plan_run
+            except Exception as e:  # noqa: BLE001 - We want to capture all exceptions from the hook here
+                logger().error(
+                    "Error in post-step stage for step {index}: {error}",
+                    index=index,
+                    error=e,
+                    plan=str(plan.id),
+                    plan_run=str(plan_run.id),
+                )
+                error_output = LocalDataValue(value=str(e))
+                self._set_step_output(error_output, plan_run, step)
+                # Skip the after_step_execution hook as we have already run it
+                return self._handle_plan_run_execution_error(plan_run, plan, error_output)
 
         return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
 
@@ -1497,11 +1510,24 @@ class Portia:
                 logger().info(
                     f"Step output - {last_executed_step_output.get_summary()!s}",
                 )
-            if clarified_plan_run := self._handle_post_step_execution(
-                plan, plan_run, index, step, last_executed_step_output
-            ):
-                # No after_plan_run call here as the plan run will be resumed later
-                return clarified_plan_run
+            try:
+                if clarified_plan_run := self._handle_post_step_execution(
+                    plan, plan_run, index, step, last_executed_step_output
+                ):
+                    # No after_plan_run call here as the plan run will be resumed later
+                    return clarified_plan_run
+            except Exception as e:  # noqa: BLE001 - We want to capture all exceptions from the hook here
+                logger().error(
+                    "Error in post-step stage for step {index}: {error}",
+                    index=index,
+                    error=e,
+                    plan=str(plan.id),
+                    plan_run=str(plan_run.id),
+                )
+                error_output = LocalDataValue(value=str(e))
+                self._set_step_output(error_output, plan_run, step)
+                # Skip the after_step_execution hook as we have already run it
+                return self._handle_plan_run_execution_error(plan_run, plan, error_output)
 
         return self._post_plan_run_execution(plan, plan_run, last_executed_step_output)
 
@@ -1777,12 +1803,15 @@ class Portia:
             logger().debug("Finished before_plan_run execution hook")
 
     def _handle_execution_error(
-        self, plan_run: PlanRun, plan: Plan, index: int, step: Step, error: Exception
+        self,
+        plan_run: PlanRun,
+        plan: Plan,
+        index: int,
+        step: Step,
+        error: Exception,
     ) -> PlanRun:
         error_output = LocalDataValue(value=str(error))
         self._set_step_output(error_output, plan_run, step)
-        plan_run.outputs.final_output = error_output
-        self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         logger().error(
             "Error executing step {index}: {error}",
             index=index,
@@ -1790,12 +1819,6 @@ class Portia:
             plan=str(plan.id),
             plan_run=str(plan_run.id),
         )
-        logger().debug(
-            f"Final run status: {plan_run.state!s}",
-            plan=str(plan.id),
-            plan_run=str(plan_run.id),
-        )
-
         if self.execution_hooks.after_step_execution:
             logger().debug("Calling after_step_execution execution hook")
             self.execution_hooks.after_step_execution(
@@ -1805,7 +1828,21 @@ class Portia:
                 error_output,
             )
             logger().debug("Finished after_step_execution execution hook")
+        return self._handle_plan_run_execution_error(plan_run, plan, error_output)
 
+    def _handle_plan_run_execution_error(
+        self,
+        plan_run: PlanRun,
+        plan: Plan,
+        error_output: Output,
+    ) -> PlanRun:
+        plan_run.outputs.final_output = error_output
+        self._set_plan_run_state(plan_run, PlanRunState.FAILED)
+        logger().debug(
+            f"Final run status: {plan_run.state!s}",
+            plan=str(plan.id),
+            plan_run=str(plan_run.id),
+        )
         if self.execution_hooks.after_plan_run:
             logger().debug("Calling after_plan_run execution hook")
             self.execution_hooks.after_plan_run(
