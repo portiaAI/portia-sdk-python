@@ -1797,13 +1797,13 @@ class Portia:
         error: Exception,
         run_after_step_hook: bool = True,
     ) -> PlanRun:
-        logger().exception(f"Error executing step {index}: {error}")
         error_output = LocalDataValue(value=str(error))
         self._set_step_output(error_output, plan_run, step)
         plan_run.outputs.final_output = error_output
         self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         logger().error(
-            "error: {error}",
+            "Error executing step {index}: {error}",
+            index=index,
             error=error,
             plan=str(plan.id),
             plan_run=str(plan_run.id),
@@ -2107,11 +2107,7 @@ class Portia:
     def _get_tool_for_step(self, step: Step, plan_run: PlanRun) -> Tool | None:
         if not step.tool_id:
             return None
-        if step.tool_id == LLMTool.LLM_TOOL_ID:
-            # Special case LLMTool so it doesn't need to be in all tool registries
-            child_tool = LLMTool()
-        else:
-            child_tool = self.tool_registry.get_tool(step.tool_id)
+        child_tool = self.tool_registry.get_tool(step.tool_id)
         return ToolCallWrapper(
             child_tool=child_tool,
             storage=self.storage,
