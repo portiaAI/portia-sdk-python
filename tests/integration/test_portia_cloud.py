@@ -50,7 +50,7 @@ def test_run_tool_error() -> None:
 
     tool = registry.get_tool("portia:tavily::search")
     assert isinstance(tool, PortiaRemoteTool)
-    tool.client = PortiaCloudClient().get_client(config)
+    tool.client = PortiaCloudClient.new_client(config)
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError):
         tool.run(ctx)
