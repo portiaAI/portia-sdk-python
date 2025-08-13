@@ -212,6 +212,50 @@ class ToolRegistry:
 
         """
         return ToolRegistry({tool.id: tool for tool in self._tools.values() if predicate(tool)})
+  
+    def with_tool_description_regex(
+        self, regex: str, updated_description: str, *, overwrite: bool = False
+    ) -> ToolRegistry:
+        """Update tools that fit the regex expression with an extension or override of the tool description.
+
+        Args:
+            regex (str): A regex expression to describe the tools to update.
+            updated_description (str): The tool description to update. If `overwrite` is False, this
+                will extend the existing tool description, otherwise, the entire tool description
+                will be updated.
+            overwrite (bool): Whether to update or extend the existing tool description.
+            
+        Returns:
+            Self: The tool registry is updated in place and returned.
+
+        This method is useful to implement tool filtering whereby only a selection of tools are
+        passed to the PlanningAgent based on the query.
+        This method is optional to implement and will default to providing all tools.
+        
+        Examples:
+            Update all tools from a specific MCP server with additional context:
+
+            >>> mcp_registry = McpToolRegistry.from_stdio_connection(
+            ...     server_name="linear",
+            ...     command="npx",
+            ...     args=["@modelcontextprotocol/server-linear"]
+            ... )
+            >>> updated_registry = mcp_registry.with_tool_description_regex(
+            ...     regex="mcp:linear:.*",
+            ...     updated_description="If a teamID is not provided, use teamID 123."
+            ... )
+
+            This will add the additional context to all Linear MCP tools, making them more
+            specific to your use case.
+
+        """
+        try:
+            filtered_tools = self.filter_tools(lambda tool: re.match(regex, tool.id) is not None)
+            [self.with_tool_description(tool.id, updated_description, overwrite=overwrite) for tool in filtered_tools]
+        except ToolNotFoundError:
+            logger().warning(f"No tools found that match the regex: {regex}")
+        return self
+
 
     def with_tool_description(
         self, tool_id: str, updated_description: str, *, overwrite: bool = False
