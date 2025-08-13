@@ -13,7 +13,7 @@ keywords = [
 ]
 classifiers = ["Development Status :: 3 - Alpha"]
 dependencies = [
-    "pydantic>=2.10.3,<3",
+    "pydantic>=2.11.5,<3",
     "jinja2>=3.1.4,<4",
     "instructor>=1.9.0,<2 ; python_version >= '3.11' and python_version < '4.0'",
     "anthropic>=0.41.0,<=0.55.0",
