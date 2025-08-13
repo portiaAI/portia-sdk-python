@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 import tempfile
 import threading
@@ -3066,9 +3065,6 @@ def test_portia_resolve_example_plans_with_plan_id_strings(portia: Portia) -> No
     assert len(resolved_plans) == 2
     assert resolved_plans[0].id == example_plan_1.id
     assert resolved_plans[1].id == example_plan_2.id
-
-
-
 
 
 def test_portia_resolve_example_plans_none() -> None:
