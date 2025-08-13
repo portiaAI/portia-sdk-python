@@ -1,5 +1,5 @@
 <p align="center">
-    <img alt="SteelThread banner" src="assets/steelthread_banner.png"  width="50%">
+    <img alt="SteelThread banner" src="assets/steelthread_banner.png"  width="75%">
 </p>
 <p align="center">
     <a href="https://github.com/portiaAI/steel_thread">
