@@ -1001,14 +1001,12 @@ class PortiaCloudStorage(Storage, AgentMemory):
             max_cache_size (int): The maximum number of files to cache locally.
 
         """
-        self.client: httpx.Client = PortiaCloudClient().get_client(config)
-        self.form_client: httpx.Client = PortiaCloudClient().new_client(config, json_headers=False)
-        self.async_client: httpx.AsyncClient = PortiaCloudClient().get_async_client(config)
-        self.async_form_client: httpx.AsyncClient = PortiaCloudClient().new_async_client(
-            config, json_headers=False
-        )
-        self.cache_dir: str = cache_dir or ".portia/cache/agent_memory"
-        self.max_cache_size: int = max_cache_size
+        self.client = PortiaCloudClient.new_client(config)
+        self.async_client = PortiaCloudClient.new_async_client(config)
+        self.form_client = PortiaCloudClient.new_client(config, json_headers=False)
+        self.async_form_client = PortiaCloudClient.new_async_client(config, json_headers=False)
+        self.cache_dir = cache_dir or ".portia/cache/agent_memory"
+        self.max_cache_size = max_cache_size
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self, file_path: str | None = None) -> None:

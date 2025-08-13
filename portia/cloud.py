@@ -6,24 +6,7 @@ from portia.config import Config
 
 
 class PortiaCloudClient:
-    """Base HTTP client for interacting with portia cloud."""
-
-    _client: httpx.Client | None = None
-    _async_client: httpx.AsyncClient | None = None
-
-    @classmethod
-    def get_client(cls, config: Config) -> httpx.Client:
-        """Return the client using a singleton pattern to help manage limits across the SDK."""
-        if cls._client is None:
-            cls._client = cls.new_client(config, allow_unauthenticated=False)
-        return cls._client
-
-    @classmethod
-    def get_async_client(cls, config: Config) -> httpx.AsyncClient:
-        """Return the async client using a singleton pattern."""
-        if cls._async_client is None:
-            cls._async_client = cls.new_async_client(config, allow_unauthenticated=False)
-        return cls._async_client
+    """Base HTTP client builder for interacting with portia cloud."""
 
     @classmethod
     def new_client(

@@ -2384,7 +2384,7 @@ class ReadyTool(Tool):
 def mock_cloud_client() -> Iterator[httpx.Client]:
     """Mock the batch ready check."""
     client = httpx.Client(base_url="https://fake.portiaai.test")
-    with mock.patch("portia.tool.PortiaCloudClient.get_client", return_value=client):
+    with mock.patch("portia.tool.PortiaCloudClient.new_client", return_value=client):
         yield client
 
 

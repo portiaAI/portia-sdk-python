@@ -346,7 +346,7 @@ class PortiaToolRegistry(ToolRegistry):
         elif client is not None:
             super().__init__(self._load_tools(client))
         elif config is not None:
-            client = PortiaCloudClient().get_client(config)
+            client = PortiaCloudClient.new_client(config)
             super().__init__(self._load_tools(client))
         else:
             raise ValueError("Either config, client or tools must be provided")

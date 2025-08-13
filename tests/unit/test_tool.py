@@ -908,7 +908,7 @@ def test_remote_tool_batch_ready_check(httpx_mock: HTTPXMock) -> None:
 
     # Configure mock for PortiaCloudClient to return our client
     mock_client = httpx.Client(base_url=endpoint)
-    with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
+    with patch("portia.cloud.PortiaCloudClient.new_client", return_value=mock_client):
         response = PortiaRemoteTool.batch_ready_check(
             config,
             {"tool1", "tool2"},
@@ -955,7 +955,7 @@ def test_remote_tool_batch_ready_check_not_ready(httpx_mock: HTTPXMock) -> None:
     config = get_test_config()
     # Configure mock for PortiaCloudClient to return our client
     mock_client = httpx.Client(base_url=endpoint)
-    with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
+    with patch("portia.cloud.PortiaCloudClient.new_client", return_value=mock_client):
         response = PortiaRemoteTool.batch_ready_check(
             config,
             {"tool1", "tool2"},
@@ -982,7 +982,7 @@ def test_remote_tool_batch_ready_check_404_fallback(httpx_mock: HTTPXMock) -> No
 
     # Configure mock for PortiaCloudClient to return our client
     mock_client = httpx.Client(base_url=endpoint)
-    with patch("portia.cloud.PortiaCloudClient.get_client", return_value=mock_client):
+    with patch("portia.cloud.PortiaCloudClient.new_client", return_value=mock_client):
         response = PortiaRemoteTool.batch_ready_check(
             config,
             {"tool1", "tool2"},
