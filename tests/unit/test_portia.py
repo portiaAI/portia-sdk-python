@@ -3065,3 +3065,58 @@ def test_portia_resolve_example_plans_with_plan_id_strings(portia: Portia) -> No
     assert len(resolved_plans) == 2
     assert resolved_plans[0].id == example_plan_1.id
     assert resolved_plans[1].id == example_plan_2.id
+
+
+def test_portia_resolve_example_plans_none(portia: Portia) -> None:
+    """Test that None example_plans returns None."""
+    result = portia._resolve_example_plans(None)
+    assert result is None
+
+
+def test_portia_resolve_single_example_plan_invalid_type(portia: Portia) -> None:
+    """Test that invalid example plan type raises TypeError."""
+    with pytest.raises(TypeError, match="Invalid example plan type"):
+        portia._resolve_single_example_plan(123)  # type: ignore[arg-type]
+
+
+def test_portia_load_plan_by_uuid_exception(portia: Portia) -> None:
+    """Test that loading plan by UUID with exception raises PlanNotFoundError."""
+    plan_uuid = PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
+
+    with (
+        mock.patch.object(portia.storage, "get_plan", side_effect=Exception("Storage error")),
+        pytest.raises(PlanNotFoundError),
+    ):
+        portia._load_plan_by_uuid(plan_uuid)
+
+
+def test_portia_resolve_string_example_plan_invalid_format(portia: Portia) -> None:
+    """Test that invalid string format raises ValueError."""
+    with pytest.raises(ValueError, match="must be a plan ID"):
+        portia._resolve_string_example_plan("invalid-plan-id")
+
+
+def test_portia_resolve_string_example_plan_not_found(portia: Portia) -> None:
+    """Test that non-existent plan ID raises PlanNotFoundError."""
+    plan_uuid = PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
+
+    with (
+        mock.patch.object(portia, "_load_plan_by_uuid", side_effect=PlanNotFoundError(plan_uuid)),
+        pytest.raises(PlanNotFoundError),
+    ):
+        portia._resolve_string_example_plan("plan-12345678-1234-5678-1234-567812345678")
+
+
+def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt(
+    portia: Portia,
+) -> None:
+    """Test that KeyboardInterrupt is handled correctly."""
+    plan, plan_run = get_test_plan_run()
+
+    with (
+        mock.patch.object(portia, "_execute_plan_run", side_effect=KeyboardInterrupt()),
+        mock.patch.object(portia.storage, "save_plan_run"),
+    ):
+        result = portia.execute_plan_run_and_handle_clarifications(plan, plan_run)
+
+        assert result.state == PlanRunState.FAILED

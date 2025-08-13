@@ -326,7 +326,7 @@ async def test_portia_arun_query_with_clarifications(
         ),
         steps=[clarification_step],
     )
-    portia.storage.save_plan(plan)
+    await portia.storage.asave_plan(plan)
 
     plan_run = await portia.arun_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
