@@ -1,4 +1,20 @@
 <p align="center">
+📣 <strong>FEATURE ANNOUNCEMENT -- STEELTHREAD</strong> 📣<br>
+    <a href="https://github.com/portiaAI/steel_thread">
+    <img src="https://img.shields.io/badge/GitHub-000?logo=github&logoColor=white">
+  </a>
+  <a href="https://docs.portialabs.ai/steel-thread-intro">
+    <img src="https://img.shields.io/badge/Docs-38BDF8">
+  </a></br></br>
+Our flexible evaluation framework is out! </br>
+  Ingest test cases directly from your agent runs rather than building datasets from scratch.</br>
+  Monitor in real-time or with offline evals.</br>
+  Use custom metric definitions including both deterministic and LLM-based judging.</br></br>
+</p>
+
+---
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/Logo_Portia_Line_Black.png">
