@@ -3067,25 +3067,20 @@ def test_portia_resolve_example_plans_with_plan_id_strings(portia: Portia) -> No
     assert resolved_plans[1].id == example_plan_2.id
 
 
-def test_portia_resolve_example_plans_none() -> None:
+def test_portia_resolve_example_plans_none(portia: Portia) -> None:
     """Test that None example_plans returns None."""
-    portia = Portia()
-
     result = portia._resolve_example_plans(None)
     assert result is None
 
 
-def test_portia_resolve_single_example_plan_invalid_type() -> None:
+def test_portia_resolve_single_example_plan_invalid_type(portia: Portia) -> None:
     """Test that invalid example plan type raises TypeError."""
-    portia = Portia()
-
     with pytest.raises(TypeError, match="Invalid example plan type"):
         portia._resolve_single_example_plan(123)  # type: ignore[arg-type]
 
 
-def test_portia_load_plan_by_uuid_exception() -> None:
+def test_portia_load_plan_by_uuid_exception(portia: Portia) -> None:
     """Test that loading plan by UUID with exception raises PlanNotFoundError."""
-    portia = Portia()
     plan_uuid = PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
 
     with (
@@ -3095,17 +3090,14 @@ def test_portia_load_plan_by_uuid_exception() -> None:
         portia._load_plan_by_uuid(plan_uuid)
 
 
-def test_portia_resolve_string_example_plan_invalid_format() -> None:
+def test_portia_resolve_string_example_plan_invalid_format(portia: Portia) -> None:
     """Test that invalid string format raises ValueError."""
-    portia = Portia()
-
     with pytest.raises(ValueError, match="must be a plan ID"):
         portia._resolve_string_example_plan("invalid-plan-id")
 
 
-def test_portia_resolve_string_example_plan_not_found() -> None:
+def test_portia_resolve_string_example_plan_not_found(portia: Portia) -> None:
     """Test that non-existent plan ID raises PlanNotFoundError."""
-    portia = Portia()
     plan_uuid = PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
 
     with (
@@ -3115,9 +3107,10 @@ def test_portia_resolve_string_example_plan_not_found() -> None:
         portia._resolve_string_example_plan("plan-12345678-1234-5678-1234-567812345678")
 
 
-def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt() -> None:
+def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt(
+    portia: Portia,
+) -> None:
     """Test that KeyboardInterrupt is handled correctly."""
-    portia = Portia()
     plan, plan_run = get_test_plan_run()
 
     with (

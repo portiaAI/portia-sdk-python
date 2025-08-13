@@ -1726,9 +1726,10 @@ async def test_portia_arun_plan_with_all_plan_types_error_handling(portia: Porti
 
 
 @pytest.mark.asyncio
-async def test_portia_aexecute_plan_run_and_handle_clarifications_keyboard_interrupt() -> None:
+async def test_portia_aexecute_plan_run_and_handle_clarifications_keyboard_interrupt(
+    portia: Portia,
+) -> None:
     """Test that KeyboardInterrupt is handled correctly in async version."""
-    portia = Portia()
     plan, plan_run = get_test_plan_run()
 
     with (
