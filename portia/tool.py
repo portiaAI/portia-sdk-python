@@ -768,7 +768,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
             ReadyResponse: The readiness response for the tools.
 
         """
-        client = PortiaCloudClient().get_client(config)
+        client = PortiaCloudClient.new_client(config)
         logger().debug("Checking readiness for Portia cloud tools: " + ", ".join(tool_ids))
         batch_ready_response = client.post(
             url="/api/v0/tools/batch/ready/",

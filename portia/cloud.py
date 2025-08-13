@@ -6,16 +6,7 @@ from portia.config import Config
 
 
 class PortiaCloudClient:
-    """Base HTTP client for interacting with portia cloud."""
-
-    _client = None
-
-    @classmethod
-    def get_client(cls, config: Config) -> httpx.Client:
-        """Return the client using a singleton pattern to help manage limits across the SDK."""
-        if cls._client is None:
-            cls._client = cls.new_client(config, allow_unauthenticated=False)
-        return cls._client
+    """Base HTTP client builder for interacting with portia cloud."""
 
     @classmethod
     def new_client(
