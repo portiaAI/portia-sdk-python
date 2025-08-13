@@ -56,6 +56,7 @@ from tests.utils import (
     ClarificationTool,
     TestClarificationHandler,
     get_test_config,
+    get_test_plan_run,
 )
 
 
@@ -1722,3 +1723,21 @@ async def test_portia_arun_plan_with_all_plan_types_error_handling(portia: Porti
         mock_aresume.side_effect = lambda x: x
         plan_run = await portia.arun_plan(non_existent_plan)
         assert plan_run.plan_id == non_existent_plan.id
+
+
+
+
+
+@pytest.mark.asyncio
+async def test_portia_aexecute_plan_run_and_handle_clarifications_keyboard_interrupt() -> None:
+    """Test that KeyboardInterrupt is handled correctly in async version."""
+    portia = Portia()
+    plan, plan_run = get_test_plan_run()
+
+    with (
+        mock.patch.object(portia, "_aexecute_plan_run", side_effect=KeyboardInterrupt()),
+        mock.patch.object(portia.storage, "save_plan_run"),
+    ):
+        result = await portia.aexecute_plan_run_and_handle_clarifications(plan, plan_run)
+
+        assert result.state == PlanRunState.FAILED
