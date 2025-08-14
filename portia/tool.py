@@ -814,7 +814,17 @@ class PortiaMcpTool(Tool[str]):
     async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
         """Call a tool using the MCP session."""
         async with get_mcp_session(self.mcp_client_config) as session:
-            tool_result = await session.call_tool(name, arguments)
+            try:
+                tool_result = await asyncio.wait_for(
+                    session.call_tool(
+                        name,
+                        arguments,
+                    ),
+                    timeout=self.mcp_client_config.tool_call_timeout_seconds,
+                )
+            except TimeoutError as e:
+                logger().error(f"MCP tool {name} timed out: {e}")
+                raise ToolSoftError(f"MCP tool {name} timed out: {e}") from e
             if tool_result.isError:
                 raise ToolHardError(
                     f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",

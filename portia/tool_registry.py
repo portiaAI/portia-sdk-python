@@ -418,6 +418,7 @@ class McpToolRegistry(ToolRegistry):
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
         tool_list_read_timeout: float | None = None,
+        tool_call_timeout_seconds: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Sync version)."""
         config = SseMcpClientConfig(
@@ -426,6 +427,7 @@ class McpToolRegistry(ToolRegistry):
             headers=headers,
             timeout=timeout,
             sse_read_timeout=sse_read_timeout,
+            tool_call_timeout_seconds=tool_call_timeout_seconds,
         )
         tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
@@ -439,6 +441,7 @@ class McpToolRegistry(ToolRegistry):
         timeout: float = 5,  # noqa: ASYNC109
         sse_read_timeout: float = 60 * 5,
         tool_list_read_timeout: float | None = None,
+        tool_call_timeout_seconds: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using an SSE connection (Async version)."""
         config = SseMcpClientConfig(
@@ -447,6 +450,7 @@ class McpToolRegistry(ToolRegistry):
             headers=headers,
             timeout=timeout,
             sse_read_timeout=sse_read_timeout,
+            tool_call_timeout_seconds=tool_call_timeout_seconds,
         )
         tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
@@ -461,6 +465,7 @@ class McpToolRegistry(ToolRegistry):
         encoding: str = "utf-8",
         encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
         tool_list_read_timeout: float | None = None,
+        tool_call_timeout_seconds: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection (Sync version)."""
         config = StdioMcpClientConfig(
@@ -470,6 +475,7 @@ class McpToolRegistry(ToolRegistry):
             env=env,
             encoding=encoding,
             encoding_error_handler=encoding_error_handler,
+            tool_call_timeout_seconds=tool_call_timeout_seconds,
         )
         tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
@@ -479,6 +485,7 @@ class McpToolRegistry(ToolRegistry):
         cls,
         config: str | dict[str, Any],
         tool_list_read_timeout: float | None = None,
+        tool_call_timeout_seconds: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection from a string.
 
@@ -487,12 +494,14 @@ class McpToolRegistry(ToolRegistry):
         Args:
             config: The string or dict to parse.
             tool_list_read_timeout: The timeout for the request.
+            tool_call_timeout_seconds: The timeout for the tool call.
 
         Returns:
             A McpToolRegistry.
 
         """
         parsed_config = StdioMcpClientConfig.from_raw(config)
+        parsed_config.tool_call_timeout_seconds = tool_call_timeout_seconds
         tools = cls._load_tools(parsed_config, read_timeout=tool_list_read_timeout)
         return cls(tools)
 
@@ -506,6 +515,7 @@ class McpToolRegistry(ToolRegistry):
         encoding: str = "utf-8",
         encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict",
         tool_list_read_timeout: float | None = None,
+        tool_call_timeout_seconds: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a stdio connection (Async version)."""
         config = StdioMcpClientConfig(
@@ -515,6 +525,7 @@ class McpToolRegistry(ToolRegistry):
             env=env,
             encoding=encoding,
             encoding_error_handler=encoding_error_handler,
+            tool_call_timeout_seconds=tool_call_timeout_seconds,
         )
         tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
@@ -531,6 +542,7 @@ class McpToolRegistry(ToolRegistry):
         terminate_on_close: bool = True,
         auth: httpx.Auth | None = None,
         tool_list_read_timeout: float | None = None,
+        tool_call_timeout_seconds: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a StreamableHTTP connection (Sync version)."""
         config = StreamableHttpMcpClientConfig(
@@ -541,6 +553,7 @@ class McpToolRegistry(ToolRegistry):
             sse_read_timeout=sse_read_timeout,
             terminate_on_close=terminate_on_close,
             auth=auth,
+            tool_call_timeout_seconds=tool_call_timeout_seconds,
         )
         tools = cls._load_tools(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
@@ -557,6 +570,7 @@ class McpToolRegistry(ToolRegistry):
         terminate_on_close: bool = True,
         auth: httpx.Auth | None = None,
         tool_list_read_timeout: float | None = None,
+        tool_call_timeout_seconds: float | None = None,
     ) -> McpToolRegistry:
         """Create a new MCPToolRegistry using a StreamableHTTP connection (Async version)."""
         config = StreamableHttpMcpClientConfig(
@@ -567,6 +581,7 @@ class McpToolRegistry(ToolRegistry):
             sse_read_timeout=sse_read_timeout,
             terminate_on_close=terminate_on_close,
             auth=auth,
+            tool_call_timeout_seconds=tool_call_timeout_seconds,
         )
         tools = await cls._load_tools_async(config, read_timeout=tool_list_read_timeout)
         return cls(tools)
