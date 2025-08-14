@@ -114,6 +114,7 @@ class ToolRegistry:
         Args:
             tools (dict[str, Tool] | Sequence[Tool]): A sequence of tools or a
               dictionary of tool IDs to tools.
+            ensure_llm_tool (bool): Whether to ensure the LLMTool is in the registry.
 
         """
         if tools is None:
@@ -126,7 +127,7 @@ class ToolRegistry:
         # Users expect to be able to call an LLM tool without having to add it to the registry.
         # So we add it by default to all registries.
         if LLMTool.LLM_TOOL_ID not in self._tools:
-            self._tools[LLMTool.LLM_TOOL_ID] = LLMTool()
+            self._tools = {LLMTool.LLM_TOOL_ID: LLMTool()}
 
     def with_tool(self, tool: Tool, *, overwrite: bool = False) -> None:
         """Update a tool based on tool ID or inserts a new tool.
