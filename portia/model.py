@@ -521,6 +521,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 
 class OpenRouterGenerativeModel(OpenAIGenerativeModel):
     """OpenRouter model implementation."""
+
     provider: LLMProvider = LLMProvider.OPENROUTER
 
     def __init__(
@@ -542,6 +543,7 @@ class OpenRouterGenerativeModel(OpenAIGenerativeModel):
             max_retries: Maximum number of retries
             temperature: Temperature parameter
             **kwargs: Additional keyword arguments to pass to ChatOpenAI
+
         """
         self._model_kwargs = kwargs.copy()
         if "disabled_params" not in kwargs:
@@ -550,7 +552,10 @@ class OpenRouterGenerativeModel(OpenAIGenerativeModel):
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
         # Unfortunately you get errors from o3 mini with Langchain unless you set
         # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
-        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini") else temperature
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini", "gpt-5") else temperature
+
+        # OpenRouter is compatible with the ChatOpenAI client, so we use this client
+        # with the openrouter URL
         client = ChatOpenAI(
             name=model_name,
             model=model_name,
