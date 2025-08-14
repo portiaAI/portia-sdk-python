@@ -2073,9 +2073,6 @@ mistralai = [
 ollama = [
     { name = "langchain-ollama", marker = "python_full_version < '4'" },
 ]
-openrouter = [
-    { name = "langchain-openrouter", marker = "python_full_version < '4'" },
-]
 tools-browser-browserbase = [
     { name = "browser-use", marker = "python_full_version < '4'" },
     { name = "browserbase" },
@@ -2133,7 +2130,6 @@ requires-dist = [
     { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'ollama'", specifier = ">=0.2.2,<0.3" },
     { name = "langchain-openai", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3,<0.4" },
     { name = "langchain-openrouter", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.0.1,<0.1" },
-    { name = "langchain-openrouter", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'openrouter'", specifier = ">=0.0.1,<0.1" },
     { name = "langchain-redis", marker = "python_full_version >= '3.11' and python_full_version < '3.14' and extra == 'all'", specifier = ">=0.1.2" },
     { name = "langchain-redis", marker = "extra == 'cache'", specifier = ">=0.1.2" },
     { name = "langgraph", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.2.59,<0.3" },
@@ -2159,7 +2155,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
     { name = "testcontainers", extras = ["redis"], marker = "python_full_version >= '3.9' and python_full_version < '4'", specifier = ">=4.10.0" },
 ]
-provides-extras = ["mistral", "mistralai", "google", "amazon", "ollama", "openrouter", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
+provides-extras = ["mistral", "mistralai", "google", "amazon", "ollama", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
 
 [package.metadata.requires-dev]
 dev = [
