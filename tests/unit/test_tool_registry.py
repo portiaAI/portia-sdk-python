@@ -75,10 +75,10 @@ def test_tool_registry_get_and_plan_run() -> None:
 def test_tool_registry_get_tools() -> None:
     """Test the get_tools method of InMemoryToolRegistry."""
     tool_registry = ToolRegistry(
-        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID), LLMTool()],
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
     tools = tool_registry.get_tools()
-    assert len(tools) == 3
+    assert len(tools) == 2
     assert any(tool.id == MOCK_TOOL_ID for tool in tools)
     assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tools)
 
@@ -86,9 +86,9 @@ def test_tool_registry_get_tools() -> None:
 def test_tool_registry_iter() -> None:
     """Test iterating over a ToolRegistry."""
     tool_registry = ToolRegistry(
-        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID), LLMTool()],
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
-    assert len(list(tool_registry)) == 3
+    assert len(list(tool_registry)) == 2
     assert any(tool.id == MOCK_TOOL_ID for tool in tool_registry)
     assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tool_registry)
 
@@ -96,15 +96,15 @@ def test_tool_registry_iter() -> None:
 def test_tool_registry_len() -> None:
     """Test the length of a ToolRegistry."""
     tool_registry = ToolRegistry(
-        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID), LLMTool()],
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
-    assert len(tool_registry) == 3
+    assert len(tool_registry) == 2
 
 
 def test_tool_registry_match_tools() -> None:
     """Test matching tools in the InMemoryToolRegistry."""
     tool_registry = ToolRegistry(
-        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID), LLMTool()],
+        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
 
     # Test matching specific tool ID
@@ -125,12 +125,8 @@ def test_tool_registry_match_tools() -> None:
 
     # Test with no tool_ids (should return all tools)
     matched_tools = tool_registry.match_tools()
-    assert len(matched_tools) == 3
-    assert {tool.id for tool in matched_tools} == {
-        MOCK_TOOL_ID,
-        OTHER_MOCK_TOOL_ID,
-        LLMTool.LLM_TOOL_ID,
-    }
+    assert len(matched_tools) == 2
+    assert {tool.id for tool in matched_tools} == {MOCK_TOOL_ID, OTHER_MOCK_TOOL_ID}
 
 
 def test_combined_tool_registry_duplicate_tool() -> None:
@@ -162,14 +158,14 @@ def test_combined_tool_registry_get_tool() -> None:
 
 def test_combined_tool_registry_get_tools() -> None:
     """Test getting all tools from an ToolRegistry."""
-    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID), LLMTool()])
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
     other_tool_registry = ToolRegistry(
-        [MockTool(id=OTHER_MOCK_TOOL_ID), LLMTool()],
+        [MockTool(id=OTHER_MOCK_TOOL_ID)],
     )
     combined_tool_registry = tool_registry + other_tool_registry
 
     tools = combined_tool_registry.get_tools()
-    assert len(tools) == 3
+    assert len(tools) == 2
     assert any(tool.id == MOCK_TOOL_ID for tool in tools)
 
 
@@ -237,22 +233,19 @@ def test_tool_registry_add_operators(mocker: MockerFixture) -> None:
 
 def test_in_memory_tool_registry_from_local_tools() -> None:
     """Test creating an InMemoryToolRegistry from a list of local tools."""
-    tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID), LLMTool()])
+    tool_registry = InMemoryToolRegistry.from_local_tools([MockTool(id=MOCK_TOOL_ID)])
     assert isinstance(tool_registry, InMemoryToolRegistry)
-    assert len(tool_registry.get_tools()) == 2
+    assert len(tool_registry.get_tools()) == 1
     assert tool_registry.get_tool(MOCK_TOOL_ID).id == MOCK_TOOL_ID
 
 
 def test_tool_registry_filter_tools() -> None:
     """Test filtering tools in a ToolRegistry."""
-    tool_registry = ToolRegistry(
-        [MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID), LLMTool()]
-    )
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID), MockTool(id=OTHER_MOCK_TOOL_ID)])
     filtered_registry = tool_registry.filter_tools(lambda tool: tool.id == MOCK_TOOL_ID)
     filtered_tools = filtered_registry.get_tools()
-    assert len(filtered_tools) == 2
-    assert any(tool.id == MOCK_TOOL_ID for tool in filtered_tools)
-    assert any(tool.id == LLMTool.LLM_TOOL_ID for tool in filtered_tools)
+    assert len(filtered_tools) == 1
+    assert filtered_tools[0].id == MOCK_TOOL_ID
 
 
 def test_portia_tool_registry_missing_required_args() -> None:
@@ -318,8 +311,7 @@ def test_portia_tool_registry_load_tools(httpx_mock: HTTPXMock) -> None:
     tools = PortiaToolRegistry(client=client)
 
     # Verify the tools were created correctly
-    # This includes the LLMTool that is automatically added to all registries
-    assert len(tools.get_tools()) == 3
+    assert len(tools.get_tools()) == 2
 
     # Check first tool
     tool1 = tools.get_tool("test_tool_1")
@@ -397,8 +389,7 @@ def test_portia_tool_registry_load_tools_fallback_v1(httpx_mock: HTTPXMock) -> N
     tools = PortiaToolRegistry(client=client)
 
     # Verify the tools were created correctly
-    # This includes the LLMTool that is automatically added to all registries
-    assert len(tools.get_tools()) == 3
+    assert len(tools.get_tools()) == 2
 
 
 def test_portia_tool_registry_load_tools_with_logger_warning(
@@ -431,8 +422,8 @@ def test_portia_tool_registry_load_tools_with_logger_warning(
     # Test the PortiaToolRegistry initialization with the client
     tools = PortiaToolRegistry(client=client)
 
-    # Verify no tools were created from API (only auto-added LLMTool)
-    assert len(tools.get_tools()) == 1
+    # Verify no tools were created
+    assert len(tools.get_tools()) == 0
 
     # Verify warnings were logged for each error
     expected_calls = [
@@ -467,11 +458,11 @@ def test_tool_registry_with_tool_description() -> None:
     """Test updating a tool registry with a new tool description."""
     mock_tool_1 = MockTool(id=MOCK_TOOL_ID, description="mock tool 1")
     mock_tool_2 = MockTool(id=OTHER_MOCK_TOOL_ID, description="mock tool 2")
-    tool_registry = ToolRegistry([mock_tool_1, mock_tool_2, LLMTool()])
+    tool_registry = ToolRegistry([mock_tool_1, mock_tool_2])
 
     tool_registry.with_tool_description(MOCK_TOOL_ID, "A bit more description")
 
-    assert len(tool_registry.get_tools()) == 3
+    assert len(tool_registry.get_tools()) == 2
     assert tool_registry.get_tool(MOCK_TOOL_ID).description == "mock tool 1. A bit more description"
     assert tool_registry.get_tool(OTHER_MOCK_TOOL_ID).description == "mock tool 2"
 
@@ -483,12 +474,12 @@ def test_tool_registry_with_tool_description_overwrite() -> None:
     """Test updating a tool registry with a new tool description."""
     mock_tool_1 = MockTool(id=MOCK_TOOL_ID, description="mock tool 1")
     tool_registry = ToolRegistry(
-        [mock_tool_1, MockTool(id=OTHER_MOCK_TOOL_ID, description="mock tool 2"), LLMTool()]
+        [mock_tool_1, MockTool(id=OTHER_MOCK_TOOL_ID, description="mock tool 2")]
     )
 
     tool_registry.with_tool_description(MOCK_TOOL_ID, "A bit more description", overwrite=True)
 
-    assert len(tool_registry.get_tools()) == 3
+    assert len(tool_registry.get_tools()) == 2
     assert tool_registry.get_tool(MOCK_TOOL_ID).description == "A bit more description"
     assert tool_registry.get_tool(OTHER_MOCK_TOOL_ID).description == "mock tool 2"
 
@@ -501,13 +492,13 @@ def test_tool_registry_with_tool_description_tool_id_not_found(mocker: MockerFix
     mock_logger = mocker.Mock()
     mocker.patch("portia.tool_registry.logger", return_value=mock_logger)
 
-    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID), LLMTool()])
+    tool_registry = ToolRegistry([MockTool(id=MOCK_TOOL_ID)])
     tool_registry.with_tool_description("unknown_id", "very descriptive")
 
     mock_logger.warning.assert_called_once_with(
         "Unknown tool ID: unknown_id. Description was not edited."
     )
-    assert len(tool_registry.get_tools()) == 2
+    assert len(tool_registry.get_tools()) == 1
 
 
 def test_tool_registry_reconfigure_llm_tool() -> None:
@@ -597,8 +588,7 @@ async def test_mcp_tool_registry_get_tools_async() -> None:
 def test_mcp_tool_registry_get_tools(mcp_tool_registry: McpToolRegistry) -> None:
     """Test getting tools from the MCPToolRegistry."""
     tools = mcp_tool_registry.get_tools()
-    # This includes the LLMTool that is automatically added to all registries
-    assert len(tools) == 3
+    assert len(tools) == 2
     assert tools[0].id == "mcp:mock_mcp:test_tool"
     assert tools[0].name == "test_tool"
     assert tools[0].description == "I am a tool"
@@ -647,8 +637,7 @@ def test_mcp_tool_registry_filters_bad_tools() -> None:
             command="test",
             args=["test"],
         )
-        # This includes the LLMTool that is automatically added to all registries
-        assert len(registry.get_tools()) == 2
+        assert len(registry.get_tools()) == 1
         assert registry.get_tool("mcp:mock_mcp:test_tool").description == "I am a tool"
 
 
@@ -1046,10 +1035,9 @@ def test_mcp_tool_registry_loads_from_string() -> None:
     }"""
     with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
         registry = McpToolRegistry.from_stdio_connection_raw(config_str)
-        assert len(registry) == 2
-        tool_ids = {tool.id for tool in registry}
-        assert MOCK_TOOL_ID in tool_ids
-        assert LLMTool.LLM_TOOL_ID in tool_ids
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
 
     config_str = """{
         "servers": {
@@ -1061,20 +1049,18 @@ def test_mcp_tool_registry_loads_from_string() -> None:
     }"""
     with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
         registry = McpToolRegistry.from_stdio_connection_raw(config_str)
-        assert len(registry) == 2
-        tool_ids = {tool.id for tool in registry}
-        assert MOCK_TOOL_ID in tool_ids
-        assert LLMTool.LLM_TOOL_ID in tool_ids
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
 
     config_dict = {
         "mcpServers": {"basic-memory": {"command": "uvx", "args": ["basic-memory", "mcp"]}}
     }
     with patch.object(McpToolRegistry, "_load_tools", return_value=[MockTool(id=MOCK_TOOL_ID)]):
         registry = McpToolRegistry.from_stdio_connection_raw(config_dict)
-        assert len(registry) == 2
-        tool_ids = {tool.id for tool in registry}
-        assert MOCK_TOOL_ID in tool_ids
-        assert LLMTool.LLM_TOOL_ID in tool_ids
+        assert len(registry) == 1
+        tool = next(iter(registry))
+        assert tool.id == MOCK_TOOL_ID
 
     broken_config_str = "{"
     with pytest.raises(ValueError, match="Invalid JSON"):
