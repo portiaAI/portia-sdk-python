@@ -2134,7 +2134,7 @@ class Portia:
             if step.tool_id == LLMTool.LLM_TOOL_ID:
                 child_tool = LLMTool()
             else:
-                raise
+                raise  # pragma: no cover
         return ToolCallWrapper(
             child_tool=child_tool,
             storage=self.storage,
