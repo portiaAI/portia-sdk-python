@@ -2126,7 +2126,11 @@ class Portia:
     def _get_tool_for_step(self, step: Step, plan_run: PlanRun) -> Tool | None:
         if not step.tool_id:
             return None
-        child_tool = self.tool_registry.get_tool(step.tool_id)
+        if step.tool_id == LLMTool.LLM_TOOL_ID:
+            # Special case LLMTool so it doesn't need to be in all tool registries
+            child_tool = LLMTool()
+        else:
+            child_tool = self.tool_registry.get_tool(step.tool_id)
         return ToolCallWrapper(
             child_tool=child_tool,
             storage=self.storage,
