@@ -1,6 +1,5 @@
 """Tests for the Tool class."""
 
-import asyncio
 import json
 from enum import Enum
 from unittest.mock import MagicMock, patch
@@ -750,12 +749,13 @@ def test_portia_mcp_tool_call_with_error() -> None:
 @pytest.mark.asyncio
 async def test_portia_mcp_tool_call_with_timeout() -> None:
     """Test that the timeout takes effect."""
-    mock_session = MagicMock(spec=ClientSession)
-
-    async def side_effect() -> None:
-        await asyncio.sleep(1)
-
-    mock_session.call_tool.side_effect = side_effect
+    mock_mcp_session = MockMcpSessionWrapper(MagicMock(spec=ClientSession))
+    mock_mcp_session.session.call_tool.side_effect = mcp.McpError(
+        mcp.types.ErrorData(
+            code=httpx.codes.REQUEST_TIMEOUT,
+            message="Request timed out",
+        ),
+    )
 
     tool = PortiaMcpTool(
         id="mcp:mock_mcp:test_tool",
@@ -766,11 +766,17 @@ async def test_portia_mcp_tool_call_with_timeout() -> None:
             server_name="mock_mcp",
             command="test",
             args=["test"],
-            tool_call_timeout_seconds=0.1,
+            tool_call_timeout_seconds=1,
         ),
     )
 
-    with pytest.raises(ToolSoftError):
+    with (
+        patch(
+            "portia.tool.get_mcp_session",
+            new=mock_mcp_session.mock_mcp_session,
+        ),
+        pytest.raises(ToolSoftError),
+    ):
         await tool.arun(get_test_tool_context(), a=1, b=2)
 
 
