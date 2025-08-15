@@ -847,4 +847,4 @@ class PortiaMcpTool(Tool[str]):
                     f"{self.mcp_client_config.tool_call_timeout_seconds}s"
                 ) from None
             # Non-timeout MCP errors: surface as a soft error for callers
-            raise ToolSoftError(f"MCP tool {name} error: {eg}") from None
+            raise ToolHardError(f"MCP tool {name} error: {eg}") from None
