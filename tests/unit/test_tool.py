@@ -4,7 +4,7 @@ import asyncio
 import json
 from enum import Enum
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import mcp
@@ -24,7 +24,7 @@ from portia.clarification import (
 from portia.errors import InvalidToolDescriptionError, ToolHardError, ToolSoftError
 from portia.execution_agents.output import LocalDataValue
 from portia.mcp_session import StdioMcpClientConfig
-from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool, ToolRunContext
+from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool, ToolRunContext, flatten_exceptions
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -841,6 +841,12 @@ async def test_portia_mcp_tool_call_with_other_mcp_error() -> None:
             ],
         ),
     )
+    mock_mcp_session.session.call_tool = AsyncMock(
+        return_value=mcp.types.CallToolResult(
+            content=[],
+            isError=False,
+        ),
+    )
 
     tool = PortiaMcpTool(
         id="mcp:mock_mcp:test_tool",
@@ -858,11 +864,29 @@ async def test_portia_mcp_tool_call_with_other_mcp_error() -> None:
     with (
         patch(
             "portia.tool.get_mcp_session",
-            new=mock_mcp_session.mock_mcp_session,
+            new=mock_mcp_session,
         ),
         pytest.raises(ToolHardError),
     ):
         await tool.arun(get_test_tool_context(), a=1, b=2)
+
+
+def test_flatten_exceptions() -> None:
+    """Test flatten_exceptions."""
+    value_error_1 = ValueError("test1")
+    value_error_2 = ValueError("test3")
+    type_error_1 = TypeError("test2")
+    eg = ExceptionGroup(
+        "group",
+        [value_error_1, type_error_1, ExceptionGroup("group2", [value_error_2])],
+    )
+    assert flatten_exceptions(eg, ValueError) == [value_error_1, value_error_2]
+    assert flatten_exceptions(eg, TypeError) == [type_error_1]
+    assert flatten_exceptions(eg, Exception) == [
+        value_error_1,
+        type_error_1,
+        value_error_2,
+    ]
 
 
 # Async tests for PortiaMcpTool
