@@ -21,7 +21,7 @@ import json
 from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
-from typing import Any, Generic, Self
+from typing import Any, Generic, Self, TypeVar
 
 import httpx
 import mcp
@@ -814,37 +814,107 @@ class PortiaMcpTool(Tool[str]):
         return await self.call_remote_mcp_tool(self.name, kwargs)
 
     async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
-        """Call a tool using the MCP session."""
+        """Call a tool using the MCP session.
+
+        There are issues with the implementation of the mcp client which mean that the
+        `read_timeout_seconds` still waits for a response from the server before raising
+        a timeout, which is entirely defeating the purpose of the timeout on our side.
+
+        This method implements a custom timeout using `asyncio.wait`, allowing us to
+        raise the correct exception when the deadline is reached.
+        """
+        task = asyncio.create_task(self._call_mcp_tool(name, arguments))
+        done, _ = await asyncio.wait(
+            [task],
+            timeout=self.mcp_client_config.tool_call_timeout_seconds,
+        )
+        if task not in done:
+            task.cancel()
+            raise ToolSoftError(
+                "MCP tool timed out after "
+                f"{self.mcp_client_config.tool_call_timeout_seconds}s: "
+                f"{self.name}({self.id})"
+            )
+        return self._handle_mcp_tool_result(task)
+
+    def _handle_mcp_tool_result(self, task: asyncio.Task[str]) -> str:
+        """Handle the result of a tool call.
+
+        Handles the ExceptionGroup structure that come from the MCP client,
+        unpacking them into ToolSoftError and ToolHardError.
+
+        ExceptionGroups have to be fully consumed in order to not raise another
+        ExceptionGroup.
+
+        E.G.
+        ```
         try:
-            async with get_mcp_session(self.mcp_client_config) as session:
-                tool_result = await session.call_tool(
-                    name,
-                    arguments,
-                    read_timeout_seconds=(
-                        timedelta(seconds=self.mcp_client_config.tool_call_timeout_seconds)
-                        if self.mcp_client_config.tool_call_timeout_seconds
-                        else None
-                    ),
-                )
-                if tool_result.isError:
-                    raise ToolHardError(
-                        f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
-                    )
-                return tool_result.model_dump_json()
-        except* mcp.McpError as eg:
+            raise ExceptionGroup("test", [ValueError("test"), TypeError("test2")])
+        except* ValueError as eg:
+            raise CustomError() from eg
+        ```
+        This code will still raise an ExceptionGroup, because the `TypeError` is not
+        consumed by the `except*` blocks.
+
+        Catching `except* Exception` will consume all exceptions in the group,
+        so the following code will raise a `CustomError`:
+        ```
+        try:
+            raise ExceptionGroup("test", [ValueError("test"), TypeError("test2")])
+        except* Exception as eg:
+            raise CustomError() from eg
+        ```
+        """
+        try:
+            return task.result()
+        except* Exception as eg:
             # Distinguish timeouts from other MCP errors using the error code
-            is_timeout = False
-            for inner in eg.exceptions:
+            for inner in flatten_exceptions(eg, mcp.McpError):
                 # REQUEST_TIMEOUT is raised by the MCP client on per-request timeouts
-                if (
-                    isinstance(inner, mcp.McpError)
-                    and inner.error.code == httpx.codes.REQUEST_TIMEOUT
-                ):
-                    is_timeout = True
-            if is_timeout:
-                raise ToolSoftError(
-                    f"MCP tool {name} timed out after "
-                    f"{self.mcp_client_config.tool_call_timeout_seconds}s"
-                ) from None
+                if inner.error.code == httpx.codes.REQUEST_TIMEOUT:
+                    raise ToolSoftError(
+                        "MCP tool timed out after "
+                        f"{self.mcp_client_config.tool_call_timeout_seconds}s: "
+                        f"{self.name}({self.id})"
+                    ) from None
             # Non-timeout MCP errors: surface as a soft error for callers
-            raise ToolHardError(f"MCP tool {name} error: {eg}") from None
+            for inner in flatten_exceptions(eg, ToolHardError):
+                raise inner from None
+            raise ToolHardError(
+                f"MCP tool {self.name}({self.id}) error: {flatten_exceptions(eg, Exception)}"
+            ) from eg
+
+    async def _call_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
+        """Call a tool using the MCP session."""
+        async with get_mcp_session(self.mcp_client_config) as session:
+            tool_result = await session.call_tool(
+                name,
+                arguments,
+                read_timeout_seconds=(
+                    timedelta(seconds=self.mcp_client_config.tool_call_timeout_seconds)
+                    if self.mcp_client_config.tool_call_timeout_seconds
+                    else None
+                ),
+            )
+            if tool_result.isError:
+                raise ToolHardError(
+                    f"MCP tool {self.name}({self.id}) returned an error: "
+                    f"{tool_result.model_dump_json()}"
+                )
+            return tool_result.model_dump_json()
+
+
+ExceptionT = TypeVar("ExceptionT", bound=BaseException)
+
+
+def flatten_exceptions(
+    exc_group: BaseExceptionGroup[Any], exc_type: type[ExceptionT]
+) -> list[ExceptionT]:
+    """Flatten an ExceptionGroup into a list of exceptions of a given type."""
+    result = []
+    for exc in exc_group.exceptions:
+        if isinstance(exc, ExceptionGroup):
+            result.extend(flatten_exceptions(exc, exc_type))
+        elif isinstance(exc, exc_type):
+            result.append(exc)
+    return result
