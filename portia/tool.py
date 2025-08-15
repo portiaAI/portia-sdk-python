@@ -19,10 +19,12 @@ import asyncio
 import inspect
 import json
 from abc import abstractmethod
+from datetime import timedelta
 from functools import partial
 from typing import Any, Generic, Self
 
 import httpx
+import mcp
 from jsonref import replace_refs
 from langchain_core.tools import StructuredTool
 from pydantic import (
@@ -813,20 +815,37 @@ class PortiaMcpTool(Tool[str]):
 
     async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
         """Call a tool using the MCP session."""
-        async with get_mcp_session(self.mcp_client_config) as session:
-            try:
-                tool_result = await asyncio.wait_for(
-                    session.call_tool(
-                        name,
-                        arguments,
+        try:
+            async with get_mcp_session(self.mcp_client_config) as session:
+                tool_result = await session.call_tool(
+                    name,
+                    arguments,
+                    read_timeout_seconds=(
+                        timedelta(seconds=self.mcp_client_config.tool_call_timeout_seconds)
+                        if self.mcp_client_config.tool_call_timeout_seconds
+                        else None
                     ),
-                    timeout=self.mcp_client_config.tool_call_timeout_seconds,
                 )
-            except TimeoutError as e:
-                logger().error(f"MCP tool {name} timed out: {e}")
-                raise ToolSoftError(f"MCP tool {name} timed out: {e}") from e
-            if tool_result.isError:
-                raise ToolHardError(
-                    f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
-                )
-            return tool_result.model_dump_json()
+                if tool_result.isError:
+                    raise ToolHardError(
+                        f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
+                    )
+                return tool_result.model_dump_json()
+        except* mcp.McpError as eg:
+            # Distinguish timeouts from other MCP errors using the error code
+            is_timeout = False
+            for inner in eg.exceptions:
+                # REQUEST_TIMEOUT is raised by the MCP client on per-request timeouts
+                if (
+                    isinstance(inner, mcp.McpError)
+                    and inner.error.code == httpx.codes.REQUEST_TIMEOUT
+                ):
+                    is_timeout = True
+                    break
+            if is_timeout:
+                raise ToolSoftError(
+                    f"MCP tool {name} timed out after "
+                    f"{self.mcp_client_config.tool_call_timeout_seconds}s"
+                ) from None
+            # Non-timeout MCP errors: surface as a soft error for callers
+            raise ToolSoftError(f"MCP tool {name} error: {eg}") from None
