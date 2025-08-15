@@ -38,6 +38,7 @@ class SseMcpClientConfig(BaseModel):
     headers: dict[str, Any] | None = None
     timeout: float = 5
     sse_read_timeout: float = 60 * 5
+    tool_call_timeout_seconds: float | None = None
 
 
 class StdioMcpClientConfig(BaseModel):
@@ -49,6 +50,7 @@ class StdioMcpClientConfig(BaseModel):
     env: dict[str, str] | None = None
     encoding: str = "utf-8"
     encoding_error_handler: Literal["strict", "ignore", "replace"] = "strict"
+    tool_call_timeout_seconds: float | None = None
 
     @classmethod
     def from_raw(cls, config: str | dict[str, Any]) -> StdioMcpClientConfig:
@@ -108,6 +110,7 @@ class StreamableHttpMcpClientConfig(BaseModel):
     sse_read_timeout: float = 60 * 5
     terminate_on_close: bool = True
     auth: httpx.Auth | None = None
+    tool_call_timeout_seconds: float | None = None
 
 
 McpClientConfig = SseMcpClientConfig | StdioMcpClientConfig | StreamableHttpMcpClientConfig

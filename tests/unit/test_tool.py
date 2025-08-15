@@ -746,6 +746,74 @@ def test_portia_mcp_tool_call_with_error() -> None:
         tool.run(get_test_tool_context(), a=1, b=2)
 
 
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_call_with_timeout() -> None:
+    """Test that the timeout takes effect."""
+    mock_mcp_session = MockMcpSessionWrapper(MagicMock(spec=ClientSession))
+    mock_mcp_session.session.call_tool.side_effect = mcp.McpError(
+        mcp.types.ErrorData(
+            code=httpx.codes.REQUEST_TIMEOUT,
+            message="Request timed out",
+        ),
+    )
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+            tool_call_timeout_seconds=1,
+        ),
+    )
+
+    with (
+        patch(
+            "portia.tool.get_mcp_session",
+            new=mock_mcp_session.mock_mcp_session,
+        ),
+        pytest.raises(ToolSoftError),
+    ):
+        await tool.arun(get_test_tool_context(), a=1, b=2)
+
+
+@pytest.mark.asyncio
+async def test_portia_mcp_tool_call_with_other_mcp_error() -> None:
+    """Test that other MCP errors are raised as hard errors."""
+    mock_mcp_session = MockMcpSessionWrapper(MagicMock(spec=ClientSession))
+    mock_mcp_session.session.call_tool.side_effect = mcp.McpError(
+        mcp.types.ErrorData(
+            code=httpx.codes.INTERNAL_SERVER_ERROR,
+            message="Internal server error",
+        ),
+    )
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+            tool_call_timeout_seconds=1,
+        ),
+    )
+
+    with (
+        patch(
+            "portia.tool.get_mcp_session",
+            new=mock_mcp_session.mock_mcp_session,
+        ),
+        pytest.raises(ToolHardError),
+    ):
+        await tool.arun(get_test_tool_context(), a=1, b=2)
+
+
 # Async tests for PortiaMcpTool
 @pytest.mark.asyncio
 async def test_portia_mcp_tool_async_call() -> None:
