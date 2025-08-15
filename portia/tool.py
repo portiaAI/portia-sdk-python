@@ -814,7 +814,15 @@ class PortiaMcpTool(Tool[str]):
         return await self.call_remote_mcp_tool(self.name, kwargs)
 
     async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
-        """Call a tool using the MCP session."""
+        """Call a tool using the MCP session.
+
+        There are issues with the implementation of the mcp client which mean that the
+        `read_timeout_seconds` still waits for a response from the server before raising
+        a timeout, which is entirely defeating the purpose of the timeout on our side.
+
+        This method implements a custom timeout using `asyncio.wait`, allowing us to
+        raise the correct exception when the deadline is reached.
+        """
         task = asyncio.create_task(self._call_mcp_tool(name, arguments))
         done, _ = await asyncio.wait(
             [task],
@@ -830,7 +838,33 @@ class PortiaMcpTool(Tool[str]):
         return self._handle_mcp_tool_result(task)
 
     def _handle_mcp_tool_result(self, task: asyncio.Task[str]) -> str:
-        """Handle the result of a tool call."""
+        """Handle the result of a tool call.
+
+        Handles the ExceptionGroup structure that come from the MCP client,
+        unpacking them into ToolSoftError and ToolHardError.
+
+        ExceptionGroups have to be fully consumed in order to not raise another
+        ExceptionGroup.
+
+        E.G.
+        ```
+        try:
+            raise ExceptionGroup("test", [ValueError("test"), TypeError("test2")])
+        except* ValueError as eg:
+            raise CustomError() from eg
+        ```
+        This code will still raise an ExceptionGroup, because the `TypeError` is not
+        consumed by the `except*` blocks.
+
+        Catching `except* Exception` will consume all exceptions in the group,
+        so the following code will raise a `CustomError`:
+        ```
+        try:
+            raise ExceptionGroup("test", [ValueError("test"), TypeError("test2")])
+        except* Exception as eg:
+            raise CustomError() from eg
+        ```
+        """
         try:
             return task.result()
         except* Exception as eg:
