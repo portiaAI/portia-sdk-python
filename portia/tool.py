@@ -841,7 +841,6 @@ class PortiaMcpTool(Tool[str]):
                     and inner.error.code == httpx.codes.REQUEST_TIMEOUT
                 ):
                     is_timeout = True
-                    break
             if is_timeout:
                 raise ToolSoftError(
                     f"MCP tool {name} timed out after "
