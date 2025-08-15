@@ -1,13 +1,7 @@
 <p align="center">
-    <img alt="SteelThread banner" src="assets/steelthread_banner.png"  width="75%">
-</p>
-<p align="center">
-    <a href="https://github.com/portiaAI/steel_thread">
-    <img src="https://img.shields.io/badge/GitHub-000?logo=github&logoColor=white">
-  </a>
-  <a href="https://docs.portialabs.ai/steel-thread-intro">
-    <img src="https://img.shields.io/badge/Docs-38BDF8">
-  </a></br></br>
+    <a href="https://docs.portialabs.ai/steel-thread-intro">
+       <img alt="SteelThread banner" src="assets/steelthread_banner.png" width="75%">
+    </a></br>
 <strong>Our flexible evaluation framework is out!</strong></br>
   🧪 Ingest test cases directly from your agent runs rather than building datasets from scratch.</br>
   🛰️ Monitor in real-time or with offline evals.</br>
