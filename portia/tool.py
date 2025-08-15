@@ -21,7 +21,7 @@ import json
 from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
-from typing import Any, Generic, Self
+from typing import Any, Generic, Self, TypeVar
 
 import httpx
 import mcp
@@ -827,24 +827,39 @@ class PortiaMcpTool(Tool[str]):
                     ),
                 )
                 if tool_result.isError:
-                    raise ToolHardError(
+                    raise ToolHardError(  # noqa: TRY301
                         f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
                     )
                 return tool_result.model_dump_json()
-        except* mcp.McpError as eg:
+        except* Exception as eg:
             # Distinguish timeouts from other MCP errors using the error code
-            is_timeout = False
-            for inner in eg.exceptions:
+            for inner in flatten_exceptions(eg, mcp.McpError):
                 # REQUEST_TIMEOUT is raised by the MCP client on per-request timeouts
-                if (
-                    isinstance(inner, mcp.McpError)
-                    and inner.error.code == httpx.codes.REQUEST_TIMEOUT
-                ):
-                    is_timeout = True
-            if is_timeout:
-                raise ToolSoftError(
-                    f"MCP tool {name} timed out after "
-                    f"{self.mcp_client_config.tool_call_timeout_seconds}s"
-                ) from None
+                if inner.error.code == httpx.codes.REQUEST_TIMEOUT:
+                    raise ToolSoftError(
+                        "MCP tool timed out after "
+                        f"{self.mcp_client_config.tool_call_timeout_seconds}s: "
+                        f"{self.name}({self.id})"
+                    ) from None
             # Non-timeout MCP errors: surface as a soft error for callers
-            raise ToolHardError(f"MCP tool {name} error: {eg}") from None
+            for inner in flatten_exceptions(eg, ToolHardError):
+                raise inner from None
+            raise ToolHardError(
+                f"MCP tool {name} error: {flatten_exceptions(eg, Exception)}"
+            ) from eg
+
+
+ExceptionT = TypeVar("ExceptionT", bound=BaseException)
+
+
+def flatten_exceptions(
+    exc_group: BaseExceptionGroup[Any], exc_type: type[ExceptionT]
+) -> list[ExceptionT]:
+    """Flatten an ExceptionGroup into a list of exceptions of a given type."""
+    result = []
+    for exc in exc_group.exceptions:
+        if isinstance(exc, ExceptionGroup):
+            result.extend(flatten_exceptions(exc, exc_type))
+        elif isinstance(exc, exc_type):
+            result.append(exc)
+    return result

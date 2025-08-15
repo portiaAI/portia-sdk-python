@@ -749,14 +749,21 @@ def test_portia_mcp_tool_call_with_error() -> None:
 @pytest.mark.asyncio
 async def test_portia_mcp_tool_call_with_timeout() -> None:
     """Test that the timeout takes effect."""
-    mock_mcp_session = MockMcpSessionWrapper(MagicMock(spec=ClientSession))
-    mock_mcp_session.session.call_tool.side_effect = mcp.McpError(
-        mcp.types.ErrorData(
-            code=httpx.codes.REQUEST_TIMEOUT,
-            message="Request timed out",
+    mock_mcp_session = MockMcpSessionWrapper(
+        MagicMock(spec=ClientSession),
+        exit_error=ExceptionGroup(
+            "group",
+            [
+                mcp.McpError(
+                    mcp.types.ErrorData(
+                        code=httpx.codes.REQUEST_TIMEOUT,
+                        message="Request timed out",
+                    ),
+                ),
+                Exception("Another error"),
+            ],
         ),
     )
-
     tool = PortiaMcpTool(
         id="mcp:mock_mcp:test_tool",
         name="test_tool",
@@ -773,7 +780,7 @@ async def test_portia_mcp_tool_call_with_timeout() -> None:
     with (
         patch(
             "portia.tool.get_mcp_session",
-            new=mock_mcp_session.mock_mcp_session,
+            new=mock_mcp_session,
         ),
         pytest.raises(ToolSoftError),
     ):
@@ -783,11 +790,19 @@ async def test_portia_mcp_tool_call_with_timeout() -> None:
 @pytest.mark.asyncio
 async def test_portia_mcp_tool_call_with_other_mcp_error() -> None:
     """Test that other MCP errors are raised as hard errors."""
-    mock_mcp_session = MockMcpSessionWrapper(MagicMock(spec=ClientSession))
-    mock_mcp_session.session.call_tool.side_effect = mcp.McpError(
-        mcp.types.ErrorData(
-            code=httpx.codes.INTERNAL_SERVER_ERROR,
-            message="Internal server error",
+    mock_mcp_session = MockMcpSessionWrapper(
+        MagicMock(spec=ClientSession),
+        exit_error=ExceptionGroup(
+            "group",
+            [
+                mcp.McpError(
+                    mcp.types.ErrorData(
+                        code=httpx.codes.INTERNAL_SERVER_ERROR,
+                        message="Internal server error",
+                    ),
+                ),
+                Exception("Another error"),
+            ],
         ),
     )
 
