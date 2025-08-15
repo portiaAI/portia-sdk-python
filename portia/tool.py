@@ -815,22 +815,24 @@ class PortiaMcpTool(Tool[str]):
 
     async def call_remote_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
         """Call a tool using the MCP session."""
+        task = asyncio.create_task(self._call_mcp_tool(name, arguments))
+        done, _ = await asyncio.wait(
+            [task],
+            timeout=self.mcp_client_config.tool_call_timeout_seconds,
+        )
+        if task not in done:
+            task.cancel()
+            raise ToolSoftError(
+                "MCP tool timed out after "
+                f"{self.mcp_client_config.tool_call_timeout_seconds}s: "
+                f"{self.name}({self.id})"
+            )
+        return self._handle_mcp_tool_result(task)
+
+    def _handle_mcp_tool_result(self, task: asyncio.Task[str]) -> str:
+        """Handle the result of a tool call."""
         try:
-            async with get_mcp_session(self.mcp_client_config) as session:
-                tool_result = await session.call_tool(
-                    name,
-                    arguments,
-                    read_timeout_seconds=(
-                        timedelta(seconds=self.mcp_client_config.tool_call_timeout_seconds)
-                        if self.mcp_client_config.tool_call_timeout_seconds
-                        else None
-                    ),
-                )
-                if tool_result.isError:
-                    raise ToolHardError(  # noqa: TRY301
-                        f"MCP tool {name} returned an error: {tool_result.model_dump_json()}",
-                    )
-                return tool_result.model_dump_json()
+            return task.result()
         except* Exception as eg:
             # Distinguish timeouts from other MCP errors using the error code
             for inner in flatten_exceptions(eg, mcp.McpError):
@@ -845,8 +847,27 @@ class PortiaMcpTool(Tool[str]):
             for inner in flatten_exceptions(eg, ToolHardError):
                 raise inner from None
             raise ToolHardError(
-                f"MCP tool {name} error: {flatten_exceptions(eg, Exception)}"
+                f"MCP tool {self.name}({self.id}) error: {flatten_exceptions(eg, Exception)}"
             ) from eg
+
+    async def _call_mcp_tool(self, name: str, arguments: dict | None = None) -> str:
+        """Call a tool using the MCP session."""
+        async with get_mcp_session(self.mcp_client_config) as session:
+            tool_result = await session.call_tool(
+                name,
+                arguments,
+                read_timeout_seconds=(
+                    timedelta(seconds=self.mcp_client_config.tool_call_timeout_seconds)
+                    if self.mcp_client_config.tool_call_timeout_seconds
+                    else None
+                ),
+            )
+            if tool_result.isError:
+                raise ToolHardError(
+                    f"MCP tool {self.name}({self.id}) returned an error: "
+                    f"{tool_result.model_dump_json()}"
+                )
+            return tool_result.model_dump_json()
 
 
 ExceptionT = TypeVar("ExceptionT", bound=BaseException)
