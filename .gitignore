@@ -11,3 +11,4 @@ docs
 .portia
 scratch
 .DS_Store
+.envrc
