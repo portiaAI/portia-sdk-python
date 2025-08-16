@@ -604,7 +604,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
 
         """
         self._ensure_storage(file_path)  # Ensure storage directory exists
-        with Path(self.storage_dir, file_path).open("w") as file:
+        with Path(self.storage_dir, file_path).open("w", encoding="utf-8") as file:
             file.write(content.model_dump_json(indent=4))
 
     def _read(self, file_name: str, model: type[T]) -> T:
@@ -622,7 +622,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             ValidationError: If the deserialization fails.
 
         """
-        with Path(self.storage_dir, file_name).open("r") as file:
+        with Path(self.storage_dir, file_name).open("r", encoding="utf-8") as file:
             f = file.read()
             return model.model_validate_json(f)
 
@@ -881,7 +881,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
         self._ensure_cache_size()
 
         # Write the file
-        with Path(self.cache_dir, file_path).open("w") as file:
+        with Path(self.cache_dir, file_path).open("w", encoding="utf-8") as file:
             file.write(content.model_dump_json(indent=4))
 
     def _read_from_cache(self, file_name: str, model: type[T]) -> T:
@@ -899,7 +899,7 @@ class PortiaCloudStorage(Storage, AgentMemory):
             ValidationError: If the deserialization fails.
 
         """
-        with Path(self.cache_dir, file_name).open("r") as file:
+        with Path(self.cache_dir, file_name).open("r", encoding="utf-8") as file:
             f = file.read()
             return model.model_validate_json(f)
 
