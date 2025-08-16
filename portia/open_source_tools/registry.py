@@ -12,6 +12,7 @@ from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.map_tool import MapTool
 from portia.open_source_tools.search_tool import SearchTool
+from portia.open_source_tools.sql_tool import SQLTool
 from portia.open_source_tools.weather import WeatherTool
 from portia.tool_registry import (
     ToolRegistry,
@@ -45,3 +46,6 @@ if validate_extras_dependencies("tools-pdf-reader", raise_error=False) and os.ge
     from .pdf_reader_tool import PDFReaderTool
 
     open_source_tool_registry.with_tool(PDFReaderTool())
+
+# Always register SQL tool (uses stdlib sqlite3). Configure via env at runtime.
+open_source_tool_registry.with_tool(SQLTool())
