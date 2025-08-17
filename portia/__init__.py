@@ -82,6 +82,7 @@ from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
 from portia.portia import ExecutionHooks, Portia
+from portia.portia_lite import PlanBuilderLite, PortiaLite
 
 # Tool related classes
 from portia.tool import Tool, ToolRunContext
@@ -137,6 +138,7 @@ __all__ = [
     "Output",
     "Plan",
     "PlanBuilder",
+    "PlanBuilderLite",
     "PlanContext",
     "PlanError",
     "PlanInput",
@@ -147,6 +149,7 @@ __all__ = [
     "PlanUUID",
     "PlanningAgentType",
     "Portia",
+    "PortiaLite",
     "PortiaBaseError",
     "PortiaToolRegistry",
     "SearchTool",
