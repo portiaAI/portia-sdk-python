@@ -50,6 +50,65 @@ BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase"
 T = TypeVar("T", bound=str | BaseModel)
 
 
+def validate_url_against_allowed_domains(url: str, allowed_domains: list[str] | None) -> None:
+    """Validate URL against allowed domains list.
+    
+    Args:
+        url: The URL to validate
+        allowed_domains: List of allowed domains. If None or empty, all domains are allowed.
+                        Supports wildcard patterns like '*.example.com'
+        
+    Raises:
+        ToolHardError: If URL is invalid, contains credentials, or domain is not allowed
+    """
+    # Return immediately if no restrictions
+    if not allowed_domains:
+        return
+        
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception:
+        raise ToolHardError("Invalid URL format")
+        
+    if not parsed.netloc:
+        raise ToolHardError("Invalid URL format")
+        
+    # Security check: reject URLs with username/password
+    if parsed.username or parsed.password:
+        raise ToolHardError("URLs with username/password are not allowed for security reasons")
+        
+    # Extract domain (convert to lowercase for case-insensitive matching)
+    domain = parsed.netloc.lower()
+    
+    # Check each allowed domain pattern
+    for allowed_pattern in allowed_domains:
+        allowed_pattern = allowed_pattern.lower()
+        
+        # Direct exact match
+        if domain == allowed_pattern:
+            return
+            
+        # Wildcard pattern matching
+        if '*' in allowed_pattern:
+            # Convert wildcard pattern to regex
+            regex_pattern = allowed_pattern.replace('.', r'\.').replace('*', '.*')
+            if re.match(f'^{regex_pattern}$', domain):
+                return
+        
+        # Subdomain matching (if allowed domain doesn't start with wildcard)
+        elif not allowed_pattern.startswith('*.'):
+            # Check if domain is a subdomain of allowed pattern
+            if domain.endswith('.' + allowed_pattern):
+                return
+            # Also handle port matching for base domains
+            if ':' in domain:
+                domain_without_port = domain.split(':')[0]
+                if domain_without_port == allowed_pattern or domain_without_port.endswith('.' + allowed_pattern):
+                    return
+    
+    raise ToolHardError(f"Domain '{domain}' is not allowed. Allowed domains: {allowed_domains}")
+
+
 class BrowserToolForUrlSchema(BaseModel):
     """Input schema for the BrowserToolForUrl.
 
