@@ -181,6 +181,7 @@ def test_safe_logger_error_handling() -> None:
     safe_logger = SafeLogger(mock_logger)
 
     # Make each method raise an exception
+    mock_logger.trace.side_effect = Exception("trace error")
     mock_logger.debug.side_effect = Exception("debug error")
     mock_logger.info.side_effect = Exception("info error")
     mock_logger.warning.side_effect = Exception("warning error")
@@ -189,6 +190,7 @@ def test_safe_logger_error_handling() -> None:
     # Test error log separately as all the other methods call the error log on exception
     mock_logger.error.side_effect = None
 
+    safe_logger.trace("trace message")
     safe_logger.debug("debug message")
     safe_logger.info("info message")
     safe_logger.warning("warning message")
@@ -203,8 +205,9 @@ def test_safe_logger_error_handling() -> None:
     assert mock_logger.warning.call_count == 1
     assert mock_logger.critical.call_count == 1
     assert mock_logger.exception.call_count == 1
-    assert mock_logger.error.call_count == 7
+    assert mock_logger.error.call_count == 8
 
+    mock_logger.error.assert_any_call("Failed to log: trace error")
     mock_logger.error.assert_any_call("Failed to log: debug error")
     mock_logger.error.assert_any_call("Failed to log: info error")
     mock_logger.error.assert_any_call("Failed to log: warning error")
