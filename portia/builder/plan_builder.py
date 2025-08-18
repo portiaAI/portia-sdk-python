@@ -10,15 +10,15 @@ if TYPE_CHECKING:
 
 from portia.builder.output import default_step_name
 from portia.builder.portia_plan import PortiaPlan
-from portia.builder.step import Hook, LLMStep, SingleToolAgent, ToolCall
+from portia.builder.step import FunctionCall, Hook, LLMStep, SingleToolAgent, ToolCall
 
 
 class PlanBuilder:
     """Builder for Portia plans."""
 
-    def __init__(self) -> None:
+    def __init__(self, task: str = "") -> None:
         """Initialize the builder."""
-        self.plan = PortiaPlan(steps=[])
+        self.plan = PortiaPlan(steps=[], task=task)
 
     def llm_step(
         self,
@@ -67,6 +67,25 @@ class PlanBuilder:
         self.plan.steps.append(
             ToolCall(
                 tool=tool,
+                args=args,
+                output_schema=output_schema,
+                name=name or default_step_name(len(self.plan.steps)),
+            )
+        )
+        return self
+
+    def function_call(
+        self,
+        *,
+        function: Callable[..., Any],
+        args: dict[str, Any],
+        output_schema: type[BaseModel] | None = None,
+        name: str | None = None,
+    ) -> PlanBuilder:
+        """Add a step that calls a function."""
+        self.plan.steps.append(
+            FunctionCall(
+                function=function,
                 args=args,
                 output_schema=output_schema,
                 name=name or default_step_name(len(self.plan.steps)),
@@ -125,6 +144,24 @@ class PlanBuilder:
                 name=name or default_step_name(len(self.plan.steps)),
             )
         )
+        return self
+
+    def final_output(
+        self,
+        output_schema: type[BaseModel] | None = None,
+        summarise: bool = False,
+    ) -> PlanBuilder:
+        """Set the final output of the plan.
+
+        Args:
+            output_schema: The schema for the final output. If provided, an LLM will be used to
+              coerce the output to this schema.
+            summarise: Whether to summarise the final output. If True, a summary of the final output
+              will be provided along with the value.
+
+        """
+        self.plan.final_output_schema = output_schema
+        self.plan.summarise = summarise
         return self
 
     def build(self) -> PortiaPlan:

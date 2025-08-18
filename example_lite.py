@@ -1,7 +1,6 @@
 """Simple Example."""
 
 import asyncio
-from typing import Any
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -9,6 +8,7 @@ from pydantic import BaseModel, Field
 from portia import Config, LogLevel
 from portia.builder.plan_builder import PlanBuilder
 from portia.builder.step import StepOutput
+from portia.cli import CLIExecutionHooks
 from portia.portia import Portia
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry
@@ -43,12 +43,26 @@ class CurrencyConversionTool(Tool[str]):
         self, _: ToolRunContext, amount: CommodityPrice, currency_from: str, currency_to: str
     ) -> str:
         """Run the CurrencyConversionTool."""
-        return f"{amount.price * 1.2}"
+        return f"{amount.price * 1.2} {currency_to}"
 
 
-def only_continue_if_affordable(price: str) -> bool:
+class CommodityPriceWithCurrency(BaseModel):
+    """Price of a commodity."""
+
+    price: float
+    currency: str
+
+
+class FinalOutput(BaseModel):
+    """Final output of the plan."""
+
+    poem: str
+    email_address: str
+
+
+def only_continue_if_affordable(cost: float) -> bool:
     """Only continue if the price is affordable."""
-    return float(price) < 5000
+    return cost < 500_000
 
 
 def always_continue(price: str) -> bool:
@@ -61,14 +75,16 @@ portia = Portia(
     config=config,
     tools=InMemoryToolRegistry.from_local_tools([CurrencyConversionTool()])
     + DefaultToolRegistry(config=config),
+    execution_hooks=CLIExecutionHooks(),
 )
 
+purchase_quantity = 100
 plan = (
-    PlanBuilder()
+    PlanBuilder("Write a poem about the price of gold")
     .single_tool_agent(
         name="Search gold price",
         tool="search_tool",
-        task="Search for the price of gold in USD",
+        task="Search for the price of gold per ounce in USD",
         output_schema=CommodityPrice,
     )
     .tool_call(
@@ -78,8 +94,13 @@ plan = (
             "currency_from": "USD",
             "currency_to": "GBP",
         },
+        output_schema=CommodityPriceWithCurrency,
     )
-    .hook(only_continue_if_affordable, args={"price": StepOutput(1)})
+    .function_call(
+        function=lambda price_with_currency: purchase_quantity * price_with_currency.price,
+        args={"price_with_currency": StepOutput(1)},
+    )
+    .hook(only_continue_if_affordable, args={"cost": StepOutput(2)})
     .llm_step(
         task="Write a poem about the price of gold",
         inputs=[StepOutput(step=0)],
@@ -87,9 +108,22 @@ plan = (
     .single_tool_agent(
         task="Send the poem to Robbie in an email at robbie+test@portialabs.ai",
         tool="portia:google:gmail:send_email",
-        inputs=[StepOutput(step=3)],
+        inputs=[StepOutput(step=4)],
+    )
+    .final_output(
+        output_schema=FinalOutput,
     )
     .build()
 )
 
-result = asyncio.run(portia.arun_plan(plan))
+# Test async
+result1 = asyncio.run(portia.arun_plan(plan))
+print(result1)
+
+# Test sync
+# result2 = portia.run_plan(plan)
+# print(result2)
+
+# Test clarifications
+# result3 = asyncio.run(portia.arun_plan(plan, end_user=EndUser(external_id=str(uuid.uuid4()))))
+# print(result3)

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import contextlib
+import uuid
 
 from pydantic import BaseModel, Field
 
 from portia.builder.step import Step
+from portia.logger import logger
 from portia.plan import Plan, PlanContext
 from portia.prefixed_uuid import PlanUUID
 
@@ -16,6 +17,9 @@ class PortiaPlan(BaseModel):
 
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")
     steps: list[Step]
+    summarise: bool = False
+    final_output_schema: type[BaseModel] | None = None
+    task: str = Field(default="", description="The task that the plan is completing.")
 
     def to_legacy_plan(self, plan_context: PlanContext) -> Plan:
         """Convert the Portia plan to a legacy plan."""
@@ -24,10 +28,27 @@ class PortiaPlan(BaseModel):
             plan_context=plan_context,
             steps=[step.to_portia_step(self) for step in self.steps],
             plan_inputs=[],
+            structured_output_schema=self.final_output_schema,
         )
 
-    def step_index(self, step: Step) -> int:
-        """Get the index of a step in the plan."""
-        with contextlib.suppress(ValueError):
-            return self.steps.index(step)
-        return -1
+    def step_output_name(self, step: int | str | Step) -> str:
+        """Get the name of the output of a step in the plan."""
+        try:
+            if isinstance(step, Step):
+                step = self.steps.index(step)
+            elif isinstance(step, str):
+                step = self.idx_by_name(step)
+        except ValueError:
+            logger().warning(
+                f"Attempted to retrieve name of step {step} but step not found in plan"
+            )
+            return f"$unknown_step_output_{uuid.uuid4().hex}"
+        else:
+            return f"$step_{step}_output"
+
+    def idx_by_name(self, name: str) -> int:
+        """Get the index of a step by name."""
+        for i, step in enumerate(self.steps):
+            if step.name == name:
+                return i
+        raise ValueError(f"Step {name} not found in plan")

@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 from portia.builder.output import StepOutput, StepOutputValue
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
-from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step as PlanStep
@@ -47,16 +46,11 @@ class Step(BaseModel):
 
     def _get_value_for_input(self, _input: Any, run_data: RunData) -> Any | StepOutputValue | None:  # noqa: ANN401
         """Get the value for an input that could come from a previous step output."""
-        if not isinstance(_input, StepOutput):
-            return _input
-
-        step_output: StepOutput = _input
-        output_value = run_data.step_output_values.get(step_output, None)
-        if not output_value:
-            logger().warning(
-                f"Output from step {step_output.step} not found when attempting to run step {self.name}"  # noqa: E501
-            )
-        return output_value
+        return (
+            _input.get_value(run_data.step_output_values)
+            if isinstance(_input, StepOutput)
+            else _input
+        )
 
 
 class LLMStep(Step):
@@ -90,33 +84,33 @@ class LLMStep(Step):
             clarifications=[],
         )
         task_data = [
-            self._format_value(value)
+            self._format_value(value, run_data)
             for _input in self.inputs
             if (value := self._get_value_for_input(_input, run_data)) is not None
             or not isinstance(_input, StepOutput)
         ]
         return await llm_tool.arun(tool_ctx, task=self.task, task_data=task_data)
 
-    def _format_value(self, _input: Any) -> Any | None:  # noqa: ANN401
+    def _format_value(self, _input: Any, run_data: RunData) -> Any | None:  # noqa: ANN401
         """Get the value for an input."""
         if not isinstance(_input, StepOutputValue):
             return _input
         step_output_value: StepOutputValue = _input
-        return (
-            f"Previous step {step_output_value.description} had output: {step_output_value.value}"
-        )
+        return f"Previous step {step_output_value.description} had output: {step_output_value.value.full_value(run_data.portia.storage)}"
 
     @override
     def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this LLMStep to a PlanStep."""
         input_variables = [
-            Variable(name=v.step) for v in self.inputs or [] if isinstance(v, StepOutput)
+            Variable(name=plan.step_output_name(v.step))
+            for v in self.inputs or []
+            if isinstance(v, StepOutput)
         ]
         return PlanStep(
             task=self.task,
             inputs=input_variables,
             tool_id=LLMTool.LLM_TOOL_ID,
-            output=f"$llm_output_step_{plan.step_index(self)}",
+            output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
         )
 
@@ -152,7 +146,11 @@ class ToolCall(Step):
             clarifications=[],
         )
         args = {
-            k: (value.value.get_value() if isinstance(value, StepOutputValue) else value)
+            k: (
+                value.value.full_value(run_data.portia.storage)
+                if isinstance(value, StepOutputValue)
+                else value
+            )
             for k, v in self.args.items()
             if (value := self._get_value_for_input(v, run_data)) is not None
             or not isinstance(v, StepOutput)
@@ -178,13 +176,75 @@ class ToolCall(Step):
         """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
         input_variables = [
-            Variable(name=v.step) for v in self.args.values() if isinstance(v, StepOutput)
+            Variable(name=plan.step_output_name(v.step))
+            for v in self.args.values()
+            if isinstance(v, StepOutput)
         ]
         return PlanStep(
             task=f"Use tool {self.tool} with inputs: {inputs_desc}",
             inputs=input_variables,
             tool_id=self.tool,
-            output=f"$tool_output_step_{plan.step_index(self)}",
+            output=plan.step_output_name(self),
+            structured_output_schema=self.output_schema,
+        )
+
+
+class FunctionCall(Step):
+    """A step that calls a function with the given inputs."""
+
+    function: Callable[..., Any]
+    args: dict[str, Any]
+    output_schema: type[BaseModel] | None = None
+
+    @override
+    def describe(self, run_data: RunData) -> str:
+        """Return a description of this step for logging purposes."""
+        output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
+        return f"FunctionCall(function='{self.function.__name__}', inputs={self.args}{output_info})"
+
+    @override
+    @traceable(name="Function Call - Run")
+    async def run(self, run_data: RunData) -> None:
+        """Run the function."""
+        args = {
+            k: (
+                value.value.full_value(run_data.portia.storage)
+                if isinstance(value, StepOutputValue)
+                else value
+            )
+            for k, v in self.args.items()
+            if (value := self._get_value_for_input(v, run_data)) is not None
+            or not isinstance(v, StepOutput)
+        }
+        output = self.function(**args)
+
+        if self.output_schema and not isinstance(output, self.output_schema):
+            model = run_data.portia.config.get_default_model()
+            output = await model.aget_structured_response(
+                [
+                    Message(
+                        role="user",
+                        content=f"Convert this output to the desired schema: {output}",
+                    )
+                ],
+                self.output_schema,
+            )
+        return output
+
+    @override
+    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
+        """Convert this FunctionCall to a PlanStep."""
+        inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
+        input_variables = [
+            Variable(name=plan.step_output_name(v.step))
+            for v in self.args.values()
+            if isinstance(v, StepOutput)
+        ]
+        return PlanStep(
+            task=f"Call function {self.function.__name__} with inputs: {inputs_desc}",
+            inputs=input_variables,
+            tool_id=f"local_function_{self.function.__name__}",
+            output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
         )
 
@@ -229,13 +289,15 @@ class SingleToolAgent(Step):
     def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this SingleToolAgent to a PlanStep."""
         input_variables = [
-            Variable(name=v.step) for v in self.inputs or [] if isinstance(v, StepOutput)
+            Variable(name=plan.step_output_name(v.step))
+            for v in self.inputs or []
+            if isinstance(v, StepOutput)
         ]
         return PlanStep(
             task=self.task,
             inputs=input_variables,
             tool_id=self.tool,
-            output=f"$single_tool_agent_output_{plan.step_index(self)}",
+            output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
         )
 
@@ -258,24 +320,29 @@ class Hook(Step):
     async def run(self, run_data: RunData) -> None:
         """Run the hook."""
         args = {
-            k: (value.value.get_value() if isinstance(value, StepOutputValue) else value)
+            k: (
+                value.value.full_value(run_data.portia.storage)
+                if isinstance(value, StepOutputValue)
+                else value
+            )
             for k, v in self.args.items()
             if (value := self._get_value_for_input(v, run_data)) is not None
             or not isinstance(v, StepOutput)
         }
-        # @@@ THINK ABOUT MAKING HOOK ASYNC
         return self.hook(**args)
 
     @override
     def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this Hook to a PlanStep."""
         input_variables = [
-            Variable(name=v.step) for v in self.args.values() if isinstance(v, StepOutput)
+            Variable(name=plan.step_output_name(v.step))
+            for v in self.args.values()
+            if isinstance(v, StepOutput)
         ]
         return PlanStep(
             task="Run hook",
             inputs=input_variables,
             tool_id=f"local_hook_{self.hook.__name__}",
-            output=f"$hook_output_{plan.step_index(self)}",
+            output=plan.step_output_name(self),
             structured_output_schema=None,
         )

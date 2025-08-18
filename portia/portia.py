@@ -21,6 +21,7 @@ complex queries using various planning and execution agent configurations.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -28,7 +29,7 @@ from uuid import UUID
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.builder.output import StepOutput, StepOutputValue
+from portia.builder.output import StepOutputValue
 from portia.builder.portia_plan import PortiaPlan
 from portia.clarification import (
     Clarification,
@@ -106,8 +107,8 @@ class RunData(BaseModel):
     legacy_plan: Plan
     plan_run: PlanRun
     end_user: EndUser
-    step_output_values: dict[StepOutput, StepOutputValue] = Field(
-        default_factory=dict, description="Outputs set by the step."
+    step_output_values: list[StepOutputValue] = Field(
+        default_factory=list, description="Outputs set by the step."
     )
     portia: Portia
 
@@ -803,12 +804,18 @@ class Portia:
             PortiaFunctionCallTelemetryEvent(
                 function_name="portia_run_plan",
                 function_call_details={
-                    "plan_type": type(plan).__name__,
+                    "plan_type": "PlanBuilderNew"
+                    if isinstance(plan, PortiaPlan)
+                    else type(plan).__name__,
                     "end_user_provided": end_user is not None,
                     "plan_run_inputs_provided": plan_run_inputs is not None,
                 },
             )
         )
+
+        if isinstance(plan, PortiaPlan):
+            return asyncio.run(self.run_builder_plan(plan, self.initialize_end_user(end_user)))
+
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
         )
@@ -845,7 +852,9 @@ class Portia:
             PortiaFunctionCallTelemetryEvent(
                 function_name="portia_arun_plan",
                 function_call_details={
-                    "plan_type": type(plan).__name__,
+                    "plan_type": "PlanBuilderNew"
+                    if isinstance(plan, PortiaPlan)
+                    else type(plan).__name__,
                     "end_user_provided": end_user is not None,
                     "plan_run_inputs_provided": plan_run_inputs is not None,
                 },
@@ -902,6 +911,7 @@ class Portia:
         self,
         plan_run: PlanRun | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
+        plan: PortiaPlan | None = None,
     ) -> PlanRun:
         """Resume a PlanRun.
 
@@ -915,6 +925,8 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
+            plan (PortiaPlan | None): If using a new plan, the plan must be passed in here in order
+                to resume.
 
         Returns:
             PlanRun: The resulting PlanRun after execution.
@@ -933,12 +945,19 @@ class Portia:
                 },
             )
         )
+        if isinstance(plan, PortiaPlan):
+            if not plan_run:
+                raise NotImplementedError(
+                    "We do not yet support retrieving plan runs by ID with PortiaPlans"
+                )
+            return asyncio.run(self.resume_builder_plan(plan, plan_run=plan_run))
         return self._resume(plan_run, plan_run_id)
 
     async def aresume(
         self,
         plan_run: PlanRun | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
+        plan: PortiaPlan | None = None,
     ) -> PlanRun:
         """Resume a PlanRun.
 
@@ -952,6 +971,8 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
+            plan (PortiaPlan | None): If using a new plan, the plan must be passed in here in order
+                to resume.
 
         Returns:
             PlanRun: The resulting PlanRun after execution.
@@ -970,6 +991,14 @@ class Portia:
                 },
             )
         )
+
+        if isinstance(plan, PortiaPlan):
+            if not plan_run:
+                raise NotImplementedError(
+                    "We do not yet support retrieving plan runs by ID with PortiaPlans"
+                )
+            return await self.resume_builder_plan(plan, plan_run=plan_run)
+
         return await self._aresume(plan_run, plan_run_id)
 
     def _resume(
@@ -1009,26 +1038,35 @@ class Portia:
             )
             plan_run = self.storage.get_plan_run(parsed_id)
 
+        plan = self.storage.get_plan(plan_id=plan_run.plan_id)
+
+        ready, plan_run = self._check_initial_readiness(plan, plan_run)
+        if not ready:
+            return plan_run
+
+        return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
+
+    def _check_initial_readiness(self, plan: Plan, plan_run: PlanRun) -> tuple[bool, PlanRun]:
+        """Check the initial readiness of the plan run."""
         if plan_run.state not in [
             PlanRunState.NOT_STARTED,
             PlanRunState.IN_PROGRESS,
             PlanRunState.NEED_CLARIFICATION,
             PlanRunState.READY_TO_RESUME,
         ]:
-            raise InvalidPlanRunStateError(plan_run.id)
+            logger().warning(
+                f"Plan run {plan_run.id} is in state {plan_run.state} so it can't be run - aborting"
+            )
+            return False, plan_run
 
-        plan = self.storage.get_plan(plan_id=plan_run.plan_id)
-
-        # Perform initial readiness check
         outstanding_clarifications = plan_run.get_outstanding_clarifications()
         ready_clarifications = self._check_remaining_tool_readiness(plan, plan_run)
         if len(clarifications_to_raise := outstanding_clarifications + ready_clarifications):
             plan_run = self._raise_clarifications(clarifications_to_raise, plan_run)
             plan_run = self._handle_clarifications(plan_run)
             if len(plan_run.get_outstanding_clarifications()) > 0:
-                return plan_run
-
-        return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
+                return False, plan_run
+        return True, plan_run
 
     async def _aresume(
         self,
@@ -1067,24 +1105,11 @@ class Portia:
             )
             plan_run = self.storage.get_plan_run(parsed_id)
 
-        if plan_run.state not in [
-            PlanRunState.NOT_STARTED,
-            PlanRunState.IN_PROGRESS,
-            PlanRunState.NEED_CLARIFICATION,
-            PlanRunState.READY_TO_RESUME,
-        ]:
-            raise InvalidPlanRunStateError(plan_run.id)
-
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
-        # Perform initial readiness check
-        outstanding_clarifications = plan_run.get_outstanding_clarifications()
-        ready_clarifications = self._check_remaining_tool_readiness(plan, plan_run)
-        if len(clarifications_to_raise := outstanding_clarifications + ready_clarifications):
-            plan_run = self._raise_clarifications(clarifications_to_raise, plan_run)
-            plan_run = self._handle_clarifications(plan_run)
-            if len(plan_run.get_outstanding_clarifications()) > 0:
-                return plan_run
+        ready, plan_run = self._check_initial_readiness(plan, plan_run)
+        if not ready:
+            return plan_run
 
         return await self.aexecute_plan_run_and_handle_clarifications(plan, plan_run)
 
@@ -1747,7 +1772,11 @@ class Portia:
             raise SkipExecutionError(pre_step_outcome.reason, should_return=True)
 
     def _post_plan_run_execution(
-        self, plan: Plan, plan_run: PlanRun, last_executed_step_output: Output | None
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        last_executed_step_output: Output | None,
+        skip_summarization: bool = False,
     ) -> PlanRun:
         """Post-execution actions for a plan run."""
         if last_executed_step_output:
@@ -1755,6 +1784,7 @@ class Portia:
                 plan,
                 plan_run,
                 last_executed_step_output,
+                skip_summarization=skip_summarization,
             )
         self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
         self._log_final_output(plan_run, plan)
@@ -2053,19 +2083,29 @@ class Portia:
 
         return cls(self.config)
 
-    def _get_final_output(self, plan: Plan, plan_run: PlanRun, step_output: Output) -> Output:
+    def _get_final_output(
+        self,
+        plan: Plan,
+        plan_run: PlanRun,
+        step_output: Output,
+        skip_summarization: bool = False,
+    ) -> Output:
         """Get the final output and add summarization to it.
 
         Args:
             plan (Plan): The plan to execute.
             plan_run (PlanRun): The PlanRun to execute.
             step_output (Output): The output of the last step.
+            skip_summarization (bool): Whether to skip summarization.
 
         """
         final_output = LocalDataValue(
             value=step_output.get_value(),
             summary=None,
         )
+        if skip_summarization:
+            return final_output
+
         try:
             summarizer = FinalOutputSummarizer(config=self.config, agent_memory=self.storage)
             output = summarizer.create_summary(
@@ -2244,12 +2284,12 @@ class Portia:
     def _get_introspection_agent(self) -> BaseIntrospectionAgent:
         return DefaultIntrospectionAgent(self.config, self.storage)
 
-    def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> None:
+    def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> Output:
         """Set the output for a step."""
         plan_run.outputs.step_outputs[step.output] = output
-        self._persist_step_state(plan_run, step)
+        return self._persist_step_state(plan_run, step)
 
-    def _persist_step_state(self, plan_run: PlanRun, step: Step) -> None:
+    def _persist_step_state(self, plan_run: PlanRun, step: Step) -> Output:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
         if isinstance(step_output, LocalDataValue) and self.config.exceeds_output_threshold(
@@ -2259,6 +2299,7 @@ class Portia:
             plan_run.outputs.step_outputs[step.output] = step_output
 
         self.storage.save_plan_run(plan_run)
+        return step_output
 
     def _check_remaining_tool_readiness(
         self,
@@ -2291,7 +2332,13 @@ class Portia:
         )
         for step_index in range(check_from_index, len(plan.steps)):
             step = plan.steps[step_index]
-            if not step.tool_id or step.tool_id in tools_remaining:
+            # TODO(RH): Tidy up this check to work with local functions
+            if (
+                not step.tool_id
+                or step.tool_id in tools_remaining
+                or step.tool_id.startswith("local_function_")
+                or step.tool_id.startswith("local_hook_")
+            ):
                 continue
             tools_remaining.add(step.tool_id)
 
@@ -2323,15 +2370,37 @@ class Portia:
         """Run a Portia plan."""
         legacy_plan = plan.to_legacy_plan(
             PlanContext(
-                query="Run plan built with plan builder",
+                query=plan.task,
                 tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
             ),
         )
-        self.storage.save_plan(legacy_plan)
         plan_run = self._get_plan_run_from_plan(legacy_plan, end_user)
+        return await self.resume_builder_plan(
+            plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
+        )
+
+    async def resume_builder_plan(
+        self,
+        plan: PortiaPlan,
+        plan_run: PlanRun,
+        end_user: EndUser | None = None,
+        legacy_plan: Plan | None = None,
+    ) -> PlanRun:
+        """Resume a Portia plan."""
+        if not legacy_plan:
+            legacy_plan = plan.to_legacy_plan(
+                PlanContext(
+                    query=plan.task,
+                    tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
+                ),
+            )
+        if not end_user:
+            end_user = self.initialize_end_user(plan_run.end_user_id)
+
         # TODO(RH): Move to async storage  # noqa: FIX002, TD003
-        self._set_plan_run_state(plan_run, PlanRunState.IN_PROGRESS)
-        self._log_execute_start(plan_run, legacy_plan)
+        ready, plan_run = self._check_initial_readiness(legacy_plan, plan_run)
+        if not ready:
+            return plan_run
 
         run_data = RunData(
             plan=plan,
@@ -2341,26 +2410,56 @@ class Portia:
             portia=self,
         )
 
+        try:
+            while plan_run.state not in [
+                PlanRunState.COMPLETE,
+                PlanRunState.FAILED,
+            ]:
+                plan_run = await self._execute_builder_plan(plan, run_data)
+
+                plan_run = self._handle_clarifications(plan_run)
+                if len(plan_run.get_outstanding_clarifications()) > 0:
+                    return plan_run
+
+        except KeyboardInterrupt:
+            logger().info("Execution interrupted by user. Setting plan run state to FAILED.")
+            self._set_plan_run_state(plan_run, PlanRunState.FAILED)
+
+        return plan_run
+
+    async def _execute_builder_plan(self, plan: PortiaPlan, run_data: RunData) -> PlanRun:
+        """Execute a Portia plan."""
+        self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
+        self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
+
         for i, step in enumerate(plan.steps):
+            if i < run_data.plan_run.current_step_index:
+                continue
+
             logger().info(f"Starting step {i}: {step.describe(run_data)}")
 
             result = await step.run(run_data)
             output_value = LocalDataValue(value=result)
+            # This may persist the output to memory - store the memory value if it does
+            output_value = self._set_step_output(
+                output_value, run_data.plan_run, step.to_portia_step(plan)
+            )
             output = StepOutputValue(
+                step_name=step.name,
                 value=output_value,
                 description=f"Output from step '{step.name}' (Description: {step.describe(run_data)})",
             )
 
-            # Ensure the step output can be looked up from both possible keys (these may be the
-            # same, which is fine)
-            run_data.step_output_values[StepOutput(i)] = output
-            run_data.step_output_values[StepOutput(step.name)] = output
-
-            # @@@ THINK ABOUT AGENT MEMORY (MAYBE TURN OFF)
-            self._set_step_output(output_value, plan_run, step.to_portia_step(plan))
+            run_data.step_output_values.append(output)
+            run_data.plan_run.current_step_index += 1
             logger().info(f"Completed step {i}, result: {result}")
 
-        return self._post_plan_run_execution(plan, plan_run, output_value)
+        return self._post_plan_run_execution(
+            run_data.legacy_plan,
+            run_data.plan_run,
+            output_value,
+            skip_summarization=plan.summarise or plan.final_output_schema is not None,
+        )
 
     @staticmethod
     def _log_models(config: Config) -> None:
