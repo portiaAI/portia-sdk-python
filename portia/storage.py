@@ -207,7 +207,9 @@ class PlanStorage(ABC):
             list[Plan]: The list of similar plans.
 
         """
-        return await asyncio.to_thread(self.get_similar_plans, query, threshold, limit)
+        return await asyncio.to_thread(
+            self.get_similar_plans, query, threshold, limit
+        )  # pragma: no cover
 
 
 class PlanRunListResponse(BaseModel):

@@ -21,6 +21,7 @@ from portia.storage import (
     MAX_STORAGE_OBJECT_BYTES,
     DiskFileStorage,
     InMemoryStorage,
+    PlanRunListResponse,
     PortiaCloudStorage,
 )
 from portia.tool_call import ToolCallRecord, ToolCallStatus
@@ -123,6 +124,552 @@ async def test_async_additional_storage_methods() -> None:
     retrieved_user = await storage.aget_end_user("test_user")
     assert retrieved_user is not None
     assert retrieved_user.external_id == "test_user"
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_run_success(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_plan_run method with successful response."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan_run_id = PlanRunUUID.from_string("prun-87654321-4321-8765-4321-876543210987")
+
+    # Mock successful response
+    mock_response_data = {
+        "id": str(plan_run_id),
+        "plan": {"id": "plan-12345678-1234-5678-1234-567812345678"},
+        "end_user": "test_user",
+        "current_step_index": 2,
+        "state": "IN_PROGRESS",
+        "outputs": {"final_output": None, "step_outputs": {}, "clarifications": []},
+        "plan_run_inputs": {
+            "input1": {"value": "test_value", "summary": "test summary"},
+            "input2": {"value": "42", "summary": None},
+        },
+    }
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run_id}/",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method
+    result = await storage.aget_plan_run(plan_run_id)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == f"/api/v0/plan-runs/{plan_run_id}/"
+
+    # Verify the returned PlanRun object
+    assert isinstance(result, PlanRun)
+    assert result.id == plan_run_id
+    assert result.plan_id == PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
+    assert result.end_user_id == "test_user"
+    assert result.current_step_index == 2
+    assert result.state == PlanRunState.IN_PROGRESS
+    assert isinstance(result.outputs, PlanRunOutputs)
+    assert len(result.plan_run_inputs) == 2
+    assert result.plan_run_inputs["input1"].value == "test_value"
+    assert result.plan_run_inputs["input1"].summary == "test summary"
+    assert result.plan_run_inputs["input2"].value == "42"
+    assert result.plan_run_inputs["input2"].summary is None
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_run_http_error(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_plan_run method with HTTP error response."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan_run_id = PlanRunUUID.from_string("prun-87654321-4321-8765-4321-876543210987")
+
+    # Mock error response
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run_id}/",
+        status_code=404,
+        content=b"Plan run not found",
+    )
+
+    # Test that StorageError is raised
+    with pytest.raises(StorageError, match="Plan run not found"):
+        await storage.aget_plan_run(plan_run_id)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == f"/api/v0/plan-runs/{plan_run_id}/"
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_run_request_exception() -> None:
+    """Test async aget_plan_run method with request exception."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan_run_id = PlanRunUUID.from_string("prun-87654321-4321-8765-4321-876543210987")
+
+    # Mock request exception
+    with patch.object(
+        storage.async_client, "get", side_effect=httpx.ConnectError("Connection failed")
+    ) as mock_get:
+        with pytest.raises(StorageError):
+            await storage.aget_plan_run(plan_run_id)
+
+        mock_get.assert_called_once_with(
+            url=f"/api/v0/plan-runs/{plan_run_id}/",
+        )
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_runs_no_params(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_plan_runs method with no parameters."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    # Mock successful response
+    mock_response_data = {
+        "results": [
+            {
+                "id": "prun-87654321-4321-8765-4321-876543210987",
+                "plan": {"id": "plan-12345678-1234-5678-1234-567812345678"},
+                "end_user": "test_user_1",
+                "current_step_index": 1,
+                "state": "IN_PROGRESS",
+                "outputs": {"final_output": None, "step_outputs": {}, "clarifications": []},
+                "plan_run_inputs": {
+                    "input1": {"value": "test_value_1", "summary": "test summary 1"}
+                },
+            },
+            {
+                "id": "prun-87654321-4321-8765-4321-876543210988",
+                "plan": {"id": "plan-12345678-1234-5678-1234-567812345679"},
+                "end_user": "test_user_2",
+                "current_step_index": 2,
+                "state": "COMPLETE",
+                "outputs": {"final_output": None, "step_outputs": {}, "clarifications": []},
+                "plan_run_inputs": {},
+            },
+        ],
+        "count": 2,
+        "current_page": 1,
+        "total_pages": 1,
+    }
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method
+    result = await storage.aget_plan_runs()
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == "/api/v0/plan-runs/"
+    assert not request.url.query or str(request.url.query) in ["", "b''"]
+
+    # Verify the returned PlanRunListResponse object
+    assert isinstance(result, PlanRunListResponse)
+    assert len(result.results) == 2
+    assert result.count == 2
+    assert result.current_page == 1
+    assert result.total_pages == 1
+
+    # Verify first plan run
+    plan_run_1 = result.results[0]
+    assert plan_run_1.id == PlanRunUUID.from_string("prun-87654321-4321-8765-4321-876543210987")
+    assert plan_run_1.plan_id == PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
+    assert plan_run_1.end_user_id == "test_user_1"
+    assert plan_run_1.current_step_index == 1
+    assert plan_run_1.state == PlanRunState.IN_PROGRESS
+    assert len(plan_run_1.plan_run_inputs) == 1
+    assert plan_run_1.plan_run_inputs["input1"].value == "test_value_1"
+
+    # Verify second plan run
+    plan_run_2 = result.results[1]
+    assert plan_run_2.id == PlanRunUUID.from_string("prun-87654321-4321-8765-4321-876543210988")
+    assert plan_run_2.state == PlanRunState.COMPLETE
+    assert len(plan_run_2.plan_run_inputs) == 0
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_runs_with_state(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_plan_runs method with run_state parameter."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    # Mock successful response
+    mock_response_data = {
+        "results": [
+            {
+                "id": "prun-87654321-4321-8765-4321-876543210987",
+                "plan": {"id": "plan-12345678-1234-5678-1234-567812345678"},
+                "end_user": "test_user",
+                "current_step_index": 3,
+                "state": "COMPLETE",
+                "outputs": {"final_output": None, "step_outputs": {}, "clarifications": []},
+                "plan_run_inputs": {},
+            }
+        ],
+        "count": 1,
+        "current_page": 1,
+        "total_pages": 1,
+    }
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?run_state=COMPLETE",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method with run_state
+    result = await storage.aget_plan_runs(run_state=PlanRunState.COMPLETE)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == "/api/v0/plan-runs/"
+    assert "run_state=COMPLETE" in str(request.url.query)
+
+    # Verify the returned data
+    assert isinstance(result, PlanRunListResponse)
+    assert len(result.results) == 1
+    assert result.results[0].state == PlanRunState.COMPLETE
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_runs_with_page(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_plan_runs method with page parameter."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    # Mock successful response
+    mock_response_data = {"results": [], "count": 0, "current_page": 2, "total_pages": 2}
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?page=2",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method with page
+    result = await storage.aget_plan_runs(page=2)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == "/api/v0/plan-runs/"
+    assert "page=2" in str(request.url.query)
+
+    # Verify the returned data
+    assert isinstance(result, PlanRunListResponse)
+    assert len(result.results) == 0
+    assert result.current_page == 2
+    assert result.total_pages == 2
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_runs_both_params(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_plan_runs method with both run_state and page parameters."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    # Mock successful response
+    mock_response_data = {
+        "results": [
+            {
+                "id": "prun-87654321-4321-8765-4321-876543210987",
+                "plan": {"id": "plan-12345678-1234-5678-1234-567812345678"},
+                "end_user": "test_user",
+                "current_step_index": 0,
+                "state": "FAILED",
+                "outputs": {"final_output": None, "step_outputs": {}, "clarifications": []},
+                "plan_run_inputs": {},
+            }
+        ],
+        "count": 1,
+        "current_page": 3,
+        "total_pages": 5,
+    }
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?page=3&run_state=FAILED",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method with both parameters
+    result = await storage.aget_plan_runs(run_state=PlanRunState.FAILED, page=3)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == "/api/v0/plan-runs/"
+    query_str = str(request.url.query)
+    assert "page=3" in query_str
+    assert "run_state=FAILED" in query_str
+
+    # Verify the returned data
+    assert isinstance(result, PlanRunListResponse)
+    assert len(result.results) == 1
+    assert result.results[0].state == PlanRunState.FAILED
+    assert result.current_page == 3
+    assert result.total_pages == 5
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_runs_http_error(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_plan_runs method with HTTP error response."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    # Mock error response
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
+        status_code=500,
+        content=b"Internal server error",
+    )
+
+    # Test that StorageError is raised
+    with pytest.raises(StorageError, match="Internal server error"):
+        await storage.aget_plan_runs()
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == "/api/v0/plan-runs/"
+
+
+@pytest.mark.asyncio
+async def test_async_aget_plan_runs_request_exception() -> None:
+    """Test async aget_plan_runs method with request exception."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    # Mock request exception
+    with patch.object(
+        storage.async_client, "get", side_effect=httpx.ConnectError("Connection failed")
+    ) as mock_get:
+        with pytest.raises(StorageError):
+            await storage.aget_plan_runs(run_state=PlanRunState.IN_PROGRESS, page=1)
+
+        mock_get.assert_called_once_with(
+            url="/api/v0/plan-runs/?page=1&run_state=IN_PROGRESS",
+        )
+
+
+@pytest.mark.asyncio
+async def test_async_aget_end_user_success(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_end_user method with successful response."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    external_id = "test_user_123"
+
+    # Mock successful response
+    mock_response_data = {
+        "external_id": external_id,
+        "name": "Test User",
+        "email": "test.user@example.com",
+        "phone_number": "+1234567890",
+        "additional_data": {"department": "Engineering", "role": "Developer"},
+    }
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{external_id}/",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method
+    result = await storage.aget_end_user(external_id)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == f"/api/v0/end-user/{external_id}/"
+
+    # Verify the returned EndUser object
+    assert result is not None
+    assert isinstance(result, EndUser)
+    assert result.external_id == external_id
+    assert result.name == "Test User"
+    assert result.email == "test.user@example.com"
+    assert result.phone_number == "+1234567890"
+    assert result.additional_data == {"department": "Engineering", "role": "Developer"}
+
+
+@pytest.mark.asyncio
+async def test_async_aget_end_user_minimal_data(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_end_user method with minimal user data."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    external_id = "minimal_user"
+
+    # Mock successful response with minimal data
+    mock_response_data = {
+        "external_id": external_id,
+        "name": "",
+        "email": "",
+        "phone_number": "",
+        "additional_data": {},
+    }
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{external_id}/",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method
+    result = await storage.aget_end_user(external_id)
+
+    # Verify the returned EndUser object
+    assert result is not None
+    assert isinstance(result, EndUser)
+    assert result.external_id == external_id
+    assert result.name == ""
+    assert result.email == ""
+    assert result.phone_number == ""
+    assert result.additional_data == {}
+
+
+@pytest.mark.asyncio
+async def test_async_aget_end_user_not_found(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_end_user method with 404 not found response."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    external_id = "nonexistent_user"
+
+    # Mock 404 error response
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{external_id}/",
+        status_code=404,
+        content=b"End user not found",
+    )
+
+    # Test that StorageError is raised
+    with pytest.raises(StorageError, match="End user not found"):
+        await storage.aget_end_user(external_id)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == f"/api/v0/end-user/{external_id}/"
+
+
+@pytest.mark.asyncio
+async def test_async_aget_end_user_server_error(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_end_user method with server error response."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    external_id = "test_user"
+
+    # Mock 500 server error response
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{external_id}/",
+        status_code=500,
+        content=b"Internal server error",
+    )
+
+    # Test that StorageError is raised
+    with pytest.raises(StorageError, match="Internal server error"):
+        await storage.aget_end_user(external_id)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == f"/api/v0/end-user/{external_id}/"
+
+
+@pytest.mark.asyncio
+async def test_async_aget_end_user_request_exception() -> None:
+    """Test async aget_end_user method with request exception."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    external_id = "test_user"
+
+    # Mock request exception
+    with patch.object(
+        storage.async_client, "get", side_effect=httpx.ConnectError("Connection failed")
+    ) as mock_get:
+        with pytest.raises(StorageError):
+            await storage.aget_end_user(external_id)
+
+        mock_get.assert_called_once_with(
+            url=f"/api/v0/end-user/{external_id}/",
+        )
+
+
+@pytest.mark.asyncio
+async def test_async_aget_end_user_special_characters(httpx_mock: HTTPXMock) -> None:
+    """Test async aget_end_user method with special characters in external_id."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    # Test with special characters that might need URL encoding
+    external_id = "user@domain.com"
+
+    # Mock successful response
+    mock_response_data = {
+        "external_id": external_id,
+        "name": "User With Email ID",
+        "email": "user@domain.com",
+        "phone_number": "",
+        "additional_data": {},
+    }
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{external_id}/",
+        status_code=200,
+        json=mock_response_data,
+    )
+
+    # Test the method
+    result = await storage.aget_end_user(external_id)
+
+    # Verify the request was made correctly
+    assert len(httpx_mock.get_requests()) == 1
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "GET"
+    assert request.url.path == f"/api/v0/end-user/{external_id}/"
+
+    # Verify the returned EndUser object
+    assert result is not None
+    assert isinstance(result, EndUser)
+    assert result.external_id == external_id
+    assert result.name == "User With Email ID"
+    assert result.email == "user@domain.com"
 
 
 @pytest.mark.asyncio
