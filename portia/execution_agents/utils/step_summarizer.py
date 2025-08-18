@@ -139,6 +139,7 @@ Here is original task:
             and isinstance(last_message.artifact, LocalDataValue)
         ):
             try:
+                logger().trace(f"LLM call: summarization (step) model={self.model!s}")
                 result = self.model.get_structured_response(
                     parsed_messages, summarizer_output_model
                 )
@@ -150,6 +151,7 @@ Here is original task:
             return {"messages": [last_message]}
 
         try:
+            logger().trace(f"LLM call: summarization (step) model={self.model!s}")
             response: Message = self.model.get_response(
                 messages=parsed_messages,
             )
@@ -274,6 +276,7 @@ Here is original task:
             and isinstance(last_message.artifact, LocalDataValue)
         ):
             try:
+                logger().trace(f"LLM call: summarization (step) model={self.model!s}")
                 result = await self.model.aget_structured_response(
                     parsed_messages, summarizer_output_model
                 )
@@ -285,6 +288,7 @@ Here is original task:
             return {"messages": [last_message]}
 
         try:
+            logger().trace(f"LLM call: summarization (step) model={self.model!s}")
             response: Message = await self.model.aget_response(
                 messages=parsed_messages,
             )

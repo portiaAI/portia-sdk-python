@@ -157,6 +157,7 @@ def test_safe_logger_successful_logs() -> None:
     safe_logger = SafeLogger(mock_logger)
 
     # Test each log level
+    safe_logger.trace("trace message", "arg1", kwarg1="value1")
     safe_logger.debug("debug message", "arg1", kwarg1="value1")  # noqa: PLE1205
     safe_logger.info("info message", "arg1", kwarg1="value1")  # noqa: PLE1205
     safe_logger.warning("warning message", "arg1", kwarg1="value1")  # noqa: PLE1205
@@ -165,6 +166,7 @@ def test_safe_logger_successful_logs() -> None:
     safe_logger.exception("exception message", "arg1", kwarg1="value1")  # noqa: PLE1205
 
     # Verify each method was called with correct arguments
+    mock_logger.trace.assert_called_once_with("trace message", "arg1", kwarg1="value1")
     mock_logger.debug.assert_called_once_with("debug message", "arg1", kwarg1="value1")
     mock_logger.info.assert_called_once_with("info message", "arg1", kwarg1="value1")
     mock_logger.warning.assert_called_once_with("warning message", "arg1", kwarg1="value1")

@@ -14,6 +14,7 @@ from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
     PreStepIntrospection,
 )
+from portia.logger import logger
 from portia.model import Message
 from portia.plan import Plan
 from portia.plan_run import PlanRun
@@ -113,7 +114,9 @@ Return the outcome and reason in the given format.
             and output.output_name in introspection_condition
         ]
 
-        return self.config.get_introspection_model().get_structured_response(
+        model = self.config.get_introspection_model()
+        logger().trace(f"LLM call: introspection model={model!s}")
+        return model.get_structured_response(
             schema=PreStepIntrospection,
             messages=[
                 Message.from_langchain(m)
@@ -154,7 +157,9 @@ Return the outcome and reason in the given format.
             and output.output_name in introspection_condition
         ]
 
-        return await self.config.get_introspection_model().aget_structured_response(
+        model = self.config.get_introspection_model()
+        logger().trace(f"LLM call: introspection model={model!s}")
+        return await model.aget_structured_response(
             schema=PreStepIntrospection,
             messages=[
                 Message.from_langchain(m)

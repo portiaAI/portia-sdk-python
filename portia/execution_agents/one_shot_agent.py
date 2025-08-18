@@ -170,6 +170,7 @@ class OneShotToolCallingModel:
 
         """
         model, formatted_messages = self._setup_model(state)
+        logger().trace(f"LLM call: tool calling (one-shot) model={self.model!s}")
         response = model.invoke(formatted_messages)
         result = template_in_required_inputs(response, state["step_inputs"])
         return self._handle_execution_hooks(response) or {"messages": [result]}
@@ -241,6 +242,7 @@ class OneShotToolCallingModel:
 
         """
         model, formatted_messages = self._setup_model(state)
+        logger().trace(f"LLM call: tool calling (one-shot) model={self.model!s}")
         response = await model.ainvoke(formatted_messages)
         result = template_in_required_inputs(response, state["step_inputs"])
         return self._handle_execution_hooks(response) or {"messages": [result]}

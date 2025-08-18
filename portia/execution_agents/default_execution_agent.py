@@ -276,6 +276,7 @@ class ParserModel:
         errors = []
         tool_inputs: ToolInputs | None = None
         try:
+            logger().trace(f"LLM call: argument parsing model={self.model!s}")
             response = self.model.get_structured_response(
                 messages=[Message.from_langchain(m) for m in formatted_messages],
                 schema=ToolInputs,
@@ -416,6 +417,7 @@ class VerifierModel:
             tool_args=self.agent.tool.args_json_schema(),
             tool_description=self.agent.tool.description,
         )
+        logger().trace(f"LLM call: argument verification model={self.model!s}")
         response = self.model.get_structured_response(
             messages=[Message.from_langchain(m) for m in formatted_messages],
             schema=VerifiedToolInputs,
@@ -555,6 +557,7 @@ class ToolCallingModel:
         self.agent.telemetry.capture(
             ToolCallTelemetryEvent(tool_id=self.agent.tool.id if self.agent.tool else None)
         )
+        logger().trace(f"LLM call: tool calling model={self.model!s}")
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 verified_args=verified_args.model_dump_json(indent=2),
