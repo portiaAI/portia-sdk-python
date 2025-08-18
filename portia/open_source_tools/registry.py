@@ -11,14 +11,50 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.map_tool import MapTool
+from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 from portia.tool_registry import (
     ToolRegistry,
 )
 
+
+def _get_preferred_search_tool():
+    """Get the preferred search tool based on available API keys and user preference.
+    
+    Users can override the default selection by setting PORTIA_SEARCH_PROVIDER to either
+    'openai' or 'tavily'. Otherwise, OpenAI search is used if OPENAI_API_KEY is available
+    and TAVILY_API_KEY is not.
+    """
+    has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+    has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
+    search_provider = os.getenv("PORTIA_SEARCH_PROVIDER", "").lower()
+    
+    # If user explicitly sets the provider, honor their choice
+    if search_provider == "openai" and has_openai_key:
+        return OpenAISearchTool()
+    elif search_provider == "tavily" and has_tavily_key:
+        return SearchTool()
+    elif search_provider and search_provider not in ["openai", "tavily"]:
+        # Invalid provider specified, fall back to default logic but warn
+        import warnings
+        warnings.warn(
+            f"Invalid PORTIA_SEARCH_PROVIDER '{search_provider}'. "
+            "Valid options are 'openai' or 'tavily'. Falling back to default selection.",
+            UserWarning,
+            stacklevel=2
+        )
+    
+    # Default automatic selection logic
+    # If user has OpenAI key but no Tavily key, use OpenAI search
+    if has_openai_key and not has_tavily_key:
+        return OpenAISearchTool()
+    # Otherwise, use Tavily search (default behavior)
+    else:
+        return SearchTool()
+
 example_tool_registry = ToolRegistry(
-    [CalculatorTool(), WeatherTool(), SearchTool(), LLMTool()],
+    [CalculatorTool(), WeatherTool(), _get_preferred_search_tool(), LLMTool()],
 )
 
 open_source_tool_registry = ToolRegistry(
@@ -31,7 +67,7 @@ open_source_tool_registry = ToolRegistry(
         ImageUnderstandingTool(),
         LLMTool(),
         MapTool(),
-        SearchTool(),
+        _get_preferred_search_tool(),
         WeatherTool(),
     ],
 )
