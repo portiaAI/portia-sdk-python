@@ -673,6 +673,58 @@ async def test_async_aget_end_user_special_characters(httpx_mock: HTTPXMock) -> 
 
 
 @pytest.mark.asyncio
+async def test_async_aget_similar_plans_threaded_execution() -> None:
+    """Test async aget_similar_plans method uses asyncio.to_thread correctly."""
+    storage = InMemoryStorage()
+
+    # Mock data to return from get_similar_plans
+    mock_plan = Plan(
+        id=PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678"),
+        plan_context=PlanContext(
+            query="test query",
+            tool_ids=["test_tool"],
+        ),
+        steps=[],
+        plan_inputs=[],
+    )
+    mock_plans = [mock_plan]
+
+    # Mock the synchronous get_similar_plans method
+    with patch.object(storage, "get_similar_plans", return_value=mock_plans) as mock_get_similar:
+        # Test the async method
+        result = await storage.aget_similar_plans(query="test query", threshold=0.7, limit=5)
+
+        # Verify that get_similar_plans was called with correct parameters
+        mock_get_similar.assert_called_once_with("test query", 0.7, 5)
+
+        # Verify the result is returned correctly
+        assert result == mock_plans
+        assert len(result) == 1
+        assert result[0].id == mock_plan.id
+        assert result[0].plan_context.query == "test query"
+
+
+@pytest.mark.asyncio
+async def test_async_aget_similar_plans_default_parameters() -> None:
+    """Test async aget_similar_plans method with default parameters."""
+    storage = InMemoryStorage()
+
+    mock_plans = []
+
+    # Mock the synchronous get_similar_plans method
+    with patch.object(storage, "get_similar_plans", return_value=mock_plans) as mock_get_similar:
+        # Test the async method with default parameters
+        result = await storage.aget_similar_plans("search query")
+
+        # Verify that get_similar_plans was called with default threshold and limit
+        mock_get_similar.assert_called_once_with("search query", 0.5, 10)
+
+        # Verify the result
+        assert result == mock_plans
+        assert len(result) == 0
+
+
+@pytest.mark.asyncio
 async def test_async_agent_memory_methods() -> None:
     """Test async agent memory methods."""
     storage = InMemoryStorage()
