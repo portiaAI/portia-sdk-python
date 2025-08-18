@@ -19,7 +19,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
+import urllib.parse
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
@@ -244,6 +246,11 @@ class BrowserTool(Tool[str | BaseModel]):
         description="Optional structured output schema for the browser tool's task output.",
     )
 
+    allowed_domains: list[str] | None = Field(
+        default=None,
+        description="List of allowed domains for browser navigation. If provided, URLs will be validated against this list. Supports wildcard patterns like '*.example.com'.",
+    )
+
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -278,6 +285,9 @@ class BrowserTool(Tool[str | BaseModel]):
         self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
+        # Validate URL against allowed domains
+        validate_url_against_allowed_domains(url, self.allowed_domains)
+        
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
@@ -390,6 +400,7 @@ class BrowserToolForUrl(BrowserTool):
         description: str | None = None,
         model: GenerativeModel | None | str = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
+        allowed_domains: list[str] | None = None,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
         domain_parts = str(HttpUrl(url).host).split(".")
@@ -411,6 +422,7 @@ class BrowserToolForUrl(BrowserTool):
             url=url,  # type: ignore reportCallIssue
             model=model,
             infrastructure_option=infrastructure_option,
+            allowed_domains=allowed_domains,
         )
 
     def run(  # type: ignore reportIncompatibleMethodOverride

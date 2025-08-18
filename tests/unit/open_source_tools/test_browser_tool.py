@@ -20,6 +20,7 @@ from portia.open_source_tools.browser_tool import (
     BrowserTool,
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
+    validate_url_against_allowed_domains,
 )
 from portia.plan import PlanBuilder
 from portia.plan_run import PlanRun
@@ -794,3 +795,170 @@ def test_browser_tool_multiple_calls(
         project_id="test_project",
         status="REQUEST_RELEASE",
     )
+
+
+class TestAllowedDomains:
+    """Test the allowed_domains feature."""
+
+    def test_validate_url_against_allowed_domains_no_restrictions(self) -> None:
+        """Test that URLs are allowed when allowed_domains is None or empty."""
+        # Test with None
+        validate_url_against_allowed_domains("https://example.com", None)
+        
+        # Test with empty list
+        validate_url_against_allowed_domains("https://example.com", [])
+
+    def test_validate_url_against_allowed_domains_exact_match(self) -> None:
+        """Test exact domain matching."""
+        allowed_domains = ["example.com", "test.com"]
+        
+        # Valid exact matches
+        validate_url_against_allowed_domains("https://example.com", allowed_domains)
+        validate_url_against_allowed_domains("http://test.com", allowed_domains)
+        validate_url_against_allowed_domains("https://example.com/path", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_subdomain_match(self) -> None:
+        """Test subdomain matching."""
+        allowed_domains = ["example.com"]
+        
+        # Valid subdomain matches
+        validate_url_against_allowed_domains("https://sub.example.com", allowed_domains)
+        validate_url_against_allowed_domains("https://api.example.com/path", allowed_domains)
+        validate_url_against_allowed_domains("https://deep.sub.example.com", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_wildcard_match(self) -> None:
+        """Test wildcard domain matching."""
+        allowed_domains = ["*.example.com", "test.*"]
+        
+        # Valid wildcard matches
+        validate_url_against_allowed_domains("https://api.example.com", allowed_domains)
+        validate_url_against_allowed_domains("https://sub.example.com", allowed_domains)
+        validate_url_against_allowed_domains("https://test.co.uk", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_blocked(self) -> None:
+        """Test that blocked domains raise ToolHardError."""
+        allowed_domains = ["example.com", "test.com"]
+        
+        with pytest.raises(ToolHardError, match="Domain 'blocked.com' is not allowed"):
+            validate_url_against_allowed_domains("https://blocked.com", allowed_domains)
+        
+        with pytest.raises(ToolHardError, match="Domain 'malicious.com' is not allowed"):
+            validate_url_against_allowed_domains("http://malicious.com/path", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_subdomain_blocked(self) -> None:
+        """Test that unrelated subdomains are blocked."""
+        allowed_domains = ["example.com"]
+        
+        with pytest.raises(ToolHardError, match="Domain 'different.com' is not allowed"):
+            validate_url_against_allowed_domains("https://sub.different.com", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_security_username_password(self) -> None:
+        """Test that URLs with username/password are blocked."""
+        allowed_domains = ["example.com"]
+        
+        with pytest.raises(ToolHardError, match="URLs with username/password are not allowed"):
+            validate_url_against_allowed_domains("https://user:pass@example.com", allowed_domains)
+        
+        with pytest.raises(ToolHardError, match="URLs with username/password are not allowed"):
+            validate_url_against_allowed_domains("https://user@example.com", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_invalid_url(self) -> None:
+        """Test that invalid URLs raise ToolHardError."""
+        allowed_domains = ["example.com"]
+        
+        with pytest.raises(ToolHardError, match="Invalid URL format"):
+            validate_url_against_allowed_domains("not-a-url", allowed_domains)
+        
+        with pytest.raises(ToolHardError, match="Invalid URL format"):
+            validate_url_against_allowed_domains("", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_case_insensitive(self) -> None:
+        """Test that domain matching is case-insensitive."""
+        allowed_domains = ["Example.COM"]
+        
+        validate_url_against_allowed_domains("https://example.com", allowed_domains)
+        validate_url_against_allowed_domains("https://EXAMPLE.COM", allowed_domains)
+        validate_url_against_allowed_domains("https://sub.Example.COM", allowed_domains)
+
+    def test_validate_url_against_allowed_domains_ip_address(self) -> None:
+        """Test IP address handling."""
+        allowed_domains = ["192.168.1.1", "*.10.0.0.*"]
+        
+        validate_url_against_allowed_domains("https://192.168.1.1", allowed_domains)
+        validate_url_against_allowed_domains("https://service.10.0.0.5", allowed_domains)
+        
+        with pytest.raises(ToolHardError, match="Domain '192.168.1.2' is not allowed"):
+            validate_url_against_allowed_domains("https://192.168.1.2", allowed_domains)
+
+    def test_browser_tool_with_allowed_domains_integration(self) -> None:
+        """Test BrowserTool integration with allowed_domains."""
+        allowed_domains = ["example.com", "*.test.com"]
+        browser_tool = BrowserTool(allowed_domains=allowed_domains)
+        
+        # Should not raise for allowed domains
+        context = get_test_tool_context()
+        
+        # Mock the agent to avoid actual browser usage
+        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+            mock_agent_instance = MagicMock()
+            mock_result = MagicMock()
+            mock_result.final_result.return_value = json.dumps({
+                "task_output": "Success",
+                "human_login_required": False
+            })
+            mock_agent_instance.run = AsyncMock(return_value=mock_result)
+            mock_agent.return_value = mock_agent_instance
+            
+            # Valid URL should work
+            result = browser_tool.run(context, "https://example.com", "test task")
+            assert result == "Success"
+
+    def test_browser_tool_for_url_with_allowed_domains(self) -> None:
+        """Test BrowserToolForUrl with allowed_domains."""
+        allowed_domains = ["example.com"]
+        
+        # Valid URL
+        tool = BrowserToolForUrl(url="https://example.com", allowed_domains=allowed_domains)
+        assert tool.url == "https://example.com"
+        
+        # Invalid URL should raise in run method
+        tool_invalid = BrowserToolForUrl(url="https://blocked.com", allowed_domains=allowed_domains)
+        context = get_test_tool_context()
+        
+        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+            mock_agent_instance = MagicMock()
+            mock_result = MagicMock()
+            mock_result.final_result.return_value = json.dumps({
+                "task_output": "Success",
+                "human_login_required": False
+            })
+            mock_agent_instance.run = AsyncMock(return_value=mock_result)
+            mock_agent.return_value = mock_agent_instance
+            
+            with pytest.raises(ToolHardError, match="Domain 'blocked.com' is not allowed"):
+                tool_invalid.run(context, "https://blocked.com", "test task")
+
+    def test_validate_url_against_allowed_domains_port_handling(self) -> None:
+        """Test port handling in domain validation."""
+        allowed_domains = ["example.com:8080", "example.com"]
+        
+        # Exact port match
+        validate_url_against_allowed_domains("https://example.com:8080", allowed_domains)
+        
+        # Standard port should match domain without port
+        validate_url_against_allowed_domains("https://example.com:443", allowed_domains)
+        validate_url_against_allowed_domains("http://example.com:80", allowed_domains)
+        
+        # Non-standard port should fail if not explicitly allowed
+        with pytest.raises(ToolHardError, match="Domain 'example.com:9999' is not allowed"):
+            validate_url_against_allowed_domains("https://example.com:9999", ["example.com"])
+
+    def test_validate_url_against_allowed_domains_complex_wildcards(self) -> None:
+        """Test complex wildcard patterns."""
+        allowed_domains = ["*.api.*.example.com", "test-*.example.com"]
+        
+        validate_url_against_allowed_domains("https://v1.api.prod.example.com", allowed_domains)
+        validate_url_against_allowed_domains("https://test-service.example.com", allowed_domains)
+        
+        with pytest.raises(ToolHardError, match="Domain 'api.example.com' is not allowed"):
+            validate_url_against_allowed_domains("https://api.example.com", allowed_domains)
