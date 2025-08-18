@@ -45,6 +45,7 @@ from portia.errors import (
     PlanError,
     PlanNotFoundError,
     SkipExecutionError,
+    ToolNotFoundError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
@@ -2354,7 +2355,14 @@ class Portia:
     def _get_tool_for_step(self, step: Step, plan_run: PlanRun) -> Tool | None:
         if not step.tool_id:
             return None
-        child_tool = self.tool_registry.get_tool(step.tool_id)
+        try:
+            child_tool = self.tool_registry.get_tool(step.tool_id)
+        except ToolNotFoundError:
+            # Special case LLMTool so it doesn't need to be in all tool registries
+            if step.tool_id == LLMTool.LLM_TOOL_ID:
+                child_tool = LLMTool()
+            else:
+                raise  # pragma: no cover
         return ToolCallWrapper(
             child_tool=child_tool,
             storage=self.storage,

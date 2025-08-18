@@ -1,13 +1,7 @@
 <p align="center">
-    <img alt="SteelThread banner" src="assets/steelthread_banner.png"  width="75%">
-</p>
-<p align="center">
-    <a href="https://github.com/portiaAI/steel_thread">
-    <img src="https://img.shields.io/badge/GitHub-000?logo=github&logoColor=white">
-  </a>
-  <a href="https://docs.portialabs.ai/steel-thread-intro">
-    <img src="https://img.shields.io/badge/Docs-38BDF8">
-  </a></br></br>
+    <a href="https://docs.portialabs.ai/steel-thread-intro">
+       <img alt="SteelThread banner" src="assets/steelthread_banner.png" width="75%">
+    </a></br>
 <strong>Our flexible evaluation framework is out!</strong></br>
   🧪 Ingest test cases directly from your agent runs rather than building datasets from scratch.</br>
   🛰️ Monitor in real-time or with offline evals.</br>
@@ -23,10 +17,9 @@
     <img alt="Portia AI logo" src="https://raw.githubusercontent.com/portiaAI/portia-sdk-python/main/assets/Logo_Portia_Line_Black.png"  width="50%">
   </picture>
 </p>
-
 <p align="center">
-  <a href="https://www.producthunt.com/products/portia-ai?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_source=badge-portia&#0045;ai&#0045;2" target="_blank">
-    <img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=983741&theme=light&period=daily&t=1751531459759" alt="Portia&#0032;AI - Secure&#0032;AI&#0032;agents&#0032;with&#0032;tools&#0044;&#0032;auth&#0044;&#0032;and&#0032;smart&#0032;control | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54"/>
+  <a href="https://github.com/mahseema/awesome-ai-tools">
+    <img src="https://awesome.re/mentioned-badge-flat.svg" alt="Mentioned in Awesome">
   </a>
 </p>
 
@@ -58,6 +51,11 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="https://www.producthunt.com/products/portia-ai?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_source=badge-portia&#0045;ai&#0045;2" target="_blank">
+    <img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=983741&theme=light&period=daily&t=1751531459759" alt="Portia&#0032;AI - Secure&#0032;AI&#0032;agents&#0032;with&#0032;tools&#0044;&#0032;auth&#0044;&#0032;and&#0032;smart&#0032;control | Product Hunt" style="width: 200px; height: 43.2px;" width="200" height="43.2"/>
+  </a>
+</p>
 
 # Portia SDK Python
 
