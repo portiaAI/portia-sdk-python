@@ -1739,3 +1739,31 @@ async def test_portia_aexecute_plan_run_and_handle_clarifications_keyboard_inter
         result = await portia.aexecute_plan_run_and_handle_clarifications(plan, plan_run)
 
         assert result.state == PlanRunState.FAILED
+
+
+@pytest.mark.asyncio
+async def test_portia_ainitialize_end_user_default(portia: Portia) -> None:
+    """Test that initialize_end_user returns a default end user if none is provided."""
+    portia.storage.aget_end_user = mock.AsyncMock(return_value=None)
+
+    async def save_end_user(end_user: EndUser) -> EndUser:
+        return end_user
+
+    portia.storage.asave_end_user = save_end_user
+
+    end_user = await portia.ainitialize_end_user()
+    assert end_user.external_id == "portia:default_user"
+
+    end_user = await portia.ainitialize_end_user(None)
+    assert end_user.external_id == "portia:default_user"
+
+    end_user = await portia.ainitialize_end_user("")
+    assert end_user.external_id == "portia:default_user"
+
+    portia.storage.aget_end_user = mock.AsyncMock(return_value=EndUser(external_id="123"))
+
+    end_user = await portia.ainitialize_end_user("123")
+    assert end_user.external_id == "123"
+
+    end_user = await portia.ainitialize_end_user(EndUser(external_id="123"))
+    assert end_user.external_id == "123"
