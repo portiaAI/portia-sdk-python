@@ -1,22 +1,31 @@
 """Simple Example."""
 
+import asyncio
 from typing import Any
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from portia import Config, LogLevel
-from portia.portia_lite import PlanBuilderLite, PortiaLite
+from portia.builder.plan_builder import PlanBuilder
+from portia.builder.step import StepOutput
+from portia.portia import Portia
 from portia.tool import Tool, ToolRunContext
 from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry
 
 load_dotenv()
 
 
+class CommodityPrice(BaseModel):
+    """Price of a commodity."""
+
+    price: float
+
+
 class CurrencyConversionToolSchema(BaseModel):
     """Schema defining the inputs for the CurrencyConversionTool."""
 
-    amount: str = Field(..., description="The amount to convert")
+    amount: CommodityPrice = Field(..., description="The amount to convert")
     currency_from: str = Field(..., description="The currency to convert from")
     currency_to: str = Field(..., description="The currency to convert to")
 
@@ -30,19 +39,11 @@ class CurrencyConversionTool(Tool[str]):
     args_schema: type[BaseModel] = CurrencyConversionToolSchema
     output_schema: tuple[str, str] = ("str", "The converted amount")
 
-    def run(self, _: ToolRunContext, amount: str, currency_from: str, currency_to: str) -> str:
+    def run(
+        self, _: ToolRunContext, amount: CommodityPrice, currency_from: str, currency_to: str
+    ) -> str:
         """Run the CurrencyConversionTool."""
-        if isinstance(amount, str) and amount.startswith("price="):
-            amount_value = amount.split("=", 1)[1]
-        else:
-            amount_value = amount
-        return f"{float(amount_value) * 1.2}"
-
-
-class CommodityPrice(BaseModel):
-    """Price of a commodity."""
-
-    price: float
+        return f"{amount.price * 1.2}"
 
 
 def only_continue_if_affordable(price: str) -> bool:
@@ -50,42 +51,45 @@ def only_continue_if_affordable(price: str) -> bool:
     return float(price) < 5000
 
 
-def always_continue(outputs: list[Any]) -> bool:
+def always_continue(price: str) -> bool:
     """Always continue."""
     return True
 
 
 config = Config.from_default(default_log_level=LogLevel.DEBUG)
-portia = PortiaLite(
+portia = Portia(
     config=config,
     tools=InMemoryToolRegistry.from_local_tools([CurrencyConversionTool()])
     + DefaultToolRegistry(config=config),
 )
 
-
 plan = (
-    PlanBuilderLite()
-    .agent_step(
+    PlanBuilder()
+    .single_tool_agent(
+        name="Search gold price",
         tool="search_tool",
-        query="Search for the price of gold in USD",
-        output_class=CommodityPrice,
-        condition=always_continue,
+        task="Search for the price of gold in USD",
+        output_schema=CommodityPrice,
     )
-    .tool_step(
+    .tool_call(
         tool="currency_conversion_tool",
-        inputs={"amount": "$output0", "currency_from": "USD", "currency_to": "GBP"},
+        args={
+            "amount": StepOutput("Search gold price"),
+            "currency_from": "USD",
+            "currency_to": "GBP",
+        },
     )
-    .hook(only_continue_if_affordable, inputs={"price": "$output1"})
+    .hook(only_continue_if_affordable, args={"price": StepOutput(1)})
     .llm_step(
-        query="The price of gold is $output1. Write a poem about the price of gold",
+        task="Write a poem about the price of gold",
+        inputs=[StepOutput(step=0)],
     )
-    .agent_step(
+    .single_tool_agent(
+        task="Send the poem to Robbie in an email at robbie+test@portialabs.ai",
         tool="portia:google:gmail:send_email",
-        query="A poem about the price of gold is $output2. Send this poem to Robbie in an email at "
-        "robbi+test@portialabs.ai",
-        condition="Continue as long as the email doesn't have any swear words",
+        inputs=[StepOutput(step=3)],
     )
     .build()
 )
 
-portia.run(plan)
+result = asyncio.run(portia.arun_plan(plan))

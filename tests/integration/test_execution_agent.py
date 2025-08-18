@@ -9,7 +9,7 @@ from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import LocalDataValue
-from portia.plan import PlanBuilder
+from portia.plan import PlanBuilderLegacy
 from portia.plan_run import PlanRun
 from portia.storage import InMemoryStorage
 from portia.tool import Tool, ToolRunContext
@@ -95,7 +95,7 @@ def test_execution_agent_with_long_tool_description(model: str) -> None:
 
     # Create Plan
     plan = (
-        PlanBuilder("Simulate quantum entanglement")
+        PlanBuilderLegacy("Simulate quantum entanglement")
         .step(
             task="Run the quantum simulator for a 3-qubit system (particle_count=3) for 500 "
             "femtoseconds (simulation_time_femtoseconds=500.0). Use an initial state vector "
@@ -151,7 +151,7 @@ async def test_execution_agent_with_long_tool_description_async(model: str) -> N
 
     # Create Plan
     plan = (
-        PlanBuilder("Simulate quantum entanglement")
+        PlanBuilderLegacy("Simulate quantum entanglement")
         .step(
             task="Run the quantum simulator for a 3-qubit system (particle_count=3) for 500 "
             "femtoseconds (simulation_time_femtoseconds=500.0). Use an initial state vector "

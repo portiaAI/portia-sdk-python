@@ -23,12 +23,14 @@ from __future__ import annotations
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from typing_extensions import deprecated
 
 from portia.common import Serializable
 from portia.prefixed_uuid import PlanUUID
 
 
-class PlanBuilder:
+@deprecated("Move to our new PlanBuilder instead")
+class PlanBuilderLegacy:
     """A builder for creating plans.
 
     This class provides an interface for constructing plans step by step. Requires a step to be
@@ -72,7 +74,7 @@ class PlanBuilder:
         inputs: list[Variable] | None = None,
         condition: str | None = None,
         structured_output_schema: type[BaseModel] | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderLegacy:
         """Add a step to the plan.
 
         Args:
@@ -111,7 +113,7 @@ class PlanBuilder:
         name: str,
         description: str | None = None,
         step_index: int | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderLegacy:
         """Add an input variable to the chosen step in the plan (default is the last step).
 
         Inputs are outputs from previous steps.
@@ -138,7 +140,7 @@ class PlanBuilder:
         self,
         name: str,
         description: str,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderLegacy:
         """Add an input variable to the plan.
 
         Args:
@@ -158,7 +160,7 @@ class PlanBuilder:
         self,
         condition: str,
         step_index: int | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderLegacy:
         """Add a condition to the chosen step in the plan (default is the last step).
 
         Args:
@@ -225,6 +227,7 @@ class Variable(BaseModel):
     )
     description: str = Field(
         description="A description of the output or plan input.",
+        default="",
     )
 
     def pretty_print(self) -> str:

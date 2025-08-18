@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from portia.plan import (
     Plan,
-    PlanBuilder,
+    PlanBuilderLegacy,
     PlanContext,
     PlanInput,
     PlanUUID,
@@ -152,7 +152,7 @@ def test_pretty_print() -> None:
 def test_plan_builder_with_plan_input() -> None:
     """Test that plan builder can create plans with plan inputs."""
     plan = (
-        PlanBuilder("Process a person's information")
+        PlanBuilderLegacy("Process a person's information")
         .step("Process person", "person_processor")
         .plan_input(
             name="$person",

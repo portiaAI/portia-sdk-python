@@ -35,7 +35,7 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.plan import (
     Plan,
-    PlanBuilder,
+    PlanBuilderLegacy,
     PlanContext,
     PlanInput,
     PlanUUID,
@@ -1639,7 +1639,7 @@ async def test_portia_acustom_tool_ready_not_ready() -> None:
         config=get_test_config(),
         tools=[ready_tool],
     )
-    plan = PlanBuilder().step("", ready_tool.id).build()
+    plan = PlanBuilderLegacy().step("", ready_tool.id).build()
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
 
@@ -1664,7 +1664,7 @@ async def test_portia_acustom_tool_ready_resume_multiple_instances_of_same_tool(
         config=get_test_config(),
         tools=[ready_tool, ready_tool],
     )
-    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool.id).build()
+    plan = PlanBuilderLegacy().step("1", ready_tool.id).step("2", ready_tool.id).build()
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
 
@@ -1684,7 +1684,7 @@ async def test_portia_acustom_tool_ready_resume_multiple_custom_tools() -> None:
     ready_tool = ReadyTool(id="ready_tool", auth_url="https://fake.portiaai.test/auth")
     ready_tool_2 = ReadyTool(id="ready_tool_2", auth_url="https://fake.portiaai.test/auth2")
     portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool_2])
-    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
+    plan = PlanBuilderLegacy().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
 

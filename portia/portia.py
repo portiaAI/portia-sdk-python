@@ -25,8 +25,11 @@ import time
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from pydantic import BaseModel
+from langsmith import traceable
+from pydantic import BaseModel, ConfigDict, Field
 
+from portia.builder.output import StepOutput, StepOutputValue
+from portia.builder.portia_plan import PortiaPlan
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -92,6 +95,21 @@ if TYPE_CHECKING:
     from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
+
+
+class RunData(BaseModel):
+    """Data that is returned from a step."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    plan: PortiaPlan
+    legacy_plan: Plan
+    plan_run: PlanRun
+    end_user: EndUser
+    step_output_values: dict[StepOutput, StepOutputValue] = Field(
+        default_factory=dict, description="Outputs set by the step."
+    )
+    portia: Portia
 
 
 class Portia:
@@ -798,7 +816,7 @@ class Portia:
 
     async def arun_plan(
         self,
-        plan: Plan | PlanUUID | UUID,
+        plan: Plan | PlanUUID | UUID | PortiaPlan,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput]
         | list[dict[str, Serializable]]
@@ -833,6 +851,10 @@ class Portia:
                 },
             )
         )
+
+        if isinstance(plan, PortiaPlan):
+            return await self.run_builder_plan(plan, self.initialize_end_user(end_user))
+
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
         )
@@ -845,7 +867,7 @@ class Portia:
         plan_run_inputs: list[PlanInput]
         | list[dict[str, Serializable]]
         | dict[str, Serializable]
-        | None,
+        | None = None,
         structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Get a plan run from storage."""
@@ -2295,6 +2317,50 @@ class Portia:
             ready_clarifications.extend(portia_tools_ready_response.clarifications)
 
         return ready_clarifications
+
+    @traceable(name="Portia - Run Plan")
+    async def run_builder_plan(self, plan: PortiaPlan, end_user: EndUser) -> PlanRun:
+        """Run a Portia plan."""
+        legacy_plan = plan.to_legacy_plan(
+            PlanContext(
+                query="Run plan built with plan builder",
+                tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
+            ),
+        )
+        self.storage.save_plan(legacy_plan)
+        plan_run = self._get_plan_run_from_plan(legacy_plan, end_user)
+        # TODO(RH): Move to async storage  # noqa: FIX002, TD003
+        self._set_plan_run_state(plan_run, PlanRunState.IN_PROGRESS)
+        self._log_execute_start(plan_run, legacy_plan)
+
+        run_data = RunData(
+            plan=plan,
+            legacy_plan=legacy_plan,
+            plan_run=plan_run,
+            end_user=end_user,
+            portia=self,
+        )
+
+        for i, step in enumerate(plan.steps):
+            logger().info(f"Starting step {i}: {step.describe(run_data)}")
+
+            result = await step.run(run_data)
+            output_value = LocalDataValue(value=result)
+            output = StepOutputValue(
+                value=output_value,
+                description=f"Output from step '{step.name}' (Description: {step.describe(run_data)})",
+            )
+
+            # Ensure the step output can be looked up from both possible keys (these may be the
+            # same, which is fine)
+            run_data.step_output_values[StepOutput(i)] = output
+            run_data.step_output_values[StepOutput(step.name)] = output
+
+            # @@@ THINK ABOUT AGENT MEMORY (MAYBE TURN OFF)
+            self._set_step_output(output_value, plan_run, step.to_portia_step(plan))
+            logger().info(f"Completed step {i}, result: {result}")
+
+        return self._post_plan_run_execution(plan, plan_run, output_value)
 
     @staticmethod
     def _log_models(config: Config) -> None:
