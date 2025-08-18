@@ -147,7 +147,7 @@ Return the outcome and reason in the given format.
         introspection_condition = plan.steps[plan_run.current_step_index].condition
 
         memory_outputs = [
-            self.agent_memory.get_plan_run_output(output.output_name, plan_run.id)
+            await self.agent_memory.aget_plan_run_output(output.output_name, plan_run.id)
             for output in plan_run.outputs.step_outputs.values()
             if isinstance(output, AgentMemoryValue)
             and introspection_condition
