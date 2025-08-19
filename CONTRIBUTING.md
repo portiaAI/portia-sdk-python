@@ -18,6 +18,7 @@ Paid contributions are shown in the [Issue](https://github.com/portiaAI/portia-s
 * Contributors can have only a single assigned issue at a time.
 * We expect paid contributions to require no more than 1 major review (i.e broader suggestions on direction), and 4 minor reviews. If more than this is required, the contribution will not be remunerated.
 * Once your feature is ready for review, please email code-submission@portialabs.ai with a link to the PR and we will review it.
+* If you submit code for an issue which you were not assigned to, you will not be remunerated.
 
 ### Getting paid
 * Once you have contributed and submitted a paid contribution, please email code-submission@portialabs.ai including a link to the PR you made and a screenshot of the Github accounts profile page that authored the PR to prove your identiy. If you are using a different currency we will provide the remuneration at the local exchange rate.
@@ -26,7 +27,7 @@ Paid contributions are shown in the [Issue](https://github.com/portiaAI/portia-s
 
 1. **Fork the Repository**: Start by forking the repository and cloning it locally.
 2. **Create a Branch**: Create a branch for your feature or bug fix. Use a descriptive name for your branch (e.g., `fix-typo`, `add-feature-x`).
-3. **Install the dependencies** We use uv to manage dependencies. Run ``uv install --all-extras``
+3. **Install the dependencies** We use uv to manage dependencies. Run ``uv sync --all-extras``
 4. **Make Your Changes**: Implement your changes in small, focused commits. Be sure to follow our linting rules and style guide.
 5. **Run Tests**: If your changes affect functionality, please test thoroughly 🌡️ Details on how run tests are in the **Tests** section below.
 6. **Lint Your Code**: We use [ruff](https://github.com/charliermarsh/ruff) for linting. Please ensure your code passes all linting checks. We prefer per-line disables for rules rather than global ignores, and please leave comments explaining why you disable any rules.
