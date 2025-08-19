@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from portia.builder.reference import default_step_name
 from portia.builder.step_v2 import StepV2
@@ -30,6 +30,25 @@ class PlanV2(BaseModel):
         default="Run the plan built with the Plan Builder",
         description="The task that the plan is completing.",
     )
+
+    @model_validator(mode="after")
+    def validate_plan(self) -> PlanV2:
+        """Validate the plan."""
+        # Check for duplicate step names
+        step_names = [step.step_name for step in self.steps]
+        if len(step_names) != len(set(step_names)):
+            duplicates = [name for name in step_names if step_names.count(name) > 1]
+            unique_duplicates = list(set(duplicates))
+            raise ValueError(f"Duplicate step names found: {unique_duplicates}")
+
+        # Check for duplicate plan input names
+        input_names = [plan_input.name for plan_input in self.plan_inputs]
+        if len(input_names) != len(set(input_names)):
+            duplicates = [name for name in input_names if input_names.count(name) > 1]
+            unique_duplicates = list(set(duplicates))
+            raise ValueError(f"Duplicate plan input names found: {unique_duplicates}")
+
+        return self
 
     def to_legacy_plan(self, plan_context: PlanContext) -> Plan:
         """Convert the Portia plan to a legacy plan."""
