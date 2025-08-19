@@ -11,7 +11,7 @@ from portia.execution_agents.output import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
-    from portia.builder.portia_plan import PortiaPlan
+    from portia.builder.portia_plan import PlanV2
     from portia.portia import RunContext
 
 
@@ -24,7 +24,7 @@ class Reference(ABC):
     """A reference to a value."""
 
     @abstractmethod
-    def get_legacy_name(self, plan: PortiaPlan) -> str:
+    def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
         raise NotImplementedError
 
@@ -48,7 +48,7 @@ class StepOutput(Reference):
         self.step = step
 
     @override
-    def get_legacy_name(self, plan: PortiaPlan) -> str:
+    def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
         return plan.step_output_name(self.step)
 
@@ -76,7 +76,7 @@ class Input(Reference):
         self.name = name
 
     @override
-    def get_legacy_name(self, plan: PortiaPlan) -> str:
+    def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
         return self.name
 

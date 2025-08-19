@@ -1,4 +1,4 @@
-"""Interface for steps that are run as part of a PortiaPlan."""
+"""Interface for steps that are run as part of a PlanV2."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from portia.plan import Variable
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
-    from portia.builder.portia_plan import PortiaPlan
+    from portia.builder.portia_plan import PlanV2
     from portia.portia import RunContext
 
 
@@ -41,7 +41,7 @@ class Step(BaseModel, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
         """Convert this step to a PlanStep from plan.py.
 
         A PlanStep is the legacy representation of a step in the plan, and is still used in the
@@ -69,7 +69,7 @@ class Step(BaseModel, ABC):
     def _resolve_input_names_for_printing(
         self,
         _input: Any,  # noqa: ANN401
-        plan: PortiaPlan,
+        plan: PlanV2,
     ) -> Any | ReferenceValue | None:  # noqa: ANN401
         """Resolve inputs to their value (if not a reference) or to their name (if reference).
 
@@ -86,9 +86,7 @@ class Step(BaseModel, ABC):
             return [self._resolve_input_names_for_printing(v, plan) for v in _input]
         return _input
 
-    def _inputs_to_legacy_plan_variables(
-        self, inputs: list[Any], plan: PortiaPlan
-    ) -> list[Variable]:
+    def _inputs_to_legacy_plan_variables(self, inputs: list[Any], plan: PlanV2) -> list[Variable]:
         """Convert a list of inputs to a list of legacy plan variables."""
         return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
 
@@ -145,7 +143,7 @@ class LLMStep(Step):
         )
 
     @override
-    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
         """Convert this LLMStep to a PlanStep."""
         return PlanStep(
             task=self.task,
@@ -227,7 +225,7 @@ class ToolRun(Step):
         return output
 
     @override
-    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
         """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
@@ -287,7 +285,7 @@ class FunctionCall(Step):
         return output
 
     @override
-    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
         """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
@@ -336,7 +334,7 @@ class SingleToolAgent(Step):
         return output_obj.get_value()
 
     @override
-    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
         """Convert this SingleToolAgent to a PlanStep."""
         return PlanStep(
             task=self.task,

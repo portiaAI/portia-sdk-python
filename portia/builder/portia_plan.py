@@ -13,7 +13,7 @@ from portia.plan import Plan, PlanContext, PlanInput
 from portia.prefixed_uuid import PlanUUID
 
 
-class PortiaPlan(BaseModel):
+class PlanV2(BaseModel):
     """A sequence of steps to be run by Portia."""
 
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")

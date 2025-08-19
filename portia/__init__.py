@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from portia.builder.plan_builder import PlanBuilderV2
-from portia.builder.portia_plan import PortiaPlan
+from portia.builder.portia_plan import PlanV2
 from portia.builder.reference import Input, StepOutput
 from portia.builder.step import FunctionCall, LLMStep, SingleToolAgent, ToolRun
 
@@ -154,10 +154,10 @@ __all__ = [
     "PlanRunNotFoundError",
     "PlanRunState",
     "PlanUUID",
+    "PlanV2",
     "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
-    "PortiaPlan",
     "PortiaToolRegistry",
     "SearchTool",
     "SingleToolAgent",

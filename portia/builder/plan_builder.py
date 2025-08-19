@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.portia_plan import PortiaPlan
+from portia.builder.portia_plan import PlanV2
 from portia.builder.reference import default_step_name
 from portia.builder.step import FunctionCall, LLMStep, SingleToolAgent, ToolRun
 from portia.plan import PlanInput
@@ -27,7 +27,7 @@ class PlanBuilderV2:
             label: The label of the plan. This is used to identify the plan in the UI.
 
         """
-        self.plan = PortiaPlan(steps=[], label=label)
+        self.plan = PlanV2(steps=[], label=label)
 
     def input(self, name: str, description: str | None = None) -> PlanBuilderV2:
         """Add an input to the plan.
@@ -175,6 +175,6 @@ class PlanBuilderV2:
         self.plan.summarize = summarize
         return self
 
-    def build(self) -> PortiaPlan:
+    def build(self) -> PlanV2:
         """Return the plan, ready to run."""
         return self.plan
