@@ -74,6 +74,7 @@ from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, Re
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.storage import (
+    MAX_OUTPUT_LOG_LENGTH,
     DiskFileStorage,
     InMemoryStorage,
     PortiaCloudStorage,
@@ -2150,8 +2151,16 @@ class Portia:
             plan_run=str(plan_run.id),
         )
         if plan_run.outputs.final_output:
+            summary = plan_run.outputs.final_output.get_summary()
+            if not summary:
+                summary = str(plan_run.outputs.final_output.get_value())
+            if len(summary) > MAX_OUTPUT_LOG_LENGTH:
+                summary = (
+                    summary[:MAX_OUTPUT_LOG_LENGTH]
+                    + "...[truncated - only first 1000 characters shown]"
+                )
             logger().info(
-                f"Final output: {plan_run.outputs.final_output.get_summary()!s}",
+                f"Final output: {summary!s}",
             )
 
     def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
