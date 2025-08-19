@@ -2001,8 +2001,8 @@ def test_portia_run_plan_with_plan_run_inputs(
 
 def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
     """Test that run_plan raises error when required inputs are missing."""
-    required_input1 = PlanInput(name="$required1", description="Required input 1", value="value 1")
-    required_input2 = PlanInput(name="$required2", description="Required input 2", value="value 2")
+    required_input1 = PlanInput(name="$required1", description="Required input 1")
+    required_input2 = PlanInput(name="$required2", description="Required input 2")
 
     plan = Plan(
         plan_context=PlanContext(query="Plan requiring inputs", tool_ids=["add_tool"]),
