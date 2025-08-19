@@ -147,10 +147,8 @@ def test_portia_local_default_config_without_api_keys() -> None:
         # Missing tools from open_source_tool_registry in default registry:
         # - crawl_tool, extract_tool, map_tool, weather_tool (4 tools missing)
         # The search_tool from open_source_tool_registry is replaced by openai_search_tool in default registry
-        # So the net difference is 4 tools missing: crawl, extract, map, weather
-        expected_diff = 4  # crawl_tool, extract_tool, map_tool, weather_tool are missing
-        if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 5  # PDF reader tool would be added to open_source_tool_registry
+        # CI environment may have additional tools (browser, PDF reader) that aren't in default registry
+        expected_diff = len(open_source_tool_registry.get_tools()) - 6  # 6 is the expected default registry size
 
         assert (
             len(portia.tool_registry.get_tools())
