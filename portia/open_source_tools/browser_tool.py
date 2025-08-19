@@ -48,8 +48,6 @@ BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase"
 T = TypeVar("T", bound=str | BaseModel)
 
 
-
-
 class BrowserToolForUrlSchema(BaseModel):
     """Input schema for the BrowserToolForUrl.
 
@@ -491,7 +489,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
-                allowed_domains=ctx.tool.allowed_domains if hasattr(ctx.tool, 'allowed_domains') else None,
+                allowed_domains=getattr(ctx.tool, 'allowed_domains', None),
             ),
         )
 
@@ -772,7 +770,7 @@ if BROWSERBASE_AVAILABLE:
             return Browser(
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
-                    allowed_domains=ctx.tool.allowed_domains if hasattr(ctx.tool, 'allowed_domains') else None,
+                    allowed_domains=getattr(ctx.tool, 'allowed_domains', None),
                 ),
             )
 
