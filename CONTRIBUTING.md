@@ -18,6 +18,7 @@ Paid contributions are shown in the [Issue](https://github.com/portiaAI/portia-s
 * Contributors can have only a single assigned issue at a time.
 * We expect paid contributions to require no more than 1 major review (i.e broader suggestions on direction), and 4 minor reviews. If more than this is required, the contribution will not be remunerated.
 * Once your feature is ready for review, please email code-submission@portialabs.ai with a link to the PR and we will review it.
+* If you submit code for an issue which you were not assigned to, you will not be remunerated.
 
 ### Getting paid
 * Once you have contributed and submitted a paid contribution, please email code-submission@portialabs.ai including a link to the PR you made and a screenshot of the Github accounts profile page that authored the PR to prove your identiy. If you are using a different currency we will provide the remuneration at the local exchange rate.

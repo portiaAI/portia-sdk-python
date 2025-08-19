@@ -20,7 +20,6 @@ from portia.open_source_tools.browser_tool import (
     BrowserTool,
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
-    validate_url_against_allowed_domains,
 )
 from portia.plan import PlanBuilder
 from portia.plan_run import PlanRun
@@ -826,111 +825,6 @@ def test_browser_tool_multiple_calls(
 # ===== ALLOWED DOMAINS FUNCTIONALITY TESTS =====
 
 
-class TestAllowedDomainsValidation:
-    """Test suite for the allowed_domains validation functionality."""
-
-    def test_validate_url_no_restrictions(self) -> None:
-        """Test that validation passes when allowed_domains is None."""
-        # Should not raise any exception
-        validate_url_against_allowed_domains("https://example.com", None)
-        validate_url_against_allowed_domains("https://malicious.com", None)
-        validate_url_against_allowed_domains("https://anything.goes.com", None)
-
-    def test_validate_url_empty_allowed_domains_list(self) -> None:
-        """Test that validation fails with empty allowed_domains list."""
-        with pytest.raises(ToolHardError, match="No domains are allowed"):
-            validate_url_against_allowed_domains("https://example.com", [])
-
-    def test_validate_url_exact_domain_match(self) -> None:
-        """Test exact domain matching."""
-        allowed_domains = ["example.com", "trusted.org"]
-        
-        # Should pass for exact matches
-        validate_url_against_allowed_domains("https://example.com", allowed_domains)
-        validate_url_against_allowed_domains("https://trusted.org", allowed_domains)
-        
-        # Should fail for non-matching domains
-        with pytest.raises(ToolHardError, match="not in the allowed domains list"):
-            validate_url_against_allowed_domains("https://malicious.com", allowed_domains)
-
-    def test_validate_url_subdomain_matching(self) -> None:
-        """Test that subdomains are properly allowed."""
-        allowed_domains = ["example.com"]
-        
-        # Should pass for subdomains
-        validate_url_against_allowed_domains("https://www.example.com", allowed_domains)
-        validate_url_against_allowed_domains("https://api.example.com", allowed_domains)
-        validate_url_against_allowed_domains("https://deep.nested.example.com", allowed_domains)
-        
-        # Should fail for domains that just contain the allowed domain
-        with pytest.raises(ToolHardError, match="not in the allowed domains list"):
-            validate_url_against_allowed_domains("https://fakeexample.com", allowed_domains)
-        
-        with pytest.raises(ToolHardError, match="not in the allowed domains list"):
-            validate_url_against_allowed_domains("https://example.com.evil.com", allowed_domains)
-
-    def test_validate_url_case_insensitive(self) -> None:
-        """Test that domain matching is case insensitive."""
-        allowed_domains = ["Example.COM"]
-        
-        # Should pass regardless of case
-        validate_url_against_allowed_domains("https://example.com", allowed_domains)
-        validate_url_against_allowed_domains("https://EXAMPLE.COM", allowed_domains)
-        validate_url_against_allowed_domains("https://ExAmPlE.cOm", allowed_domains)
-        validate_url_against_allowed_domains("https://www.EXAMPLE.com", allowed_domains)
-
-    def test_validate_url_with_ports(self) -> None:
-        """Test that URLs with ports are handled correctly."""
-        allowed_domains = ["example.com"]
-        
-        # Should pass with ports
-        validate_url_against_allowed_domains("https://example.com:443", allowed_domains)
-        validate_url_against_allowed_domains("https://www.example.com:8080", allowed_domains)
-        validate_url_against_allowed_domains("http://example.com:80", allowed_domains)
-
-    def test_validate_url_different_protocols(self) -> None:
-        """Test that different protocols are handled correctly."""
-        allowed_domains = ["example.com"]
-        
-        # Should pass with different protocols
-        validate_url_against_allowed_domains("https://example.com", allowed_domains)
-        validate_url_against_allowed_domains("http://example.com", allowed_domains)
-        validate_url_against_allowed_domains("ftp://example.com", allowed_domains)
-
-    def test_validate_url_prohibits_credentials(self) -> None:
-        """Test that URLs with username/password are prohibited."""
-        allowed_domains = ["example.com"]
-        
-        # Should fail with username/password
-        with pytest.raises(ToolHardError, match="username/password authentication are not allowed"):
-            validate_url_against_allowed_domains("https://user:pass@example.com", allowed_domains)
-        
-        with pytest.raises(ToolHardError, match="username/password authentication are not allowed"):
-            validate_url_against_allowed_domains("https://user@example.com", allowed_domains)
-        
-        with pytest.raises(ToolHardError, match="username/password authentication are not allowed"):
-            validate_url_against_allowed_domains("https://:password@example.com", allowed_domains)
-
-    def test_validate_url_invalid_formats(self) -> None:
-        """Test handling of invalid URL formats."""
-        allowed_domains = ["example.com"]
-        
-        # Should fail with invalid URLs (no hostname)
-        with pytest.raises(ToolHardError, match="URL must have a valid hostname"):
-            validate_url_against_allowed_domains("not-a-url", allowed_domains)
-        
-        with pytest.raises(ToolHardError, match="URL must have a valid hostname"):
-            validate_url_against_allowed_domains("https://", allowed_domains)
-
-    def test_validate_url_whitespace_handling(self) -> None:
-        """Test that whitespace in domains is handled correctly."""
-        allowed_domains = [" example.com ", "  trusted.org  "]
-        
-        # Should pass after whitespace normalization
-        validate_url_against_allowed_domains("https://example.com", allowed_domains)
-        validate_url_against_allowed_domains("https://trusted.org", allowed_domains)
-
-
 class TestBrowserToolAllowedDomains:
     """Test suite for BrowserTool with allowed_domains functionality."""
 
@@ -966,24 +860,21 @@ class TestBrowserToolAllowedDomains:
             result = browser_tool.run(context, "https://www.example.com", "test task")
             assert result == "Task completed successfully"
 
-    def test_browser_tool_with_allowed_domains_blocked(
+    def test_browser_tool_with_allowed_domains_parameter(
         self,
         mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
     ) -> None:
-        """Test BrowserTool blocks navigation to domains not in allowed_domains list."""
+        """Test BrowserTool passes allowed_domains to browser-use correctly."""
         browser_tool = BrowserTool(
             custom_infrastructure_provider=mock_browser_infrastructure_provider,
-            allowed_domains=["example.com"],
+            allowed_domains=["example.com", "*.wikipedia.org"],
         )
-        context = get_test_tool_context()
-
-        # Should fail for disallowed domain
-        with pytest.raises(ToolHardError, match="not in the allowed domains list"):
-            browser_tool.run(context, "https://malicious.com", "test task")
-
-        # Should fail for URLs with credentials
-        with pytest.raises(ToolHardError, match="username/password authentication"):
-            browser_tool.run(context, "https://user:pass@example.com", "test task")
+        
+        # Verify allowed_domains is set on the tool
+        assert browser_tool.allowed_domains == ["example.com", "*.wikipedia.org"]
+        
+        # Note: Domain validation is now handled by browser-use, not by custom logic
+        # So we don't test validation behavior here, just that the parameter is set
 
     def test_browser_tool_for_url_with_allowed_domains(self) -> None:
         """Test BrowserToolForUrl respects allowed_domains parameter."""
@@ -1065,6 +956,5 @@ class TestBrowserToolAllowedDomains:
                 result = browser_tool.run(context, domain, "test task")
                 assert result == "Task completed successfully"
 
-            # Should fail for disallowed domain
-            with pytest.raises(ToolHardError, match="not in the allowed domains list"):
-                browser_tool.run(context, "https://malicious.com", "test task")
+            # Note: Domain validation is now handled by browser-use internally
+            # We don't test blocking behavior here as that's browser-use's responsibility
