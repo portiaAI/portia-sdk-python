@@ -1,5 +1,6 @@
 """OpenAI Search tool tests."""
 
+import json
 from unittest.mock import Mock, patch
 
 import httpx
@@ -194,7 +195,7 @@ def test_openai_search_tool_invalid_json() -> None:
         ctx = get_test_tool_context()
         with patch("httpx.post") as mock_post:
             mock_response = Mock(status_code=200)
-            mock_response.json.side_effect = ValueError("Invalid JSON")
+            mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "", 0)
             mock_post.return_value = mock_response
 
             with pytest.raises(ToolSoftError, match="Failed to parse OpenAI response"):

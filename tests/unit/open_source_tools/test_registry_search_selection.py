@@ -100,7 +100,7 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_no_keys(self) -> None:
         """Test DefaultToolRegistry with no API keys."""
-        config = Config(portia_api_key=None)
+        config = Config(portia_api_key=None, llm_provider="openai")
         with patch.dict(os.environ, {}, clear=True):
             registry = DefaultToolRegistry(config)
             tools = registry.get_tools()
@@ -111,7 +111,7 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_only_openai_key(self) -> None:
         """Test DefaultToolRegistry with only OpenAI key."""
-        config = Config(portia_api_key=None)
+        config = Config(portia_api_key=None, llm_provider="openai")
         with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=True):
             registry = DefaultToolRegistry(config)
             tools = registry.get_tools()
@@ -126,7 +126,7 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_only_tavily_key(self) -> None:
         """Test DefaultToolRegistry with only Tavily key."""
-        config = Config(portia_api_key=None)
+        config = Config(portia_api_key=None, llm_provider="openai")
         with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test"}, clear=True):
             registry = DefaultToolRegistry(config)
             tools = registry.get_tools()
@@ -148,7 +148,7 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_both_keys_prefers_tavily(self) -> None:
         """Test DefaultToolRegistry with both keys prefers Tavily."""
-        config = Config(portia_api_key=None)
+        config = Config(portia_api_key=None, llm_provider="openai")
         env_vars = {"OPENAI_API_KEY": "sk-test", "TAVILY_API_KEY": "tvly-test"}
         with patch.dict(os.environ, env_vars, clear=True):
             registry = DefaultToolRegistry(config)
@@ -164,7 +164,7 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_manual_override_openai(self) -> None:
         """Test DefaultToolRegistry with manual override to OpenAI."""
-        config = Config(portia_api_key=None)
+        config = Config(portia_api_key=None, llm_provider="openai")
         env_vars = {
             "OPENAI_API_KEY": "sk-test",
             "TAVILY_API_KEY": "tvly-test",
@@ -190,7 +190,7 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_manual_override_tavily(self) -> None:
         """Test DefaultToolRegistry with manual override to Tavily."""
-        config = Config(portia_api_key=None)
+        config = Config(portia_api_key=None, llm_provider="openai")
         env_vars = {
             "OPENAI_API_KEY": "sk-test",
             "TAVILY_API_KEY": "tvly-test",
