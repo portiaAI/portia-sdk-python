@@ -7,7 +7,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from portia.builder.reference import default_step_name
-from portia.builder.step import Step
+from portia.builder.step_v2 import StepV2
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanInput
 from portia.prefixed_uuid import PlanUUID
@@ -17,7 +17,7 @@ class PlanV2(BaseModel):
     """A sequence of steps to be run by Portia."""
 
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")
-    steps: list[Step] = Field(description="The steps to be executed in the plan.")
+    steps: list[StepV2] = Field(description="The steps to be executed in the plan.")
     plan_inputs: list[PlanInput] = Field(
         default=[],
         description="The inputs required by the plan.",
@@ -41,10 +41,10 @@ class PlanV2(BaseModel):
             structured_output_schema=self.final_output_schema,
         )
 
-    def step_output_name(self, step: int | str | Step) -> str:
+    def step_output_name(self, step: int | str | StepV2) -> str:
         """Get the name of the output of a step in the plan."""
         try:
-            if isinstance(step, Step):
+            if isinstance(step, StepV2):
                 step_num = self.steps.index(step)
             elif isinstance(step, str):
                 step_num = self.idx_by_name(step)

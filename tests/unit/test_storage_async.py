@@ -860,7 +860,7 @@ async def test_async_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
 
     end_user = EndUser(external_id="123")
 
-        # Test async save_plan failure
+    # Test async save_plan failure
     httpx_mock.add_response(
         method="POST",
         url=f"{config.portia_api_endpoint}/api/v0/plans/",
@@ -925,7 +925,7 @@ async def test_async_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
 
     await storage.asave_tool_call(tool_call)
 
-        # Test async get_end_user failure
+    # Test async get_end_user failure
     httpx_mock.add_response(
         method="GET",
         url=f"{config.portia_api_endpoint}/api/v0/end-user/{end_user.external_id}/",
@@ -969,7 +969,7 @@ async def test_async_portia_cloud_storage_errors(httpx_mock: HTTPXMock) -> None:
 
     end_user = EndUser(external_id="123")
 
-        # Test async save_plan failure - simulate network error
+    # Test async save_plan failure - simulate network error
     httpx_mock.add_exception(
         method="POST",
         url=f"{config.portia_api_endpoint}/api/v0/plans/",
@@ -1178,7 +1178,7 @@ async def test_async_portia_cloud_agent_memory_errors(httpx_mock: HTTPXMock) -> 
 
     mock_exception = RuntimeError("An error occurred.")
 
-        # Test async save_plan_run_output error
+    # Test async save_plan_run_output error
     httpx_mock.add_exception(
         method="PUT",
         url=f"{config.portia_api_endpoint}/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",

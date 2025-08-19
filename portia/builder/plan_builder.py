@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.portia_plan import PlanV2
+from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
-from portia.builder.step import FunctionCall, LLMStep, SingleToolAgent, ToolRun
+from portia.builder.step_v2 import FunctionCall, LLMStep, SingleToolAgent, ToolRun
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ class PlanBuilderV2:
         """Initialize the builder.
 
         Args:
-            label: The label of the plan. This is used to identify the plan in the UI.
+            label: The label of the plan. This is used to identify the plan in the Portia dashboard.
 
         """
         self.plan = PlanV2(steps=[], label=label)
@@ -46,9 +46,9 @@ class PlanBuilderV2:
         task: str,
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
-        name: str | None = None,
+        step_name: str | None = None,
     ) -> PlanBuilderV2:
-        """Add a step that directly queries the LLM tool.
+        """Add a step that sends a query to the underlying LLM.
 
         Args:
             task: The task to perform.
@@ -56,7 +56,7 @@ class PlanBuilderV2:
               plan inputs (using StepOutput / Input) or just plain values. They are passed in as
               additional context to the LLM when it is completing the task.
             output_schema: The schema of the output.
-            name: Optional name for the step. If not provided, will be auto-generated.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
         self.plan.steps.append(
@@ -64,7 +64,7 @@ class PlanBuilderV2:
                 task=task,
                 inputs=inputs or [],
                 output_schema=output_schema,
-                step_name=name or default_step_name(len(self.plan.steps)),
+                step_name=step_name or default_step_name(len(self.plan.steps)),
             )
         )
         return self
@@ -75,7 +75,7 @@ class PlanBuilderV2:
         tool: str | Tool,
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
-        name: str | None = None,
+        step_name: str | None = None,
     ) -> PlanBuilderV2:
         """Add a step that directly invokes a tool.
 
@@ -85,7 +85,7 @@ class PlanBuilderV2:
             args: The arguments to the tool. If any of these values are instances of StepOutput or
               Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
-            name: Optional name for the step. If not provided, will be auto-generated.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
         self.plan.steps.append(
@@ -93,7 +93,7 @@ class PlanBuilderV2:
                 tool=tool,
                 args=args or {},
                 output_schema=output_schema,
-                step_name=name or default_step_name(len(self.plan.steps)),
+                step_name=step_name or default_step_name(len(self.plan.steps)),
             )
         )
         return self
@@ -104,7 +104,7 @@ class PlanBuilderV2:
         function: Callable[..., Any],
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
-        name: str | None = None,
+        step_name: str | None = None,
     ) -> PlanBuilderV2:
         """Add a step that directly invokes a function.
 
@@ -113,7 +113,7 @@ class PlanBuilderV2:
             args: The arguments to the function. If any of these values are instances of StepOutput
               or Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
-            name: Optional name for the step. If not provided, will be auto-generated.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
         self.plan.steps.append(
@@ -121,7 +121,7 @@ class PlanBuilderV2:
                 function=function,
                 args=args or {},
                 output_schema=output_schema,
-                step_name=name or default_step_name(len(self.plan.steps)),
+                step_name=step_name or default_step_name(len(self.plan.steps)),
             )
         )
         return self
@@ -133,7 +133,7 @@ class PlanBuilderV2:
         task: str,
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
-        name: str | None = None,
+        step_name: str | None = None,
     ) -> PlanBuilderV2:
         """Add a step that uses the execution agent with a tool.
 
@@ -143,7 +143,7 @@ class PlanBuilderV2:
             inputs: The inputs to the task. If any of these values are instances of StepOutput or
               Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
-            name: Optional name for the step. If not provided, will be auto-generated.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
         self.plan.steps.append(
@@ -152,7 +152,7 @@ class PlanBuilderV2:
                 task=task,
                 inputs=inputs or [],
                 output_schema=output_schema,
-                step_name=name or default_step_name(len(self.plan.steps)),
+                step_name=step_name or default_step_name(len(self.plan.steps)),
             )
         )
         return self

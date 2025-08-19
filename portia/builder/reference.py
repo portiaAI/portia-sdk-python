@@ -11,7 +11,7 @@ from portia.execution_agents.output import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
-    from portia.builder.portia_plan import PlanV2
+    from portia.builder.plan_v2 import PlanV2
     from portia.portia import RunContext
 
 
@@ -35,7 +35,13 @@ class Reference(ABC):
 
 
 class StepOutput(Reference):
-    """A reference to the output of a step."""
+    """A reference to the output of a previous step.
+
+    When building your plan, you can use this class to reference the output of a previous step.
+    The output from the specified step will then be substituted in when the plan is run.
+
+    See the example usage in example_builder.py for more details.
+    """
 
     step: str | int = Field(
         description="The step to reference the output of. If a string is provided, this will be"
@@ -67,7 +73,15 @@ class StepOutput(Reference):
 
 
 class Input(Reference):
-    """A reference to a plan input."""
+    """A reference to a plan input.
+
+    When building your plan, you can specify plan inputs using the PlanBuilder.input() method. These
+    are inputs whose values you provide when running the plan, rather than when building the plan.
+    You can then use this to reference those inputs later in your plan. When you do this, the values
+    will be substituted in when the plan is run.
+
+    See the example usage in example_builder.py for more details.
+    """
 
     name: str = Field(description="The name of the input.")
 

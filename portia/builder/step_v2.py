@@ -19,11 +19,11 @@ from portia.plan import Variable
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
-    from portia.builder.portia_plan import PlanV2
+    from portia.builder.plan_v2 import PlanV2
     from portia.portia import RunContext
 
 
-class Step(BaseModel, ABC):
+class StepV2(BaseModel, ABC):
     """Interface for steps that are run as part of a plan."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -91,7 +91,7 @@ class Step(BaseModel, ABC):
         return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
 
 
-class LLMStep(Step):
+class LLMStep(StepV2):
     """A step that runs a given task through an LLM (without any tools)."""
 
     task: str = Field(description="The task to perform.")
@@ -154,7 +154,7 @@ class LLMStep(Step):
         )
 
 
-class ToolRun(Step):
+class ToolRun(StepV2):
     """A step that calls a tool with the given args (no LLM involved, just a direct tool call)."""
 
     tool: str | Tool = Field(
@@ -239,7 +239,7 @@ class ToolRun(Step):
         )
 
 
-class FunctionCall(Step):
+class FunctionCall(StepV2):
     """Calls a function with the given args (no LLM involved, just a direct function call)."""
 
     function: Callable[..., Any] = Field(description=("The function to call."))
@@ -300,7 +300,7 @@ class FunctionCall(Step):
         )
 
 
-class SingleToolAgent(Step):
+class SingleToolAgent(StepV2):
     """A step where an LLM agent uses a single tool (calling it only once) to complete a task."""
 
     task: str = Field(description="The task to perform.")

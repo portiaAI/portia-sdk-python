@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from portia.builder.plan_builder import PlanBuilderV2
-from portia.builder.portia_plan import PlanV2
+from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step import FunctionCall, LLMStep, SingleToolAgent, ToolRun
+from portia.builder.step_v2 import FunctionCall, LLMStep, SingleToolAgent, ToolRun
 
 # Clarification related classes
 from portia.clarification import (
