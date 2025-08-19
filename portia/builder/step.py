@@ -95,7 +95,7 @@ class LLMStep(Step):
     """A step that runs a given task through an LLM (without any tools)."""
 
     task: str = Field(description="The task to perform.")
-    inputs: list[Any] = Field(
+    inputs: list[Any | Reference] = Field(
         default_factory=list,
         description=(
             "The inputs for the task. The inputs can be references to previous step outputs / "
@@ -163,8 +163,12 @@ class ToolRun(Step):
             "run."
         )
     )
-    args: dict[str, Any] = Field(
-        default_factory=dict, description="The args to call the tool with."
+    args: dict[str, Any | Reference] = Field(
+        default_factory=dict,
+        description=(
+            "The args to call the tool with. The arg values can be references to previous step "
+            "outputs / plan inputs (using StepOutput / Input) or just plain values."
+        ),
     )
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
@@ -239,8 +243,12 @@ class FunctionCall(Step):
     """Calls a function with the given args (no LLM involved, just a direct function call)."""
 
     function: Callable[..., Any] = Field(description=("The function to call."))
-    args: dict[str, Any] = Field(
-        default_factory=dict, description="The args to call the tool with."
+    args: dict[str, Any | Reference] = Field(
+        default_factory=dict,
+        description=(
+            "The args to call the function with. The arg values can be references to previous step "
+            "outputs / plan inputs (using StepOutput / Input) or just plain values."
+        ),
     )
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
@@ -297,7 +305,14 @@ class SingleToolAgent(Step):
 
     task: str = Field(description="The task to perform.")
     tool: str = Field(description="The tool to use.")
-    inputs: list[Any] = Field(default_factory=list, description="The inputs to the tool.")
+    inputs: list[Any | Reference] = Field(
+        default_factory=list,
+        description=(
+            "The inputs for the task. The inputs can be references to previous step outputs / "
+            "plan inputs (using StepOutput / Input) or just plain values. They are passed in as "
+            "additional context to the agent when it is completing the task."
+        ),
+    )
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
     )
