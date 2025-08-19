@@ -2633,6 +2633,11 @@ class Portia:
             ),
         )
         if structured_output_schema:
+            if plan.final_output_schema:
+                logger().warning(
+                    "Running plan with structured output schema passed into run_plan - this "
+                    "overwrites the final output schema set in the plan builder."
+                )
             plan.final_output_schema = structured_output_schema
         plan_run = await self._aget_plan_run_from_plan(legacy_plan, end_user, plan_run_inputs)
         return await self.resume_builder_plan(
