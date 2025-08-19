@@ -2423,14 +2423,15 @@ class Portia:
         self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
         return plan_run
 
-    def _get_tool_for_step(self, step: Step, plan_run: PlanRun) -> Tool | None:
-        if not step.tool_id:
+    def get_tool(self, tool_id: str | None, plan_run: PlanRun) -> Tool | None:
+        """Get the tool for a step."""
+        if not tool_id:
             return None
         try:
-            child_tool = self.tool_registry.get_tool(step.tool_id)
+            child_tool = self.tool_registry.get_tool(tool_id)
         except ToolNotFoundError:
             # Special case LLMTool so it doesn't need to be in all tool registries
-            if step.tool_id == LLMTool.LLM_TOOL_ID:
+            if tool_id == LLMTool.LLM_TOOL_ID:
                 child_tool = LLMTool()
             else:
                 raise  # pragma: no cover
@@ -2457,7 +2458,7 @@ class Portia:
             BaseAgent: The agent to execute the step.
 
         """
-        tool = self._get_tool_for_step(step, plan_run)
+        tool = self.get_tool(step.tool_id, plan_run)
         cls: type[BaseExecutionAgent]
         match self.config.execution_agent_type:
             case ExecutionAgentType.ONE_SHOT:
@@ -2579,7 +2580,7 @@ class Portia:
                 continue
             tools_remaining.add(step.tool_id)
 
-            tool = self._get_tool_for_step(step, plan_run)
+            tool = self.get_tool(step.tool_id, plan_run)
             if not tool:
                 continue  # pragma: no cover - Should not happen if tool_id is set - defensive check
             if tool.id.startswith("portia:"):

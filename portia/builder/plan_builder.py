@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from portia.builder.portia_plan import PortiaPlan
 from portia.builder.reference import default_step_name
-from portia.builder.step import FunctionCall, Hook, LLMStep, SingleToolAgent, ToolCall
+from portia.builder.step import LLMStep, SingleToolAgent, ToolCall
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:
@@ -64,7 +64,7 @@ class PlanBuilder:
     def tool_call(
         self,
         *,
-        tool: str,
+        tool: str | Callable[..., Any],
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
@@ -72,7 +72,8 @@ class PlanBuilder:
         """Add a step that directly invokes a tool.
 
         Args:
-            tool: The tool to invoke.
+            tool: The tool to invoke. Should either be the id of the tool to call or a python
+              function that should be called.
             args: The arguments to the tool. If any of these values are instances of StepOutput or
               Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
@@ -82,34 +83,6 @@ class PlanBuilder:
         self.plan.steps.append(
             ToolCall(
                 tool=tool,
-                args=args or {},
-                output_schema=output_schema,
-                name=name or default_step_name(len(self.plan.steps)),
-            )
-        )
-        return self
-
-    def function_call(
-        self,
-        *,
-        function: Callable[..., Any],
-        args: dict[str, Any] | None = None,
-        output_schema: type[BaseModel] | None = None,
-        name: str | None = None,
-    ) -> PlanBuilder:
-        """Add a step that calls a function.
-
-        Args:
-            function: The function to call.
-            args: The arguments to the function. If any of these values are instances of StepOutput
-              or Input, the corresponding values will be substituted in when the plan is run.
-            output_schema: The schema of the output.
-            name: Optional name for the step. If not provided, will be auto-generated.
-
-        """
-        self.plan.steps.append(
-            FunctionCall(
-                function=function,
                 args=args or {},
                 output_schema=output_schema,
                 name=name or default_step_name(len(self.plan.steps)),
@@ -143,30 +116,6 @@ class PlanBuilder:
                 task=task,
                 inputs=inputs or [],
                 output_schema=output_schema,
-                name=name or default_step_name(len(self.plan.steps)),
-            )
-        )
-        return self
-
-    def hook(
-        self,
-        hook: Callable[..., None],
-        args: dict[str, Any] | None = None,
-        name: str | None = None,
-    ) -> PlanBuilder:
-        """Add a hook step.
-
-        Args:
-            hook: The hook to add.
-            args: The args to call the hook with. If any of these values are instances of StepOutput
-              or Input, the corresponding values will be substituted in when the plan is run.
-            name: Optional name for the step. If not provided, will be auto-generated.
-
-        """
-        self.plan.steps.append(
-            Hook(
-                hook=hook,
-                args=args or {},
                 name=name or default_step_name(len(self.plan.steps)),
             )
         )

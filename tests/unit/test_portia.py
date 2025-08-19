@@ -1206,7 +1206,7 @@ def test_portia_get_tool_for_step_none_tool_id() -> None:
         tool_id=None,
     )
 
-    tool = portia._get_tool_for_step(step, plan_run)
+    tool = portia.get_tool(step.tool_id, plan_run)
     assert tool is None
 
 
@@ -1223,7 +1223,7 @@ def test_get_llm_tool() -> None:
         tool_id=LLMTool.LLM_TOOL_ID,
     )
 
-    tool = portia._get_tool_for_step(step, plan_run)
+    tool = portia.get_tool(step.tool_id, plan_run)
     assert tool is not None
     assert isinstance(tool._child_tool, LLMTool)  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -2692,7 +2692,7 @@ class CustomPortia(Portia):
     def get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
         """Get the agent for a step."""
         if step.task == "raise_clarification":
-            tool = self._get_tool_for_step(step, plan_run)
+            tool = self.get_tool(step.tool_id, plan_run)
             return RaiseClarificationAgent(
                 plan=plan,
                 plan_run=plan_run,

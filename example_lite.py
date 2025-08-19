@@ -98,8 +98,8 @@ plan = (
         },
         output_schema=CommodityPriceWithCurrency,
     )
-    .function_call(
-        function=lambda price_with_currency, purchase_quantity: (
+    .tool_call(
+        tool=lambda price_with_currency, purchase_quantity: (
             purchase_quantity * price_with_currency.price
         ),
         args={
@@ -107,7 +107,6 @@ plan = (
             "purchase_quantity": Input("purchase_quantity"),
         },
     )
-    .hook(log_cost, args={"cost": StepOutput(2)})
     .llm_step(
         task="Write a poem about the price of gold",
         inputs=[StepOutput(step=0)],
@@ -115,7 +114,7 @@ plan = (
     .single_tool_agent(
         task="Send the poem to Robbie in an email at robbie+test@portialabs.ai",
         tool="portia:google:gmail:send_email",
-        inputs=[StepOutput(step=4)],
+        inputs=[StepOutput(step=3)],
     )
     .final_output(
         output_schema=FinalOutput,
