@@ -27,7 +27,7 @@ Paid contributions are shown in the [Issue](https://github.com/portiaAI/portia-s
 
 1. **Fork the Repository**: Start by forking the repository and cloning it locally.
 2. **Create a Branch**: Create a branch for your feature or bug fix. Use a descriptive name for your branch (e.g., `fix-typo`, `add-feature-x`).
-3. **Install the dependencies** We use uv to manage dependencies. Run ``uv install --all-extras``
+3. **Install the dependencies** We use uv to manage dependencies. Run ``uv pip install -r pyproject.toml --all-extras``
 4. **Make Your Changes**: Implement your changes in small, focused commits. Be sure to follow our linting rules and style guide.
 5. **Run Tests**: If your changes affect functionality, please test thoroughly 🌡️ Details on how run tests are in the **Tests** section below.
 6. **Lint Your Code**: We use [ruff](https://github.com/charliermarsh/ruff) for linting. Please ensure your code passes all linting checks. We prefer per-line disables for rules rather than global ignores, and please leave comments explaining why you disable any rules.
