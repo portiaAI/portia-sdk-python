@@ -115,17 +115,21 @@ class FinalOutputSummarizer:
                 # summary = Field(description="The summary of the weather in london") # noqa: ERA001
                 fo_summary: str = Field(description="The summary of the plan output")
 
-            logger().trace(f"LLM call: summarization (final output) model={model!s}")
+            msg = self.summarizer_and_structured_output_prompt + context
+            preview = msg.replace("\n", " ")[:120]
+            logger().trace(
+                f"LLM call: summarization (final output) model={model!s} msg={preview!r}"
+            )
             return model.get_structured_response(
                 [
-                    Message(
-                        content=self.summarizer_and_structured_output_prompt + context, role="user"
-                    )
+                    Message(content=msg, role="user")
                 ],
                 SchemaWithSummary,
             )
-        logger().trace(f"LLM call: summarization (final output) model={model!s}")
-        response = model.get_response(
-            [Message(content=self.summarizer_only_prompt + context, role="user")],
+        msg = self.summarizer_only_prompt + context
+        preview = msg.replace("\n", " ")[:120]
+        logger().trace(
+            f"LLM call: summarization (final output) model={model!s} msg={preview!r}"
         )
+        response = model.get_response([Message(content=msg, role="user")])
         return str(response.content) if response.content else None
