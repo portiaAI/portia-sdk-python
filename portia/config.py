@@ -721,6 +721,8 @@ class Config(BaseModel):
         ]:
             try:
                 model_getter()
+            except (ImportError, ConfigNotFoundError, ValueError):
+                raise
             except Exception as e:
                 raise InvalidConfigError(
                     label,
@@ -910,7 +912,7 @@ class Config(BaseModel):
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.MISTRALAI:
-                validate_extras_dependencies("mistralai")
+                validate_extras_dependencies("mistralai", raise_error=True)
                 from portia.model import MistralAIGenerativeModel
 
                 return MistralAIGenerativeModel(
@@ -919,7 +921,7 @@ class Config(BaseModel):
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
-                validate_extras_dependencies("google")
+                validate_extras_dependencies("google", raise_error=True)
                 from portia.model import GoogleGenAiGenerativeModel
 
                 return GoogleGenAiGenerativeModel(
@@ -928,7 +930,7 @@ class Config(BaseModel):
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.AMAZON:
-                validate_extras_dependencies("amazon")
+                validate_extras_dependencies("amazon", raise_error=True)
                 from portia.model import AmazonBedrockGenerativeModel
 
                 return AmazonBedrockGenerativeModel(
@@ -947,7 +949,7 @@ class Config(BaseModel):
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.OLLAMA:
-                validate_extras_dependencies("ollama")
+                validate_extras_dependencies("ollama", raise_error=True)
                 from portia.model import OllamaGenerativeModel
 
                 return OllamaGenerativeModel(
