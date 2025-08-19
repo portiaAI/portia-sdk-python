@@ -29,15 +29,24 @@ class PlanBuilderV2:
         """
         self.plan = PlanV2(steps=[], label=label)
 
-    def input(self, name: str, description: str | None = None) -> PlanBuilderV2:
+    def input(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        default_value: Any | None = None,  # noqa: ANN401
+    ) -> PlanBuilderV2:
         """Add an input to the plan.
 
         Args:
             name: The name of the input.
             description: The description of the input.
+            default_value: The default value of the input.
 
         """
-        self.plan.plan_inputs.append(PlanInput(name=name, description=description))
+        self.plan.plan_inputs.append(
+            PlanInput(name=name, description=description, value=default_value)
+        )
         return self
 
     def llm_step(

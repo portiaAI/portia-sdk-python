@@ -58,6 +58,14 @@ class StepOutput(Reference):
         """Get the name of the reference to use with legacy Portia plans."""
         return plan.step_output_name(self.step)
 
+    def __str__(self) -> str:
+        """Get the string representation of the step output."""
+        # We use double braces around the StepOutput to allow string interpolation for StepOutputs
+        # used in PlanBuilderV2 steps.
+        # The double braces are used when the plan is running to template the StepOutput value so it
+        # can be substituted at runtime.
+        return f"{{{{ StepOutput({self.step}) }}}}"
+
     @override
     def get_value(self, run_data: RunContext) -> ReferenceValue | None:
         """Get the value of the step output."""
@@ -112,6 +120,13 @@ class Input(Reference):
             value=value,
             description=plan_input.description or "Input to plan",
         )
+
+    def __str__(self) -> str:
+        """Get the string representation of the input."""
+        # We use double braces around the Input to allow string interpolation for Inputs used
+        # in PlanBuilderV2 steps. The double braces are used when the plan is running to template
+        # the input value so it can be substituted at runtime.
+        return f"{{{{ Input({self.name}) }}}}"
 
 
 class ReferenceValue(BaseModel):

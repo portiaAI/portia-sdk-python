@@ -29,7 +29,7 @@ portia = Portia(execution_hooks=CLIExecutionHooks())
 
 plan = (
     PlanBuilderV2("Write a poem about the price of gold")
-    .input("purchase_quantity", "The quantity of gold to purchase in ounces")
+    .input(name="purchase_quantity", description="The quantity of gold to purchase in ounces")
     .tool_run(
         step_name="Search gold price",
         tool="search_tool",

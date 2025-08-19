@@ -1247,7 +1247,7 @@ class Portia:
 
         return await self.aexecute_plan_run_and_handle_clarifications(plan, plan_run)
 
-    def _process_plan_input_values(
+    def _process_plan_input_values(  # noqa: C901
         self,
         plan: Plan,
         plan_run: PlanRun,
@@ -1265,7 +1265,19 @@ class Portia:
 
         """
         if plan.plan_inputs and not plan_run_inputs:
-            raise ValueError("Inputs are required for this plan but have not been specified")
+            missing_inputs = [
+                input_obj.name for input_obj in plan.plan_inputs if input_obj.value is None
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+
+            for plan_input in plan.plan_inputs:
+                if plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
+                    )
+            return
+
         if plan_run_inputs and not plan.plan_inputs:
             logger().warning(
                 "Inputs are not required for this plan but plan inputs were provided",
@@ -1274,11 +1286,11 @@ class Portia:
         if plan_run_inputs and plan.plan_inputs:
             input_values_by_name = {input_obj.name: input_obj for input_obj in plan_run_inputs}
 
-            # Validate all required inputs are provided
+            # Validate all required inputs are provided or have default values
             missing_inputs = [
                 input_obj.name
                 for input_obj in plan.plan_inputs
-                if input_obj.name not in input_values_by_name
+                if input_obj.name not in input_values_by_name and input_obj.value is None
             ]
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
@@ -1287,6 +1299,10 @@ class Portia:
                 if plan_input.name in input_values_by_name:
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
                         value=input_values_by_name[plan_input.name].value
+                    )
+                elif plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
                     )
 
             # Check for unknown inputs
@@ -1296,7 +1312,7 @@ class Portia:
 
             self.storage.save_plan_run(plan_run)
 
-    async def _aprocess_plan_input_values(
+    async def _aprocess_plan_input_values(  # noqa: C901
         self,
         plan: Plan,
         plan_run: PlanRun,
@@ -1314,7 +1330,19 @@ class Portia:
 
         """
         if plan.plan_inputs and not plan_run_inputs:
-            raise ValueError("Inputs are required for this plan but have not been specified")
+            missing_inputs = [
+                input_obj.name for input_obj in plan.plan_inputs if input_obj.value is None
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+
+            for plan_input in plan.plan_inputs:
+                if plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
+                    )
+            return
+
         if plan_run_inputs and not plan.plan_inputs:
             logger().warning(
                 "Inputs are not required for this plan but plan inputs were provided",
@@ -1323,11 +1351,10 @@ class Portia:
         if plan_run_inputs and plan.plan_inputs:
             input_values_by_name = {input_obj.name: input_obj for input_obj in plan_run_inputs}
 
-            # Validate all required inputs are provided
             missing_inputs = [
                 input_obj.name
                 for input_obj in plan.plan_inputs
-                if input_obj.name not in input_values_by_name
+                if input_obj.name not in input_values_by_name and input_obj.value is None
             ]
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
@@ -1337,8 +1364,11 @@ class Portia:
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
                         value=input_values_by_name[plan_input.name].value
                     )
+                elif plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
+                    )
 
-            # Check for unknown inputs
             for input_obj in plan_run_inputs:
                 if not any(plan_input.name == input_obj.name for plan_input in plan.plan_inputs):
                     logger().warning(f"Ignoring unknown plan input: {input_obj.name}")
