@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.portia_plan import PortiaPlan
+from portia.builder.portia_plan import PlanV2
 from portia.builder.reference import default_step_name
-from portia.builder.step import LLMStep, SingleToolAgent, ToolCall
+from portia.builder.step import FunctionCall, LLMStep, SingleToolAgent, ToolRun
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:
@@ -17,23 +17,36 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 
-class PlanBuilder:
+class PlanBuilderV2:
     """Builder for Portia plans."""
 
-    def __init__(self, task: str = "Run the plan built with the Plan Builder") -> None:
-        """Initialize the builder."""
-        self.plan = PortiaPlan(steps=[], task=task)
+    def __init__(self, label: str = "Run the plan built with the Plan Builder") -> None:
+        """Initialize the builder.
 
-    def input(self, name: str, description: str | None = None, value: Any | None = None) -> PlanBuilder:
+        Args:
+            label: The label of the plan. This is used to identify the plan in the UI.
+
+        """
+        self.plan = PlanV2(steps=[], label=label)
+
+    def input(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        default_value: Any | None = None,  # noqa: ANN401
+    ) -> PlanBuilderV2:
         """Add an input to the plan.
 
         Args:
             name: The name of the input.
             description: The description of the input.
-            value: The value of the input.
+            default_value: The default value of the input.
 
         """
-        self.plan.plan_inputs.append(PlanInput(name=name, description=description, value=value))
+        self.plan.plan_inputs.append(
+            PlanInput(name=name, description=description, value=default_value)
+        )
         return self
 
     def llm_step(
@@ -43,7 +56,7 @@ class PlanBuilder:
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Add a step that directly queries the LLM tool.
 
         Args:
@@ -65,14 +78,14 @@ class PlanBuilder:
         )
         return self
 
-    def tool_call(
+    def tool_run(
         self,
         *,
-        tool: str | Tool | Callable[..., Any],
+        tool: str | Tool,
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Add a step that directly invokes a tool.
 
         Args:
@@ -85,8 +98,36 @@ class PlanBuilder:
 
         """
         self.plan.steps.append(
-            ToolCall(
+            ToolRun(
                 tool=tool,
+                args=args or {},
+                output_schema=output_schema,
+                step_name=name or default_step_name(len(self.plan.steps)),
+            )
+        )
+        return self
+
+    def function_call(
+        self,
+        *,
+        function: Callable[..., Any],
+        args: dict[str, Any] | None = None,
+        output_schema: type[BaseModel] | None = None,
+        name: str | None = None,
+    ) -> PlanBuilderV2:
+        """Add a step that directly invokes a function.
+
+        Args:
+            function: The function to invoke.
+            args: The arguments to the function. If any of these values are instances of StepOutput
+              or Input, the corresponding values will be substituted in when the plan is run.
+            output_schema: The schema of the output.
+            name: Optional name for the step. If not provided, will be auto-generated.
+
+        """
+        self.plan.steps.append(
+            FunctionCall(
+                function=function,
                 args=args or {},
                 output_schema=output_schema,
                 step_name=name or default_step_name(len(self.plan.steps)),
@@ -102,7 +143,7 @@ class PlanBuilder:
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Add a step that uses the execution agent with a tool.
 
         Args:
@@ -129,7 +170,7 @@ class PlanBuilder:
         self,
         output_schema: type[BaseModel] | None = None,
         summarize: bool = False,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Set the final output of the plan.
 
         Args:
@@ -143,6 +184,6 @@ class PlanBuilder:
         self.plan.summarize = summarize
         return self
 
-    def build(self) -> PortiaPlan:
+    def build(self) -> PlanV2:
         """Return the plan, ready to run."""
         return self.plan

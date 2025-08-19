@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from unittest.mock import MagicMock
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -25,6 +26,7 @@ from portia.execution_agents.execution_utils import (
     tool_call_or_end,
 )
 from portia.execution_agents.output import LocalDataValue, Output
+from portia.plan import Step
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import AdditionTool
 
@@ -53,7 +55,7 @@ def test_process_output_with_clarifications() -> None:
     ]
     message = HumanMessage(content="test")
 
-    result = process_output([message], clarifications=clarifications)  # type: ignore  # noqa: PGH003
+    result = process_output(MagicMock(spec=Step), [message], clarifications=clarifications)  # type: ignore  # noqa: PGH003
 
     assert isinstance(result, Output)
     assert result.get_value() == clarifications
@@ -77,10 +79,10 @@ def test_process_output_with_tool_errors() -> None:
     )
 
     with pytest.raises(ToolRetryError):
-        process_output([soft_error], tool)
+        process_output(MagicMock(spec=Step), [soft_error], tool)
 
     with pytest.raises(ToolFailedError):
-        process_output([hard_error], tool)
+        process_output(MagicMock(spec=Step), [hard_error], tool)
 
 
 def test_process_output_with_invalid_message() -> None:
@@ -88,7 +90,7 @@ def test_process_output_with_invalid_message() -> None:
     invalid_message = AIMessage(content="test")
 
     with pytest.raises(InvalidAgentOutputError):
-        process_output([invalid_message])
+        process_output(MagicMock(spec=Step), [invalid_message])
 
 
 def test_process_output_with_output_artifacts() -> None:
@@ -96,7 +98,7 @@ def test_process_output_with_output_artifacts() -> None:
     message = ToolMessage(tool_call_id="1", content="", artifact=LocalDataValue(value="test"))
     message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalDataValue(value="bar"))
 
-    result = process_output([message, message2], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message, message2], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.get_value() == ["test", "bar"]
@@ -107,7 +109,7 @@ def test_process_output_with_artifacts() -> None:
     """Test process_output with artifacts."""
     message = ToolMessage(tool_call_id="1", content="", artifact="test")
 
-    result = process_output([message], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.get_value() == "test"
@@ -117,7 +119,7 @@ def test_process_output_with_content() -> None:
     """Test process_output with content."""
     message = ToolMessage(tool_call_id="1", content="test")
 
-    result = process_output([message], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.get_value() == "test"
@@ -133,7 +135,7 @@ def test_process_output_with_clarification() -> None:
     )
     message = ToolMessage(tool_call_id="1", content=clarification.model_dump_json())
 
-    result = process_output([message], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.get_value() == [clarification]
@@ -146,7 +148,7 @@ def test_process_output_summary_matches_serialized_value() -> None:
         tool_call_id="1", content="test", artifact=LocalDataValue(value=dict_value)
     )
 
-    result = process_output([message], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.get_value() == dict_value
@@ -163,7 +165,7 @@ def test_process_output_summary_not_updated_if_provided() -> None:
         artifact=LocalDataValue(value=dict_value, summary=provided_summary),
     )
 
-    result = process_output([message], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message], clarifications=[])
 
     assert isinstance(result, Output)
     assert result.get_value() == dict_value
@@ -286,7 +288,7 @@ def test_process_output_with_mixed_list_and_scalar_values() -> None:
         artifact=LocalDataValue(value=["item3", "item4"], summary="Third list output"),
     )
 
-    result = process_output([message1, message2, message3], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message1, message2, message3], clarifications=[])
 
     assert isinstance(result, Output)
     # The list values should be extended, scalar values should be appended
@@ -302,7 +304,7 @@ def test_process_output_with_multiple_outputs_no_summaries() -> None:
     message2 = ToolMessage(tool_call_id="2", content="", artifact=LocalDataValue(value="c"))
     message3 = ToolMessage(tool_call_id="3", content="", artifact=LocalDataValue(value=["d", "e"]))
 
-    result = process_output([message1, message2, message3], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message1, message2, message3], clarifications=[])
 
     assert isinstance(result, Output)
     expected_values = ["a", "b", "c", "d", "e"]
@@ -330,7 +332,7 @@ def test_process_output_with_nested_list_values() -> None:
         artifact=LocalDataValue(value=[{"id": 3}, {"id": 4}], summary="Final user list"),
     )
 
-    result = process_output([message1, message2, message3], clarifications=[])
+    result = process_output(MagicMock(spec=Step), [message1, message2, message3], clarifications=[])
 
     assert isinstance(result, Output)
     expected_values = [{"id": 1}, {"id": 2}, {"status": "success"}, {"id": 3}, {"id": 4}]

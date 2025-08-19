@@ -2,13 +2,13 @@
 
 import pytest
 
-from portia.plan import Plan, PlanBuilderLegacy, PlanContext, Step, Variable
+from portia.plan import Plan, PlanBuilder, PlanContext, Step, Variable
 
 
 def test_plan_builder_syntax() -> None:
     """Test that the plan builder syntax works."""
     plan_builder = (
-        PlanBuilderLegacy("Find the best offers for a flight from London to New York")
+        PlanBuilder("Find the best offers for a flight from London to New York")
         .step(
             task="Search for flights",
             tool_id="flight_search",
@@ -48,7 +48,7 @@ def test_plan_builder_syntax() -> None:
 
 def test_plan_variable_no_steps() -> None:
     """Test that the plan variable function raises an error if there are no steps."""
-    plan = PlanBuilderLegacy("Find the best offers for a flight from London to New York")
+    plan = PlanBuilder("Find the best offers for a flight from London to New York")
     with pytest.raises(ValueError, match="Invalid step index or no steps in the plan"):
         plan.input("$flights")
 
@@ -56,7 +56,7 @@ def test_plan_variable_no_steps() -> None:
 def test_plan_condition() -> None:
     """Test that the plan condition function works."""
     plan = (
-        PlanBuilderLegacy("Find the best offers for a flight from London to New York")
+        PlanBuilder("Find the best offers for a flight from London to New York")
         .step("search for flights", "flight_search")
         .step("compare prices", "price_comparison")
         .condition("The flight search has more than 30 results")

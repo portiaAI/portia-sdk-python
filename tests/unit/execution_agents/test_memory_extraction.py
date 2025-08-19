@@ -11,7 +11,7 @@ from portia.errors import InvalidPlanRunStateError
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.output import LocalDataValue
-from portia.plan import PlanBuilderLegacy, Variable
+from portia.plan import PlanBuilder, Variable
 from portia.storage import InMemoryStorage
 from tests.utils import get_test_config, get_test_plan_run
 
@@ -20,7 +20,7 @@ def test_memory_extraction_step_no_inputs() -> None:
     """Test MemoryExtractionStep with no step inputs."""
     (_, plan_run) = get_test_plan_run()
     agent = BaseExecutionAgent(
-        plan=PlanBuilderLegacy().step(task="DESCRIPTION_STRING", output="$out").build(),
+        plan=PlanBuilder().step(task="DESCRIPTION_STRING", output="$out").build(),
         plan_run=plan_run,
         config=get_test_config(),
         end_user=EndUser(external_id="123"),
@@ -50,7 +50,7 @@ def test_memory_extraction_step_with_inputs() -> None:
     }
 
     agent = BaseExecutionAgent(
-        plan=PlanBuilderLegacy()
+        plan=PlanBuilder()
         .step(
             task="DESCRIPTION_STRING",
             output="$out",
@@ -83,7 +83,7 @@ def test_memory_extraction_step_errors_with_missing_input() -> None:
     """Test MemoryExtractionStep ignores step inputs that aren't in previous outputs."""
     (_, plan_run) = get_test_plan_run()
     agent = BaseExecutionAgent(
-        plan=PlanBuilderLegacy()
+        plan=PlanBuilder()
         .step(
             task="DESCRIPTION_STRING",
             output="$out",
@@ -113,7 +113,7 @@ def test_memory_extraction_step_with_plan_run_inputs() -> None:
     }
 
     agent = BaseExecutionAgent(
-        plan=PlanBuilderLegacy()
+        plan=PlanBuilder()
         .step(
             task="DESCRIPTION_STRING",
             output="$out",
@@ -149,7 +149,7 @@ def test_memory_extraction_step_uses_summary_when_value_too_large() -> None:
     }
 
     agent = BaseExecutionAgent(
-        plan=PlanBuilderLegacy()
+        plan=PlanBuilder()
         .step(
             task="DESCRIPTION_STRING",
             output="$out",
@@ -191,7 +191,7 @@ def test_memory_extraction_step_uses_summaries_when_multiple_values_too_large() 
     }
 
     agent = BaseExecutionAgent(
-        plan=PlanBuilderLegacy()
+        plan=PlanBuilder()
         .step(
             task="DESCRIPTION_STRING",
             output="$out",

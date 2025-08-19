@@ -22,7 +22,7 @@ from portia.config import (
 from portia.errors import PlanError, ToolHardError, ToolSoftError
 from portia.model import LLMProvider, OpenAIGenerativeModel
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
-from portia.plan import Plan, PlanBuilderLegacy, PlanContext, PlanInput, Step, Variable
+from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step, Variable
 from portia.plan_run import PlanRunState
 from portia.portia import ExecutionHooks, Portia
 from portia.tool import Tool
@@ -371,6 +371,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     plan_run = portia.resolve_clarification(
         plan_run.get_outstanding_clarifications()[0],
         "False",
+        plan_run,
     )
 
     portia.resume(plan_run)
@@ -413,6 +414,7 @@ async def test_portia_arun_query_with_clarifications_no_handler() -> None:
     plan_run = portia.resolve_clarification(
         plan_run.get_outstanding_clarifications()[0],
         "False",
+        plan_run,
     )
 
     portia.resume(plan_run)
@@ -1123,7 +1125,7 @@ def test_run_plan_with_large_step_input() -> None:
             return f"Email sent to {recipient} with subject '{subject}'"
 
     plan = (
-        PlanBuilderLegacy(
+        PlanBuilder(
             "Send an email to robbie@portialabs.ai titles 'Story' containing the first "
             "chapter of War and Peace"
         )
@@ -1206,7 +1208,7 @@ async def test_arun_plan_with_large_step_input() -> None:
             return f"Email sent to {recipient} with subject '{subject}'"
 
     plan = (
-        PlanBuilderLegacy(
+        PlanBuilder(
             "Send an email to robbie@portialabs.ai titles 'Story' containing the first "
             "chapter of War and Peace"
         )

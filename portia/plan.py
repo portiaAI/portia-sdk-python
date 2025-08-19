@@ -23,14 +23,12 @@ from __future__ import annotations
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
-from typing_extensions import deprecated
 
 from portia.common import Serializable
 from portia.prefixed_uuid import PlanUUID
 
 
-@deprecated("Move to our new PlanBuilder instead")
-class PlanBuilderLegacy:
+class PlanBuilder:
     """A builder for creating plans.
 
     This class provides an interface for constructing plans step by step. Requires a step to be
@@ -74,7 +72,7 @@ class PlanBuilderLegacy:
         inputs: list[Variable] | None = None,
         condition: str | None = None,
         structured_output_schema: type[BaseModel] | None = None,
-    ) -> PlanBuilderLegacy:
+    ) -> PlanBuilder:
         """Add a step to the plan.
 
         Args:
@@ -113,7 +111,7 @@ class PlanBuilderLegacy:
         name: str,
         description: str | None = None,
         step_index: int | None = None,
-    ) -> PlanBuilderLegacy:
+    ) -> PlanBuilder:
         """Add an input variable to the chosen step in the plan (default is the last step).
 
         Inputs are outputs from previous steps.
@@ -140,7 +138,7 @@ class PlanBuilderLegacy:
         self,
         name: str,
         description: str,
-    ) -> PlanBuilderLegacy:
+    ) -> PlanBuilder:
         """Add an input variable to the plan.
 
         Args:
@@ -160,7 +158,7 @@ class PlanBuilderLegacy:
         self,
         condition: str,
         step_index: int | None = None,
-    ) -> PlanBuilderLegacy:
+    ) -> PlanBuilder:
         """Add a condition to the chosen step in the plan (default is the last step).
 
         Args:

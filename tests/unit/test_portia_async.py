@@ -35,7 +35,7 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.plan import (
     Plan,
-    PlanBuilderLegacy,
+    PlanBuilder,
     PlanContext,
     PlanInput,
     PlanUUID,
@@ -1163,6 +1163,7 @@ async def test_portia_aerror_clarification(portia: Portia, planning_model: Magic
             source="Test portia error clarification",
         ),
         error=ValueError("test error"),
+        plan_run=plan_run,
     )
     assert plan_run.state == PlanRunState.FAILED
 
@@ -1745,7 +1746,7 @@ async def test_portia_acustom_tool_ready_not_ready() -> None:
         config=get_test_config(),
         tools=[ready_tool],
     )
-    plan = PlanBuilderLegacy().step("", ready_tool.id).build()
+    plan = PlanBuilder().step("", ready_tool.id).build()
     plan_run = await portia.acreate_plan_run(plan, end_user="123")
     await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
@@ -1770,7 +1771,7 @@ async def test_portia_acustom_tool_ready_resume_multiple_instances_of_same_tool(
         config=get_test_config(),
         tools=[ready_tool, ready_tool],
     )
-    plan = PlanBuilderLegacy().step("1", ready_tool.id).step("2", ready_tool.id).build()
+    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool.id).build()
     plan_run = await portia.acreate_plan_run(plan, end_user="123")
     await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
@@ -1790,7 +1791,7 @@ async def test_portia_acustom_tool_ready_resume_multiple_custom_tools() -> None:
     ready_tool = ReadyTool(id="ready_tool", auth_url="https://fake.portiaai.test/auth")
     ready_tool_2 = ReadyTool(id="ready_tool_2", auth_url="https://fake.portiaai.test/auth2")
     portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool_2])
-    plan = PlanBuilderLegacy().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
+    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
     plan_run = await portia.acreate_plan_run(plan, end_user="123")
     await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 

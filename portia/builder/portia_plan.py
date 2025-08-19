@@ -13,7 +13,7 @@ from portia.plan import Plan, PlanContext, PlanInput
 from portia.prefixed_uuid import PlanUUID
 
 
-class PortiaPlan(BaseModel):
+class PlanV2(BaseModel):
     """A sequence of steps to be run by Portia."""
 
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")
@@ -26,7 +26,7 @@ class PortiaPlan(BaseModel):
     final_output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the final output of the plan."
     )
-    task: str = Field(
+    label: str = Field(
         default="Run the plan built with the Plan Builder",
         description="The task that the plan is completing.",
     )

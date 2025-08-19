@@ -11,7 +11,7 @@ from portia.execution_agents.output import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
-    from portia.builder.portia_plan import PortiaPlan
+    from portia.builder.portia_plan import PlanV2
     from portia.portia import RunContext
 
 
@@ -24,7 +24,7 @@ class Reference(ABC):
     """A reference to a value."""
 
     @abstractmethod
-    def get_legacy_name(self, plan: PortiaPlan) -> str:
+    def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
         raise NotImplementedError
 
@@ -48,12 +48,16 @@ class StepOutput(Reference):
         self.step = step
 
     @override
-    def get_legacy_name(self, plan: PortiaPlan) -> str:
+    def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
         return plan.step_output_name(self.step)
 
     def __str__(self) -> str:
         """Get the string representation of the step output."""
+        # We use double braces around the StepOutput to allow string interpolation for StepOutputs
+        # used in PlanBuilderV2 steps.
+        # The double braces are used when the plan is running to template the StepOutput value so it
+        # can be substituted at runtime.
         return f"{{{{ StepOutput({self.step}) }}}}"
 
     @override
@@ -80,7 +84,7 @@ class Input(Reference):
         self.name = name
 
     @override
-    def get_legacy_name(self, plan: PortiaPlan) -> str:
+    def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
         return self.name
 
@@ -105,6 +109,9 @@ class Input(Reference):
 
     def __str__(self) -> str:
         """Get the string representation of the input."""
+        # We use double braces around the Input to allow string interpolation for Inputs used
+        # in PlanBuilderV2 steps. The double braces are used when the plan is running to template
+        # the input value so it can be substituted at runtime.
         return f"{{{{ Input({self.name}) }}}}"
 
 

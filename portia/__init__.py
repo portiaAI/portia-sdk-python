@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from portia.builder.plan_builder import PlanBuilder
-from portia.builder.portia_plan import PortiaPlan
+from portia.builder.plan_builder import PlanBuilderV2
+from portia.builder.portia_plan import PlanV2
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step import LLMStep, SingleToolAgent, ToolCall
+from portia.builder.step import FunctionCall, LLMStep, SingleToolAgent, ToolRun
 
 # Clarification related classes
 from portia.clarification import (
@@ -82,7 +82,7 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanBuilderLegacy, PlanContext, PlanInput, PlanUUID, Step, Variable
+from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
@@ -121,6 +121,7 @@ __all__ = [
     "ExtractTool",
     "FileReaderTool",
     "FileWriterTool",
+    "FunctionCall",
     "GenerativeModel",
     "GenerativeModelsConfig",
     "InMemoryToolRegistry",
@@ -144,7 +145,7 @@ __all__ = [
     "Output",
     "Plan",
     "PlanBuilder",
-    "PlanBuilderLegacy",
+    "PlanBuilderV2",
     "PlanContext",
     "PlanError",
     "PlanInput",
@@ -153,10 +154,10 @@ __all__ = [
     "PlanRunNotFoundError",
     "PlanRunState",
     "PlanUUID",
+    "PlanV2",
     "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
-    "PortiaPlan",
     "PortiaToolRegistry",
     "SearchTool",
     "SingleToolAgent",
@@ -167,12 +168,12 @@ __all__ = [
     "StorageClass",
     "StorageError",
     "Tool",
-    "ToolCall",
     "ToolFailedError",
     "ToolHardError",
     "ToolNotFoundError",
     "ToolRegistry",
     "ToolRetryError",
+    "ToolRun",
     "ToolRunContext",
     "UserVerificationClarification",
     "ValueConfirmationClarification",
