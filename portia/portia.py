@@ -1415,8 +1415,8 @@ class Portia:
             logger().debug("Calling clarification_handler execution hook")
             self.execution_hooks.clarification_handler.handle(
                 clarification=clarification,
-                on_resolution=lambda c, r: self.resolve_clarification(c, r) and None,
-                on_error=lambda c, r: self.error_clarification(c, r) and None,
+                on_resolution=lambda c, r: self.resolve_clarification(c, r, plan_run) and None,
+                on_error=lambda c, r: self.error_clarification(c, r, plan_run) and None,
             )
             logger().debug("Finished clarification_handler execution hook")
 
@@ -1433,7 +1433,7 @@ class Portia:
         self,
         clarification: Clarification,
         response: object,
-        plan_run: PlanRun | None = None,
+        plan_run: PlanRun,
     ) -> PlanRun:
         """Resolve a clarification updating the run state as needed.
 
@@ -1455,8 +1455,6 @@ class Portia:
                 },
             )
         )
-        if plan_run is None:
-            plan_run = self.storage.get_plan_run(clarification.plan_run_id)
 
         matched_clarification = next(
             (c for c in plan_run.outputs.clarifications if c.id == clarification.id),
@@ -1486,14 +1484,12 @@ class Portia:
         self,
         clarification: Clarification,
         error: object,
-        plan_run: PlanRun | None = None,
+        plan_run: PlanRun,
     ) -> PlanRun:
         """Mark that there was an error handling the clarification."""
         logger().error(
             f"Error handling clarification with guidance '{clarification.user_guidance}': {error}",
         )
-        if plan_run is None:
-            plan_run = self.storage.get_plan_run(clarification.plan_run_id)
         self._set_plan_run_state(plan_run, PlanRunState.FAILED)
         return plan_run
 
@@ -2055,9 +2051,12 @@ class Portia:
         # all subsequent steps.
         # Otherwise, combine the new clarifications with the ready clarifications from the
         # next step.
+        tool_id = step.tool_id or ""
+        step_tool = self.tool_registry.get_tool(tool_id) if tool_id in self.tool_registry else None
+
         if (
             len(new_clarifications) == 1
-            and isinstance(self.tool_registry.get_tool(step.tool_id or ""), PortiaRemoteTool)
+            and isinstance(step_tool, PortiaRemoteTool)
             and new_clarifications[0].category == ClarificationCategory.ACTION
         ):
             combined_clarifications = self._check_remaining_tool_readiness(
@@ -2105,7 +2104,7 @@ class Portia:
     ) -> PlanRun:
         error_output = LocalDataValue(value=str(error))
         self._set_step_output(error_output, plan_run, step)
-        logger().error(
+        logger().exception(
             "Error executing step {index}: {error}",
             index=index,
             error=error,

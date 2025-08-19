@@ -1163,6 +1163,7 @@ async def test_portia_aerror_clarification(portia: Portia, planning_model: Magic
             source="Test portia error clarification",
         ),
         error=ValueError("test error"),
+        plan_run=plan_run,
     )
     assert plan_run.state == PlanRunState.FAILED
 
