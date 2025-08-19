@@ -68,7 +68,9 @@ class Step(BaseModel, ABC):
                 result = _input
                 for ref_type, var_name in matches:
                     var_name = var_name.strip()  # noqa: PLW2901
-                    ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)
+                    if ref_type == "StepOutput" and var_name.isdigit():
+                        var_name = int(var_name)  # noqa: PLW2901
+                    ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
                     resolved = self._resolve_input_reference(ref, run_data)
                     resolved_val = (
                         resolved.value.full_value(run_data.portia.storage)
@@ -79,7 +81,7 @@ class Step(BaseModel, ABC):
                         r"\{\{\s*"
                         + re.escape(ref_type)
                         + r"\s*\(\s*"
-                        + re.escape(var_name)
+                        + re.escape(str(var_name))
                         + r"\s*\)\s*\}\}"
                     )
                     result = re.sub(pattern, str(resolved_val), result, count=1)
