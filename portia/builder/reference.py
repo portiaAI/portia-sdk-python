@@ -103,5 +103,5 @@ class Input(Reference):
 class ReferenceValue(BaseModel):
     """Value that can be referenced."""
 
-    value: Output
-    description: str
+    value: Output = Field(description="The referenced value.")
+    description: str = Field(description="Description of the referenced value.", default="")

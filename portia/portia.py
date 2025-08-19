@@ -103,14 +103,14 @@ class RunData(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    plan: PortiaPlan
-    legacy_plan: Plan
-    plan_run: PlanRun
-    end_user: EndUser
+    plan: PortiaPlan = Field(description="The Portia plan being executed.")
+    legacy_plan: Plan = Field(description="The legacy plan representation.")
+    plan_run: PlanRun = Field(description="The current plan run instance.")
+    end_user: EndUser = Field(description="The end user executing the plan.")
     step_output_values: list[ReferenceValue] = Field(
         default_factory=list, description="Outputs set by the step."
     )
-    portia: Portia
+    portia: Portia = Field(description="The Portia client instance.")
 
 
 class Portia:
@@ -967,7 +967,7 @@ class Portia:
         plan_run_inputs: list[PlanInput]
         | list[dict[str, Serializable]]
         | dict[str, Serializable]
-        | None = None,
+        | None,
         structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Get a plan run from storage."""
@@ -1054,8 +1054,8 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
-            plan (PortiaPlan | None): If using a new plan, the plan must be passed in here in order
-                to resume.
+            plan (PortiaPlan | None): If using a plan built with the Plan Builder, the plan must be
+                passed in here in order to resume.
 
         Returns:
             PlanRun: The resulting PlanRun after execution.
@@ -1100,8 +1100,8 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
-            plan (PortiaPlan | None): If using a new plan, the plan must be passed in here in order
-                to resume.
+            plan (PortiaPlan | None): If using a plan built with the Plan Builder, the plan must be
+                passed in here in order to resume.
 
         Returns:
             PlanRun: The resulting PlanRun after execution.
@@ -1896,7 +1896,7 @@ class Portia:
 
         # we pass read only copies of the state to the agent so that the portia remains
         # responsible for handling the output of the agent and updating the state.
-        agent = self._get_agent_for_step(
+        agent = self.get_agent_for_step(
             step=ReadOnlyStep.from_step(step),
             plan=ReadOnlyPlan.from_plan(plan),
             plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
@@ -1939,7 +1939,7 @@ class Portia:
 
         # we pass read only copies of the state to the agent so that the portia remains
         # responsible for handling the output of the agent and updating the state.
-        agent = self._get_agent_for_step(
+        agent = self.get_agent_for_step(
             step=ReadOnlyStep.from_step(step),
             plan=ReadOnlyPlan.from_plan(plan),
             plan_run=ReadOnlyPlanRun.from_plan_run(plan_run),
@@ -2440,7 +2440,7 @@ class Portia:
             plan_run=plan_run,
         )
 
-    def _get_agent_for_step(
+    def get_agent_for_step(
         self,
         step: Step,
         plan: Plan,
@@ -2640,7 +2640,7 @@ class Portia:
                 ),
             )
         if not end_user:
-            end_user = self.initialize_end_user(plan_run.end_user_id)
+            end_user = self.storage.get_end_user(plan_run.end_user_id)
 
         ready, plan_run = self._check_initial_readiness(legacy_plan, plan_run)
         if not ready:
@@ -2650,7 +2650,7 @@ class Portia:
             plan=plan,
             legacy_plan=legacy_plan,
             plan_run=plan_run,
-            end_user=end_user,
+            end_user=end_user or self.initialize_end_user(plan_run.end_user_id),
             portia=self,
         )
 
@@ -2676,27 +2676,61 @@ class Portia:
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
 
-        output_value = None
+        output_value = self._get_last_executed_step_output(run_data.legacy_plan, run_data.plan_run)
         for i, step in enumerate(plan.steps):
             if i < run_data.plan_run.current_step_index:
                 continue
 
-            logger().info(f"Starting step {i}: {step.describe(run_data)}")
+            logger().info(f"Starting step {i}: {step.describe()}")
 
-            result = await step.run(run_data)
+            try:
+                result = await step.run(run_data)
+            except Exception as e:  # noqa: BLE001
+                return self._handle_execution_error(
+                    run_data.plan_run, run_data.legacy_plan, i, step.to_legacy_step(plan), e
+                )
+
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
             output_value = self._set_step_output(
-                output_value, run_data.plan_run, step.to_portia_step(plan)
+                output_value, run_data.plan_run, step.to_legacy_step(plan)
             )
             output = ReferenceValue(
                 value=output_value,
-                description=(
-                    f"Output from step '{step.name}' (Description: {step.describe(run_data)})"
-                ),
+                description=(f"Output from step '{step.name}' (Description: {step.describe()})"),
             )
-
             run_data.step_output_values.append(output)
+
+            try:
+                if clarified_plan_run := self._handle_post_step_execution(
+                    run_data.legacy_plan,
+                    run_data.plan_run,
+                    i,
+                    step.to_legacy_step(plan),
+                    output_value,
+                ):
+                    # No after_plan_run call here as the plan run will be resumed later
+                    return clarified_plan_run
+            except Exception as e:  # noqa: BLE001 - We want to capture all exceptions from the hook here
+                logger().error(
+                    "Error in post-step stage for step {index}: {error}",
+                    index=i,
+                    error=e,
+                    plan=str(plan.id),
+                    plan_run=str(run_data.plan_run.id),
+                )
+                error_value = LocalDataValue(value=str(e))
+                self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
+                error_output = ReferenceValue(
+                    value=error_value,
+                    description=(f"Error from step '{step.name}' (Description: {step.describe()})"),
+                )
+                run_data.step_output_values.append(error_output)
+                # Skip the after_step_execution hook as we have already run it
+                return self._handle_plan_run_execution_error(
+                    run_data.plan_run, run_data.legacy_plan, error_value
+                )
+
             run_data.plan_run.current_step_index += 1
             logger().info(f"Completed step {i}, result: {result}")
 

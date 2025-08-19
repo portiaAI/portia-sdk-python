@@ -889,7 +889,7 @@ def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
         ),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan_run = portia.run(query)
 
@@ -1069,7 +1069,7 @@ def test_portia_run_query_with_memory(
         ),
         mock.patch.object(
             portia_with_agent_memory,
-            "_get_agent_for_step",
+            "get_agent_for_step",
             return_value=mock_step_agent,
         ),
     ):
@@ -1348,7 +1348,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
         ),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan = portia.plan("Raise a clarification")
         plan_run = portia.create_plan_run(plan)
@@ -1445,7 +1445,7 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
 
     with (
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan_run = portia.run("Test query with skipped step")
 
@@ -1513,7 +1513,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
 
     with (
         mock.patch.object(portia, "_generate_introspection_outcome", custom_handle_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         # Run the test
         plan_run = portia.run("Test query with early completed execution")
@@ -1719,7 +1719,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
 
     with (
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
         mock.patch("portia.portia.FinalOutputSummarizer", return_value=mock_summarizer),
     ):
         result_plan_run = portia.resume(plan_run)
@@ -1824,7 +1824,7 @@ def test_portia_run_with_plan_run_inputs(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
         ),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan_run = portia.run(
             query="Add the two numbers together",
@@ -1987,7 +1987,7 @@ def test_portia_run_plan_with_plan_run_inputs(
         return
 
     # Mock the get_agent_for_step method to return our mock agent
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
 
     assert plan_run.plan_id == plan.id
@@ -2183,7 +2183,7 @@ def test_portia_execution_step_hooks(portia: Portia, planning_model: MagicMock) 
     mock_summarizer_agent.create_summary.return_value = None
 
     with (
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -2239,7 +2239,7 @@ def test_portia_execution_step_hooks_with_error(portia: Portia, planning_model: 
     mock_agent = MagicMock()
     mock_agent.execute_sync.side_effect = ValueError("Test execution error")
 
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = portia.run("Test execution hooks with error")
     assert plan_run.state == PlanRunState.FAILED
 
@@ -2276,7 +2276,7 @@ def test_portia_execution_step_hooks_with_skip(portia: Portia, planning_model: M
     mock_summarizer_agent.create_summary.return_value = None
 
     with (
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -2315,7 +2315,7 @@ def test_portia_execution_step_hooks_after_step_exception(
     step_1_result = LocalDataValue(value="Step 1 result")
     mock_agent.execute_sync.return_value = step_1_result
 
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = portia.run("Test after_step_execution hook exception")
 
     assert plan_run.state == PlanRunState.FAILED
@@ -2689,7 +2689,8 @@ class CustomPortia(Portia):
         super().__init__(*args, **kwargs)
         self.forced_clarifications = forced_clarifications
 
-    def _get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
+    def get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
+        """Get the agent for a step."""
         if step.task == "raise_clarification":
             tool = self._get_tool_for_step(step, plan_run)
             return RaiseClarificationAgent(
@@ -2701,7 +2702,7 @@ class CustomPortia(Portia):
                 tool=tool,
                 forced_clarifications=self.forced_clarifications,
             )
-        return super()._get_agent_for_step(step, plan, plan_run)
+        return super().get_agent_for_step(step, plan, plan_run)
 
 
 def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() -> None:

@@ -699,7 +699,7 @@ async def test_portia_arun_plan_with_plan_run_inputs(
         return
 
     # Mock the get_agent_for_step method to return our mock agent
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
 
     assert plan_run.plan_id == plan.id
@@ -916,7 +916,7 @@ async def test_portia_arun_plan_with_unknown_inputs_mixed_case(portia: Portia) -
     # Mock the logger to capture warning messages
     with (
         mock.patch("portia.portia.logger") as mock_logger,
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
     ):
         plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
 
@@ -962,7 +962,7 @@ async def test_portia_arun_plan_logs_unknown_input_warning(portia: Portia) -> No
     # Mock the logger to specifically capture the unknown input warning
     with (
         mock.patch("portia.portia.logger") as mock_logger,
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
     ):
         plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
 
@@ -1112,7 +1112,7 @@ async def test_portia_ahandle_clarification(planning_model: MagicMock) -> None:
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
         ),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan = await portia.aplan("Raise a clarification")
         plan_run = portia.create_plan_run(plan)
@@ -1221,7 +1221,7 @@ async def test_portia_aexecute_plan_run_with_introspection_skip(
 
     with (
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan_run = await portia.arun("Test query with skipped step")
 
@@ -1294,7 +1294,7 @@ async def test_portia_aexecute_plan_run_with_introspection_complete(
 
     with (
         mock.patch.object(portia, "_agenerate_introspection_outcome", custom_handle_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         # Run the test
         plan_run = await portia.arun("Test query with early completed execution")
@@ -1467,7 +1467,7 @@ async def test_portia_aexecute_step_hooks(portia: Portia, planning_model: MagicM
     mock_summarizer_agent.create_summary.return_value = None
 
     with (
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -1577,7 +1577,7 @@ async def test_portia_aresume_with_skipped_steps(portia: Portia) -> None:
 
     with (
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
         mock.patch("portia.portia.FinalOutputSummarizer", return_value=mock_summarizer),
     ):
         result_plan_run = await portia.aresume(plan_run)
@@ -1614,7 +1614,7 @@ async def test_portia_aexecute_step_hooks_with_error(
     mock_agent = MagicMock()
     mock_agent.execute_async.side_effect = ValueError("Test execution error")
 
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = await portia.arun("Test execution hooks with error")
     assert plan_run.state == PlanRunState.FAILED
 
@@ -1654,7 +1654,7 @@ async def test_portia_aexecute_step_hooks_with_skip(
     mock_summarizer_agent.create_summary.return_value = None
 
     with (
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -1694,7 +1694,7 @@ async def test_portia_aexecute_step_hooks_after_step_exception(
     step_1_result = LocalDataValue(value="Step 1 result")
     mock_agent.execute_async = mock.AsyncMock(return_value=step_1_result)
 
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = await portia.arun("Test after_step_execution hook exception")
 
     assert plan_run.state == PlanRunState.FAILED

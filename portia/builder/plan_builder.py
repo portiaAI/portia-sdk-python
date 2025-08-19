@@ -4,21 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from pydantic import BaseModel
-
 from portia.builder.portia_plan import PortiaPlan
 from portia.builder.reference import default_step_name
 from portia.builder.step import FunctionCall, Hook, LLMStep, SingleToolAgent, ToolCall
 from portia.plan import PlanInput
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from pydantic import BaseModel
+
 
 class PlanBuilder:
     """Builder for Portia plans."""
 
-    def __init__(self, task: str = "") -> None:
+    def __init__(self, task: str = "Run the plan built with the Plan Builder") -> None:
         """Initialize the builder."""
         self.plan = PortiaPlan(steps=[], task=task)
 
@@ -54,7 +54,7 @@ class PlanBuilder:
         self.plan.steps.append(
             LLMStep(
                 task=task,
-                inputs=inputs,
+                inputs=inputs or [],
                 output_schema=output_schema,
                 name=name or default_step_name(len(self.plan.steps)),
             )
@@ -65,7 +65,7 @@ class PlanBuilder:
         self,
         *,
         tool: str,
-        args: dict[str, Any],
+        args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
     ) -> PlanBuilder:
@@ -82,7 +82,7 @@ class PlanBuilder:
         self.plan.steps.append(
             ToolCall(
                 tool=tool,
-                args=args,
+                args=args or {},
                 output_schema=output_schema,
                 name=name or default_step_name(len(self.plan.steps)),
             )
@@ -93,7 +93,7 @@ class PlanBuilder:
         self,
         *,
         function: Callable[..., Any],
-        args: dict[str, Any],
+        args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
     ) -> PlanBuilder:
@@ -110,7 +110,7 @@ class PlanBuilder:
         self.plan.steps.append(
             FunctionCall(
                 function=function,
-                args=args,
+                args=args or {},
                 output_schema=output_schema,
                 name=name or default_step_name(len(self.plan.steps)),
             )
@@ -141,7 +141,7 @@ class PlanBuilder:
             SingleToolAgent(
                 tool=tool,
                 task=task,
-                inputs=inputs,
+                inputs=inputs or [],
                 output_schema=output_schema,
                 name=name or default_step_name(len(self.plan.steps)),
             )

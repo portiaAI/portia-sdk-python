@@ -10,7 +10,6 @@ from langsmith import traceable
 from pydantic import BaseModel, Field
 
 from portia.builder.reference import Reference, ReferenceValue
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step as PlanStep
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
 class Step(BaseModel, ABC):
     """Interface for steps that are run as part of a plan."""
 
-    name: str
+    name: str = Field(description="The name of the step.")
 
     @abstractmethod
     async def run(self, run_data: RunData) -> Any:  # noqa: ANN401
@@ -34,12 +33,12 @@ class Step(BaseModel, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def describe(self, run_data: RunData) -> str:
+    def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         raise NotImplementedError
 
     @abstractmethod
-    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this step to a PlanStep from plan.py.
 
         A PlanStep is the legacy representation of a step in the plan, and is still used in the
@@ -49,24 +48,27 @@ class Step(BaseModel, ABC):
         raise NotImplementedError
 
     def _get_value_for_input(self, _input: Any, run_data: RunData) -> Any | ReferenceValue | None:  # noqa: ANN401
-        """Get the value for an input that could come from a previous step output."""
+        """Get the value for an input that could come from a reference."""
         return _input.get_value(run_data) if isinstance(_input, Reference) else _input
+
+    def _inputs_to_legacy_plan_variables(
+        self, inputs: list[Any], plan: PortiaPlan
+    ) -> list[Variable]:
+        """Convert a list of inputs to a list of legacy plan variables."""
+        return [Variable(name=v.get_name(plan)) for v in inputs or [] if isinstance(v, Reference)]
 
 
 class LLMStep(Step):
     """A step that runs a given task through an LLM (without any tools)."""
 
-    task: str
-    inputs: list[Any] | None = None
-    output_schema: type[BaseModel] | None = None
-
-    @property
-    def tool_id(self) -> str:
-        """Return the LLM tool ID."""
-        return LLMTool.LLM_TOOL_ID
+    task: str = Field(description="The task to perform.")
+    inputs: list[Any] = Field(default_factory=list, description="The inputs to the task.")
+    output_schema: type[BaseModel] | None = Field(
+        default=None, description="The schema of the output."
+    )
 
     @override
-    def describe(self, run_data: RunData) -> str:
+    def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         return f"LLMStep(task='{self.task}'{output_info})"
@@ -95,21 +97,17 @@ class LLMStep(Step):
         """Get the value for an input."""
         if not isinstance(_input, ReferenceValue):
             return _input
-        step_output_value: ReferenceValue = _input
         return (
-            f"Previous step {step_output_value.description} had output: "
-            f"{step_output_value.value.full_value(run_data.portia.storage)}"
+            f"Previous step {_input.description} had output: "
+            f"{_input.value.full_value(run_data.portia.storage)}"
         )
 
     @override
-    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this LLMStep to a PlanStep."""
-        input_variables = [
-            Variable(name=v.get_name(plan)) for v in self.inputs or [] if isinstance(v, Reference)
-        ]
         return PlanStep(
             task=self.task,
-            inputs=input_variables,
+            inputs=self._inputs_to_legacy_plan_variables(self.inputs or [], plan),
             tool_id=LLMTool.LLM_TOOL_ID,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
@@ -119,12 +117,16 @@ class LLMStep(Step):
 class ToolCall(Step):
     """A step that calls a tool with the given inputs."""
 
-    tool: str
-    args: dict[str, Any]
-    output_schema: type[BaseModel] | None = None
+    tool: str = Field(description="The id of the tool to call.")
+    args: dict[str, Any] = Field(
+        default_factory=dict, description="The args to call the tool with."
+    )
+    output_schema: type[BaseModel] | None = Field(
+        default=None, description="The schema of the output."
+    )
 
     @override
-    def describe(self, run_data: RunData) -> str:
+    def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         return f"ToolCall(tool='{self.tool}', inputs={self.args}{output_info})"
@@ -173,15 +175,12 @@ class ToolCall(Step):
         return output
 
     @override
-    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
-        input_variables = [
-            Variable(name=v.get_name(plan)) for v in self.args.values() if isinstance(v, Reference)
-        ]
         return PlanStep(
             task=f"Use tool {self.tool} with inputs: {inputs_desc}",
-            inputs=input_variables,
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=self.tool,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
@@ -191,12 +190,16 @@ class ToolCall(Step):
 class FunctionCall(Step):
     """A step that calls a function with the given inputs."""
 
-    function: Callable[..., Any]
-    args: dict[str, Any]
-    output_schema: type[BaseModel] | None = None
+    function: Callable[..., Any] = Field(description="The function to call.")
+    args: dict[str, Any] = Field(
+        default_factory=dict, description="The args to call the function with."
+    )
+    output_schema: type[BaseModel] | None = Field(
+        default=None, description="The schema of the output."
+    )
 
     @override
-    def describe(self, run_data: RunData) -> str:
+    def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         return f"FunctionCall(function='{self.function.__name__}', inputs={self.args}{output_info})"
@@ -231,15 +234,12 @@ class FunctionCall(Step):
         return output
 
     @override
-    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this FunctionCall to a PlanStep."""
         inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
-        input_variables = [
-            Variable(name=v.get_name(plan)) for v in self.args.values() if isinstance(v, Reference)
-        ]
         return PlanStep(
             task=f"Call function {self.function.__name__} with inputs: {inputs_desc}",
-            inputs=input_variables,
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=f"local_function_{self.function.__name__}",
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
@@ -249,13 +249,15 @@ class FunctionCall(Step):
 class SingleToolAgent(Step):
     """A step where an LLM agent uses a single tool (calling it only once) to complete a task."""
 
-    task: str
-    tool: str
-    inputs: list[Any] | None = None
-    output_schema: type[BaseModel] | None = None
+    task: str = Field(description="The task to perform.")
+    tool: str = Field(description="The tool to use.")
+    inputs: list[Any] = Field(default_factory=list, description="The inputs to the tool.")
+    output_schema: type[BaseModel] | None = Field(
+        default=None, description="The schema of the output."
+    )
 
     @override
-    def describe(self, run_data: RunData) -> str:
+    def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         return f"SingleToolAgent(tool='{self.tool}', query='{self.task}'{output_info})"
@@ -264,32 +266,18 @@ class SingleToolAgent(Step):
     @traceable(name="Single Tool Agent - Run")
     async def run(self, run_data: RunData) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
-        tool = run_data.portia.tool_registry.get_tool(self.tool)
-        wrapped_tool = ToolCallWrapper(
-            child_tool=tool,
-            storage=run_data.portia.storage,
-            plan_run=run_data.plan_run,
-        )
-        agent = DefaultExecutionAgent(
-            plan=run_data.legacy_plan,
-            plan_run=run_data.plan_run,
-            config=run_data.portia.config,
-            agent_memory=run_data.portia.storage,
-            end_user=run_data.end_user,
-            tool=wrapped_tool,
+        agent = run_data.portia.get_agent_for_step(
+            self.to_legacy_step(run_data.plan), run_data.legacy_plan, run_data.plan_run
         )
         output_obj = await agent.execute_async()
         return output_obj.get_value()
 
     @override
-    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this SingleToolAgent to a PlanStep."""
-        input_variables = [
-            Variable(name=v.get_name(plan)) for v in self.inputs or [] if isinstance(v, Reference)
-        ]
         return PlanStep(
             task=self.task,
-            inputs=input_variables,
+            inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=self.tool,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
@@ -299,11 +287,11 @@ class SingleToolAgent(Step):
 class Hook(Step):
     """A custom function that runs between steps to extend / modify the running of the plan."""
 
-    hook: Callable[..., None]
+    hook: Callable[..., None] = Field(description="The hook to run.")
     args: dict[str, Any] = Field(default_factory=dict)
 
     @override
-    def describe(self, run_data: RunData) -> str:
+    def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         hook_name = getattr(self.hook, "__name__", str(self.hook))
         return f"Hook(hook={hook_name}, args={self.args})"
@@ -325,14 +313,11 @@ class Hook(Step):
         return self.hook(**args)
 
     @override
-    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this Hook to a PlanStep."""
-        input_variables = [
-            Variable(name=v.get_name(plan)) for v in self.args.values() if isinstance(v, Reference)
-        ]
         return PlanStep(
             task="Run hook",
-            inputs=input_variables,
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=f"local_hook_{self.hook.__name__}",
             output=plan.step_output_name(self),
             structured_output_schema=None,
