@@ -64,12 +64,6 @@ def validate_url_against_allowed_domains(url: str, allowed_domains: list[str] | 
     Raises:
         ToolHardError: If the URL is not allowed or contains security risks
     """
-    if allowed_domains is None:
-        return  # No restrictions if allowed_domains is None
-    
-    if not allowed_domains:
-        raise ToolHardError("No domains are allowed in the allowed_domains list")
-    
     try:
         parsed_url = urllib.parse.urlparse(url)
     except Exception as e:
@@ -85,6 +79,13 @@ def validate_url_against_allowed_domains(url: str, allowed_domains: list[str] | 
     hostname = parsed_url.hostname
     if not hostname:
         raise ToolHardError(f"URL must have a valid hostname: {url}")
+    
+    # If allowed_domains is None, allow all valid URLs (security checks already passed)
+    if allowed_domains is None:
+        return  # No restrictions if allowed_domains is None
+    
+    if not allowed_domains:
+        raise ToolHardError("No domains are allowed in the allowed_domains list")
     
     # Normalize hostname to lowercase for comparison
     hostname = hostname.lower().strip()
@@ -460,6 +461,7 @@ class BrowserToolForUrl(BrowserTool):
         description: str | None = None,
         model: GenerativeModel | None | str = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
+        custom_infrastructure_provider: BrowserInfrastructureProvider | None = None,
         allowed_domains: list[str] | None = None,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
@@ -482,6 +484,7 @@ class BrowserToolForUrl(BrowserTool):
             url=url,  # type: ignore reportCallIssue
             model=model,
             infrastructure_option=infrastructure_option,
+            custom_infrastructure_provider=custom_infrastructure_provider,
             allowed_domains=allowed_domains,
         )
 

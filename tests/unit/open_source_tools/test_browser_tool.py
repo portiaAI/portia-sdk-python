@@ -889,8 +889,8 @@ class TestAllowedDomainsValidation:
         """Test handling of invalid URL formats."""
         allowed_domains = ["example.com"]
         
-        # Should fail with invalid URLs
-        with pytest.raises(ToolHardError, match="Invalid URL format"):
+        # Should fail with invalid URLs (no hostname)
+        with pytest.raises(ToolHardError, match="URL must have a valid hostname"):
             validate_url_against_allowed_domains("not-a-url", allowed_domains)
         
         with pytest.raises(ToolHardError, match="URL must have a valid hostname"):
