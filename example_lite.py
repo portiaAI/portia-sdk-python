@@ -1,7 +1,5 @@
 """Simple Example."""
 
-import asyncio
-
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
@@ -126,12 +124,12 @@ plan = (
 )
 
 # Test async
-result1 = asyncio.run(portia.arun_plan(plan, plan_run_inputs={"purchase_quantity": 100}))
-print(result1)  # noqa: T201
+# result1 = asyncio.run(portia.arun_plan(plan, plan_run_inputs={"purchase_quantity": 100}))  # noqa: E501, ERA001
+# print(result1)  # noqa: ERA001
 
 # Test sync
-# result2 = portia.run_plan(plan)  # noqa: ERA001
-# print(result2)  # noqa: ERA001
+result2 = portia.run_plan(plan, plan_run_inputs={"purchase_quantity": 100})
+print(result2)  # noqa: T201
 
 # Test clarifications
 # result3 = asyncio.run(portia.arun_plan(plan, end_user=EndUser(external_id=str(uuid.uuid4()))))  # noqa: E501, ERA001

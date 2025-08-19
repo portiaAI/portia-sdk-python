@@ -857,7 +857,7 @@ class Portia:
 
     def run_plan(
         self,
-        plan: Plan | PlanUUID | UUID,
+        plan: Plan | PlanUUID | UUID | PortiaPlan,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput]
         | list[dict[str, Serializable]]
@@ -868,7 +868,7 @@ class Portia:
         """Run a plan.
 
         Args:
-            plan (Plan | PlanUUID | UUID): The plan to run, or the ID of the plan to load from
+            plan (Plan | PlanUUID | UUID | PortiaPlan): The plan to run, or the ID of the plan to load from
               storage.
             end_user (str | EndUser | None = None): The end user to use.
             plan_run_inputs (list[PlanInput] | list[dict[str, Serializable]] | dict[str, Serializable] | None):
