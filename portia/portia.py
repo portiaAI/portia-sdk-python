@@ -29,7 +29,7 @@ from uuid import UUID
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.builder.portia_plan import PlanV2
+from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import ReferenceValue
 from portia.clarification import (
     Clarification,

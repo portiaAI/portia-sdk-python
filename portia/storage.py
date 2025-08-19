@@ -1003,8 +1003,8 @@ class PortiaCloudStorage(Storage, AgentMemory):
         """
         self.client = PortiaCloudClient.new_client(config)
         self.form_client = PortiaCloudClient.new_client(config, json_headers=False)
-        self.async_client = PortiaCloudClient.new_async_client(config)
-        self.async_form_client = PortiaCloudClient.new_async_client(config, json_headers=False)
+        self.config = config
+        self.client_builder = PortiaCloudClient(config)
         self.cache_dir = cache_dir or ".portia/cache/agent_memory"
         self.max_cache_size = max_cache_size
         self._ensure_cache_dir()
@@ -1127,19 +1127,20 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.post(
-                url="/api/v0/plans/",
-                json={
-                    "id": str(plan.id),
-                    "query": plan.plan_context.query,
-                    "tool_ids": plan.plan_context.tool_ids,
-                    "steps": [step.model_dump(mode="json") for step in plan.steps],
-                    "plan_inputs": [
-                        {**input_.model_dump(mode="json"), "description": input_.description}
-                        for input_ in plan.plan_inputs
-                    ],
-                },
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.post(
+                    url="/api/v0/plans/",
+                    json={
+                        "id": str(plan.id),
+                        "query": plan.plan_context.query,
+                        "tool_ids": plan.plan_context.tool_ids,
+                        "steps": [step.model_dump(mode="json") for step in plan.steps],
+                        "plan_inputs": [
+                            {**input_.model_dump(mode="json"), "description": input_.description}
+                            for input_ in plan.plan_inputs
+                        ],
+                    },
+                )
         except Exception as e:
             raise StorageError(e) from e
         else:
@@ -1183,9 +1184,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.get(
-                url=f"/api/v0/plans/{plan_id}/",
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.get(
+                    url=f"/api/v0/plans/{plan_id}/",
+                )
         except Exception as e:
             raise StorageError(e) from e
         else:
@@ -1253,9 +1255,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.get(
-                url=f"/api/v0/plans/{plan_id}/",
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.get(
+                    url=f"/api/v0/plans/{plan_id}/",
+                )
         except Exception:  # noqa: BLE001
             return False
         else:
@@ -1301,19 +1304,21 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.put(
-                url=f"/api/v0/plan-runs/{plan_run.id}/",
-                json={
-                    "current_step_index": plan_run.current_step_index,
-                    "state": plan_run.state,
-                    "end_user": plan_run.end_user_id,
-                    "outputs": plan_run.outputs.model_dump(mode="json"),
-                    "plan_id": str(plan_run.plan_id),
-                    "plan_run_inputs": {
-                        k: v.model_dump(mode="json") for k, v in plan_run.plan_run_inputs.items()
+            async with self.client_builder.async_client() as client:
+                response = await client.put(
+                    url=f"/api/v0/plan-runs/{plan_run.id}/",
+                    json={
+                        "current_step_index": plan_run.current_step_index,
+                        "state": plan_run.state,
+                        "end_user": plan_run.end_user_id,
+                        "outputs": plan_run.outputs.model_dump(mode="json"),
+                        "plan_id": str(plan_run.plan_id),
+                        "plan_run_inputs": {
+                            k: v.model_dump(mode="json")
+                            for k, v in plan_run.plan_run_inputs.items()
+                        },
                     },
-                },
-            )
+                )
         except Exception as e:
             raise StorageError(e) from e
         else:
@@ -1368,9 +1373,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.get(
-                url=f"/api/v0/plan-runs/{plan_run_id}/",
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.get(
+                    url=f"/api/v0/plan-runs/{plan_run_id}/",
+                )
         except Exception as e:
             raise StorageError(e) from e
         else:
@@ -1466,9 +1472,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
                 query["page"] = page
             if run_state:
                 query["run_state"] = run_state.value
-            response = await self.async_client.get(
-                url=f"/api/v0/plan-runs/?{urlencode(query)}",
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.get(
+                    url=f"/api/v0/plan-runs/?{urlencode(query)}",
+                )
         except Exception as e:
             raise StorageError(e) from e
         else:
@@ -1542,19 +1549,20 @@ class PortiaCloudStorage(Storage, AgentMemory):
         """
         try:
             _check_size(f"{tool_call.tool_name} output", tool_call.output)
-            response = await self.async_client.post(
-                url="/api/v0/tool-calls/",
-                json={
-                    "plan_run_id": str(tool_call.plan_run_id),
-                    "tool_name": tool_call.tool_name,
-                    "step": tool_call.step,
-                    "end_user_id": tool_call.end_user_id or "",
-                    "input": tool_call.serialize_input(),
-                    "output": tool_call.serialize_output(),
-                    "status": tool_call.status,
-                    "latency_seconds": tool_call.latency_seconds,
-                },
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.post(
+                    url="/api/v0/tool-calls/",
+                    json={
+                        "plan_run_id": str(tool_call.plan_run_id),
+                        "tool_name": tool_call.tool_name,
+                        "step": tool_call.step,
+                        "end_user_id": tool_call.end_user_id or "",
+                        "input": tool_call.serialize_input(),
+                        "output": tool_call.serialize_output(),
+                        "status": tool_call.status,
+                        "latency_seconds": tool_call.latency_seconds,
+                    },
+                )
         except Exception as e:  # noqa: BLE001
             logger().error(f"Error saving tool call to Portia Cloud: {e}")
         else:
@@ -1633,18 +1641,19 @@ class PortiaCloudStorage(Storage, AgentMemory):
         try:
             _check_size(output_name, output)
 
-            response = await self.async_form_client.put(
-                url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
-                files={
-                    "value": (
-                        "output",
-                        BytesIO(output.serialize_value().encode("utf-8")),
-                    ),
-                },
-                data={
-                    "summary": output.get_summary() or "",
-                },
-            )
+            async with self.client_builder.async_client(json_headers=False) as client:
+                response = await client.put(
+                    url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
+                    files={
+                        "value": (
+                            "output",
+                            BytesIO(output.serialize_value().encode("utf-8")),
+                        ),
+                    },
+                    data={
+                        "summary": output.get_summary() or "",
+                    },
+                )
             self.check_response(response)
 
             # Save to local cache
@@ -1744,16 +1753,17 @@ class PortiaCloudStorage(Storage, AgentMemory):
             # Retrieving a value is a two step process
             # 1. Get the output with the storage URL from the backend
             # 2. Fetch the value from the storage URL
-            output_response = await self.async_client.get(
-                url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
-            )
-            self.check_response(output_response)
-            output_json = output_response.json()
-            summary = output_json["summary"]
-            value_url = output_json["url"]
+            async with self.client_builder.async_client() as client:
+                output_response = await client.get(
+                    url=f"/api/v0/agent-memory/plan-runs/{plan_run_id}/outputs/{output_name}/",
+                )
+                self.check_response(output_response)
+                output_json = output_response.json()
+                summary = output_json["summary"]
+                value_url = output_json["url"]
 
-            value_response = await self.async_client.get(value_url)
-            value_response.raise_for_status()
+                value_response = await client.get(value_url)
+                value_response.raise_for_status()
 
             # Create the output object
             output = LocalDataValue(
@@ -1811,14 +1821,15 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.post(
-                "/api/v0/plans/embeddings/search/",
-                json={
-                    "query": query,
-                    "threshold": threshold,
-                    "limit": limit,
-                },
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.post(
+                    url="/api/v0/plans/embeddings/search/",
+                    json={
+                        "query": query,
+                        "threshold": threshold,
+                        "limit": limit,
+                    },
+                )
             self.check_response(response)
             results = response.json()
             return [Plan.from_response(result) for result in results]
@@ -1864,10 +1875,11 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.put(
-                url=f"/api/v0/end-user/{end_user.external_id}/",
-                json=end_user.model_dump(mode="json"),
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.put(
+                    url=f"/api/v0/end-user/{end_user.external_id}/",
+                    json=end_user.model_dump(mode="json"),
+                )
         except Exception as e:
             raise StorageError(e) from e
         else:
@@ -1925,9 +1937,10 @@ class PortiaCloudStorage(Storage, AgentMemory):
 
         """
         try:
-            response = await self.async_client.get(
-                url=f"/api/v0/end-user/{external_id}/",
-            )
+            async with self.client_builder.async_client() as client:
+                response = await client.get(
+                    url=f"/api/v0/end-user/{external_id}/",
+                )
         except Exception as e:
             raise StorageError(e) from e
         else:
