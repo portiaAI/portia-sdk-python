@@ -29,8 +29,8 @@ from uuid import UUID
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.builder.output import StepOutputValue
 from portia.builder.portia_plan import PortiaPlan
+from portia.builder.reference import ReferenceValue
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -107,7 +107,7 @@ class RunData(BaseModel):
     legacy_plan: Plan
     plan_run: PlanRun
     end_user: EndUser
-    step_output_values: list[StepOutputValue] = Field(
+    step_output_values: list[ReferenceValue] = Field(
         default_factory=list, description="Outputs set by the step."
     )
     portia: Portia
@@ -814,7 +814,13 @@ class Portia:
         )
 
         if isinstance(plan, PortiaPlan):
-            return asyncio.run(self.run_builder_plan(plan, self.initialize_end_user(end_user)))
+            return asyncio.run(
+                self.run_builder_plan(
+                    plan,
+                    self.initialize_end_user(end_user),
+                    plan_run_inputs,
+                )
+            )
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
@@ -862,7 +868,11 @@ class Portia:
         )
 
         if isinstance(plan, PortiaPlan):
-            return await self.run_builder_plan(plan, self.initialize_end_user(end_user))
+            return await self.run_builder_plan(
+                plan,
+                self.initialize_end_user(end_user),
+                plan_run_inputs,
+            )
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
@@ -2366,7 +2376,15 @@ class Portia:
         return ready_clarifications
 
     @traceable(name="Portia - Run Plan")
-    async def run_builder_plan(self, plan: PortiaPlan, end_user: EndUser) -> PlanRun:
+    async def run_builder_plan(
+        self,
+        plan: PortiaPlan,
+        end_user: EndUser,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None = None,
+    ) -> PlanRun:
         """Run a Portia plan."""
         legacy_plan = plan.to_legacy_plan(
             PlanContext(
@@ -2374,7 +2392,7 @@ class Portia:
                 tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
             ),
         )
-        plan_run = self._get_plan_run_from_plan(legacy_plan, end_user)
+        plan_run = self._get_plan_run_from_plan(legacy_plan, end_user, plan_run_inputs)
         return await self.resume_builder_plan(
             plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
         )
@@ -2444,7 +2462,7 @@ class Portia:
             output_value = self._set_step_output(
                 output_value, run_data.plan_run, step.to_portia_step(plan)
             )
-            output = StepOutputValue(
+            output = ReferenceValue(
                 step_name=step.name,
                 value=output_value,
                 description=f"Output from step '{step.name}' (Description: {step.describe(run_data)})",
@@ -2458,7 +2476,7 @@ class Portia:
             run_data.legacy_plan,
             run_data.plan_run,
             output_value,
-            skip_summarization=plan.summarise or plan.final_output_schema is not None,
+            skip_summarization=not plan.summarize and plan.final_output_schema is None,
         )
 
     @staticmethod

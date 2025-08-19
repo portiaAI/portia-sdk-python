@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from portia import Config, LogLevel
 from portia.builder.plan_builder import PlanBuilder
-from portia.builder.step import StepOutput
+from portia.builder.reference import Input, StepOutput
 from portia.cli import CLIExecutionHooks
 from portia.portia import Portia
 from portia.tool import Tool, ToolRunContext
@@ -78,9 +78,9 @@ portia = Portia(
     execution_hooks=CLIExecutionHooks(),
 )
 
-purchase_quantity = 100
 plan = (
     PlanBuilder("Write a poem about the price of gold")
+    .input("purchase_quantity", "The quantity of gold to purchase")
     .single_tool_agent(
         name="Search gold price",
         tool="search_tool",
@@ -97,8 +97,13 @@ plan = (
         output_schema=CommodityPriceWithCurrency,
     )
     .function_call(
-        function=lambda price_with_currency: purchase_quantity * price_with_currency.price,
-        args={"price_with_currency": StepOutput(1)},
+        function=lambda price_with_currency, purchase_quantity: (
+            purchase_quantity * price_with_currency.price
+        ),
+        args={
+            "price_with_currency": StepOutput(1),
+            "purchase_quantity": Input("purchase_quantity"),
+        },
     )
     .hook(only_continue_if_affordable, args={"cost": StepOutput(2)})
     .llm_step(
@@ -117,7 +122,7 @@ plan = (
 )
 
 # Test async
-result1 = asyncio.run(portia.arun_plan(plan))
+result1 = asyncio.run(portia.arun_plan(plan, plan_run_inputs={"purchase_quantity": 100}))
 print(result1)
 
 # Test sync

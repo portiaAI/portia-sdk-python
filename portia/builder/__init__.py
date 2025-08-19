@@ -1,6 +1,6 @@
 """Builder module for constructing Portia plans."""
 
 from portia.builder.plan_builder import PlanBuilder
-from portia.builder.step import LLMStep, Step
+from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
 
-__all__ = ["LLMStep", "PlanBuilder", "Step"]
+__all__ = ["Input", "LLMStep", "PlanBuilder", "Reference", "ReferenceValue", "StepOutput"]

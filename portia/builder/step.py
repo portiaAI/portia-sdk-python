@@ -1,14 +1,15 @@
-"""@@@ TODO: Add docstring."""
+"""Interface for steps that are run as part of a PortiaPlan."""
 
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, override
 
 from langsmith import traceable
 from pydantic import BaseModel, Field
 
-from portia.builder.output import StepOutput, StepOutputValue
+from portia.builder.reference import Reference, ReferenceValue
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from portia.portia import RunData
 
 
-class Step(BaseModel):
+class Step(BaseModel, ABC):
     """Interface for steps that are run as part of a plan."""
 
     name: str
@@ -44,13 +45,9 @@ class Step(BaseModel):
         """
         raise NotImplementedError
 
-    def _get_value_for_input(self, _input: Any, run_data: RunData) -> Any | StepOutputValue | None:  # noqa: ANN401
+    def _get_value_for_input(self, _input: Any, run_data: RunData) -> Any | ReferenceValue | None:  # noqa: ANN401
         """Get the value for an input that could come from a previous step output."""
-        return (
-            _input.get_value(run_data.step_output_values)
-            if isinstance(_input, StepOutput)
-            else _input
-        )
+        return _input.get_value(run_data) if isinstance(_input, Reference) else _input
 
 
 class LLMStep(Step):
@@ -87,24 +84,22 @@ class LLMStep(Step):
             self._format_value(value, run_data)
             for _input in self.inputs
             if (value := self._get_value_for_input(_input, run_data)) is not None
-            or not isinstance(_input, StepOutput)
+            or not isinstance(_input, Reference)
         ]
         return await llm_tool.arun(tool_ctx, task=self.task, task_data=task_data)
 
     def _format_value(self, _input: Any, run_data: RunData) -> Any | None:  # noqa: ANN401
         """Get the value for an input."""
-        if not isinstance(_input, StepOutputValue):
+        if not isinstance(_input, ReferenceValue):
             return _input
-        step_output_value: StepOutputValue = _input
+        step_output_value: ReferenceValue = _input
         return f"Previous step {step_output_value.description} had output: {step_output_value.value.full_value(run_data.portia.storage)}"
 
     @override
     def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this LLMStep to a PlanStep."""
         input_variables = [
-            Variable(name=plan.step_output_name(v.step))
-            for v in self.inputs or []
-            if isinstance(v, StepOutput)
+            Variable(name=v.get_name(plan)) for v in self.inputs or [] if isinstance(v, Reference)
         ]
         return PlanStep(
             task=self.task,
@@ -148,12 +143,12 @@ class ToolCall(Step):
         args = {
             k: (
                 value.value.full_value(run_data.portia.storage)
-                if isinstance(value, StepOutputValue)
+                if isinstance(value, ReferenceValue)
                 else value
             )
             for k, v in self.args.items()
             if (value := self._get_value_for_input(v, run_data)) is not None
-            or not isinstance(v, StepOutput)
+            or not isinstance(v, Reference)
         }
 
         # TODO(RH): Move to async tool run when we can
@@ -176,9 +171,7 @@ class ToolCall(Step):
         """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
         input_variables = [
-            Variable(name=plan.step_output_name(v.step))
-            for v in self.args.values()
-            if isinstance(v, StepOutput)
+            Variable(name=v.get_name(plan)) for v in self.args.values() if isinstance(v, Reference)
         ]
         return PlanStep(
             task=f"Use tool {self.tool} with inputs: {inputs_desc}",
@@ -209,12 +202,12 @@ class FunctionCall(Step):
         args = {
             k: (
                 value.value.full_value(run_data.portia.storage)
-                if isinstance(value, StepOutputValue)
+                if isinstance(value, ReferenceValue)
                 else value
             )
             for k, v in self.args.items()
             if (value := self._get_value_for_input(v, run_data)) is not None
-            or not isinstance(v, StepOutput)
+            or not isinstance(v, Reference)
         }
         output = self.function(**args)
 
@@ -236,9 +229,7 @@ class FunctionCall(Step):
         """Convert this FunctionCall to a PlanStep."""
         inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
         input_variables = [
-            Variable(name=plan.step_output_name(v.step))
-            for v in self.args.values()
-            if isinstance(v, StepOutput)
+            Variable(name=v.get_name(plan)) for v in self.args.values() if isinstance(v, Reference)
         ]
         return PlanStep(
             task=f"Call function {self.function.__name__} with inputs: {inputs_desc}",
@@ -281,7 +272,6 @@ class SingleToolAgent(Step):
             end_user=run_data.end_user,
             tool=wrapped_tool,
         )
-        # @@@ CHECK THIS WILL EXECUTE OK - DEPENDS ON PLAN / PLAN RUN BEING REPRESENTED CORRECTLY
         output_obj = await agent.execute_async()
         return output_obj.get_value()
 
@@ -289,9 +279,7 @@ class SingleToolAgent(Step):
     def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this SingleToolAgent to a PlanStep."""
         input_variables = [
-            Variable(name=plan.step_output_name(v.step))
-            for v in self.inputs or []
-            if isinstance(v, StepOutput)
+            Variable(name=v.get_name(plan)) for v in self.inputs or [] if isinstance(v, Reference)
         ]
         return PlanStep(
             task=self.task,
@@ -312,8 +300,7 @@ class Hook(Step):
     def describe(self, run_data: RunData) -> str:
         """Return a description of this step for logging purposes."""
         hook_name = getattr(self.hook, "__name__", str(self.hook))
-        inputs_info = ", ".join([f"{k}={v}" for k, v in self.args.items()])
-        return f"Hook(hook={hook_name}, inputs={inputs_info})"
+        return f"Hook(hook={hook_name}, args={self.args})"
 
     @override
     @traceable(name="Hook - Run")
@@ -322,12 +309,12 @@ class Hook(Step):
         args = {
             k: (
                 value.value.full_value(run_data.portia.storage)
-                if isinstance(value, StepOutputValue)
+                if isinstance(value, ReferenceValue)
                 else value
             )
             for k, v in self.args.items()
             if (value := self._get_value_for_input(v, run_data)) is not None
-            or not isinstance(v, StepOutput)
+            or not isinstance(v, Reference)
         }
         return self.hook(**args)
 
@@ -335,9 +322,7 @@ class Hook(Step):
     def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this Hook to a PlanStep."""
         input_variables = [
-            Variable(name=plan.step_output_name(v.step))
-            for v in self.args.values()
-            if isinstance(v, StepOutput)
+            Variable(name=v.get_name(plan)) for v in self.args.values() if isinstance(v, Reference)
         ]
         return PlanStep(
             task="Run hook",

@@ -1,4 +1,4 @@
-"""@@@ TODO"""
+"""A plan built using the PlanBuilder."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from portia.builder.step import Step
 from portia.logger import logger
-from portia.plan import Plan, PlanContext
+from portia.plan import Plan, PlanContext, PlanInput
 from portia.prefixed_uuid import PlanUUID
 
 
@@ -17,7 +17,11 @@ class PortiaPlan(BaseModel):
 
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")
     steps: list[Step]
-    summarise: bool = False
+    plan_inputs: list[PlanInput] = Field(
+        default=[],
+        description="The inputs required by the plan.",
+    )
+    summarize: bool = False
     final_output_schema: type[BaseModel] | None = None
     task: str = Field(default="", description="The task that the plan is completing.")
 
@@ -27,7 +31,7 @@ class PortiaPlan(BaseModel):
             id=self.id,
             plan_context=plan_context,
             steps=[step.to_portia_step(self) for step in self.steps],
-            plan_inputs=[],
+            plan_inputs=self.plan_inputs,
             structured_output_schema=self.final_output_schema,
         )
 
