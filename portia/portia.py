@@ -897,13 +897,14 @@ class Portia:
         )
 
         if isinstance(plan, PortiaPlan):
-            return asyncio.run(
-                self.run_builder_plan(
-                    plan,
-                    self.initialize_end_user(end_user),
-                    plan_run_inputs,
+            with asyncio.Runner() as runner:
+                return runner.run(
+                    self.run_builder_plan(
+                        plan,
+                        self.initialize_end_user(end_user),
+                        plan_run_inputs,
+                    )
                 )
-            )
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
@@ -1080,7 +1081,8 @@ class Portia:
                 raise NotImplementedError(
                     "We do not yet support retrieving plan runs by ID with PortiaPlans"
                 )
-            return asyncio.run(self.resume_builder_plan(plan, plan_run=plan_run))
+            with asyncio.Runner() as runner:
+                return runner.run(self.resume_builder_plan(plan, plan_run=plan_run))
         return self._resume(plan_run, plan_run_id)
 
     async def aresume(
