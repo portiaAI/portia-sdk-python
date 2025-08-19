@@ -207,3 +207,25 @@ class TestDefaultToolRegistrySearchSelection:
             # Should not contain OpenAI search tool
             openai_search_tools = [t for t in tools if isinstance(t, OpenAISearchTool)]
             assert len(openai_search_tools) == 0
+
+    def test_default_registry_invalid_provider_warning(self) -> None:
+        """Test DefaultToolRegistry with invalid provider shows warning."""
+        config = Config(portia_api_key=None, llm_provider="openai")
+        env_vars = {
+            "OPENAI_API_KEY": "sk-test",
+            "PORTIA_SEARCH_PROVIDER": "invalid"
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                registry = DefaultToolRegistry(config)
+                tools = registry.get_tools()
+                
+                # Should fall back to OpenAI (default logic)
+                openai_search_tools = [t for t in tools if isinstance(t, OpenAISearchTool)]
+                assert len(openai_search_tools) == 1
+                
+                # Should have issued a warning
+                assert len(w) == 1
+                assert "Invalid PORTIA_SEARCH_PROVIDER" in str(w[0].message)
+                assert "invalid" in str(w[0].message)

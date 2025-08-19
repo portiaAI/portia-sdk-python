@@ -145,13 +145,12 @@ def test_portia_local_default_config_without_api_keys() -> None:
         # can't just mock the Mistral API key here.
         # NOTE: OpenAI search tool is now included when OPENAI_API_KEY is present
         # Missing tools from open_source_tool_registry in default registry:
-        # - crawl_tool, extract_tool, map_tool, weather_tool (4 tools)
-        # But search_tool is replaced by openai_search_tool, so net difference changes
-        # Originally: 6 tools missing (including search_tool)
-        # Now: 5 tools missing (search_tool replaced by openai_search_tool, but still missing crawl, extract, map, weather, plus potentially PDF reader)
-        expected_diff = 5  # Adjusted for OpenAI search tool replacing Tavily but other tools still missing
+        # - crawl_tool, extract_tool, map_tool, weather_tool (4 tools missing)
+        # The search_tool from open_source_tool_registry is replaced by openai_search_tool in default registry
+        # So the net difference is 4 tools missing: crawl, extract, map, weather
+        expected_diff = 4  # crawl_tool, extract_tool, map_tool, weather_tool are missing
         if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 6
+            expected_diff = 5  # PDF reader tool would be added to open_source_tool_registry
 
         assert (
             len(portia.tool_registry.get_tools())

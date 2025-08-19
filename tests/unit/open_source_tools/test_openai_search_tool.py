@@ -1,6 +1,7 @@
 """OpenAI Search tool tests."""
 
 import json
+import os
 from unittest.mock import Mock, patch
 
 import httpx
@@ -281,6 +282,38 @@ async def test_openai_search_tool_async_http_error(httpx_mock: HTTPXMock) -> Non
             await tool.arun(ctx, "What is the capital of France?")
 
 
+def test_openai_search_tool_manual_override_tavily_with_tavily_key() -> None:
+    """Test manual override to Tavily when Tavily key is available."""
+    tool = OpenAISearchTool()
+    from portia.open_source_tools.registry import _get_preferred_search_tool
+    from portia.open_source_tools.search_tool import SearchTool
+    
+    env_vars = {
+        "OPENAI_API_KEY": "sk-test",
+        "TAVILY_API_KEY": "tvly-test", 
+        "PORTIA_SEARCH_PROVIDER": "tavily"
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        selected_tool = _get_preferred_search_tool()
+        assert isinstance(selected_tool, SearchTool)
+
+
+def test_registry_return_search_tool_line_coverage() -> None:
+    """Test that covers the specific return SearchTool() line in registry.py:37."""
+    from portia.open_source_tools.registry import _get_preferred_search_tool
+    from portia.open_source_tools.search_tool import SearchTool
+    
+    # Set up environment to specifically trigger line 37: return SearchTool()
+    env_vars = {
+        "TAVILY_API_KEY": "tvly-test", 
+        "PORTIA_SEARCH_PROVIDER": "tavily"
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        selected_tool = _get_preferred_search_tool()
+        # This should trigger the return SearchTool() on line 37
+        assert isinstance(selected_tool, SearchTool)
+
+
 @pytest.mark.asyncio
 async def test_openai_search_tool_async_different_query(httpx_mock: HTTPXMock) -> None:
     """Test that OpenAISearchTool works with different search queries (async)."""
@@ -321,3 +354,29 @@ async def test_openai_search_tool_async_different_query(httpx_mock: HTTPXMock) -
         assert len(result) == 1
         assert result[0]["url"] == "https://example.com/election-results"
         assert result[0]["title"] == "2020 Election Results"
+
+
+def test_openai_search_tool_no_search_results() -> None:
+    """Test that OpenAISearchTool raises ToolSoftError when no search results found."""
+    tool = OpenAISearchTool()
+    mock_api_key = "sk-test-api-key"
+    mock_response = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "annotations": []
+                },
+                "finish_reason": "stop"
+            }
+        ]
+    }
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
+
+            with pytest.raises(ToolSoftError, match="No search results found in OpenAI response"):
+                tool.run(ctx, "What is the capital of France?")
