@@ -56,7 +56,7 @@ class PortiaPlan(BaseModel):
             )
             return f"$unknown_step_output_{uuid.uuid4().hex}"
         else:
-            return f"{default_step_name(step_num)}_output"
+            return f"${default_step_name(step_num)}_output"
 
     def idx_by_name(self, name: str) -> int:
         """Get the index of a step by name."""

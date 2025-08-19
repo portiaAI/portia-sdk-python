@@ -47,15 +47,47 @@ class Step(BaseModel, ABC):
         """
         raise NotImplementedError
 
-    def _get_value_for_input(self, _input: Any, run_data: RunData) -> Any | ReferenceValue | None:  # noqa: ANN401
-        """Get the value for an input that could come from a reference."""
+    def _resolve_input_reference(
+        self,
+        _input: Any,  # noqa: ANN401
+        run_data: RunData,
+    ) -> Any | ReferenceValue | None:  # noqa: ANN401
+        """Resolve input values by retrieving the ReferenceValue for any Reference inputs."""
         return _input.get_value(run_data) if isinstance(_input, Reference) else _input
+
+    def _get_value_for_input(self, _input: Any, run_data: RunData) -> Any | None:  # noqa: ANN401
+        """Get the value for an input that could come from a reference."""
+        resolved_input = self._resolve_input_reference(_input, run_data)
+
+        if isinstance(resolved_input, ReferenceValue):
+            return resolved_input.value.full_value(run_data.portia.storage)
+        return resolved_input
+
+    def _resolve_input_names_for_printing(
+        self,
+        _input: Any,  # noqa: ANN401
+        plan: PortiaPlan,
+    ) -> Any | ReferenceValue | None:  # noqa: ANN401
+        """Resolve inputs to their value (if not a reference) or to their name (if reference).
+
+        Useful for printing inputs before the plan is run.
+        """
+        if isinstance(_input, Reference):
+            name = _input.get_legacy_name(plan)
+            # Ensure name starts with a $ so that it is clear it is a reference
+            # This is done so it appears nicely in the UI
+            if not name.startswith("$"):
+                name = f"${name}"
+            return name
+        if isinstance(_input, list):
+            return [self._resolve_input_names_for_printing(v, plan) for v in _input]
+        return _input
 
     def _inputs_to_legacy_plan_variables(
         self, inputs: list[Any], plan: PortiaPlan
     ) -> list[Variable]:
         """Convert a list of inputs to a list of legacy plan variables."""
-        return [Variable(name=v.get_name(plan)) for v in inputs or [] if isinstance(v, Reference)]
+        return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
 
 
 class LLMStep(Step):
@@ -88,7 +120,7 @@ class LLMStep(Step):
         task_data = [
             self._format_value(value, run_data)
             for _input in self.inputs or []
-            if (value := self._get_value_for_input(_input, run_data)) is not None
+            if (value := self._resolve_input_reference(_input, run_data)) is not None
             or not isinstance(_input, Reference)
         ]
         return await llm_tool.arun(tool_ctx, task=self.task, task_data=task_data)
@@ -107,7 +139,7 @@ class LLMStep(Step):
         """Convert this LLMStep to a PlanStep."""
         return PlanStep(
             task=self.task,
-            inputs=self._inputs_to_legacy_plan_variables(self.inputs or [], plan),
+            inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=LLMTool.LLM_TOOL_ID,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
@@ -148,16 +180,7 @@ class ToolCall(Step):
             config=run_data.portia.config,
             clarifications=[],
         )
-        args = {
-            k: (
-                value.value.full_value(run_data.portia.storage)
-                if isinstance(value, ReferenceValue)
-                else value
-            )
-            for k, v in self.args.items()
-            if (value := self._get_value_for_input(v, run_data)) is not None
-            or not isinstance(v, Reference)
-        }
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
         # TODO(RH): Move to async tool run when we can  # noqa: FIX002, TD003
         output = wrapped_tool.run(tool_ctx, **args)
@@ -177,7 +200,9 @@ class ToolCall(Step):
     @override
     def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this ToolCall to a PlanStep."""
-        inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
+        inputs_desc = ", ".join(
+            [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
+        )
         return PlanStep(
             task=f"Use tool {self.tool} with inputs: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
@@ -208,16 +233,7 @@ class FunctionCall(Step):
     @traceable(name="Function Call - Run")
     async def run(self, run_data: RunData) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the function."""
-        args = {
-            k: (
-                value.value.full_value(run_data.portia.storage)
-                if isinstance(value, ReferenceValue)
-                else value
-            )
-            for k, v in self.args.items()
-            if (value := self._get_value_for_input(v, run_data)) is not None
-            or not isinstance(v, Reference)
-        }
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         output = self.function(**args)
 
         if self.output_schema and not isinstance(output, self.output_schema):
@@ -236,7 +252,9 @@ class FunctionCall(Step):
     @override
     def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this FunctionCall to a PlanStep."""
-        inputs_desc = ", ".join([f"{k}={v}" for k, v in self.args.items()])
+        inputs_desc = ", ".join(
+            [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
+        )
         return PlanStep(
             task=f"Call function {self.function.__name__} with inputs: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
@@ -300,25 +318,17 @@ class Hook(Step):
     @traceable(name="Hook - Run")
     async def run(self, run_data: RunData) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the hook."""
-        args = {
-            k: (
-                value.value.full_value(run_data.portia.storage)
-                if isinstance(value, ReferenceValue)
-                else value
-            )
-            for k, v in self.args.items()
-            if (value := self._get_value_for_input(v, run_data)) is not None
-            or not isinstance(v, Reference)
-        }
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         return self.hook(**args)
 
     @override
     def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this Hook to a PlanStep."""
+        hook_name = getattr(self.hook, "__name__", str(self.hook))
         return PlanStep(
-            task="Run hook",
+            task=f"Run hook: {hook_name}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
-            tool_id=f"local_hook_{self.hook.__name__}",
+            tool_id=f"local_hook_{hook_name}",
             output=plan.step_output_name(self),
             structured_output_schema=None,
         )
