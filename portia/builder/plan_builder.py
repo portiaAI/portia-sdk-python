@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantic import BaseModel
 
 from portia.builder.portia_plan import PortiaPlan
@@ -149,7 +150,7 @@ class PlanBuilder:
 
     def hook(
         self,
-        hook: Callable[..., bool],
+        hook: Callable[..., None],
         args: dict[str, Any] | None = None,
         name: str | None = None,
     ) -> PlanBuilder:
@@ -165,7 +166,7 @@ class PlanBuilder:
         self.plan.steps.append(
             Hook(
                 hook=hook,
-                args=args,
+                args=args or {},
                 name=name or default_step_name(len(self.plan.steps)),
             )
         )

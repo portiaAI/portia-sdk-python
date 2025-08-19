@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, override
 
@@ -28,15 +28,18 @@ class Step(BaseModel, ABC):
 
     name: str
 
-    async def run(self, run_data: RunData) -> None:
+    @abstractmethod
+    async def run(self, run_data: RunData) -> Any:  # noqa: ANN401
         """Execute the step."""
         raise NotImplementedError
 
+    @abstractmethod
     def describe(self, run_data: RunData) -> str:
         """Return a description of this step for logging purposes."""
         raise NotImplementedError
 
-    def to_portia_step(self, plan: PortiaPlan) -> PlanStep | None:
+    @abstractmethod
+    def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this step to a PlanStep from plan.py.
 
         A PlanStep is the legacy representation of a step in the plan, and is still used in the
@@ -70,7 +73,7 @@ class LLMStep(Step):
 
     @override
     @traceable(name="LLM Step - Run")
-    async def run(self, run_data: RunData) -> None:
+    async def run(self, run_data: RunData) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the LLM query."""
         llm_tool = LLMTool(structured_output_schema=self.output_schema)
         tool_ctx = ToolRunContext(
@@ -82,7 +85,7 @@ class LLMStep(Step):
         )
         task_data = [
             self._format_value(value, run_data)
-            for _input in self.inputs
+            for _input in self.inputs or []
             if (value := self._get_value_for_input(_input, run_data)) is not None
             or not isinstance(_input, Reference)
         ]
@@ -93,7 +96,10 @@ class LLMStep(Step):
         if not isinstance(_input, ReferenceValue):
             return _input
         step_output_value: ReferenceValue = _input
-        return f"Previous step {step_output_value.description} had output: {step_output_value.value.full_value(run_data.portia.storage)}"
+        return (
+            f"Previous step {step_output_value.description} had output: "
+            f"{step_output_value.value.full_value(run_data.portia.storage)}"
+        )
 
     @override
     def to_portia_step(self, plan: PortiaPlan) -> PlanStep:
@@ -125,7 +131,7 @@ class ToolCall(Step):
 
     @override
     @traceable(name="Tool Call - Run")
-    async def run(self, run_data: RunData) -> None:
+    async def run(self, run_data: RunData) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the tool."""
         tool = run_data.portia.tool_registry.get_tool(self.tool)
         wrapped_tool = ToolCallWrapper(
@@ -151,7 +157,7 @@ class ToolCall(Step):
             or not isinstance(v, Reference)
         }
 
-        # TODO(RH): Move to async tool run when we can
+        # TODO(RH): Move to async tool run when we can  # noqa: FIX002, TD003
         output = wrapped_tool.run(tool_ctx, **args)
         if self.output_schema and not isinstance(output, self.output_schema):
             model = run_data.portia.config.get_default_model()
@@ -197,7 +203,7 @@ class FunctionCall(Step):
 
     @override
     @traceable(name="Function Call - Run")
-    async def run(self, run_data: RunData) -> None:
+    async def run(self, run_data: RunData) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the function."""
         args = {
             k: (
@@ -256,7 +262,7 @@ class SingleToolAgent(Step):
 
     @override
     @traceable(name="Single Tool Agent - Run")
-    async def run(self, run_data: RunData) -> None:
+    async def run(self, run_data: RunData) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
         tool = run_data.portia.tool_registry.get_tool(self.tool)
         wrapped_tool = ToolCallWrapper(
@@ -304,7 +310,7 @@ class Hook(Step):
 
     @override
     @traceable(name="Hook - Run")
-    async def run(self, run_data: RunData) -> None:
+    async def run(self, run_data: RunData) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the hook."""
         args = {
             k: (

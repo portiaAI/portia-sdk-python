@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, override
 
 from pydantic import BaseModel, Field
@@ -20,13 +20,15 @@ def default_step_name(step_index: int) -> str:
     return f"step_{step_index}"
 
 
-class Reference(BaseModel, ABC):
+class Reference(ABC):
     """A reference to a value."""
 
+    @abstractmethod
     def get_name(self, plan: PortiaPlan) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
         raise NotImplementedError
 
+    @abstractmethod
     def get_value(self, run_data: RunData) -> ReferenceValue | None:
         """Get the value of the reference."""
         raise NotImplementedError
@@ -36,14 +38,14 @@ class StepOutput(Reference):
     """A reference to the output of a step."""
 
     step: str | int = Field(
-        description="The step to reference the output of. If a string is provided, this will be used"
-        "to find the step by name. If an integer is provided, this will be used to find the"
+        description="The step to reference the output of. If a string is provided, this will be"
+        "used to find the step by name. If an integer is provided, this will be used to find the"
         "step by index (steps are 0-indexed)."
     )
 
     def __init__(self, step: str | int) -> None:
         """Initialize the step output."""
-        super().__init__(step=step)
+        self.step = step
 
     @override
     def get_name(self, plan: PortiaPlan) -> str:
@@ -71,7 +73,7 @@ class Input(Reference):
 
     def __init__(self, name: str) -> None:
         """Initialize the input."""
-        super().__init__(name=name)
+        self.name = name
 
     @override
     def get_name(self, plan: PortiaPlan) -> str:

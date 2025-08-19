@@ -2342,7 +2342,7 @@ class Portia:
         )
         for step_index in range(check_from_index, len(plan.steps)):
             step = plan.steps[step_index]
-            # TODO(RH): Tidy up this check to work with local functions
+            # TODO(RH): Tidy up this check to work with local functions  # noqa: FIX002, TD003
             if (
                 not step.tool_id
                 or step.tool_id in tools_remaining
@@ -2450,6 +2450,7 @@ class Portia:
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
 
+        output_value = None
         for i, step in enumerate(plan.steps):
             if i < run_data.plan_run.current_step_index:
                 continue
@@ -2463,9 +2464,10 @@ class Portia:
                 output_value, run_data.plan_run, step.to_portia_step(plan)
             )
             output = ReferenceValue(
-                step_name=step.name,
                 value=output_value,
-                description=f"Output from step '{step.name}' (Description: {step.describe(run_data)})",
+                description=(
+                    f"Output from step '{step.name}' (Description: {step.describe(run_data)})"
+                ),
             )
 
             run_data.step_output_values.append(output)

@@ -40,7 +40,11 @@ class CurrencyConversionTool(Tool[str]):
     output_schema: tuple[str, str] = ("str", "The converted amount")
 
     def run(
-        self, _: ToolRunContext, amount: CommodityPrice, currency_from: str, currency_to: str
+        self,
+        _: ToolRunContext,
+        amount: CommodityPrice,
+        currency_from: str,  # noqa: ARG002
+        currency_to: str,
     ) -> str:
         """Run the CurrencyConversionTool."""
         return f"{amount.price * 1.2} {currency_to}"
@@ -60,13 +64,13 @@ class FinalOutput(BaseModel):
     email_address: str
 
 
-def only_continue_if_affordable(cost: float) -> bool:
-    """Only continue if the price is affordable."""
-    return cost < 500_000
+def log_cost(cost: float) -> None:
+    """Log the cost."""
+    print(f"Cost: {cost}")  # noqa: T201
 
 
-def always_continue(price: str) -> bool:
-    """Always continue."""
+def always_continue(_: str) -> bool:
+    """Always continues."""  # noqa: D401
     return True
 
 
@@ -105,7 +109,7 @@ plan = (
             "purchase_quantity": Input("purchase_quantity"),
         },
     )
-    .hook(only_continue_if_affordable, args={"cost": StepOutput(2)})
+    .hook(log_cost, args={"cost": StepOutput(2)})
     .llm_step(
         task="Write a poem about the price of gold",
         inputs=[StepOutput(step=0)],
@@ -123,12 +127,12 @@ plan = (
 
 # Test async
 result1 = asyncio.run(portia.arun_plan(plan, plan_run_inputs={"purchase_quantity": 100}))
-print(result1)
+print(result1)  # noqa: T201
 
 # Test sync
-# result2 = portia.run_plan(plan)
-# print(result2)
+# result2 = portia.run_plan(plan)  # noqa: ERA001
+# print(result2)  # noqa: ERA001
 
 # Test clarifications
-# result3 = asyncio.run(portia.arun_plan(plan, end_user=EndUser(external_id=str(uuid.uuid4()))))
-# print(result3)
+# result3 = asyncio.run(portia.arun_plan(plan, end_user=EndUser(external_id=str(uuid.uuid4()))))  # noqa: E501, ERA001
+# print(result3)  # noqa: ERA001

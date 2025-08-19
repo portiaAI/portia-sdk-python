@@ -23,7 +23,10 @@ class PortiaPlan(BaseModel):
     )
     summarize: bool = False
     final_output_schema: type[BaseModel] | None = None
-    task: str = Field(default="", description="The task that the plan is completing.")
+    task: str = Field(
+        default="Run the plan build with the Plan Builder",
+        description="The task that the plan is completing.",
+    )
 
     def to_legacy_plan(self, plan_context: PlanContext) -> Plan:
         """Convert the Portia plan to a legacy plan."""
