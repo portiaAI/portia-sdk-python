@@ -5,11 +5,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, override
+import re
 
 from langsmith import traceable
 from pydantic import BaseModel, Field
 
-from portia.builder.reference import Reference, ReferenceValue
+from portia.builder.reference import Reference, ReferenceValue, StepOutput, Input
 from portia.errors import ToolNotFoundError
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
@@ -53,6 +54,29 @@ class Step(BaseModel, ABC):
         run_data: RunContext,
     ) -> Any | ReferenceValue | None:  # noqa: ANN401
         """Resolve input values by retrieving the ReferenceValue for any Reference inputs."""
+        if isinstance(_input, str):
+            # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }} from _input if it's a string
+            matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", _input)
+        # If there are matches, replace each {{ StepOutput(var_name) }} or {{ Input(var_name) }} with its resolved value
+        if isinstance(_input, str) and matches:
+            result = _input
+            for ref_type, var_name in matches:
+                var_name = var_name.strip()
+                if ref_type == "StepOutput":
+                    ref = StepOutput(var_name)
+                else:  # ref_type == "Input"
+                    ref = Input(var_name)
+                resolved = self._resolve_input_reference(ref, run_data)
+                # If resolved is a ReferenceValue, get its value
+                if isinstance(resolved, ReferenceValue):
+                    resolved_val = resolved.value.full_value(run_data.portia.storage)
+                else:
+                    resolved_val = resolved
+                # Replace the first occurrence of the template with the resolved value
+                # Use the full pattern to match and replace
+                pattern = r"\{\{\s*" + re.escape(ref_type) + r"\s*\(\s*" + re.escape(var_name) + r"\s*\)\s*\}\}"
+                result = re.sub(pattern, str(resolved_val), result, count=1)
+            return result
         return _input.get_value(run_data) if isinstance(_input, Reference) else _input
 
     def _get_value_for_input(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401

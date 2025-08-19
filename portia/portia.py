@@ -1263,7 +1263,23 @@ class Portia:
 
         """
         if plan.plan_inputs and not plan_run_inputs:
-            raise ValueError("Inputs are required for this plan but have not been specified")
+            # Check if all required inputs have default values
+            missing_inputs = [
+                input_obj.name
+                for input_obj in plan.plan_inputs
+                if input_obj.value is None
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+            
+            # Use default values from plan inputs
+            for plan_input in plan.plan_inputs:
+                if plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
+                    )
+            return
+
         if plan_run_inputs and not plan.plan_inputs:
             logger().warning(
                 "Inputs are not required for this plan but plan inputs were provided",
@@ -1272,19 +1288,25 @@ class Portia:
         if plan_run_inputs and plan.plan_inputs:
             input_values_by_name = {input_obj.name: input_obj for input_obj in plan_run_inputs}
 
-            # Validate all required inputs are provided
+            # Validate all required inputs are provided or have default values
             missing_inputs = [
                 input_obj.name
                 for input_obj in plan.plan_inputs
-                if input_obj.name not in input_values_by_name
+                if input_obj.name not in input_values_by_name and input_obj.value is None
             ]
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
 
             for plan_input in plan.plan_inputs:
                 if plan_input.name in input_values_by_name:
+                    # Use provided value
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
                         value=input_values_by_name[plan_input.name].value
+                    )
+                elif plan_input.value is not None:
+                    # Use default value
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
                     )
 
             # Check for unknown inputs
@@ -1312,7 +1334,23 @@ class Portia:
 
         """
         if plan.plan_inputs and not plan_run_inputs:
-            raise ValueError("Inputs are required for this plan but have not been specified")
+            # Check if all required inputs have default values
+            missing_inputs = [
+                input_obj.name
+                for input_obj in plan.plan_inputs
+                if input_obj.value is None
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+            
+            # Use default values from plan inputs
+            for plan_input in plan.plan_inputs:
+                if plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
+                    )
+            return
+
         if plan_run_inputs and not plan.plan_inputs:
             logger().warning(
                 "Inputs are not required for this plan but plan inputs were provided",
@@ -1321,19 +1359,25 @@ class Portia:
         if plan_run_inputs and plan.plan_inputs:
             input_values_by_name = {input_obj.name: input_obj for input_obj in plan_run_inputs}
 
-            # Validate all required inputs are provided
+            # Validate all required inputs are provided or have default values
             missing_inputs = [
                 input_obj.name
                 for input_obj in plan.plan_inputs
-                if input_obj.name not in input_values_by_name
+                if input_obj.name not in input_values_by_name and input_obj.value is None
             ]
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
 
             for plan_input in plan.plan_inputs:
                 if plan_input.name in input_values_by_name:
+                    # Use provided value
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
                         value=input_values_by_name[plan_input.name].value
+                    )
+                elif plan_input.value is not None:
+                    # Use default value
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
                     )
 
             # Check for unknown inputs

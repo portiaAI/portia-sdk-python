@@ -24,15 +24,16 @@ class PlanBuilder:
         """Initialize the builder."""
         self.plan = PortiaPlan(steps=[], task=task)
 
-    def input(self, name: str, description: str | None = None) -> PlanBuilder:
+    def input(self, name: str, description: str | None = None, value: Any | None = None) -> PlanBuilder:
         """Add an input to the plan.
 
         Args:
             name: The name of the input.
             description: The description of the input.
+            value: The value of the input.
 
         """
-        self.plan.plan_inputs.append(PlanInput(name=name, description=description))
+        self.plan.plan_inputs.append(PlanInput(name=name, description=description, value=value))
         return self
 
     def llm_step(
