@@ -99,7 +99,6 @@ class OneShotToolCallingModel:
                 template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
-                "Context for user input and past steps:\n{{ context }}\n"
                 "Task: {{ task }}\n"
                 "The system has a tool available named '{{ tool_name }}'.\n"
                 "Argument schema for the tool:\n{{ tool_args }}\n"
@@ -108,6 +107,8 @@ class OneShotToolCallingModel:
                 "You also have a clarification tool available with "
                 "argument schema:\n{{ clarification_tool_args }}\n"
                 "{% endif %}"
+                "\n\n----------\n\n"
+                "Context for user input and past steps:\n{{ context }}\n"
                 "\n\n----------\n\n"
                 "The following section contains previous errors. "
                 "Ensure your response avoids these errors. "

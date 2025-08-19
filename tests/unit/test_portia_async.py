@@ -56,6 +56,7 @@ from tests.utils import (
     ClarificationTool,
     TestClarificationHandler,
     get_test_config,
+    get_test_plan_run,
 )
 
 
@@ -151,11 +152,11 @@ async def test_portia_aplan_with_use_cached_plan_success(portia: Portia) -> None
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan = await portia.aplan(query, use_cached_plan=True)
 
@@ -176,7 +177,7 @@ async def test_portia_aplan_with_use_cached_plan_not_found(
 
     # Mock the storage.get_plan_by_query to raise StorageError
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", side_effect=StorageError("No plan found for query")
+        portia.storage, "aget_plan_by_query", side_effect=StorageError("No plan found for query")
     ) as mock_get_cached:
         # Mock the planning model to return a successful plan
         planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -203,13 +204,13 @@ async def test_portia_aplan_with_use_cached_plan_false(
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the planning model to return a successful plan
     planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
 
     # Mock the storage.get_plan_by_query to ensure it's not called
-    with mock.patch.object(portia.storage, "get_plan_by_query") as mock_get_cached:
+    with mock.patch.object(portia.storage, "aget_plan_by_query") as mock_get_cached:
         plan = await portia.aplan(query, use_cached_plan=False)
 
         # Verify get_plan_by_query was NOT called
@@ -230,11 +231,11 @@ async def test_portia_aplan_with_use_cached_plan_and_tools(portia: Portia) -> No
         plan_context=PlanContext(query=query, tool_ids=["add_tool", "subtract_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan = await portia.aplan(query, tools=["add_tool"], use_cached_plan=True)
 
@@ -439,11 +440,11 @@ async def test_portia_arun_with_use_cached_plan_success(portia: Portia) -> None:
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan_run = await portia.arun(query, use_cached_plan=True)
 
@@ -464,7 +465,7 @@ async def test_portia_arun_with_use_cached_plan_not_found(
 
     # Mock the storage.get_plan_by_query to raise StorageError
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", side_effect=StorageError("No plan found for query")
+        portia.storage, "aget_plan_by_query", side_effect=StorageError("No plan found for query")
     ) as mock_get_cached:
         # Mock the planning model to return a successful plan
         planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -491,13 +492,13 @@ async def test_portia_arun_with_use_cached_plan_false(
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the planning model to return a successful plan
     planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
 
     # Mock the storage.get_plan_by_query to ensure it's not called
-    with mock.patch.object(portia.storage, "get_plan_by_query") as mock_get_cached:
+    with mock.patch.object(portia.storage, "aget_plan_by_query") as mock_get_cached:
         plan_run = await portia.arun(query, use_cached_plan=False)
 
         # Verify get_plan_by_query was NOT called
@@ -519,11 +520,11 @@ async def test_portia_arun_with_use_cached_plan_and_plan_run_inputs(portia: Port
         plan_context=PlanContext(query=query, tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(cached_plan)
+    await portia.storage.asave_plan(cached_plan)
 
     # Mock the storage.get_plan_by_query to return the cached plan
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", return_value=cached_plan
+        portia.storage, "aget_plan_by_query", return_value=cached_plan
     ) as mock_get_cached:
         plan_run = await portia.arun(query, plan_run_inputs=plan_run_inputs, use_cached_plan=True)
 
@@ -544,7 +545,7 @@ async def test_portia_arun_with_use_cached_plan_storage_error_logging(
 
     # Mock the storage.get_plan_by_query to raise StorageError
     with mock.patch.object(
-        portia.storage, "get_plan_by_query", side_effect=StorageError("Test storage error")
+        portia.storage, "aget_plan_by_query", side_effect=StorageError("Test storage error")
     ) as mock_get_cached:
         # Mock the planning model to return a successful plan
         planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
@@ -595,7 +596,7 @@ async def test_portia_arun_plan(
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -717,11 +718,11 @@ async def test_portia_arun_plan_with_plan_uuid(portia: Portia, telemetry: MagicM
         plan_context=PlanContext(query="Test query", tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(plan)
+    await portia.storage.asave_plan(plan)
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -766,7 +767,7 @@ async def test_portia_arun_plan_with_new_plan(portia: Portia, planning_model: Ma
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -793,11 +794,11 @@ async def test_portia_arun_plan_with_uuid(portia: Portia) -> None:
         plan_context=PlanContext(query="Test query", tool_ids=["add_tool"]),
         steps=[],
     )
-    portia.storage.save_plan(plan)
+    await portia.storage.asave_plan(plan)
 
     # Mock the _create_plan_run and _aresume methods
     with (
-        mock.patch.object(portia, "_create_plan_run") as mock_create_plan_run,
+        mock.patch.object(portia, "_acreate_plan_run") as mock_create_plan_run,
         mock.patch.object(portia, "_aresume") as mock_aresume,
     ):
         mock_plan_run = MagicMock()
@@ -865,8 +866,113 @@ async def test_portia_arun_plan_with_extra_input_when_expecting_none(portia: Por
 
     # Run with input that isn't in the plan's inputs
     extra_input = PlanInput(name="$extra", description="Extra unused input", value="value")
-    plan_run = await portia.arun_plan(plan, plan_run_inputs=[extra_input])
+
+    # Mock the logger to capture warning messages
+    with mock.patch("portia.portia.logger") as mock_logger:
+        plan_run = await portia.arun_plan(plan, plan_run_inputs=[extra_input])
+
+        # Verify the warning was logged for providing inputs when none are required
+        mock_logger().warning.assert_called_with(
+            "Inputs are not required for this plan but plan inputs were provided"
+        )
+
     assert plan_run.plan_run_inputs == {}
+
+
+@pytest.mark.asyncio
+async def test_portia_arun_plan_with_unknown_inputs_mixed_case(portia: Portia) -> None:
+    """Test that arun_plan logs warnings for unknown inputs while processing known ones."""
+    # Create a plan with some required inputs
+    plan = Plan(
+        plan_context=PlanContext(query="Plan with some inputs", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Use inputs",
+                tool_id="add_tool",
+                inputs=[
+                    Variable(name="$known1", description="Known input 1"),
+                    Variable(name="$known2", description="Known input 2"),
+                ],
+                output="$result",
+            ),
+        ],
+        plan_inputs=[
+            PlanInput(name="$known1", description="Known input 1"),
+            PlanInput(name="$known2", description="Known input 2"),
+        ],
+    )
+
+    # Provide both known and unknown inputs
+    plan_run_inputs = [
+        PlanInput(name="$known1", value="value1"),
+        PlanInput(name="$known2", value="value2"),
+        PlanInput(name="$unknown1", description="Unknown input 1", value="unknown_value1"),
+        PlanInput(name="$unknown2", description="Unknown input 2", value="unknown_value2"),
+    ]
+
+    mock_agent = MagicMock()
+    mock_agent.execute_async = mock.AsyncMock(return_value=LocalDataValue(value="result"))
+
+    # Mock the logger to capture warning messages
+    with (
+        mock.patch("portia.portia.logger") as mock_logger,
+        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+    ):
+        plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
+
+        # Verify warnings were logged for both unknown inputs
+        mock_logger().warning.assert_any_call("Ignoring unknown plan input: $unknown1")
+        mock_logger().warning.assert_any_call("Ignoring unknown plan input: $unknown2")
+        assert mock_logger().warning.call_count == 2
+
+    # Verify known inputs were processed correctly
+    assert len(plan_run.plan_run_inputs) == 2
+    assert plan_run.plan_run_inputs["$known1"].get_value() == "value1"
+    assert plan_run.plan_run_inputs["$known2"].get_value() == "value2"
+
+
+@pytest.mark.asyncio
+async def test_portia_arun_plan_logs_unknown_input_warning(portia: Portia) -> None:
+    """Test that the specific 'Ignoring unknown plan input' warning is logged."""
+    # Create a plan with one expected input
+    plan = Plan(
+        plan_context=PlanContext(query="Plan with one input", tool_ids=["add_tool"]),
+        steps=[
+            Step(
+                task="Use input",
+                tool_id="add_tool",
+                inputs=[Variable(name="$expected", description="Expected input")],
+                output="$result",
+            ),
+        ],
+        plan_inputs=[
+            PlanInput(name="$expected", description="Expected input"),
+        ],
+    )
+
+    # Provide both expected and unknown inputs
+    plan_run_inputs = [
+        PlanInput(name="$expected", value="expected_value"),
+        PlanInput(name="$unknown", description="Unknown input", value="unknown_value"),
+    ]
+
+    mock_agent = MagicMock()
+    mock_agent.execute_async = mock.AsyncMock(return_value=LocalDataValue(value="result"))
+
+    # Mock the logger to specifically capture the unknown input warning
+    with (
+        mock.patch("portia.portia.logger") as mock_logger,
+        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+    ):
+        plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
+
+        # Verify the specific warning message is logged
+        mock_logger().warning.assert_called_with("Ignoring unknown plan input: $unknown")
+
+    # Verify the expected input was processed and unknown input was ignored
+    assert len(plan_run.plan_run_inputs) == 1
+    assert plan_run.plan_run_inputs["$expected"].get_value() == "expected_value"
+    assert "$unknown" not in plan_run.plan_run_inputs
 
 
 @pytest.mark.asyncio
@@ -1376,7 +1482,7 @@ async def test_portia_aexecute_step_hooks(portia: Portia, planning_model: MagicM
     assert execution_hooks.after_step_execution.call_count == 2  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
     assert execution_hooks.after_plan_run.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
 
-    plan = portia.storage.get_plan(plan_run.plan_id)
+    plan = await portia.storage.aget_plan(plan_run.plan_id)
     execution_hooks.before_plan_run.assert_called_once_with(  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
         ReadOnlyPlan.from_plan(plan), mock.ANY
     )
@@ -1433,8 +1539,8 @@ async def test_portia_aresume_with_skipped_steps(portia: Portia) -> None:
     )
 
     # Mock the storage to return our plan
-    portia.storage.save_plan(plan)
-    portia.storage.save_plan_run(plan_run)
+    await portia.storage.asave_plan(plan)
+    await portia.storage.asave_plan_run(plan_run)
 
     # Mock introspection agent to SKIP steps 3 and 4
     mock_introspection = MagicMock()
@@ -1640,8 +1746,8 @@ async def test_portia_acustom_tool_ready_not_ready() -> None:
         tools=[ready_tool],
     )
     plan = PlanBuilder().step("", ready_tool.id).build()
-    plan_run = portia.create_plan_run(plan, end_user="123")
-    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    plan_run = await portia.acreate_plan_run(plan, end_user="123")
+    await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = await portia.aresume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -1665,8 +1771,8 @@ async def test_portia_acustom_tool_ready_resume_multiple_instances_of_same_tool(
         tools=[ready_tool, ready_tool],
     )
     plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool.id).build()
-    plan_run = portia.create_plan_run(plan, end_user="123")
-    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    plan_run = await portia.acreate_plan_run(plan, end_user="123")
+    await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = await portia.aresume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -1685,8 +1791,8 @@ async def test_portia_acustom_tool_ready_resume_multiple_custom_tools() -> None:
     ready_tool_2 = ReadyTool(id="ready_tool_2", auth_url="https://fake.portiaai.test/auth2")
     portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool_2])
     plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
-    plan_run = portia.create_plan_run(plan, end_user="123")
-    portia.storage.save_plan(plan)  # Explicitly save plan for test
+    plan_run = await portia.acreate_plan_run(plan, end_user="123")
+    await portia.storage.asave_plan(plan)  # Explicitly save plan for test
 
     output_plan_run = await portia.aresume(plan_run)
     assert output_plan_run.state == PlanRunState.NEED_CLARIFICATION
@@ -1722,3 +1828,220 @@ async def test_portia_arun_plan_with_all_plan_types_error_handling(portia: Porti
         mock_aresume.side_effect = lambda x: x
         plan_run = await portia.arun_plan(non_existent_plan)
         assert plan_run.plan_id == non_existent_plan.id
+
+
+@pytest.mark.asyncio
+async def test_portia_aexecute_plan_run_and_handle_clarifications_keyboard_interrupt(
+    portia: Portia,
+) -> None:
+    """Test that KeyboardInterrupt is handled correctly in async version."""
+    plan, plan_run = get_test_plan_run()
+
+    with (
+        mock.patch.object(portia, "_aexecute_plan_run", side_effect=KeyboardInterrupt()),
+        mock.patch.object(portia.storage, "save_plan_run"),
+    ):
+        result = await portia.aexecute_plan_run_and_handle_clarifications(plan, plan_run)
+
+        assert result.state == PlanRunState.FAILED
+
+
+@pytest.mark.asyncio
+async def test_portia_ainitialize_end_user_default(portia: Portia) -> None:
+    """Test that initialize_end_user returns a default end user if none is provided."""
+    portia.storage.aget_end_user = mock.AsyncMock(return_value=None)
+
+    async def save_end_user(end_user: EndUser) -> EndUser:
+        return end_user
+
+    portia.storage.asave_end_user = save_end_user
+
+    end_user = await portia.ainitialize_end_user()
+    assert end_user.external_id == "portia:default_user"
+
+    end_user = await portia.ainitialize_end_user(None)
+    assert end_user.external_id == "portia:default_user"
+
+    end_user = await portia.ainitialize_end_user("")
+    assert end_user.external_id == "portia:default_user"
+
+    portia.storage.aget_end_user = mock.AsyncMock(return_value=EndUser(external_id="123"))
+
+    end_user = await portia.ainitialize_end_user("123")
+    assert end_user.external_id == "123"
+
+    end_user = await portia.ainitialize_end_user(EndUser(external_id="123"))
+    assert end_user.external_id == "123"
+
+
+@pytest.mark.asyncio
+async def test_portia__aresolve_single_example_plan(portia: Portia) -> None:
+    """Test _aresolve_single_example_plan with all supported input types and error cases."""
+    # Create example plans for testing
+    example_plan_1 = Plan(
+        plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 1", tool_id="add_tool", inputs=[], output="$result1")],
+    )
+    example_plan_2 = Plan(
+        plan_context=PlanContext(query="example query 2", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 2", tool_id="add_tool", inputs=[], output="$result2")],
+    )
+
+    # Save plans to storage
+    await portia.storage.asave_plan(example_plan_1)
+    await portia.storage.asave_plan(example_plan_2)
+
+    # Test with Plan object (should return directly)
+    resolved_plan = await portia._aresolve_single_example_plan(example_plan_1)
+    assert resolved_plan is example_plan_1  # Should be same object
+    assert resolved_plan.id == example_plan_1.id
+
+    # Test with PlanUUID (should load from storage)
+    resolved_plan = await portia._aresolve_single_example_plan(example_plan_2.id)
+    assert resolved_plan.id == example_plan_2.id
+    assert resolved_plan.plan_context.query == example_plan_2.plan_context.query
+
+    # Test with plan ID string (should load from storage)
+    plan_id_string = str(example_plan_1.id)  # "plan-uuid"
+    resolved_plan = await portia._aresolve_single_example_plan(plan_id_string)
+    assert resolved_plan.id == example_plan_1.id
+    assert resolved_plan.plan_context.query == example_plan_1.plan_context.query
+
+    # Test with non-existent PlanUUID (should raise PlanNotFoundError)
+    non_existent_uuid = PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")
+    with pytest.raises(PlanNotFoundError):
+        await portia._aresolve_single_example_plan(non_existent_uuid)
+
+    # Test with non-existent plan ID string (should raise PlanNotFoundError)
+    with pytest.raises(PlanNotFoundError):
+        await portia._aresolve_single_example_plan("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")
+
+    # Test with invalid string format (should raise ValueError)
+    with pytest.raises(ValueError, match="must be a plan ID.*Query strings are not supported"):
+        await portia._aresolve_single_example_plan("regular query string")
+
+    # Test with invalid type (should raise TypeError)
+    with pytest.raises(TypeError, match="Invalid example plan type"):
+        await portia._aresolve_single_example_plan(123)  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_portia__aresolve_example_plans(portia: Portia) -> None:
+    """Test _aresolve_example_plans method with various input combinations."""
+    # Test with None (should return None)
+    result = await portia._aresolve_example_plans(None)
+    assert result is None
+
+    # Create example plans for testing
+    example_plan_1 = Plan(
+        plan_context=PlanContext(query="example query 1", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 1", tool_id="add_tool", inputs=[], output="$result1")],
+    )
+    example_plan_2 = Plan(
+        plan_context=PlanContext(query="example query 2", tool_ids=["add_tool"]),
+        steps=[Step(task="Example task 2", tool_id="add_tool", inputs=[], output="$result2")],
+    )
+
+    # Save plans to storage
+    await portia.storage.asave_plan(example_plan_1)
+    await portia.storage.asave_plan(example_plan_2)
+
+    # Test with empty list (should return empty list)
+    result = await portia._aresolve_example_plans([])
+    assert result == []
+
+    # Test with mixed types: Plan, PlanUUID, plan ID string
+    example_plans = [
+        example_plan_1,  # Plan object
+        example_plan_2.id,  # PlanUUID
+        str(example_plan_1.id),  # plan ID string
+    ]
+
+    resolved_plans = await portia._aresolve_example_plans(example_plans)
+
+    # Verify all plans were resolved correctly
+    assert resolved_plans is not None
+    assert len(resolved_plans) == 3
+    assert resolved_plans[0] is example_plan_1  # Plan object should be returned directly
+    assert resolved_plans[1].id == example_plan_2.id  # PlanUUID resolved
+    assert resolved_plans[2].id == example_plan_1.id  # Plan ID string resolved
+
+    # Test error handling - one invalid plan in the list should raise error
+    example_plans_with_error = [
+        example_plan_1,
+        PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05"),  # Non-existent
+    ]
+
+    with pytest.raises(PlanNotFoundError):
+        await portia._aresolve_example_plans(example_plans_with_error)
+
+    # Test with invalid string in list
+    example_plans_with_invalid_string = [
+        example_plan_1,
+        "invalid query string",  # Should raise ValueError
+    ]
+
+    with pytest.raises(ValueError, match="must be a plan ID"):
+        await portia._aresolve_example_plans(example_plans_with_invalid_string)
+
+    # Test with invalid type in list
+    example_plans_with_invalid_type = [
+        example_plan_1,
+        123,  # Should raise TypeError
+    ]
+
+    with pytest.raises(TypeError, match="Invalid example plan type"):
+        await portia._aresolve_example_plans(example_plans_with_invalid_type)  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_portia__aload_plan_by_uuid(portia: Portia) -> None:
+    """Test _aload_plan_by_uuid method for both success and error cases."""
+    # Create and save a plan
+    test_plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["add_tool"]),
+        steps=[Step(task="Test task", tool_id="add_tool", inputs=[], output="$result")],
+    )
+    await portia.storage.asave_plan(test_plan)
+
+    # Test successful plan loading
+    loaded_plan = await portia._aload_plan_by_uuid(test_plan.id)
+    assert loaded_plan.id == test_plan.id
+    assert loaded_plan.plan_context.query == test_plan.plan_context.query
+
+    # Test error case - non-existent plan UUID should raise PlanNotFoundError
+    non_existent_uuid = PlanUUID.from_string("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")
+    with pytest.raises(PlanNotFoundError):
+        await portia._aload_plan_by_uuid(non_existent_uuid)
+
+
+@pytest.mark.asyncio
+async def test_portia__aresolve_string_example_plan(portia: Portia) -> None:
+    """Test _aresolve_string_example_plan method with various string inputs."""
+    # Create and save a test plan
+    test_plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["add_tool"]),
+        steps=[Step(task="Test task", tool_id="add_tool", inputs=[], output="$result")],
+    )
+    await portia.storage.asave_plan(test_plan)
+
+    # Test success case: valid plan ID string that exists
+    plan_id_string = str(test_plan.id)  # e.g., "plan-uuid"
+    resolved_plan = await portia._aresolve_string_example_plan(plan_id_string)
+    assert resolved_plan.id == test_plan.id
+    assert resolved_plan.plan_context.query == test_plan.plan_context.query
+
+    # Test error case: string doesn't start with "plan-"
+    with pytest.raises(ValueError, match="must be a plan ID.*Query strings are not supported"):
+        await portia._aresolve_string_example_plan("regular query string")
+
+    with pytest.raises(ValueError, match="must be a plan ID.*Query strings are not supported"):
+        await portia._aresolve_string_example_plan("some-other-prefix-uuid")
+
+    # Test error case: valid plan ID format but plan doesn't exist
+    with pytest.raises(PlanNotFoundError):
+        await portia._aresolve_string_example_plan("plan-99fc470b-4cbd-489b-b251-7076bf7e8f05")
+
+    # Test error case: plan ID string with invalid UUID format
+    with pytest.raises(ValueError, match="badly formed hexadecimal UUID string"):
+        await portia._aresolve_string_example_plan("plan-invalid-uuid-format")
