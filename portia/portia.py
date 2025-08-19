@@ -98,7 +98,7 @@ if TYPE_CHECKING:
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
 
 
-class RunData(BaseModel):
+class RunContext(BaseModel):
     """Data that is returned from a step."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -2646,7 +2646,7 @@ class Portia:
         if not ready:
             return plan_run
 
-        run_data = RunData(
+        run_data = RunContext(
             plan=plan,
             legacy_plan=legacy_plan,
             plan_run=plan_run,
@@ -2671,7 +2671,7 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PortiaPlan, run_data: RunData) -> PlanRun:
+    async def _execute_builder_plan(self, plan: PortiaPlan, run_data: RunContext) -> PlanRun:
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
@@ -2697,7 +2697,9 @@ class Portia:
             )
             output = ReferenceValue(
                 value=output_value,
-                description=(f"Output from step '{step.name}' (Description: {step.describe()})"),
+                description=(
+                    f"Output from step '{step.step_name}' (Description: {step.describe()})"
+                ),
             )
             run_data.step_output_values.append(output)
 
@@ -2723,7 +2725,9 @@ class Portia:
                 self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
                 error_output = ReferenceValue(
                     value=error_value,
-                    description=(f"Error from step '{step.name}' (Description: {step.describe()})"),
+                    description=(
+                        f"Error from step '{step.step_name}' (Description: {step.describe()})"
+                    ),
                 )
                 run_data.step_output_values.append(error_output)
                 # Skip the after_step_execution hook as we have already run it
@@ -2731,7 +2735,9 @@ class Portia:
                     run_data.plan_run, run_data.legacy_plan, error_value
                 )
 
-            run_data.plan_run.current_step_index += 1
+            # Don't increment current step beyond the last step
+            if i < len(plan.steps) - 1:
+                run_data.plan_run.current_step_index += 1
             logger().info(f"Completed step {i}, result: {result}")
 
         return self._post_plan_run_execution(

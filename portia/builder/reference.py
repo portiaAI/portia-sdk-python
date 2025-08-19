@@ -12,7 +12,7 @@ from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.portia_plan import PortiaPlan
-    from portia.portia import RunData
+    from portia.portia import RunContext
 
 
 def default_step_name(step_index: int) -> str:
@@ -29,7 +29,7 @@ class Reference(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_value(self, run_data: RunData) -> ReferenceValue | None:
+    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
         """Get the value of the reference."""
         raise NotImplementedError
 
@@ -53,7 +53,7 @@ class StepOutput(Reference):
         return plan.step_output_name(self.step)
 
     @override
-    def get_value(self, run_data: RunData) -> ReferenceValue | None:
+    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
         """Get the value of the step output."""
         try:
             if isinstance(self.step, int):
@@ -81,7 +81,7 @@ class Input(Reference):
         return self.name
 
     @override
-    def get_value(self, run_data: RunData) -> ReferenceValue | None:
+    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
         """Get the value of the input."""
         plan_input = next(
             (_input for _input in run_data.plan.plan_inputs if _input.name == self.name), None

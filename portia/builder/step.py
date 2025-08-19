@@ -16,20 +16,20 @@ from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step as PlanStep
 from portia.plan import Variable
-from portia.tool import ToolRunContext
+from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from portia.builder.portia_plan import PortiaPlan
-    from portia.portia import RunData
+    from portia.portia import RunContext
 
 
 class Step(BaseModel, ABC):
     """Interface for steps that are run as part of a plan."""
 
-    name: str = Field(description="The name of the step.")
+    step_name: str = Field(description="The name of the step.")
 
     @abstractmethod
-    async def run(self, run_data: RunData) -> Any:  # noqa: ANN401
+    async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
         """Execute the step."""
         raise NotImplementedError
 
@@ -51,12 +51,12 @@ class Step(BaseModel, ABC):
     def _resolve_input_reference(
         self,
         _input: Any,  # noqa: ANN401
-        run_data: RunData,
+        run_data: RunContext,
     ) -> Any | ReferenceValue | None:  # noqa: ANN401
         """Resolve input values by retrieving the ReferenceValue for any Reference inputs."""
         return _input.get_value(run_data) if isinstance(_input, Reference) else _input
 
-    def _get_value_for_input(self, _input: Any, run_data: RunData) -> Any | None:  # noqa: ANN401
+    def _get_value_for_input(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
         """Get the value for an input that could come from a reference."""
         resolved_input = self._resolve_input_reference(_input, run_data)
 
@@ -95,7 +95,14 @@ class LLMStep(Step):
     """A step that runs a given task through an LLM (without any tools)."""
 
     task: str = Field(description="The task to perform.")
-    inputs: list[Any] = Field(default_factory=list, description="The inputs to the task.")
+    inputs: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "The inputs for the task. The inputs can be references to previous step outputs / "
+            "plan inputs (using StepOutput / Input) or just plain values. They are passed in as "
+            "additional context to the LLM when it is completing the task."
+        ),
+    )
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
     )
@@ -108,7 +115,7 @@ class LLMStep(Step):
 
     @override
     @traceable(name="LLM Step - Run")
-    async def run(self, run_data: RunData) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+    async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the LLM query."""
         llm_tool = LLMTool(structured_output_schema=self.output_schema)
         tool_ctx = ToolRunContext(
@@ -126,7 +133,7 @@ class LLMStep(Step):
         ]
         return await llm_tool.arun(tool_ctx, task=self.task, task_data=task_data)
 
-    def _format_value(self, _input: Any, run_data: RunData) -> Any | None:  # noqa: ANN401
+    def _format_value(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
         """Get the value for an input."""
         if not isinstance(_input, ReferenceValue):
             return _input
@@ -150,10 +157,10 @@ class LLMStep(Step):
 class ToolCall(Step):
     """A step that calls a tool with the given inputs."""
 
-    tool: str | Callable[..., Any] = Field(
+    tool: str | Tool | Callable[..., Any] = Field(
         description=(
-            "The tool to use. Should either be the id of the tool to call or "
-            "a python function that should be called."
+            "The tool to use. Should either be the id of the tool to call, the Tool instance to "
+            "call, or a python function that should be called."
         )
     )
     args: dict[str, Any] = Field(
@@ -173,19 +180,25 @@ class ToolCall(Step):
         """Get the name of the tool."""
         if isinstance(self.tool, str):
             return self.tool
+        if isinstance(self.tool, Tool):
+            return self.tool.id
         fn_name = getattr(self.tool, "__name__", str(self.tool))
         return f"local_function_{fn_name}"
 
     @override
     @traceable(name="Tool Call - Run")
-    async def run(self, run_data: RunData) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the tool."""
         if isinstance(self.tool, str):
             output = await self._run_tool_by_id(self.tool, run_data)
+        elif isinstance(self.tool, Tool):
+            output = await self._run_portia_tool(self.tool, run_data)
         else:
             output = await self._run_callable_tool(self.tool, run_data)
+
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
+
         if self.output_schema and not isinstance(output, self.output_schema):
             model = run_data.portia.config.get_default_model()
             output = await model.aget_structured_response(
@@ -199,11 +212,14 @@ class ToolCall(Step):
             )
         return output
 
-    async def _run_tool_by_id(self, tool_id: str, run_data: RunData) -> Any:  # noqa: ANN401
+    async def _run_tool_by_id(self, tool_id: str, run_data: RunContext) -> Any:  # noqa: ANN401
         """Run a tool by id."""
         tool = run_data.portia.get_tool(tool_id, run_data.plan_run)
         if not tool:
             raise ToolNotFoundError(tool_id)
+        return await self._run_portia_tool(tool, run_data)
+
+    async def _run_portia_tool(self, tool: Tool, run_data: RunContext) -> Any:  # noqa: ANN401
         tool_ctx = ToolRunContext(
             end_user=run_data.end_user,
             plan_run=run_data.plan_run,
@@ -216,7 +232,7 @@ class ToolCall(Step):
         # TODO(RH): Move to async tool run when we can  # noqa: FIX002, TD003
         return tool.run(tool_ctx, **args)
 
-    async def _run_callable_tool(self, tool: Callable[..., Any], run_data: RunData) -> Any:  # noqa: ANN401
+    async def _run_callable_tool(self, tool: Callable[..., Any], run_data: RunContext) -> Any:  # noqa: ANN401
         """Run a callable tool."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         return tool(**args)
@@ -254,7 +270,7 @@ class SingleToolAgent(Step):
 
     @override
     @traceable(name="Single Tool Agent - Run")
-    async def run(self, run_data: RunData) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+    async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
         agent = run_data.portia.get_agent_for_step(
             self.to_legacy_step(run_data.plan), run_data.legacy_plan, run_data.plan_run

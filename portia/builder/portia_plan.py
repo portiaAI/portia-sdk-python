@@ -61,6 +61,6 @@ class PortiaPlan(BaseModel):
     def idx_by_name(self, name: str) -> int:
         """Get the index of a step by name."""
         for i, step in enumerate(self.steps):
-            if step.name == name:
+            if step.step_name == name:
                 return i
         raise ValueError(f"Step {name} not found in plan")

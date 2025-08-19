@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-# @@@TODO: Update once we're happy with the methods
+from portia.builder.plan_builder import PlanBuilder
+from portia.builder.portia_plan import PortiaPlan
+from portia.builder.reference import Input, StepOutput
+from portia.builder.step import LLMStep, SingleToolAgent, ToolCall
+
 # Clarification related classes
 from portia.clarification import (
     ActionClarification,
@@ -120,6 +124,7 @@ __all__ = [
     "GenerativeModel",
     "GenerativeModelsConfig",
     "InMemoryToolRegistry",
+    "Input",
     "InputClarification",
     "InvalidAgentError",
     "InvalidAgentOutputError",
@@ -128,6 +133,7 @@ __all__ = [
     "InvalidToolDescriptionError",
     "LLMModel",
     "LLMProvider",
+    "LLMStep",
     "LLMTool",
     "LocalDataValue",
     "LogLevel",
@@ -137,6 +143,7 @@ __all__ = [
     "MultipleChoiceClarification",
     "Output",
     "Plan",
+    "PlanBuilder",
     "PlanBuilderLegacy",
     "PlanContext",
     "PlanError",
@@ -149,14 +156,18 @@ __all__ = [
     "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
+    "PortiaPlan",
     "PortiaToolRegistry",
     "SearchTool",
+    "SingleToolAgent",
     "SseMcpClientConfig",
     "StdioMcpClientConfig",
     "Step",
+    "StepOutput",
     "StorageClass",
     "StorageError",
     "Tool",
+    "ToolCall",
     "ToolFailedError",
     "ToolHardError",
     "ToolNotFoundError",

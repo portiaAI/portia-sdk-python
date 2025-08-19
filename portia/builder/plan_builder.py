@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from portia.tool import Tool
+
 
 class PlanBuilder:
     """Builder for Portia plans."""
@@ -45,8 +47,9 @@ class PlanBuilder:
 
         Args:
             task: The task to perform.
-            inputs: The inputs to the task. If any of these values are instances of StepOutput or
-              Input, the corresponding values will be substituted in when the plan is run.
+            inputs: The inputs to the task. The inputs can be references to previous step outputs /
+              plan inputs (using StepOutput / Input) or just plain values. They are passed in as
+              additional context to the LLM when it is completing the task.
             output_schema: The schema of the output.
             name: Optional name for the step. If not provided, will be auto-generated.
 
@@ -56,7 +59,7 @@ class PlanBuilder:
                 task=task,
                 inputs=inputs or [],
                 output_schema=output_schema,
-                name=name or default_step_name(len(self.plan.steps)),
+                step_name=name or default_step_name(len(self.plan.steps)),
             )
         )
         return self
@@ -64,7 +67,7 @@ class PlanBuilder:
     def tool_call(
         self,
         *,
-        tool: str | Callable[..., Any],
+        tool: str | Tool | Callable[..., Any],
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
@@ -72,8 +75,8 @@ class PlanBuilder:
         """Add a step that directly invokes a tool.
 
         Args:
-            tool: The tool to invoke. Should either be the id of the tool to call or a python
-              function that should be called.
+            tool: The tool to invoke. Should either be the id of the tool to call, the Tool instance
+              to call, or a python function that should be called.
             args: The arguments to the tool. If any of these values are instances of StepOutput or
               Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
@@ -85,7 +88,7 @@ class PlanBuilder:
                 tool=tool,
                 args=args or {},
                 output_schema=output_schema,
-                name=name or default_step_name(len(self.plan.steps)),
+                step_name=name or default_step_name(len(self.plan.steps)),
             )
         )
         return self
@@ -116,7 +119,7 @@ class PlanBuilder:
                 task=task,
                 inputs=inputs or [],
                 output_schema=output_schema,
-                name=name or default_step_name(len(self.plan.steps)),
+                step_name=name or default_step_name(len(self.plan.steps)),
             )
         )
         return self
