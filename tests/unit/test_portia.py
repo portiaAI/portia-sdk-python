@@ -1161,7 +1161,7 @@ def test_portia_resolve_clarification_error(portia: Portia) -> None:
     portia.storage.save_plan(plan2)
     portia.storage.save_plan_run(plan_run2)
     with pytest.raises(InvalidPlanRunStateError):
-        portia.resolve_clarification(clarification, "test")
+        portia.resolve_clarification(clarification, "test", plan_run)
 
     with pytest.raises(InvalidPlanRunStateError):
         portia.resolve_clarification(clarification, "test", plan_run)
@@ -1394,6 +1394,7 @@ def test_portia_error_clarification(portia: Portia, planning_model: MagicMock) -
             source="Test portia error clarification",
         ),
         error=ValueError("test error"),
+        plan_run=plan_run,
     )
     assert plan_run.state == PlanRunState.FAILED
 

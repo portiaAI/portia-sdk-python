@@ -371,6 +371,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     plan_run = portia.resolve_clarification(
         plan_run.get_outstanding_clarifications()[0],
         "False",
+        plan_run,
     )
 
     portia.resume(plan_run)
@@ -413,6 +414,7 @@ async def test_portia_arun_query_with_clarifications_no_handler() -> None:
     plan_run = portia.resolve_clarification(
         plan_run.get_outstanding_clarifications()[0],
         "False",
+        plan_run,
     )
 
     portia.resume(plan_run)

@@ -10,6 +10,7 @@ from langsmith import traceable
 from pydantic import BaseModel, Field
 
 from portia.builder.reference import Reference, ReferenceValue
+from portia.clarification import Clarification
 from portia.errors import ToolNotFoundError
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
@@ -194,6 +195,9 @@ class ToolCall(Step):
             output = await self._run_portia_tool(self.tool, run_data)
         else:
             output = await self._run_callable_tool(self.tool, run_data)
+
+        if isinstance(output, Clarification) and output.plan_run_id is None:
+            output.plan_run_id = run_data.plan_run.id
 
         if self.output_schema and not isinstance(output, self.output_schema):
             model = run_data.portia.config.get_default_model()
