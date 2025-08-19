@@ -342,7 +342,8 @@ def test_browser_infra_local_setup_browser(
         mock_browser.assert_called_once()
         call_args = mock_browser.call_args[1]  # kwargs
         assert "config" in call_args
-        # The config should have been created with allowed_domains
+        config = call_args["config"]
+        assert config.allowed_domains == ["example.com"]
         assert browser == mock_browser_instance
 
 
@@ -532,6 +533,8 @@ def test_browserbase_provider_setup_browser(
         mock_browser.assert_called_once()
         call_args = mock_browser.call_args[1]  # kwargs
         assert "config" in call_args
+        config = call_args["config"]
+        assert config.allowed_domains == ["example.com"]
         assert browser == mock_browser_instance
 
 
@@ -969,6 +972,8 @@ class TestBrowserToolAllowedDomains:
             allowed_domains=["example.com", "*.trusted.org"],
         )
         context = get_test_tool_context()
+        # Set the tool in the context to match the expected type
+        context.tool = browser_tool
         
         with patch("portia.open_source_tools.browser_tool.Browser") as mock_browser:
             mock_browser_instance = MagicMock()
@@ -981,8 +986,10 @@ class TestBrowserToolAllowedDomains:
             mock_browser.assert_called_once()
             call_args = mock_browser.call_args
             
-            # Check that config parameter exists
-            assert "config" in call_args.kwargs or len(call_args.args) > 0
+            # Check that config parameter exists and has the correct allowed_domains
+            assert "config" in call_args.kwargs
+            config = call_args.kwargs["config"]
+            assert config.allowed_domains == ["example.com", "*.trusted.org"]
             
     def test_allowed_domains_none_allows_all_domains(
         self,
@@ -1047,3 +1054,20 @@ class TestBrowserToolAllowedDomains:
         
         # Domain validation should be handled by browser-use's BrowserConfig
         assert browser_tool.allowed_domains == ["example.com"]
+
+    def test_allowed_domains_format_validation(self) -> None:
+        """Test that invalid domain formats are rejected during initialization."""
+        # Test valid domains
+        valid_domains = ["example.com", "*.wikipedia.org", "sub.domain.com"]
+        browser_tool = BrowserTool(allowed_domains=valid_domains)
+        assert browser_tool.allowed_domains == valid_domains
+        
+        # Test invalid domains
+        with pytest.raises(ValueError, match="Invalid domain in allowed_domains: "):
+            BrowserTool(allowed_domains=["example.com", ""])
+            
+        with pytest.raises(ValueError, match="Invalid domain in allowed_domains: "):
+            BrowserTool(allowed_domains=["example.com", None])  # type: ignore
+            
+        with pytest.raises(ValueError, match="Invalid domain in allowed_domains: "):
+            BrowserTool(allowed_domains=["example.com", 123])  # type: ignore

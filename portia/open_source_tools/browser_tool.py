@@ -393,36 +393,40 @@ class BrowserToolForUrl(BrowserTool):
 
     def __init__(
         self,
-        url: str,
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         description: str | None = None,
         model: GenerativeModel | None | str = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
         custom_infrastructure_provider: BrowserInfrastructureProvider | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
         allowed_domains: list[str] | None = None,
     ) -> None:
-        """Initialize the BrowserToolForUrl."""
-        domain_parts = str(HttpUrl(url).host).split(".")
-        formatted_domain = "_".join(domain_parts)
-        if not id:
-            id = f"browser_tool_for_url_{formatted_domain}"  # noqa: A001
-        if not name:
-            name = f"Browser Tool for {formatted_domain}"
-        if not description:
-            description = (
-                f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete "
-                "tasks."
-            )
+        """Initialize the BrowserTool."""
+        # Validate allowed_domains format if provided
+        if allowed_domains:
+            for domain in allowed_domains:
+                if not isinstance(domain, str) or not domain.strip():
+                    raise ValueError(f"Invalid domain in allowed_domains: {domain}")
+        
         super().__init__(
-            id=id,
-            name=name,
-            description=description,
-            args_schema=BrowserToolForUrlSchema,
-            url=url,  # type: ignore reportCallIssue
+            id=id or "browser_tool",
+            name=name or "Browser Tool",
+            description=description
+            or (
+                "General purpose browser tool. Can be used to navigate to a URL and complete tasks. "
+                "Should only be used if the task requires a browser and you are sure of the URL. "
+                "This tool handles a full end to end task. It is capable of doing multiple things "
+                "across different URLs within the same root domain as part of the end to end task. As "
+                "a result, do not call this tool more than once back to back unless it is for "
+                "different root domains - just call it once with the combined task and the URL set "
+                "to the root domain."
+            ),
+            args_schema=BrowserToolSchema,
             model=model,
             infrastructure_option=infrastructure_option,
             custom_infrastructure_provider=custom_infrastructure_provider,
+            structured_output_schema=structured_output_schema,
             allowed_domains=allowed_domains,
         )
 
@@ -485,11 +489,16 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
+        # Type-safe access to allowed_domains
+        allowed_domains = None
+        if hasattr(ctx.tool, 'allowed_domains') and isinstance(ctx.tool, BrowserTool):
+            allowed_domains = ctx.tool.allowed_domains
+            
         return Browser(
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
-                allowed_domains=getattr(ctx.tool, 'allowed_domains', None),
+                allowed_domains=allowed_domains,
             ),
         )
 
@@ -767,10 +776,15 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
+            # Type-safe access to allowed_domains
+            allowed_domains = None
+            if hasattr(ctx.tool, 'allowed_domains') and isinstance(ctx.tool, BrowserTool):
+                allowed_domains = ctx.tool.allowed_domains
+                
             return Browser(
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
-                    allowed_domains=getattr(ctx.tool, 'allowed_domains', None),
+                    allowed_domains=allowed_domains,
                 ),
             )
 
