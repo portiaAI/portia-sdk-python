@@ -20,7 +20,6 @@ import asyncio
 import json
 import os
 import sys
-import urllib.parse
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
@@ -49,63 +48,6 @@ BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase"
 T = TypeVar("T", bound=str | BaseModel)
 
 
-def validate_url_against_allowed_domains(url: str, allowed_domains: list[str] | None) -> None:
-    """Validate that a URL is allowed based on the allowed_domains list.
-    
-    This function provides thorough URL validation to mitigate security risks by:
-    1. Parsing the URL vs the allowed_domains list in a more thorough manner
-    2. Prohibiting username/password sections in URLs
-    3. Ensuring domain matching is secure and accurate
-    
-    Args:
-        url (str): The URL to validate
-        allowed_domains (list[str] | None): List of allowed domains. If None, all domains are allowed.
-        
-    Raises:
-        ToolHardError: If the URL is not allowed or contains security risks
-    """
-    try:
-        parsed_url = urllib.parse.urlparse(url)
-    except Exception as e:
-        raise ToolHardError(f"Invalid URL format: {url}. Error: {str(e)}")
-    
-    # Security check: Prohibit username/password in URLs
-    if parsed_url.username or parsed_url.password:
-        raise ToolHardError(
-            "URLs with username/password authentication are not allowed for security reasons"
-        )
-    
-    # Extract the hostname
-    hostname = parsed_url.hostname
-    if not hostname:
-        raise ToolHardError(f"URL must have a valid hostname: {url}")
-    
-    # If allowed_domains is None, allow all valid URLs (security checks already passed)
-    if allowed_domains is None:
-        return  # No restrictions if allowed_domains is None
-    
-    if not allowed_domains:
-        raise ToolHardError("No domains are allowed in the allowed_domains list")
-    
-    # Normalize hostname to lowercase for comparison
-    hostname = hostname.lower().strip()
-    
-    # Check if hostname matches any allowed domain
-    for allowed_domain in allowed_domains:
-        allowed_domain = allowed_domain.lower().strip()
-        
-        # Exact match
-        if hostname == allowed_domain:
-            return
-            
-        # Subdomain match (ensure it's a proper subdomain)
-        if hostname.endswith(f".{allowed_domain}"):
-            return
-    
-    # If we get here, the domain is not allowed
-    raise ToolHardError(
-        f"Domain '{hostname}' is not in the allowed domains list: {allowed_domains}"
-    )
 
 
 class BrowserToolForUrlSchema(BaseModel):
@@ -307,9 +249,10 @@ class BrowserTool(Tool[str | BaseModel]):
     allowed_domains: list[str] | None = Field(
         default=None,
         description="List of allowed domains that the browser tool can navigate to. "
-        "If None, all domains are allowed. If provided, the tool will only navigate "
-        "to URLs whose domains (including subdomains) match the allowed list. "
-        "This provides security by restricting browser agent navigation to specific domains.",
+        "If None, all domains are allowed. If provided, browser-use will restrict "
+        "navigation to URLs whose domains match the allowed list. Supports glob patterns "
+        "like ['example.com', '*.wikipedia.org']. This provides security by restricting "
+        "browser agent navigation to specific domains using browser-use's built-in feature.",
     )
 
     @cached_property
@@ -346,9 +289,6 @@ class BrowserTool(Tool[str | BaseModel]):
         self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
-        # Validate URL against allowed domains for security
-        validate_url_against_allowed_domains(url, self.allowed_domains)
-        
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
@@ -551,6 +491,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
+                allowed_domains=ctx.tool.allowed_domains if hasattr(ctx.tool, 'allowed_domains') else None,
             ),
         )
 
@@ -831,6 +772,7 @@ if BROWSERBASE_AVAILABLE:
             return Browser(
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
+                    allowed_domains=ctx.tool.allowed_domains if hasattr(ctx.tool, 'allowed_domains') else None,
                 ),
             )
 
