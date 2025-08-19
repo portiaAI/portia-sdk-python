@@ -2670,7 +2670,7 @@ class Portia:
             plan=plan,
             legacy_plan=legacy_plan,
             plan_run=plan_run,
-            end_user=end_user or self.initialize_end_user(plan_run.end_user_id),
+            end_user=end_user or await self.ainitialize_end_user(plan_run.end_user_id),
             portia=self,
         )
 
