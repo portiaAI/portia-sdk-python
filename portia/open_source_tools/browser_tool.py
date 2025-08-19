@@ -26,6 +26,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
+from browser_use.browser.context import BrowserContextConfig
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
@@ -244,6 +245,20 @@ class BrowserTool(Tool[str | BaseModel]):
         description="Optional structured output schema for the browser tool's task output.",
     )
 
+    allowed_domains: list[str] | None = Field(
+        default=None,
+        description="List of allowed domains for browser navigation.",
+    )
+
+    def __init__(self, **kwargs) -> None:
+        """Initialize the BrowserTool with validation."""
+        allowed_domains = kwargs.get('allowed_domains')
+        if allowed_domains:
+            for domain in allowed_domains:
+                if not isinstance(domain, str) or not domain.strip():
+                    raise ValueError(f"Invalid domain in allowed_domains: {domain}")
+        super().__init__(**kwargs)
+
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -280,6 +295,12 @@ class BrowserTool(Tool[str | BaseModel]):
         """Run the BrowserTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
+
+        # Pass allowed_domains to infrastructure provider via context
+        if hasattr(self, 'allowed_domains'):
+            ctx._tool_allowed_domains = self.allowed_domains
+        else:
+            ctx._tool_allowed_domains = None
 
         async def run_browser_tasks() -> str | BaseModel | ActionClarification:
             def handle_login_requirement(
@@ -360,13 +381,9 @@ class BrowserToolForUrl(BrowserTool):
     `infrastructure_option` argument.
 
     Args:
-        url (str): The URL that this browser tool will navigate to for all tasks.
-        id (str, optional): Custom identifier for the tool. If not provided, will be generated
-            based on the URL's domain.
-        name (str, optional): Display name for the tool. If not provided, will be generated
-            based on the URL's domain.
-        description (str, optional): Custom description of the tool's purpose. If not provided,
-            will be generated with the URL.
+        id (str, optional): Custom identifier for the tool. Defaults to "browser_tool".
+        name (str, optional): Display name for the tool. Defaults to "Browser Tool".
+        description (str, optional): Custom description of the tool's purpose.
         infrastructure_option (BrowserInfrastructureOption, optional): The infrastructure
             provider to use. Can be either `BrowserInfrastructureOption.LOCAL` or
             `BrowserInfrastructureOption.REMOTE`. Defaults to
@@ -374,44 +391,59 @@ class BrowserToolForUrl(BrowserTool):
         custom_infrastructure_provider (BrowserInfrastructureProvider, optional): A custom
             infrastructure provider to use. If not provided, the infrastructure provider will be
             resolved from the `infrastructure_option` argument.
+        allowed_domains (list[str], optional): List of allowed domains for browser navigation.
 
     """
 
-    url: str = Field(
-        ...,
-        description="The URL to navigate to.",
+    allowed_domains: list[str] | None = Field(
+        default=None,
+        description="List of allowed domains for browser navigation.",
+    )
+    url: str | None = Field(
+        default=None,
+        description="The URL that this browser tool should navigate to.",
     )
 
     def __init__(
         self,
-        url: str,
+        url: str | None = None,
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         description: str | None = None,
         model: GenerativeModel | None | str = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
+        custom_infrastructure_provider: BrowserInfrastructureProvider | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+        allowed_domains: list[str] | None = None,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
-        domain_parts = str(HttpUrl(url).host).split(".")
-        formatted_domain = "_".join(domain_parts)
-        if not id:
-            id = f"browser_tool_for_url_{formatted_domain}"  # noqa: A001
-        if not name:
-            name = f"Browser Tool for {formatted_domain}"
-        if not description:
-            description = (
-                f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete "
-                "tasks."
-            )
+        # Validate allowed_domains format if provided
+        if allowed_domains:
+            for domain in allowed_domains:
+                if not isinstance(domain, str) or not domain.strip():
+                    raise ValueError(f"Invalid domain in allowed_domains: {domain}")
+        
         super().__init__(
-            id=id,
-            name=name,
-            description=description,
+            id=id or "browser_tool",
+            name=name or "Browser Tool",
+            description=description
+            or (
+                "General purpose browser tool. Can be used to navigate to a URL and complete tasks. "
+                "Should only be used if the task requires a browser and you are sure of the URL. "
+                "This tool handles a full end to end task. It is capable of doing multiple things "
+                "across different URLs within the same root domain as part of the end to end task. As "
+                "a result, do not call this tool more than once back to back unless it is for "
+                "different root domains - just call it once with the combined task and the URL set "
+                "to the root domain."
+            ),
             args_schema=BrowserToolForUrlSchema,
-            url=url,  # type: ignore reportCallIssue
             model=model,
             infrastructure_option=infrastructure_option,
+            custom_infrastructure_provider=custom_infrastructure_provider,
+            structured_output_schema=structured_output_schema,
         )
+        self.allowed_domains = allowed_domains
+        self.url = url
 
     def run(  # type: ignore reportIncompatibleMethodOverride
         self,
@@ -420,7 +452,9 @@ class BrowserToolForUrl(BrowserTool):
         task_data: list[Any] | str | None = None,
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserToolForUrl."""
-        return super().run(ctx, self.url, task, task_data)  # pragma: no cover
+        # Use the URL provided during initialization, or about:blank as fallback
+        url_to_use = self.url or "about:blank"
+        return super().run(ctx, url_to_use, task, task_data)
 
 
 class BrowserInfrastructureProvider(ABC):
@@ -472,10 +506,20 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
+        
+        # Retrieve allowed_domains from context
+        allowed_domains = getattr(ctx, '_tool_allowed_domains', None)
+        
+        # Create browser context config with allowed_domains
+        browser_context_config = BrowserContextConfig(
+            allowed_domains=allowed_domains,
+        )
+        
         return Browser(
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
+                new_context_config=browser_context_config,
             ),
         )
 
@@ -753,9 +797,18 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
+            # Retrieve allowed_domains from context
+            allowed_domains = getattr(ctx, '_tool_allowed_domains', None)
+
+            # Create browser context config with allowed_domains
+            browser_context_config = BrowserContextConfig(
+                allowed_domains=allowed_domains,
+            )
+
             return Browser(
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
+                    new_context_config=browser_context_config,
                 ),
             )
 
