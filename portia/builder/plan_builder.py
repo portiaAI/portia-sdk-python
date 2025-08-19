@@ -17,14 +17,14 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 
-class PlanBuilder:
+class PlanBuilderV2:
     """Builder for Portia plans."""
 
     def __init__(self, task: str = "Run the plan built with the Plan Builder") -> None:
         """Initialize the builder."""
         self.plan = PortiaPlan(steps=[], task=task)
 
-    def input(self, name: str, description: str | None = None) -> PlanBuilder:
+    def input(self, name: str, description: str | None = None) -> PlanBuilderV2:
         """Add an input to the plan.
 
         Args:
@@ -42,7 +42,7 @@ class PlanBuilder:
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Add a step that directly queries the LLM tool.
 
         Args:
@@ -71,7 +71,7 @@ class PlanBuilder:
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Add a step that directly invokes a tool.
 
         Args:
@@ -101,7 +101,7 @@ class PlanBuilder:
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         name: str | None = None,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Add a step that uses the execution agent with a tool.
 
         Args:
@@ -128,7 +128,7 @@ class PlanBuilder:
         self,
         output_schema: type[BaseModel] | None = None,
         summarize: bool = False,
-    ) -> PlanBuilder:
+    ) -> PlanBuilderV2:
         """Set the final output of the plan.
 
         Args:

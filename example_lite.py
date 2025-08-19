@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from portia import Config, LogLevel
-from portia.builder.plan_builder import PlanBuilder
+from portia.builder.plan_builder import PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
 from portia.cli import CLIExecutionHooks
 from portia.portia import Portia
@@ -81,7 +81,7 @@ portia = Portia(
 )
 
 plan = (
-    PlanBuilder("Write a poem about the price of gold")
+    PlanBuilderV2("Write a poem about the price of gold")
     .input("purchase_quantity", "The quantity of gold to purchase")
     .single_tool_agent(
         name="Search gold price",

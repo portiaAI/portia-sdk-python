@@ -21,7 +21,7 @@ from portia.open_source_tools.browser_tool import (
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
 )
-from portia.plan import PlanBuilderLegacy
+from portia.plan import PlanBuilder
 from portia.plan_run import PlanRun
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import assert_clarification_equality_without_uuid, get_test_tool_context
@@ -753,7 +753,7 @@ def test_browser_tool_multiple_calls(
 ) -> None:
     """Test step_complete only cleans up on final browser tool call."""
     plan = (
-        PlanBuilderLegacy()
+        PlanBuilder()
         .step(task="1st browser tool task", tool_id="browser_tool")
         .step(task="2nd browser tool task", tool_id="browser_tool")
         .step(task="3rd browser tool task", tool_id="browser_tool")

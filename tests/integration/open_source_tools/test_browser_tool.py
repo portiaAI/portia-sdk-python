@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from portia import LLMProvider, PlanBuilderLegacy, PlanRunState, Portia, ToolRegistry
+from portia import LLMProvider, PlanBuilder, PlanRunState, Portia, ToolRegistry
 from portia.config import (
     Config,
     StorageClass,
@@ -119,7 +119,7 @@ def test_portia_multi_step_from_plan() -> None:
     )
 
     plan = (
-        PlanBuilderLegacy()
+        PlanBuilder()
         .step(
             "Retrieve the title of the first section of the homepage, it should contain the "
             "word 'environments'",
