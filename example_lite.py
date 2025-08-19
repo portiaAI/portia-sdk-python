@@ -89,7 +89,7 @@ plan = (
         task="Search for the price of gold per ounce in USD",
         output_schema=CommodityPrice,
     )
-    .tool_call(
+    .tool_run(
         tool="currency_conversion_tool",
         args={
             "amount": StepOutput("Search gold price"),
@@ -98,8 +98,8 @@ plan = (
         },
         output_schema=CommodityPriceWithCurrency,
     )
-    .tool_call(
-        tool=lambda price_with_currency, purchase_quantity: (
+    .function_call(
+        function=lambda price_with_currency, purchase_quantity: (
             purchase_quantity * price_with_currency.price
         ),
         args={

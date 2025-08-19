@@ -26,7 +26,7 @@ class PortiaPlan(BaseModel):
     final_output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the final output of the plan."
     )
-    task: str = Field(
+    label: str = Field(
         default="Run the plan built with the Plan Builder",
         description="The task that the plan is completing.",
     )

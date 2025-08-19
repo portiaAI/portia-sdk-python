@@ -154,13 +154,13 @@ class LLMStep(Step):
         )
 
 
-class ToolCall(Step):
-    """A step that calls a tool with the given inputs."""
+class ToolRun(Step):
+    """A step that calls a tool with the given args (no LLM involved, just a direct tool call)."""
 
-    tool: str | Tool | Callable[..., Any] = Field(
+    tool: str | Tool = Field(
         description=(
-            "The tool to use. Should either be the id of the tool to call, the Tool instance to "
-            "call, or a python function that should be called."
+            "The tool to use. Should either be the id of the tool to run or the Tool instance to "
+            "run."
         )
     )
     args: dict[str, Any] = Field(
@@ -174,27 +174,91 @@ class ToolCall(Step):
     def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"ToolCall(tool='{self._tool_name()}', inputs={self.args}{output_info})"
+        return f"ToolRun(tool='{self._tool_name()}', args={self.args}{output_info})"
 
     def _tool_name(self) -> str:
         """Get the name of the tool."""
         if isinstance(self.tool, str):
             return self.tool
-        if isinstance(self.tool, Tool):
-            return self.tool.id
-        fn_name = getattr(self.tool, "__name__", str(self.tool))
-        return f"local_function_{fn_name}"
+        return self.tool.id
 
     @override
-    @traceable(name="Tool Call - Run")
+    @traceable(name="Tool Run - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the tool."""
         if isinstance(self.tool, str):
-            output = await self._run_tool_by_id(self.tool, run_data)
-        elif isinstance(self.tool, Tool):
-            output = await self._run_portia_tool(self.tool, run_data)
+            tool = run_data.portia.get_tool(self.tool, run_data.plan_run)
         else:
-            output = await self._run_callable_tool(self.tool, run_data)
+            tool = self.tool
+        if not tool:
+            raise ToolNotFoundError(self.tool if isinstance(self.tool, str) else self.tool.id)
+
+        tool_ctx = ToolRunContext(
+            end_user=run_data.end_user,
+            plan_run=run_data.plan_run,
+            plan=run_data.legacy_plan,
+            config=run_data.portia.config,
+            clarifications=[],
+        )
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+
+        # TODO(RH): Move to async tool run when we can  # noqa: FIX002, TD003
+        output = tool.run(tool_ctx, **args)
+        if isinstance(output, Clarification) and output.plan_run_id is None:
+            output.plan_run_id = run_data.plan_run.id
+
+        if self.output_schema and not isinstance(output, self.output_schema):
+            model = run_data.portia.config.get_default_model()
+            output = await model.aget_structured_response(
+                [
+                    Message(
+                        role="user",
+                        content=f"Convert this output to the desired schema: {output}",
+                    )
+                ],
+                self.output_schema,
+            )
+        return output
+
+    @override
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+        """Convert this ToolCall to a PlanStep."""
+        inputs_desc = ", ".join(
+            [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
+        )
+        return PlanStep(
+            task=f"Use tool {self._tool_name()} with inputs: {inputs_desc}",
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
+            tool_id=self._tool_name(),
+            output=plan.step_output_name(self),
+            structured_output_schema=self.output_schema,
+        )
+
+
+class FunctionCall(Step):
+    """Calls a function with the given args (no LLM involved, just a direct function call)."""
+
+    function: Callable[..., Any] = Field(description=("The function to call."))
+    args: dict[str, Any] = Field(
+        default_factory=dict, description="The args to call the tool with."
+    )
+    output_schema: type[BaseModel] | None = Field(
+        default=None, description="The schema of the output."
+    )
+
+    @override
+    def describe(self) -> str:
+        """Return a description of this step for logging purposes."""
+        output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
+        fn_name = getattr(self.function, "__name__", str(self.function))
+        return f"FunctionCall(function='{fn_name}', args={self.args}{output_info})"
+
+    @override
+    @traceable(name="Function Call - Run")
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+        """Run the function."""
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+        output = self.function(**args)
 
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
@@ -212,41 +276,17 @@ class ToolCall(Step):
             )
         return output
 
-    async def _run_tool_by_id(self, tool_id: str, run_data: RunContext) -> Any:  # noqa: ANN401
-        """Run a tool by id."""
-        tool = run_data.portia.get_tool(tool_id, run_data.plan_run)
-        if not tool:
-            raise ToolNotFoundError(tool_id)
-        return await self._run_portia_tool(tool, run_data)
-
-    async def _run_portia_tool(self, tool: Tool, run_data: RunContext) -> Any:  # noqa: ANN401
-        tool_ctx = ToolRunContext(
-            end_user=run_data.end_user,
-            plan_run=run_data.plan_run,
-            plan=run_data.legacy_plan,
-            config=run_data.portia.config,
-            clarifications=[],
-        )
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-
-        # TODO(RH): Move to async tool run when we can  # noqa: FIX002, TD003
-        return tool.run(tool_ctx, **args)
-
-    async def _run_callable_tool(self, tool: Callable[..., Any], run_data: RunContext) -> Any:  # noqa: ANN401
-        """Run a callable tool."""
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-        return tool(**args)
-
     @override
     def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
+        fn_name = getattr(self.function, "__name__", str(self.function))
         return PlanStep(
-            task=f"Use tool {self._tool_name()} with inputs: {inputs_desc}",
+            task=f"Run function {fn_name} with args: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
-            tool_id=self._tool_name(),
+            tool_id=f"local_function_{fn_name}",
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
         )

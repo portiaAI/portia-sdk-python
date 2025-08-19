@@ -2585,7 +2585,6 @@ class Portia:
                 not step.tool_id
                 or step.tool_id in tools_remaining
                 or step.tool_id.startswith("local_function_")
-                or step.tool_id.startswith("local_hook_")
             ):
                 continue
             tools_remaining.add(step.tool_id)
@@ -2626,7 +2625,7 @@ class Portia:
         """Run a Portia plan."""
         legacy_plan = plan.to_legacy_plan(
             PlanContext(
-                query=plan.task,
+                query=plan.label,
                 tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
             ),
         )
@@ -2646,7 +2645,7 @@ class Portia:
         if not legacy_plan:
             legacy_plan = plan.to_legacy_plan(
                 PlanContext(
-                    query=plan.task,
+                    query=plan.label,
                     tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
                 ),
             )
