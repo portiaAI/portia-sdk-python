@@ -903,6 +903,7 @@ class Portia:
                         plan,
                         self.initialize_end_user(end_user),
                         plan_run_inputs,
+                        structured_output_schema,
                     )
                 )
 
@@ -955,6 +956,7 @@ class Portia:
                 plan,
                 self.initialize_end_user(end_user),
                 plan_run_inputs,
+                structured_output_schema,
             )
 
         plan_run = await self._aget_plan_run_from_plan(
@@ -2621,6 +2623,7 @@ class Portia:
         | list[dict[str, Serializable]]
         | dict[str, Serializable]
         | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a Portia plan."""
         legacy_plan = plan.to_legacy_plan(
@@ -2629,6 +2632,8 @@ class Portia:
                 tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
             ),
         )
+        if structured_output_schema:
+            plan.final_output_schema = structured_output_schema
         plan_run = await self._aget_plan_run_from_plan(legacy_plan, end_user, plan_run_inputs)
         return await self.resume_builder_plan(
             plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
