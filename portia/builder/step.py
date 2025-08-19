@@ -7,7 +7,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, override
 
 from langsmith import traceable
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.builder.reference import Reference, ReferenceValue
 from portia.clarification import Clarification
@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 
 class Step(BaseModel, ABC):
     """Interface for steps that are run as part of a plan."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     step_name: str = Field(description="The name of the step.")
 
