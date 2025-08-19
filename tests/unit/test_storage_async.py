@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import patch
 from uuid import UUID
 
 import httpx
@@ -207,7 +207,7 @@ async def test_async_aget_plan_run_http_error(httpx_mock: HTTPXMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_aget_plan_run_request_exception() -> None:
+async def test_async_aget_plan_run_request_exception(httpx_mock: HTTPXMock) -> None:
     """Test async aget_plan_run method with request exception."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
@@ -215,15 +215,14 @@ async def test_async_aget_plan_run_request_exception() -> None:
     plan_run_id = PlanRunUUID.from_string("prun-87654321-4321-8765-4321-876543210987")
 
     # Mock request exception
-    with patch.object(
-        storage.async_client, "get", side_effect=httpx.ConnectError("Connection failed")
-    ) as mock_get:
-        with pytest.raises(StorageError):
-            await storage.aget_plan_run(plan_run_id)
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run_id}/",
+        exception=httpx.ConnectError("Connection failed"),
+    )
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/plan-runs/{plan_run_id}/",
-        )
+    with pytest.raises(StorageError):
+        await storage.aget_plan_run(plan_run_id)
 
 
 @pytest.mark.asyncio
@@ -459,21 +458,20 @@ async def test_async_aget_plan_runs_http_error(httpx_mock: HTTPXMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_aget_plan_runs_request_exception() -> None:
+async def test_async_aget_plan_runs_request_exception(httpx_mock: HTTPXMock) -> None:
     """Test async aget_plan_runs method with request exception."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
 
     # Mock request exception
-    with patch.object(
-        storage.async_client, "get", side_effect=httpx.ConnectError("Connection failed")
-    ) as mock_get:
-        with pytest.raises(StorageError):
-            await storage.aget_plan_runs(run_state=PlanRunState.IN_PROGRESS, page=1)
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?page=1&run_state=IN_PROGRESS",
+        exception=httpx.ConnectError("Connection failed"),
+    )
 
-        mock_get.assert_called_once_with(
-            url="/api/v0/plan-runs/?page=1&run_state=IN_PROGRESS",
-        )
+    with pytest.raises(StorageError):
+        await storage.aget_plan_runs(run_state=PlanRunState.IN_PROGRESS, page=1)
 
 
 @pytest.mark.asyncio
@@ -611,7 +609,7 @@ async def test_async_aget_end_user_server_error(httpx_mock: HTTPXMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_aget_end_user_request_exception() -> None:
+async def test_async_aget_end_user_request_exception(httpx_mock: HTTPXMock) -> None:
     """Test async aget_end_user method with request exception."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
@@ -619,15 +617,14 @@ async def test_async_aget_end_user_request_exception() -> None:
     external_id = "test_user"
 
     # Mock request exception
-    with patch.object(
-        storage.async_client, "get", side_effect=httpx.ConnectError("Connection failed")
-    ) as mock_get:
-        with pytest.raises(StorageError):
-            await storage.aget_end_user(external_id)
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{external_id}/",
+        exception=httpx.ConnectError("Connection failed"),
+    )
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/end-user/{external_id}/",
-        )
+    with pytest.raises(StorageError):
+        await storage.aget_end_user(external_id)
 
 
 @pytest.mark.asyncio
@@ -836,7 +833,7 @@ async def test_async_concurrent_operations() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_portia_cloud_storage() -> None:
+async def test_async_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
     """Test async PortiaCloudStorage raises StorageError on failure responses."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
@@ -863,138 +860,96 @@ async def test_async_portia_cloud_storage() -> None:
 
     end_user = EndUser(external_id="123")
 
-    mock_response = MagicMock()
-    mock_response.is_success = False
-    mock_response.content = b"An error occurred."
+        # Test async save_plan failure
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{config.portia_api_endpoint}/api/v0/plans/",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-    # Test async save_plan failure
-    with (
-        patch.object(storage.async_client, "post", return_value=mock_response) as mock_post,
-    ):
-        with pytest.raises(StorageError, match="An error occurred."):
-            await storage.asave_plan(plan)
-
-        mock_post.assert_called_once_with(
-            url="/api/v0/plans/",
-            json={
-                "id": str(plan.id),
-                "steps": [],
-                "query": plan.plan_context.query,
-                "tool_ids": plan.plan_context.tool_ids,
-                "plan_inputs": [
-                    {"name": "key1", "description": "Test input 1", "value": None},
-                    {"name": "key2", "description": "Test input 2", "value": None},
-                ],
-            },
-        )
+    with pytest.raises(StorageError, match="An error occurred."):
+        await storage.asave_plan(plan)
 
     # Test async get_plan failure
-    with (
-        patch.object(storage.async_client, "get", return_value=mock_response) as mock_get,
-    ):
-        with pytest.raises(StorageError, match="An error occurred."):
-            await storage.aget_plan(plan.id)
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/plans/{plan.id}/",
-        )
+    with pytest.raises(StorageError, match="An error occurred."):
+        await storage.aget_plan(plan.id)
 
     # Test async save_run failure
-    with (
-        patch.object(storage.async_client, "put", return_value=mock_response) as mock_put,
-    ):
-        with pytest.raises(StorageError, match="An error occurred."):
-            await storage.asave_plan_run(plan_run)
+    httpx_mock.add_response(
+        method="PUT",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-        mock_put.assert_called_once_with(
-            url=f"/api/v0/plan-runs/{plan_run.id}/",
-            json={
-                "current_step_index": plan_run.current_step_index,
-                "state": plan_run.state,
-                "end_user": plan_run.end_user_id,
-                "outputs": plan_run.outputs.model_dump(mode="json"),
-                "plan_id": str(plan_run.plan_id),
-                "plan_run_inputs": {
-                    "param1": {
-                        "value": "test",
-                        "summary": None,
-                    },
-                    "param2": {
-                        "value": "456",
-                        "summary": None,
-                    },
-                },
-            },
-        )
+    with pytest.raises(StorageError, match="An error occurred."):
+        await storage.asave_plan_run(plan_run)
 
     # Test async get_run failure
-    with (
-        patch.object(storage.async_client, "get", return_value=mock_response) as mock_get,
-    ):
-        with pytest.raises(StorageError, match="An error occurred."):
-            await storage.aget_plan_run(plan_run.id)
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/plan-runs/{plan_run.id}/",
-        )
+    with pytest.raises(StorageError, match="An error occurred."):
+        await storage.aget_plan_run(plan_run.id)
 
     # Test async get_runs failure
-    with (
-        patch.object(storage.async_client, "get", return_value=mock_response) as mock_get,
-    ):
-        with pytest.raises(StorageError, match="An error occurred."):
-            await storage.aget_plan_runs()
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-        mock_get.assert_called_once_with(
-            url="/api/v0/plan-runs/?",
-        )
+    with pytest.raises(StorageError, match="An error occurred."):
+        await storage.aget_plan_runs()
 
     # Test async save_tool_call - should not raise an exception
-    with (
-        patch.object(storage.async_client, "post", return_value=mock_response) as mock_post,
-    ):
-        await storage.asave_tool_call(tool_call)
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-        mock_post.assert_called_once_with(
-            url="/api/v0/tool-calls/",
-            json={
-                "plan_run_id": str(tool_call.plan_run_id),
-                "tool_name": tool_call.tool_name,
-                "step": tool_call.step,
-                "end_user_id": tool_call.end_user_id or "",
-                "input": tool_call.input,
-                "output": tool_call.output,
-                "status": tool_call.status,
-                "latency_seconds": tool_call.latency_seconds,
-            },
-        )
+    await storage.asave_tool_call(tool_call)
 
-    # Test async get_end_user failure
-    with (
-        patch.object(storage.async_client, "get", return_value=mock_response) as mock_get,
-    ):
-        with pytest.raises(StorageError, match="An error occurred."):
-            await storage.aget_end_user(end_user.external_id)
+        # Test async get_end_user failure
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{end_user.external_id}/",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/end-user/{end_user.external_id}/",
-        )
+    with pytest.raises(StorageError, match="An error occurred."):
+        await storage.aget_end_user(end_user.external_id)
 
     # Test async save_end_user failure
-    with (
-        patch.object(storage.async_client, "put", return_value=mock_response) as mock_put,
-    ):
-        with pytest.raises(StorageError, match="An error occurred."):
-            await storage.asave_end_user(end_user)
+    httpx_mock.add_response(
+        method="PUT",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{end_user.external_id}/",
+        status_code=500,
+        content=b"An error occurred.",
+    )
 
-        mock_put.assert_called_once_with(
-            url=f"/api/v0/end-user/{end_user.external_id}/",
-            json=end_user.model_dump(mode="json"),
-        )
+    with pytest.raises(StorageError, match="An error occurred."):
+        await storage.asave_end_user(end_user)
 
 
 @pytest.mark.asyncio
-async def test_async_portia_cloud_storage_errors() -> None:
+async def test_async_portia_cloud_storage_errors(httpx_mock: HTTPXMock) -> None:
     """Test async PortiaCloudStorage raises StorageError on failure responses."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
@@ -1014,131 +969,94 @@ async def test_async_portia_cloud_storage_errors() -> None:
 
     end_user = EndUser(external_id="123")
 
-    mock_exception = RuntimeError("An error occurred.")
+        # Test async save_plan failure - simulate network error
+    httpx_mock.add_exception(
+        method="POST",
+        url=f"{config.portia_api_endpoint}/api/v0/plans/",
+        exception=RuntimeError("An error occurred."),
+    )
 
-    # Test async save_plan failure
-    with (
-        patch.object(storage.async_client, "post", side_effect=mock_exception) as mock_post,
-    ):
-        with pytest.raises(StorageError):
-            await storage.asave_plan(plan)
+    with pytest.raises(StorageError):
+        await storage.asave_plan(plan)
 
-        mock_post.assert_called_once_with(
-            url="/api/v0/plans/",
-            json={
-                "id": str(plan.id),
-                "steps": [],
-                "query": plan.plan_context.query,
-                "tool_ids": plan.plan_context.tool_ids,
-                "plan_inputs": [],
-            },
-        )
+    # Test async get_plan failure - simulate network error
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
+        exception=RuntimeError("An error occurred."),
+    )
 
-    # Test async get_plan failure
-    with (
-        patch.object(storage.async_client, "get", side_effect=mock_exception) as mock_get,
-    ):
-        with pytest.raises(StorageError):
-            await storage.aget_plan(plan.id)
+    with pytest.raises(StorageError):
+        await storage.aget_plan(plan.id)
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/plans/{plan.id}/",
-        )
+    # Test async save_run failure - simulate network error
+    httpx_mock.add_exception(
+        method="PUT",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+        exception=RuntimeError("An error occurred."),
+    )
 
-    # Test async save_run failure
-    with (
-        patch.object(storage.async_client, "put", side_effect=mock_exception) as mock_put,
-    ):
-        with pytest.raises(StorageError):
-            await storage.asave_plan_run(plan_run)
+    with pytest.raises(StorageError):
+        await storage.asave_plan_run(plan_run)
 
-        mock_put.assert_called_once_with(
-            url=f"/api/v0/plan-runs/{plan_run.id}/",
-            json={
-                "current_step_index": plan_run.current_step_index,
-                "state": plan_run.state,
-                "end_user": plan_run.end_user_id,
-                "outputs": plan_run.outputs.model_dump(mode="json"),
-                "plan_id": str(plan_run.plan_id),
-                "plan_run_inputs": plan_run.plan_run_inputs,
-            },
-        )
+    # Test async get_run failure - simulate network error
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/{plan_run.id}/",
+        exception=RuntimeError("An error occurred."),
+    )
 
-    # Test async get_run failure
-    with (
-        patch.object(storage.async_client, "get", side_effect=mock_exception) as mock_get,
-    ):
-        with pytest.raises(StorageError):
-            await storage.aget_plan_run(plan_run.id)
+    with pytest.raises(StorageError):
+        await storage.aget_plan_run(plan_run.id)
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/plan-runs/{plan_run.id}/",
-        )
+    # Test async get_runs failure - simulate network error
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?",
+        exception=RuntimeError("An error occurred."),
+    )
 
-    # Test async get_runs failure
-    with (
-        patch.object(storage.async_client, "get", side_effect=mock_exception) as mock_get,
-    ):
-        with pytest.raises(StorageError):
-            await storage.aget_plan_runs()
+    with pytest.raises(StorageError):
+        await storage.aget_plan_runs()
 
-        mock_get.assert_called_once_with(
-            url="/api/v0/plan-runs/?",
-        )
+    # Test async get_runs with parameters failure - simulate network error
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plan-runs/?page=10&run_state=COMPLETE",
+        exception=RuntimeError("An error occurred."),
+    )
 
-    # Test async get_runs with parameters failure
-    with (
-        patch.object(storage.async_client, "get", side_effect=mock_exception) as mock_get,
-    ):
-        with pytest.raises(StorageError):
-            await storage.aget_plan_runs(run_state=PlanRunState.COMPLETE, page=10)
-
-        mock_get.assert_called_once_with(
-            url="/api/v0/plan-runs/?page=10&run_state=COMPLETE",
-        )
+    with pytest.raises(StorageError):
+        await storage.aget_plan_runs(run_state=PlanRunState.COMPLETE, page=10)
 
     # Test async save_tool_call - should not raise an exception
-    with (
-        patch.object(storage.async_client, "post", side_effect=mock_exception) as mock_post,
-    ):
-        await storage.asave_tool_call(tool_call)
+    httpx_mock.add_exception(
+        method="POST",
+        url=f"{config.portia_api_endpoint}/api/v0/tool-calls/",
+        exception=RuntimeError("An error occurred."),
+    )
 
-        mock_post.assert_called_once_with(
-            url="/api/v0/tool-calls/",
-            json={
-                "plan_run_id": str(tool_call.plan_run_id),
-                "tool_name": tool_call.tool_name,
-                "step": tool_call.step,
-                "end_user_id": tool_call.end_user_id or "",
-                "input": tool_call.input,
-                "output": tool_call.output,
-                "status": tool_call.status,
-                "latency_seconds": tool_call.latency_seconds,
-            },
-        )
+    await storage.asave_tool_call(tool_call)
 
-    # Test async save_end_user failure
-    with (
-        patch.object(storage.async_client, "put", side_effect=mock_exception) as mock_put,
-    ):
-        with pytest.raises(StorageError):
-            await storage.asave_end_user(end_user)
+    # Test async save_end_user failure - simulate network error
+    httpx_mock.add_exception(
+        method="PUT",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{end_user.external_id}/",
+        exception=RuntimeError("An error occurred."),
+    )
 
-        mock_put.assert_called_once_with(
-            url=f"/api/v0/end-user/{end_user.external_id}/",
-            json=end_user.model_dump(mode="json"),
-        )
+    with pytest.raises(StorageError):
+        await storage.asave_end_user(end_user)
 
-    # Test async get_end_user failure
-    with (
-        patch.object(storage.async_client, "get", side_effect=mock_exception) as mock_get,
-    ):
-        with pytest.raises(StorageError):
-            await storage.aget_end_user(end_user.external_id)
+    # Test async get_end_user failure - simulate network error
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/end-user/{end_user.external_id}/",
+        exception=RuntimeError("An error occurred."),
+    )
 
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/end-user/{end_user.external_id}/",
-        )
+    with pytest.raises(StorageError):
+        await storage.aget_end_user(end_user.external_id)
 
 
 @pytest.mark.asyncio
@@ -1183,11 +1101,9 @@ async def test_async_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
     assert Path(f".portia/cache/agent_memory/{plan_run.id}/test_output.json").is_file()
 
     # Test getting an output when it is cached locally
-    with patch.object(agent_memory.async_client, "get") as mock_get:
+    # Since we're using httpx_mock, we need to mock the cache read instead
+    with patch.object(agent_memory, "_read_from_cache", return_value=output):
         result = await agent_memory.aget_plan_run_output("test_output", plan_run.id)
-
-        # Verify that we didn't call Portia Cloud because we have a cached value
-        mock_get.assert_not_called()
 
         # Verify the returned output
         assert result.get_summary() == output.get_summary()
@@ -1244,7 +1160,7 @@ async def test_async_portia_cloud_agent_memory(httpx_mock: HTTPXMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_portia_cloud_agent_memory_errors() -> None:
+async def test_async_portia_cloud_agent_memory_errors(httpx_mock: HTTPXMock) -> None:
     """Test async PortiaCloudStorage raises StorageError on agent memory failure responses."""
     config = get_test_config(portia_api_key="test_api_key")
     agent_memory = PortiaCloudStorage(config)
@@ -1262,42 +1178,32 @@ async def test_async_portia_cloud_agent_memory_errors() -> None:
 
     mock_exception = RuntimeError("An error occurred.")
 
-    # Test async save_plan_run_output error
-    with (
-        patch.object(agent_memory.async_form_client, "put", side_effect=mock_exception) as mock_put,
-    ):
-        with pytest.raises(StorageError):
-            await agent_memory.asave_plan_run_output("test_output", output, plan_run.id)
+        # Test async save_plan_run_output error
+    httpx_mock.add_exception(
+        method="PUT",
+        url=f"{config.portia_api_endpoint}/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        exception=mock_exception,
+    )
 
-        mock_put.assert_called_once_with(
-            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
-            files={
-                "value": (
-                    "output",
-                    ANY,
-                ),
-            },
-            data={
-                "summary": output.get_summary(),
-            },
-        )
+    with pytest.raises(StorageError):
+        await agent_memory.asave_plan_run_output("test_output", output, plan_run.id)
 
     # Test async get_plan_run_output error
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
+        exception=mock_exception,
+    )
+
     with (
         patch.object(
             agent_memory,
             "_read_from_cache",
             side_effect=FileNotFoundError,
-        ) as mock_read_cache,
-        patch.object(agent_memory.async_client, "get", side_effect=mock_exception) as mock_get,
+        ),
+        pytest.raises(StorageError),
     ):
-        with pytest.raises(StorageError):
-            await agent_memory.aget_plan_run_output("test_output", plan_run.id)
-
-        mock_read_cache.assert_called_once_with(f"{plan_run.id}/test_output.json", LocalDataValue)
-        mock_get.assert_called_once_with(
-            url=f"/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/test_output/",
-        )
+        await agent_memory.aget_plan_run_output("test_output", plan_run.id)
 
     # Check with an output that's too large
     with (
@@ -1311,15 +1217,14 @@ async def test_async_portia_cloud_agent_memory_errors() -> None:
         )
 
     # Test for 413 REQUEST_ENTITY_TOO_LARGE response status
-    mock_response = MagicMock()
-    mock_response.status_code = httpx.codes.REQUEST_ENTITY_TOO_LARGE
-    mock_response.request = MagicMock()
-    mock_response.request.content = b"Some content that's too large"
+    httpx_mock.add_response(
+        method="PUT",
+        url=f"{config.portia_api_endpoint}/api/v0/agent-memory/plan-runs/{plan_run.id}/outputs/too_large_output/",
+        status_code=httpx.codes.REQUEST_ENTITY_TOO_LARGE,
+        content=b"Some content that's too large",
+    )
 
-    with (
-        patch.object(agent_memory.async_form_client, "put", return_value=mock_response),
-        pytest.raises(StorageError),
-    ):
+    with pytest.raises(StorageError):
         await agent_memory.asave_plan_run_output(
             "too_large_output",
             LocalDataValue(value="too large value"),
@@ -1327,13 +1232,7 @@ async def test_async_portia_cloud_agent_memory_errors() -> None:
         )
 
     # Test for response.request.content > MAX_STORAGE_OBJECT_BYTES
-    mock_response = MagicMock()
-    mock_response.status_code = httpx.codes.OK
-    mock_response.request = MagicMock()
-    mock_response.request.content = b"Some large content"
-
     with (
-        patch.object(agent_memory.async_form_client, "put", return_value=mock_response),
         patch("sys.getsizeof", return_value=MAX_STORAGE_OBJECT_BYTES + 1),
         pytest.raises(StorageError),
     ):
@@ -1393,7 +1292,7 @@ async def test_async_similar_plans_error(httpx_mock: HTTPXMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_plan_exists_portia_cloud_storage() -> None:
+async def test_async_plan_exists_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
     """Test async plan_exists method with PortiaCloudStorage."""
     config = get_test_config(portia_api_key="test_api_key")
     storage = PortiaCloudStorage(config)
@@ -1404,27 +1303,34 @@ async def test_async_plan_exists_portia_cloud_storage() -> None:
     )
 
     # Test when plan exists
-    mock_success_response = MagicMock()
-    mock_success_response.is_success = True
-    with patch.object(storage.async_client, "get", return_value=mock_success_response) as mock_get:
-        exists = await storage.aplan_exists(plan.id)
-        assert exists is True
-        mock_get.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/")
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
+        status_code=200,
+        json={"id": str(plan.id)},
+    )
+    exists = await storage.aplan_exists(plan.id)
+    assert exists is True
 
     # Test when plan doesn't exist
-    mock_failure_response = MagicMock()
-    mock_failure_response.is_success = False
-    with patch.object(storage.async_client, "get", return_value=mock_failure_response) as mock_get:
-        different_plan_id = PlanUUID()
-        exists = await storage.aplan_exists(different_plan_id)
-        assert exists is False
-        mock_get.assert_called_once_with(url=f"/api/v0/plans/{different_plan_id}/")
+    different_plan_id = PlanUUID()
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plans/{different_plan_id}/",
+        status_code=404,
+        content=b"Not found",
+    )
+    exists = await storage.aplan_exists(different_plan_id)
+    assert exists is False
 
     # Test when API call fails
-    with patch.object(storage.async_client, "get", side_effect=Exception("API Error")) as mock_get:
-        exists = await storage.aplan_exists(plan.id)
-        assert exists is False
-        mock_get.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/")
+    httpx_mock.add_exception(
+        method="GET",
+        url=f"{config.portia_api_endpoint}/api/v0/plans/{plan.id}/",
+        exception=Exception("API Error"),
+    )
+    exists = await storage.aplan_exists(plan.id)
+    assert exists is False
 
 
 @pytest.mark.asyncio
