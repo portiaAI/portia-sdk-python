@@ -33,9 +33,9 @@ class FileWriterTool(Tool[str]):
         """Run the FileWriterTool."""
         filepath = Path(filename)
         if filepath.is_file():
-            with Path.open(filepath, "w") as file:
+            with Path.open(filepath, "w", encoding="utf-8") as file:
                 file.write(content)
         else:
-            with Path.open(filepath, "x") as file:
+            with Path.open(filepath, "x", encoding="utf-8") as file:
                 file.write(content)
         return f"Content written to {filename}"
