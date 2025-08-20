@@ -26,7 +26,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from browser_use.browser.context import BrowserContextConfig
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_core import PydanticUndefined
 
 from portia import logger
@@ -254,6 +255,25 @@ class BrowserTool(Tool[str | BaseModel]):
         "browser-use's BrowserConfig.allowed_domains for built-in validation.",
     )
 
+    @field_validator('allowed_domains', mode='before')
+    @classmethod
+    def validate_allowed_domains(cls, v: list[str] | None) -> list[str] | None:
+        """Validate allowed_domains format."""
+        if v is None:
+            return v
+        
+        if not isinstance(v, list):
+            raise ValueError(f"Invalid domain in allowed_domains: {v}. Must be a list of non-empty strings.")
+            
+        for domain in v:
+            if not isinstance(domain, str) or not domain.strip():
+                raise ValueError(f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings.")
+            # Warn about wildcard usage as per browser-use docs
+            if '*' in domain and not domain.startswith('http'):
+                logger().warning(f"Wildcard domain '{domain}' matches ALL subdomains. Use with caution for security.")
+        
+        return v
+
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -407,7 +427,7 @@ class BrowserToolForUrl(BrowserTool):
         """Initialize the BrowserToolForUrl."""
         
         # Basic validation for allowed_domains format - only validate format, not usage
-        if allowed_domains:
+        if allowed_domains is not None:
             for domain in allowed_domains:
                 if not isinstance(domain, str) or not domain.strip():
                     raise ValueError(f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings.")
@@ -497,12 +517,19 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         allowed_domains = None
         if hasattr(ctx.tool, 'allowed_domains') and isinstance(ctx.tool, BrowserTool):
             allowed_domains = ctx.tool.allowed_domains
+        
+        # Create BrowserContextConfig with allowed_domains if needed
+        context_config_kwargs = {}
+        if allowed_domains is not None:
+            context_config_kwargs['allowed_domains'] = allowed_domains
+        
+        context_config = BrowserContextConfig(**context_config_kwargs) if context_config_kwargs else BrowserContextConfig()
             
-        # Remove allowed_domains from BrowserConfig - it may not be supported
         return Browser(
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
+                new_context_config=context_config,
             ),
         )
 
@@ -784,11 +811,18 @@ if BROWSERBASE_AVAILABLE:
             allowed_domains = None
             if hasattr(ctx.tool, 'allowed_domains') and isinstance(ctx.tool, BrowserTool):
                 allowed_domains = ctx.tool.allowed_domains
+            
+            # Create BrowserContextConfig with allowed_domains if needed
+            context_config_kwargs = {}
+            if allowed_domains is not None:
+                context_config_kwargs['allowed_domains'] = allowed_domains
+            
+            context_config = BrowserContextConfig(**context_config_kwargs) if context_config_kwargs else BrowserContextConfig()
                 
-            # Remove allowed_domains from BrowserConfig - it may not be supported
             return Browser(
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
+                    new_context_config=context_config,
                 ),
             )
 

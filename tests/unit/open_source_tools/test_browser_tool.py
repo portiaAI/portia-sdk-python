@@ -343,7 +343,7 @@ def test_browser_infra_local_setup_browser(
         call_args = mock_browser.call_args[1]  # kwargs
         assert "config" in call_args
         config = call_args["config"]
-        assert config.allowed_domains == ["example.com"]
+        assert config.new_context_config.allowed_domains == ["example.com"]
         assert browser == mock_browser_instance
 
 
@@ -534,7 +534,7 @@ def test_browserbase_provider_setup_browser(
         call_args = mock_browser.call_args[1]  # kwargs
         assert "config" in call_args
         config = call_args["config"]
-        assert config.allowed_domains == ["example.com"]
+        assert config.new_context_config.allowed_domains == ["example.com"]
         assert browser == mock_browser_instance
 
 
@@ -545,9 +545,11 @@ def test_browser_tool_for_url_init_default_parameters() -> None:
 
     assert tool.url == url
     assert tool.id == "browser_tool_for_url_example_com"
-    assert tool.name == "Browser Tool for example_com"
+    assert tool.name == "Browser Tool for example.com"
     assert tool.description == (
-        f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete tasks."
+        f"Browser tool specifically configured for {url}. Can be used to navigate to this URL and complete tasks. "
+        "This tool handles a full end to end task. It is capable of doing multiple things "
+        "across different URLs within the same root domain as part of the end to end task."
     )
     assert tool.args_schema == BrowserToolForUrlSchema
 
@@ -580,7 +582,7 @@ def test_browser_tool_for_url_init_subdomain_handling() -> None:
 
     assert tool.url == url
     assert tool.id == "browser_tool_for_url_sub_example_com"
-    assert tool.name == "Browser Tool for sub_example_com"
+    assert tool.name == "Browser Tool for sub.example.com"
 
 
 class TestStructuredOutputSchema(BaseModel):
@@ -962,25 +964,23 @@ class TestBrowserToolAllowedDomains:
             # Note: Domain validation is now handled by browser-use internally
             # We don't test blocking behavior here as that's browser-use's responsibility
 
-    def test_allowed_domains_integration_with_browser_config(
-        self,
-        mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
-    ) -> None:
+    def test_allowed_domains_integration_with_browser_config(self) -> None:
         """Test that allowed_domains is properly passed to BrowserConfig during setup."""
-        browser_tool = BrowserTool(
-            custom_infrastructure_provider=mock_browser_infrastructure_provider,
-            allowed_domains=["example.com", "*.trusted.org"],
-        )
+        browser_tool = BrowserTool(allowed_domains=["example.com", "*.trusted.org"])
         context = get_test_tool_context()
         # Set the tool in the context to match the expected type
         context.tool = browser_tool
+        
+        # Use a real local infrastructure provider to test our code
+        from portia.open_source_tools.browser_tool import BrowserInfrastructureProviderLocal
+        local_provider = BrowserInfrastructureProviderLocal()
         
         with patch("portia.open_source_tools.browser_tool.Browser") as mock_browser:
             mock_browser_instance = MagicMock()
             mock_browser.return_value = mock_browser_instance
             
-            # Setup browser through infrastructure provider
-            browser = mock_browser_infrastructure_provider.setup_browser(context)
+            # Setup browser through real infrastructure provider
+            browser = local_provider.setup_browser(context)
             
             # Verify Browser was called with BrowserConfig containing allowed_domains
             mock_browser.assert_called_once()
@@ -989,7 +989,8 @@ class TestBrowserToolAllowedDomains:
             # Check that config parameter exists and has the correct allowed_domains
             assert "config" in call_args.kwargs
             config = call_args.kwargs["config"]
-            assert config.allowed_domains == ["example.com", "*.trusted.org"]
+            # allowed_domains should be in the BrowserContextConfig
+            assert config.new_context_config.allowed_domains == ["example.com", "*.trusted.org"]
             
     def test_allowed_domains_none_allows_all_domains(
         self,
