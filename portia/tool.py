@@ -89,7 +89,7 @@ class ToolRunContext(BaseModel):
     plan: Plan
     config: Config
     clarifications: ClarificationListType
-    tool: Any = None  # Optional tool reference for compatibility
+    tool: "Tool | None" = None  # Optional tool reference for compatibility
 
 
 class _ArgsSchemaPlaceholder(BaseModel):

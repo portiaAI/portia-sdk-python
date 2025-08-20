@@ -258,21 +258,104 @@ class BrowserTool(Tool[str | BaseModel]):
     @field_validator('allowed_domains', mode='before')
     @classmethod
     def validate_allowed_domains(cls, v: list[str] | None) -> list[str] | None:
-        """Validate allowed_domains format."""
+        """Validate allowed_domains format and warn about security implications."""
         if v is None:
             return v
         
-        if not isinstance(v, list):
-            raise ValueError(f"Invalid domain in allowed_domains: {v}. Must be a list of non-empty strings.")
+        return cls._validate_domains_list(v)
+    
+    @classmethod
+    def _validate_domains_list(cls, domains: list[str]) -> list[str]:
+        """Centralized validation for allowed_domains list.
+        
+        Args:
+            domains: List of domain strings to validate
             
-        for domain in v:
+        Returns:
+            Validated list of domains
+            
+        Raises:
+            ValueError: If domains format is invalid
+        """
+        if not isinstance(domains, list):
+            raise ValueError(f"Invalid allowed_domains: {domains}. Must be a list of non-empty strings.")
+            
+        validated_domains = []
+        for domain in domains:
             if not isinstance(domain, str) or not domain.strip():
                 raise ValueError(f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings.")
-            # Warn about wildcard usage as per browser-use docs
-            if '*' in domain and not domain.startswith('http'):
-                logger().warning(f"Wildcard domain '{domain}' matches ALL subdomains. Use with caution for security.")
+            
+            # Enhanced security warning based on browser-use documentation
+            cls._warn_about_domain_security(domain)
+            validated_domains.append(domain.strip())
         
-        return v
+        return validated_domains
+    
+    @classmethod
+    def _warn_about_domain_security(cls, domain: str) -> None:
+        """Warn about domain security implications based on browser-use patterns.
+        
+        Based on browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!'
+        
+        Args:
+            domain: Domain string to check for security issues
+        """
+        if '*' in domain:
+            if domain.startswith('*.'):
+                # Pattern like '*.example.com' - high risk as per docs
+                logger().warning(
+                    f"Wildcard domain '{domain}' matches ALL subdomains. "
+                    "Per browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!' "
+                    "Consider explicitly listing specific subdomains for better security."
+                )
+            elif domain == '*' or '/*' in domain:
+                # Extremely dangerous patterns
+                logger().warning(
+                    f"Wildcard pattern '{domain}' allows access to ANY domain. "
+                    "This is extremely dangerous. Use specific domain patterns instead."
+                )
+            else:
+                # Other wildcard patterns
+                logger().warning(
+                    f"Wildcard pattern '{domain}' may match unintended domains. "
+                    "Per browser-use docs, be very cautious with wildcards. "
+                    "Use full URLs with schemes (https://example.com) for security."
+                )
+        
+        # Warn about missing scheme as recommended in docs
+        if not domain.startswith(('http://', 'https://')) and not domain.startswith('*'):
+            logger().info(
+                f"Domain '{domain}' lacks scheme. "
+                "Browser-use docs recommend full URLs like 'https://example.com' for clarity."
+            )
+    
+    @classmethod 
+    def _create_browser_context_config(cls, allowed_domains: list[str] | None) -> BrowserContextConfig:
+        """Create BrowserContextConfig with optional allowed_domains.
+        
+        Args:
+            allowed_domains: List of allowed domains or None
+            
+        Returns:
+            Configured BrowserContextConfig instance
+        """
+        if allowed_domains is not None:
+            return BrowserContextConfig(allowed_domains=allowed_domains)
+        return BrowserContextConfig()
+    
+    @classmethod
+    def _extract_allowed_domains_from_context(cls, ctx: ToolRunContext) -> list[str] | None:
+        """Type-safe extraction of allowed_domains from tool context.
+        
+        Args:
+            ctx: Tool run context containing tool instance
+            
+        Returns:
+            List of allowed domains or None if not set
+        """
+        if hasattr(ctx.tool, 'allowed_domains'):
+            return ctx.tool.allowed_domains
+        return None
 
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
@@ -426,15 +509,9 @@ class BrowserToolForUrl(BrowserTool):
     ) -> None:
         """Initialize the BrowserToolForUrl."""
         
-        # Basic validation for allowed_domains format - only validate format, not usage
+        # Validate allowed_domains format using centralized validation
         if allowed_domains is not None:
-            for domain in allowed_domains:
-                if not isinstance(domain, str) or not domain.strip():
-                    raise ValueError(f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings.")
-                # Warn about wildcard usage as per browser-use docs
-                if '*' in domain and not domain.startswith('http'):
-                    from portia.logger import logger
-                    logger().warning(f"Wildcard domain '{domain}' matches ALL subdomains. Use with caution for security.")
+            allowed_domains = self._validate_domains_list(allowed_domains)
         
         super().__init__(
             id=id or f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}",
@@ -513,17 +590,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        # Type-safe access to allowed_domains
-        allowed_domains = None
-        if hasattr(ctx.tool, 'allowed_domains'):
-            allowed_domains = ctx.tool.allowed_domains
-        
-        # Create BrowserContextConfig with allowed_domains if needed
-        context_config_kwargs = {}
-        if allowed_domains is not None:
-            context_config_kwargs['allowed_domains'] = allowed_domains
-        
-        context_config = BrowserContextConfig(**context_config_kwargs) if context_config_kwargs else BrowserContextConfig()
+        # Extract allowed_domains using common helper
+        allowed_domains = self._extract_allowed_domains_from_context(ctx)
+        context_config = self._create_browser_context_config(allowed_domains)
             
         return Browser(
             config=BrowserConfig(
@@ -807,17 +876,9 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
-            # Type-safe access to allowed_domains
-            allowed_domains = None
-            if hasattr(ctx.tool, 'allowed_domains'):
-                allowed_domains = ctx.tool.allowed_domains
-            
-            # Create BrowserContextConfig with allowed_domains if needed
-            context_config_kwargs = {}
-            if allowed_domains is not None:
-                context_config_kwargs['allowed_domains'] = allowed_domains
-            
-            context_config = BrowserContextConfig(**context_config_kwargs) if context_config_kwargs else BrowserContextConfig()
+            # Extract allowed_domains using common helper
+            allowed_domains = self._extract_allowed_domains_from_context(ctx)
+            context_config = self._create_browser_context_config(allowed_domains)
                 
             return Browser(
                 config=BrowserConfig(
