@@ -9,6 +9,7 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
+from portia.errors import ToolNotFoundError
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -646,6 +647,35 @@ class TestToolRun:
             assert result.plan_run_id == mock_run_data.plan_run.id
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
             mock_tool.run.assert_called_once_with(mock_ctx_class.return_value)
+
+    @pytest.mark.asyncio
+    async def test_tool_run_with_tool_instance(self) -> None:
+        """Test ToolRun run with Tool instance instead of string tool."""
+        mock_tool = MockTool()
+        step = ToolRun(tool=mock_tool, step_name="run_tool", args={"input": "test input"})
+        mock_run_data = Mock()
+
+        with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
+            mock_ctx_class.return_value = Mock()
+
+            result = await step.run(mock_run_data)
+
+            assert result == "mock result"
+
+    @pytest.mark.asyncio
+    async def test_tool_run_with_nonexistent_tool_id(self) -> None:
+        """Test ToolRun run with nonexistent tool_id raises ToolNotFoundError."""
+        step = ToolRun(tool="nonexistent_tool", step_name="run_tool", args={"query": "test"})
+        mock_run_data = Mock()
+
+        with patch.object(mock_run_data.portia, "get_tool") as mock_get_tool:
+            mock_get_tool.return_value = None  # Tool not found
+
+            with pytest.raises(ToolNotFoundError) as exc_info:
+                await step.run(mock_run_data)
+
+            assert "nonexistent_tool" in str(exc_info.value)
+            mock_get_tool.assert_called_once_with("nonexistent_tool", mock_run_data.plan_run)
 
     def test_tool_run_to_legacy_step(self) -> None:
         """Test ToolRun to_legacy_step method."""

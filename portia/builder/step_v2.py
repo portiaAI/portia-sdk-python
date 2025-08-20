@@ -33,12 +33,12 @@ class StepV2(BaseModel, ABC):
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
         """Execute the step."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def describe(self) -> str:
         """Return a description of this step for logging purposes."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def to_legacy_step(self, plan: PlanV2) -> Step:
@@ -48,7 +48,7 @@ class StepV2(BaseModel, ABC):
         Portia backend. If this step doesn't need to be represented in the plan sent to the Portia
         backend, return None.
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def _resolve_input_reference(
         self,

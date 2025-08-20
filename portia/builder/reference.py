@@ -26,12 +26,12 @@ class Reference(ABC):
     @abstractmethod
     def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def get_value(self, run_data: RunContext) -> ReferenceValue | None:
         """Get the value of the reference."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class StepOutput(Reference):
