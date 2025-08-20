@@ -2126,7 +2126,7 @@ requires-dist = [
     { name = "mistralai", marker = "extra == 'mistral'", specifier = ">=1.2.5,<2" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = ">=1.2.5,<2" },
     { name = "mistralai", marker = "extra == 'tools-pdf-reader'", specifier = ">=1.2.5,<2" },
-    { name = "openai", specifier = ">=1.98,<1.99" },
+    { name = "openai", specifier = "<1.99" },
     { name = "openpyxl", specifier = ">=3.1.5,<4" },
     { name = "pandas", specifier = ">=2.2.3,<3" },
     { name = "playwright", marker = "extra == 'all'", specifier = ">=1.49.0,<2" },
