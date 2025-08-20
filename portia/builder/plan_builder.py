@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
-from portia.builder.step_v2 import FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
+from portia.builder.step_v2 import (
+    ConditionalStep,
+    FunctionStep,
+    InvokeToolStep,
+    LLMStep,
+    SingleToolAgentStep,
+)
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:
@@ -15,6 +22,10 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from portia.tool import Tool
+
+
+class PlanBuilderError(ValueError):
+    """Error in Plan definition."""
 
 
 class PlanBuilderV2:
@@ -28,6 +39,7 @@ class PlanBuilderV2:
 
         """
         self.plan = PlanV2(steps=[], label=label)
+        self._conditional_block_stack: list[ConditionalBlock] = []
 
     def input(
         self,
@@ -47,6 +59,100 @@ class PlanBuilderV2:
         self.plan.plan_inputs.append(
             PlanInput(name=name, description=description, value=default_value)
         )
+        return self
+
+    @property
+    def _current_conditional_block(self) -> ConditionalBlock | None:
+        """Get the current conditional block."""
+        return self._conditional_block_stack[-1] if len(self._conditional_block_stack) > 0 else None
+
+    def if_(
+        self,
+        condition: Callable[..., bool] | str,
+        args: dict[str, Any] | None = None,
+    ) -> PlanBuilderV2:
+        """Add a step that checks a condition."""
+        parent_block = self._current_conditional_block
+        conditional_block = ConditionalBlock(
+            clause_step_indexes=[len(self.plan.steps)],
+            parent_conditional_block=parent_block,
+        )
+        self._conditional_block_stack.append(conditional_block)
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=condition,
+                args=args or {},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_block=conditional_block,
+                clause_index_in_block=0,
+                block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+            )
+        )
+        return self
+
+    def else_if_(
+        self,
+        condition: Callable[..., bool],
+        args: dict[str, Any] | None = None,
+    ) -> PlanBuilderV2:
+        """Add a step that checks a condition."""
+        if len(self._conditional_block_stack) == 0:
+            raise PlanBuilderError(
+                "else_if_ must be called from a conditional block. Please add an if_ first."
+            )
+        self._conditional_block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=condition,
+                args=args or {},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_block=self._conditional_block_stack[-1],
+                clause_index_in_block=len(self._conditional_block_stack[-1].clause_step_indexes)
+                - 1,
+                block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
+            )
+        )
+        return self
+
+    def else_(self) -> PlanBuilderV2:
+        """Add a step that checks a condition."""
+        if len(self._conditional_block_stack) == 0:
+            raise PlanBuilderError(
+                "else_ must be called from a conditional block. Please add an if_ first."
+            )
+        self._conditional_block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=lambda: True,
+                args={},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_block=self._conditional_block_stack[-1],
+                clause_index_in_block=len(self._conditional_block_stack[-1].clause_step_indexes)
+                - 1,
+                block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
+            )
+        )
+        return self
+
+    def endif(self) -> PlanBuilderV2:
+        """Exit a conditional block."""
+        if len(self._conditional_block_stack) == 0:
+            raise PlanBuilderError(
+                "endif must be called from a conditional block. Please add an if_ first."
+            )
+        self._conditional_block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=lambda: True,
+                args={},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_block=self._conditional_block_stack[-1],
+                clause_index_in_block=len(self._conditional_block_stack[-1].clause_step_indexes)
+                - 1,
+                block_clause_type=ConditionalBlockClauseType.END_CONDITION_BLOCK,
+            )
+        )
+        self._conditional_block_stack.pop()
         return self
 
     def llm_step(
@@ -74,6 +180,7 @@ class PlanBuilderV2:
                 inputs=inputs or [],
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
             )
         )
         return self
@@ -103,6 +210,7 @@ class PlanBuilderV2:
                 args=args or {},
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
             )
         )
         return self
@@ -131,6 +239,7 @@ class PlanBuilderV2:
                 args=args or {},
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
             )
         )
         return self
@@ -162,6 +271,7 @@ class PlanBuilderV2:
                 inputs=inputs or [],
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
             )
         )
         return self
@@ -186,4 +296,9 @@ class PlanBuilderV2:
 
     def build(self) -> PlanV2:
         """Return the plan, ready to run."""
+        if len(self._conditional_block_stack) > 0:
+            raise PlanBuilderError(
+                "An endif must be called for all if_ steps. "
+                "Please add an endif for all if_ steps."
+            )
         return self.plan

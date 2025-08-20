@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, override
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.execution_agents.output import Output
 from portia.logger import logger
@@ -20,8 +20,12 @@ def default_step_name(step_index: int) -> str:
     return f"step_{step_index}"
 
 
-class Reference(ABC):
+class Reference(BaseModel, ABC):
     """A reference to a value."""
+
+    # Allow setting temporary/mock attributes in tests (e.g. patch.object(..., "get_value"))
+    # Without this, Pydantic v2 prevents setting non-field attributes on instances.
+    model_config = ConfigDict(extra="allow")
 
     @abstractmethod
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -51,7 +55,7 @@ class StepOutput(Reference):
 
     def __init__(self, step: str | int) -> None:
         """Initialize the step output."""
-        self.step = step
+        super().__init__(step=step)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -95,7 +99,7 @@ class Input(Reference):
 
     def __init__(self, name: str) -> None:
         """Initialize the input."""
-        self.name = name
+        super().__init__(name=name)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:

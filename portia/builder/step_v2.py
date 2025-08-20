@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 from langsmith import traceable
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from portia.builder.conditionals import (
+    ConditionalBlock,
+    ConditionalBlockClauseType,
+    ConditionalStepResult,
+)
 from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
 from portia.clarification import Clarification
 from portia.errors import ToolNotFoundError
@@ -29,6 +35,9 @@ class StepV2(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     step_name: str = Field(description="The name of the step.")
+    conditional_block: ConditionalBlock | None = Field(
+        default=None, description="The conditional block this step is part of, if any."
+    )
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
@@ -119,6 +128,63 @@ class StepV2(BaseModel, ABC):
         """Convert a list of inputs to a list of legacy plan variables."""
         return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
 
+    def _get_legacy_condition(self, plan: PlanV2) -> str | None:
+        """Get the legacy condition for a step."""
+        if self.conditional_block is None:
+            return None
+        step_names = [s.step_name for s in plan.steps]
+        current_step_index = step_names.index(self.step_name)
+
+        def get_conditional_for_nested_block(block: ConditionalBlock) -> str | None:
+            active_clause_step_index = next(
+                itertools.dropwhile(
+                    # First clause step index where the current step index is greater
+                    # than the clause step index e.g. for clause step indexes [1, 8, 12]
+                    # and current step index 2, the active clause step index is 1
+                    lambda x: current_step_index < x,
+                    reversed(block.clause_step_indexes),
+                ),
+                None,
+            )
+            if active_clause_step_index is None:
+                raise ValueError(f"Cannot determine active conditional for step {self.step_name}")
+
+            if (
+                current_step_index == block.clause_step_indexes[0]
+                or current_step_index == block.clause_step_indexes[-1]
+            ):
+                # The step is the `if_` or the `endif` step, so no new condition is needed
+                # as this will always be evaluated at this 'depth' of the plan branching.
+                return None
+
+            # All previous clause conditions must be false for this step to get run
+            previous_clause_step_indexes = itertools.takewhile(
+                lambda x: x < current_step_index,
+                itertools.filterfalse(
+                    lambda x: x == active_clause_step_index, block.clause_step_indexes
+                ),
+            )
+            condition_str = " and ".join(
+                f"{plan.step_output_name(i)} is false" for i in previous_clause_step_indexes
+            )
+            if current_step_index not in block.clause_step_indexes:
+                # The step is a non-conditional step within a block, so we need to make the
+                # active clause condition was true.
+                condition_str = f"{plan.step_output_name(active_clause_step_index)} is true" + (
+                    f" and {condition_str}" if condition_str else ""
+                )
+
+            return condition_str
+
+        legacy_condition_strings = []
+        current_block = self.conditional_block
+        while current_block is not None:
+            legacy_condition_string = get_conditional_for_nested_block(current_block)
+            if legacy_condition_string is not None:
+                legacy_condition_strings.append(legacy_condition_string)
+            current_block = current_block.parent_conditional_block
+        return "If " + " and ".join(legacy_condition_strings) if legacy_condition_strings else None
+
 
 class LLMStep(StepV2):
     """A step that runs a given task through an LLM (without any tools)."""
@@ -180,6 +246,7 @@ class LLMStep(StepV2):
             tool_id=LLMTool.LLM_TOOL_ID,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
         )
 
 
@@ -269,6 +336,7 @@ class InvokeToolStep(StepV2):
             tool_id=self._tool_name(),
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
         )
 
 
@@ -334,6 +402,7 @@ class FunctionStep(StepV2):
             tool_id=f"local_function_{fn_name}",
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
         )
 
 
@@ -379,4 +448,76 @@ class SingleToolAgentStep(StepV2):
             tool_id=self.tool,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class ConditionalStep(StepV2):
+    """A step that represents a conditional clause in a conditional block.
+
+    I.E. if, else-if, else, end-if clauses.
+    """
+
+    condition: Callable[..., bool] | str = Field(
+        description=(
+            "The boolean predicate to check. If evaluated to true, the steps within this clause "
+            "will be evaluated - otherwise they will be skipped and we jump to the next clause."
+        )
+    )
+    args: dict[str, Reference | Any] = Field(
+        default_factory=dict, description="The args to check the condition with."
+    )
+    clause_index_in_block: int = Field(description="The index of the clause in the condition block")
+    block_clause_type: ConditionalBlockClauseType
+
+    @field_validator("conditional_block", mode="after")
+    @classmethod
+    def validate_conditional_block(cls, v: ConditionalBlock | None) -> ConditionalBlock:
+        """Validate the conditional block."""
+        if v is None:
+            raise ValueError("Conditional block is required for ConditionSteps")
+        return v
+
+    @property
+    def block(self) -> ConditionalBlock:
+        """Get the conditional block for this step."""
+        return cast(ConditionalBlock, self.conditional_block)
+
+    @override
+    def describe(self) -> str:
+        """Return a description of this step for logging purposes."""
+        return (
+            f"ConditionalStep(condition='{self.condition}', "
+            f"clause_type='{self.block_clause_type.value}' args={self.args})"
+        )
+
+    @override
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+        """Run the conditional step."""
+        if isinstance(self.condition, str):
+            raise NotImplementedError("Condition string not supported yet")
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+        conditional_result = self.condition(**args)
+        next_clause_step_index = (
+            self.block.clause_step_indexes[self.clause_index_in_block + 1]
+            if self.clause_index_in_block < len(self.block.clause_step_indexes) - 1
+            else self.block.clause_step_indexes[self.clause_index_in_block]
+        )
+        return ConditionalStepResult(
+            type=self.block_clause_type,
+            conditional_result=conditional_result,
+            next_clause_step_index=next_clause_step_index,
+            end_condition_block_step_index=self.block.clause_step_indexes[-1],
+        )
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this ConditionalStep to a PlanStep."""
+        fn_name = getattr(self.condition, "__name__", str(self.condition))
+        return Step(
+            task=f"Conditional clause evaluation: {fn_name}",
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
+            tool_id=None,
+            output=plan.step_output_name(self),
+            condition=self._get_legacy_condition(plan),
         )
