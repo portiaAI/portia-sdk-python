@@ -431,10 +431,8 @@ class BrowserToolForUrl(BrowserTool):
             custom_infrastructure_provider=custom_infrastructure_provider,
             structured_output_schema=structured_output_schema,
             allowed_domains=allowed_domains,
+            url=url,  # Pass url to parent init
         )
-        
-        # Set the URL after super().__init__ to avoid Pydantic conflicts
-        self.url = url
 
     def run(  # type: ignore reportIncompatibleMethodOverride
         self,
