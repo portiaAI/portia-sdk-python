@@ -247,10 +247,11 @@ class BrowserTool(Tool[str | BaseModel]):
     allowed_domains: list[str] | None = Field(
         default=None,
         description="List of allowed domains that the browser tool can navigate to. "
-        "If None, all domains are allowed. If provided, browser-use will restrict "
-        "navigation to URLs whose domains match the allowed list. Supports glob patterns "
-        "like ['example.com', '*.wikipedia.org']. This provides security by restricting "
-        "browser agent navigation to specific domains using browser-use's built-in feature.",
+        "If None, all domains are allowed. Supports exact domain matching and glob patterns. "
+        "Examples: ['example.com'], ['https://google.com', 'http*://www.google.com'], "
+        "['*.example.com']. Use with caution as wildcards match ALL subdomains. "
+        "Explicitly list domains and include schemes for security. Passed directly to "
+        "browser-use's BrowserConfig.allowed_domains for built-in validation.",
     )
 
     @cached_property
@@ -403,11 +404,15 @@ class BrowserToolForUrl(BrowserTool):
         allowed_domains: list[str] | None = None,
     ) -> None:
         """Initialize the BrowserTool."""
-        # Validate allowed_domains format if provided
+        # Basic validation for allowed_domains format
         if allowed_domains:
             for domain in allowed_domains:
                 if not isinstance(domain, str) or not domain.strip():
-                    raise ValueError(f"Invalid domain in allowed_domains: {domain}")
+                    raise ValueError(f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings.")
+                # Warn about wildcard usage as per browser-use docs
+                if '*' in domain and not domain.startswith('http'):
+                    from portia.logger import logger
+                    logger().warning(f"Wildcard domain '{domain}' matches ALL subdomains. Use with caution for security.")
         
         super().__init__(
             id=id or "browser_tool",
