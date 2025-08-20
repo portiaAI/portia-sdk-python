@@ -957,3 +957,98 @@ class TestBrowserToolAllowedDomains:
 
         with pytest.raises(ValueError, match="Invalid domain in allowed_domains"):
             BrowserTool(allowed_domains=[123, "valid.com"])  # type: ignore
+
+    def test_browser_tool_url_scheme_validation(self) -> None:
+        """Test BrowserTool validates URL schemes."""
+        allowed_domains = ["example.com"]
+        tool = BrowserTool(allowed_domains=allowed_domains)
+        context = get_test_tool_context()
+
+        # Should reject non-HTTP(S) schemes
+        with pytest.raises(ValueError, match="Unsupported URL scheme 'ftp'"):
+            tool.run(context, "ftp://example.com", "test task")
+
+        with pytest.raises(ValueError, match="Unsupported URL scheme 'file'"):
+            tool.run(context, "file://example.com/test", "test task")
+
+    def test_browser_tool_ip_address_validation(self) -> None:
+        """Test BrowserTool handles IP addresses correctly."""
+        # Test with IPv4 address in allowed domains
+        allowed_domains = ["192.168.1.1", "example.com"]
+        tool = BrowserTool(allowed_domains=allowed_domains)
+        context = get_test_tool_context()
+
+        mock_task_response = BrowserTaskOutput(
+            task_output="Task completed successfully",
+            human_login_required=False,
+        )
+
+        mock_task_result = MagicMock()
+        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+        mock_run = AsyncMock(return_value=mock_task_result)
+
+        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+            mock_agent_instance = MagicMock()
+            mock_agent_instance.run = mock_run
+            mock_agent.return_value = mock_agent_instance
+
+            # Should allow allowed IP address
+            result = tool.run(context, "https://192.168.1.1", "test task")
+            assert result == "Task completed successfully"
+
+        # Should reject non-allowed IP address
+        with pytest.raises(ValueError, match="Access denied: IP address '10.0.0.1' is not in the allowed domains list"):
+            tool.run(context, "https://10.0.0.1", "test task")
+
+    def test_browser_tool_domain_format_validation(self) -> None:
+        """Test BrowserTool validates domain formats during initialization."""
+        # Should reject invalid domain formats
+        with pytest.raises(ValueError, match="Invalid domain format"):
+            BrowserTool(allowed_domains=["invalid-.com"])
+
+        with pytest.raises(ValueError, match="Invalid domain format"):
+            BrowserTool(allowed_domains=[".invalid.com"])
+
+        with pytest.raises(ValueError, match="Invalid domain format"):
+            BrowserTool(allowed_domains=["invalid..com"])
+
+        # Should accept valid domain formats
+        tool = BrowserTool(allowed_domains=["example.com", "sub-domain.example.org", "test123.co.uk"])
+        assert tool.allowed_domains == ["example.com", "sub-domain.example.org", "test123.co.uk"]
+
+    def test_browser_tool_performance_optimization(self) -> None:
+        """Test that domain caching works correctly."""
+        allowed_domains = ["Example.COM", "TEST.org", "SUB.example.com"]
+        tool = BrowserTool(allowed_domains=allowed_domains)
+        
+        # Verify domains are cached in lowercase
+        expected_lower = ["example.com", "test.org", "sub.example.com"]
+        assert tool._allowed_domains_lower == expected_lower
+
+    def test_browser_tool_for_url_enhanced_validation(self) -> None:
+        """Test BrowserToolForUrl with enhanced validation features."""
+        # Test scheme validation
+        tool = BrowserToolForUrl(url="ftp://example.com", allowed_domains=["example.com"])
+        context = get_test_tool_context()
+
+        with pytest.raises(ValueError, match="Unsupported URL scheme 'ftp'"):
+            tool.run(context, "test task")
+
+        # Test IPv6 address handling
+        tool_ipv6 = BrowserToolForUrl(url="https://[::1]", allowed_domains=["::1"])
+        
+        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+            mock_task_response = BrowserTaskOutput(
+                task_output="Task completed successfully",
+                human_login_required=False,
+            )
+            mock_task_result = MagicMock()
+            mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+            mock_run = AsyncMock(return_value=mock_task_result)
+            
+            mock_agent_instance = MagicMock()
+            mock_agent_instance.run = mock_run
+            mock_agent.return_value = mock_agent_instance
+
+            result = tool_ipv6.run(context, "test task")
+            assert result == "Task completed successfully"

@@ -25,6 +25,8 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from urllib.parse import urlparse
+import ipaddress
+import re
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browser_use.browser.context import BrowserContextConfig
@@ -251,6 +253,49 @@ class BrowserTool(Tool[str | BaseModel]):
         description="List of allowed domains for browser navigation.",
     )
 
+    def _is_valid_domain_format(self, domain: str) -> bool:
+        """Validate basic domain format.
+        
+        Args:
+            domain: The domain to validate
+            
+        Returns:
+            bool: True if domain format is valid
+        """
+        # Basic domain format validation
+        domain_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
+        
+        # Check length (max 253 characters for full domain)
+        if len(domain) > 253:
+            return False
+            
+        # Check basic pattern
+        if not re.match(domain_pattern, domain):
+            return False
+            
+        # Check each label length (max 63 characters)
+        labels = domain.split('.')
+        for label in labels:
+            if len(label) > 63 or len(label) == 0:
+                return False
+                
+        return True
+    
+    def _is_ip_address(self, address: str) -> bool:
+        """Check if the given string is a valid IPv4 or IPv6 address.
+        
+        Args:
+            address: The address to check
+            
+        Returns:
+            bool: True if it's a valid IP address
+        """
+        try:
+            ipaddress.ip_address(address)
+            return True
+        except ValueError:
+            return False
+
     def __init__(self, **kwargs) -> None:
         """Initialize the BrowserTool with validation."""
         allowed_domains = kwargs.get('allowed_domains')
@@ -258,6 +303,12 @@ class BrowserTool(Tool[str | BaseModel]):
             for domain in allowed_domains:
                 if not isinstance(domain, str) or not domain.strip():
                     raise ValueError(f"Invalid domain in allowed_domains: {domain}")
+                if not self._is_valid_domain_format(domain):
+                    raise ValueError(f"Invalid domain format: {domain}")
+        
+        # Cache lowercased domains for performance
+        self._allowed_domains_lower = [d.lower() for d in allowed_domains] if allowed_domains else []
+        
         super().__init__(**kwargs)
 
     @cached_property
@@ -374,26 +425,39 @@ class BrowserTool(Tool[str | BaseModel]):
             url: The URL to validate
             
         Raises:
-            ValueError: If the URL domain is not in allowed domains
+            ValueError: If the URL domain is not in allowed domains or has invalid scheme
         """
         if not self.allowed_domains:
             return
             
         parsed_url = urlparse(url)
+        
+        # Validate URL scheme
+        if parsed_url.scheme not in ['http', 'https']:
+            raise ValueError(f"Unsupported URL scheme '{parsed_url.scheme}'. Only 'http' and 'https' are allowed.")
+        
         domain = parsed_url.netloc.lower()
         
         # Remove port if present
         if ':' in domain:
             domain = domain.split(':')[0]
         
-        # Check if domain or any parent domain is in allowed list
+        # Handle IPv4/IPv6 addresses
+        if self._is_ip_address(domain):
+            if domain not in self._allowed_domains_lower:
+                raise ValueError(f"Access denied: IP address '{domain}' is not in the allowed domains list. "
+                               f"Allowed domains: {', '.join(self.allowed_domains)}")
+            return
+        
+        # Check if domain or any parent domain is in allowed list (using cached lowercase domains)
         domain_parts = domain.split('.')
         for i in range(len(domain_parts)):
             check_domain = '.'.join(domain_parts[i:])
-            if check_domain in [d.lower() for d in self.allowed_domains]:
+            if check_domain in self._allowed_domains_lower:
                 return
         
-        raise ValueError(f"URL domain '{domain}' is not in allowed domains: {self.allowed_domains}")
+        raise ValueError(f"Access denied: '{domain}' is not in the allowed domains list. "
+                        f"Allowed domains: {', '.join(self.allowed_domains)}")
 
 
 class BrowserToolForUrl(BrowserTool):
@@ -455,6 +519,8 @@ class BrowserToolForUrl(BrowserTool):
             for domain in allowed_domains:
                 if not isinstance(domain, str) or not domain.strip():
                     raise ValueError(f"Invalid domain in allowed_domains: {domain}")
+                if not self._is_valid_domain_format(domain):
+                    raise ValueError(f"Invalid domain format: {domain}")
         
         super().__init__(
             id=id or "browser_tool",
