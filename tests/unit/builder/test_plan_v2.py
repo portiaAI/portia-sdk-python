@@ -31,10 +31,6 @@ class MockStepV2(StepV2):
         """Mock run method."""
         return "mock result"
 
-    def describe(self) -> str:
-        """Mock describe method."""
-        return f"MockStep(step_name='{self.step_name}')"
-
     def to_legacy_step(self, plan: PlanV2) -> Step:  # noqa: ARG002
         """Mock to_legacy_step method."""
         return Step(
