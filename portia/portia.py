@@ -2743,7 +2743,6 @@ class Portia:
                     run_data.plan_run, run_data.legacy_plan, i, step.to_legacy_step(plan), e
                 )
             jump_to_step_index: int | None = None
-            # TODO: (SS) We shouldnt jump from here, we should jump at the end of the loop  # noqa: E501, FIX002, TD002, TD003
             if (
                 isinstance(result, ConditionalStepResult)
                 and result.type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
