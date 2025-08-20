@@ -72,16 +72,18 @@ class ToolRunContext(BaseModel):
         plan(Plan): The plan the tool run is part of.
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
+        tool: The tool instance being executed (for compatibility).
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     end_user: EndUser
     plan_run: PlanRun
     plan: Plan
     config: Config
     clarifications: ClarificationListType
+    tool: Any = None  # Optional tool reference for compatibility
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
