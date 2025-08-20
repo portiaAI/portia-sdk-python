@@ -879,6 +879,11 @@ class TestFunctionStep:
             assert len(legacy_step.inputs) == 1
             assert legacy_step.inputs[0].name == "number"
 
+    def test_function_step_tool_id_is_local_function(self) -> None:
+        """Test FunctionStep tool_id_is_local_function method."""
+        assert FunctionStep.tool_id_is_local_function("local_function_example_function")
+        assert not FunctionStep.tool_id_is_local_function("search_tool")
+
 
 class TestSingleToolAgent:
     """Test cases for the SingleToolAgent class."""
