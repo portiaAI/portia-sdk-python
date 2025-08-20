@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from typing import Any
 
 import httpx
@@ -27,7 +28,7 @@ class OpenAISearchToolSchema(BaseModel):
     )
 
 
-class OpenAISearchTool(Tool[str]):
+class OpenAISearchTool(Tool[list[dict[str, Any]]]):
     """Searches the internet using OpenAI's web search feature.
     
     This tool uses OpenAI's web search capability to find answers to search queries
@@ -43,17 +44,17 @@ class OpenAISearchTool(Tool[str]):
         "information on users or information not available on the internet"
     )
     args_schema: type[BaseModel] = OpenAISearchToolSchema
-    output_schema: tuple[str, str] = ("str", "str: output of the search results")
+    output_schema: tuple[str, str] = ("list", "list: search results with urls, titles, and content")
     should_summarize: bool = True
     api_url: str = "https://api.openai.com/v1/chat/completions"
 
-    def run(self, _: ToolRunContext, search_query: str) -> str:
+    def run(self, _: ToolRunContext, search_query: str) -> list[dict[str, Any]]:
         """Run the OpenAI Search Tool."""
         payload, headers = self._prep_request(search_query)
         response = httpx.post(self.api_url, headers=headers, json=payload, timeout=60.0)
         return self._parse_response(response)
 
-    async def arun(self, _: ToolRunContext, search_query: str) -> str:
+    async def arun(self, _: ToolRunContext, search_query: str) -> list[dict[str, Any]]:
         """Run the OpenAI Search Tool asynchronously."""
         payload, headers = self._prep_request(search_query)
         async with httpx.AsyncClient() as client:
@@ -96,12 +97,20 @@ class OpenAISearchTool(Tool[str]):
         headers = self._build_headers(api_key)
         return payload, headers
 
-    def _parse_response(self, response: httpx.Response) -> str:
+    def _parse_response(self, response: httpx.Response) -> list[dict[str, Any]]:
         """Parse the response from the OpenAI Search Tool."""
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
-            raise ToolSoftError(f"OpenAI API error: {e.response.status_code} - {e.response.text}") from e
+            status_code = e.response.status_code
+            if status_code == 401:
+                raise ToolHardError(f"Invalid OpenAI API key: {e.response.text}") from e
+            elif status_code == 429:
+                raise ToolSoftError(f"OpenAI API rate limit exceeded: {e.response.text}") from e
+            elif status_code >= 500:
+                raise ToolSoftError(f"OpenAI API server error ({status_code}): {e.response.text}") from e
+            else:
+                raise ToolSoftError(f"OpenAI API error ({status_code}): {e.response.text}") from e
         
         try:
             json_response = response.json()
@@ -129,7 +138,7 @@ class OpenAISearchTool(Tool[str]):
                     result = {
                         "url": url,
                         "title": title,
-                        "content": message.get("content", "")[:200] + "..." if len(message.get("content", "")) > 200 else message.get("content", "")
+                        "content": self._truncate_content(message.get("content", ""), 200)
                     }
                     results.append(result)
         
@@ -152,3 +161,9 @@ class OpenAISearchTool(Tool[str]):
             raise ToolSoftError(f"No search results found in OpenAI response: {json_response}")
         
         return limited_results
+    
+    def _truncate_content(self, content: str, max_length: int) -> str:
+        """Truncate content to specified length with ellipsis if needed."""
+        if len(content) <= max_length:
+            return content
+        return content[:max_length] + "..."

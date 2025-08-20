@@ -1,6 +1,7 @@
 """Example registry containing simple tools."""
 
 import os
+import warnings
 
 from portia.common import validate_extras_dependencies
 from portia.open_source_tools.calculator_tool import CalculatorTool
@@ -37,7 +38,6 @@ def _get_preferred_search_tool():
         return SearchTool()
     elif search_provider and search_provider not in ["openai", "tavily"]:
         # Invalid provider specified, fall back to default logic but warn
-        import warnings
         warnings.warn(
             f"Invalid PORTIA_SEARCH_PROVIDER '{search_provider}'. "
             "Valid options are 'openai' or 'tavily'. Falling back to default selection.",

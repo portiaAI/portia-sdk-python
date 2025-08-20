@@ -183,7 +183,7 @@ def test_openai_search_tool_http_error() -> None:
                 "401 Unauthorized", request=Mock(), response=mock_response
             )
 
-            with pytest.raises(ToolSoftError, match="OpenAI API error: 401"):
+            with pytest.raises(ToolHardError, match="Invalid OpenAI API key"):
                 tool.run(ctx, "What is the capital of France?")
 
 
@@ -278,7 +278,7 @@ async def test_openai_search_tool_async_http_error(httpx_mock: HTTPXMock) -> Non
             text="Internal Server Error"
         )
         ctx = get_test_tool_context()
-        with pytest.raises(ToolSoftError, match="OpenAI API error: 500"):
+        with pytest.raises(ToolSoftError, match="OpenAI API server error \(500\)"):
             await tool.arun(ctx, "What is the capital of France?")
 
 
@@ -379,4 +379,39 @@ def test_openai_search_tool_no_search_results() -> None:
             mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
 
             with pytest.raises(ToolSoftError, match="No search results found in OpenAI response"):
+                tool.run(ctx, "What is the capital of France?")
+
+def test_openai_search_tool_rate_limit_error() -> None:
+    """Test that OpenAISearchTool handles rate limit errors correctly."""
+    tool = OpenAISearchTool()
+    mock_api_key = "sk-test-api-key"
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_response = Mock(status_code=429, text="Rate limit exceeded")
+            mock_post.return_value = mock_response
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "429 Too Many Requests", request=Mock(), response=mock_response
+            )
+
+            with pytest.raises(ToolSoftError, match="OpenAI API rate limit exceeded"):
+                tool.run(ctx, "What is the capital of France?")
+
+
+def test_openai_search_tool_server_error() -> None:
+    """Test that OpenAISearchTool handles server errors correctly."""
+    tool = OpenAISearchTool()
+    mock_api_key = "sk-test-api-key"
+
+    with patch("os.getenv", return_value=mock_api_key):
+        ctx = get_test_tool_context()
+        with patch("httpx.post") as mock_post:
+            mock_response = Mock(status_code=500, text="Internal Server Error")
+            mock_post.return_value = mock_response
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "500 Internal Server Error", request=Mock(), response=mock_response
+            )
+
+            with pytest.raises(ToolSoftError, match="OpenAI API server error \(500\)"):
                 tool.run(ctx, "What is the capital of France?")
