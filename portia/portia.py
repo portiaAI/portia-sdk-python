@@ -898,15 +898,21 @@ class Portia:
         )
 
         if isinstance(plan, PlanV2):
-            with asyncio.Runner() as runner:
-                return runner.run(
-                    self.run_builder_plan(
-                        plan,
-                        self.initialize_end_user(end_user),
-                        plan_run_inputs,
-                        structured_output_schema,
+            try:
+                with asyncio.Runner() as runner:
+                    return runner.run(
+                        self.run_builder_plan(
+                            plan=plan,
+                            end_user=self.initialize_end_user(end_user),
+                            plan_run_inputs=plan_run_inputs,
+                            structured_output_schema=structured_output_schema,
+                        )
                     )
+            except RuntimeError:
+                logger().error(
+                    "run_plan should be called outside of an async context: Use arun_plan instead"
                 )
+                raise
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
@@ -954,10 +960,10 @@ class Portia:
         )
         if isinstance(plan, PlanV2):
             return await self.run_builder_plan(
-                plan,
-                self.initialize_end_user(end_user),
-                plan_run_inputs,
-                structured_output_schema,
+                plan=plan,
+                end_user=self.initialize_end_user(end_user),
+                plan_run_inputs=plan_run_inputs,
+                structured_output_schema=structured_output_schema,
             )
 
         plan_run = await self._aget_plan_run_from_plan(

@@ -16,6 +16,8 @@ import httpx
 import pytest
 from pydantic import BaseModel, HttpUrl, SecretStr
 
+from portia.builder.plan_v2 import PlanV2
+from portia.builder.step_v2 import StepV2
 from portia.clarification import (
     ActionClarification,
     Clarification,
@@ -60,7 +62,7 @@ from portia.plan import (
 )
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
-from portia.portia import ExecutionHooks, Portia
+from portia.portia import ExecutionHooks, Portia, RunContext
 from portia.prefixed_uuid import ClarificationUUID
 from portia.storage import StorageError
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
@@ -3122,3 +3124,40 @@ def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt(
         result = portia.execute_plan_run_and_handle_clarifications(plan, plan_run)
 
         assert result.state == PlanRunState.FAILED
+
+
+def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia: Portia) -> None:
+    """Test that run_plan with PlanV2 inside async context raises RuntimeError with error log."""
+    import asyncio
+
+    # Create a simple PlanV2 for testing
+    class MockStepV2(StepV2):
+        async def run(self, run_data: RunContext) -> str:  # noqa: ARG002
+            return "test result"
+
+        def describe(self) -> str:
+            return "Mock step"
+
+        def to_legacy_step(self, plan: PlanV2) -> Step:  # noqa: ARG002
+            from portia.plan import Step
+
+            return Step(task="Mock task", tool_id="mock_tool", inputs=[], output="$result")
+
+    plan_v2 = PlanV2(steps=[MockStepV2(step_name="test_step")], label="Test plan")
+
+    # Mock the run_builder_plan method to avoid actual execution
+    with mock.patch.object(portia, "run_builder_plan") as mock_run_builder:
+        mock_run_builder.return_value = None
+
+        # Create an async function that calls run_plan inside an event loop
+        async def async_function() -> PlanRun:
+            return portia.run_plan(plan_v2)
+
+        # Run the async function, which should trigger the RuntimeError
+        # because asyncio.Runner() cannot be used inside an already running event loop
+        with pytest.raises(RuntimeError) as exc_info:
+            asyncio.run(async_function())
+
+        # The original RuntimeError from asyncio.Runner() is re-raised
+        # The custom error message is logged but not part of the exception
+        assert "Cannot run the event loop while another loop is running" in str(exc_info.value)
