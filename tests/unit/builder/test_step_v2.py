@@ -68,10 +68,6 @@ class ConcreteStepV2(StepV2):
         """Mock run method."""
         return "test result"
 
-    def describe(self) -> str:
-        """Mock describe method."""
-        return f"ConcreteStepV2(step_name='{self.step_name}')"
-
     def to_legacy_step(self, plan: PlanV2) -> PlanStep:  # noqa: ARG002
         """Mock to_legacy_step method."""
         return PlanStep(
@@ -244,15 +240,15 @@ class TestLLMStep:
         assert step.inputs == inputs
         assert step.output_schema == MockOutputSchema
 
-    def test_llm_step_describe(self) -> None:
-        """Test LLMStep describe method."""
+    def test_llm_step_str(self) -> None:
+        """Test LLMStep str method."""
         step = LLMStep(task="Test task", step_name="test")
-        assert step.describe() == "LLMStep(task='Test task')"
+        assert str(step) == "LLMStep(task='Test task')"
 
-    def test_llm_step_describe_with_output_schema(self) -> None:
-        """Test LLMStep describe method with output schema."""
+    def test_llm_step_str_with_output_schema(self) -> None:
+        """Test LLMStep str method with output schema."""
         step = LLMStep(task="Test task", step_name="test", output_schema=MockOutputSchema)
-        assert step.describe() == "LLMStep(task='Test task' -> MockOutputSchema)"
+        assert str(step) == "LLMStep(task='Test task' -> MockOutputSchema)"
 
     @pytest.mark.asyncio
     async def test_llm_step_run_no_inputs(self) -> None:
@@ -449,19 +445,18 @@ class TestInvokeToolStep:
         assert step.args == args
         assert step.output_schema == MockOutputSchema
 
-    def test_invoke_tool_step_describe_with_string_tool(self) -> None:
-        """Test InvokeToolStep describe method with string tool."""
+    def test_invoke_tool_step_str_with_string_tool(self) -> None:
+        """Test InvokeToolStep str method with string tool."""
         step = InvokeToolStep(
             tool="search_tool",
             step_name="search",
             args={"query": "test"},
         )
 
-        result = step.describe()
-        assert result == "InvokeToolStep(tool='search_tool', args={'query': 'test'})"
+        assert str(step) == "InvokeToolStep(tool='search_tool', args={'query': 'test'})"
 
-    def test_invoke_tool_step_describe_with_tool_instance(self) -> None:
-        """Test InvokeToolStep describe method with Tool instance."""
+    def test_invoke_tool_step_str_with_tool_instance(self) -> None:
+        """Test InvokeToolStep str method with Tool instance."""
         mock_tool = MockTool()
         step = InvokeToolStep(
             tool=mock_tool,
@@ -470,9 +465,10 @@ class TestInvokeToolStep:
             output_schema=MockOutputSchema,
         )
 
-        result = step.describe()
-        expected = "InvokeToolStep(tool='mock_tool', args={'query': 'test'} -> MockOutputSchema)"
-        assert result == expected
+        assert (
+            str(step)
+            == "InvokeToolStep(tool='mock_tool', args={'query': 'test'} -> MockOutputSchema)"
+        )
 
     def test_tool_name_with_string_tool(self) -> None:
         """Test _tool_name method with string tool."""
@@ -732,20 +728,18 @@ class TestFunctionStep:
         assert step.args == args
         assert step.output_schema == MockOutputSchema
 
-    def test_function_step_describe(self) -> None:
-        """Test FunctionStep describe method."""
+    def test_function_step_str(self) -> None:
+        """Test FunctionStep str method."""
         step = FunctionStep(
             function=example_function,
             step_name="calc",
             args={"x": 42, "y": "test"},
         )
 
-        result = step.describe()
-        expected = "FunctionStep(function='example_function', args={'x': 42, 'y': 'test'})"
-        assert result == expected
+        assert str(step) == "FunctionStep(function='example_function', args={'x': 42, 'y': 'test'})"
 
-    def test_function_step_describe_with_output_schema(self) -> None:
-        """Test FunctionStep describe method with output schema."""
+    def test_function_step_str_with_output_schema(self) -> None:
+        """Test FunctionStep str method with output schema."""
         step = FunctionStep(
             function=example_function,
             step_name="calc",
@@ -753,9 +747,10 @@ class TestFunctionStep:
             output_schema=MockOutputSchema,
         )
 
-        result = step.describe()
-        expected = "FunctionStep(function='example_function', args={'x': 42} -> MockOutputSchema)"
-        assert result == expected
+        assert (
+            str(step)
+            == "FunctionStep(function='example_function', args={'x': 42} -> MockOutputSchema)"
+        )
 
     @pytest.mark.asyncio
     async def test_function_step_with_normal_arg(self) -> None:
@@ -899,20 +894,18 @@ class TestSingleToolAgent:
         assert step.inputs == inputs
         assert step.output_schema == MockOutputSchema
 
-    def test_single_tool_agent_describe(self) -> None:
-        """Test SingleToolAgent describe method."""
+    def test_single_tool_agent_str(self) -> None:
+        """Test SingleToolAgent str method."""
         step = SingleToolAgentStep(
             task="Search for info",
             tool="search_tool",
             step_name="search",
         )
 
-        result = step.describe()
-        expected = "SingleToolAgentStep(tool='search_tool', query='Search for info')"
-        assert result == expected
+        assert str(step) == "SingleToolAgentStep(tool='search_tool', query='Search for info')"
 
-    def test_single_tool_agent_describe_with_output_schema(self) -> None:
-        """Test SingleToolAgent describe method with output schema."""
+    def test_single_tool_agent_str_with_output_schema(self) -> None:
+        """Test SingleToolAgent str method with output schema."""
         step = SingleToolAgentStep(
             task="Search for info",
             tool="search_tool",
@@ -920,11 +913,10 @@ class TestSingleToolAgent:
             output_schema=MockOutputSchema,
         )
 
-        result = step.describe()
-        expected = (
+        expected_str = (
             "SingleToolAgentStep(tool='search_tool', query='Search for info' -> MockOutputSchema)"
         )
-        assert result == expected
+        assert str(step) == expected_str
 
     @pytest.mark.asyncio
     async def test_single_tool_agent_run_with_mocked_agent(self) -> None:
