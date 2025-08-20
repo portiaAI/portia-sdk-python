@@ -48,6 +48,14 @@ plan = (
             "purchase_quantity": Input("purchase_quantity"),
         },
     )
+    .if_(
+        condition=lambda total_price: total_price > 100,  # noqa: PLR2004
+        args={"total_price": StepOutput(1)},
+    )
+    .function_step(function=lambda: print("Hey big spender!"))  # noqa: T201
+    .else_()
+    .function_step(function=lambda: print("We need more gold!"))  # noqa: T201
+    .endif()
     .llm_step(
         task="Write a poem about the current price of gold",
         inputs=[StepOutput(0), Input("currency")],
