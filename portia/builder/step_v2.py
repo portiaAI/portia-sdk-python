@@ -498,8 +498,9 @@ class ConditionalStep(StepV2):
         """Run the conditional step."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         if isinstance(self.condition, str):
+            condition_str = self._get_value_for_input(self.condition, run_data)
             agent = ConditionalEvaluationAgent(run_data.portia.config)
-            conditional_result = await agent.execute(self.condition, args)
+            conditional_result = await agent.execute(condition_str, args)
         else:
             conditional_result = self.condition(**args)
         next_clause_step_index = (
