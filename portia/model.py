@@ -130,8 +130,8 @@ class GenerativeModel(ABC):
                 content_preview = " ".join(msg.content.replace("\n", " ") for msg in messages)
                 preview = content_preview[:120]
                 logger().trace(f"LLM call: model={self!s} msg={preview!r}")
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001, S110
+            pass  # pragma: no cover
 
     @abstractmethod
     def get_response(self, messages: list[Message]) -> Message:
