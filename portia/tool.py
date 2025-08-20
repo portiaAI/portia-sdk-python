@@ -21,7 +21,13 @@ import json
 from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Generic, TypeVar, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
+else:
+    # For Python < 3.11 compatibility, use forward reference
+    Self = "Self"
 
 import httpx
 import mcp
