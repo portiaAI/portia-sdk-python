@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Any
 from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
-from portia.builder.step_v2 import ConditionalStep, FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
+from portia.builder.step_v2 import (
+    ConditionalStep,
+    FunctionStep,
+    InvokeToolStep,
+    LLMStep,
+    SingleToolAgentStep,
+)
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:

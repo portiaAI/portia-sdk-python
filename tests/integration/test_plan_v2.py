@@ -142,25 +142,25 @@ def test_plan_v2_conditionals() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: True)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[1]"),
         )
         .else_if_(
             condition=lambda: True,
             args={},
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -182,25 +182,25 @@ def test_plan_v2_conditionals_else_if() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[1]"),
         )
         .else_if_(
             condition=lambda: True,
             args={},
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -222,25 +222,25 @@ def test_plan_v2_conditionals_else() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[1]"),
         )
         .else_if_(
             condition=lambda: False,
             args={},
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -262,16 +262,16 @@ def test_plan_v2_conditionals_nested_branches() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: True)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
         # Start nested branch
         .if_(condition=lambda: True)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_.if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_.else_[0]"),
         )
         .endif()
@@ -280,15 +280,15 @@ def test_plan_v2_conditionals_nested_branches() -> None:
             condition=lambda: True,
             args={},
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -310,24 +310,24 @@ def test_plan_v2_conditionals_nested_branches_else_if() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: True)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
         # Start nested branch
         .if_(condition=lambda: False)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_.if_[0]"),
         )
         .else_if_(condition=lambda: True)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_.else_if_[0]"),
         )
         .else_if_(condition=lambda: True)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_.else_if_2[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_.else_[0]"),
         )
         .endif()
@@ -336,15 +336,15 @@ def test_plan_v2_conditionals_nested_branches_else_if() -> None:
             condition=lambda: True,
             args={},
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -360,7 +360,7 @@ def test_plan_v2_unclosed_conditionals() -> None:
         (
             PlanBuilderV2(label="Evaluate arbitrary conditionals")
             .if_(condition=lambda: True)
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             .build()
@@ -373,24 +373,24 @@ def test_plan_v2_unclosed_conditionals_complex() -> None:
         (
             PlanBuilderV2(label="Evaluate arbitrary conditionals")
             .if_(condition=lambda: True)
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             # Start nested branch
             .if_(condition=lambda: False)
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             .else_if_(condition=lambda: True)
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             .else_if_(condition=lambda: True)
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             .else_()
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             # End nested branch
@@ -398,15 +398,15 @@ def test_plan_v2_unclosed_conditionals_complex() -> None:
                 condition=lambda: True,
                 args={},
             )
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             .else_()
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             .endif()
-            .function_call(
+            .function_step(
                 function=lambda: None,
             )
             .build()
@@ -425,18 +425,18 @@ def test_plan_v2_conditional_if_without_else_if() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[1]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -458,18 +458,18 @@ def test_plan_v2_conditional_if_without_else() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[1]"),
         )
         .else_if_(condition=lambda: True)
-        .function_call(
+        .function_step(
             function=lambda: record_func("else_if_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -491,14 +491,14 @@ def test_plan_v2_conditional_if_without_else_if_or_else() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[0]"),
         )
-        .function_call(
+        .function_step(
             function=lambda: record_func("if_[1]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: record_func("final step"),
         )
         .build()
@@ -520,16 +520,16 @@ def test_plan_v2_legacy_condition_string() -> None:
     plan = (
         PlanBuilderV2(label="Evaluate arbitrary conditionals")
         .if_(condition=evals_true)  # None
-        .function_call(
+        .function_step(
             function=lambda: dummy("if_[0]"),
         )
         # Start nested branch
         .if_(condition=evals_true)
-        .function_call(
+        .function_step(
             function=lambda: dummy("if_.if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: dummy("if_.else_[0]"),
         )
         .endif()
@@ -538,15 +538,15 @@ def test_plan_v2_legacy_condition_string() -> None:
             condition=evals_true,
             args={},
         )
-        .function_call(
+        .function_step(
             function=lambda: dummy("else_if_[0]"),
         )
         .else_()
-        .function_call(
+        .function_step(
             function=lambda: dummy("else_[0]"),
         )
         .endif()
-        .function_call(
+        .function_step(
             function=lambda: dummy("final step"),
         )
         .build()
