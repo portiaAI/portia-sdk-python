@@ -15,8 +15,7 @@ from portia.clarification import Clarification
 from portia.errors import ToolNotFoundError
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Step as PlanStep
-from portia.plan import Variable
+from portia.plan import Step, Variable
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -42,10 +41,10 @@ class StepV2(BaseModel, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
-        """Convert this step to a PlanStep from plan.py.
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this step to a Step from plan.py.
 
-        A PlanStep is the legacy representation of a step in the plan, and is still used in the
+        A Step is the legacy representation of a step in the plan, and is still used in the
         Portia backend. If this step doesn't need to be represented in the plan sent to the Portia
         backend, return None.
         """
@@ -173,9 +172,9 @@ class LLMStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
-        """Convert this LLMStep to a PlanStep."""
-        return PlanStep(
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this LLMStep to a Step."""
+        return Step(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=LLMTool.LLM_TOOL_ID,
@@ -241,7 +240,11 @@ class ToolRun(StepV2):
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
 
-        if self.output_schema and not isinstance(output, self.output_schema):
+        if (
+            self.output_schema
+            and not isinstance(output, self.output_schema)
+            and not isinstance(output, Clarification)
+        ):
             model = run_data.portia.config.get_default_model()
             output = await model.aget_structured_response(
                 [
@@ -255,12 +258,12 @@ class ToolRun(StepV2):
         return output
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
-        """Convert this ToolCall to a PlanStep."""
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this ToolCall to a Step."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
-        return PlanStep(
+        return Step(
             task=f"Use tool {self._tool_name()} with inputs: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=self._tool_name(),
@@ -301,7 +304,11 @@ class FunctionCall(StepV2):
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
 
-        if self.output_schema and not isinstance(output, self.output_schema):
+        if (
+            self.output_schema
+            and not isinstance(output, self.output_schema)
+            and not isinstance(output, Clarification)
+        ):
             model = run_data.portia.config.get_default_model()
             output = await model.aget_structured_response(
                 [
@@ -315,13 +322,13 @@ class FunctionCall(StepV2):
         return output
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
-        """Convert this ToolCall to a PlanStep."""
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this ToolCall to a Step."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
         fn_name = getattr(self.function, "__name__", str(self.function))
-        return PlanStep(
+        return Step(
             task=f"Run function {fn_name} with args: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=f"local_function_{fn_name}",
@@ -364,9 +371,9 @@ class SingleToolAgent(StepV2):
         return output_obj.get_value()
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> PlanStep:
-        """Convert this SingleToolAgent to a PlanStep."""
-        return PlanStep(
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this SingleToolAgent to a Step."""
+        return Step(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=self.tool,
