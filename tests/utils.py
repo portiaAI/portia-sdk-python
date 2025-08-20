@@ -125,6 +125,10 @@ class AdditionTool(Tool):
         """Add the numbers."""
         return a + b
 
+    async def arun(self, _: ToolRunContext, a: int, b: int) -> int:
+        """Add the numbers asynchronously."""
+        return a + b
+
 
 class EndUserUpdateToolSchema(BaseModel):
     """Input for AdditionTool."""
@@ -143,6 +147,11 @@ class EndUserUpdateTool(Tool):
 
     def run(self, ctx: ToolRunContext, name: str) -> str:
         """Change the name."""
+        ctx.end_user.name = name
+        return name
+
+    async def arun(self, ctx: ToolRunContext, name: str) -> str:
+        """Change the name asynchronously."""
         ctx.end_user.name = name
         return name
 
@@ -180,6 +189,21 @@ class ClarificationTool(Tool):
             )
         return None
 
+    async def arun(
+        self,
+        ctx: ToolRunContext,
+        user_guidance: str,
+    ) -> Clarification | None:
+        """Add the numbers asynchronously."""
+        if len(ctx.clarifications) == 0:
+            return InputClarification(
+                plan_run_id=ctx.plan_run.id,
+                user_guidance=user_guidance,
+                argument_name="raise_clarification",
+                source="Test clarification tool",
+            )
+        return None
+
 
 class MockToolSchema(BaseModel):
     """Input for MockTool."""
@@ -198,6 +222,13 @@ class MockTool(Tool):
         _: ToolRunContext,
     ) -> None:
         """Do nothing."""
+        return
+
+    async def arun(
+        self,
+        _: ToolRunContext,
+    ) -> None:
+        """Do nothing asynchronously."""
         return
 
 
@@ -235,6 +266,20 @@ class ErrorTool(Tool):
             raise ToolSoftError(error_str)
         raise ToolHardError(error_str)
 
+    async def arun(
+        self,
+        _: ToolRunContext,
+        error_str: str,
+        return_uncaught_error: bool,
+        return_soft_error: bool,
+    ) -> None:
+        """Return the error asynchronously."""
+        if return_uncaught_error:
+            raise Exception(error_str)  # noqa: TRY002
+        if return_soft_error:
+            raise ToolSoftError(error_str)
+        raise ToolHardError(error_str)
+
 
 class NoneTool(Tool):
     """Returns None."""
@@ -246,6 +291,10 @@ class NoneTool(Tool):
 
     def run(self, _: ToolRunContext) -> None:
         """Return."""
+        return
+
+    async def arun(self, _: ToolRunContext) -> None:
+        """Return asynchronously."""
         return
 
 
