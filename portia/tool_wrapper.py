@@ -10,13 +10,14 @@ Classes:
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict
 
 from portia.clarification import Clarification
-from portia.common import combine_args_kwargs
+from portia.common import Serializable, combine_args_kwargs
 from portia.execution_agents.output import LocalDataValue
 from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
@@ -96,7 +97,44 @@ class ToolCallWrapper(Tool):
 
         """
         # initialize empty call record
+        record = self._setup_tool_call(ctx, *args, **kwargs)
+        start_time = datetime.now(tz=UTC)
+        try:
+            output = self._child_tool.run(ctx, *args, **kwargs)
+        except Exception as e:
+            # handle the tool call record
+            record.output = str(e)
+            record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
+            record.status = ToolCallStatus.FAILED
+            raise
+        else:
+            record = self._process_output(record, output, start_time)
+        finally:
+            self._storage.save_tool_call(record)
+            self._storage.save_end_user(ctx.end_user)
 
+        return output
+
+    def _process_output(
+        self,
+        record: ToolCallRecord,
+        output: Serializable | Clarification,
+        start_time: datetime,
+    ) -> ToolCallRecord:
+        """Process the output of the tool call and update the record."""
+        if isinstance(output, Clarification):
+            record.status = ToolCallStatus.NEED_CLARIFICATION
+            record.output = output.model_dump(mode="json")
+        elif output is None:
+            record.output = LocalDataValue(value=output).model_dump(mode="json")
+            record.status = ToolCallStatus.SUCCESS
+        else:
+            record.output = output
+            record.status = ToolCallStatus.SUCCESS
+        record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
+        return record
+
+    def _setup_tool_call(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> ToolCallRecord:
         record = ToolCallRecord(
             input=combine_args_kwargs(*args, **kwargs),
             output=None,
@@ -116,30 +154,23 @@ class ToolCallWrapper(Tool):
         logger().info(
             f"Invoking {record.tool_name!s} with args: {truncated_input}",
         )
+        return record
+
+    async def arun(self, ctx: ToolRunContext, *args: Any, **kwargs: Any) -> Any | Clarification:  # noqa: ANN401
+        """Async run the child tool and store the outcome."""
+        record = self._setup_tool_call(ctx, *args, **kwargs)
         start_time = datetime.now(tz=UTC)
         try:
-            output = self._child_tool.run(ctx, *args, **kwargs)
+            output = await self._child_tool.arun(ctx, *args, **kwargs)
         except Exception as e:
-            # handle the tool call record
             record.output = str(e)
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
             record.status = ToolCallStatus.FAILED
-            self._storage.save_tool_call(record)
-            # persist changes to the end_user
-            self._storage.save_end_user(ctx.end_user)
             raise
         else:
-            if isinstance(output, Clarification):
-                record.status = ToolCallStatus.NEED_CLARIFICATION
-                record.output = output.model_dump(mode="json")
-            elif output is None:
-                record.output = LocalDataValue(value=output).model_dump(mode="json")
-                record.status = ToolCallStatus.SUCCESS
-            else:
-                record.output = output
-                record.status = ToolCallStatus.SUCCESS
-            record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
-            self._storage.save_tool_call(record)
-            # persist changes to the end_user
-            self._storage.save_end_user(ctx.end_user)
+            record = self._process_output(record, output, start_time)
+        finally:
+            # Fire-and-forget background tasks
+            asyncio.create_task(self._storage.asave_tool_call(record))  # noqa: RUF006
+            asyncio.create_task(self._storage.asave_end_user(ctx.end_user))  # noqa: RUF006
         return output
