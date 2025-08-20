@@ -82,7 +82,7 @@ def test_example_builder(is_async: bool) -> None:
     plan = (
         PlanBuilderV2("Calculate gold purchase cost and write a poem")
         .input(name="purchase_quantity", description="The quantity of gold to purchase in ounces")
-        .tool_run(
+        .invoke_tool_step(
             step_name="Search gold price",
             tool="search_tool",
             args={
@@ -90,7 +90,7 @@ def test_example_builder(is_async: bool) -> None:
             },
             output_schema=CommodityPriceWithCurrency,
         )
-        .function_call(
+        .function_step(
             function=lambda price_with_currency, purchase_quantity: (
                 price_with_currency.price * purchase_quantity
             ),
@@ -103,7 +103,7 @@ def test_example_builder(is_async: bool) -> None:
             task="Write a poem about the current price of gold in USD",
             inputs=[StepOutput(0)],
         )
-        .single_tool_agent(
+        .single_tool_agent_step(
             task="Search for similar poems about gold",
             tool="search_tool",
             inputs=[StepOutput(2)],

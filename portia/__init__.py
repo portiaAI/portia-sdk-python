@@ -5,7 +5,7 @@ from __future__ import annotations
 from portia.builder.plan_builder import PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import FunctionCall, LLMStep, SingleToolAgent, ToolRun
+from portia.builder.step_v2 import FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
 
 # Clarification related classes
 from portia.clarification import (
@@ -121,7 +121,7 @@ __all__ = [
     "ExtractTool",
     "FileReaderTool",
     "FileWriterTool",
-    "FunctionCall",
+    "FunctionStep",
     "GenerativeModel",
     "GenerativeModelsConfig",
     "InMemoryToolRegistry",
@@ -132,6 +132,7 @@ __all__ = [
     "InvalidConfigError",
     "InvalidPlanRunStateError",
     "InvalidToolDescriptionError",
+    "InvokeToolStep",
     "LLMModel",
     "LLMProvider",
     "LLMStep",
@@ -160,7 +161,7 @@ __all__ = [
     "PortiaBaseError",
     "PortiaToolRegistry",
     "SearchTool",
-    "SingleToolAgent",
+    "SingleToolAgentStep",
     "SseMcpClientConfig",
     "StdioMcpClientConfig",
     "Step",
@@ -173,7 +174,6 @@ __all__ = [
     "ToolNotFoundError",
     "ToolRegistry",
     "ToolRetryError",
-    "ToolRun",
     "ToolRunContext",
     "UserVerificationClarification",
     "ValueConfirmationClarification",

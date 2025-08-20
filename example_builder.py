@@ -31,7 +31,7 @@ plan = (
     PlanBuilderV2("Write a poem about the price of gold")
     .input(name="purchase_quantity", description="The quantity of gold to purchase in ounces")
     .input(name="currency", description="The currency to purchase the gold in", default_value="GBP")
-    .tool_run(
+    .invoke_tool_step(
         step_name="Search gold price",
         tool="search_tool",
         args={
@@ -39,7 +39,7 @@ plan = (
         },
         output_schema=CommodityPriceWithCurrency,
     )
-    .function_call(
+    .function_step(
         function=lambda price_with_currency, purchase_quantity: (
             price_with_currency.price * purchase_quantity
         ),
@@ -52,7 +52,7 @@ plan = (
         task="Write a poem about the current price of gold",
         inputs=[StepOutput(0), Input("currency")],
     )
-    .single_tool_agent(
+    .single_tool_agent_step(
         task="Send the poem to Robbie in an email at not_an_email@portialabs.ai",
         tool="portia:google:gmail:send_email",
         inputs=[StepOutput(2)],

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from portia.builder.plan_builder import PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import FunctionCall, LLMStep, SingleToolAgent, ToolRun
+from portia.builder.step_v2 import FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
 from portia.tool import Tool
 
 
@@ -187,37 +187,37 @@ class TestPlanBuilderV2:
         assert builder.plan.steps[0].step_name == "step_0"
         assert builder.plan.steps[1].step_name == "step_1"
 
-    def test_tool_run_method_with_string_tool(self) -> None:
-        """Test the tool_run() method with string tool identifier."""
+    def test_invoke_tool_step_method_with_string_tool(self) -> None:
+        """Test the invoke_tool_step() method with string tool identifier."""
         builder = PlanBuilderV2()
         args = {"param1": "value1", "param2": StepOutput(0)}
 
-        result = builder.tool_run(tool="search_tool", args=args)
+        result = builder.invoke_tool_step(tool="search_tool", args=args)
 
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
-        assert isinstance(builder.plan.steps[0], ToolRun)
+        assert isinstance(builder.plan.steps[0], InvokeToolStep)
         assert builder.plan.steps[0].tool == "search_tool"
         assert builder.plan.steps[0].args == args
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
 
-    def test_tool_run_method_with_tool_instance(self) -> None:
-        """Test the tool_run() method with Tool instance."""
+    def test_invoke_tool_step_method_with_tool_instance(self) -> None:
+        """Test the invoke_tool_step() method with Tool instance."""
         builder = PlanBuilderV2()
         mock_tool = MockTool()
 
-        builder.tool_run(tool=mock_tool, args={"input": "test"})
+        builder.invoke_tool_step(tool=mock_tool, args={"input": "test"})
 
         step = builder.plan.steps[0]
-        assert isinstance(step, ToolRun)
+        assert isinstance(step, InvokeToolStep)
         assert step.tool is mock_tool
 
-    def test_tool_run_method_with_all_parameters(self) -> None:
-        """Test the tool_run() method with all parameters."""
+    def test_invoke_tool_step_method_with_all_parameters(self) -> None:
+        """Test the invoke_tool_step() method with all parameters."""
         builder = PlanBuilderV2()
 
-        builder.tool_run(
+        builder.invoke_tool_step(
             tool="test_tool",
             args={"arg1": "value1"},
             output_schema=OutputSchema,
@@ -225,42 +225,42 @@ class TestPlanBuilderV2:
         )
 
         step = builder.plan.steps[0]
-        assert isinstance(step, ToolRun)
+        assert isinstance(step, InvokeToolStep)
         assert step.tool == "test_tool"
         assert step.args == {"arg1": "value1"}
         assert step.output_schema == OutputSchema
         assert step.step_name == "tool_step"
 
-    def test_tool_run_method_no_args(self) -> None:
-        """Test the tool_run() method with no args."""
+    def test_invoke_tool_step_method_no_args(self) -> None:
+        """Test the invoke_tool_step() method with no args."""
         builder = PlanBuilderV2()
 
-        builder.tool_run(tool="no_args_tool")
+        builder.invoke_tool_step(tool="no_args_tool")
 
         step = builder.plan.steps[0]
-        assert isinstance(step, ToolRun)
+        assert isinstance(step, InvokeToolStep)
         assert step.args == {}
 
-    def test_function_call_method_basic(self) -> None:
-        """Test the function_call() method with basic parameters."""
+    def test_function_step_method_basic(self) -> None:
+        """Test the function_step() method with basic parameters."""
         builder = PlanBuilderV2()
 
-        result = builder.function_call(function=example_function_for_testing)
+        result = builder.function_step(function=example_function_for_testing)
 
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
-        assert isinstance(builder.plan.steps[0], FunctionCall)
+        assert isinstance(builder.plan.steps[0], FunctionStep)
         assert builder.plan.steps[0].function is example_function_for_testing
         assert builder.plan.steps[0].args == {}
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
 
-    def test_function_call_method_with_all_parameters(self) -> None:
-        """Test the function_call() method with all parameters."""
+    def test_function_step_method_with_all_parameters(self) -> None:
+        """Test the function_step() method with all parameters."""
         builder = PlanBuilderV2()
         args = {"x": 42, "y": Input("user_input")}
 
-        builder.function_call(
+        builder.function_step(
             function=example_function_for_testing,
             args=args,
             output_schema=OutputSchema,
@@ -268,33 +268,33 @@ class TestPlanBuilderV2:
         )
 
         step = builder.plan.steps[0]
-        assert isinstance(step, FunctionCall)
+        assert isinstance(step, FunctionStep)
         assert step.function is example_function_for_testing
         assert step.args == args
         assert step.output_schema == OutputSchema
         assert step.step_name == "func_step"
 
-    def test_single_tool_agent_method_basic(self) -> None:
-        """Test the single_tool_agent() method with basic parameters."""
+    def test_single_tool_agent_step_method_basic(self) -> None:
+        """Test the single_tool_agent_step() method with basic parameters."""
         builder = PlanBuilderV2()
 
-        result = builder.single_tool_agent(tool="agent_tool", task="Complete the task")
+        result = builder.single_tool_agent_step(tool="agent_tool", task="Complete the task")
 
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
-        assert isinstance(builder.plan.steps[0], SingleToolAgent)
+        assert isinstance(builder.plan.steps[0], SingleToolAgentStep)
         assert builder.plan.steps[0].tool == "agent_tool"
         assert builder.plan.steps[0].task == "Complete the task"
         assert builder.plan.steps[0].inputs == []
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
 
-    def test_single_tool_agent_method_with_all_parameters(self) -> None:
-        """Test the single_tool_agent() method with all parameters."""
+    def test_single_tool_agent_step_method_with_all_parameters(self) -> None:
+        """Test the single_tool_agent_step() method with all parameters."""
         builder = PlanBuilderV2()
         inputs = ["context", StepOutput(0)]
 
-        builder.single_tool_agent(
+        builder.single_tool_agent_step(
             tool="complex_tool",
             task="Process complex data",
             inputs=inputs,
@@ -303,7 +303,7 @@ class TestPlanBuilderV2:
         )
 
         step = builder.plan.steps[0]
-        assert isinstance(step, SingleToolAgent)
+        assert isinstance(step, SingleToolAgentStep)
         assert step.tool == "complex_tool"
         assert step.task == "Process complex data"
         assert step.inputs == inputs
@@ -375,9 +375,9 @@ class TestPlanBuilderV2:
             )
             .input(name="user_age", description="Age of the user", default_value=25)
             .llm_step(task="Analyze user info", inputs=[Input("user_name"), Input("user_age")])
-            .tool_run(tool="search_tool", args={"query": StepOutput(0)})
-            .function_call(function=example_function_for_testing, args={"x": 1, "y": "test"})
-            .single_tool_agent(tool="agent_tool", task="Final processing")
+            .invoke_tool_step(tool="search_tool", args={"query": StepOutput(0)})
+            .function_step(function=example_function_for_testing, args={"x": 1, "y": "test"})
+            .single_tool_agent_step(tool="agent_tool", task="Final processing")
             .final_output(output_schema=OutputSchema, summarize=True)
         )
 
@@ -388,9 +388,9 @@ class TestPlanBuilderV2:
         assert len(plan.plan_inputs) == 2
         assert len(plan.steps) == 4
         assert isinstance(plan.steps[0], LLMStep)
-        assert isinstance(plan.steps[1], ToolRun)
-        assert isinstance(plan.steps[2], FunctionCall)
-        assert isinstance(plan.steps[3], SingleToolAgent)
+        assert isinstance(plan.steps[1], InvokeToolStep)
+        assert isinstance(plan.steps[2], FunctionStep)
+        assert isinstance(plan.steps[3], SingleToolAgentStep)
         assert plan.final_output_schema == OutputSchema
         assert plan.summarize is True
 
@@ -415,9 +415,9 @@ class TestPlanBuilderV2:
         builder = PlanBuilderV2()
 
         builder.llm_step(task="LLM task")
-        builder.tool_run(tool="tool1")
-        builder.function_call(function=example_function_for_testing)
-        builder.single_tool_agent(tool="agent_tool", task="Agent task")
+        builder.invoke_tool_step(tool="tool1")
+        builder.function_step(function=example_function_for_testing)
+        builder.single_tool_agent_step(tool="agent_tool", task="Agent task")
 
         assert builder.plan.steps[0].step_name == "step_0"
         assert builder.plan.steps[1].step_name == "step_1"
@@ -445,8 +445,8 @@ class TestPlanBuilderV2:
 
         # Add steps with references
         builder.llm_step(task="Process query", inputs=[Input("user_query"), "additional context"])
-        builder.tool_run(tool="search_tool", args={"query": StepOutput(0), "limit": 10})
-        builder.function_call(
+        builder.invoke_tool_step(tool="search_tool", args={"query": StepOutput(0), "limit": 10})
+        builder.function_step(
             function=example_function_for_testing, args={"x": 42, "y": StepOutput(1)}
         )
 
@@ -459,11 +459,11 @@ class TestPlanBuilderV2:
         assert llm_step.inputs[0].name == "user_query"
 
         tool_step = plan.steps[1]
-        assert isinstance(tool_step, ToolRun)
+        assert isinstance(tool_step, InvokeToolStep)
         assert isinstance(tool_step.args["query"], StepOutput)
         assert tool_step.args["query"].step == 0
 
         func_step = plan.steps[2]
-        assert isinstance(func_step, FunctionCall)
+        assert isinstance(func_step, FunctionStep)
         assert isinstance(func_step.args["y"], StepOutput)
         assert func_step.args["y"].step == 1

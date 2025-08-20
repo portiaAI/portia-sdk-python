@@ -250,7 +250,7 @@ class LLMStep(StepV2):
         )
 
 
-class ToolRun(StepV2):
+class InvokeToolStep(StepV2):
     """A step that calls a tool with the given args (no LLM involved, just a direct tool call)."""
 
     tool: str | Tool = Field(
@@ -274,7 +274,7 @@ class ToolRun(StepV2):
     def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"ToolRun(tool='{self._tool_name()}', args={self.args}{output_info})"
+        return f"InvokeToolStep(tool='{self._tool_name()}', args={self.args}{output_info})"
 
     def _tool_name(self) -> str:
         """Get the name of the tool."""
@@ -283,7 +283,7 @@ class ToolRun(StepV2):
         return self.tool.id
 
     @override
-    @traceable(name="Tool Run - Run")
+    @traceable(name="Invoke Tool Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the tool."""
         if isinstance(self.tool, str):
@@ -326,7 +326,7 @@ class ToolRun(StepV2):
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this ToolCall to a Step."""
+        """Convert this InvokeToolStep to a legacy Step."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
@@ -340,7 +340,7 @@ class ToolRun(StepV2):
         )
 
 
-class FunctionCall(StepV2):
+class FunctionStep(StepV2):
     """Calls a function with the given args (no LLM involved, just a direct function call)."""
 
     function: Callable[..., Any] = Field(description=("The function to call."))
@@ -360,10 +360,10 @@ class FunctionCall(StepV2):
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         fn_name = getattr(self.function, "__name__", str(self.function))
-        return f"FunctionCall(function='{fn_name}', args={self.args}{output_info})"
+        return f"FunctionStep(function='{fn_name}', args={self.args}{output_info})"
 
     @override
-    @traceable(name="Function Call - Run")
+    @traceable(name="Function Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the function."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
@@ -391,7 +391,7 @@ class FunctionCall(StepV2):
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this ToolCall to a Step."""
+        """Convert this FunctionStep to a legacy Step."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
@@ -406,7 +406,7 @@ class FunctionCall(StepV2):
         )
 
 
-class SingleToolAgent(StepV2):
+class SingleToolAgentStep(StepV2):
     """A step where an LLM agent uses a single tool (calling it only once) to complete a task."""
 
     task: str = Field(description="The task to perform.")
@@ -427,10 +427,10 @@ class SingleToolAgent(StepV2):
     def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"SingleToolAgent(tool='{self.tool}', query='{self.task}'{output_info})"
+        return f"SingleToolAgentStep(tool='{self.tool}', query='{self.task}'{output_info})"
 
     @override
-    @traceable(name="Single Tool Agent - Run")
+    @traceable(name="Single Tool Agent Step - Run")
     async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
         agent = run_data.portia.get_agent_for_step(
@@ -441,7 +441,7 @@ class SingleToolAgent(StepV2):
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this SingleToolAgent to a Step."""
+        """Convert this SingleToolAgentStep to a Step."""
         return Step(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
