@@ -634,7 +634,7 @@ class Config(BaseModel):
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
                     case LLMProvider.OPENROUTER:
-                        return "moonshotai/kimi-k2"
+                        return "openrouter/moonshotai/kimi-k2"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -666,7 +666,7 @@ class Config(BaseModel):
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
                     case LLMProvider.OPENROUTER:
-                        return "moonshotai/kimi-k2"
+                        return "openrouter/moonshotai/kimi-k2"
                 return None
 
     @model_validator(mode="after")
@@ -984,8 +984,6 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         None: If no API key is found.
 
     """
-    if os.getenv("OPENROUTER_API_KEY") or kwargs.get("openrouter_api_key"):
-        return LLMProvider.OPENROUTER
     if os.getenv("OPENAI_API_KEY") or kwargs.get("openai_api_key"):
         return LLMProvider.OPENAI
     if os.getenv("ANTHROPIC_API_KEY") or kwargs.get("anthropic_api_key"):
@@ -1005,6 +1003,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
     ):
         return LLMProvider.AZURE_OPENAI
+    if os.getenv("OPENROUTER_API_KEY") or kwargs.get("openrouter_api_key"):
+        return LLMProvider.OPENROUTER
     return None
 
 
