@@ -2747,7 +2747,7 @@ class Portia:
                 isinstance(result, ConditionalStepResult)
                 and result.type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
             ):
-                logger().info("New branch")
+                logger().info("Entering new conditional branch")
                 branch_stack.append(result)
                 if not result.conditional_result:
                     logger().info("Branch conditional is false, jumping to next branch")
@@ -2758,7 +2758,7 @@ class Portia:
             ):
                 stack_state = branch_stack[-1]
                 if stack_state.conditional_result:
-                    logger().info("Previous branch has already run, jumping to exit")
+                    logger().info("Previous conditional branch has already run, jumping to exit")
                     # One of the branches has already run, so we jump to exit
                     jump_to_step_index = stack_state.end_condition_block_step_index
                 elif result.conditional_result:
@@ -2772,7 +2772,7 @@ class Portia:
                 isinstance(result, ConditionalStepResult)
                 and result.type == ConditionalBlockClauseType.END_CONDITION_BLOCK
             ):
-                logger().info("Exiting branch")
+                logger().info("Exiting conditional branch")
                 branch_stack.pop()
 
             output_value = LocalDataValue(value=result)
