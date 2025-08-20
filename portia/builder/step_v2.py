@@ -19,6 +19,7 @@ from portia.builder.conditionals import (
 from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
 from portia.clarification import Clarification
 from portia.errors import ToolNotFoundError
+from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step, Variable
@@ -492,12 +493,15 @@ class ConditionalStep(StepV2):
         )
 
     @override
+    @traceable(name="Conditional Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the conditional step."""
-        if isinstance(self.condition, str):
-            raise NotImplementedError("Condition string not supported yet")
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-        conditional_result = self.condition(**args)
+        if isinstance(self.condition, str):
+            agent = ConditionalEvaluationAgent(run_data.portia.config)
+            conditional_result = await agent.execute(self.condition, args)
+        else:
+            conditional_result = self.condition(**args)
         next_clause_step_index = (
             self.block.clause_step_indexes[self.clause_index_in_block + 1]
             if self.clause_index_in_block < len(self.block.clause_step_indexes) - 1
@@ -513,9 +517,16 @@ class ConditionalStep(StepV2):
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
         """Convert this ConditionalStep to a PlanStep."""
-        fn_name = getattr(self.condition, "__name__", str(self.condition))
+        if isinstance(self.condition, str):
+            cond_str = self.condition
+        else:
+            cond_str = (
+                "If result of "
+                + getattr(self.condition, "__name__", str(self.condition))
+                + " is true"
+            )
         return Step(
-            task=f"Conditional clause evaluation: {fn_name}",
+            task=f"Conditional clause: {cond_str}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=None,
             output=plan.step_output_name(self),
