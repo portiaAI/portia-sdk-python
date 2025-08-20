@@ -3,7 +3,7 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-from portia.builder.plan_builder import PlanBuilderV2
+from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
 from portia.cli import CLIExecutionHooks
 from portia.portia import Portia
