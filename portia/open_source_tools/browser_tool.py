@@ -515,7 +515,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             )
         # Type-safe access to allowed_domains
         allowed_domains = None
-        if hasattr(ctx.tool, 'allowed_domains') and isinstance(ctx.tool, BrowserTool):
+        if hasattr(ctx.tool, 'allowed_domains'):
             allowed_domains = ctx.tool.allowed_domains
         
         # Create BrowserContextConfig with allowed_domains if needed
@@ -809,7 +809,7 @@ if BROWSERBASE_AVAILABLE:
 
             # Type-safe access to allowed_domains
             allowed_domains = None
-            if hasattr(ctx.tool, 'allowed_domains') and isinstance(ctx.tool, BrowserTool):
+            if hasattr(ctx.tool, 'allowed_domains'):
                 allowed_domains = ctx.tool.allowed_domains
             
             # Create BrowserContextConfig with allowed_domains if needed
