@@ -223,7 +223,10 @@ def process_output(  # noqa: C901 PLR0912
     if step.structured_output_schema:
         # If there is a structured output schema, then it is stored in the last tool call's value
         final_value = output_values[-1].get_value()
-        return LocalDataValue(value=final_value, summary=output_values[-1].get_summary() or "")
+        return LocalDataValue(
+            value=final_value,
+            summary=output_values[-1].get_summary() or output_values[-1].serialize_value(),
+        )
 
     values = []
     summaries = []

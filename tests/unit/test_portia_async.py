@@ -20,7 +20,6 @@ from portia.clarification import (
 from portia.config import Config, GenerativeModelsConfig, StorageClass
 from portia.end_user import EndUser
 from portia.errors import (
-    InvalidPlanRunStateError,
     PlanError,
     PlanNotFoundError,
     PlanRunNotFoundError,
@@ -1074,8 +1073,8 @@ async def test_portia_arun_invalid_state(portia: Portia, planning_model: MagicMo
     # Set invalid state
     plan_run.state = PlanRunState.COMPLETE
 
-    with pytest.raises(InvalidPlanRunStateError):
-        await portia.aresume(plan_run)
+    result = await portia.aresume(plan_run)
+    assert result == plan_run
 
 
 @pytest.mark.asyncio

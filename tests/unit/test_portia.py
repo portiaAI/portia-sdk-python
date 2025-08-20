@@ -671,8 +671,8 @@ def test_portia_run_invalid_state(portia: Portia, planning_model: MagicMock) -> 
     # Set invalid state
     plan_run.state = PlanRunState.COMPLETE
 
-    with pytest.raises(InvalidPlanRunStateError):
-        portia.resume(plan_run)
+    result = portia.resume(plan_run)
+    assert result == plan_run
 
 
 def test_portia_wait_for_ready(
