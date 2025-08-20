@@ -35,8 +35,8 @@ class StepV2(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     step_name: str = Field(description="The name of the step.")
-    conditional_branch: ConditionalBlock | None = Field(
-        default=None, description="The conditional branch this step is part of."
+    conditional_block: ConditionalBlock | None = Field(
+        default=None, description="The conditional block this step is part of, if any."
     )
 
     @abstractmethod
@@ -130,59 +130,59 @@ class StepV2(BaseModel, ABC):
 
     def _get_legacy_condition(self, plan: PlanV2) -> str | None:
         """Get the legacy condition for a step."""
-        if self.conditional_branch is None:
+        if self.conditional_block is None:
             return None
         step_names = [s.step_name for s in plan.steps]
         current_step_index = step_names.index(self.step_name)
 
-        def get_conditional_for_nested_branch(branch: ConditionalBlock) -> str | None:
-            active_branch_step_index = next(
+        def get_conditional_for_nested_block(block: ConditionalBlock) -> str | None:
+            active_clause_step_index = next(
                 itertools.dropwhile(
-                    # First branch step index where the current step index is greater
-                    # than the branch step index e.g. for branch step indexes [1, 8, 12]
-                    # and current step index 2, the active branch is 1
+                    # First clause step index where the current step index is greater
+                    # than the clause step index e.g. for clause step indexes [1, 8, 12]
+                    # and current step index 2, the active clause step index is 1
                     lambda x: current_step_index < x,
-                    reversed(branch.clause_step_indexes),
+                    reversed(block.clause_step_indexes),
                 ),
                 None,
             )
-            if active_branch_step_index is None:
+            if active_clause_step_index is None:
                 raise ValueError(f"Cannot determine active conditional for step {self.step_name}")
 
             if (
-                current_step_index == branch.clause_step_indexes[0]
-                or current_step_index == branch.clause_step_indexes[-1]
+                current_step_index == block.clause_step_indexes[0]
+                or current_step_index == block.clause_step_indexes[-1]
             ):
                 # The step is the `if_` or the `endif` step, so no new condition is needed
                 # as this will always be evaluated at this 'depth' of the plan branching.
                 return None
 
-            # All previous branch conditions must be false for this step to get run
-            previous_branch_step_indexes = itertools.takewhile(
+            # All previous clause conditions must be false for this step to get run
+            previous_clause_step_indexes = itertools.takewhile(
                 lambda x: x < current_step_index,
                 itertools.filterfalse(
-                    lambda x: x == active_branch_step_index, branch.clause_step_indexes
+                    lambda x: x == active_clause_step_index, block.clause_step_indexes
                 ),
             )
             condition_str = " and ".join(
-                f"{plan.step_output_name(i)} is false" for i in previous_branch_step_indexes
+                f"{plan.step_output_name(i)} is false" for i in previous_clause_step_indexes
             )
-            if current_step_index not in branch.clause_step_indexes:
-                # The step is a non-conditional step within a branch, so we need to make the
-                # active branch condition was true.
-                condition_str = f"{plan.step_output_name(active_branch_step_index)} is true" + (
+            if current_step_index not in block.clause_step_indexes:
+                # The step is a non-conditional step within a block, so we need to make the
+                # active clause condition was true.
+                condition_str = f"{plan.step_output_name(active_clause_step_index)} is true" + (
                     f" and {condition_str}" if condition_str else ""
                 )
 
             return condition_str
 
         legacy_condition_strings = []
-        current_branch = self.conditional_branch
-        while current_branch is not None:
-            legacy_condition_string = get_conditional_for_nested_branch(current_branch)
+        current_block = self.conditional_block
+        while current_block is not None:
+            legacy_condition_string = get_conditional_for_nested_block(current_block)
             if legacy_condition_string is not None:
                 legacy_condition_strings.append(legacy_condition_string)
-            current_branch = current_branch.parent_conditional_block
+            current_block = current_block.parent_conditional_block
         return "If " + " and ".join(legacy_condition_strings) if legacy_condition_strings else None
 
 
@@ -457,35 +457,35 @@ class ConditionalStep(StepV2):
 
     condition: Callable[..., bool] | str = Field(
         description=(
-            "The condition to check. If evaluated to true, the steps within this part "
-            "of the branch will be evaluated - otherwise they will be skipped."
+            "The boolean predicate to check. If evaluated to true, the steps within this clause "
+            "will be evaluated - otherwise they will be skipped and we jump to the next clause."
         )
     )
     args: dict[str, Reference | Any] = Field(
         default_factory=dict, description="The args to check the condition with."
     )
-    branch_index: int = Field(description="The index of the clause in the condition block")
-    branch_state_type: ConditionalBlockClauseType
+    clause_index_in_block: int = Field(description="The index of the clause in the condition block")
+    block_clause_type: ConditionalBlockClauseType
 
-    @field_validator("conditional_branch", mode="after")
+    @field_validator("conditional_block", mode="after")
     @classmethod
-    def validate_conditional_branch(cls, v: ConditionalBlock | None) -> ConditionalBlock:
-        """Validate the conditional branch."""
+    def validate_conditional_block(cls, v: ConditionalBlock | None) -> ConditionalBlock:
+        """Validate the conditional block."""
         if v is None:
-            raise ValueError("Conditional branch is required")
+            raise ValueError("Conditional block is required for ConditionSteps")
         return v
 
     @property
-    def branch(self) -> ConditionalBlock:
-        """Get the branch for this step."""
-        return cast(ConditionalBlock, self.conditional_branch)
+    def block(self) -> ConditionalBlock:
+        """Get the conditional block for this step."""
+        return cast(ConditionalBlock, self.conditional_block)
 
     @override
     def describe(self) -> str:
         """Return a description of this step for logging purposes."""
         return (
             f"ConditionalStep(condition='{self.condition}', "
-            f"branch_type='{self.branch_state_type.value}' args={self.args})"
+            f"clause_type='{self.block_clause_type.value}' args={self.args})"
         )
 
     @override
@@ -495,16 +495,16 @@ class ConditionalStep(StepV2):
             raise NotImplementedError("Condition string not supported yet")
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         conditional_result = self.condition(**args)
-        next_branch_step_index = (
-            self.branch.clause_step_indexes[self.branch_index + 1]
-            if self.branch_index < len(self.branch.clause_step_indexes) - 1
-            else self.branch.clause_step_indexes[self.branch_index]
+        next_clause_step_index = (
+            self.block.clause_step_indexes[self.clause_index_in_block + 1]
+            if self.clause_index_in_block < len(self.block.clause_step_indexes) - 1
+            else self.block.clause_step_indexes[self.clause_index_in_block]
         )
         return ConditionalStepResult(
-            type=self.branch_state_type,
+            type=self.block_clause_type,
             conditional_result=conditional_result,
-            next_clause_step_index=next_branch_step_index,
-            end_condition_block_step_index=self.branch.clause_step_indexes[-1],
+            next_clause_step_index=next_clause_step_index,
+            end_condition_block_step_index=self.block.clause_step_indexes[-1],
         )
 
     @override
@@ -512,7 +512,7 @@ class ConditionalStep(StepV2):
         """Convert this ConditionalStep to a PlanStep."""
         fn_name = getattr(self.condition, "__name__", str(self.condition))
         return Step(
-            task=f"Conditional branch evaluation: {fn_name}",
+            task=f"Conditional clause evaluation: {fn_name}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=None,
             output=plan.step_output_name(self),
