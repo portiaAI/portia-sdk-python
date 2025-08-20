@@ -1358,7 +1358,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.75.8"
+version = "1.75.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1373,9 +1373,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8d/4e/48e3d6de19afe713223e3bc7009a2003501420de2a5d823c569cefbd9731/litellm-1.75.8.tar.gz", hash = "sha256:92061bd263ff8c33c8fff70ba92cd046adb7ea041a605826a915d108742fe59e", size = 10140384, upload-time = "2025-08-16T21:42:24.23Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/98/ea40c48fda5121af00e44c9c6d01a0cd8cb9987bb0ce91c6add917d9db9d/litellm-1.75.3.tar.gz", hash = "sha256:a6a0f33884f35a9391a9a4363043114d7f2513ab2e5c2e1fa54c56d695663764", size = 10104437, upload-time = "2025-08-08T14:58:09.423Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/82/c4d00fbeafd93c00dab6ea03f33cadd6a97adeb720ba1d89fc319e5cb10b/litellm-1.75.8-py3-none-any.whl", hash = "sha256:0bf004488df8506381ec6e35e1486e2870e8d578a7c3f2427cd497558ce07a2e", size = 8916305, upload-time = "2025-08-16T21:42:21.387Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/1e/8ef7e7ac7d33f900ae44e9e3a33d668783034e414aa4d7191ae3e4068ec5/litellm-1.75.3-py3-none-any.whl", hash = "sha256:0ff3752b1f1c07f8a4b9a364b1595e2147ae640f1e77cd8312e6f6a5ca0f34ec", size = 8870578, upload-time = "2025-08-08T14:58:06.766Z" },
 ]
 
 [[package]]
@@ -1770,7 +1770,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.99.9"
+version = "1.98.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1782,9 +1782,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/d2/ef89c6f3f36b13b06e271d3cc984ddd2f62508a0972c1cbcc8485a6644ff/openai-1.99.9.tar.gz", hash = "sha256:f2082d155b1ad22e83247c3de3958eb4255b20ccf4a1de2e6681b6957b554e92", size = 506992, upload-time = "2025-08-12T02:31:10.054Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/9d/52eadb15c92802711d6b6cf00df3a6d0d18b588f4c5ba5ff210c6419fc03/openai-1.98.0.tar.gz", hash = "sha256:3ee0fcc50ae95267fd22bd1ad095ba5402098f3df2162592e68109999f685427", size = 496695, upload-time = "2025-07-30T12:48:03.701Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/fb/df274ca10698ee77b07bff952f302ea627cc12dac6b85289485dd77db6de/openai-1.99.9-py3-none-any.whl", hash = "sha256:9dbcdb425553bae1ac5d947147bebbd630d91bbfc7788394d4c4f3a35682ab3a", size = 786816, upload-time = "2025-08-12T02:31:08.34Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/fe/f64631075b3d63a613c0d8ab761d5941631a470f6fa87eaaee1aa2b4ec0c/openai-1.98.0-py3-none-any.whl", hash = "sha256:b99b794ef92196829120e2df37647722104772d2a74d08305df9ced5f26eae34", size = 767713, upload-time = "2025-07-30T12:48:01.264Z" },
 ]
 
 [[package]]
@@ -2011,6 +2011,7 @@ dependencies = [
     { name = "litellm" },
     { name = "loguru", marker = "python_full_version < '4'" },
     { name = "mcp" },
+    { name = "openai" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "posthog" },
@@ -2125,6 +2126,7 @@ requires-dist = [
     { name = "mistralai", marker = "extra == 'mistral'", specifier = ">=1.2.5,<2" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = ">=1.2.5,<2" },
     { name = "mistralai", marker = "extra == 'tools-pdf-reader'", specifier = ">=1.2.5,<2" },
+    { name = "openai", specifier = ">=1.98,<1.99" },
     { name = "openpyxl", specifier = ">=3.1.5,<4" },
     { name = "pandas", specifier = ">=2.2.3,<3" },
     { name = "playwright", marker = "extra == 'all'", specifier = ">=1.49.0,<2" },
