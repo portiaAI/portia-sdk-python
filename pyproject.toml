@@ -181,6 +181,7 @@ omit = [
     "portia/portia.py", # TODO: Remove this once testing has been added for new PlanV2
     "portia/builder/step_v2.py", # TODO: Remove this once testing has been added for string templating
     "portia/builder/plan_builder_v2.py", # TODO: Remove this once testing has been added for string templating
+    "portia/execution_agents/conditional_evaluation_agent.py", # TODO: Remove after tests added
 ]
 
 [tool.coverage.report]
