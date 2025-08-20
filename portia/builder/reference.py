@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, override
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from portia.execution_agents.output import Output
 from portia.logger import logger
@@ -20,8 +20,12 @@ def default_step_name(step_index: int) -> str:
     return f"step_{step_index}"
 
 
-class Reference(ABC, BaseModel):
+class Reference(BaseModel, ABC):
     """A reference to a value."""
+
+    # Allow setting temporary/mock attributes in tests (e.g. patch.object(..., "get_value"))
+    # Without this, Pydantic v2 prevents setting non-field attributes on instances.
+    model_config = ConfigDict(extra="allow")
 
     @abstractmethod
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -34,7 +38,7 @@ class Reference(ABC, BaseModel):
         raise NotImplementedError  # pragma: no cover
 
 
-class StepOutput(Reference, BaseModel):
+class StepOutput(Reference):
     """A reference to the output of a previous step.
 
     When building your plan, you can use this class to reference the output of a previous step.
@@ -80,7 +84,7 @@ class StepOutput(Reference, BaseModel):
         return val
 
 
-class Input(Reference, BaseModel):
+class Input(Reference):
     """A reference to a plan input.
 
     When building your plan, you can specify plan inputs using the PlanBuilder.input() method. These
