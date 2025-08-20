@@ -115,7 +115,7 @@ Return the outcome and reason in the given format.
         ]
 
         model = self.config.get_introspection_model()
-        logger().trace(f"LLM call: introspection model={model!s}")
+        logger().trace("LLM call: introspection")
         return model.get_structured_response(
             schema=PreStepIntrospection,
             messages=[
@@ -158,7 +158,7 @@ Return the outcome and reason in the given format.
         ]
 
         model = self.config.get_introspection_model()
-        logger().trace(f"LLM call: introspection model={model!s}")
+        logger().trace("LLM call: introspection")
         return await model.aget_structured_response(
             schema=PreStepIntrospection,
             messages=[

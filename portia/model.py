@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from contextvars import ContextVar
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
@@ -125,13 +126,11 @@ class GenerativeModel(ABC):
 
     def _log_llm_call(self, messages: list[Message]) -> None:
         """Log TRACE level information about the LLM call."""
-        try:
+        with suppress(Exception):
             if messages:
                 content_preview = " ".join(msg.content.replace("\n", " ") for msg in messages)
                 preview = content_preview[:120]
                 logger().trace(f"LLM call: model={self!s} msg={preview!r}")
-        except Exception:  # noqa: BLE001, S110
-            pass  # pragma: no cover
 
     @abstractmethod
     def get_response(self, messages: list[Message]) -> Message:

@@ -91,7 +91,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 plan_inputs,
                 previous_errors,
             )
-            logger().trace(f"LLM call: planning model={self.model!s}")
+            logger().trace("LLM call: planning")
             response = self.model.get_structured_response(
                 schema=StepsOrError,
                 messages=[
@@ -173,7 +173,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 plan_inputs,
                 previous_errors,
             )
-            logger().trace(f"LLM call: planning model={self.model!s}")
+            logger().trace("LLM call: planning")
             response = await self.model.aget_structured_response(
                 schema=StepsOrError,
                 messages=[

@@ -101,7 +101,7 @@ class LLMTool(Tool[str | BaseModel]):
         """Run the LLMTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         messages = self._get_messages(task, task_data)
-        logger().trace(f"LLM call: llm-tool model={model!s}")
+        logger().trace("LLM call: llm-tool")
         if self.structured_output_schema:
             return model.get_structured_response(messages, self.structured_output_schema)
 
@@ -114,7 +114,7 @@ class LLMTool(Tool[str | BaseModel]):
         """Run the LLMTool asynchronously."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         messages = self._get_messages(task, task_data)
-        logger().trace(f"LLM call: llm-tool model={model!s}")
+        logger().trace("LLM call: llm-tool")
         if self.structured_output_schema:
             return await model.aget_structured_response(messages, self.structured_output_schema)
         response = await model.aget_response(messages)

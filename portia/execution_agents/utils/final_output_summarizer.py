@@ -116,16 +116,12 @@ class FinalOutputSummarizer:
                 fo_summary: str = Field(description="The summary of the plan output")
 
             msg = self.summarizer_and_structured_output_prompt + context
-            preview = msg.replace("\n", " ")[:120]
-            logger().trace(
-                f"LLM call: summarization (final output) model={model!s} msg={preview!r}"
-            )
+            logger().trace("LLM call: summarization (final output)")
             return model.get_structured_response(
                 [Message(content=msg, role="user")],
                 SchemaWithSummary,
             )
         msg = self.summarizer_only_prompt + context
-        preview = msg.replace("\n", " ")[:120]
-        logger().trace(f"LLM call: summarization (final output) model={model!s} msg={preview!r}")
+        logger().trace("LLM call: summarization (final output)")
         response = model.get_response([Message(content=msg, role="user")])
         return str(response.content) if response.content else None
