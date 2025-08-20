@@ -2747,10 +2747,10 @@ class Portia:
                 isinstance(result, ConditionalStepResult)
                 and result.type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
             ):
-                logger().info("Entering new conditional branch")
+                logger().debug("Entering new conditional block")
                 branch_stack.append(result)
                 if not result.conditional_result:
-                    logger().info("Branch conditional is false, jumping to next branch")
+                    logger().debug("Conditional clause is false, jumping to next clause")
                     jump_to_step_index = result.next_clause_step_index
             elif (
                 isinstance(result, ConditionalStepResult)
@@ -2758,21 +2758,21 @@ class Portia:
             ):
                 stack_state = branch_stack[-1]
                 if stack_state.conditional_result:
-                    logger().info("Previous conditional branch has already run, jumping to exit")
+                    logger().debug("Previous conditional clause has already run, jumping to exit")
                     # One of the branches has already run, so we jump to exit
                     jump_to_step_index = stack_state.end_condition_block_step_index
                 elif result.conditional_result:
-                    logger().info("Branch conditional is true, evaluating steps")
+                    logger().debug("Conditional clause is true, evaluating steps")
                     # Overwrite the stack state with the new result
                     branch_stack[-1] = result
                 elif not result.conditional_result:
-                    logger().info("Branch conditional is false, jumping to next branch")
+                    logger().debug("Conditional clause is false, jumping to next clause or exit")
                     jump_to_step_index = result.next_clause_step_index
             elif (
                 isinstance(result, ConditionalStepResult)
                 and result.type == ConditionalBlockClauseType.END_CONDITION_BLOCK
             ):
-                logger().info("Exiting conditional branch")
+                logger().debug("Exiting conditional branch")
                 branch_stack.pop()
 
             output_value = LocalDataValue(value=result)
@@ -2824,7 +2824,7 @@ class Portia:
             if jump_to_step_index is None and i < len(plan.steps) - 1:
                 run_data.plan_run.current_step_index += 1
             if jump_to_step_index is not None:
-                logger().info(f"Jumping to step {jump_to_step_index} from {i}")
+                logger().debug(f"Jumping to step {jump_to_step_index} from {i}")
                 run_data.plan_run.current_step_index = jump_to_step_index
             logger().info(f"Completed step {i}, result: {result}")
 
