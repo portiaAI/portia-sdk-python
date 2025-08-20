@@ -24,6 +24,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from urllib.parse import urlparse
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
 from browser_use.browser.context import BrowserContextConfig
@@ -293,6 +294,10 @@ class BrowserTool(Tool[str | BaseModel]):
         self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
+        # Validate URL against allowed domains if specified
+        if self.allowed_domains:
+            self._validate_url_domain(url)
+        
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
@@ -361,6 +366,34 @@ class BrowserTool(Tool[str | BaseModel]):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop.run_until_complete(run_browser_tasks())
+    
+    def _validate_url_domain(self, url: str) -> None:
+        """Validate that the URL domain is in the allowed domains list.
+        
+        Args:
+            url: The URL to validate
+            
+        Raises:
+            ValueError: If the URL domain is not in allowed domains
+        """
+        if not self.allowed_domains:
+            return
+            
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.lower()
+        
+        # Remove port if present
+        if ':' in domain:
+            domain = domain.split(':')[0]
+        
+        # Check if domain or any parent domain is in allowed list
+        domain_parts = domain.split('.')
+        for i in range(len(domain_parts)):
+            check_domain = '.'.join(domain_parts[i:])
+            if check_domain in [d.lower() for d in self.allowed_domains]:
+                return
+        
+        raise ValueError(f"URL domain '{domain}' is not in allowed domains: {self.allowed_domains}")
 
 
 class BrowserToolForUrl(BrowserTool):
@@ -444,7 +477,7 @@ class BrowserToolForUrl(BrowserTool):
         )
         self.allowed_domains = allowed_domains
         self.url = url
-
+    
     def run(  # type: ignore reportIncompatibleMethodOverride
         self,
         ctx: ToolRunContext,
@@ -454,6 +487,11 @@ class BrowserToolForUrl(BrowserTool):
         """Run the BrowserToolForUrl."""
         # Use the URL provided during initialization, or about:blank as fallback
         url_to_use = self.url or "about:blank"
+        
+        # Validate URL against allowed domains if specified
+        if self.allowed_domains and url_to_use != "about:blank":
+            self._validate_url_domain(url_to_use)
+        
         return super().run(ctx, url_to_use, task, task_data)
 
 

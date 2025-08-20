@@ -511,47 +511,112 @@ def test_browserbase_provider_setup_browser(
 
 def test_browser_tool_for_url_init_default_parameters() -> None:
     """Test BrowserToolForUrl initialization with default parameters."""
-    url = "https://example.com"
-    tool = BrowserToolForUrl(url=url)
+    tool = BrowserToolForUrl()
 
-    assert tool.url == url
-    assert tool.id == "browser_tool_for_url_example_com"
-    assert tool.name == "Browser Tool for example_com"
+    assert tool.id == "browser_tool"
+    assert tool.name == "Browser Tool"
     assert tool.description == (
-        f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete tasks."
+        "General purpose browser tool. Can be used to navigate to a URL and complete tasks. "
+        "Should only be used if the task requires a browser and you are sure of the URL. "
+        "This tool handles a full end to end task. It is capable of doing multiple things "
+        "across different URLs within the same root domain as part of the end to end task. As "
+        "a result, do not call this tool more than once back to back unless it is for "
+        "different root domains - just call it once with the combined task and the URL set "
+        "to the root domain."
     )
     assert tool.args_schema == BrowserToolForUrlSchema
 
 
 def test_browser_tool_for_url_init_custom_parameters() -> None:
     """Test BrowserToolForUrl initialization with custom parameters."""
-    url = "https://example.com"
     custom_id = "custom_browser_tool"
     custom_name = "Custom Browser Tool"
     custom_description = "Custom description for browser tool"
+    allowed_domains = ["example.com", "test.com"]
 
     tool = BrowserToolForUrl(
-        url=url,
         id=custom_id,
         name=custom_name,
         description=custom_description,
+        allowed_domains=allowed_domains,
     )
 
-    assert tool.url == url
     assert tool.id == custom_id
     assert tool.name == custom_name
     assert tool.description == custom_description
     assert tool.args_schema == BrowserToolForUrlSchema
+    assert tool.allowed_domains == allowed_domains
 
 
 def test_browser_tool_for_url_init_subdomain_handling() -> None:
     """Test BrowserToolForUrl initialization correctly handles subdomains."""
-    url = "https://sub.example.com"
-    tool = BrowserToolForUrl(url=url)
+    allowed_domains = ["sub.example.com"]
+    tool = BrowserToolForUrl(allowed_domains=allowed_domains)
 
-    assert tool.url == url
-    assert tool.id == "browser_tool_for_url_sub_example_com"
-    assert tool.name == "Browser Tool for sub_example_com"
+    assert tool.id == "browser_tool"
+    assert tool.name == "Browser Tool"
+    assert tool.allowed_domains == allowed_domains
+
+
+def test_browser_tool_for_url_allowed_domains_validation() -> None:
+    """Test BrowserToolForUrl allowed domains validation."""
+    allowed_domains = ["example.com", "test.com"]
+    tool = BrowserToolForUrl(allowed_domains=allowed_domains)
+    context = get_test_tool_context()
+
+    # Test valid domain
+    result = tool.run(context, "https://example.com", "test task")
+    assert result is not None
+
+    # Test valid subdomain
+    result = tool.run(context, "https://sub.example.com", "test task")
+    assert result is not None
+
+    # Test invalid domain
+    with pytest.raises(ValueError, match="URL domain 'invalid.com' is not in allowed domains"):
+        tool.run(context, "https://invalid.com", "test task")
+
+
+def test_browser_tool_for_url_allowed_domains_empty() -> None:
+    """Test BrowserToolForUrl with empty allowed domains allows all domains."""
+    tool = BrowserToolForUrl(allowed_domains=[])
+    context = get_test_tool_context()
+
+    # Should allow any domain when allowed_domains is empty
+    result = tool.run(context, "https://any-domain.com", "test task")
+    assert result is not None
+
+
+def test_browser_tool_for_url_no_allowed_domains() -> None:
+    """Test BrowserToolForUrl with no allowed domains allows all domains."""
+    tool = BrowserToolForUrl()
+    context = get_test_tool_context()
+
+    # Should allow any domain when allowed_domains is None
+    result = tool.run(context, "https://any-domain.com", "test task")
+    assert result is not None
+
+
+def test_browser_tool_for_url_invalid_domain_format() -> None:
+    """Test BrowserToolForUrl raises error for invalid allowed domains."""
+    with pytest.raises(ValueError, match="Invalid domain in allowed_domains"):
+        BrowserToolForUrl(allowed_domains=["", "valid.com"])
+
+    with pytest.raises(ValueError, match="Invalid domain in allowed_domains"):
+        BrowserToolForUrl(allowed_domains=[123, "valid.com"])  # type: ignore
+
+
+def test_browser_tool_for_url_run_method_signature() -> None:
+    """Test BrowserToolForUrl run method accepts URL parameter."""
+    tool = BrowserToolForUrl()
+    context = get_test_tool_context()
+    
+    # Test that run method accepts URL parameter
+    with patch.object(tool, '_BrowserTool__run') as mock_run:
+        mock_run.return_value = "test result"
+        result = tool.run(context, "https://example.com", "test task")
+        mock_run.assert_called_once_with(context, "https://example.com", "test task", None)
+        assert result == "test result"
 
 
 class TestStructuredOutputSchema(BaseModel):
@@ -794,3 +859,101 @@ def test_browser_tool_multiple_calls(
         project_id="test_project",
         status="REQUEST_RELEASE",
     )
+
+
+class TestBrowserToolAllowedDomains:
+    """Test class for browser tool allowed domains functionality."""
+
+    def test_browser_tool_for_url_executes_with_domain_restrictions(self) -> None:
+        """Test BrowserToolForUrl with domain restrictions executes successfully."""
+        allowed_domains = ["example.com"]
+        tool = BrowserToolForUrl(url="https://example.com", allowed_domains=allowed_domains)
+        context = get_test_tool_context()
+
+        # Mock successful task execution
+        mock_task_response = BrowserTaskOutput(
+            task_output="Task completed successfully",
+            human_login_required=False,
+        )
+
+        mock_task_result = MagicMock()
+        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+        mock_run = AsyncMock(return_value=mock_task_result)
+
+        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+            mock_agent_instance = MagicMock()
+            mock_agent_instance.run = mock_run
+            mock_agent.return_value = mock_agent_instance
+
+            # This should not raise an error
+            result = tool.run(context, "test task")
+            assert result == "Task completed successfully"
+
+    def test_browser_tool_with_allowed_domains_success(self) -> None:
+        """Test BrowserTool with allowed domains executes successfully."""
+        allowed_domains = ["example.com"]
+        tool = BrowserTool(allowed_domains=allowed_domains)
+        context = get_test_tool_context()
+
+        mock_task_response = BrowserTaskOutput(
+            task_output="Task completed successfully", 
+            human_login_required=False,
+        )
+
+        mock_task_result = MagicMock()
+        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+        mock_run = AsyncMock(return_value=mock_task_result)
+
+        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+            mock_agent_instance = MagicMock()
+            mock_agent_instance.run = mock_run
+            mock_agent.return_value = mock_agent_instance
+
+            result = tool.run(context, "https://example.com", "test task")
+            assert result == "Task completed successfully"
+
+    def test_browser_tool_for_url_domain_validation_fails(self) -> None:
+        """Test BrowserToolForUrl fails with invalid domain."""
+        allowed_domains = ["example.com"]
+        tool = BrowserToolForUrl(url="https://invalid.com", allowed_domains=allowed_domains)
+        context = get_test_tool_context()
+
+        with pytest.raises(ValueError, match="URL domain 'invalid.com' is not in allowed domains"):
+            tool.run(context, "test task")
+
+    def test_browser_tool_allowed_domains_subdomain_validation(self) -> None:
+        """Test BrowserTool allows subdomains of allowed domains."""
+        allowed_domains = ["example.com"]
+        tool = BrowserTool(allowed_domains=allowed_domains)
+        context = get_test_tool_context()
+
+        mock_task_response = BrowserTaskOutput(
+            task_output="Task completed successfully",
+            human_login_required=False,
+        )
+
+        mock_task_result = MagicMock()
+        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+        mock_run = AsyncMock(return_value=mock_task_result)
+
+        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+            mock_agent_instance = MagicMock()
+            mock_agent_instance.run = mock_run
+            mock_agent.return_value = mock_agent_instance
+
+            # Should allow subdomain
+            result = tool.run(context, "https://sub.example.com", "test task")
+            assert result == "Task completed successfully"
+
+    def test_browser_tool_allowed_domains_initialization_validation(self) -> None:
+        """Test BrowserTool validates allowed_domains during initialization."""
+        # Should not raise error for valid domains
+        tool = BrowserTool(allowed_domains=["example.com", "test.org"])
+        assert tool.allowed_domains == ["example.com", "test.org"]
+
+        # Should raise error for invalid domains
+        with pytest.raises(ValueError, match="Invalid domain in allowed_domains"):
+            BrowserTool(allowed_domains=["", "valid.com"])
+
+        with pytest.raises(ValueError, match="Invalid domain in allowed_domains"):
+            BrowserTool(allowed_domains=[123, "valid.com"])  # type: ignore
