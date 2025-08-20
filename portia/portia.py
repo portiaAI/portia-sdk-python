@@ -29,7 +29,7 @@ from uuid import UUID
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.builder.conditionals import BranchStateType, ConditionalStepResult
+from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import ReferenceValue
 from portia.clarification import (
@@ -2746,32 +2746,32 @@ class Portia:
             # TODO: (SS) We shouldnt jump from here, we should jump at the end of the loop  # noqa: E501, FIX002, TD002, TD003
             if (
                 isinstance(result, ConditionalStepResult)
-                and result.type == BranchStateType.ENTER_BRANCH
+                and result.type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
             ):
                 logger().info("New branch")
                 branch_stack.append(result)
                 if not result.conditional_result:
                     logger().info("Branch conditional is false, jumping to next branch")
-                    jump_to_step_index = result.next_branch_step_index
+                    jump_to_step_index = result.next_clause_step_index
             elif (
                 isinstance(result, ConditionalStepResult)
-                and result.type == BranchStateType.ALTERNATE_BRANCH
+                and result.type == ConditionalBlockClauseType.ALTERNATE_CLAUSE
             ):
                 stack_state = branch_stack[-1]
                 if stack_state.conditional_result:
                     logger().info("Previous branch has already run, jumping to exit")
                     # One of the branches has already run, so we jump to exit
-                    jump_to_step_index = stack_state.branch_exit_step_index
+                    jump_to_step_index = stack_state.end_condition_block_step_index
                 elif result.conditional_result:
                     logger().info("Branch conditional is true, evaluating steps")
                     # Overwrite the stack state with the new result
                     branch_stack[-1] = result
                 elif not result.conditional_result:
                     logger().info("Branch conditional is false, jumping to next branch")
-                    jump_to_step_index = result.next_branch_step_index
+                    jump_to_step_index = result.next_clause_step_index
             elif (
                 isinstance(result, ConditionalStepResult)
-                and result.type == BranchStateType.EXIT_BRANCH
+                and result.type == ConditionalBlockClauseType.END_CONDITION_BLOCK
             ):
                 logger().info("Exiting branch")
                 branch_stack.pop()

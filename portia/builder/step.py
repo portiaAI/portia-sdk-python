@@ -1,38 +1,36 @@
-"""Interface for steps that are run as part of a PlanV2."""
+"""Interface for steps that are run as part of a PortiaPlan."""
 
 from __future__ import annotations
 
 import itertools
-import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast, override
 
 from langsmith import traceable
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from portia.builder.conditionals import (
     ConditionalBlock,
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
-from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
+from portia.builder.reference import Reference, ReferenceValue
 from portia.clarification import Clarification
 from portia.errors import ToolNotFoundError
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Step, Variable
+from portia.plan import Step as PlanStep
+from portia.plan import Variable
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.portia_plan import PortiaPlan
     from portia.portia import RunContext
 
 
-class StepV2(BaseModel, ABC):
+class Step(BaseModel, ABC):
     """Interface for steps that are run as part of a plan."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     step_name: str = Field(description="The name of the step.")
     conditional_branch: ConditionalBlock | None = Field(
@@ -42,22 +40,22 @@ class StepV2(BaseModel, ABC):
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
         """Execute the step."""
-        raise NotImplementedError  # pragma: no cover
+        raise NotImplementedError
 
     @abstractmethod
     def describe(self) -> str:
         """Return a description of this step for logging purposes."""
-        raise NotImplementedError  # pragma: no cover
+        raise NotImplementedError
 
     @abstractmethod
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this step to a Step from plan.py.
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+        """Convert this step to a PlanStep from plan.py.
 
-        A Step is the legacy representation of a step in the plan, and is still used in the
+        A PlanStep is the legacy representation of a step in the plan, and is still used in the
         Portia backend. If this step doesn't need to be represented in the plan sent to the Portia
         backend, return None.
         """
-        raise NotImplementedError  # pragma: no cover
+        raise NotImplementedError
 
     def _resolve_input_reference(
         self,
@@ -65,35 +63,6 @@ class StepV2(BaseModel, ABC):
         run_data: RunContext,
     ) -> Any | ReferenceValue | None:  # noqa: ANN401
         """Resolve input values by retrieving the ReferenceValue for any Reference inputs."""
-        if isinstance(_input, str):
-            # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
-            # from _input if it's a string
-            matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", _input)
-
-            # If there are matches, replace each {{ StepOutput(var_name) }}
-            # or {{ Input(var_name) }} with its resolved value.
-            if isinstance(_input, str) and matches:
-                result = _input
-                for ref_type, var_name in matches:
-                    var_name = var_name.strip()  # noqa: PLW2901
-                    if ref_type == "StepOutput" and var_name.isdigit():
-                        var_name = int(var_name)  # noqa: PLW2901
-                    ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
-                    resolved = self._resolve_input_reference(ref, run_data)
-                    resolved_val = (
-                        resolved.value.full_value(run_data.portia.storage)
-                        if isinstance(resolved, ReferenceValue)
-                        else resolved
-                    )
-                    pattern = (
-                        r"\{\{\s*"
-                        + re.escape(ref_type)
-                        + r"\s*\(\s*"
-                        + re.escape(str(var_name))
-                        + r"\s*\)\s*\}\}"
-                    )
-                    result = re.sub(pattern, str(resolved_val), result, count=1)
-                return result
         return _input.get_value(run_data) if isinstance(_input, Reference) else _input
 
     def _get_value_for_input(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
@@ -107,7 +76,7 @@ class StepV2(BaseModel, ABC):
     def _resolve_input_names_for_printing(
         self,
         _input: Any,  # noqa: ANN401
-        plan: PlanV2,
+        plan: PortiaPlan,
     ) -> Any | ReferenceValue | None:  # noqa: ANN401
         """Resolve inputs to their value (if not a reference) or to their name (if reference).
 
@@ -124,11 +93,13 @@ class StepV2(BaseModel, ABC):
             return [self._resolve_input_names_for_printing(v, plan) for v in _input]
         return _input
 
-    def _inputs_to_legacy_plan_variables(self, inputs: list[Any], plan: PlanV2) -> list[Variable]:
+    def _inputs_to_legacy_plan_variables(
+        self, inputs: list[Any], plan: PortiaPlan
+    ) -> list[Variable]:
         """Convert a list of inputs to a list of legacy plan variables."""
         return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
 
-    def _get_legacy_condition(self, plan: PlanV2) -> str | None:
+    def _get_legacy_condition(self, plan: PortiaPlan) -> str | None:
         """Get the legacy condition for a step."""
         if self.conditional_branch is None:
             return None
@@ -186,7 +157,7 @@ class StepV2(BaseModel, ABC):
         return "If " + " and ".join(legacy_condition_strings) if legacy_condition_strings else None
 
 
-class LLMStep(StepV2):
+class LLMStep(Step):
     """A step that runs a given task through an LLM (without any tools)."""
 
     task: str = Field(description="The task to perform.")
@@ -238,9 +209,9 @@ class LLMStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this LLMStep to a Step."""
-        return Step(
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+        """Convert this LLMStep to a PlanStep."""
+        return PlanStep(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=LLMTool.LLM_TOOL_ID,
@@ -250,7 +221,7 @@ class LLMStep(StepV2):
         )
 
 
-class ToolRun(StepV2):
+class ToolRun(Step):
     """A step that calls a tool with the given args (no LLM involved, just a direct tool call)."""
 
     tool: str | Tool = Field(
@@ -307,11 +278,7 @@ class ToolRun(StepV2):
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
 
-        if (
-            self.output_schema
-            and not isinstance(output, self.output_schema)
-            and not isinstance(output, Clarification)
-        ):
+        if self.output_schema and not isinstance(output, self.output_schema):
             model = run_data.portia.config.get_default_model()
             output = await model.aget_structured_response(
                 [
@@ -325,12 +292,12 @@ class ToolRun(StepV2):
         return output
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this ToolCall to a Step."""
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+        """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
-        return Step(
+        return PlanStep(
             task=f"Use tool {self._tool_name()} with inputs: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=self._tool_name(),
@@ -340,7 +307,7 @@ class ToolRun(StepV2):
         )
 
 
-class FunctionCall(StepV2):
+class FunctionCall(Step):
     """Calls a function with the given args (no LLM involved, just a direct function call)."""
 
     function: Callable[..., Any] = Field(description=("The function to call."))
@@ -372,11 +339,7 @@ class FunctionCall(StepV2):
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
 
-        if (
-            self.output_schema
-            and not isinstance(output, self.output_schema)
-            and not isinstance(output, Clarification)
-        ):
+        if self.output_schema and not isinstance(output, self.output_schema):
             model = run_data.portia.config.get_default_model()
             output = await model.aget_structured_response(
                 [
@@ -390,13 +353,13 @@ class FunctionCall(StepV2):
         return output
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this ToolCall to a Step."""
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+        """Convert this ToolCall to a PlanStep."""
         inputs_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
         fn_name = getattr(self.function, "__name__", str(self.function))
-        return Step(
+        return PlanStep(
             task=f"Run function {fn_name} with args: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=f"local_function_{fn_name}",
@@ -406,7 +369,7 @@ class FunctionCall(StepV2):
         )
 
 
-class SingleToolAgent(StepV2):
+class SingleToolAgent(Step):
     """A step where an LLM agent uses a single tool (calling it only once) to complete a task."""
 
     task: str = Field(description="The task to perform.")
@@ -440,9 +403,9 @@ class SingleToolAgent(StepV2):
         return output_obj.get_value()
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this SingleToolAgent to a Step."""
-        return Step(
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
+        """Convert this SingleToolAgent to a PlanStep."""
+        return PlanStep(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=self.tool,
@@ -452,7 +415,7 @@ class SingleToolAgent(StepV2):
         )
 
 
-class ConditionalStep(StepV2):
+class ConditionalStep(Step):
     """A step that checks a condition."""
 
     condition: Callable[..., bool] | str = Field(
@@ -467,7 +430,7 @@ class ConditionalStep(StepV2):
     branch_index: int = Field(description="The index of the clause in the condition block")
     branch_state_type: ConditionalBlockClauseType
 
-    @field_validator("conditional_branch", mode="after")
+    @field_validator("conditional_branch")
     @classmethod
     def validate_conditional_branch(cls, v: ConditionalBlock | None) -> ConditionalBlock:
         """Validate the conditional branch."""
@@ -508,10 +471,10 @@ class ConditionalStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_legacy_step(self, plan: PortiaPlan) -> PlanStep:
         """Convert this ConditionalStep to a PlanStep."""
         fn_name = getattr(self.condition, "__name__", str(self.condition))
-        return Step(
+        return PlanStep(
             task=f"Conditional branch evaluation: {fn_name}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=None,
