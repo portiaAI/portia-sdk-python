@@ -149,6 +149,23 @@ class BrowserTaskOutput(BaseModel, Generic[T]):
     )
 
 
+class SimpleBrowserTaskOutput(BaseModel, Generic[T]):
+    """Simplified output schema for browser task execution without authentication fields.
+
+    This class represents the response from executing a browser task on pages
+    that do not require authentication.
+
+    Attributes:
+        task_output (T): The result or output from executing the requested task.
+
+    """
+
+    task_output: T = Field(
+        ...,
+        description="The output from the task.",
+    )
+
+
 class BrowserInfrastructureOption(Enum):
     """Enumeration of supported browser infrastructure providers.
 
