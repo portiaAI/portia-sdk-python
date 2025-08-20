@@ -29,6 +29,7 @@ from uuid import UUID
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field
 
+from portia.builder.conditionals import BranchStateType, ConditionalStepResult
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import ReferenceValue
 from portia.clarification import (
@@ -2721,14 +2722,16 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:
+    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
 
         output_value = self._get_last_executed_step_output(run_data.legacy_plan, run_data.plan_run)
+        branch_stack: list[ConditionalStepResult] = []
         for i, step in enumerate(plan.steps):
             if i < run_data.plan_run.current_step_index:
+                logger().debug(f"Skipping step {i}: {step.describe()}")
                 continue
 
             logger().info(f"Starting step {i}: {step.describe()}")
@@ -2739,6 +2742,39 @@ class Portia:
                 return self._handle_execution_error(
                     run_data.plan_run, run_data.legacy_plan, i, step.to_legacy_step(plan), e
                 )
+            jump_to_step_index: int | None = None
+            # TODO: (SS) We shouldnt jump from here, we should jump at the end of the loop  # noqa: E501, FIX002, TD002, TD003
+            if (
+                isinstance(result, ConditionalStepResult)
+                and result.type == BranchStateType.ENTER_BRANCH
+            ):
+                logger().info("New branch")
+                branch_stack.append(result)
+                if not result.conditional_result:
+                    logger().info("Branch conditional is false, jumping to next branch")
+                    jump_to_step_index = result.next_branch_step_index
+            elif (
+                isinstance(result, ConditionalStepResult)
+                and result.type == BranchStateType.ALTERNATE_BRANCH
+            ):
+                stack_state = branch_stack[-1]
+                if stack_state.conditional_result:
+                    logger().info("Previous branch has already run, jumping to exit")
+                    # One of the branches has already run, so we jump to exit
+                    jump_to_step_index = stack_state.branch_exit_step_index
+                elif result.conditional_result:
+                    logger().info("Branch conditional is true, evaluating steps")
+                    # Overwrite the stack state with the new result
+                    branch_stack[-1] = result
+                elif not result.conditional_result:
+                    logger().info("Branch conditional is false, jumping to next branch")
+                    jump_to_step_index = result.next_branch_step_index
+            elif (
+                isinstance(result, ConditionalStepResult)
+                and result.type == BranchStateType.EXIT_BRANCH
+            ):
+                logger().info("Exiting branch")
+                branch_stack.pop()
 
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
@@ -2786,8 +2822,11 @@ class Portia:
                 )
 
             # Don't increment current step beyond the last step
-            if i < len(plan.steps) - 1:
+            if jump_to_step_index is None and i < len(plan.steps) - 1:
                 run_data.plan_run.current_step_index += 1
+            if jump_to_step_index is not None:
+                logger().info(f"Jumping to step {jump_to_step_index} from {i}")
+                run_data.plan_run.current_step_index = jump_to_step_index
             logger().info(f"Completed step {i}, result: {result}")
 
         return self._post_plan_run_execution(

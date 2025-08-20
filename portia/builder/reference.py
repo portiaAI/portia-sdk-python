@@ -20,7 +20,7 @@ def default_step_name(step_index: int) -> str:
     return f"step_{step_index}"
 
 
-class Reference(ABC):
+class Reference(ABC, BaseModel):
     """A reference to a value."""
 
     @abstractmethod
@@ -34,7 +34,7 @@ class Reference(ABC):
         raise NotImplementedError  # pragma: no cover
 
 
-class StepOutput(Reference):
+class StepOutput(Reference, BaseModel):
     """A reference to the output of a previous step.
 
     When building your plan, you can use this class to reference the output of a previous step.
@@ -51,7 +51,7 @@ class StepOutput(Reference):
 
     def __init__(self, step: str | int) -> None:
         """Initialize the step output."""
-        self.step = step
+        super().__init__(step=step)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -80,7 +80,7 @@ class StepOutput(Reference):
         return val
 
 
-class Input(Reference):
+class Input(Reference, BaseModel):
     """A reference to a plan input.
 
     When building your plan, you can specify plan inputs using the PlanBuilder.input() method. These
@@ -95,7 +95,7 @@ class Input(Reference):
 
     def __init__(self, name: str) -> None:
         """Initialize the input."""
-        self.name = name
+        super().__init__(name=name)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:

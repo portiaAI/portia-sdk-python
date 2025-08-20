@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 from langsmith import traceable
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from portia.builder.conditionals import BranchStateType, ConditionalBranch, ConditionalStepResult
 from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
 from portia.clarification import Clarification
 from portia.errors import ToolNotFoundError
@@ -29,6 +31,9 @@ class StepV2(BaseModel, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     step_name: str = Field(description="The name of the step.")
+    conditional_branch: ConditionalBranch | None = Field(
+        default=None, description="The conditional branch this step is part of."
+    )
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
@@ -119,6 +124,63 @@ class StepV2(BaseModel, ABC):
         """Convert a list of inputs to a list of legacy plan variables."""
         return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
 
+    def _get_legacy_condition(self, plan: PlanV2) -> str | None:
+        """Get the legacy condition for a step."""
+        if self.conditional_branch is None:
+            return None
+        step_names = [s.step_name for s in plan.steps]
+        current_step_index = step_names.index(self.step_name)
+
+        def get_conditional_for_nested_branch(branch: ConditionalBranch) -> str | None:
+            active_branch_step_index = next(
+                itertools.dropwhile(
+                    # First branch step index where the current step index is greater
+                    # than the branch step index e.g. for branch step indexes [1, 8, 12]
+                    # and current step index 2, the active branch is 1
+                    lambda x: current_step_index < x,
+                    reversed(branch.branch_step_indexes),
+                ),
+                None,
+            )
+            if active_branch_step_index is None:
+                raise ValueError(f"Cannot determine active conditional for step {self.step_name}")
+
+            if (
+                current_step_index == branch.branch_step_indexes[0]
+                or current_step_index == branch.branch_step_indexes[-1]
+            ):
+                # The step is the `if_` or the `endif` step, so no new condition is needed
+                # as this will always be evaluated at this 'depth' of the plan branching.
+                return None
+
+            # All previous branch conditions must be false for this step to get run
+            previous_branch_step_indexes = itertools.takewhile(
+                lambda x: x < current_step_index,
+                itertools.filterfalse(
+                    lambda x: x == active_branch_step_index, branch.branch_step_indexes
+                ),
+            )
+            condition_str = " and ".join(
+                f"{plan.step_output_name(i)} is false" for i in previous_branch_step_indexes
+            )
+            if current_step_index not in branch.branch_step_indexes:
+                # The step is a non-conditional step within a branch, so we need to make the
+                # active branch condition was true.
+                condition_str = f"{plan.step_output_name(active_branch_step_index)} is true" + (
+                    f" and {condition_str}" if condition_str else ""
+                )
+
+            return condition_str
+
+        legacy_condition_strings = []
+        current_branch = self.conditional_branch
+        while current_branch is not None:
+            legacy_condition_string = get_conditional_for_nested_branch(current_branch)
+            if legacy_condition_string is not None:
+                legacy_condition_strings.append(legacy_condition_string)
+            current_branch = current_branch.parent_branch
+        return "If " + " and ".join(legacy_condition_strings) if legacy_condition_strings else None
+
 
 class LLMStep(StepV2):
     """A step that runs a given task through an LLM (without any tools)."""
@@ -180,6 +242,7 @@ class LLMStep(StepV2):
             tool_id=LLMTool.LLM_TOOL_ID,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
         )
 
 
@@ -269,6 +332,7 @@ class ToolRun(StepV2):
             tool_id=self._tool_name(),
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
         )
 
 
@@ -334,6 +398,7 @@ class FunctionCall(StepV2):
             tool_id=f"local_function_{fn_name}",
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
         )
 
 
@@ -379,4 +444,73 @@ class SingleToolAgent(StepV2):
             tool_id=self.tool,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class ConditionalStep(StepV2):
+    """A step that checks a condition."""
+
+    condition: Callable[..., bool] | str = Field(
+        description=(
+            "The condition to check. If evaluated to true, the steps within this part "
+            "of the branch will be evaluated - otherwise they will be skipped."
+        )
+    )
+    args: dict[str, Reference | Any] = Field(
+        default_factory=dict, description="The args to check the condition with."
+    )
+    branch_index: int = Field(description="The index of the clause in the condition block")
+    branch_state_type: BranchStateType
+
+    @field_validator("conditional_branch", mode="after")
+    @classmethod
+    def validate_conditional_branch(cls, v: ConditionalBranch | None) -> ConditionalBranch:
+        """Validate the conditional branch."""
+        if v is None:
+            raise ValueError("Conditional branch is required")
+        return v
+
+    @property
+    def branch(self) -> ConditionalBranch:
+        """Get the branch for this step."""
+        return cast(ConditionalBranch, self.conditional_branch)
+
+    @override
+    def describe(self) -> str:
+        """Return a description of this step for logging purposes."""
+        return (
+            f"ConditionalStep(condition='{self.condition}', "
+            f"branch_type='{self.branch_state_type.value}' args={self.args})"
+        )
+
+    @override
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+        """Run the conditional step."""
+        if isinstance(self.condition, str):
+            raise NotImplementedError("Condition string not supported yet")
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+        conditional_result = self.condition(**args)
+        next_branch_step_index = (
+            self.branch.branch_step_indexes[self.branch_index + 1]
+            if self.branch_index < len(self.branch.branch_step_indexes) - 1
+            else self.branch.branch_step_indexes[self.branch_index]
+        )
+        return ConditionalStepResult(
+            type=self.branch_state_type,
+            conditional_result=conditional_result,
+            next_branch_step_index=next_branch_step_index,
+            branch_exit_step_index=self.branch.branch_step_indexes[-1],
+        )
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this ConditionalStep to a PlanStep."""
+        fn_name = getattr(self.condition, "__name__", str(self.condition))
+        return Step(
+            task=f"Conditional branch evaluation: {fn_name}",
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
+            tool_id=None,
+            output=plan.step_output_name(self),
+            condition=self._get_legacy_condition(plan),
         )

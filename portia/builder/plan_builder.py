@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from portia.builder.conditionals import BranchStateType, ConditionalBranch
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
-from portia.builder.step_v2 import FunctionCall, LLMStep, SingleToolAgent, ToolRun
+from portia.builder.step_v2 import ConditionalStep, FunctionCall, LLMStep, SingleToolAgent, ToolRun
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:
@@ -15,6 +16,10 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from portia.tool import Tool
+
+
+class PlanBuilderError(ValueError):
+    """Error in Plan definition."""
 
 
 class PlanBuilderV2:
@@ -28,6 +33,7 @@ class PlanBuilderV2:
 
         """
         self.plan = PlanV2(steps=[], label=label)
+        self._conditional_stack: list[ConditionalBranch] = []
 
     def input(
         self,
@@ -47,6 +53,97 @@ class PlanBuilderV2:
         self.plan.plan_inputs.append(
             PlanInput(name=name, description=description, value=default_value)
         )
+        return self
+
+    @property
+    def _current_conditional_branch(self) -> ConditionalBranch | None:
+        """Get the current conditional branch."""
+        return self._conditional_stack[-1] if len(self._conditional_stack) > 0 else None
+
+    def if_(
+        self,
+        condition: Callable[..., bool] | str,
+        args: dict[str, Any] | None = None,
+    ) -> PlanBuilderV2:
+        """Add a step that checks a condition."""
+        parent_branch = self._current_conditional_branch
+        conditional_branch = ConditionalBranch(
+            branch_step_indexes=[len(self.plan.steps)],
+            parent_branch=parent_branch,
+        )
+        self._conditional_stack.append(conditional_branch)
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=condition,
+                args=args or {},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_branch=conditional_branch,
+                branch_index=0,
+                branch_state_type=BranchStateType.ENTER_BRANCH,
+            )
+        )
+        return self
+
+    def else_if_(
+        self,
+        condition: Callable[..., bool],
+        args: dict[str, Any] | None = None,
+    ) -> PlanBuilderV2:
+        """Add a step that checks a condition."""
+        if len(self._conditional_stack) == 0:
+            raise PlanBuilderError(
+                "else_if_ must be called from a conditional branch. Please add an if_ first."
+            )
+        self._conditional_stack[-1].branch_step_indexes.append(len(self.plan.steps))
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=condition,
+                args=args or {},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_branch=self._conditional_stack[-1],
+                branch_index=len(self._conditional_stack[-1].branch_step_indexes) - 1,
+                branch_state_type=BranchStateType.ALTERNATE_BRANCH,
+            )
+        )
+        return self
+
+    def else_(self) -> PlanBuilderV2:
+        """Add a step that checks a condition."""
+        if len(self._conditional_stack) == 0:
+            raise PlanBuilderError(
+                "else_ must be called from a conditional branch. Please add an if_ first."
+            )
+        self._conditional_stack[-1].branch_step_indexes.append(len(self.plan.steps))
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=lambda: True,
+                args={},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_branch=self._conditional_stack[-1],
+                branch_index=len(self._conditional_stack[-1].branch_step_indexes) - 1,
+                branch_state_type=BranchStateType.ALTERNATE_BRANCH,
+            )
+        )
+        return self
+
+    def endif(self) -> PlanBuilderV2:
+        """Exit a conditional branch."""
+        if len(self._conditional_stack) == 0:
+            raise PlanBuilderError(
+                "endif must be called from a conditional branch. Please add an if_ first."
+            )
+        self._conditional_stack[-1].branch_step_indexes.append(len(self.plan.steps))
+        self.plan.steps.append(
+            ConditionalStep(
+                condition=lambda: True,
+                args={},
+                step_name=default_step_name(len(self.plan.steps)),
+                conditional_branch=self._conditional_stack[-1],
+                branch_index=len(self._conditional_stack[-1].branch_step_indexes) - 1,
+                branch_state_type=BranchStateType.EXIT_BRANCH,
+            )
+        )
+        self._conditional_stack.pop()
         return self
 
     def llm_step(
@@ -74,6 +171,7 @@ class PlanBuilderV2:
                 inputs=inputs or [],
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_branch=self._current_conditional_branch,
             )
         )
         return self
@@ -103,6 +201,7 @@ class PlanBuilderV2:
                 args=args or {},
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_branch=self._current_conditional_branch,
             )
         )
         return self
@@ -131,6 +230,7 @@ class PlanBuilderV2:
                 args=args or {},
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_branch=self._current_conditional_branch,
             )
         )
         return self
@@ -162,6 +262,7 @@ class PlanBuilderV2:
                 inputs=inputs or [],
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_branch=self._current_conditional_branch,
             )
         )
         return self
@@ -186,4 +287,9 @@ class PlanBuilderV2:
 
     def build(self) -> PlanV2:
         """Return the plan, ready to run."""
+        if len(self._conditional_stack) > 0:
+            raise PlanBuilderError(
+                "endif must be called for all if_ branches. "
+                "Please add an endif for all if_ branches."
+            )
         return self.plan
