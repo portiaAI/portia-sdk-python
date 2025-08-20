@@ -303,7 +303,9 @@ class OneShotAgent(BaseExecutionAgent):
         app = self._setup_graph(sync=True).compile()
         invocation_result = app.invoke({"messages": [], "step_inputs": []})
 
-        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
+        return process_output(
+            self.step, invocation_result["messages"], self.tool, self.new_clarifications
+        )
 
     async def execute_async(self) -> Output:
         """Run the core execution logic of the task.
@@ -316,7 +318,9 @@ class OneShotAgent(BaseExecutionAgent):
         """
         app = self._setup_graph(sync=False).compile()
         invocation_result = await app.ainvoke({"messages": [], "step_inputs": []})
-        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
+        return process_output(
+            self.step, invocation_result["messages"], self.tool, self.new_clarifications
+        )
 
     def _setup_graph(self, sync: bool) -> StateGraph:
         """Set up the graph for the agent."""

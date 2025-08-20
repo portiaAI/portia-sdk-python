@@ -83,6 +83,14 @@ def test_tool_registry_get_tools() -> None:
     assert any(tool.id == OTHER_MOCK_TOOL_ID for tool in tools)
 
 
+def test_tool_registry_contains() -> None:
+    """Test the contains method of ToolRegistry."""
+    tool_registry = ToolRegistry()
+    tool_registry.with_tool(MockTool(id=MOCK_TOOL_ID))
+    assert MOCK_TOOL_ID in tool_registry
+    assert "non_existent_tool" not in tool_registry
+
+
 def test_tool_registry_iter() -> None:
     """Test iterating over a ToolRegistry."""
     tool_registry = ToolRegistry(
