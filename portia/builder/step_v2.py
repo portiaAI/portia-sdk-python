@@ -453,7 +453,10 @@ class SingleToolAgent(StepV2):
 
 
 class ConditionalStep(StepV2):
-    """A step that checks a condition."""
+    """A step that represents a conditional clause in a conditional block.
+
+    I.E. if, else-if, else, end-if clauses.
+    """
 
     condition: Callable[..., bool] | str = Field(
         description=(
