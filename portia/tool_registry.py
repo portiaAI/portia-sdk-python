@@ -279,6 +279,10 @@ class ToolRegistry:
         """Return the number of tools in the registry."""
         return len(self._tools)
 
+    def __contains__(self, tool_id: str) -> bool:
+        """Check if a tool is in the registry."""
+        return tool_id in self._tools
+
     def _add(self, other: ToolRegistry | list[Tool]) -> ToolRegistry:
         """Add a tool registry or Tool list to the current registry."""
         other_registry = other if isinstance(other, ToolRegistry) else ToolRegistry(other)
