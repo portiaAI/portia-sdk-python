@@ -13,7 +13,13 @@ from portia.errors import ToolNotFoundError
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import FunctionCall, LLMStep, SingleToolAgent, StepV2, ToolRun
+from portia.builder.step_v2 import (
+    FunctionStep,
+    InvokeToolStep,
+    LLMStep,
+    SingleToolAgentStep,
+    StepV2,
+)
 from portia.clarification import ClarificationCategory
 from portia.execution_agents.output import LocalDataValue
 from portia.model import Message
@@ -30,7 +36,7 @@ class MockOutputSchema(BaseModel):
 
 
 def example_function(x: int, y: str) -> str:
-    """Return formatted string for testing FunctionCall."""
+    """Return formatted string for testing FunctionStep."""
     return f"{y}: {x}"
 
 
@@ -415,24 +421,24 @@ class TestLLMStep:
             mock_plan.step_output_name.assert_called_once_with(step)
 
 
-class TestToolRun:
-    """Test cases for the ToolRun class."""
+class TestInvokeToolStep:
+    """Test cases for the InvokeToolStep class."""
 
-    def test_tool_run_initialization_with_string_tool(self) -> None:
-        """Test ToolRun initialization with string tool."""
-        step = ToolRun(tool="search_tool", step_name="search")
+    def test_invoke_tool_step_initialization_with_string_tool(self) -> None:
+        """Test InvokeToolStep initialization with string tool."""
+        step = InvokeToolStep(tool="search_tool", step_name="search")
 
         assert step.tool == "search_tool"
         assert step.step_name == "search"
         assert step.args == {}
         assert step.output_schema is None
 
-    def test_tool_run_initialization_with_tool_instance(self) -> None:
-        """Test ToolRun initialization with Tool instance."""
+    def test_invoke_tool_step_initialization_with_tool_instance(self) -> None:
+        """Test InvokeToolStep initialization with Tool instance."""
         mock_tool = MockTool()
         args = {"query": "test", "limit": StepOutput(0)}
 
-        step = ToolRun(
+        step = InvokeToolStep(
             tool=mock_tool,
             step_name="search",
             args=args,
@@ -443,21 +449,21 @@ class TestToolRun:
         assert step.args == args
         assert step.output_schema == MockOutputSchema
 
-    def test_tool_run_describe_with_string_tool(self) -> None:
-        """Test ToolRun describe method with string tool."""
-        step = ToolRun(
+    def test_invoke_tool_step_describe_with_string_tool(self) -> None:
+        """Test InvokeToolStep describe method with string tool."""
+        step = InvokeToolStep(
             tool="search_tool",
             step_name="search",
             args={"query": "test"},
         )
 
         result = step.describe()
-        assert result == "ToolRun(tool='search_tool', args={'query': 'test'})"
+        assert result == "InvokeToolStep(tool='search_tool', args={'query': 'test'})"
 
-    def test_tool_run_describe_with_tool_instance(self) -> None:
-        """Test ToolRun describe method with Tool instance."""
+    def test_invoke_tool_step_describe_with_tool_instance(self) -> None:
+        """Test InvokeToolStep describe method with Tool instance."""
         mock_tool = MockTool()
-        step = ToolRun(
+        step = InvokeToolStep(
             tool=mock_tool,
             step_name="search",
             args={"query": "test"},
@@ -465,24 +471,24 @@ class TestToolRun:
         )
 
         result = step.describe()
-        expected = "ToolRun(tool='mock_tool', args={'query': 'test'} -> MockOutputSchema)"
+        expected = "InvokeToolStep(tool='mock_tool', args={'query': 'test'} -> MockOutputSchema)"
         assert result == expected
 
     def test_tool_name_with_string_tool(self) -> None:
         """Test _tool_name method with string tool."""
-        step = ToolRun(tool="search_tool", step_name="search")
+        step = InvokeToolStep(tool="search_tool", step_name="search")
         assert step._tool_name() == "search_tool"
 
     def test_tool_name_with_tool_instance(self) -> None:
         """Test _tool_name method with Tool instance."""
         mock_tool = MockTool()
-        step = ToolRun(tool=mock_tool, step_name="search")
+        step = InvokeToolStep(tool=mock_tool, step_name="search")
         assert step._tool_name() == "mock_tool"
 
     @pytest.mark.asyncio
-    async def test_tool_run_with_regular_value_input(self) -> None:
-        """Test ToolRun run with 1 regular value input."""
-        step = ToolRun(tool="mock_tool", step_name="run_tool", args={"query": "search term"})
+    async def test_invoke_tool_step_with_regular_value_input(self) -> None:
+        """Test InvokeToolStep run with 1 regular value input."""
+        step = InvokeToolStep(tool="mock_tool", step_name="run_tool", args={"query": "search term"})
         mock_run_data = Mock()
         mock_tool = Mock()
         mock_tool.run.return_value = "tool result"
@@ -503,9 +509,9 @@ class TestToolRun:
             assert call_args[1]["query"] == "search term"
 
     @pytest.mark.asyncio
-    async def test_tool_run_with_regular_value_input_and_output_schema(self) -> None:
-        """Test ToolRun run with 1 regular value input and output schema."""
-        step = ToolRun(
+    async def test_invoke_tool_step_with_regular_value_input_and_output_schema(self) -> None:
+        """Test InvokeToolStep run with 1 regular value input and output schema."""
+        step = InvokeToolStep(
             tool="mock_tool",
             step_name="run_tool",
             args={"query": "search term"},
@@ -539,10 +545,12 @@ class TestToolRun:
             mock_model.aget_structured_response.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_tool_run_with_reference_input(self) -> None:
-        """Test ToolRun run with 1 reference input."""
+    async def test_invoke_tool_step_with_reference_input(self) -> None:
+        """Test InvokeToolStep run with 1 reference input."""
         reference_input = StepOutput(0)
-        step = ToolRun(tool="mock_tool", step_name="run_tool", args={"query": reference_input})
+        step = InvokeToolStep(
+            tool="mock_tool", step_name="run_tool", args={"query": reference_input}
+        )
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_tool = Mock()
@@ -570,11 +578,11 @@ class TestToolRun:
             assert call_args[1]["query"] == "previous step output"
 
     @pytest.mark.asyncio
-    async def test_tool_run_with_mixed_inputs(self) -> None:
-        """Test ToolRun run with 2 regular value inputs and 2 reference inputs."""
+    async def test_invoke_tool_step_with_mixed_inputs(self) -> None:
+        """Test InvokeToolStep run with 2 regular value inputs and 2 reference inputs."""
         ref1 = Input("user_query")
         ref2 = StepOutput(1)
-        step = ToolRun(
+        step = InvokeToolStep(
             tool="mock_tool",
             step_name="run_tool",
             args={
@@ -618,11 +626,11 @@ class TestToolRun:
             assert call_args["previous_result"] == "step 1 output"
 
     @pytest.mark.asyncio
-    async def test_tool_run_no_args_with_clarification(self) -> None:
-        """Test ToolRun run with no args and tool returns a clarification."""
+    async def test_invoke_tool_step_no_args_with_clarification(self) -> None:
+        """Test InvokeToolStep run with no args and tool returns a clarification."""
         from portia.clarification import Clarification
 
-        step = ToolRun(tool="mock_tool", step_name="run_tool", args={})
+        step = InvokeToolStep(tool="mock_tool", step_name="run_tool", args={})
         mock_run_data = Mock()
         mock_tool = Mock()
 
@@ -649,10 +657,10 @@ class TestToolRun:
             mock_tool.run.assert_called_once_with(mock_ctx_class.return_value)
 
     @pytest.mark.asyncio
-    async def test_tool_run_with_tool_instance(self) -> None:
-        """Test ToolRun run with Tool instance instead of string tool."""
+    async def test_invoke_tool_step_with_tool_instance(self) -> None:
+        """Test InvokeToolStep run with Tool instance instead of string tool."""
         mock_tool = MockTool()
-        step = ToolRun(tool=mock_tool, step_name="run_tool", args={"input": "test input"})
+        step = InvokeToolStep(tool=mock_tool, step_name="run_tool", args={"input": "test input"})
         mock_run_data = Mock()
 
         with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
@@ -663,9 +671,9 @@ class TestToolRun:
             assert result == "mock result"
 
     @pytest.mark.asyncio
-    async def test_tool_run_with_nonexistent_tool_id(self) -> None:
-        """Test ToolRun run with nonexistent tool_id raises ToolNotFoundError."""
-        step = ToolRun(tool="nonexistent_tool", step_name="run_tool", args={"query": "test"})
+    async def test_invoke_tool_step_with_nonexistent_tool_id(self) -> None:
+        """Test InvokeToolStep run with nonexistent tool_id raises ToolNotFoundError."""
+        step = InvokeToolStep(tool="nonexistent_tool", step_name="run_tool", args={"query": "test"})
         mock_run_data = Mock()
 
         with patch.object(mock_run_data.portia, "get_tool") as mock_get_tool:
@@ -677,10 +685,10 @@ class TestToolRun:
             assert "nonexistent_tool" in str(exc_info.value)
             mock_get_tool.assert_called_once_with("nonexistent_tool", mock_run_data.plan_run)
 
-    def test_tool_run_to_legacy_step(self) -> None:
-        """Test ToolRun to_legacy_step method."""
+    def test_invoke_tool_step_to_legacy_step(self) -> None:
+        """Test InvokeToolStep to_legacy_step method."""
         args = {"query": Input("user_query"), "limit": 10}
-        step = ToolRun(
+        step = InvokeToolStep(
             tool="search_tool",
             step_name="search",
             args=args,
@@ -707,13 +715,13 @@ class TestToolRun:
             assert legacy_step.inputs[0].name == "user_query"
 
 
-class TestFunctionCall:
-    """Test cases for the FunctionCall class."""
+class TestFunctionStep:
+    """Test cases for the FunctionStep class."""
 
-    def test_function_call_initialization(self) -> None:
-        """Test FunctionCall initialization."""
+    def test_function_step_initialization(self) -> None:
+        """Test FunctionStep initialization."""
         args = {"x": 42, "y": Input("user_input")}
-        step = FunctionCall(
+        step = FunctionStep(
             function=example_function,
             step_name="calc",
             args=args,
@@ -724,21 +732,21 @@ class TestFunctionCall:
         assert step.args == args
         assert step.output_schema == MockOutputSchema
 
-    def test_function_call_describe(self) -> None:
-        """Test FunctionCall describe method."""
-        step = FunctionCall(
+    def test_function_step_describe(self) -> None:
+        """Test FunctionStep describe method."""
+        step = FunctionStep(
             function=example_function,
             step_name="calc",
             args={"x": 42, "y": "test"},
         )
 
         result = step.describe()
-        expected = "FunctionCall(function='example_function', args={'x': 42, 'y': 'test'})"
+        expected = "FunctionStep(function='example_function', args={'x': 42, 'y': 'test'})"
         assert result == expected
 
-    def test_function_call_describe_with_output_schema(self) -> None:
-        """Test FunctionCall describe method with output schema."""
-        step = FunctionCall(
+    def test_function_step_describe_with_output_schema(self) -> None:
+        """Test FunctionStep describe method with output schema."""
+        step = FunctionStep(
             function=example_function,
             step_name="calc",
             args={"x": 42},
@@ -746,13 +754,13 @@ class TestFunctionCall:
         )
 
         result = step.describe()
-        expected = "FunctionCall(function='example_function', args={'x': 42} -> MockOutputSchema)"
+        expected = "FunctionStep(function='example_function', args={'x': 42} -> MockOutputSchema)"
         assert result == expected
 
     @pytest.mark.asyncio
-    async def test_function_call_with_normal_arg(self) -> None:
-        """Test FunctionCall run with normal arguments."""
-        step = FunctionCall(
+    async def test_function_step_with_normal_arg(self) -> None:
+        """Test FunctionStep run with normal arguments."""
+        step = FunctionStep(
             function=example_function, step_name="calc", args={"x": 42, "y": "Result"}
         )
         mock_run_data = Mock()
@@ -762,10 +770,10 @@ class TestFunctionCall:
         assert result == "Result: 42"
 
     @pytest.mark.asyncio
-    async def test_function_call_with_reference_arg(self) -> None:
-        """Test FunctionCall run with reference argument."""
+    async def test_function_step_with_reference_arg(self) -> None:
+        """Test FunctionStep run with reference argument."""
         reference_input = StepOutput(0)
-        step = FunctionCall(
+        step = FunctionStep(
             function=example_function, step_name="calc", args={"x": 10, "y": reference_input}
         )
         mock_run_data = Mock()
@@ -783,8 +791,8 @@ class TestFunctionCall:
             mock_get_value.assert_called_once_with(mock_run_data)
 
     @pytest.mark.asyncio
-    async def test_function_call_no_args_with_clarification(self) -> None:
-        """Test FunctionCall run with no args that returns a clarification."""
+    async def test_function_step_no_args_with_clarification(self) -> None:
+        """Test FunctionStep run with no args that returns a clarification."""
         from portia.clarification import Clarification
 
         def clarification_function() -> Clarification:
@@ -794,7 +802,7 @@ class TestFunctionCall:
                 plan_run_id=None,
             )
 
-        step = FunctionCall(function=clarification_function, step_name="clarify", args={})
+        step = FunctionStep(function=clarification_function, step_name="clarify", args={})
         mock_run_data = Mock()
 
         result = await step.run(mock_run_data)
@@ -804,13 +812,13 @@ class TestFunctionCall:
         assert result.plan_run_id == mock_run_data.plan_run.id
 
     @pytest.mark.asyncio
-    async def test_function_call_no_args_with_output_schema(self) -> None:
-        """Test FunctionCall run with no args and output schema conversion."""
+    async def test_function_step_no_args_with_output_schema(self) -> None:
+        """Test FunctionStep run with no args and output schema conversion."""
 
         def raw_output_function() -> str:
             return "raw function output"
 
-        step = FunctionCall(
+        step = FunctionStep(
             function=raw_output_function,
             step_name="convert",
             args={},
@@ -841,10 +849,10 @@ class TestFunctionCall:
             expected_content = "Convert this output to the desired schema: raw function output"
             assert expected_content in messages[0].content
 
-    def test_function_call_to_legacy_step(self) -> None:
-        """Test FunctionCall to_legacy_step method."""
+    def test_function_step_to_legacy_step(self) -> None:
+        """Test FunctionStep to_legacy_step method."""
         args = {"x": Input("number"), "y": "constant"}
-        step = FunctionCall(
+        step = FunctionStep(
             function=example_function,
             step_name="calc",
             args=args,
@@ -878,7 +886,7 @@ class TestSingleToolAgent:
     def test_single_tool_agent_initialization(self) -> None:
         """Test SingleToolAgent initialization."""
         inputs = [Input("query"), "context"]
-        step = SingleToolAgent(
+        step = SingleToolAgentStep(
             task="Search for information",
             tool="search_tool",
             step_name="search_agent",
@@ -893,19 +901,19 @@ class TestSingleToolAgent:
 
     def test_single_tool_agent_describe(self) -> None:
         """Test SingleToolAgent describe method."""
-        step = SingleToolAgent(
+        step = SingleToolAgentStep(
             task="Search for info",
             tool="search_tool",
             step_name="search",
         )
 
         result = step.describe()
-        expected = "SingleToolAgent(tool='search_tool', query='Search for info')"
+        expected = "SingleToolAgentStep(tool='search_tool', query='Search for info')"
         assert result == expected
 
     def test_single_tool_agent_describe_with_output_schema(self) -> None:
         """Test SingleToolAgent describe method with output schema."""
-        step = SingleToolAgent(
+        step = SingleToolAgentStep(
             task="Search for info",
             tool="search_tool",
             step_name="search",
@@ -914,14 +922,14 @@ class TestSingleToolAgent:
 
         result = step.describe()
         expected = (
-            "SingleToolAgent(tool='search_tool', query='Search for info' -> MockOutputSchema)"
+            "SingleToolAgentStep(tool='search_tool', query='Search for info' -> MockOutputSchema)"
         )
         assert result == expected
 
     @pytest.mark.asyncio
     async def test_single_tool_agent_run_with_mocked_agent(self) -> None:
         """Test SingleToolAgent run with get_agent_for_step and agent mocked."""
-        step = SingleToolAgent(
+        step = SingleToolAgentStep(
             tool="search_tool", task="Search for information", step_name="search"
         )
         mock_run_data = Mock()
@@ -964,7 +972,7 @@ class TestSingleToolAgent:
     def test_single_tool_agent_to_legacy_step(self) -> None:
         """Test SingleToolAgent to_legacy_step method."""
         inputs = [Input("query"), StepOutput(0)]
-        step = SingleToolAgent(
+        step = SingleToolAgentStep(
             task="Search for information",
             tool="search_tool",
             step_name="search_agent",

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
-from portia.builder.step_v2 import FunctionCall, LLMStep, SingleToolAgent, ToolRun
+from portia.builder.step_v2 import FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:
@@ -78,7 +78,7 @@ class PlanBuilderV2:
         )
         return self
 
-    def tool_run(
+    def invoke_tool_step(
         self,
         *,
         tool: str | Tool,
@@ -98,7 +98,7 @@ class PlanBuilderV2:
 
         """
         self.plan.steps.append(
-            ToolRun(
+            InvokeToolStep(
                 tool=tool,
                 args=args or {},
                 output_schema=output_schema,
@@ -107,7 +107,7 @@ class PlanBuilderV2:
         )
         return self
 
-    def function_call(
+    def function_step(
         self,
         *,
         function: Callable[..., Any],
@@ -126,7 +126,7 @@ class PlanBuilderV2:
 
         """
         self.plan.steps.append(
-            FunctionCall(
+            FunctionStep(
                 function=function,
                 args=args or {},
                 output_schema=output_schema,
@@ -135,7 +135,7 @@ class PlanBuilderV2:
         )
         return self
 
-    def single_tool_agent(
+    def single_tool_agent_step(
         self,
         *,
         tool: str,
@@ -156,7 +156,7 @@ class PlanBuilderV2:
 
         """
         self.plan.steps.append(
-            SingleToolAgent(
+            SingleToolAgentStep(
                 tool=tool,
                 task=task,
                 inputs=inputs or [],

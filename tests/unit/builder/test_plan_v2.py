@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import LLMStep, StepV2, ToolRun
+from portia.builder.step_v2 import InvokeToolStep, LLMStep, StepV2
 from portia.plan import Plan, PlanContext, PlanInput, Step
 
 
@@ -202,7 +202,7 @@ class TestPlanV2:
             task="Test LLM task",
             step_name="llm_step",
         )
-        tool_step = ToolRun(
+        tool_step = InvokeToolStep(
             tool="test_tool",
             step_name="tool_step",
         )
