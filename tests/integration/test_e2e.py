@@ -627,6 +627,20 @@ def test_portia_run_query_with_multiple_clarifications(
                 )
             return a + b
 
+        async def arun(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+            # Avoid an endless loop of clarifications
+            if self.retries > 2:
+                raise ToolHardError("Tool failed after 2 retries")
+            if a == 1:
+                self.retries += 1
+                return InputClarification(
+                    plan_run_id=ctx.plan_run.id,
+                    argument_name="a",
+                    user_guidance="please try again",
+                    source="MyAdditionTool test tool",
+                )
+            return a + b
+
     test_clarification_handler = TestClarificationHandler()
     test_clarification_handler.clarification_response = (
         "Override value a with 456, keep value b as 2."
@@ -699,6 +713,20 @@ async def test_portia_arun_query_with_multiple_clarifications(
         retries: int = 0
 
         def run(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+            # Avoid an endless loop of clarifications
+            if self.retries > 2:
+                raise ToolHardError("Tool failed after 2 retries")
+            if a == 1:
+                self.retries += 1
+                return InputClarification(
+                    plan_run_id=ctx.plan_run.id,
+                    argument_name="a",
+                    user_guidance="please try again",
+                    source="MyAdditionTool test tool",
+                )
+            return a + b
+
+        async def arun(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
             # Avoid an endless loop of clarifications
             if self.retries > 2:
                 raise ToolHardError("Tool failed after 2 retries")
