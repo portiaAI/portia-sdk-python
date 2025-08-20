@@ -121,15 +121,11 @@ class FinalOutputSummarizer:
                 f"LLM call: summarization (final output) model={model!s} msg={preview!r}"
             )
             return model.get_structured_response(
-                [
-                    Message(content=msg, role="user")
-                ],
+                [Message(content=msg, role="user")],
                 SchemaWithSummary,
             )
         msg = self.summarizer_only_prompt + context
         preview = msg.replace("\n", " ")[:120]
-        logger().trace(
-            f"LLM call: summarization (final output) model={model!s} msg={preview!r}"
-        )
+        logger().trace(f"LLM call: summarization (final output) model={model!s} msg={preview!r}")
         response = model.get_response([Message(content=msg, role="user")])
         return str(response.content) if response.content else None

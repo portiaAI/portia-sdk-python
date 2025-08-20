@@ -24,6 +24,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
 from portia.common import validate_extras_dependencies
+from portia.logger import logger
 from portia.token_check import estimate_tokens
 
 if TYPE_CHECKING:
@@ -122,6 +123,16 @@ class GenerativeModel(ABC):
         """
         self.model_name = model_name
 
+    def _log_llm_call(self, messages: list[Message]) -> None:
+        """Log TRACE level information about the LLM call."""
+        try:
+            if messages:
+                content_preview = " ".join(msg.content.replace("\n", " ") for msg in messages)
+                preview = content_preview[:120]
+                logger().trace(f"LLM call: model={self!s} msg={preview!r}")
+        except Exception:
+            pass
+
     @abstractmethod
     def get_response(self, messages: list[Message]) -> Message:
         """Given a list of messages, call the model and return its response as a new message.
@@ -133,6 +144,7 @@ class GenerativeModel(ABC):
             Message: The response from the model.
 
         """
+        self._log_llm_call(messages)
 
     @abstractmethod
     def get_structured_response(
@@ -150,6 +162,7 @@ class GenerativeModel(ABC):
             BaseModelT: The structured response from the model.
 
         """
+        self._log_llm_call(messages)
 
     @abstractmethod
     async def aget_response(self, messages: list[Message]) -> Message:
@@ -159,6 +172,7 @@ class GenerativeModel(ABC):
             messages (list[Message]): The list of messages to send to the model.
 
         """
+        self._log_llm_call(messages)
         raise NotImplementedError("async is not implemented")  # pragma: no cover
 
     @abstractmethod
@@ -174,6 +188,7 @@ class GenerativeModel(ABC):
             schema (type[BaseModelT]): The Pydantic model to use for the response.
 
         """
+        self._log_llm_call(messages)
         raise NotImplementedError("async is not implemented")  # pragma: no cover
 
     def get_context_window_size(self) -> int:
@@ -225,6 +240,7 @@ class LangChainGenerativeModel(GenerativeModel):
 
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = self._client.invoke(langchain_messages)
         return Message.from_langchain(response)
@@ -246,6 +262,7 @@ class LangChainGenerativeModel(GenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = structured_client.invoke(langchain_messages)
@@ -260,6 +277,7 @@ class LangChainGenerativeModel(GenerativeModel):
             messages (list[Message]): The list of messages to send to the model.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = await self._client.ainvoke(langchain_messages)
         return Message.from_langchain(response)
@@ -278,6 +296,7 @@ class LangChainGenerativeModel(GenerativeModel):
             **kwargs: Additional keyword arguments to pass to the with_structured_output method.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = await structured_client.ainvoke(langchain_messages)
@@ -464,6 +483,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -508,6 +528,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor asynchronously."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return await self._acached_instructor_call(
             client=self._instructor_client_async,
@@ -688,6 +709,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -860,6 +882,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -937,6 +960,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor asynchronously."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return await self._acached_instructor_call(
             client=self._instructor_client_async,
@@ -1023,6 +1047,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             schema: type[BaseModelT],
         ) -> BaseModelT:
             """Get structured response using instructor."""
+            super()._log_llm_call(messages)
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return self._cached_instructor_call(
                 client=self._instructor_client,
@@ -1075,6 +1100,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             schema: type[BaseModelT],
         ) -> BaseModelT:
             """Get structured response using instructor asynchronously."""
+            super()._log_llm_call(messages)
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return await self._acached_instructor_call(
                 client=self._instructor_client_async,
