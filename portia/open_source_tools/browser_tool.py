@@ -404,9 +404,7 @@ class BrowserToolForUrl(BrowserTool):
         structured_output_schema: type[BaseModel] | None = None,
         allowed_domains: list[str] | None = None,
     ) -> None:
-        """Initialize the BrowserTool."""
-        # Store url parameter 
-        self.url = url
+        """Initialize the BrowserToolForUrl."""
         
         # Basic validation for allowed_domains format - only validate format, not usage
         if allowed_domains:
@@ -434,6 +432,9 @@ class BrowserToolForUrl(BrowserTool):
             structured_output_schema=structured_output_schema,
             allowed_domains=allowed_domains,
         )
+        
+        # Set the URL after super().__init__ to avoid Pydantic conflicts
+        self.url = url
 
     def run(  # type: ignore reportIncompatibleMethodOverride
         self,
