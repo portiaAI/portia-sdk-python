@@ -565,7 +565,10 @@ async def test_portia_arun_query_with_soft_error(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
+        def run(self, _: ToolRunContext, a: int, b: int) -> int:
+            raise NotImplementedError("Shouldn't be called")
+
+        async def arun(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
             raise ToolSoftError("Server Timeout")
 
     tool_registry = ToolRegistry([MyAdditionTool()])
