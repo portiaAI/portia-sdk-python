@@ -303,8 +303,7 @@ class InvokeToolStep(StepV2):
         )
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
-        # TODO(RH): Move to async tool run when we can  # noqa: FIX002, TD003
-        output = tool.run(tool_ctx, **args)
+        output = await tool.arun(tool_ctx, **args)
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
 
