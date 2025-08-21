@@ -738,7 +738,7 @@ class DefaultToolRegistry(ToolRegistry):
         ]
         
         # Search tool selection logic with Config support
-        has_openai_key = bool(config.openai_api_key and config.openai_api_key.get_secret_value().strip())
+        has_openai_key = bool(config.openai_api_key and config.openai_api_key.get_secret_value().strip()) or bool(os.getenv("OPENAI_API_KEY"))
         has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
         search_provider = config.search_provider
         

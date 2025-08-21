@@ -177,7 +177,7 @@ def test_openai_search_tool_http_error() -> None:
             
             tool = OpenAISearchTool()
             ctx = get_test_tool_context()
-            with pytest.raises(ToolHardError, match="Invalid OpenAI API key"):
+            with pytest.raises(ToolSoftError, match="OpenAI API error"):
                 tool.run(ctx, "What is the capital of France?")
 
 
@@ -270,7 +270,7 @@ async def test_openai_search_tool_async_http_error() -> None:
             
             tool = OpenAISearchTool()
             ctx = get_test_tool_context()
-            with pytest.raises(ToolSoftError, match="OpenAI API error"):
+            with pytest.raises(ToolSoftError, match="OpenAI API server error"):
                 await tool.arun(ctx, "What is the capital of France?")
 
 

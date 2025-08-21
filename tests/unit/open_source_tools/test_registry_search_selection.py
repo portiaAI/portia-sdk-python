@@ -100,8 +100,8 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_no_keys(self) -> None:
         """Test DefaultToolRegistry with no API keys."""
-        config = Config(portia_api_key=None, llm_provider="openai")
         with patch.dict(os.environ, {}, clear=True):
+            config = Config(portia_api_key=None, llm_provider="openai")
             registry = DefaultToolRegistry(config)
             tools = registry.get_tools()
             
@@ -164,13 +164,13 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_manual_override_openai(self) -> None:
         """Test DefaultToolRegistry with manual override to OpenAI."""
-        config = Config(portia_api_key=None, llm_provider="openai")
         env_vars = {
             "OPENAI_API_KEY": "sk-test",
             "TAVILY_API_KEY": "tvly-test",
             "PORTIA_SEARCH_PROVIDER": "openai"
         }
         with patch.dict(os.environ, env_vars, clear=True):
+            config = Config(portia_api_key=None, llm_provider="openai")
             registry = DefaultToolRegistry(config)
             tools = registry.get_tools()
             
@@ -210,7 +210,6 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_invalid_provider_warning(self) -> None:
         """Test DefaultToolRegistry with invalid provider shows warning."""
-        config = Config(portia_api_key=None, llm_provider="openai")
         env_vars = {
             "OPENAI_API_KEY": "sk-test",
             "PORTIA_SEARCH_PROVIDER": "invalid"
@@ -218,6 +217,7 @@ class TestDefaultToolRegistrySearchSelection:
         with patch.dict(os.environ, env_vars, clear=True):
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
+                config = Config(portia_api_key=None, llm_provider="openai")
                 registry = DefaultToolRegistry(config)
                 tools = registry.get_tools()
                 
