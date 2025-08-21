@@ -764,6 +764,11 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         )
         kwargs_no_thinking = kwargs.copy()
         kwargs_no_thinking.get("model_kwargs", {}).pop("thinking", None)
+        # You cannot use structured output with thinking enabled, or you get an error saying 
+        # 'Thinking may not be enabled when tool_choice forces tool use'.
+        # So we create a separate client for structured output.
+        # NB Instructor can be used, because it doesn't use the tool_choice API.
+        # See https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#extended-thinking-with-tool-use
         self._non_thinking_client = ChatAnthropic(
             model_name=model_name,
             timeout=timeout,
