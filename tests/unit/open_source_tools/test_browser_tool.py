@@ -76,7 +76,7 @@ def mock_browserbase_provider(
 class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
     """Mock browser infrastructure provider."""
 
-    def setup_browser(self, _: ToolRunContext) -> Browser:  # type: ignore reportIncompatibleMethodOverride
+    def setup_browser(self, _: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:  # type: ignore reportIncompatibleMethodOverride
         """Create the browser with a mock for testing."""
         return MagicMock()
 
@@ -319,10 +319,8 @@ def test_browser_infra_local_setup_browser(
     context = get_test_tool_context()
     context.end_user = EndUser(external_id="test_user")
     
-    # Mock tool with allowed_domains
-    mock_tool = MagicMock()
-    mock_tool.allowed_domains = ["example.com"]
-    context.tool = mock_tool
+    # Test with allowed_domains parameter
+    allowed_domains = ["example.com"]
 
     mock_logger_instance = MagicMock()
     mock_logger = MagicMock(return_value=mock_logger_instance)
@@ -333,7 +331,7 @@ def test_browser_infra_local_setup_browser(
         mock_browser_instance = MagicMock()
         mock_browser.return_value = mock_browser_instance
         
-        browser = local_browser_provider.setup_browser(context)
+        browser = local_browser_provider.setup_browser(context, allowed_domains)
 
         # Verify warning was logged for end_user
         mock_logger.assert_called_once()
@@ -345,7 +343,7 @@ def test_browser_infra_local_setup_browser(
         call_args = mock_browser.call_args[1]  # kwargs
         assert "config" in call_args
         config = call_args["config"]
-        assert config.new_context_config.allowed_domains == ["example.com"]
+        assert config.new_context_config.allowed_domains == allowed_domains
         assert browser == mock_browser_instance
 
 
@@ -510,10 +508,8 @@ def test_browserbase_provider_setup_browser(
     """Test setting up browser with allowed_domains passed through."""
     context = get_test_tool_context()
     
-    # Mock tool with allowed_domains
-    mock_tool = MagicMock()
-    mock_tool.allowed_domains = ["example.com"]
-    context.tool = mock_tool
+    # Test with allowed_domains parameter
+    allowed_domains = ["example.com"]
 
     mock_session = MagicMock()
     mock_session.id = "test_session_id"
@@ -529,14 +525,14 @@ def test_browserbase_provider_setup_browser(
         mock_browser_instance.config.cdp_url = "test_connect_url"
         mock_browser.return_value = mock_browser_instance
         
-        browser = mock_browserbase_provider.setup_browser(context)
+        browser = mock_browserbase_provider.setup_browser(context, allowed_domains)
 
         # Verify browser was created with allowed_domains
         mock_browser.assert_called_once()
         call_args = mock_browser.call_args[1]  # kwargs
         assert "config" in call_args
         config = call_args["config"]
-        assert config.new_context_config.allowed_domains == ["example.com"]
+        assert config.new_context_config.allowed_domains == allowed_domains
         assert browser == mock_browser_instance
 
 

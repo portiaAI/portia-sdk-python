@@ -653,6 +653,19 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
             return extra_chromium_args_from_env.split(",")
         return None
 
+    def _create_browser_context_config(self, allowed_domains: list[str] | None) -> BrowserContextConfig:
+        """Create BrowserContextConfig with optional allowed_domains.
+        
+        Args:
+            allowed_domains: List of allowed domains or None
+            
+        Returns:
+            Configured BrowserContextConfig instance
+        """
+        if allowed_domains is not None:
+            return BrowserContextConfig(allowed_domains=allowed_domains)
+        return BrowserContextConfig()
+
 
 if BROWSERBASE_AVAILABLE:
     from browserbase import Browserbase
@@ -874,6 +887,19 @@ if BROWSERBASE_AVAILABLE:
                     new_context_config=context_config,
                 ),
             )
+
+        def _create_browser_context_config(self, allowed_domains: list[str] | None) -> BrowserContextConfig:
+            """Create BrowserContextConfig with optional allowed_domains.
+            
+            Args:
+                allowed_domains: List of allowed domains or None
+                
+            Returns:
+                Configured BrowserContextConfig instance
+            """
+            if allowed_domains is not None:
+                return BrowserContextConfig(allowed_domains=allowed_domains)
+            return BrowserContextConfig()
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
             """Check if the current call is the first browser call in the plan run.
