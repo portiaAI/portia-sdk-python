@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13' and python_full_version < '4'",
@@ -1267,19 +1267,6 @@ wheels = [
 ]
 
 [[package]]
-name = "langchain-openrouter"
-version = "0.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "langchain", marker = "python_full_version < '4'" },
-    { name = "requests", marker = "python_full_version < '4'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ac/7c/4fefada8f7ececa3e1b1c7338d38e61a08f3ba35a4ce511ac87cc7fb154c/langchain_openrouter-0.0.1.tar.gz", hash = "sha256:afc193cf7a0599fb6786a91644180f21557fd2a37d061506b4475d7e9e3be75d", size = 2559, upload-time = "2024-02-05T13:16:02.183Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/00/67ce61f767834c8ed2b748f1e4931aa7c3253d91e0101acc38bed39c8f13/langchain_openrouter-0.0.1-py3-none-any.whl", hash = "sha256:abe643add05285e2116238da0ad24a0347e876719e492caede5f09df9a433ce4", size = 2801, upload-time = "2024-02-05T13:16:00.155Z" },
-]
-
-[[package]]
 name = "langchain-redis"
 version = "0.2.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2007,7 +1994,7 @@ wheels = [
 
 [[package]]
 name = "portia-sdk-python"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -2044,7 +2031,6 @@ all = [
     { name = "langchain-google-genai", marker = "python_full_version < '4'" },
     { name = "langchain-mistralai", marker = "python_full_version < '4'" },
     { name = "langchain-ollama", marker = "python_full_version < '4'" },
-    { name = "langchain-openrouter", marker = "python_full_version < '4'" },
     { name = "langchain-redis", marker = "python_full_version < '3.14'" },
     { name = "mistralai" },
     { name = "playwright" },
@@ -2129,7 +2115,6 @@ requires-dist = [
     { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.2.2,<0.3" },
     { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'ollama'", specifier = ">=0.2.2,<0.3" },
     { name = "langchain-openai", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3,<0.4" },
-    { name = "langchain-openrouter", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.0.1,<0.1" },
     { name = "langchain-redis", marker = "python_full_version >= '3.11' and python_full_version < '3.14' and extra == 'all'", specifier = ">=0.1.2" },
     { name = "langchain-redis", marker = "extra == 'cache'", specifier = ">=0.1.2" },
     { name = "langgraph", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.2.59,<0.3" },
