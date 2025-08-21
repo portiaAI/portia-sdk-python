@@ -343,20 +343,6 @@ class BrowserTool(Tool[str | BaseModel]):
             return BrowserContextConfig(allowed_domains=allowed_domains)
         return BrowserContextConfig()
     
-    @classmethod
-    def _extract_allowed_domains_from_context(cls, ctx: ToolRunContext) -> list[str] | None:
-        """Type-safe extraction of allowed_domains from tool context.
-        
-        Args:
-            ctx: Tool run context containing tool instance
-            
-        Returns:
-            List of allowed domains or None if not set
-        """
-        if hasattr(ctx.tool, 'allowed_domains'):
-            return ctx.tool.allowed_domains
-        return None
-
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -424,7 +410,7 @@ class BrowserTool(Tool[str | BaseModel]):
                 agent = Agent(
                     task=task_description,
                     llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx),
+                    browser=self.infrastructure_provider.setup_browser(ctx, self.allowed_domains),
                     controller=Controller(output_model=output_model),
                 )
                 result = await agent.run()
@@ -545,10 +531,14 @@ class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
 
     @abstractmethod
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
         """Get a Browser instance.
 
         This is called at the start of every step using this tool.
+        
+        Args:
+            ctx: Tool run context
+            allowed_domains: List of allowed domains for browser navigation
         """
 
     @abstractmethod
@@ -572,7 +562,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         self.chrome_path = chrome_path or self.get_chrome_instance_path()
         self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
 
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
         """Get a Browser instance.
 
         Note: This provider does not support end_user_id.
@@ -580,6 +570,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         Args:
             ctx (ToolRunContext): The context for the tool run, containing execution context
                 and other relevant information.
+            allowed_domains: List of allowed domains for browser navigation
 
         Returns:
             Browser: A configured Browser instance for local browser automation.
@@ -590,8 +581,6 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        # Extract allowed_domains using common helper
-        allowed_domains = self._extract_allowed_domains_from_context(ctx)
         context_config = self._create_browser_context_config(allowed_domains)
             
         return Browser(
@@ -861,7 +850,7 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(session_id)
             return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
 
-        def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
             """Set up a Browser instance connected to BrowserBase.
 
             Creates or retrieves a BrowserBase session and configures a Browser instance
@@ -869,6 +858,7 @@ if BROWSERBASE_AVAILABLE:
 
             Args:
                 ctx (ToolRunContext): The tool run context containing execution information.
+                allowed_domains: List of allowed domains for browser navigation
 
             Returns:
                 Browser: A configured Browser instance connected to the BrowserBase session.
@@ -876,8 +866,6 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
-            # Extract allowed_domains using common helper
-            allowed_domains = self._extract_allowed_domains_from_context(ctx)
             context_config = self._create_browser_context_config(allowed_domains)
                 
             return Browser(

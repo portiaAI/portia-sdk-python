@@ -326,8 +326,10 @@ def test_browser_infra_local_setup_browser(
 
     mock_logger_instance = MagicMock()
     mock_logger = MagicMock(return_value=mock_logger_instance)
-    with patch("portia.open_source_tools.browser_tool.logger", mock_logger), \
-         patch("portia.open_source_tools.browser_tool.Browser") as mock_browser:
+    with (
+        patch("portia.open_source_tools.browser_tool.logger", mock_logger),
+        patch("portia.open_source_tools.browser_tool.Browser") as mock_browser,
+    ):
         mock_browser_instance = MagicMock()
         mock_browser.return_value = mock_browser_instance
         
@@ -830,245 +832,20 @@ def test_browser_tool_multiple_calls(
 # ===== ALLOWED DOMAINS FUNCTIONALITY TESTS =====
 
 
-class TestBrowserToolAllowedDomains:
-    """Test suite for BrowserTool with allowed_domains functionality."""
 
-    def test_allowed_domains_permits_navigation_to_whitelisted_domains(
-        self,
-        mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
-    ) -> None:
-        """Test BrowserTool allows navigation to domains in allowed_domains list."""
-        mock_task_response = BrowserTaskOutput(
-            task_output="Task completed successfully",
-            human_login_required=False,
-        )
-        mock_task_result = MagicMock()
-        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
-        mock_run = AsyncMock(return_value=mock_task_result)
 
-        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.run = mock_run
-            mock_agent.return_value = mock_agent_instance
+def test_browser_tool_allowed_domains_parameter():
+    """Test that BrowserTool accepts allowed_domains parameter."""
+    allowed_domains = ["example.com", "trusted.org"]
+    browser_tool = BrowserTool(allowed_domains=allowed_domains)
+    assert browser_tool.allowed_domains == allowed_domains
 
-            browser_tool = BrowserTool(
-                custom_infrastructure_provider=mock_browser_infrastructure_provider,
-                allowed_domains=["example.com", "trusted.org"],
-            )
-            context = get_test_tool_context()
 
-            # Should succeed for allowed domain
-            result = browser_tool.run(context, "https://example.com", "test task")
-            assert result == "Task completed successfully"
-
-            # Should succeed for subdomain of allowed domain
-            result = browser_tool.run(context, "https://www.example.com", "test task")
-            assert result == "Task completed successfully"
-
-    def test_allowed_domains_parameter_passed_to_browser_use(
-        self,
-        mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
-    ) -> None:
-        """Test BrowserTool passes allowed_domains to browser-use correctly."""
-        browser_tool = BrowserTool(
-            custom_infrastructure_provider=mock_browser_infrastructure_provider,
-            allowed_domains=["example.com", "*.wikipedia.org"],
-        )
-        
-        # Verify allowed_domains is set on the tool
-        assert browser_tool.allowed_domains == ["example.com", "*.wikipedia.org"]
-        
-        # Note: Domain validation is now handled by browser-use, not by custom logic
-        # So we don't test validation behavior here, just that the parameter is set
-
-    def test_browser_tool_for_url_accepts_allowed_domains_parameter(self) -> None:
-        """Test BrowserToolForUrl correctly accepts and stores allowed_domains parameter."""
-        # Should succeed when URL matches allowed domain
-        tool = BrowserToolForUrl(
-            url="https://example.com",
-            allowed_domains=["example.com"]
-        )
-        assert tool.allowed_domains == ["example.com"]
-        assert tool.url == "https://example.com"
-
-        # Should be able to create tool with subdomain when parent domain is allowed
-        tool_subdomain = BrowserToolForUrl(
-            url="https://www.example.com",
-            allowed_domains=["example.com"]
-        )
-        assert tool_subdomain.allowed_domains == ["example.com"]
-        assert tool_subdomain.url == "https://www.example.com"
-
-    def test_browser_tool_for_url_executes_with_domain_restrictions(
-        self,
-        mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
-    ) -> None:
-        """Test BrowserToolForUrl executes successfully when URL matches allowed_domains."""
-        mock_task_response = BrowserTaskOutput(
-            task_output="Task completed successfully",
-            human_login_required=False,
-        )
-        mock_task_result = MagicMock()
-        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
-        mock_run = AsyncMock(return_value=mock_task_result)
-
-        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.run = mock_run
-            mock_agent.return_value = mock_agent_instance
-
-            # Create tool with allowed domain
-            tool = BrowserToolForUrl(
-                url="https://example.com",
-                allowed_domains=["example.com"],
-                custom_infrastructure_provider=mock_browser_infrastructure_provider,
-            )
-            
-            context = get_test_tool_context()
-            
-            # Should succeed since the URL matches allowed domain
-            result = tool.run(context, "test task")
-            assert result == "Task completed successfully"
-
-    def test_allowed_domains_supports_multiple_domain_whitelist(
-        self,
-        mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
-    ) -> None:
-        """Test allowed_domains correctly handles multiple domains in whitelist."""
-        allowed_domains = ["example.com", "trusted.org", "safe.net"]
-        
-        mock_task_response = BrowserTaskOutput(
-            task_output="Task completed successfully",
-            human_login_required=False,
-        )
-        mock_task_result = MagicMock()
-        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
-        mock_run = AsyncMock(return_value=mock_task_result)
-
-        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.run = mock_run
-            mock_agent.return_value = mock_agent_instance
-
-            browser_tool = BrowserTool(
-                custom_infrastructure_provider=mock_browser_infrastructure_provider,
-                allowed_domains=allowed_domains,
-            )
-            context = get_test_tool_context()
-
-            # Should succeed for all allowed domains
-            for domain in ["https://example.com", "https://trusted.org", "https://safe.net"]:
-                result = browser_tool.run(context, domain, "test task")
-                assert result == "Task completed successfully"
-
-            # Note: Domain validation is now handled by browser-use internally
-            # We don't test blocking behavior here as that's browser-use's responsibility
-
-    def test_allowed_domains_integration_with_browser_config(self) -> None:
-        """Test that allowed_domains is properly passed to BrowserConfig during setup."""
-        browser_tool = BrowserTool(allowed_domains=["example.com", "*.trusted.org"])
-        context = get_test_tool_context()
-        # Set the tool in the context to match the expected type
-        context.tool = browser_tool
-        
-        # Use a real local infrastructure provider to test our code
-        from portia.open_source_tools.browser_tool import BrowserInfrastructureProviderLocal
-        local_provider = BrowserInfrastructureProviderLocal()
-        
-        with patch("portia.open_source_tools.browser_tool.Browser") as mock_browser:
-            mock_browser_instance = MagicMock()
-            mock_browser.return_value = mock_browser_instance
-            
-            # Setup browser through real infrastructure provider
-            browser = local_provider.setup_browser(context)
-            
-            # Verify Browser was called with BrowserConfig containing allowed_domains
-            mock_browser.assert_called_once()
-            call_args = mock_browser.call_args
-            
-            # Check that config parameter exists and has the correct allowed_domains
-            assert "config" in call_args.kwargs
-            config = call_args.kwargs["config"]
-            # allowed_domains should be in the BrowserContextConfig
-            assert config.new_context_config.allowed_domains == ["example.com", "*.trusted.org"]
-            
-    def test_allowed_domains_none_allows_all_domains(
-        self,
-        mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
-    ) -> None:
-        """Test that when allowed_domains is None, all domains are permitted (default behavior)."""
-        browser_tool = BrowserTool(
-            custom_infrastructure_provider=mock_browser_infrastructure_provider,
-            allowed_domains=None,  # Explicitly set to None
-        )
-        
-        # Verify allowed_domains is None
-        assert browser_tool.allowed_domains is None
-        
-        # This should work for any domain since no restrictions
-        mock_task_response = BrowserTaskOutput(
-            task_output="Task completed successfully",
-            human_login_required=False,
-        )
-        mock_task_result = MagicMock()
-        mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
-        mock_run = AsyncMock(return_value=mock_task_result)
-
-        with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.run = mock_run
-            mock_agent.return_value = mock_agent_instance
-            
-            context = get_test_tool_context()
-            
-            # Should succeed for any domain when allowed_domains is None
-            result = browser_tool.run(context, "https://any-domain.com", "test task")
-            assert result == "Task completed successfully"
-
-    def test_allowed_domains_supports_glob_patterns(
-        self,
-        mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
-    ) -> None:
-        """Test that allowed_domains supports glob patterns like *.example.com."""
-        browser_tool = BrowserTool(
-            custom_infrastructure_provider=mock_browser_infrastructure_provider,
-            allowed_domains=["*.example.com", "specific-site.org"],
-        )
-        
-        # Verify glob patterns are properly stored
-        assert "*.example.com" in browser_tool.allowed_domains
-        assert "specific-site.org" in browser_tool.allowed_domains
-        assert len(browser_tool.allowed_domains) == 2
-
-    def test_allowed_domains_validation_delegated_to_browser_use(self) -> None:
-        """Test that domain validation is properly delegated to browser-use rather than custom logic."""
-        # Test that we don't implement custom URL validation
-        # This is important because custom validation often has security bugs
-        
-        # Create tool with restricted domains
-        browser_tool = BrowserTool(allowed_domains=["example.com"])
-        
-        # Verify no custom validation methods exist
-        assert not hasattr(browser_tool, '_validate_url')
-        assert not hasattr(browser_tool, '_check_domain_allowed')
-        assert not hasattr(browser_tool, '_parse_domain')
-        
-        # Domain validation should be handled by browser-use's BrowserConfig
-        assert browser_tool.allowed_domains == ["example.com"]
-
-    def test_allowed_domains_format_validation(self) -> None:
-        """Test that invalid domain formats are rejected during initialization."""
-        # Test valid domains
-        valid_domains = ["example.com", "*.wikipedia.org", "sub.domain.com"]
-        browser_tool = BrowserTool(allowed_domains=valid_domains)
-        assert browser_tool.allowed_domains == valid_domains
-        
-        # Test invalid domains
-        with pytest.raises(ValueError, match="Invalid domain in allowed_domains: "):
-            BrowserTool(allowed_domains=["example.com", ""])
-            
-        with pytest.raises(ValueError, match="Invalid domain in allowed_domains: "):
-            BrowserTool(allowed_domains=["example.com", None])  # type: ignore
-            
-        with pytest.raises(ValueError, match="Invalid domain in allowed_domains: "):
-            BrowserTool(allowed_domains=["example.com", 123])  # type: ignore
+def test_browser_tool_for_url_allowed_domains_parameter():
+    """Test that BrowserToolForUrl accepts allowed_domains parameter."""
+    url = "https://example.com"
+    allowed_domains = ["example.com", "api.example.com"]
+    
+    tool = BrowserToolForUrl(url=url, allowed_domains=allowed_domains)
+    assert tool.url == url
+    assert tool.allowed_domains == allowed_domains

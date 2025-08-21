@@ -21,13 +21,7 @@ import json
 from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
-from typing import Any, Generic, TypeVar, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from typing_extensions import Self
-else:
-    # For Python < 3.11 compatibility, use forward reference
-    Self = "Self"
+from typing import Any, Generic, Self, TypeVar
 
 import httpx
 import mcp
@@ -78,18 +72,16 @@ class ToolRunContext(BaseModel):
         plan(Plan): The plan the tool run is part of.
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
-        tool: The tool instance being executed (for compatibility).
 
     """
 
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="forbid")
 
     end_user: EndUser
     plan_run: PlanRun
     plan: Plan
     config: Config
     clarifications: ClarificationListType
-    tool: "Tool | None" = None  # Optional tool reference for compatibility
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
