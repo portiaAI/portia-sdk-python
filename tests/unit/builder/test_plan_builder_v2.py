@@ -2,15 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import pytest
 from pydantic import BaseModel
 
-from portia.builder.plan_builder_v2 import PlanBuilderV2
+from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
+from portia.builder.step_v2 import (
+    FunctionStep,
+    InvokeToolStep,
+    LLMStep,
+    SingleToolAgentStep,
+    StepV2,
+)
+from portia.plan import PlanInput, Step
 from portia.tool import Tool
+
+if TYPE_CHECKING:
+    from portia.portia import RunContext
 
 
 class OutputSchema(BaseModel):
@@ -40,6 +51,23 @@ class MockTool(Tool):
     def run(self, ctx: Any, **kwargs: Any) -> str:  # noqa: ANN401, ARG002
         """Run the mock tool."""
         return "mock result"
+
+
+class CustomStep(StepV2):
+    """Custom step for testing."""
+
+    async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401, ARG002
+        """Execute the step."""
+        return "mock result"
+
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this step to a Step from plan.py.
+
+        A Step is the legacy representation of a step in the plan, and is still used in the
+        Portia backend. If this step doesn't need to be represented in the plan sent to the Portia
+        backend, return None.
+        """
+        raise NotImplementedError
 
 
 class TestPlanBuilderV2:
@@ -467,3 +495,163 @@ class TestPlanBuilderV2:
         assert isinstance(func_step, FunctionStep)
         assert isinstance(func_step.args["y"], StepOutput)
         assert func_step.args["y"].step == 1
+
+    def test_add_step_method_basic(self) -> None:
+        """Test the add_step() method with basic functionality."""
+        builder = PlanBuilderV2()
+        custom_step = CustomStep(step_name="custom_step")
+
+        result = builder.add_step(custom_step)
+
+        assert len(result.plan.steps) == 1
+        assert result.plan.steps[0] is custom_step
+        assert result.plan.steps[0].step_name == "custom_step"
+
+    def test_add_step_method_with_different_step_types(self) -> None:
+        """Test the add_step() method with different step types."""
+        builder = PlanBuilderV2()
+
+        llm_step = LLMStep(task="LLM task", step_name="llm_step")
+        tool_step = InvokeToolStep(
+            tool="search_tool", args={"query": "test"}, step_name="tool_step"
+        )
+        func_step = FunctionStep(
+            function=example_function_for_testing, args={"x": 1, "y": "test"}, step_name="func_step"
+        )
+        agent_step = SingleToolAgentStep(
+            tool="agent_tool", task="Agent task", step_name="agent_step"
+        )
+
+        builder.add_step(llm_step).add_step(tool_step).add_step(func_step).add_step(agent_step)
+
+        assert len(builder.plan.steps) == 4
+        assert isinstance(builder.plan.steps[0], LLMStep)
+        assert isinstance(builder.plan.steps[1], InvokeToolStep)
+        assert isinstance(builder.plan.steps[2], FunctionStep)
+        assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
+
+    def test_add_steps_method_with_iterable(self) -> None:
+        """Test the add_steps() method with an iterable of steps."""
+        builder = PlanBuilderV2()
+
+        steps = [
+            LLMStep(task="First task", step_name="step1"),
+            InvokeToolStep(tool="test_tool", args={"input": "test"}, step_name="step2"),
+            FunctionStep(
+                function=example_function_for_testing,
+                args={"x": 42, "y": "hello"},
+                step_name="step3",
+            ),
+        ]
+
+        result = builder.add_steps(steps)
+
+        assert len(result.plan.steps) == 3
+        assert result.plan.steps[0] is steps[0]
+        assert result.plan.steps[1] is steps[1]
+        assert result.plan.steps[2] is steps[2]
+
+    def test_add_steps_method_with_plan_v2(self) -> None:
+        """Test the add_steps() method with a PlanV2 instance."""
+        builder = PlanBuilderV2()
+
+        other_plan = PlanV2(
+            label="Other plan",
+            steps=[
+                LLMStep(task="Task from other plan", step_name="other_step1"),
+                InvokeToolStep(tool="other_tool", args={}, step_name="other_step2"),
+            ],
+            plan_inputs=[
+                PlanInput(name="other_input", description="Input from other plan"),
+                PlanInput(name="another_input", description="Another input", value="default"),
+            ],
+        )
+
+        result = builder.input(name="input1").add_steps(other_plan)
+
+        assert len(result.plan.steps) == 2
+        assert len(result.plan.plan_inputs) == 3
+
+        assert result.plan.steps[0] is other_plan.steps[0]
+        assert result.plan.steps[1] is other_plan.steps[1]
+
+        assert result.plan.plan_inputs[0].name == "input1"
+        assert result.plan.plan_inputs[1].name == "other_input"
+        assert result.plan.plan_inputs[2].name == "another_input"
+
+    def test_add_steps_method_with_plan_v2_duplicate_inputs_error(self) -> None:
+        """Test the add_steps() method raises error for duplicate plan inputs."""
+        builder = PlanBuilderV2()
+
+        builder.input(name="shared_input", description="Shared input name")
+
+        other_plan = PlanV2(
+            label="Other plan",
+            steps=[LLMStep(task="Task", step_name="step1")],
+            plan_inputs=[
+                PlanInput(name="shared_input", description="Duplicate input name"),
+                PlanInput(name="unique_input", description="Unique input"),
+            ],
+        )
+
+        # Should raise PlanBuilderError due to duplicate input
+        with pytest.raises(PlanBuilderError, match="Duplicate input shared_input found in plan"):
+            builder.add_steps(other_plan)
+
+    def test_add_steps_method_with_empty_iterable(self) -> None:
+        """Test the add_steps() method with an empty iterable."""
+        builder = PlanBuilderV2().llm_step(task="Initial step").add_steps([])
+        assert len(builder.plan.steps) == 1
+
+    def test_add_steps_method_with_empty_plan_v2(self) -> None:
+        """Test the add_steps() method with an empty PlanV2."""
+        builder = PlanBuilderV2().input(name="existing_input").llm_step(task="Initial step")
+        empty_plan = PlanBuilderV2().build()
+
+        result = builder.add_steps(empty_plan)
+
+        assert len(result.plan.steps) == 1
+        assert len(result.plan.plan_inputs) == 1
+
+    def test_add_steps_method_chaining_with_different_sources(self) -> None:
+        """Test chaining add_steps() method with different sources."""
+        builder = PlanBuilderV2()
+
+        step_list = [LLMStep(task="List step", step_name="list_step")]
+        plan_with_steps = PlanV2(
+            label="Source plan",
+            steps=[InvokeToolStep(tool="plan_tool", args={}, step_name="plan_step")],
+            plan_inputs=[PlanInput(name="plan_input", description="From plan")],
+        )
+
+        result = builder.add_steps(step_list).add_steps(plan_with_steps)
+
+        assert len(result.plan.steps) == 2
+        assert len(result.plan.plan_inputs) == 1
+        assert result.plan.steps[0].step_name == "list_step"
+        assert result.plan.steps[1].step_name == "plan_step"
+        assert result.plan.plan_inputs[0].name == "plan_input"
+
+    def test_add_step_and_add_steps_integration(self) -> None:
+        """Test integration of add_step and add_steps methods together."""
+        step_batch = [
+            InvokeToolStep(tool="batch_tool", args={}, step_name="batch1"),
+            FunctionStep(function=example_function_for_testing, args={}, step_name="batch2"),
+        ]
+        builder = (
+            PlanBuilderV2()
+            .add_step(LLMStep(task="Individual step", step_name="individual"))
+            .add_steps(step_batch)
+            .add_steps(
+                PlanBuilderV2().add_step(LLMStep(task="From plan", step_name="from_plan")).build()
+            )
+            .add_step(SingleToolAgentStep(tool="final_tool", task="Final step", step_name="final"))
+        )
+
+        assert len(builder.plan.steps) == 5
+        assert len(builder.plan.plan_inputs) == 0
+        assert builder.plan.steps[0].step_name == "individual"
+        assert builder.plan.steps[1].step_name == "batch1"
+        assert builder.plan.steps[2].step_name == "batch2"
+        assert builder.plan.steps[3].step_name == "from_plan"
+        assert builder.plan.steps[4].step_name == "final"
