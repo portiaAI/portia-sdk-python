@@ -1,6 +1,7 @@
-import os
 import json
+import os
 from datetime import datetime
+
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -40,6 +41,7 @@ class ExtractedDataModel(BaseModel):
 load_dotenv(override=True)
 
 import pandas as pd
+
 
 def run_scraping_demo(start_row: int, end_row: int):
     # Create timestamp directory
@@ -83,10 +85,15 @@ def run_scraping_demo(start_row: int, end_row: int):
 
         browser_tool = BrowserTool(
             structured_output_schema=PepExtractionList,
-            infrastructure_option=BrowserInfrastructureOption.LOCAL,
+            infrastructure_option=BrowserInfrastructureOption.REMOTE,
         )
 
-        task = f"From the url {source_domain}, navigate using the {instruction} to a page containing a list of people.  Extract the information for each person in the list."
+        task = (
+            f"From the url {source_domain}, navigate using the {instruction} to the page or section"
+            " containing a list of people.  Extract the information for each person in the relevant "
+            "part of the page. Do not deviate or extend your navigation from the instructions "
+            "provided. Do not visit other domains than the one provided."
+        )
 
         portia = Portia(
             Config(storage_class=StorageClass.DISK, llm_provider=LLMProvider.GOOGLE_GENERATIVE_AI),
@@ -97,20 +104,10 @@ def run_scraping_demo(start_row: int, end_row: int):
             plan = portia.plan(task)
             plan_run = portia.run_plan(plan)
 
-            # Save the output as JSON
             output_file = f"{output_dir}/row_{row}_output.json"
-
-            # Extract the result data
-            result_data = {
-                "row": row,
-                "source_domain": source_domain,
-                "instruction": instruction,
-                "task": task,
-                "result": plan_run.dict() if hasattr(plan_run, 'dict') else str(plan_run)
-            }
-
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(result_data, f, indent=2, ensure_ascii=False)
+            final_output = plan_run.outputs.final_output.get_value()
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(final_output.model_dump_json(indent=2))
 
             print(f"Saved output for row {row} to {output_file}")
 
@@ -123,13 +120,14 @@ def run_scraping_demo(start_row: int, end_row: int):
                 "source_domain": source_domain,
                 "instruction": instruction,
                 "task": task,
-                "error": str(e)
+                "error": str(e),
             }
-            with open(error_file, 'w', encoding='utf-8') as f:
+            with open(error_file, "w", encoding="utf-8") as f:
                 json.dump(error_data, f, indent=2, ensure_ascii=False)
+
 
 # Example usage - modify these parameters as needed
 if __name__ == "__main__":
     start_row = 1
-    end_row = 3
+    end_row = 1
     run_scraping_demo(start_row, end_row)
