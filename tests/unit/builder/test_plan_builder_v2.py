@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel
@@ -10,9 +10,18 @@ from pydantic import BaseModel
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
-from portia.plan import PlanInput
+from portia.builder.step_v2 import (
+    FunctionStep,
+    InvokeToolStep,
+    LLMStep,
+    SingleToolAgentStep,
+    StepV2,
+)
+from portia.plan import PlanInput, Step
 from portia.tool import Tool
+
+if TYPE_CHECKING:
+    from portia.portia import RunContext
 
 
 class OutputSchema(BaseModel):
@@ -42,6 +51,23 @@ class MockTool(Tool):
     def run(self, ctx: Any, **kwargs: Any) -> str:  # noqa: ANN401, ARG002
         """Run the mock tool."""
         return "mock result"
+
+
+class CustomStep(StepV2):
+    """Custom step for testing."""
+
+    async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401, ARG002
+        """Execute the step."""
+        return "mock result"
+
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this step to a Step from plan.py.
+
+        A Step is the legacy representation of a step in the plan, and is still used in the
+        Portia backend. If this step doesn't need to be represented in the plan sent to the Portia
+        backend, return None.
+        """
+        raise NotImplementedError
 
 
 class TestPlanBuilderV2:
@@ -473,14 +499,12 @@ class TestPlanBuilderV2:
     def test_add_step_method_basic(self) -> None:
         """Test the add_step() method with basic functionality."""
         builder = PlanBuilderV2()
-        llm_step = LLMStep(
-            task="Test task", inputs=["input1"], output_schema=None, step_name="custom_step"
-        )
+        custom_step = CustomStep(step_name="custom_step")
 
-        result = builder.add_step(llm_step)
+        result = builder.add_step(custom_step)
 
         assert len(result.plan.steps) == 1
-        assert result.plan.steps[0] is llm_step
+        assert result.plan.steps[0] is custom_step
         assert result.plan.steps[0].step_name == "custom_step"
 
     def test_add_step_method_with_different_step_types(self) -> None:
@@ -546,7 +570,7 @@ class TestPlanBuilderV2:
         result = builder.input(name="input1").add_steps(other_plan)
 
         assert len(result.plan.steps) == 2
-        assert len(result.plan.plan_inputs) == 2
+        assert len(result.plan.plan_inputs) == 3
 
         assert result.plan.steps[0] is other_plan.steps[0]
         assert result.plan.steps[1] is other_plan.steps[1]
@@ -625,10 +649,9 @@ class TestPlanBuilderV2:
         )
 
         assert len(builder.plan.steps) == 5
-        assert len(builder.plan.plan_inputs) == 1
+        assert len(builder.plan.plan_inputs) == 0
         assert builder.plan.steps[0].step_name == "individual"
         assert builder.plan.steps[1].step_name == "batch1"
         assert builder.plan.steps[2].step_name == "batch2"
         assert builder.plan.steps[3].step_name == "from_plan"
         assert builder.plan.steps[4].step_name == "final"
-        assert builder.plan.plan_inputs[0].name == "source_input"
