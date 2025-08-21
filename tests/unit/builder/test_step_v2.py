@@ -491,7 +491,9 @@ class TestInvokeToolStep:
         step = InvokeToolStep(tool="mock_tool", step_name="run_tool", args={"query": "search term"})
         mock_run_data = Mock()
         mock_tool = Mock()
-        mock_tool.arun = AsyncMock(return_value="tool result")
+        mock_output = Mock()
+        mock_output.get_value.return_value = "tool result"
+        mock_tool._arun = AsyncMock(return_value=mock_output)
 
         with (
             patch.object(mock_run_data.portia, "get_tool") as mock_get_tool,
@@ -504,8 +506,8 @@ class TestInvokeToolStep:
 
             assert result == "tool result"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
-            mock_tool.arun.assert_called_once()
-            call_args = mock_tool.arun.call_args
+            mock_tool._arun.assert_called_once()
+            call_args = mock_tool._arun.call_args
             assert call_args[1]["query"] == "search term"
 
     @pytest.mark.asyncio
@@ -519,7 +521,9 @@ class TestInvokeToolStep:
         )
         mock_run_data = Mock()
         mock_tool = Mock()
-        mock_tool.arun = AsyncMock(return_value="raw tool result")
+        mock_output = Mock()
+        mock_output.get_value.return_value = "raw tool result"
+        mock_tool._arun = AsyncMock(return_value=mock_output)
 
         # Mock the model and its aget_structured_response method
         mock_model = Mock()
@@ -541,7 +545,7 @@ class TestInvokeToolStep:
             assert isinstance(result, MockOutputSchema)
             assert result.result == "structured result"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
-            mock_tool.arun.assert_called_once()
+            mock_tool._arun.assert_called_once()
             mock_model.aget_structured_response.assert_called_once()
 
     @pytest.mark.asyncio
@@ -554,7 +558,9 @@ class TestInvokeToolStep:
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_tool = Mock()
-        mock_tool.arun = AsyncMock(return_value="tool result with reference")
+        mock_output = Mock()
+        mock_output.get_value.return_value = "tool result with reference"
+        mock_tool._arun = AsyncMock(return_value=mock_output)
 
         # Create proper ReferenceValue that the real methods can work with
         mock_data_value = LocalDataValue(value="previous step output")
@@ -573,8 +579,8 @@ class TestInvokeToolStep:
 
             assert result == "tool result with reference"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
-            mock_tool.arun.assert_called_once()
-            call_args = mock_tool.arun.call_args
+            mock_tool._arun.assert_called_once()
+            call_args = mock_tool._arun.call_args
             assert call_args[1]["query"] == "previous step output"
 
     @pytest.mark.asyncio
@@ -595,7 +601,9 @@ class TestInvokeToolStep:
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_tool = Mock()
-        mock_tool.arun = AsyncMock(return_value="mixed inputs result")
+        mock_output = Mock()
+        mock_output.get_value.return_value = "mixed inputs result"
+        mock_tool._arun = AsyncMock(return_value=mock_output)
 
         mock_data_value1 = LocalDataValue(value="user question")
         mock_ref1_value = ReferenceValue(value=mock_data_value1, description="User input")
@@ -618,8 +626,8 @@ class TestInvokeToolStep:
 
             assert result == "mixed inputs result"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
-            mock_tool.arun.assert_called_once()
-            call_args = mock_tool.arun.call_args[1]
+            mock_tool._arun.assert_called_once()
+            call_args = mock_tool._arun.call_args[1]
             assert call_args["context"] == "static context"
             assert call_args["user_input"] == "user question"
             assert call_args["limit"] == 10
@@ -639,7 +647,9 @@ class TestInvokeToolStep:
             user_guidance="Need more information",
             plan_run_id=None,
         )
-        mock_tool.arun = AsyncMock(return_value=mock_clarification)
+        mock_output = Mock()
+        mock_output.get_value.return_value = mock_clarification
+        mock_tool._arun = AsyncMock(return_value=mock_output)
 
         with (
             patch.object(mock_run_data.portia, "get_tool") as mock_get_tool,
@@ -654,7 +664,7 @@ class TestInvokeToolStep:
             assert result.user_guidance == "Need more information"
             assert result.plan_run_id == mock_run_data.plan_run.id
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
-            mock_tool.arun.assert_called_once_with(mock_ctx_class.return_value)
+            mock_tool._arun.assert_called_once_with(mock_ctx_class.return_value)
 
     @pytest.mark.asyncio
     async def test_invoke_tool_step_with_tool_instance(self) -> None:
@@ -663,8 +673,14 @@ class TestInvokeToolStep:
         step = InvokeToolStep(tool=mock_tool, step_name="run_tool", args={"input": "test input"})
         mock_run_data = Mock()
 
-        with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
+        with (
+            patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+            patch.object(mock_tool, "_arun") as mock_arun,
+        ):
             mock_ctx_class.return_value = Mock()
+            mock_output = Mock()
+            mock_output.get_value.return_value = "mock result"
+            mock_arun.return_value = mock_output
 
             result = await step.run(mock_run_data)
 

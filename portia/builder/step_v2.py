@@ -296,7 +296,7 @@ class InvokeToolStep(StepV2):
         )
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
-        output = await tool._arun(tool_ctx, **args)
+        output = await tool._arun(tool_ctx, **args)  # noqa: SLF001
         output_value = output.get_value()
         if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
             output_value.plan_run_id = run_data.plan_run.id
