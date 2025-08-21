@@ -91,7 +91,7 @@ class TestSearchToolSelection:
                 
                 # Should have issued a warning
                 assert len(w) == 1
-                assert "Invalid PORTIA_SEARCH_PROVIDER" in str(w[0].message)
+                assert "Invalid search_provider" in str(w[0].message)
                 assert "invalid" in str(w[0].message)
 
 
@@ -227,5 +227,5 @@ class TestDefaultToolRegistrySearchSelection:
                 
                 # Should have issued a warning
                 assert len(w) == 1
-                assert "Invalid PORTIA_SEARCH_PROVIDER" in str(w[0].message)
+                assert "Invalid search_provider" in str(w[0].message)
                 assert "invalid" in str(w[0].message)

@@ -16,63 +16,54 @@ from tests.utils import get_test_tool_context
 # Original tests for backward compatibility and integration with Response API
 def test_openai_search_tool_missing_api_key() -> None:
     """Test that OpenAISearchTool raises ToolHardError if API key is missing."""
-    tool = OpenAISearchTool()
     with patch("os.getenv", return_value=""):
-        ctx = get_test_tool_context()
         with pytest.raises(ToolHardError, match="OPENAI_API_KEY is required"):
-            tool.run(ctx, "What is the capital of France?")
+            OpenAISearchTool()
 
 
 def test_openai_search_tool_successful_response() -> None:
     """Test that OpenAISearchTool successfully processes a valid response."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "The capital of France is Paris, a city known for its rich history and culture.",
-                    "annotations": [
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://en.wikipedia.org/wiki/Paris",
-                                "title": "Paris - Wikipedia",
-                                "start_index": 0,
-                                "end_index": 50
-                            }
-                        },
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://britannica.com/place/Paris",
-                                "title": "Paris | History, Geography & Culture | Britannica",
-                                "start_index": 51,
-                                "end_index": 100
-                            }
-                        },
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://example.com/france-capital",
-                                "title": "France Capital Information",
-                                "start_index": 101,
-                                "end_index": 150
-                            }
-                        }
-                    ]
-                },
-                "finish_reason": "stop"
-            }
-        ]
-    }
+    
+    # Mock response object structure
+    mock_output_item = Mock()
+    mock_output_item.annotations = [
+        Mock(
+            type="url_citation",
+            url_citation=Mock(
+                url="https://en.wikipedia.org/wiki/Paris",
+                title="Paris - Wikipedia"
+            )
+        ),
+        Mock(
+            type="url_citation", 
+            url_citation=Mock(
+                url="https://britannica.com/place/Paris",
+                title="Paris | History, Geography & Culture | Britannica"
+            )
+        ),
+        Mock(
+            type="url_citation",
+            url_citation=Mock(
+                url="https://example.com/france-capital",
+                title="France Capital Information"
+            )
+        )
+    ]
+    mock_output_item.text = "The capital of France is Paris, a city known for its rich history and culture."
+    
+    mock_response = Mock()
+    mock_response.output = [mock_output_item]
+    mock_response.output_text = "The capital of France is Paris."
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
-
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            mock_client.responses.create.return_value = mock_response
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
             
             # Should return all results (no MAX_RESULTS limit anymore)
@@ -86,36 +77,33 @@ def test_openai_search_tool_successful_response() -> None:
 
 def test_openai_search_tool_fewer_results_than_max() -> None:
     """Test that OpenAISearchTool successfully processes response with fewer results."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "The capital of France is Paris.",
-                    "annotations": [
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://en.wikipedia.org/wiki/Paris",
-                                "title": "Paris - Wikipedia",
-                                "start_index": 0,
-                                "end_index": 30
-                            }
-                        }
-                    ]
-                },
-                "finish_reason": "stop"
-            }
-        ]
-    }
+    
+    # Mock response object structure
+    mock_output_item = Mock()
+    mock_output_item.annotations = [
+        Mock(
+            type="url_citation",
+            url_citation=Mock(
+                url="https://en.wikipedia.org/wiki/Paris",
+                title="Paris - Wikipedia"
+            )
+        )
+    ]
+    mock_output_item.text = "The capital of France is Paris."
+    
+    mock_response = Mock()
+    mock_response.output = [mock_output_item]
+    mock_response.output_text = "The capital of France is Paris."
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
-
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            mock_client.responses.create.return_value = mock_response
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
             
             # Should return only 1 result
@@ -126,26 +114,22 @@ def test_openai_search_tool_fewer_results_than_max() -> None:
 
 def test_openai_search_tool_no_annotations() -> None:
     """Test that OpenAISearchTool handles response with no annotations."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "The capital of France is Paris.",
-                    "annotations": []
-                },
-                "finish_reason": "stop"
-            }
-        ]
-    }
+    
+    # Mock response with no annotations
+    mock_response = Mock()
+    mock_response.output = Mock()
+    mock_response.output.annotations = []
+    mock_response.output_text = "The capital of France is Paris."
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
-
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            mock_client.responses.create.return_value = mock_response
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
             
             # Should create a basic result with content
@@ -155,52 +139,62 @@ def test_openai_search_tool_no_annotations() -> None:
             assert result[0]["url"] == ""
 
 
-def test_openai_search_tool_no_choices() -> None:
-    """Test that OpenAISearchTool raises ToolSoftError if no choices in response."""
-    tool = OpenAISearchTool()
+def test_openai_search_tool_no_output() -> None:
+    """Test that OpenAISearchTool raises ToolSoftError if no output in response."""
     mock_api_key = "sk-test-api-key"
-    mock_response = {"choices": []}
+    
+    # Mock response with no output
+    mock_response = Mock()
+    mock_response.output = None
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
-
-            with pytest.raises(ToolSoftError, match="No choices in OpenAI response"):
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            mock_client.responses.create.return_value = mock_response
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
+            with pytest.raises(ToolSoftError, match="No output in OpenAI response"):
                 tool.run(ctx, "What is the capital of France?")
 
 
 def test_openai_search_tool_http_error() -> None:
     """Test that OpenAISearchTool handles HTTP errors correctly."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_response = Mock(status_code=401, text="Unauthorized")
-            mock_post.return_value = mock_response
-            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "401 Unauthorized", request=Mock(), response=mock_response
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            # Simulate 401 authentication error
+            from openai import AuthenticationError
+            mock_client.responses.create.side_effect = AuthenticationError(
+                message="Incorrect API key provided",
+                response=Mock(status_code=401),
+                body=None
             )
-
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
             with pytest.raises(ToolHardError, match="Invalid OpenAI API key"):
                 tool.run(ctx, "What is the capital of France?")
 
 
-def test_openai_search_tool_invalid_json() -> None:
-    """Test that OpenAISearchTool handles invalid JSON response."""
-    tool = OpenAISearchTool()
+def test_openai_search_tool_api_error() -> None:
+    """Test that OpenAISearchTool handles general API errors."""
     mock_api_key = "sk-test-api-key"
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_response = Mock(status_code=200)
-            mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "", 0)
-            mock_post.return_value = mock_response
-
-            with pytest.raises(ToolSoftError, match="Failed to parse OpenAI response"):
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            # Simulate general API error
+            mock_client.responses.create.side_effect = Exception("General API error")
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
+            with pytest.raises(ToolSoftError, match="OpenAI API error"):
                 tool.run(ctx, "What is the capital of France?")
 
 
@@ -208,79 +202,76 @@ def test_openai_search_tool_invalid_json() -> None:
 @pytest.mark.asyncio
 async def test_openai_search_tool_async_missing_api_key() -> None:
     """Test that OpenAISearchTool raises ToolHardError if API key is missing (async)."""
-    tool = OpenAISearchTool()
     with patch("os.getenv", return_value=""):
-        ctx = get_test_tool_context()
         with pytest.raises(ToolHardError, match="OPENAI_API_KEY is required"):
-            await tool.arun(ctx, "What is the capital of France?")
+            OpenAISearchTool()
 
 
 @pytest.mark.asyncio
-async def test_openai_search_tool_async_successful_response(httpx_mock: HTTPXMock) -> None:
+async def test_openai_search_tool_async_successful_response() -> None:
     """Test that OpenAISearchTool successfully processes a valid response (async)."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "The capital of France is Paris.",
-                    "annotations": [
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://en.wikipedia.org/wiki/Paris",
-                                "title": "Paris - Wikipedia",
-                                "start_index": 0,
-                                "end_index": 30
-                            }
-                        },
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://britannica.com/place/Paris",
-                                "title": "Paris | Britannica",
-                                "start_index": 31,
-                                "end_index": 60
-                            }
-                        }
-                    ]
-                },
-                "finish_reason": "stop"
-            }
-        ]
-    }
+    
+    # Mock response object structure
+    mock_output_item = Mock()
+    mock_output_item.annotations = [
+        Mock(
+            type="url_citation",
+            url_citation=Mock(
+                url="https://en.wikipedia.org/wiki/Paris",
+                title="Paris - Wikipedia"
+            )
+        ),
+        Mock(
+            type="url_citation", 
+            url_citation=Mock(
+                url="https://britannica.com/place/Paris",
+                title="Paris | Britannica"
+            )
+        )
+    ]
+    mock_output_item.text = "The capital of France is Paris."
+    
+    mock_response = Mock()
+    mock_response.output = [mock_output_item]
+    mock_response.output_text = "The capital of France is Paris."
 
     with patch("os.getenv", return_value=mock_api_key):
-        httpx_mock.add_response(
-            url="https://api.openai.com/v1/chat/completions",
-            json=mock_response,
-            status_code=200,
-        )
-        ctx = get_test_tool_context()
-        result = await tool.arun(ctx, "What is the capital of France?")
-        
-        assert len(result) == 2
-        assert result[0]["url"] == "https://en.wikipedia.org/wiki/Paris"
-        assert result[1]["url"] == "https://britannica.com/place/Paris"
+        with patch("portia.open_source_tools.openai_search_tool.AsyncOpenAI") as mock_async_openai:
+            mock_client = Mock()
+            # Create an async mock
+            async def mock_create(*args, **kwargs):
+                return mock_response
+            mock_client.responses.create = mock_create
+            mock_async_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
+            result = await tool.arun(ctx, "What is the capital of France?")
+            
+            assert len(result) == 2
+            assert result[0]["url"] == "https://en.wikipedia.org/wiki/Paris"
+            assert result[1]["url"] == "https://britannica.com/place/Paris"
 
 
 @pytest.mark.asyncio
-async def test_openai_search_tool_async_http_error(httpx_mock: HTTPXMock) -> None:
+async def test_openai_search_tool_async_http_error() -> None:
     """Test that OpenAISearchTool handles HTTP errors correctly (async)."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
 
     with patch("os.getenv", return_value=mock_api_key):
-        httpx_mock.add_response(
-            url="https://api.openai.com/v1/chat/completions",
-            status_code=500,
-            text="Internal Server Error"
-        )
-        ctx = get_test_tool_context()
-        with pytest.raises(ToolSoftError, match="OpenAI API server error \(500\)"):
-            await tool.arun(ctx, "What is the capital of France?")
+        with patch("portia.open_source_tools.openai_search_tool.AsyncOpenAI") as mock_async_openai:
+            mock_client = Mock()
+            # Create an async mock that raises server error
+            async def mock_create_error(*args, **kwargs):
+                raise Exception("500 Internal Server Error")
+            mock_client.responses.create = mock_create_error
+            mock_async_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
+            with pytest.raises(ToolSoftError, match="OpenAI API error"):
+                await tool.arun(ctx, "What is the capital of France?")
 
 
 def test_openai_search_tool_manual_override_tavily_with_tavily_key() -> None:
@@ -316,103 +307,95 @@ def test_registry_return_search_tool_line_coverage() -> None:
 
 
 @pytest.mark.asyncio
-async def test_openai_search_tool_async_different_query(httpx_mock: HTTPXMock) -> None:
+async def test_openai_search_tool_async_different_query() -> None:
     """Test that OpenAISearchTool works with different search queries (async)."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "Joe Biden won the 2020 US Presidential election.",
-                    "annotations": [
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://example.com/election-results",
-                                "title": "2020 Election Results",
-                                "start_index": 0,
-                                "end_index": 40
-                            }
-                        }
-                    ]
-                },
-                "finish_reason": "stop"
-            }
-        ]
-    }
+    
+    # Mock response object structure
+    mock_output_item = Mock()
+    mock_output_item.annotations = [
+        Mock(
+            type="url_citation",
+            url_citation=Mock(
+                url="https://example.com/election-results",
+                title="2020 Election Results"
+            )
+        )
+    ]
+    mock_output_item.text = "Joe Biden won the 2020 US Presidential election."
+    
+    mock_response = Mock()
+    mock_response.output = [mock_output_item]
+    mock_response.output_text = "Joe Biden won the 2020 US Presidential election."
 
     with patch("os.getenv", return_value=mock_api_key):
-        httpx_mock.add_response(
-            url="https://api.openai.com/v1/chat/completions",
-            json=mock_response,
-            status_code=200,
-        )
-        ctx = get_test_tool_context()
-        result = await tool.arun(ctx, "Who won the US election in 2020?")
-        
-        assert len(result) == 1
-        assert result[0]["url"] == "https://example.com/election-results"
-        assert result[0]["title"] == "2020 Election Results"
+        with patch("portia.open_source_tools.openai_search_tool.AsyncOpenAI") as mock_async_openai:
+            mock_client = Mock()
+            # Create an async mock
+            async def mock_create(*args, **kwargs):
+                return mock_response
+            mock_client.responses.create = mock_create
+            mock_async_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
+            result = await tool.arun(ctx, "Who won the US election in 2020?")
+            
+            assert len(result) == 1
+            assert result[0]["url"] == "https://example.com/election-results"
+            assert result[0]["title"] == "2020 Election Results"
 
 
 def test_openai_search_tool_no_search_results() -> None:
     """Test that OpenAISearchTool raises ToolSoftError when no search results found."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
-    mock_response = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "",
-                    "annotations": []
-                },
-                "finish_reason": "stop"
-            }
-        ]
-    }
+    
+    # Mock response with empty content and no annotations
+    mock_response = Mock()
+    mock_response.output = Mock()
+    mock_response.output.annotations = []
+    mock_response.output_text = ""
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_post.return_value = Mock(status_code=200, json=lambda: mock_response)
-
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            mock_client.responses.create.return_value = mock_response
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
             with pytest.raises(ToolSoftError, match="No search results found in OpenAI response"):
                 tool.run(ctx, "What is the capital of France?")
 
 def test_openai_search_tool_rate_limit_error() -> None:
     """Test that OpenAISearchTool handles rate limit errors correctly."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_response = Mock(status_code=429, text="Rate limit exceeded")
-            mock_post.return_value = mock_response
-            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "429 Too Many Requests", request=Mock(), response=mock_response
-            )
-
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            # Simulate rate limit error
+            mock_client.responses.create.side_effect = Exception("429 Rate limit exceeded")
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
             with pytest.raises(ToolSoftError, match="OpenAI API rate limit exceeded"):
                 tool.run(ctx, "What is the capital of France?")
 
 
 def test_openai_search_tool_server_error() -> None:
     """Test that OpenAISearchTool handles server errors correctly."""
-    tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
 
     with patch("os.getenv", return_value=mock_api_key):
-        ctx = get_test_tool_context()
-        with patch("httpx.post") as mock_post:
-            mock_response = Mock(status_code=500, text="Internal Server Error")
-            mock_post.return_value = mock_response
-            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "500 Internal Server Error", request=Mock(), response=mock_response
-            )
-
-            with pytest.raises(ToolSoftError, match="OpenAI API server error \(500\)"):
+        with patch("portia.open_source_tools.openai_search_tool.OpenAI") as mock_openai:
+            mock_client = Mock()
+            # Simulate server error
+            mock_client.responses.create.side_effect = Exception("500 Internal Server Error")
+            mock_openai.return_value = mock_client
+            
+            tool = OpenAISearchTool()
+            ctx = get_test_tool_context()
+            with pytest.raises(ToolSoftError, match="OpenAI API server error"):
                 tool.run(ctx, "What is the capital of France?")

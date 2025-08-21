@@ -762,7 +762,7 @@ class DefaultToolRegistry(ToolRegistry):
             # Default logic: use OpenAI if available and no Tavily key
             use_openai_search = has_openai_key and not has_tavily_key
         
-        if use_openai_search:
+        if use_openai_search and has_openai_key:
             tools.append(OpenAISearchTool())
         elif has_tavily_key:
             # Add Tavily-based tools
