@@ -794,3 +794,116 @@ def test_browser_tool_multiple_calls(
         project_id="test_project",
         status="REQUEST_RELEASE",
     )
+
+
+@pytest.mark.asyncio
+async def test_browser_tool_arun_method(
+    mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
+) -> None:
+    """Test the async arun method of BrowserTool."""
+    # Mock task response data
+    mock_task_response = BrowserTaskOutput(
+        task_output="Task completed successfully",
+        human_login_required=False,
+    )
+
+    mock_task_result = MagicMock()
+    mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+
+    # Create async mock for agent.run()
+    mock_run = AsyncMock(return_value=mock_task_result)
+
+    # Patch the Agent class
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserTool(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider
+        )
+        context = get_test_tool_context()
+
+        # Run the async tool
+        result = await browser_tool.arun(context, "https://example.com", "test task")
+
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1
+
+        # Verify the final result is the task output
+        assert result == "Task completed successfully"
+
+
+def test_browser_tool_task_output_return(
+    mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
+) -> None:
+    """Test the browser tool returns task_output when not None."""
+    # Mock task response data with non-None task_output
+    mock_task_response = BrowserTaskOutput(
+        task_output="Specific task output result",
+        human_login_required=False,
+    )
+
+    mock_task_result = MagicMock()
+    mock_task_result.final_result.return_value = json.dumps(mock_task_response.model_dump())
+
+    # Create async mock for agent.run()
+    mock_run = AsyncMock(return_value=mock_task_result)
+
+    # Patch the Agent class
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserTool(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider
+        )
+        context = get_test_tool_context()
+
+        # Run the tool
+        result = browser_tool.run(context, "https://example.com", "test task")
+
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1
+
+        # Verify the result is exactly the task_output
+        assert result == "Specific task output result"
+
+
+def test_browser_tool_final_result_not_string(
+    mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
+) -> None:
+    """Test the browser tool raises ToolHardError when final_result is not a string."""
+    # Create mock result object that returns a non-string final_result
+    mock_result = MagicMock()
+    mock_result.final_result.return_value = 123  # Non-string value
+
+    # Create async mock for agent.run()
+    mock_run = AsyncMock(return_value=mock_result)
+
+    # Patch the Agent class
+    with patch("portia.open_source_tools.browser_tool.Agent") as mock_agent:
+        # Configure the mock Agent instance
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.run = mock_run
+        mock_agent.return_value = mock_agent_instance
+
+        browser_tool = BrowserTool(
+            custom_infrastructure_provider=mock_browser_infrastructure_provider
+        )
+        context = get_test_tool_context()
+
+        # Run the tool and expect ToolHardError
+        with pytest.raises(
+            ToolHardError, match="Expected final result to be a string, got <class 'int'>"
+        ):
+            browser_tool.run(context, "https://example.com", "test task")
+
+        # Verify Agent was called once
+        assert mock_agent.call_count == 1
+        assert mock_run.call_count == 1

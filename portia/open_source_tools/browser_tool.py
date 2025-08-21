@@ -336,9 +336,9 @@ class BrowserTool(Tool[str | BaseModel]):
         )
         result = await agent.run()
         final_result = result.final_result()
-        if isinstance(final_result, str):
-            return output_model.model_validate(json.loads(final_result))
-        raise ToolHardError(f"Expected final result to be a string, got {type(final_result)}")
+        if not isinstance(final_result, str):
+            raise ToolHardError(f"Expected final result to be a string, got {type(final_result)}")
+        return output_model.model_validate(json.loads(final_result))
 
     def _handle_login_requirement(
         self,
