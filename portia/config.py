@@ -33,6 +33,7 @@ from portia.model import (
     LangChainGenerativeModel,
     LLMProvider,
     OpenAIGenerativeModel,
+    OpenRouterGenerativeModel,
 )
 from portia.token_check import estimate_tokens
 
@@ -419,6 +420,10 @@ class Config(BaseModel):
     )
 
     # LLM API Keys
+    openrouter_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("OPENROUTER_API_KEY") or ""),
+        description="The API Key for OpenRouter. Must be set if llm-provider is OPENROUTER",
+    )
     openai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""),
         description="The API Key for OpenAI. Must be set if llm-provider is OPENAI",
@@ -642,6 +647,8 @@ class Config(BaseModel):
                         return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o3-mini"
+                    case LLMProvider.OPENROUTER:
+                        return "openrouter/moonshotai/kimi-k2"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -672,6 +679,8 @@ class Config(BaseModel):
                         return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/gpt-4.1"
+                    case LLMProvider.OPENROUTER:
+                        return "openrouter/moonshotai/kimi-k2"
                 return None
 
     @model_validator(mode="after")
@@ -913,6 +922,12 @@ class Config(BaseModel):
 
         """
         match llm_provider:
+            case LLMProvider.OPENROUTER:
+                return OpenRouterGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("openrouter_api_key"),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
+                )
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
                     model_name=model_name,
@@ -1002,6 +1017,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         kwargs.get("azure_openai_api_key") and kwargs.get("azure_openai_endpoint")
     ):
         return LLMProvider.AZURE_OPENAI
+    if os.getenv("OPENROUTER_API_KEY") or kwargs.get("openrouter_api_key"):
+        return LLMProvider.OPENROUTER
     return None
 
 

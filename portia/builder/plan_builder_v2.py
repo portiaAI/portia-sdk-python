@@ -13,11 +13,12 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
+    StepV2,
 )
 from portia.plan import PlanInput
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
     from pydantic import BaseModel
 
@@ -274,6 +275,33 @@ class PlanBuilderV2:
                 conditional_block=self._current_conditional_block,
             )
         )
+        return self
+
+    def add_step(self, step: StepV2) -> PlanBuilderV2:
+        """Add a pre-built step to the plan.
+
+        This can be used to add custom steps into the plan.
+        """
+        self.plan.steps.append(step)
+        return self
+
+    def add_steps(self, plan: PlanV2 | Iterable[StepV2]) -> PlanBuilderV2:
+        """Add steps to the plan.
+
+        Step can be provided as a sequence or as a plan. If provided as a plan, we will also take
+        plan inputs from the plan, provided there are no duplicates (if there are duplicates, a
+        PlanBuilderError will be raised).
+        """
+        if isinstance(plan, PlanV2):
+            # Ensure there are no duplicate plan inputs
+            existing_input_names = {p.name for p in self.plan.plan_inputs}
+            for _input in plan.plan_inputs:
+                if _input.name in existing_input_names:
+                    raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
+            self.plan.plan_inputs.extend(plan.plan_inputs)
+            self.plan.steps.extend(plan.steps)
+        else:
+            self.plan.steps.extend(plan)
         return self
 
     def final_output(

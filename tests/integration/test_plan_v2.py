@@ -567,3 +567,65 @@ def test_plan_v2_legacy_condition_string() -> None:
         None,  # 11: final endif
         None,  # 12: final step
     ]
+
+
+@pytest.mark.parametrize(("input_value", "expected_output"), [(4, 3), (6, 7)])
+def test_conditional_plan_with_record_functions(input_value: int, expected_output: int) -> None:
+    """Test a plan with conditional logic that calls different record functions."""
+
+    class ConditionalTestOutput(BaseModel):
+        """Output schema for conditional test."""
+
+        value_being_processed: int = Field(description="The value being processed")
+
+    portia = Portia(config=Config.from_default(default_log_level=LogLevel.DEBUG))
+
+    # Track which functions were called
+    called_functions: list[str] = []
+
+    def record_high_value() -> int:
+        """Record that high value branch was taken and return incremented value."""
+        called_functions.append("high_value_branch")
+        return input_value + 1
+
+    def record_low_value() -> int:
+        """Record that low value branch was taken and return decremented value."""
+        called_functions.append("low_value_branch")
+        return input_value - 1
+
+    plan = (
+        PlanBuilderV2()
+        .input(name="number_input", description="An integer to process")
+        .if_(
+            condition=lambda number_input: number_input > 5,
+            args={"number_input": Input("number_input")},
+        )
+        .function_step(
+            function=record_high_value,
+            step_name="record_high",
+        )
+        .else_()
+        .function_step(
+            function=record_low_value,
+            step_name="record_low",
+        )
+        .endif()
+        .llm_step(
+            task="Generate a message about the chosen value being processed",
+            inputs=[StepOutput("record_high"), StepOutput(5)],
+            step_name="print_message",
+        )
+        .final_output(
+            output_schema=ConditionalTestOutput,
+        )
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan, plan_run_inputs={"number_input": input_value})
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    final_output = plan_run.outputs.final_output.get_value()
+    assert isinstance(final_output, ConditionalTestOutput)
+    assert final_output.value_being_processed == expected_output
