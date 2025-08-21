@@ -296,17 +296,18 @@ class InvokeToolStep(StepV2):
         )
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
-        output = await tool.arun(tool_ctx, **args)
-        if isinstance(output, Clarification) and output.plan_run_id is None:
-            output.plan_run_id = run_data.plan_run.id
+        output = await tool._arun(tool_ctx, **args)
+        output_value = output.get_value()
+        if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
+            output_value.plan_run_id = run_data.plan_run.id
 
         if (
             self.output_schema
-            and not isinstance(output, self.output_schema)
-            and not isinstance(output, Clarification)
+            and not isinstance(output_value, self.output_schema)
+            and not isinstance(output_value, Clarification)
         ):
             model = run_data.portia.config.get_default_model()
-            output = await model.aget_structured_response(
+            output_value = await model.aget_structured_response(
                 [
                     Message(
                         role="user",
@@ -315,7 +316,7 @@ class InvokeToolStep(StepV2):
                 ],
                 self.output_schema,
             )
-        return output
+        return output_value
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
