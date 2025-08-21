@@ -762,7 +762,18 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             **kwargs,
         )
+        kwargs_no_thinking = kwargs.copy()
+        kwargs_no_thinking.get("model_kwargs", {}).pop("thinking", None)
+        self._non_thinking_client = ChatAnthropic(
+            model_name=model_name,
+            timeout=timeout,
+            max_retries=max_retries,
+            max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
+            api_key=api_key,
+            **kwargs_no_thinking,
+        )
         super().__init__(client, model_name)
+
         self._instructor_client = instructor.from_anthropic(
             client=wrappers.wrap_anthropic(
                 Anthropic(api_key=api_key.get_secret_value()),
@@ -817,7 +828,11 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._non_thinking_client.with_structured_output(
+            schema,
+            include_raw=True,
+            **kwargs,
+        )
         raw_response = structured_client.invoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
@@ -890,7 +905,11 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return await self.aget_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._non_thinking_client.with_structured_output(
+            schema,
+            include_raw=True,
+            **kwargs,
+        )
         raw_response = await structured_client.ainvoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")

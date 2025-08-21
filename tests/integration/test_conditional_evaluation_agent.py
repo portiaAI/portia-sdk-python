@@ -5,18 +5,16 @@ import pytest
 from portia import LLMProvider
 from portia.config import Config
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
-from tests.integration.test_e2e import PROVIDER_MODELS
 
 
-@pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(
+    "llm_provider", [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE]
+)
 @pytest.mark.asyncio
-async def test_conditional_evaluation_agent(
-    llm_provider: LLMProvider, default_model_name: str
-) -> None:
+async def test_conditional_evaluation_agent(llm_provider: LLMProvider) -> None:
     """The agent should correctly evaluate true and false statements."""
     config = Config.from_default(
         llm_provider=llm_provider,
-        default_model=default_model_name,
     )
     agent = ConditionalEvaluationAgent(config)
 
@@ -27,15 +25,14 @@ async def test_conditional_evaluation_agent(
     assert false_result is False
 
 
-@pytest.mark.parametrize(("llm_provider", "default_model_name"), PROVIDER_MODELS)
+@pytest.mark.parametrize(
+    "llm_provider", [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE]
+)
 @pytest.mark.asyncio
-async def test_conditional_evaluation_agent_with_arguments(
-    llm_provider: LLMProvider, default_model_name: str
-) -> None:
+async def test_conditional_evaluation_agent_with_arguments(llm_provider: LLMProvider) -> None:
     """The agent should correctly evaluate statements using passed arguments."""
     config = Config.from_default(
         llm_provider=llm_provider,
-        default_model=default_model_name,
     )
     agent = ConditionalEvaluationAgent(config)
 
