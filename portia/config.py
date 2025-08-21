@@ -467,6 +467,20 @@ class Config(BaseModel):
         ),
     )
 
+    # Search Tool Options
+    search_provider: str = Field(
+        default_factory=lambda: os.getenv("PORTIA_SEARCH_PROVIDER", "tavily"),
+        description="The search provider to use ('openai' or 'tavily'). Defaults to 'tavily'.",
+    )
+
+    @field_validator("search_provider")
+    @classmethod
+    def validate_search_provider(cls, v: str) -> str:
+        """Validate that search_provider is one of the supported values."""
+        if v.lower() not in ["openai", "tavily"]:
+            raise ValueError(f"search_provider must be 'openai' or 'tavily', got '{v}'")
+        return v.lower()
+
     llm_redis_cache_url: str | None = Field(
         default_factory=lambda: os.getenv("LLM_REDIS_CACHE_URL"),
         description="Optional Redis URL used for caching LLM responses. This URl should include "

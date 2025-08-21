@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import os
-import warnings
 from typing import Any
 
-import httpx
+from openai import AsyncOpenAI, OpenAI
 from pydantic import BaseModel, Field
 
 from portia.errors import ToolHardError, ToolSoftError
 from portia.tool import Tool, ToolRunContext
-
-MAX_RESULTS = 3
 
 
 class OpenAISearchToolSchema(BaseModel):
@@ -31,7 +27,7 @@ class OpenAISearchToolSchema(BaseModel):
 class OpenAISearchTool(Tool[list[dict[str, Any]]]):
     """Searches the internet using OpenAI's web search feature.
     
-    This tool uses OpenAI's web search capability to find answers to search queries
+    This tool uses OpenAI's Response API with web search capability to find answers to search queries
     and returns the results in a format compatible with Tavily's search tool.
     """
 
@@ -46,105 +42,115 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
     args_schema: type[BaseModel] = OpenAISearchToolSchema
     output_schema: tuple[str, str] = ("list", "list: search results with urls, titles, and content")
     should_summarize: bool = True
-    api_url: str = "https://api.openai.com/v1/chat/completions"
+
+    def __init__(
+        self,
+        model: str = "gpt-5-mini",
+        web_search_context_size: str = "medium",
+        api_key: str | None = None,
+    ):
+        """Initialize the OpenAI Search Tool.
+        
+        Args:
+            model: The model to use for search (default: gpt-5-mini)
+            web_search_context_size: Context size for web search ("small", "medium", "large")
+            api_key: OpenAI API key, if None will use OPENAI_API_KEY env var
+        """
+        super().__init__()
+        self._model = model
+        self._web_search_context_size = web_search_context_size
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
+        
+        if not self._api_key:
+            raise ToolHardError("OPENAI_API_KEY is required to use OpenAI search")
+            
+        self._client = OpenAI(api_key=self._api_key)
+        self._async_client = AsyncOpenAI(api_key=self._api_key)
+    
+    @property
+    def model(self) -> str:
+        """Get the model being used."""
+        return self._model
+    
+    @property
+    def web_search_context_size(self) -> str:
+        """Get the web search context size."""
+        return self._web_search_context_size
+    
+    @property
+    def api_key(self) -> str:
+        """Get the API key."""
+        return self._api_key
 
     def run(self, _: ToolRunContext, search_query: str) -> list[dict[str, Any]]:
         """Run the OpenAI Search Tool."""
-        payload, headers = self._prep_request(search_query)
-        response = httpx.post(self.api_url, headers=headers, json=payload, timeout=60.0)
+        try:
+            response = self._client.responses.create(
+                model=self._model,
+                input=f"search the web using search term '{search_query}' and provide all results",
+                tools=[
+                    {
+                        "type": "web_search_preview",
+                        "web_search_preview": {
+                            "context_size": self._web_search_context_size
+                        }
+                    }
+                ],
+                store=False,  # Don't store responses for privacy
+                timeout=60.0
+            )
+        except Exception as e:
+            if "401" in str(e) or "unauthorized" in str(e).lower():
+                raise ToolHardError(f"Invalid OpenAI API key: {e}") from e
+            elif "429" in str(e) or "rate limit" in str(e).lower():
+                raise ToolSoftError(f"OpenAI API rate limit exceeded: {e}") from e
+            elif "500" in str(e) or "502" in str(e) or "503" in str(e) or "504" in str(e):
+                raise ToolSoftError(f"OpenAI API server error: {e}") from e
+            else:
+                raise ToolSoftError(f"OpenAI API error: {e}") from e
+                
         return self._parse_response(response)
 
     async def arun(self, _: ToolRunContext, search_query: str) -> list[dict[str, Any]]:
         """Run the OpenAI Search Tool asynchronously."""
-        payload, headers = self._prep_request(search_query)
-        async with httpx.AsyncClient() as client:
-            response = await client.post(self.api_url, headers=headers, json=payload, timeout=60.0)
+        try:
+            response = await self._async_client.responses.create(
+                model=self._model,
+                input=f"search the web using search term '{search_query}' and provide all results",
+                tools=[
+                    {
+                        "type": "web_search_preview",
+                        "web_search_preview": {
+                            "context_size": self._web_search_context_size
+                        }
+                    }
+                ],
+                store=False,  # Don't store responses for privacy
+                timeout=60.0
+            )
+        except Exception as e:
+            if "401" in str(e) or "unauthorized" in str(e).lower():
+                raise ToolHardError(f"Invalid OpenAI API key: {e}") from e
+            elif "429" in str(e) or "rate limit" in str(e).lower():
+                raise ToolSoftError(f"OpenAI API rate limit exceeded: {e}") from e
+            elif "500" in str(e) or "502" in str(e) or "503" in str(e) or "504" in str(e):
+                raise ToolSoftError(f"OpenAI API server error: {e}") from e
+            else:
+                raise ToolSoftError(f"OpenAI API error: {e}") from e
+                
         return self._parse_response(response)
 
-    def _check_valid_api_key(self) -> str:
-        """Check if the API key is valid."""
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key or api_key == "":
-            raise ToolHardError("OPENAI_API_KEY is required to use OpenAI search")
-        return api_key
+    def _parse_response(self, response) -> list[dict[str, Any]]:
+        """Parse the response from the OpenAI Response API."""
+        if not hasattr(response, 'output') or not response.output:
+            raise ToolSoftError(f"No output in OpenAI response: {response}")
 
-    def _build_payload(self, search_query: str) -> dict[str, Any]:
-        """Build the payload for the OpenAI Search Tool."""
-        return {
-            "model": "gpt-4o-search-preview",
-            "web_search_options": {
-                "search_context_size": "medium"
-            },
-            "messages": [
-                {
-                    "role": "user",
-                    "content": f"search the web using search term '{search_query}' and provide all results"
-                }
-            ]
-        }
-
-    def _build_headers(self, api_key: str) -> dict[str, str]:
-        """Build the headers for the OpenAI Search Tool."""
-        return {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        }
-
-    def _prep_request(self, search_query: str) -> tuple[dict[str, Any], dict[str, str]]:
-        """Prepare the request for the OpenAI Search Tool."""
-        api_key = self._check_valid_api_key()
-        payload = self._build_payload(search_query)
-        headers = self._build_headers(api_key)
-        return payload, headers
-
-    def _parse_response(self, response: httpx.Response) -> list[dict[str, Any]]:
-        """Parse the response from the OpenAI Search Tool."""
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            status_code = e.response.status_code
-            if status_code == 401:
-                raise ToolHardError(f"Invalid OpenAI API key: {e.response.text}") from e
-            elif status_code == 429:
-                raise ToolSoftError(f"OpenAI API rate limit exceeded: {e.response.text}") from e
-            elif status_code >= 500:
-                raise ToolSoftError(f"OpenAI API server error ({status_code}): {e.response.text}") from e
-            else:
-                raise ToolSoftError(f"OpenAI API error ({status_code}): {e.response.text}") from e
-        
-        try:
-            json_response = response.json()
-        except json.JSONDecodeError as e:
-            raise ToolSoftError(f"Failed to parse OpenAI response: {e}") from e
-
-        if "choices" not in json_response or not json_response["choices"]:
-            raise ToolSoftError(f"No choices in OpenAI response: {json_response}")
-
-        choice = json_response["choices"][0]
-        message = choice.get("message", {})
-        
         # Extract URLs from annotations to mimic Tavily's results format
-        annotations = message.get("annotations", [])
-        results = []
-        
-        for annotation in annotations:
-            if annotation.get("type") == "url_citation":
-                url_citation = annotation.get("url_citation", {})
-                url = url_citation.get("url")
-                title = url_citation.get("title", "")
-                
-                if url:
-                    # Create a result object similar to what Tavily returns
-                    result = {
-                        "url": url,
-                        "title": title,
-                        "content": self._truncate_content(message.get("content", ""), 200)
-                    }
-                    results.append(result)
+        results = self._extract_search_results_from_annotations(response.output)
         
         # If no annotations, try to extract content and create a single result
         if not results:
-            content = message.get("content", "")
+            content = response.output_text or ""
             if content:
                 # Create a basic result with the content
                 result = {
@@ -154,16 +160,56 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
                 }
                 results.append(result)
         
-        # Return first MAX_RESULTS results to match Tavily format
-        limited_results = results[:MAX_RESULTS]
+        if not results:
+            raise ToolSoftError(f"No search results found in OpenAI response: {response}")
         
-        if not limited_results:
-            raise ToolSoftError(f"No search results found in OpenAI response: {json_response}")
+        return results
+
+    def _extract_search_results_from_annotations(self, output) -> list[dict[str, Any]]:
+        """Extract search results from response output annotations.
         
-        return limited_results
-    
-    def _truncate_content(self, content: str, max_length: int) -> str:
-        """Truncate content to specified length with ellipsis if needed."""
-        if len(content) <= max_length:
-            return content
-        return content[:max_length] + "..."
+        Args:
+            output: The output object from OpenAI response
+            
+        Returns:
+            List of search result dictionaries with url, title, and content fields
+        """
+        results = []
+        
+        # Handle output as a list of content items
+        if isinstance(output, list):
+            for content_item in output:
+                if hasattr(content_item, 'annotations'):
+                    annotations = content_item.annotations or []
+                    for annotation in annotations:
+                        if getattr(annotation, 'type', None) == 'url_citation':
+                            url_citation = getattr(annotation, 'url_citation', {})
+                            url = getattr(url_citation, 'url', None)
+                            title = getattr(url_citation, 'title', '') or ''
+                            
+                            if url:
+                                result = {
+                                    "url": url,
+                                    "title": title,
+                                    "content": getattr(content_item, 'text', '') or ''
+                                }
+                                results.append(result)
+        
+        # Handle single output item
+        elif hasattr(output, 'annotations'):
+            annotations = output.annotations or []
+            for annotation in annotations:
+                if getattr(annotation, 'type', None) == 'url_citation':
+                    url_citation = getattr(annotation, 'url_citation', {})
+                    url = getattr(url_citation, 'url', None)
+                    title = getattr(url_citation, 'title', '') or ''
+                    
+                    if url:
+                        result = {
+                            "url": url,
+                            "title": title,
+                            "content": getattr(output, 'text', '') or ''
+                        }
+                        results.append(result)
+        
+        return results

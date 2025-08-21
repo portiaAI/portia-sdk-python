@@ -27,19 +27,28 @@ def _get_preferred_search_tool():
     'openai' or 'tavily'. Otherwise, OpenAI search is used if OPENAI_API_KEY is available
     and TAVILY_API_KEY is not.
     """
-    has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
-    has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
-    search_provider = os.getenv("PORTIA_SEARCH_PROVIDER", "").lower()
+    from portia.config import Config
+    
+    try:
+        config = Config()
+        has_openai_key = bool(config.openai_api_key and config.openai_api_key.get_secret_value().strip())
+        has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
+        search_provider = config.search_provider
+    except Exception:
+        # Fallback to env vars if config fails
+        has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+        has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
+        search_provider = os.getenv("PORTIA_SEARCH_PROVIDER", "tavily").lower()
     
     # If user explicitly sets the provider, honor their choice
     if search_provider == "openai" and has_openai_key:
         return OpenAISearchTool()
     elif search_provider == "tavily" and has_tavily_key:
         return SearchTool()
-    elif search_provider and search_provider not in ["openai", "tavily"]:
+    elif search_provider not in ["openai", "tavily"]:
         # Invalid provider specified, fall back to default logic but warn
         warnings.warn(
-            f"Invalid PORTIA_SEARCH_PROVIDER '{search_provider}'. "
+            f"Invalid search_provider '{search_provider}'. "
             "Valid options are 'openai' or 'tavily'. Falling back to default selection.",
             UserWarning,
             stacklevel=2

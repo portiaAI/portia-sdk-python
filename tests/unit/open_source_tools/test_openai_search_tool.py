@@ -13,6 +13,7 @@ from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 from tests.utils import get_test_tool_context
 
 
+# Original tests for backward compatibility and integration with Response API
 def test_openai_search_tool_missing_api_key() -> None:
     """Test that OpenAISearchTool raises ToolHardError if API key is missing."""
     tool = OpenAISearchTool()
@@ -74,7 +75,7 @@ def test_openai_search_tool_successful_response() -> None:
 
             result = tool.run(ctx, "What is the capital of France?")
             
-            # Should return first 3 results (MAX_RESULTS)
+            # Should return all results (no MAX_RESULTS limit anymore)
             assert len(result) == 3
             assert all("url" in res for res in result)
             assert all("title" in res for res in result)
@@ -84,7 +85,7 @@ def test_openai_search_tool_successful_response() -> None:
 
 
 def test_openai_search_tool_fewer_results_than_max() -> None:
-    """Test that OpenAISearchTool successfully processes response with fewer than MAX_RESULTS."""
+    """Test that OpenAISearchTool successfully processes response with fewer results."""
     tool = OpenAISearchTool()
     mock_api_key = "sk-test-api-key"
     mock_response = {

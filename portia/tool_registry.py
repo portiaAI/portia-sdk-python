@@ -737,10 +737,10 @@ class DefaultToolRegistry(ToolRegistry):
             ImageUnderstandingTool(),
         ]
         
-        # Search tool selection logic with manual override support
-        has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+        # Search tool selection logic with Config support
+        has_openai_key = bool(config.openai_api_key and config.openai_api_key.get_secret_value().strip())
         has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
-        search_provider = os.getenv("PORTIA_SEARCH_PROVIDER", "").lower()
+        search_provider = config.search_provider
         
         # Determine which search tool to use
         use_openai_search = False
@@ -748,11 +748,11 @@ class DefaultToolRegistry(ToolRegistry):
             use_openai_search = True
         elif search_provider == "tavily" and has_tavily_key:
             use_openai_search = False
-        elif search_provider and search_provider not in ["openai", "tavily"]:
+        elif search_provider not in ["openai", "tavily"]:
             # Invalid provider, warn and fall back to default logic
             import warnings
             warnings.warn(
-                f"Invalid PORTIA_SEARCH_PROVIDER '{search_provider}'. "
+                f"Invalid search_provider '{search_provider}'. "
                 "Valid options are 'openai' or 'tavily'. Falling back to default selection.",
                 UserWarning,
                 stacklevel=2
