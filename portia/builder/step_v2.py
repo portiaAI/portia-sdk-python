@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import itertools
 import re
 from abc import ABC, abstractmethod
@@ -362,7 +363,14 @@ class FunctionStep(StepV2):
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the function."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-        output = self.function(**args)
+
+        # Check if the function is async (coroutine function)
+        if inspect.iscoroutinefunction(self.function):
+            # For async functions, await the result
+            output = await self.function(**args)
+        else:
+            # For sync functions, call directly
+            output = self.function(**args)
 
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
