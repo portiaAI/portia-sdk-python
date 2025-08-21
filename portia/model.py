@@ -143,7 +143,6 @@ class GenerativeModel(ABC):
             Message: The response from the model.
 
         """
-        self._log_llm_call(messages)
 
     @abstractmethod
     def get_structured_response(
@@ -161,7 +160,6 @@ class GenerativeModel(ABC):
             BaseModelT: The structured response from the model.
 
         """
-        self._log_llm_call(messages)
 
     @abstractmethod
     async def aget_response(self, messages: list[Message]) -> Message:
@@ -171,7 +169,6 @@ class GenerativeModel(ABC):
             messages (list[Message]): The list of messages to send to the model.
 
         """
-        self._log_llm_call(messages)
         raise NotImplementedError("async is not implemented")  # pragma: no cover
 
     @abstractmethod
@@ -187,7 +184,6 @@ class GenerativeModel(ABC):
             schema (type[BaseModelT]): The Pydantic model to use for the response.
 
         """
-        self._log_llm_call(messages)
         raise NotImplementedError("async is not implemented")  # pragma: no cover
 
     def get_context_window_size(self) -> int:
