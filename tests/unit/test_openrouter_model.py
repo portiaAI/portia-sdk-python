@@ -14,7 +14,6 @@ class StructuredOutputTestModel(MagicMock):
     """Test model for structured output testing."""
 
 
-
 @pytest.mark.asyncio
 async def test_openrouter_model_aget_response() -> None:
     """Test OpenRouter model aget_response method."""
