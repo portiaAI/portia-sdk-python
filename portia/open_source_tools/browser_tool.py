@@ -787,3 +787,146 @@ if BROWSERBASE_AVAILABLE:
             return not any(
                 step.tool_id == "browser_tool" for step in plan.steps[: plan_run.current_step_index]
             )
+
+
+class BrowserToolWithoutAuth(Tool[str | BaseModel]):
+    """Browser tool for pages that don't require authentication.
+
+    This tool is identical to BrowserTool except it uses SimpleBrowserTaskOutput which doesn't
+    include authentication-related fields (human_login_required, login_url, user_login_guidance).
+    The task instructions also don't reference login, making it suitable for pages that don't
+    require authentication.
+
+    Args:
+        id (str, optional): Custom identifier for the tool. Defaults to "browser_tool_without_auth".
+        name (str, optional): Display name for the tool. Defaults to "Browser Tool Without Auth".
+        description (str, optional): Custom description of the tool's purpose. Defaults to a
+            general description of the browser tool's capabilities.
+        infrastructure_option (BrowserInfrastructureOption, optional): The infrastructure
+            provider to use. Can be either `BrowserInfrastructureOption.LOCAL` or
+            `BrowserInfrastructureOption.REMOTE`. Defaults to
+            `BrowserInfrastructureOption.REMOTE`.
+        custom_infrastructure_provider (BrowserInfrastructureProvider, optional): A custom
+            infrastructure provider to use. If not provided, the infrastructure provider will be
+            resolved from the `infrastructure_option` argument.
+        structured_output_schema (BaseModel, optional): A Pydantic model to use for structured
+            output. If not provided, the tool will return a string.
+
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    id: str = Field(init_var=True, default="browser_tool_without_auth")
+    name: str = Field(init_var=True, default="Browser Tool Without Auth")
+    description: str = Field(
+        init_var=True,
+        default=(
+            "Browser tool for pages that don't require authentication. Can be used to navigate "
+            "to a URL and complete tasks on public pages. Should only be used if the task "
+            "requires a browser and you are sure of the URL and that no authentication is needed. "
+            "This tool handles a full end to end task. It is capable of doing multiple things "
+            "across different URLs within the same root domain as part of the end to end task. As "
+            "a result, do not call this tool more than once back to back unless it is for "
+            "different root domains - just call it once with the combined task and the URL set "
+            "to the root domain."
+        ),
+    )
+    args_schema: type[BaseModel] = Field(init_var=True, default=BrowserToolSchema)
+    output_schema: tuple[str, str] = ("str", "The Browser tool's response to the user query.")
+
+    model: GenerativeModel | None | str = Field(
+        default=None,
+        exclude=True,
+        description="The model to use for the BrowserToolWithoutAuth. If not provided, "
+        "the model will be resolved from the config.",
+    )
+
+    infrastructure_option: BrowserInfrastructureOption = Field(
+        default_factory=lambda: BrowserInfrastructureOption.REMOTE
+        if (
+            BROWSERBASE_AVAILABLE
+            and os.getenv("BROWSERBASE_API_KEY")
+            and os.getenv("BROWSERBASE_PROJECT_ID")
+        )
+        else BrowserInfrastructureOption.LOCAL,
+        description="The infrastructure provider to use for the browser tool.",
+    )
+
+    custom_infrastructure_provider: BrowserInfrastructureProvider | None = Field(default=None)
+
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        description="Optional structured output schema for the browser tool's task output.",
+    )
+
+    @cached_property
+    def infrastructure_provider(self) -> BrowserInfrastructureProvider:
+        """Get the infrastructure provider instance (cached)."""
+        if self.custom_infrastructure_provider:
+            return self.custom_infrastructure_provider
+        if self.infrastructure_option == BrowserInfrastructureOption.REMOTE:
+            # Ensure error is raised if not installed
+            validate_extras_dependencies("tools-browser-browserbase", raise_error=True)
+            return BrowserInfrastructureProviderBrowserBase()
+        return BrowserInfrastructureProviderLocal()
+
+    @staticmethod
+    def process_task_data(task_data: list[Any] | str | None) -> str:
+        """Process task_data into a string, handling different input types.
+
+        Args:
+            task_data: Data that can be a None, a string or a list of objects.
+
+        Returns:
+            A string representation of the data, with list items joined by newlines.
+
+        """
+        if task_data is None:
+            return ""
+
+        if isinstance(task_data, str):
+            return task_data
+
+        return "\n".join(str(item) for item in task_data)
+
+    def run(
+        self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
+    ) -> str | BaseModel:
+        """Run the BrowserToolWithoutAuth."""
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+        llm = model.to_langchain()
+
+        async def run_browser_tasks() -> str | BaseModel:
+            output_schema = self.structured_output_schema if self.structured_output_schema else str
+            output_model = SimpleBrowserTaskOutput[output_schema]
+
+            async def run_agent_task(
+                task_description: str,
+                output_model: type[BaseModel],
+            ) -> BaseModel:
+                agent = Agent(
+                    task=task_description,
+                    llm=llm,
+                    browser=self.infrastructure_provider.setup_browser(ctx),
+                    controller=Controller(output_model=output_model),
+                )
+                result = await agent.run()
+                return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
+
+            # Main task - no login references
+            task_to_complete = (
+                f"Go to {url} and complete the following task: {task}. "
+                "Additional data is available below: "
+                f"{self.process_task_data(task_data)}"
+            )
+
+            task_result = await run_agent_task(task_to_complete, output_model)
+            self.infrastructure_provider.step_complete(ctx)
+            return task_result.task_output  # type: ignore reportCallIssue
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:  # pragma: no cover
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return loop.run_until_complete(run_browser_tasks())
