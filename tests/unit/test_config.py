@@ -29,6 +29,7 @@ from portia.model import (
     LLMProvider,
     MistralAIGenerativeModel,
     OpenAIGenerativeModel,
+    OpenRouterGenerativeModel,
     _llm_cache,
 )
 
@@ -43,6 +44,7 @@ PROVIDER_ENV_VARS = [
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_DEFAULT_REGION",
+    "OPENROUTER_API_KEY",
 ]
 
 
@@ -181,6 +183,7 @@ def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
             AzureOpenAIGenerativeModel,
             ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"],
         ),
+        ("openrouter/moonshotai/kimi-k2", OpenRouterGenerativeModel, ["OPENROUTER_API_KEY"]),
     ],
 )
 def test_set_default_model_from_string(
@@ -596,6 +599,7 @@ def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
             },
             LLMProvider.AZURE_OPENAI,
         ),
+        ({"OPENROUTER_API_KEY": "test-openrouter-api-key"}, LLMProvider.OPENROUTER),
     ],
 )
 def test_llm_provider_default_from_api_keys_env_vars(
@@ -633,6 +637,7 @@ def test_llm_provider_default_from_api_keys_env_vars(
             },
             LLMProvider.AZURE_OPENAI,
         ),
+        ({"openrouter_api_key": "test-openrouter-api-key"}, LLMProvider.OPENROUTER),
     ],
 )
 def test_llm_provider_default_from_api_keys_config_kwargs(
