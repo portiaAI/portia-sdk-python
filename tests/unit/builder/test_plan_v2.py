@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from pydantic import BaseModel
@@ -112,6 +113,64 @@ class TestPlanV2:
         assert legacy_plan.steps[0].task == "Mock task for step_1"
         assert legacy_plan.steps[1].task == "Mock task for step_2"
 
+    def test_step_output_name_with_step_index(self) -> None:
+        """Test step_output_name() method with step index."""
+        step1 = MockStepV2("first_step")
+        step2 = MockStepV2("second_step")
+        plan = PlanV2(steps=[step1, step2])
+
+        assert plan.step_output_name(0) == "$step_0_output"
+        assert plan.step_output_name(1) == "$step_1_output"
+
+    def test_step_output_name_with_step_name(self) -> None:
+        """Test step_output_name() method with step name."""
+        step1 = MockStepV2("custom_step_name")
+        step2 = MockStepV2("another_step")
+        plan = PlanV2(steps=[step1, step2])
+
+        assert plan.step_output_name("custom_step_name") == "$step_0_output"
+        assert plan.step_output_name("another_step") == "$step_1_output"
+
+    def test_step_output_name_with_step_instance(self) -> None:
+        """Test step_output_name() method with StepV2 instance."""
+        step1 = MockStepV2("instance_step")
+        step2 = MockStepV2("another_instance")
+        plan = PlanV2(steps=[step1, step2])
+
+        assert plan.step_output_name(step1) == "$step_0_output"
+        assert plan.step_output_name(step2) == "$step_1_output"
+
+    def test_step_output_name_invalid_step_index(self) -> None:
+        """Test step_output_name() method with invalid step index."""
+        plan = PlanV2(steps=[MockStepV2("test_step")])
+
+        # Invalid indices don't raise ValueError, they just get passed through
+        result = plan.step_output_name(999)  # Invalid index
+        assert result == "$step_999_output"
+
+    def test_step_output_name_invalid_step_name(self) -> None:
+        """Test step_output_name() method with invalid step name."""
+        plan = PlanV2(steps=[MockStepV2("valid_step")])
+
+        with patch("portia.builder.plan_v2.logger") as mock_logger:
+            result = plan.step_output_name("nonexistent_step")
+
+            # Should return a UUID-based fallback name
+            assert result.startswith("$unknown_step_output_")
+            mock_logger().warning.assert_called_once()
+
+    def test_step_output_name_step_not_in_plan(self) -> None:
+        """Test step_output_name() method with step instance not in plan."""
+        plan = PlanV2(steps=[MockStepV2("in_plan")])
+        external_step = MockStepV2("not_in_plan")
+
+        with patch("portia.builder.plan_v2.logger") as mock_logger:
+            result = plan.step_output_name(external_step)
+
+            # Should return a UUID-based fallback name
+            assert result.startswith("$unknown_step_output_")
+            mock_logger().warning.assert_called_once()
+
     def test_idx_by_name_valid_names(self) -> None:
         """Test idx_by_name() method with valid step names."""
         step1 = MockStepV2("first")
@@ -150,6 +209,13 @@ class TestPlanV2:
 
         plan = PlanV2(steps=[llm_step, tool_step])
 
+        # Test step output names
+        assert plan.step_output_name(0) == "$step_0_output"
+        assert plan.step_output_name(1) == "$step_1_output"
+        assert plan.step_output_name("llm_step") == "$step_0_output"
+        assert plan.step_output_name("tool_step") == "$step_1_output"
+
+        # Test idx_by_name
         assert plan.idx_by_name("llm_step") == 0
         assert plan.idx_by_name("tool_step") == 1
 
@@ -157,8 +223,13 @@ class TestPlanV2:
         """Test PlanV2 behavior with no steps."""
         plan = PlanV2(steps=[])
 
+        # idx_by_name should raise ValueError for any name
         with pytest.raises(ValueError, match="Step any_name not found in plan"):
             plan.idx_by_name("any_name")
+
+        # step_output_name with invalid index should return default format
+        result = plan.step_output_name(0)
+        assert result == "$step_0_output"
 
     def test_plan_id_generation(self) -> None:
         """Test that each PlanV2 instance gets a unique ID."""
@@ -190,6 +261,13 @@ class TestPlanV2:
             final_output_schema=OutputSchema,
             label="Complex Data Analysis Plan",
         )
+
+        # Test all step names can be found
+        for i, step in enumerate(steps):
+            assert plan.idx_by_name(step.step_name) == i
+            assert plan.step_output_name(i) == f"$step_{i}_output"
+            assert plan.step_output_name(step.step_name) == f"$step_{i}_output"
+            assert plan.step_output_name(step) == f"$step_{i}_output"
 
         # Test legacy plan conversion
         plan_context = PlanContext(

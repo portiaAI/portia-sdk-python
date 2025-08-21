@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, Field, model_validator
 
+from portia.builder.reference import default_step_name
 from portia.builder.step_v2 import StepV2
+from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanInput
 from portia.prefixed_uuid import PlanUUID
 
@@ -55,6 +59,23 @@ class PlanV2(BaseModel):
             plan_inputs=self.plan_inputs,
             structured_output_schema=self.final_output_schema,
         )
+
+    def step_output_name(self, step: int | str | StepV2) -> str:
+        """Get the name of the output of a step in the plan."""
+        try:
+            if isinstance(step, StepV2):
+                step_num = self.steps.index(step)
+            elif isinstance(step, str):
+                step_num = self.idx_by_name(step)
+            else:
+                step_num = step
+        except ValueError:
+            logger().warning(
+                f"Attempted to retrieve name of step {step} but step not found in plan"
+            )
+            return f"$unknown_step_output_{uuid.uuid4().hex}"
+        else:
+            return f"${default_step_name(step_num)}_output"
 
     def idx_by_name(self, name: str) -> int:
         """Get the index of a step by name."""

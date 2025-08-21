@@ -9,7 +9,6 @@ from portia.builder.reference import Input, ReferenceValue, StepOutput, default_
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
-from tests.unit.builder.test_plan_v2 import MockStepV2
 
 
 class TestDefaultStepName:
@@ -75,41 +74,6 @@ class TestStepOutput:
 
         assert result == "$named_step_output"
         mock_plan.step_output_name.assert_called_once_with("named_step")
-
-    def test_step_output_name_with_step_index(self) -> None:
-        """Test step_output_name() method with step index."""
-        assert StepOutput.name_from_step(0, Mock(spec=PlanV2)) == "$step_0_output"
-        assert StepOutput.name_from_step(1, Mock(spec=PlanV2)) == "$step_1_output"
-
-        # Invalid step still returns a valid string
-        assert StepOutput.name_from_step(999, Mock(spec=PlanV2)) == "$step_999_output"
-
-    def test_step_output_name_with_step_instance(self) -> None:
-        """Test step_output_name() method with StepV2 instance."""
-        step1 = MockStepV2("instance_step")
-        step2 = MockStepV2("another_instance")
-        plan = PlanV2(steps=[step1, step2])
-
-        assert StepOutput.name_from_step(step1, plan) == "$step_0_output"
-        assert StepOutput.name_from_step(step2, plan) == "$step_1_output"
-
-        # Invalid step still returns a valid string
-        assert StepOutput.name_from_step(MockStepV2("nonexistent"), plan).startswith(
-            "$unknown_step_output_"
-        )
-
-    def test_step_output_name_with_step_name(self) -> None:
-        """Test step_output_name() method with step name."""
-        step1 = MockStepV2("custom_step_name")
-        step2 = MockStepV2("another_step")
-        plan = PlanV2(steps=[step1, step2])
-
-        assert StepOutput.name_from_step("custom_step_name", plan) == "$step_0_output"
-        assert StepOutput.name_from_step("another_step", plan) == "$step_1_output"
-
-        # Invalid step still returns a valid string
-        result = StepOutput.name_from_step("nonexistent_step", plan)
-        assert result.startswith("$unknown_step_output_")
 
     def test_get_value_with_int_step_success(self) -> None:
         """Test get_value method with integer step - successful case."""

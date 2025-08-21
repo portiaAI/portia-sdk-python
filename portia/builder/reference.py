@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, override
 
@@ -13,7 +12,6 @@ from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.builder.step_v2 import StepV2
     from portia.portia import RunContext
 
 
@@ -62,25 +60,7 @@ class StepOutput(Reference):
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
         """Get the name of the reference to use with legacy Portia plans."""
-        return StepOutput.name_from_step(self.step, plan)
-
-    @classmethod
-    def name_from_step(cls, step: StepV2 | int | str, plan: PlanV2) -> str:
-        """Get the name of the output of a step in the plan."""
-        try:
-            if isinstance(step, int):
-                step_num = step
-            elif isinstance(step, str):
-                step_num = plan.idx_by_name(step)
-            else:
-                step_num = plan.steps.index(step)
-        except ValueError:
-            logger().warning(
-                f"Attempted to retrieve name of step {step} but step not found in plan"
-            )
-            return f"$unknown_step_output_{uuid.uuid4().hex}"
-        else:
-            return f"${default_step_name(step_num)}_output"
+        return plan.step_output_name(self.step)
 
     def __str__(self) -> str:
         """Get the string representation of the step output."""

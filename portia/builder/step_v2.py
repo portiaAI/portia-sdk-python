@@ -166,15 +166,13 @@ class StepV2(BaseModel, ABC):
                 ),
             )
             condition_str = " and ".join(
-                f"{StepOutput.name_from_step(i, plan)} is false"
-                for i in previous_clause_step_indexes
+                f"{plan.step_output_name(i)} is false" for i in previous_clause_step_indexes
             )
             if current_step_index not in block.clause_step_indexes:
                 # The step is a non-conditional step within a block, so we need to make the
                 # active clause condition was true.
-                condition_str = (
-                    f"{StepOutput.name_from_step(active_clause_step_index, plan)} is true"
-                    + (f" and {condition_str}" if condition_str else "")
+                condition_str = f"{plan.step_output_name(active_clause_step_index)} is true" + (
+                    f" and {condition_str}" if condition_str else ""
                 )
 
             return condition_str
@@ -247,7 +245,7 @@ class LLMStep(StepV2):
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=LLMTool.LLM_TOOL_ID,
-            output=StepOutput.name_from_step(self, plan),
+            output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
         )
@@ -337,7 +335,7 @@ class InvokeToolStep(StepV2):
             task=f"Use tool {self._tool_name()} with inputs: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=self._tool_name(),
-            output=StepOutput.name_from_step(self, plan),
+            output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
         )
@@ -405,7 +403,7 @@ class FunctionStep(StepV2):
             task=f"Run function {fn_name} with args: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=f"{self._TOOL_ID_PREFIX}{fn_name}",
-            output=StepOutput.name_from_step(self, plan),
+            output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
         )
@@ -456,7 +454,7 @@ class SingleToolAgentStep(StepV2):
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
             tool_id=self.tool,
-            output=StepOutput.name_from_step(self, plan),
+            output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
         )
@@ -539,6 +537,6 @@ class ConditionalStep(StepV2):
             task=f"Conditional clause: {cond_str}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=None,
-            output=StepOutput.name_from_step(self, plan),
+            output=plan.step_output_name(self),
             condition=self._get_legacy_condition(plan),
         )
