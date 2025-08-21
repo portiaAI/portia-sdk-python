@@ -6,7 +6,7 @@ import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -296,18 +296,18 @@ class InvokeToolStep(StepV2):
         )
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
-        # TODO(RH): Move to async tool run when we can  # noqa: FIX002, TD003
-        output = tool.run(tool_ctx, **args)
-        if isinstance(output, Clarification) and output.plan_run_id is None:
-            output.plan_run_id = run_data.plan_run.id
+        output = await tool._arun(tool_ctx, **args)  # noqa: SLF001
+        output_value = output.get_value()
+        if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
+            output_value.plan_run_id = run_data.plan_run.id
 
         if (
             self.output_schema
-            and not isinstance(output, self.output_schema)
-            and not isinstance(output, Clarification)
+            and not isinstance(output_value, self.output_schema)
+            and not isinstance(output_value, Clarification)
         ):
             model = run_data.portia.config.get_default_model()
-            output = await model.aget_structured_response(
+            output_value = await model.aget_structured_response(
                 [
                     Message(
                         role="user",
@@ -316,7 +316,7 @@ class InvokeToolStep(StepV2):
                 ],
                 self.output_schema,
             )
-        return output
+        return output_value
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
@@ -348,6 +348,8 @@ class FunctionStep(StepV2):
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
     )
+
+    _TOOL_ID_PREFIX: ClassVar[str] = "local_function_"
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -392,11 +394,16 @@ class FunctionStep(StepV2):
         return Step(
             task=f"Run function {fn_name} with args: {inputs_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
-            tool_id=f"local_function_{fn_name}",
+            tool_id=f"{self._TOOL_ID_PREFIX}{fn_name}",
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
         )
+
+    @classmethod
+    def tool_id_is_local_function(cls, tool_id: str) -> bool:
+        """Check if the tool id is a local function."""
+        return tool_id.startswith(cls._TOOL_ID_PREFIX)
 
 
 class SingleToolAgentStep(StepV2):

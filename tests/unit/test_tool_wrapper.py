@@ -119,7 +119,8 @@ def test_tool_call_wrapper_run_with_clarification(
     wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     result = wrapper.run(ctx, "new clarification")
-    assert isinstance(result, Clarification)
+    assert isinstance(result, list)
+    assert isinstance(result[0], Clarification)
     assert mock_storage.records[-1].status == ToolCallStatus.NEED_CLARIFICATION
 
 
@@ -192,7 +193,8 @@ async def test_tool_call_wrapper_arun_with_clarification(mock_storage: MockStora
     wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     result = await wrapper.arun(ctx, "new clarification")
-    assert isinstance(result, Clarification)
+    assert isinstance(result, list)
+    assert isinstance(result[0], Clarification)
 
     # Wait for background tasks to complete
     import asyncio

@@ -32,6 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import ReferenceValue
+from portia.builder.step_v2 import FunctionStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -2619,11 +2620,10 @@ class Portia:
         )
         for step_index in range(check_from_index, len(plan.steps)):
             step = plan.steps[step_index]
-            # TODO(RH): Tidy up this check to work with local functions  # noqa: FIX002, TD003
             if (
                 not step.tool_id
                 or step.tool_id in tools_remaining
-                or step.tool_id.startswith("local_function_")
+                or FunctionStep.tool_id_is_local_function(step.tool_id)
             ):
                 continue
             tools_remaining.add(step.tool_id)
