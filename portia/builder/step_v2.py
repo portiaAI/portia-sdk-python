@@ -6,7 +6,7 @@ import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, cast, override
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -43,11 +43,6 @@ class StepV2(BaseModel, ABC):
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
         """Execute the step."""
-        raise NotImplementedError  # pragma: no cover
-
-    @abstractmethod
-    def describe(self) -> str:
-        """Return a description of this step for logging purposes."""
         raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
@@ -203,8 +198,7 @@ class LLMStep(StepV2):
         default=None, description="The schema of the output."
     )
 
-    @override
-    def describe(self) -> str:
+    def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         return f"LLMStep(task='{self.task}'{output_info})"
@@ -271,8 +265,7 @@ class InvokeToolStep(StepV2):
         default=None, description="The schema of the output."
     )
 
-    @override
-    def describe(self) -> str:
+    def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         return f"InvokeToolStep(tool='{self._tool_name()}', args={self.args}{output_info})"
@@ -357,8 +350,7 @@ class FunctionStep(StepV2):
 
     _TOOL_ID_PREFIX: ClassVar[str] = "local_function_"
 
-    @override
-    def describe(self) -> str:
+    def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         fn_name = getattr(self.function, "__name__", str(self.function))
@@ -430,8 +422,7 @@ class SingleToolAgentStep(StepV2):
         default=None, description="The schema of the output."
     )
 
-    @override
-    def describe(self) -> str:
+    def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
         return f"SingleToolAgentStep(tool='{self.tool}', query='{self.task}'{output_info})"
@@ -488,10 +479,11 @@ class ConditionalStep(StepV2):
     @property
     def block(self) -> ConditionalBlock:
         """Get the conditional block for this step."""
-        return cast(ConditionalBlock, self.conditional_block)
+        if not isinstance(self.conditional_block, ConditionalBlock):
+            raise TypeError("Conditional block is not a ConditionalBlock")
+        return self.conditional_block
 
-    @override
-    def describe(self) -> str:
+    def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         return (
             f"ConditionalStep(condition='{self.condition}', "

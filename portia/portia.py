@@ -2737,10 +2737,10 @@ class Portia:
         branch_stack: list[ConditionalStepResult] = []
         for i, step in enumerate(plan.steps):
             if i < run_data.plan_run.current_step_index:
-                logger().debug(f"Skipping step {i}: {step.describe()}")
+                logger().debug(f"Skipping step {i}: {step}")
                 continue
 
-            logger().info(f"Starting step {i}: {step.describe()}")
+            logger().info(f"Starting step {i}: {step}")
 
             try:
                 result = await step.run(run_data)
@@ -2788,9 +2788,7 @@ class Portia:
             )
             output = ReferenceValue(
                 value=output_value,
-                description=(
-                    f"Output from step '{step.step_name}' (Description: {step.describe()})"
-                ),
+                description=(f"Output from step '{step.step_name}' (Description: {step})"),
             )
             run_data.step_output_values.append(output)
 
@@ -2816,9 +2814,7 @@ class Portia:
                 self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
                 error_output = ReferenceValue(
                     value=error_value,
-                    description=(
-                        f"Error from step '{step.step_name}' (Description: {step.describe()})"
-                    ),
+                    description=(f"Error from step '{step.step_name}' (Description: {step})"),
                 )
                 run_data.step_output_values.append(error_output)
                 # Skip the after_step_execution hook as we have already run it

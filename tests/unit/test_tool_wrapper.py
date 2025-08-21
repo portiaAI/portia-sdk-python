@@ -26,6 +26,8 @@ class MockStorage(AdditionalStorage):
         """Save records in array."""
         self.records = []
         self.end_users = {}
+        self.async_save_calls = []
+        self.async_end_user_calls = []
 
     def save_tool_call(self, tool_call: ToolCallRecord) -> None:
         """Save records in array."""
@@ -52,6 +54,17 @@ class MockStorage(AdditionalStorage):
             return self.end_users[external_id]
         end_user = EndUser(external_id=external_id)
         return self.save_end_user(end_user)
+
+    async def asave_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Async save records in array."""
+        self.async_save_calls.append(tool_call)
+        self.records.append(tool_call)
+
+    async def asave_end_user(self, end_user: EndUser) -> EndUser:
+        """Async add end_user to dict."""
+        self.async_end_user_calls.append(end_user)
+        self.end_users[end_user.external_id] = end_user
+        return end_user
 
 
 @pytest.fixture
@@ -127,3 +140,108 @@ def test_tool_call_wrapper_run_returns_none(mock_storage: MockStorage) -> None:
     wrapper.run(ctx)
     assert mock_storage.records[-1].output
     assert mock_storage.records[-1].output == LocalDataValue(value=None).model_dump(mode="json")
+
+
+# Async tests for ToolCallWrapper.arun method
+@pytest.mark.asyncio
+async def test_tool_call_wrapper_arun_success(mock_tool: Tool, mock_storage: MockStorage) -> None:
+    """Test successful async run of the ToolCallWrapper."""
+    (_, plan_run) = get_test_plan_run()
+    wrapper = ToolCallWrapper(mock_tool, mock_storage, plan_run)
+    ctx = get_test_tool_context()
+    result = await wrapper.arun(ctx, 1, 2)
+    assert result == 3
+
+    # Wait for background tasks to complete
+    import asyncio
+
+    await asyncio.sleep(0.01)
+
+    # Check that async storage methods were called
+    assert len(mock_storage.async_save_calls) == 1
+    assert mock_storage.async_save_calls[0].status == ToolCallStatus.SUCCESS
+    assert len(mock_storage.async_end_user_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_tool_call_wrapper_arun_with_exception(mock_storage: MockStorage) -> None:
+    """Test async run of the ToolCallWrapper when the child tool raises an exception."""
+    tool = ErrorTool()
+    (_, plan_run) = get_test_plan_run()
+    wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
+    ctx = get_test_tool_context()
+    with pytest.raises(ToolHardError, match="Test error"):
+        await wrapper.arun(ctx, "Test error", False, False)  # noqa: FBT003
+
+    # Wait for background tasks to complete
+    import asyncio
+
+    await asyncio.sleep(0.01)
+
+    # Check that async storage methods were called
+    assert len(mock_storage.async_save_calls) == 1
+    assert mock_storage.async_save_calls[0].status == ToolCallStatus.FAILED
+    assert len(mock_storage.async_end_user_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_tool_call_wrapper_arun_with_clarification(mock_storage: MockStorage) -> None:
+    """Test async run of the ToolCallWrapper when the child tool returns a Clarification."""
+    (_, plan_run) = get_test_plan_run()
+    tool = ClarificationTool()
+    wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
+    ctx = get_test_tool_context()
+    result = await wrapper.arun(ctx, "new clarification")
+    assert isinstance(result, Clarification)
+
+    # Wait for background tasks to complete
+    import asyncio
+
+    await asyncio.sleep(0.01)
+
+    # Check that async storage methods were called
+    assert len(mock_storage.async_save_calls) == 1
+    assert mock_storage.async_save_calls[0].status == ToolCallStatus.NEED_CLARIFICATION
+    assert len(mock_storage.async_end_user_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_tool_call_wrapper_arun_records_latency(
+    mock_tool: Tool, mock_storage: MockStorage
+) -> None:
+    """Test that the ToolCallWrapper records latency correctly in async mode."""
+    (_, plan_run) = get_test_plan_run()
+    wrapper = ToolCallWrapper(mock_tool, mock_storage, plan_run)
+    ctx = get_test_tool_context()
+    await wrapper.arun(ctx, 1, 2)
+
+    # Wait for background tasks to complete
+    import asyncio
+
+    await asyncio.sleep(0.01)
+
+    # Check that async storage methods were called
+    assert len(mock_storage.async_save_calls) == 1
+    assert mock_storage.async_save_calls[0].latency_seconds > 0
+    assert len(mock_storage.async_end_user_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_tool_call_wrapper_arun_returns_none(mock_storage: MockStorage) -> None:
+    """Test that the ToolCallWrapper handles None returns correctly in async mode."""
+    (_, plan_run) = get_test_plan_run()
+    wrapper = ToolCallWrapper(NoneTool(), mock_storage, plan_run)
+    ctx = get_test_tool_context()
+    await wrapper.arun(ctx)
+
+    # Wait for background tasks to complete
+    import asyncio
+
+    await asyncio.sleep(0.01)
+
+    # Check that async storage methods were called
+    assert len(mock_storage.async_save_calls) == 1
+    assert mock_storage.async_save_calls[0].output
+    expected_output = LocalDataValue(value=None).model_dump(mode="json")
+    assert mock_storage.async_save_calls[0].output == expected_output
+    assert len(mock_storage.async_end_user_calls) == 1
