@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from abc import ABC, abstractmethod
@@ -762,9 +763,9 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             **kwargs,
         )
-        kwargs_no_thinking = kwargs.copy()
+        kwargs_no_thinking = copy.deepcopy(kwargs)
         kwargs_no_thinking.get("model_kwargs", {}).pop("thinking", None)
-        # You cannot use structured output with thinking enabled, or you get an error saying 
+        # You cannot use structured output with thinking enabled, or you get an error saying
         # 'Thinking may not be enabled when tool_choice forces tool use'.
         # So we create a separate client for structured output.
         # NB Instructor can be used, because it doesn't use the tool_choice API.
