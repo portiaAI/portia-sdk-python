@@ -14,22 +14,14 @@ from portia.plan import PlanInput
 class TestDefaultStepName:
     """Test cases for the default_step_name function."""
 
-    def test_default_step_name_zero_index(self) -> None:
-        """Test default_step_name with index 0."""
-        result = default_step_name(0)
-        assert result == "step_0"
-
-    def test_default_step_name_positive_indices(self) -> None:
-        """Test default_step_name with various positive indices."""
+    def test_default_step_name(self) -> None:
+        """Test default_step_name."""
+        assert default_step_name(0) == "step_0"
         assert default_step_name(1) == "step_1"
         assert default_step_name(5) == "step_5"
         assert default_step_name(42) == "step_42"
         assert default_step_name(999) == "step_999"
-
-    def test_default_step_name_large_index(self) -> None:
-        """Test default_step_name with a large index."""
-        result = default_step_name(123456)
-        assert result == "step_123456"
+        assert default_step_name(123456) == "step_123456"
 
 
 class TestStepOutput:
