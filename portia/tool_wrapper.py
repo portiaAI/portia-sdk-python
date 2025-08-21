@@ -16,14 +16,15 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict
 
-from portia.clarification import Clarification
-from portia.common import Serializable, combine_args_kwargs
-from portia.execution_agents.output import LocalDataValue
+from portia.common import combine_args_kwargs
+from portia.execution_agents.execution_utils import is_clarification
 from portia.logger import logger
 from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import ReadyResponse, Tool, ToolRunContext
 
 if TYPE_CHECKING:
+    from portia.clarification import Clarification
+    from portia.execution_agents.output import Output
     from portia.plan_run import PlanRun
 
 
@@ -100,7 +101,7 @@ class ToolCallWrapper(Tool):
         record = self._setup_tool_call(ctx, *args, **kwargs)
         start_time = datetime.now(tz=UTC)
         try:
-            output = self._child_tool.run(ctx, *args, **kwargs)
+            output = self._child_tool._run(ctx, *args, **kwargs)  # noqa: SLF001
         except Exception as e:
             # handle the tool call record
             record.output = str(e)
@@ -113,23 +114,24 @@ class ToolCallWrapper(Tool):
             self._storage.save_tool_call(record)
             self._storage.save_end_user(ctx.end_user)
 
-        return output
+        return output.get_value()
 
     def _process_output(
         self,
         record: ToolCallRecord,
-        output: Serializable | Clarification,
+        output: Output,
         start_time: datetime,
     ) -> ToolCallRecord:
         """Process the output of the tool call and update the record."""
-        if isinstance(output, Clarification):
+        output_value = output.get_value()
+        if is_clarification(output_value) and output_value is not None:
+            record.output = [clar.model_dump(mode="json") for clar in output_value]
             record.status = ToolCallStatus.NEED_CLARIFICATION
+        elif output_value is None:
             record.output = output.model_dump(mode="json")
-        elif output is None:
-            record.output = LocalDataValue(value=output).model_dump(mode="json")
             record.status = ToolCallStatus.SUCCESS
         else:
-            record.output = output
+            record.output = output_value
             record.status = ToolCallStatus.SUCCESS
         record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
         return record
@@ -161,7 +163,7 @@ class ToolCallWrapper(Tool):
         record = self._setup_tool_call(ctx, *args, **kwargs)
         start_time = datetime.now(tz=UTC)
         try:
-            output = await self._child_tool.arun(ctx, *args, **kwargs)
+            output = await self._child_tool._arun(ctx, *args, **kwargs)  # noqa: SLF001
         except Exception as e:
             record.output = str(e)
             record.latency_seconds = (datetime.now(tz=UTC) - start_time).total_seconds()
@@ -173,4 +175,4 @@ class ToolCallWrapper(Tool):
             # Fire-and-forget background tasks
             asyncio.create_task(self._storage.asave_tool_call(record))  # noqa: RUF006
             asyncio.create_task(self._storage.asave_end_user(ctx.end_user))  # noqa: RUF006
-        return output
+        return output.get_value()
