@@ -26,7 +26,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from browser_use import Agent, Browser, BrowserConfig, Controller
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from browser_use.browser.context import BrowserContextConfig
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_core import PydanticUndefined
 
 from portia import logger
@@ -244,6 +245,104 @@ class BrowserTool(Tool[str | BaseModel]):
         description="Optional structured output schema for the browser tool's task output.",
     )
 
+    allowed_domains: list[str] | None = Field(
+        default=None,
+        description="List of allowed domains that the browser tool can navigate to. "
+        "If None, all domains are allowed. Supports exact domain matching and glob patterns. "
+        "Examples: ['example.com'], ['https://google.com', 'http*://www.google.com'], "
+        "['*.example.com']. Use with caution as wildcards match ALL subdomains. "
+        "Explicitly list domains and include schemes for security. Passed directly to "
+        "browser-use's BrowserConfig.allowed_domains for built-in validation.",
+    )
+
+    @field_validator('allowed_domains', mode='before')
+    @classmethod
+    def validate_allowed_domains(cls, v: list[str] | None) -> list[str] | None:
+        """Validate allowed_domains format and warn about security implications."""
+        if v is None:
+            return v
+        
+        return cls._validate_domains_list(v)
+    
+    @classmethod
+    def _validate_domains_list(cls, domains: list[str]) -> list[str]:
+        """Centralized validation for allowed_domains list.
+        
+        Args:
+            domains: List of domain strings to validate
+            
+        Returns:
+            Validated list of domains
+            
+        Raises:
+            ValueError: If domains format is invalid
+        """
+        if not isinstance(domains, list):
+            raise ValueError(f"Invalid allowed_domains: {domains}. Must be a list of non-empty strings.")
+            
+        validated_domains = []
+        for domain in domains:
+            if not isinstance(domain, str) or not domain.strip():
+                raise ValueError(f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings.")
+            
+            # Enhanced security warning based on browser-use documentation
+            cls._warn_about_domain_security(domain)
+            validated_domains.append(domain.strip())
+        
+        return validated_domains
+    
+    @classmethod
+    def _warn_about_domain_security(cls, domain: str) -> None:
+        """Warn about domain security implications based on browser-use patterns.
+        
+        Based on browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!'
+        
+        Args:
+            domain: Domain string to check for security issues
+        """
+        if '*' in domain:
+            if domain.startswith('*.'):
+                # Pattern like '*.example.com' - high risk as per docs
+                logger().warning(
+                    f"Wildcard domain '{domain}' matches ALL subdomains. "
+                    "Per browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!' "
+                    "Consider explicitly listing specific subdomains for better security."
+                )
+            elif domain == '*' or '/*' in domain:
+                # Extremely dangerous patterns
+                logger().warning(
+                    f"Wildcard pattern '{domain}' allows access to ANY domain. "
+                    "This is extremely dangerous. Use specific domain patterns instead."
+                )
+            else:
+                # Other wildcard patterns
+                logger().warning(
+                    f"Wildcard pattern '{domain}' may match unintended domains. "
+                    "Per browser-use docs, be very cautious with wildcards. "
+                    "Use full URLs with schemes (https://example.com) for security."
+                )
+        
+        # Warn about missing scheme as recommended in docs
+        if not domain.startswith(('http://', 'https://')) and not domain.startswith('*'):
+            logger().info(
+                f"Domain '{domain}' lacks scheme. "
+                "Browser-use docs recommend full URLs like 'https://example.com' for clarity."
+            )
+    
+    @classmethod 
+    def _create_browser_context_config(cls, allowed_domains: list[str] | None) -> BrowserContextConfig:
+        """Create BrowserContextConfig with optional allowed_domains.
+        
+        Args:
+            allowed_domains: List of allowed domains or None
+            
+        Returns:
+            Configured BrowserContextConfig instance
+        """
+        if allowed_domains is not None:
+            return BrowserContextConfig(allowed_domains=allowed_domains)
+        return BrowserContextConfig()
+    
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -311,7 +410,7 @@ class BrowserTool(Tool[str | BaseModel]):
                 agent = Agent(
                     task=task_description,
                     llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx),
+                    browser=self.infrastructure_provider.setup_browser(ctx, self.allowed_domains),
                     controller=Controller(output_model=output_model),
                 )
                 result = await agent.run()
@@ -390,27 +489,32 @@ class BrowserToolForUrl(BrowserTool):
         description: str | None = None,
         model: GenerativeModel | None | str = NotSet,
         infrastructure_option: BrowserInfrastructureOption | None = NotSet,
+        custom_infrastructure_provider: BrowserInfrastructureProvider | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+        allowed_domains: list[str] | None = None,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
-        domain_parts = str(HttpUrl(url).host).split(".")
-        formatted_domain = "_".join(domain_parts)
-        if not id:
-            id = f"browser_tool_for_url_{formatted_domain}"  # noqa: A001
-        if not name:
-            name = f"Browser Tool for {formatted_domain}"
-        if not description:
-            description = (
-                f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete "
-                "tasks."
-            )
+        
+        # Validate allowed_domains format using centralized validation
+        if allowed_domains is not None:
+            allowed_domains = self._validate_domains_list(allowed_domains)
+        
         super().__init__(
-            id=id,
-            name=name,
-            description=description,
+            id=id or f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}",
+            name=name or f"Browser Tool for {url.replace('https://', '').replace('http://', '')}",
+            description=description
+            or (
+                f"Browser tool specifically configured for {url}. Can be used to navigate to this URL and complete tasks. "
+                "This tool handles a full end to end task. It is capable of doing multiple things "
+                "across different URLs within the same root domain as part of the end to end task."
+            ),
             args_schema=BrowserToolForUrlSchema,
-            url=url,  # type: ignore reportCallIssue
             model=model,
             infrastructure_option=infrastructure_option,
+            custom_infrastructure_provider=custom_infrastructure_provider,
+            structured_output_schema=structured_output_schema,
+            allowed_domains=allowed_domains,
+            url=url,  # Pass url to parent init
         )
 
     def run(  # type: ignore reportIncompatibleMethodOverride
@@ -427,10 +531,14 @@ class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
 
     @abstractmethod
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
         """Get a Browser instance.
 
         This is called at the start of every step using this tool.
+        
+        Args:
+            ctx: Tool run context
+            allowed_domains: List of allowed domains for browser navigation
         """
 
     @abstractmethod
@@ -454,7 +562,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         self.chrome_path = chrome_path or self.get_chrome_instance_path()
         self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
 
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
         """Get a Browser instance.
 
         Note: This provider does not support end_user_id.
@@ -462,6 +570,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         Args:
             ctx (ToolRunContext): The context for the tool run, containing execution context
                 and other relevant information.
+            allowed_domains: List of allowed domains for browser navigation
 
         Returns:
             Browser: A configured Browser instance for local browser automation.
@@ -472,10 +581,13 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
+        context_config = self._create_browser_context_config(allowed_domains)
+            
         return Browser(
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
+                new_context_config=context_config,
             ),
         )
 
@@ -540,6 +652,19 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         if extra_chromium_args_from_env:
             return extra_chromium_args_from_env.split(",")
         return None
+
+    def _create_browser_context_config(self, allowed_domains: list[str] | None) -> BrowserContextConfig:
+        """Create BrowserContextConfig with optional allowed_domains.
+        
+        Args:
+            allowed_domains: List of allowed domains or None
+            
+        Returns:
+            Configured BrowserContextConfig instance
+        """
+        if allowed_domains is not None:
+            return BrowserContextConfig(allowed_domains=allowed_domains)
+        return BrowserContextConfig()
 
 
 if BROWSERBASE_AVAILABLE:
@@ -738,7 +863,7 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(session_id)
             return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
 
-        def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
             """Set up a Browser instance connected to BrowserBase.
 
             Creates or retrieves a BrowserBase session and configures a Browser instance
@@ -746,6 +871,7 @@ if BROWSERBASE_AVAILABLE:
 
             Args:
                 ctx (ToolRunContext): The tool run context containing execution information.
+                allowed_domains: List of allowed domains for browser navigation
 
             Returns:
                 Browser: A configured Browser instance connected to the BrowserBase session.
@@ -753,11 +879,27 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
+            context_config = self._create_browser_context_config(allowed_domains)
+                
             return Browser(
                 config=BrowserConfig(
                     cdp_url=session_connect_url,
+                    new_context_config=context_config,
                 ),
             )
+
+        def _create_browser_context_config(self, allowed_domains: list[str] | None) -> BrowserContextConfig:
+            """Create BrowserContextConfig with optional allowed_domains.
+            
+            Args:
+                allowed_domains: List of allowed domains or None
+                
+            Returns:
+                Configured BrowserContextConfig instance
+            """
+            if allowed_domains is not None:
+                return BrowserContextConfig(allowed_domains=allowed_domains)
+            return BrowserContextConfig()
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
             """Check if the current call is the first browser call in the plan run.
