@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
+from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from portia.plan import Plan, PlanInput, Step
     from portia.tool import Tool
 
-logger = logging.getLogger(__name__)
 
 DEFAULT_PLANNING_PROMPT = """
 You are an outstanding task planner. Your job is to provide a detailed plan of action in the form
@@ -92,6 +91,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 plan_inputs,
                 previous_errors,
             )
+            logger().trace("LLM call: planning")
             response = self.model.get_structured_response(
                 schema=StepsOrError,
                 messages=[
@@ -173,6 +173,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 plan_inputs,
                 previous_errors,
             )
+            logger().trace("LLM call: planning")
             response = await self.model.aget_structured_response(
                 schema=StepsOrError,
                 messages=[

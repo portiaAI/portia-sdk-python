@@ -121,6 +121,7 @@ Head over to <a href="https://app.portialabs.ai" target="_blank">**app.portialab
 The example below introduces **some** of the config options available with Portia AI (check out our <a href="https://docs.portialabs.ai/manage-config" target="_blank">**docs (↗)**</a> for more):
 - The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, runs and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
 - The `default_log_level` is set using the `LogLevel.DEBUG` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, run states, tool calls and outputs at every step 😅
+  - To enable ultra-verbose tracing of LLM calls across agents and tools, set `default_log_level=LogLevel.TRACE` (or the string "TRACE"). TRACE includes all DEBUG logs plus additional "LLM call" entries showing the model and high-level purpose (planning, introspection, summarization, parsing/verification, tool-calling).
 - The `llm_provider` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider. In the example below we're using GPT 4o, but you can use Anthropic, Gemini and others!
 
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
