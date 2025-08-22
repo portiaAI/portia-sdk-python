@@ -196,17 +196,33 @@ jobs:
 
 
       - name: Setup Redis CLI
-        if: failure()
+        if: false  # Temporarily disabled to avoid platform directory issues
         uses: shogo82148/actions-setup-redis@v1
       - name: Clear LLM cache
-        if: failure()
+        if: false  # Temporarily disabled to avoid platform directory issues
         run: |
-          if [ -d "./platform" ] && [ -f "./platform/scripts/clear_llm_cache.sh" ]; then
-            echo "Platform directory and cache script found, clearing cache..."
-            cd ./platform
-            echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
-            ./scripts/clear_llm_cache.sh
+          echo "=== Cache Clearing Debug Info ==="
+          echo "Current directory: $(pwd)"
+          echo "Available directories: $(ls -la)"
+          echo "Checking for platform directory..."
+          
+          if [ -d "./platform" ]; then
+            echo "✅ Platform directory found"
+            if [ -f "./platform/scripts/clear_llm_cache.sh" ]; then
+              echo "✅ Cache script found, clearing cache..."
+              cd ./platform
+              echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
+              chmod +x ./scripts/clear_llm_cache.sh
+              ./scripts/clear_llm_cache.sh
+              echo "✅ Cache clearing completed"
+            else
+              echo "❌ Cache script not found at ./platform/scripts/clear_llm_cache.sh"
+              echo "Available files in platform: $(ls -la ./platform/ 2>/dev/null || echo 'Cannot list platform directory')"
+            fi
           else
-            echo "Platform directory or cache script not found, skipping cache clearing..."
-            echo "This is expected for workflows that don't check out the platform repo."
+            echo "❌ Platform directory not found"
+            echo "This is expected for workflows that don't check out the platform repo"
+            echo "Skipping cache clearing - no error"
           fi
+          
+          echo "=== Cache Clearing Complete ==="
