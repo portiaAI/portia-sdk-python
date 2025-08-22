@@ -198,8 +198,12 @@ jobs:
         if: failure()
         uses: shogo82148/actions-setup-redis@v1
       - name: Clear LLM cache
-        if: failure()
+        if: failure() && hashFiles('./platform/scripts/clear_llm_cache.sh') != ''
         working-directory: ./platform
         run: |
           echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
-          ./scripts/clear_llm_cache.sh
+          if [ -f "./scripts/clear_llm_cache.sh" ]; then
+            ./scripts/clear_llm_cache.sh
+          else
+            echo "Cache clearing script not found, skipping..."
+          fi
