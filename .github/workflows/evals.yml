@@ -194,11 +194,10 @@ jobs:
       - name: Clear LLM cache
         if: failure()
         run: |
+          echo "Cache clearing step - checking if platform script exists..."
           if [ -f "./platform/scripts/clear_llm_cache.sh" ]; then
-            echo "Platform cache script found, clearing cache..."
-            cd ./platform
-            echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
-            ./scripts/clear_llm_cache.sh
+            echo "Found platform script, executing..."
+            (cd ./platform && echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env && ./scripts/clear_llm_cache.sh)
           else
-            echo "Platform cache script not found, skipping..."
+            echo "Platform script not found, skipping cache clear (this is normal for some workflows)"
           fi
