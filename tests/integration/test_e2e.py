@@ -44,6 +44,10 @@ CORE_PROVIDERS = [
         LLMProvider.ANTHROPIC,
         "anthropic/claude-3-5-sonnet-latest",
     ),
+    (
+        LLMProvider.GROQ,
+        "groq/llama3-8b-8192",
+    ),
 ]
 
 PLANNING_PROVIDERS = [
@@ -55,6 +59,10 @@ PLANNING_PROVIDERS = [
         LLMProvider.ANTHROPIC,
         "anthropic/claude-3-5-sonnet-latest",
     ),
+    (
+        LLMProvider.GROQ,
+        "groq/llama3-70b-8192",
+    ),
 ]
 
 PROVIDER_MODELS = [
@@ -62,6 +70,10 @@ PROVIDER_MODELS = [
     (
         LLMProvider.GOOGLE,
         "google/gemini-2.0-flash",
+    ),
+    (
+        LLMProvider.GROQ,
+        "groq/llama3-8b-8192",
     ),
 ]
 
