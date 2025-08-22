@@ -31,14 +31,10 @@ jobs:
       github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'ready_to_eval')
     steps:
-      - name: Checkout portia-sdk-python repo
-        uses: actions/checkout@v4
+      - name: Checkout PR branch
+        uses: actions/checkout@v3
         with:
-          path: portia-sdk-python
-          # Simple approach: just checkout the current PR head
-          ref: ${{ github.event.pull_request.head.sha }}
-          # Use default token which should work for public forks
-          token: ${{ github.token }}
+          ref: ${{ github.ref }}
 
       - name: Checkout platform repo
         uses: actions/checkout@v4
@@ -196,30 +192,13 @@ jobs:
         if: false  # Temporarily disabled to avoid platform directory issues
         uses: shogo82148/actions-setup-redis@v1
       - name: Clear LLM cache
-        if: false  # Temporarily disabled to avoid platform directory issues
+        if: failure()
         run: |
-          echo "=== Cache Clearing Debug Info ==="
-          echo "Current directory: $(pwd)"
-          echo "Available directories: $(ls -la)"
-          echo "Checking for platform directory..."
-          
-          if [ -d "./platform" ]; then
-            echo "✅ Platform directory found"
-            if [ -f "./platform/scripts/clear_llm_cache.sh" ]; then
-              echo "✅ Cache script found, clearing cache..."
-              cd ./platform
-              echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
-              chmod +x ./scripts/clear_llm_cache.sh
-              ./scripts/clear_llm_cache.sh
-              echo "✅ Cache clearing completed"
-            else
-              echo "❌ Cache script not found at ./platform/scripts/clear_llm_cache.sh"
-              echo "Available files in platform: $(ls -la ./platform/ 2>/dev/null || echo 'Cannot list platform directory')"
-            fi
+          if [ -f "./platform/scripts/clear_llm_cache.sh" ]; then
+            echo "Platform cache script found, clearing cache..."
+            cd ./platform
+            echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
+            ./scripts/clear_llm_cache.sh
           else
-            echo "❌ Platform directory not found"
-            echo "This is expected for workflows that don't check out the platform repo"
-            echo "Skipping cache clearing - no error"
+            echo "Platform cache script not found, skipping..."
           fi
-          
-          echo "=== Cache Clearing Complete ==="
