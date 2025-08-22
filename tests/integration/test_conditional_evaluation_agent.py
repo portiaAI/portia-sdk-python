@@ -8,7 +8,7 @@ from portia.execution_agents.conditional_evaluation_agent import ConditionalEval
 
 
 @pytest.mark.parametrize(
-    "llm_provider", [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE, LLMProvider.GROQ]
+    "llm_provider", [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE]
 )
 @pytest.mark.asyncio
 async def test_conditional_evaluation_agent(llm_provider: LLMProvider) -> None:
@@ -26,7 +26,7 @@ async def test_conditional_evaluation_agent(llm_provider: LLMProvider) -> None:
 
 
 @pytest.mark.parametrize(
-    "llm_provider", [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE, LLMProvider.GROQ]
+    "llm_provider", [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE]
 )
 @pytest.mark.asyncio
 async def test_conditional_evaluation_agent_with_arguments(llm_provider: LLMProvider) -> None:

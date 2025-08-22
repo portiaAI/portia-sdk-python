@@ -2,11 +2,11 @@ version = 1
 revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
-    "python_full_version >= '3.13' and python_full_version < '4'",
+    "python_full_version >= '3.13' and python_full_version < '4.0'",
     "python_full_version >= '3.12.4' and python_full_version < '3.13'",
     "python_full_version >= '3.12' and python_full_version < '3.12.4'",
     "python_full_version < '3.12'",
-    "python_full_version >= '4'",
+    "python_full_version >= '4.0'",
 ]
 
 [[package]]
@@ -172,8 +172,8 @@ name = "beautifulsoup4"
 version = "4.13.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "soupsieve", marker = "python_full_version < '4'" },
-    { name = "typing-extensions", marker = "python_full_version < '4'" },
+    { name = "soupsieve", marker = "python_full_version < '4.0'" },
+    { name = "typing-extensions", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d8/e4/0c4c39e18fd76d6a628d4dd8da40543d136ce2d1752bd6eeeab0791f4d6b/beautifulsoup4-4.13.4.tar.gz", hash = "sha256:dbb3c4e1ceae6aefebdaf2423247260cd062430a410e38c66f2baa50a8437195", size = 621067, upload-time = "2025-04-15T17:05:13.836Z" }
 wheels = [
@@ -213,18 +213,18 @@ name = "browser-use"
 version = "0.1.40"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx", marker = "python_full_version < '4'" },
-    { name = "langchain-anthropic", marker = "python_full_version < '4'" },
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "langchain-ollama", marker = "python_full_version < '4'" },
-    { name = "langchain-openai", marker = "python_full_version < '4'" },
-    { name = "markdownify", marker = "python_full_version < '4'" },
-    { name = "playwright", marker = "python_full_version < '4'" },
-    { name = "posthog", marker = "python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
-    { name = "python-dotenv", marker = "python_full_version < '4'" },
-    { name = "requests", marker = "python_full_version < '4'" },
-    { name = "setuptools", marker = "python_full_version < '4'" },
+    { name = "httpx", marker = "python_full_version < '4.0'" },
+    { name = "langchain-anthropic", marker = "python_full_version < '4.0'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "langchain-ollama", marker = "python_full_version < '4.0'" },
+    { name = "langchain-openai", marker = "python_full_version < '4.0'" },
+    { name = "markdownify", marker = "python_full_version < '4.0'" },
+    { name = "playwright", marker = "python_full_version < '4.0'" },
+    { name = "posthog", marker = "python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
+    { name = "python-dotenv", marker = "python_full_version < '4.0'" },
+    { name = "requests", marker = "python_full_version < '4.0'" },
+    { name = "setuptools", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/36/ff/3c2b0e0cc1deae97f8977526ae7ecbe9b1fe075638d91312504d98bed20e/browser_use-0.1.40.tar.gz", hash = "sha256:ddafcda30a9f9fe0f63612af5bf19a0ec03454d2774f54543eee70eef7ab369f", size = 1394511, upload-time = "2025-02-23T18:01:56.368Z" }
 wheels = [
@@ -515,9 +515,9 @@ name = "docker"
 version = "7.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pywin32", marker = "python_full_version < '4' and sys_platform == 'win32'" },
-    { name = "requests", marker = "python_full_version < '4'" },
-    { name = "urllib3", marker = "python_full_version < '4'" },
+    { name = "pywin32", marker = "python_full_version < '4.0' and sys_platform == 'win32'" },
+    { name = "requests", marker = "python_full_version < '4.0'" },
+    { name = "urllib3", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/91/9b/4a2ea29aeba62471211598dac5d96825bb49348fa07e906ea930394a83ce/docker-7.1.0.tar.gz", hash = "sha256:ad8c70e6e3f8926cb8a92619b832b4ea5299e2831c14284663184e200546fa6c", size = 117834, upload-time = "2024-05-23T11:13:57.216Z" }
 wheels = [
@@ -669,10 +669,10 @@ name = "google-ai-generativelanguage"
 version = "0.6.18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "google-api-core", extra = ["grpc"], marker = "python_full_version < '4'" },
-    { name = "google-auth", marker = "python_full_version < '4'" },
-    { name = "proto-plus", marker = "python_full_version < '4'" },
-    { name = "protobuf", marker = "python_full_version < '4'" },
+    { name = "google-api-core", extra = ["grpc"], marker = "python_full_version < '4.0'" },
+    { name = "google-auth", marker = "python_full_version < '4.0'" },
+    { name = "proto-plus", marker = "python_full_version < '4.0'" },
+    { name = "protobuf", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/77/3e89a4c4200135eac74eca2f6c9153127e3719a825681ad55f5a4a58b422/google_ai_generativelanguage-0.6.18.tar.gz", hash = "sha256:274ba9fcf69466ff64e971d565884434388e523300afd468fc8e3033cd8e606e", size = 1444757, upload-time = "2025-04-29T15:45:45.527Z" }
 wheels = [
@@ -684,11 +684,11 @@ name = "google-api-core"
 version = "2.25.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "google-auth", marker = "python_full_version < '4'" },
-    { name = "googleapis-common-protos", marker = "python_full_version < '4'" },
-    { name = "proto-plus", marker = "python_full_version < '4'" },
-    { name = "protobuf", marker = "python_full_version < '4'" },
-    { name = "requests", marker = "python_full_version < '4'" },
+    { name = "google-auth", marker = "python_full_version < '4.0'" },
+    { name = "googleapis-common-protos", marker = "python_full_version < '4.0'" },
+    { name = "proto-plus", marker = "python_full_version < '4.0'" },
+    { name = "protobuf", marker = "python_full_version < '4.0'" },
+    { name = "requests", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/dc/21/e9d043e88222317afdbdb567165fdbc3b0aad90064c7e0c9eb0ad9955ad8/google_api_core-2.25.1.tar.gz", hash = "sha256:d2aaa0b13c78c61cb3f4282c464c046e45fbd75755683c9c525e6e8f7ed0a5e8", size = 165443, upload-time = "2025-06-12T20:52:20.439Z" }
 wheels = [
@@ -697,8 +697,8 @@ wheels = [
 
 [package.optional-dependencies]
 grpc = [
-    { name = "grpcio", marker = "python_full_version < '4'" },
-    { name = "grpcio-status", marker = "python_full_version < '4'" },
+    { name = "grpcio", marker = "python_full_version < '4.0'" },
+    { name = "grpcio-status", marker = "python_full_version < '4.0'" },
 ]
 
 [[package]]
@@ -739,7 +739,7 @@ name = "googleapis-common-protos"
 version = "1.70.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "protobuf", marker = "python_full_version < '4'" },
+    { name = "protobuf", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/39/24/33db22342cf4a2ea27c9955e6713140fedd51e8b141b5ce5260897020f1a/googleapis_common_protos-1.70.0.tar.gz", hash = "sha256:0e1b44e0ea153e6594f9f394fef15193a68aaaea2d843f83e2742717ca753257", size = 145903, upload-time = "2025-04-14T10:17:02.924Z" }
 wheels = [
@@ -789,6 +789,23 @@ wheels = [
 ]
 
 [[package]]
+name = "groq"
+version = "0.31.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/66/a2/77fd1460e7d55859219223719aa44ae8902a3a1ad333cd5faf330eb0b894/groq-0.31.0.tar.gz", hash = "sha256:182252e9bf0d696df607c137cbafa851d2c84aaf94bcfe9165c0bc231043490c", size = 136237, upload-time = "2025-08-05T23:14:01.183Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/f8/14672d69a91495f43462c5490067eeafc30346e81bda1a62848e897f9bc3/groq-0.31.0-py3-none-any.whl", hash = "sha256:5e3c7ec9728b7cccf913da982a9b5ebb46dc18a070b35e12a3d6a1e12d6b0f7f", size = 131365, upload-time = "2025-08-05T23:13:59.768Z" },
+]
+
+[[package]]
 name = "grpcio"
 version = "1.74.0"
 source = { registry = "https://pypi.org/simple" }
@@ -831,9 +848,9 @@ name = "grpcio-status"
 version = "1.74.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "googleapis-common-protos", marker = "python_full_version < '4'" },
-    { name = "grpcio", marker = "python_full_version < '4'" },
-    { name = "protobuf", marker = "python_full_version < '4'" },
+    { name = "googleapis-common-protos", marker = "python_full_version < '4.0'" },
+    { name = "grpcio", marker = "python_full_version < '4.0'" },
+    { name = "protobuf", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/93/22/238c5f01e6837df54494deb08d5c772bc3f5bf5fb80a15dce254892d1a81/grpcio_status-1.74.0.tar.gz", hash = "sha256:c58c1b24aa454e30f1fc6a7e0dbbc194c54a408143971a94b5f4e40bb5831432", size = 13662, upload-time = "2025-07-24T19:01:56.874Z" }
 wheels = [
@@ -964,18 +981,18 @@ name = "instructor"
 version = "1.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "aiohttp", marker = "python_full_version < '4'" },
-    { name = "diskcache", marker = "python_full_version < '4'" },
-    { name = "docstring-parser", marker = "python_full_version < '4'" },
-    { name = "jinja2", marker = "python_full_version < '4'" },
-    { name = "jiter", marker = "python_full_version < '4'" },
-    { name = "openai", marker = "python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
-    { name = "pydantic-core", marker = "python_full_version < '4'" },
-    { name = "requests", marker = "python_full_version < '4'" },
-    { name = "rich", marker = "python_full_version < '4'" },
-    { name = "tenacity", marker = "python_full_version < '4'" },
-    { name = "typer", marker = "python_full_version < '4'" },
+    { name = "aiohttp", marker = "python_full_version < '4.0'" },
+    { name = "diskcache", marker = "python_full_version < '4.0'" },
+    { name = "docstring-parser", marker = "python_full_version < '4.0'" },
+    { name = "jinja2", marker = "python_full_version < '4.0'" },
+    { name = "jiter", marker = "python_full_version < '4.0'" },
+    { name = "openai", marker = "python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
+    { name = "pydantic-core", marker = "python_full_version < '4.0'" },
+    { name = "requests", marker = "python_full_version < '4.0'" },
+    { name = "rich", marker = "python_full_version < '4.0'" },
+    { name = "tenacity", marker = "python_full_version < '4.0'" },
+    { name = "typer", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a5/67/63c4b4d2cc3c7b4238920ad3388a6f5d67265ab7c09ee34012d6b591130e/instructor-1.10.0.tar.gz", hash = "sha256:887d33e058b913290dbf526b0096b1bb8d7ea1a07d75afecbf716161f959697b", size = 69388981, upload-time = "2025-07-18T15:28:52.386Z" }
 wheels = [
@@ -1146,13 +1163,13 @@ name = "langchain"
 version = "0.3.27"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "langchain-text-splitters", marker = "python_full_version < '4'" },
-    { name = "langsmith", marker = "python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
-    { name = "pyyaml", marker = "python_full_version < '4'" },
-    { name = "requests", marker = "python_full_version < '4'" },
-    { name = "sqlalchemy", marker = "python_full_version < '4'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "langchain-text-splitters", marker = "python_full_version < '4.0'" },
+    { name = "langsmith", marker = "python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
+    { name = "pyyaml", marker = "python_full_version < '4.0'" },
+    { name = "requests", marker = "python_full_version < '4.0'" },
+    { name = "sqlalchemy", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/83/f6/f4f7f3a56626fe07e2bb330feb61254dbdf06c506e6b59a536a337da51cf/langchain-0.3.27.tar.gz", hash = "sha256:aa6f1e6274ff055d0fd36254176770f356ed0a8994297d1df47df341953cec62", size = 10233809, upload-time = "2025-07-24T14:42:32.959Z" }
 wheels = [
@@ -1164,10 +1181,10 @@ name = "langchain-anthropic"
 version = "0.3.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anthropic", marker = "python_full_version < '4'" },
-    { name = "defusedxml", marker = "python_full_version < '4'" },
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
+    { name = "anthropic", marker = "python_full_version < '4.0'" },
+    { name = "defusedxml", marker = "python_full_version < '4.0'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5f/ad/f9f77948deeca2c33a55f262ca78cee7c2c3dfbaef849704991517443bf6/langchain_anthropic-0.3.3.tar.gz", hash = "sha256:1faf0aa0aed392a18ed34d00e816d7c748ef342523deacc131690aae08ab4f1b", size = 21003, upload-time = "2025-01-17T20:32:56.379Z" }
 wheels = [
@@ -1179,11 +1196,11 @@ name = "langchain-aws"
 version = "0.2.30"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "boto3", marker = "python_full_version < '4'" },
-    { name = "langchain-core", marker = "python_full_version < '4'" },
+    { name = "boto3", marker = "python_full_version < '4.0'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
+    { name = "numpy", version = "2.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d3/58/a3071e27315017fe2320a3d39a1a6fb081a78868034488f3fefec61df971/langchain_aws-0.2.30.tar.gz", hash = "sha256:67c31f0784045a4a73ef78a2c18f392e14c1e9f7b55870e62f18039cadfb925c", size = 109960, upload-time = "2025-07-31T22:02:11.4Z" }
 wheels = [
@@ -1213,10 +1230,10 @@ name = "langchain-google-genai"
 version = "2.1.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filetype", marker = "python_full_version < '4'" },
-    { name = "google-ai-generativelanguage", marker = "python_full_version < '4'" },
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
+    { name = "filetype", marker = "python_full_version < '4.0'" },
+    { name = "google-ai-generativelanguage", marker = "python_full_version < '4.0'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ba/24/4ad44e9a8ad25682c22b56f0b665eb6d87090f2360355b48095e285a7810/langchain_google_genai-2.1.9.tar.gz", hash = "sha256:cd5d6f644b8dac3e312e30101bb97541aab240e82678e87a4df039ee1dc77531", size = 45866, upload-time = "2025-08-04T18:51:51.42Z" }
 wheels = [
@@ -1228,11 +1245,11 @@ name = "langchain-mistralai"
 version = "0.2.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx", marker = "python_full_version < '4'" },
-    { name = "httpx-sse", marker = "python_full_version < '4'" },
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
-    { name = "tokenizers", marker = "python_full_version < '4'" },
+    { name = "httpx", marker = "python_full_version < '4.0'" },
+    { name = "httpx-sse", marker = "python_full_version < '4.0'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
+    { name = "tokenizers", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6d/f5/7afd7dcd252e5abaaf3a13849733a32aaf0b5f2290dc62bd2c72afdc33e4/langchain_mistralai-0.2.11.tar.gz", hash = "sha256:0816bb9972c9e407d9eca567ad16095ec4f0f5bb9094890692ceb149aa72c71e", size = 21718, upload-time = "2025-07-07T19:38:04.35Z" }
 wheels = [
@@ -1244,8 +1261,8 @@ name = "langchain-ollama"
 version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "ollama", marker = "python_full_version < '4'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "ollama", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/88/8e/21f1df6af0983cf1bc6d15c71f21bd17d968114bf6cce0fb40442f5ba81f/langchain_ollama-0.2.2.tar.gz", hash = "sha256:2d9bcb06ffdbe43c7c6906c46e710d36d33b6b99cd4975cbf54060f13e51c875", size = 16970, upload-time = "2024-12-18T22:40:30.239Z" }
 wheels = [
@@ -1257,9 +1274,9 @@ name = "langchain-openai"
 version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "openai", marker = "python_full_version < '4'" },
-    { name = "tiktoken", marker = "python_full_version < '4'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "openai", marker = "python_full_version < '4.0'" },
+    { name = "tiktoken", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/85/01/8fa0e1a708f1634a88df0c239f1e9733a2848c62fcd6aaea08cee4857ec1/langchain_openai-0.3.1.tar.gz", hash = "sha256:cce314f1437b2cad73e0ed2b55e74dc399bc1bbc43594c4448912fb51c5e4447", size = 48216, upload-time = "2025-01-19T17:47:11.993Z" }
 wheels = [
@@ -1291,7 +1308,7 @@ name = "langchain-text-splitters"
 version = "0.3.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "langchain-core", marker = "python_full_version < '4'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/91/52/d43ad77acae169210cc476cbc1e4ab37a701017c950211a11ab500fe7d7e/langchain_text_splitters-0.3.9.tar.gz", hash = "sha256:7cd1e5a3aaf609979583eeca2eb34177622570b8fa8f586a605c6b1c34e7ebdb", size = 45260, upload-time = "2025-07-24T14:38:45.14Z" }
 wheels = [
@@ -1303,9 +1320,9 @@ name = "langgraph"
 version = "0.2.76"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "langgraph-checkpoint", marker = "python_full_version < '4'" },
-    { name = "langgraph-sdk", marker = "python_full_version < '4'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "langgraph-checkpoint", marker = "python_full_version < '4.0'" },
+    { name = "langgraph-sdk", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ee/62/8d484e498ec95d5a8c71e78f5a2d09ff280db0c99737b7aef0524cd67076/langgraph-0.2.76.tar.gz", hash = "sha256:688f8dcd9b6797ba78384599e0de944773000c75156ad1e186490e99e89fa5c0", size = 133005, upload-time = "2025-02-26T21:57:39.108Z" }
 wheels = [
@@ -1317,8 +1334,8 @@ name = "langgraph-checkpoint"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "ormsgpack", marker = "python_full_version < '4'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "ormsgpack", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/73/3e/d00eb2b56c3846a0cabd2e5aa71c17a95f882d4f799a6ffe96a19b55eba9/langgraph_checkpoint-2.1.1.tar.gz", hash = "sha256:72038c0f9e22260cb9bff1f3ebe5eb06d940b7ee5c1e4765019269d4f21cf92d", size = 136256, upload-time = "2025-07-17T13:07:52.411Z" }
 wheels = [
@@ -1330,8 +1347,8 @@ name = "langgraph-sdk"
 version = "0.1.74"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx", marker = "python_full_version < '4'" },
-    { name = "orjson", marker = "python_full_version < '4'" },
+    { name = "httpx", marker = "python_full_version < '4.0'" },
+    { name = "orjson", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6d/f7/3807b72988f7eef5e0eb41e7e695eca50f3ed31f7cab5602db3b651c85ff/langgraph_sdk-0.1.74.tar.gz", hash = "sha256:7450e0db5b226cc2e5328ca22c5968725873630ef47c4206a30707cb25dc3ad6", size = 72190, upload-time = "2025-07-21T16:36:50.032Z" }
 wheels = [
@@ -1383,8 +1400,8 @@ name = "loguru"
 version = "0.7.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "python_full_version < '4' and sys_platform == 'win32'" },
-    { name = "win32-setctime", marker = "python_full_version < '4' and sys_platform == 'win32'" },
+    { name = "colorama", marker = "python_full_version < '4.0' and sys_platform == 'win32'" },
+    { name = "win32-setctime", marker = "python_full_version < '4.0' and sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559, upload-time = "2024-12-06T11:20:56.608Z" }
 wheels = [
@@ -1396,7 +1413,7 @@ name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "mdurl", marker = "python_full_version < '4'" },
+    { name = "mdurl", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5b/f5/4ec618ed16cc4f8fb3b701563655a69816155e79e24a17b651541804721d/markdown_it_py-4.0.0.tar.gz", hash = "sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3", size = 73070, upload-time = "2025-08-11T12:57:52.854Z" }
 wheels = [
@@ -1408,8 +1425,8 @@ name = "markdownify"
 version = "0.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "beautifulsoup4", marker = "python_full_version < '4'" },
-    { name = "six", marker = "python_full_version < '4'" },
+    { name = "beautifulsoup4", marker = "python_full_version < '4.0'" },
+    { name = "six", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1b/75/483a4bcca436fe88d02dc7686c372631d833848951b368700bdc0c770bb7/markdownify-0.14.1.tar.gz", hash = "sha256:a62a7a216947ed0b8dafb95b99b2ef4a0edd1e18d5653c656f68f03db2bfb2f1", size = 14332, upload-time = "2024-11-24T22:08:30.775Z" }
 wheels = [
@@ -1673,10 +1690,10 @@ name = "numpy"
 version = "2.3.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.13' and python_full_version < '4'",
+    "python_full_version >= '3.13' and python_full_version < '4.0'",
     "python_full_version >= '3.12.4' and python_full_version < '3.13'",
     "python_full_version >= '3.12' and python_full_version < '3.12.4'",
-    "python_full_version >= '4'",
+    "python_full_version >= '4.0'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/37/7d/3fec4199c5ffb892bed55cff901e4f39a58c81df9c44c280499e92cad264/numpy-2.3.2.tar.gz", hash = "sha256:e0486a11ec30cdecb53f184d496d1c6a20786c81e55e41640270130056f8ee48", size = 20489306, upload-time = "2025-07-24T21:32:07.553Z" }
 wheels = [
@@ -1760,8 +1777,8 @@ name = "ollama"
 version = "0.5.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx", marker = "python_full_version < '4'" },
-    { name = "pydantic", marker = "python_full_version < '4'" },
+    { name = "httpx", marker = "python_full_version < '4.0'" },
+    { name = "pydantic", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/91/6d/ae96027416dcc2e98c944c050c492789502d7d7c0b95a740f0bb39268632/ollama-0.5.3.tar.gz", hash = "sha256:40b6dff729df3b24e56d4042fd9d37e231cee8e528677e0d085413a1d6692394", size = 43331, upload-time = "2025-08-07T21:44:10.422Z" }
 wheels = [
@@ -1994,22 +2011,23 @@ wheels = [
 
 [[package]]
 name = "portia-sdk-python"
-version = "0.7.1"
+version = "0.7.2"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "click" },
-    { name = "instructor", marker = "python_full_version < '4'" },
+    { name = "groq" },
+    { name = "instructor", marker = "python_full_version < '4.0'" },
     { name = "jinja2" },
     { name = "jsonref" },
-    { name = "langchain", marker = "python_full_version < '4'" },
-    { name = "langchain-anthropic", marker = "python_full_version < '4'" },
-    { name = "langchain-core", marker = "python_full_version < '4'" },
-    { name = "langchain-openai", marker = "python_full_version < '4'" },
-    { name = "langgraph", marker = "python_full_version < '4'" },
-    { name = "langsmith", marker = "python_full_version < '4'" },
+    { name = "langchain", marker = "python_full_version < '4.0'" },
+    { name = "langchain-anthropic", marker = "python_full_version < '4.0'" },
+    { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "langchain-openai", marker = "python_full_version < '4.0'" },
+    { name = "langgraph", marker = "python_full_version < '4.0'" },
+    { name = "langsmith", marker = "python_full_version < '4.0'" },
     { name = "litellm" },
-    { name = "loguru", marker = "python_full_version < '4'" },
+    { name = "loguru", marker = "python_full_version < '4.0'" },
     { name = "mcp" },
     { name = "openai" },
     { name = "openpyxl" },
@@ -2018,19 +2036,20 @@ dependencies = [
     { name = "pydantic" },
     { name = "pytest-mock" },
     { name = "python-dotenv" },
-    { name = "testcontainers", extra = ["redis"], marker = "python_full_version < '4'" },
+    { name = "testcontainers", extra = ["redis"], marker = "python_full_version < '4.0'" },
 ]
 
 [package.optional-dependencies]
 all = [
-    { name = "boto3", marker = "python_full_version < '4'" },
-    { name = "browser-use", marker = "python_full_version < '4'" },
+    { name = "boto3", marker = "python_full_version < '4.0'" },
+    { name = "browser-use", marker = "python_full_version < '4.0'" },
     { name = "browserbase" },
     { name = "google-genai" },
-    { name = "langchain-aws", marker = "python_full_version < '4'" },
-    { name = "langchain-google-genai", marker = "python_full_version < '4'" },
-    { name = "langchain-mistralai", marker = "python_full_version < '4'" },
-    { name = "langchain-ollama", marker = "python_full_version < '4'" },
+    { name = "groq" },
+    { name = "langchain-aws", marker = "python_full_version < '4.0'" },
+    { name = "langchain-google-genai", marker = "python_full_version < '4.0'" },
+    { name = "langchain-mistralai", marker = "python_full_version < '4.0'" },
+    { name = "langchain-ollama", marker = "python_full_version < '4.0'" },
     { name = "langchain-redis", marker = "python_full_version < '3.14'" },
     { name = "mistralai" },
     { name = "playwright" },
@@ -2038,7 +2057,7 @@ all = [
 ]
 amazon = [
     { name = "boto3" },
-    { name = "langchain-aws", marker = "python_full_version < '4'" },
+    { name = "langchain-aws", marker = "python_full_version < '4.0'" },
 ]
 cache = [
     { name = "langchain-redis" },
@@ -2046,26 +2065,29 @@ cache = [
 ]
 google = [
     { name = "google-genai" },
-    { name = "langchain-google-genai", marker = "python_full_version < '4'" },
+    { name = "langchain-google-genai", marker = "python_full_version < '4.0'" },
+]
+groq = [
+    { name = "groq" },
 ]
 mistral = [
-    { name = "langchain-mistralai", marker = "python_full_version < '4'" },
+    { name = "langchain-mistralai", marker = "python_full_version < '4.0'" },
     { name = "mistralai" },
 ]
 mistralai = [
-    { name = "langchain-mistralai", marker = "python_full_version < '4'" },
+    { name = "langchain-mistralai", marker = "python_full_version < '4.0'" },
     { name = "mistralai" },
 ]
 ollama = [
-    { name = "langchain-ollama", marker = "python_full_version < '4'" },
+    { name = "langchain-ollama", marker = "python_full_version < '4.0'" },
 ]
 tools-browser-browserbase = [
-    { name = "browser-use", marker = "python_full_version < '4'" },
+    { name = "browser-use", marker = "python_full_version < '4.0'" },
     { name = "browserbase" },
     { name = "playwright" },
 ]
 tools-browser-local = [
-    { name = "browser-use", marker = "python_full_version < '4'" },
+    { name = "browser-use", marker = "python_full_version < '4.0'" },
     { name = "playwright" },
 ]
 tools-pdf-reader = [
@@ -2088,39 +2110,42 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.41.0,<=0.55.0" },
-    { name = "boto3", marker = "python_full_version >= '3.9' and python_full_version < '4' and extra == 'all'", specifier = ">=1.39.9" },
+    { name = "boto3", marker = "python_full_version >= '3.9' and python_full_version < '4.0' and extra == 'all'", specifier = ">=1.39.9" },
     { name = "boto3", marker = "extra == 'amazon'", specifier = ">=1.39.9" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = "==0.1.40" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-browserbase'", specifier = "==0.1.40" },
-    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-local'", specifier = "==0.1.40" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = "==0.1.40" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tools-browser-browserbase'", specifier = "==0.1.40" },
+    { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'tools-browser-local'", specifier = "==0.1.40" },
     { name = "browserbase", marker = "extra == 'all'", specifier = ">=1.2.0,<2" },
     { name = "browserbase", marker = "extra == 'tools-browser-browserbase'", specifier = ">=1.2.0,<2" },
     { name = "click", specifier = ">=8.1.7,<9" },
     { name = "google-genai", marker = "extra == 'all'", specifier = ">=1.18.0" },
     { name = "google-genai", marker = "extra == 'google'", specifier = ">=1.18.0" },
-    { name = "instructor", marker = "python_full_version >= '3.9' and python_full_version < '4'", specifier = ">=1.9.0" },
-    { name = "instructor", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=1.9.0,<2" },
+    { name = "groq", specifier = ">=0.12.0,<1.0" },
+    { name = "groq", marker = "extra == 'all'", specifier = ">=0.12.0,<1.0" },
+    { name = "groq", marker = "extra == 'groq'", specifier = ">=0.12.0,<1.0" },
+    { name = "instructor", marker = "python_full_version >= '3.9' and python_full_version < '4.0'", specifier = ">=1.9.0" },
+    { name = "instructor", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=1.9.0,<2" },
     { name = "jinja2", specifier = ">=3.1.4,<4" },
     { name = "jsonref", specifier = ">=1.1.0,<2" },
-    { name = "langchain", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.17,<0.4" },
-    { name = "langchain-anthropic", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = "==0.3.3" },
-    { name = "langchain-aws", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.2.28" },
-    { name = "langchain-aws", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'amazon'", specifier = ">=0.2.28" },
-    { name = "langchain-core", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.25,<0.4" },
-    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=2.1.8,<3" },
-    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'google'", specifier = ">=2.1.8,<3" },
-    { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.2.3,<0.3" },
-    { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'mistral'", specifier = ">=0.2.3,<0.3" },
-    { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'mistralai'", specifier = ">=0.2.3,<0.3" },
-    { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'all'", specifier = ">=0.2.2,<0.3" },
-    { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'ollama'", specifier = ">=0.2.2,<0.3" },
-    { name = "langchain-openai", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3,<0.4" },
+    { name = "langchain", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3.17,<0.4" },
+    { name = "langchain-anthropic", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = "==0.3.3" },
+    { name = "langchain-aws", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=0.2.28" },
+    { name = "langchain-aws", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'amazon'", specifier = ">=0.2.28" },
+    { name = "langchain-core", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3.25,<0.4" },
+    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=2.1.8,<3" },
+    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'google'", specifier = ">=2.1.8,<3" },
+    { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=0.2.3,<0.3" },
+    { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'mistral'", specifier = ">=0.2.3,<0.3" },
+    { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'mistralai'", specifier = ">=0.2.3,<0.3" },
+    { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=0.2.2,<0.3" },
+    { name = "langchain-ollama", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'ollama'", specifier = ">=0.2.2,<0.3" },
+    { name = "langchain-openai", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3,<0.4" },
     { name = "langchain-redis", marker = "python_full_version >= '3.11' and python_full_version < '3.14' and extra == 'all'", specifier = ">=0.1.2" },
     { name = "langchain-redis", marker = "extra == 'cache'", specifier = ">=0.1.2" },
-    { name = "langgraph", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.2.59,<0.3" },
-    { name = "langsmith", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.3.15,<0.4" },
+    { name = "langgraph", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.2.59,<0.3" },
+    { name = "langsmith", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3.15,<0.4" },
     { name = "litellm", specifier = ">=1.74.9.post1" },
-    { name = "loguru", marker = "python_full_version >= '3.11' and python_full_version < '4'", specifier = ">=0.7.3,<0.8" },
+    { name = "loguru", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.7.3,<0.8" },
     { name = "mcp", specifier = ">=1.9.2,<2" },
     { name = "mistralai", marker = "extra == 'all'", specifier = ">=1.2.5,<2" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = ">=1.2.5,<2" },
@@ -2138,9 +2163,9 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.1,<2" },
     { name = "redis", marker = "extra == 'all'", specifier = ">=5.2.1,<6" },
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
-    { name = "testcontainers", extras = ["redis"], marker = "python_full_version >= '3.9' and python_full_version < '4'", specifier = ">=4.10.0" },
+    { name = "testcontainers", extras = ["redis"], marker = "python_full_version >= '3.9' and python_full_version < '4.0'", specifier = ">=4.10.0" },
 ]
-provides-extras = ["mistral", "mistralai", "google", "amazon", "ollama", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
+provides-extras = ["mistral", "mistralai", "google", "amazon", "ollama", "groq", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2266,7 +2291,7 @@ name = "proto-plus"
 version = "1.26.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "protobuf", marker = "python_full_version < '4'" },
+    { name = "protobuf", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f4/ac/87285f15f7cce6d4a008f33f1757fb5a13611ea8914eb58c3d0d26243468/proto_plus-1.26.1.tar.gz", hash = "sha256:21a515a4c4c0088a773899e23c7bbade3d18f9c66c73edd4c7ee3816bc96a012", size = 56142, upload-time = "2025-03-10T15:54:38.843Z" }
 wheels = [
@@ -2811,8 +2836,8 @@ name = "rich"
 version = "14.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "markdown-it-py", marker = "python_full_version < '4'" },
-    { name = "pygments", marker = "python_full_version < '4'" },
+    { name = "markdown-it-py", marker = "python_full_version < '4.0'" },
+    { name = "pygments", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fe/75/af448d8e52bf1d8fa6a9d089ca6c07ff4453d86c65c145d0a300bb073b9b/rich-14.1.0.tar.gz", hash = "sha256:e497a48b844b0320d45007cdebfeaeed8db2a4f4bcf49f15e455cfc4af11eaa8", size = 224441, upload-time = "2025-07-25T07:32:58.125Z" }
 wheels = [
@@ -3027,7 +3052,7 @@ version = "2.0.43"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "greenlet", marker = "(python_full_version < '3.14' and platform_machine == 'AMD64') or (python_full_version < '3.14' and platform_machine == 'WIN32') or (python_full_version < '3.14' and platform_machine == 'aarch64') or (python_full_version < '3.14' and platform_machine == 'amd64') or (python_full_version < '3.14' and platform_machine == 'ppc64le') or (python_full_version < '3.14' and platform_machine == 'win32') or (python_full_version < '3.14' and platform_machine == 'x86_64')" },
-    { name = "typing-extensions", marker = "python_full_version < '4'" },
+    { name = "typing-extensions", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d7/bc/d59b5d97d27229b0e009bd9098cd81af71c2fa5549c580a0a67b9bed0496/sqlalchemy-2.0.43.tar.gz", hash = "sha256:788bfcef6787a7764169cfe9859fe425bf44559619e1d9f56f5bddf2ebf6f417", size = 9762949, upload-time = "2025-08-11T14:24:58.438Z" }
 wheels = [
@@ -3097,11 +3122,11 @@ name = "testcontainers"
 version = "4.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "docker", marker = "python_full_version < '4'" },
-    { name = "python-dotenv", marker = "python_full_version < '4'" },
-    { name = "typing-extensions", marker = "python_full_version < '4'" },
-    { name = "urllib3", marker = "python_full_version < '4'" },
-    { name = "wrapt", marker = "python_full_version < '4'" },
+    { name = "docker", marker = "python_full_version < '4.0'" },
+    { name = "python-dotenv", marker = "python_full_version < '4.0'" },
+    { name = "typing-extensions", marker = "python_full_version < '4.0'" },
+    { name = "urllib3", marker = "python_full_version < '4.0'" },
+    { name = "wrapt", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d3/62/01d9f648e9b943175e0dcddf749cf31c769665d8ba08df1e989427163f33/testcontainers-4.12.0.tar.gz", hash = "sha256:13ee89cae995e643f225665aad8b200b25c4f219944a6f9c0b03249ec3f31b8d", size = 66631, upload-time = "2025-07-21T20:32:26.37Z" }
 wheels = [
@@ -3110,7 +3135,7 @@ wheels = [
 
 [package.optional-dependencies]
 redis = [
-    { name = "redis", marker = "python_full_version < '4'" },
+    { name = "redis", marker = "python_full_version < '4.0'" },
 ]
 
 [[package]]
@@ -3224,10 +3249,10 @@ name = "typer"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "python_full_version < '4'" },
-    { name = "rich", marker = "python_full_version < '4'" },
-    { name = "shellingham", marker = "python_full_version < '4'" },
-    { name = "typing-extensions", marker = "python_full_version < '4'" },
+    { name = "click", marker = "python_full_version < '4.0'" },
+    { name = "rich", marker = "python_full_version < '4.0'" },
+    { name = "shellingham", marker = "python_full_version < '4.0'" },
+    { name = "typing-extensions", marker = "python_full_version < '4.0'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c5/8c/7d682431efca5fd290017663ea4588bf6f2c6aad085c7f108c5dbc316e70/typer-0.16.0.tar.gz", hash = "sha256:af377ffaee1dbe37ae9440cb4e8f11686ea5ce4e9bae01b84ae7c63b87f1dd3b", size = 102625, upload-time = "2025-05-26T14:30:31.824Z" }
 wheels = [
