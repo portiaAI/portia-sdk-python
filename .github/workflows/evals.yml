@@ -36,17 +36,21 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref }}
 
-      - name: Checkout platform repo
+      - name: Checkout platform repo (skip if token missing)
+        id: checkout-platform
         uses: actions/checkout@v4
         with:
           path: platform
           repository: portiaAI/platform
           token: ${{ secrets.PORTIA_GH_TOKEN }}
+          ref: main
+        continue-on-error: true
 
       - name: Install UV
         run: pip install uv
 
       - name: Install dependencies to SteelThread
+        if: ${{ steps.checkout-platform.outcome == 'success' }}
         working-directory: ./platform/steel_thread
         run: |
           uv add "portia-sdk-python[all] @ file://../../portia-sdk-python"
