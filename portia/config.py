@@ -904,7 +904,7 @@ class Config(BaseModel):
         llm_provider = LLMProvider(provider)
         return self._construct_model_from_name(llm_provider, model_name)
 
-    def _construct_model_from_name(  # noqa: PLR0911
+    def _construct_model_from_name(  # noqa: PLR0911,C901
         self,
         llm_provider: LLMProvider,
         model_name: str,
