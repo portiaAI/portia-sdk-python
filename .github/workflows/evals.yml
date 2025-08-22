@@ -57,12 +57,14 @@ jobs:
 
       - name: Install dependencies to Evals
         working-directory: ./platform/evals
+        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         run: |
           uv add "portia-sdk-python[all] @ file://../../portia-sdk-python"
 
       - name: Eval query planner
         id: eval_query_planner
         working-directory: ./platform/evals
+        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
@@ -88,6 +90,7 @@ jobs:
       - name: Eval agent (execution)
         id: eval_execution_agent
         working-directory: ./platform/evals
+        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
@@ -116,6 +119,7 @@ jobs:
       - name: Eval agent (introspection)
         id: eval_agent_introspection
         working-directory: ./platform/evals
+        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
@@ -141,6 +145,7 @@ jobs:
       - name: Summary results
         id: summary_results
         working-directory: ./platform/evals
+        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
