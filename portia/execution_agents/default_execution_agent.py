@@ -35,7 +35,7 @@ from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-from portia.telemetry.views import ToolCallTelemetryEvent
+from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -709,6 +709,14 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        self.telemetry.capture(
+            ExecutionAgentUsageTelemetryEvent(
+                agent_type="default",
+                model=str(self.config.get_execution_model()),
+                sync=True,
+            )
+        )
+
         if not self.tool:
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
 
