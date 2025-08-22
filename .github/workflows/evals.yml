@@ -35,7 +35,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: portia-sdk-python
-          repository: portiaAI/portia-sdk-python
+          # For pull_request_target from forks, use the head repository; otherwise use the base repo
+          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || 'portiaAI/portia-sdk-python' }}
           # For push events, use github.ref_name (branch name that was pushed)
           # For pull_request_target, use github.event.pull_request.head.ref (PR branch)
           # For workflow_dispatch, use github.ref_name
@@ -198,12 +199,14 @@ jobs:
         if: failure()
         uses: shogo82148/actions-setup-redis@v1
       - name: Clear LLM cache
-        if: failure() && hashFiles('./platform/scripts/clear_llm_cache.sh') != ''
-        working-directory: ./platform
+        if: failure()
         run: |
-          echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
-          if [ -f "./scripts/clear_llm_cache.sh" ]; then
+          if [ -d "./platform" ] && [ -f "./platform/scripts/clear_llm_cache.sh" ]; then
+            echo "Platform directory and cache script found, clearing cache..."
+            cd ./platform
+            echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
             ./scripts/clear_llm_cache.sh
           else
-            echo "Cache clearing script not found, skipping..."
+            echo "Platform directory or cache script not found, skipping cache clearing..."
+            echo "This is expected for workflows that don't check out the platform repo."
           fi
