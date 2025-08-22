@@ -58,6 +58,7 @@ amazon = [
     "boto3>=1.39.9"
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
+groq = ["groq>=0.12.0,<1.0"]
 tools-browser-local = [
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
@@ -75,6 +76,7 @@ all = [
     "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
     "google-genai>=1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
+    "groq>=0.12.0,<1.0",
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
