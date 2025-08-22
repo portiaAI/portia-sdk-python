@@ -337,8 +337,9 @@ class InvokeToolStep(StepV2):
 
 class FunctionStep(StepV2):
     """Calls a function with the given args (no LLM involved, just a direct function call).
-    
-    The function can be either synchronous or asynchronous. Async functions will be properly awaited.
+
+    The function can be either synchronous or asynchronous. Async functions will be properly
+    awaited.
     """
 
     function: Callable[..., Any] = Field(description=("The function to call."))
