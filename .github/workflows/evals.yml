@@ -35,13 +35,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: portia-sdk-python
-          # For pull_request_target from forks, use the head repository; otherwise use the base repo
-          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || 'portiaAI/portia-sdk-python' }}
-          # For push events, use github.ref_name (branch name that was pushed)
-          # For pull_request_target, use github.event.pull_request.head.ref (PR branch)
-          # For workflow_dispatch, use github.ref_name
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.ref_name }}
-          token: ${{ secrets.PORTIA_GH_TOKEN }}
+          # Simple approach: just checkout the current PR head
+          ref: ${{ github.event.pull_request.head.sha }}
+          # Use default token which should work for public forks
+          token: ${{ github.token }}
 
       - name: Checkout platform repo
         uses: actions/checkout@v4
