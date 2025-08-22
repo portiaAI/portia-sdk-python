@@ -367,12 +367,9 @@ class FunctionStep(StepV2):
         """Run the function."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
-        # Check if the function is async (coroutine function)
         if inspect.iscoroutinefunction(self.function):
-            # For async functions, await the result
             output = await self.function(**args)
         else:
-            # For sync functions, call directly
             output = self.function(**args)
 
         if isinstance(output, Clarification) and output.plan_run_id is None:
