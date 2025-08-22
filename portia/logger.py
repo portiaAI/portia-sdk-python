@@ -54,6 +54,7 @@ class LoggerInterface(Protocol):
 
     """
 
+    def trace(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
     def debug(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
     def info(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
     def warning(self, msg: str, *args, **kwargs) -> None: ...  # noqa: ANN002, ANN003, D102
@@ -172,6 +173,13 @@ class SafeLogger(LoggerInterface):
             if isinstance(child_logger, type(default_logger))
             else child_logger
         )
+
+    def trace(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Wrap the child logger's trace method to catch exceptions."""
+        try:
+            self.child_logger.trace(msg, *args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            self.child_logger.error(f"Failed to log: {e}")  # noqa: G004, TRY400
 
     def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Wrap the child logger's debug method to catch exceptions."""
