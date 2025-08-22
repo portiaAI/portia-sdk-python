@@ -3,10 +3,8 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-from portia.builder.plan_builder_v2 import PlanBuilderV2
-from portia.builder.reference import Input, StepOutput
+from portia import Input, PlanBuilderV2, Portia, StepOutput
 from portia.cli import CLIExecutionHooks
-from portia.portia import Portia
 
 load_dotenv()
 
@@ -45,7 +43,7 @@ plan = (
         ),
         args={
             "price_with_currency": StepOutput("Search gold price"),
-            "purchase_quantity": Input("purchase_quantity"),
+            "purchase_quantity": 100,
         },
     )
     .if_(
