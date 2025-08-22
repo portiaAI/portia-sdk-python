@@ -43,7 +43,7 @@ plan = (
         ),
         args={
             "price_with_currency": StepOutput("Search gold price"),
-            "purchase_quantity": 100,
+            "purchase_quantity": Input("purchase_quantity"),
         },
     )
     .if_(
