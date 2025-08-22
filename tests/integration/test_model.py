@@ -32,7 +32,6 @@ MODELS = [
     "mistralai/mistral-small-latest",
     "google/gemini-2.0-flash",
     "azure-openai/gpt-4o-mini",
-    "groq/llama3-8b-8192",
 ]
 
 LOW_CAPABILITY_MODELS = [
