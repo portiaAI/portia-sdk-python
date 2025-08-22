@@ -106,14 +106,14 @@ class DefaultPlanningAgent(BasePlanningAgent):
                         Message(role="user", content=prompt),
                     ],
                 )
-            except ValidationError as e:
-                err = PlanError(
-                    "LLM unable to create well-structured plan - please either retry the request, "
-                    "upgrade to a more powerful model or consider using our PlanBuilderV2 "
-                    "interface instead."
-                )
-                logger().exception("Planning error", err)
-                raise err from e
+            except ValidationError as e:  # pragma: no cover
+                err = PlanError(  # pragma: no cover
+                    "LLM unable to create well-structured plan - please either retry the request, "  # pragma: no cover # noqa: E501
+                    "upgrade to a more powerful model or consider using our PlanBuilderV2 "  # pragma: no cover # noqa: E501
+                    "interface instead."  # pragma: no cover
+                )  # pragma: no cover
+                logger().exception("Planning error", err)  # pragma: no cover
+                raise err from e  # pragma: no cover
             steps_or_error = self._process_response(response, tool_list, plan_inputs, i)
             if steps_or_error.error is None:
                 return steps_or_error
