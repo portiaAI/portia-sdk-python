@@ -34,7 +34,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Checkout platform repo
         uses: actions/checkout@v4
@@ -188,16 +188,10 @@ jobs:
           fi
 
 
-      - name: Setup Redis CLI
-        if: false  # Temporarily disabled to avoid platform directory issues
-        uses: shogo82148/actions-setup-redis@v1
-      - name: Clear LLM cache
-        if: failure()
-        run: |
-          echo "Cache clearing step - checking if platform script exists..."
-          if [ -f "./platform/scripts/clear_llm_cache.sh" ]; then
-            echo "Found platform script, executing..."
-            (cd ./platform && echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env && ./scripts/clear_llm_cache.sh)
-          else
-            echo "Platform script not found, skipping cache clear (this is normal for some workflows)"
-          fi
+      # Cache clearing steps completely removed - not needed for Groq feature testing
+      # - name: Setup Redis CLI
+      #   if: failure()  
+      #   uses: shogo82148/actions-setup-redis@v1
+      # - name: Clear LLM cache
+      #   if: failure()
+      #   run: echo "Cache clearing disabled - focusing on core evaluation"
