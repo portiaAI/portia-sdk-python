@@ -274,36 +274,33 @@ async def test_openai_search_tool_async_http_error() -> None:
                 await tool.arun(ctx, "What is the capital of France?")
 
 
-def test_openai_search_tool_manual_override_tavily_with_tavily_key() -> None:
+def test_openai_search_tool_manual_override_tavily_with_tavily_key(monkeypatch) -> None:
     """Test manual override to Tavily when Tavily key is available."""
     tool = OpenAISearchTool()
     from portia.open_source_tools.registry import _get_preferred_search_tool
     from portia.open_source_tools.search_tool import SearchTool
     
-    env_vars = {
-        "OPENAI_API_KEY": "sk-test",
-        "TAVILY_API_KEY": "tvly-test", 
-        "PORTIA_SEARCH_PROVIDER": "tavily"
-    }
-    with patch.dict(os.environ, env_vars, clear=True):
-        selected_tool = _get_preferred_search_tool()
-        assert isinstance(selected_tool, SearchTool)
+    # Use monkeypatch to set environment variables
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    monkeypatch.setenv("PORTIA_SEARCH_PROVIDER", "tavily")
+    
+    selected_tool = _get_preferred_search_tool()
+    assert isinstance(selected_tool, SearchTool)
 
 
-def test_registry_return_search_tool_line_coverage() -> None:
+def test_registry_return_search_tool_line_coverage(monkeypatch) -> None:
     """Test that covers the specific return SearchTool() line in registry.py:37."""
     from portia.open_source_tools.registry import _get_preferred_search_tool
     from portia.open_source_tools.search_tool import SearchTool
     
-    # Set up environment to specifically trigger line 37: return SearchTool()
-    env_vars = {
-        "TAVILY_API_KEY": "tvly-test", 
-        "PORTIA_SEARCH_PROVIDER": "tavily"
-    }
-    with patch.dict(os.environ, env_vars, clear=True):
-        selected_tool = _get_preferred_search_tool()
-        # This should trigger the return SearchTool() on line 37
-        assert isinstance(selected_tool, SearchTool)
+    # Use monkeypatch to set environment variables to trigger line 37: return SearchTool()
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    monkeypatch.setenv("PORTIA_SEARCH_PROVIDER", "tavily")
+    
+    selected_tool = _get_preferred_search_tool()
+    # This should trigger the return SearchTool() on line 37
+    assert isinstance(selected_tool, SearchTool)
 
 
 @pytest.mark.asyncio

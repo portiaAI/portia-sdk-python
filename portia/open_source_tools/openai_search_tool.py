@@ -180,36 +180,47 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
         if isinstance(output, list):
             for content_item in output:
                 if hasattr(content_item, 'annotations'):
-                    annotations = content_item.annotations or []
-                    for annotation in annotations:
-                        if getattr(annotation, 'type', None) == 'url_citation':
-                            url_citation = getattr(annotation, 'url_citation', {})
-                            url = getattr(url_citation, 'url', None)
-                            title = getattr(url_citation, 'title', '') or ''
-                            
-                            if url:
-                                result = {
-                                    "url": url,
-                                    "title": title,
-                                    "content": getattr(content_item, 'text', '') or ''
-                                }
-                                results.append(result)
+                    item_results = self._process_annotations_from_item(
+                        content_item, 
+                        getattr(content_item, 'text', '') or ''
+                    )
+                    results.extend(item_results)
         
         # Handle single output item
         elif hasattr(output, 'annotations'):
-            annotations = output.annotations or []
-            for annotation in annotations:
-                if getattr(annotation, 'type', None) == 'url_citation':
-                    url_citation = getattr(annotation, 'url_citation', {})
-                    url = getattr(url_citation, 'url', None)
-                    title = getattr(url_citation, 'title', '') or ''
-                    
-                    if url:
-                        result = {
-                            "url": url,
-                            "title": title,
-                            "content": getattr(output, 'text', '') or ''
-                        }
-                        results.append(result)
+            item_results = self._process_annotations_from_item(
+                output,
+                getattr(output, 'text', '') or ''
+            )
+            results.extend(item_results)
+        
+        return results
+
+    def _process_annotations_from_item(self, item, content_text: str) -> list[dict[str, Any]]:
+        """Process annotations from a single item and extract URL citations.
+        
+        Args:
+            item: The content item with annotations
+            content_text: The text content to include in results
+            
+        Returns:
+            List of search result dictionaries
+        """
+        results = []
+        annotations = item.annotations or []
+        
+        for annotation in annotations:
+            if getattr(annotation, 'type', None) == 'url_citation':
+                url_citation = getattr(annotation, 'url_citation', {})
+                url = getattr(url_citation, 'url', None)
+                title = getattr(url_citation, 'title', '') or ''
+                
+                if url:
+                    result = {
+                        "url": url,
+                        "title": title,
+                        "content": content_text
+                    }
+                    results.append(result)
         
         return results
