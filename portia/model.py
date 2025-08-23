@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from contextvars import ContextVar
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
@@ -23,6 +25,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
 from portia.common import validate_extras_dependencies
+from portia.logger import logger
 from portia.token_check import estimate_tokens
 
 if TYPE_CHECKING:
@@ -120,6 +123,14 @@ class GenerativeModel(ABC):
 
         """
         self.model_name = model_name
+
+    def _log_llm_call(self, messages: list[Message]) -> None:
+        """Log TRACE level information about the LLM call."""
+        with suppress(Exception):
+            if messages:
+                content_preview = " ".join(msg.content.replace("\n", " ") for msg in messages)
+                preview = content_preview[:120]
+                logger().trace(f"LLM call: model={self!s} msg={preview!r}")
 
     @abstractmethod
     def get_response(self, messages: list[Message]) -> Message:
@@ -224,6 +235,7 @@ class LangChainGenerativeModel(GenerativeModel):
 
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = self._client.invoke(langchain_messages)
         return Message.from_langchain(response)
@@ -245,6 +257,7 @@ class LangChainGenerativeModel(GenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = structured_client.invoke(langchain_messages)
@@ -259,6 +272,7 @@ class LangChainGenerativeModel(GenerativeModel):
             messages (list[Message]): The list of messages to send to the model.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = await self._client.ainvoke(langchain_messages)
         return Message.from_langchain(response)
@@ -277,6 +291,7 @@ class LangChainGenerativeModel(GenerativeModel):
             **kwargs: Additional keyword arguments to pass to the with_structured_output method.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = await structured_client.ainvoke(langchain_messages)
@@ -463,6 +478,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -507,6 +523,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor asynchronously."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return await self._acached_instructor_call(
             client=self._instructor_client_async,
@@ -687,6 +704,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -762,7 +780,23 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             **kwargs,
         )
+        kwargs_no_thinking = copy.deepcopy(kwargs)
+        kwargs_no_thinking.get("model_kwargs", {}).pop("thinking", None)
+        # You cannot use structured output with thinking enabled, or you get an error saying
+        # 'Thinking may not be enabled when tool_choice forces tool use'.
+        # So we create a separate client for structured output.
+        # NB Instructor can be used, because it doesn't use the tool_choice API.
+        # See https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#extended-thinking-with-tool-use
+        self._non_thinking_client = ChatAnthropic(
+            model_name=model_name,
+            timeout=timeout,
+            max_retries=max_retries,
+            max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
+            api_key=api_key,
+            **kwargs_no_thinking,
+        )
         super().__init__(client, model_name)
+
         self._instructor_client = instructor.from_anthropic(
             client=wrappers.wrap_anthropic(
                 Anthropic(api_key=api_key.get_secret_value()),
@@ -817,7 +851,11 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._non_thinking_client.with_structured_output(
+            schema,
+            include_raw=True,
+            **kwargs,
+        )
         raw_response = structured_client.invoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
@@ -839,6 +877,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -890,7 +929,11 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return await self.aget_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._non_thinking_client.with_structured_output(
+            schema,
+            include_raw=True,
+            **kwargs,
+        )
         raw_response = await structured_client.ainvoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
@@ -912,6 +955,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor asynchronously."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return await self._acached_instructor_call(
             client=self._instructor_client_async,
@@ -998,6 +1042,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             schema: type[BaseModelT],
         ) -> BaseModelT:
             """Get structured response using instructor."""
+            super()._log_llm_call(messages)
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return self._cached_instructor_call(
                 client=self._instructor_client,
@@ -1050,6 +1095,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             schema: type[BaseModelT],
         ) -> BaseModelT:
             """Get structured response using instructor asynchronously."""
+            super()._log_llm_call(messages)
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return await self._acached_instructor_call(
                 client=self._instructor_client_async,
