@@ -380,6 +380,12 @@ class BrowserTool(Tool[str | BaseModel]):
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
 
+        # Pass allowed_domains to infrastructure provider via context
+        if hasattr(self, 'allowed_domains'):
+            ctx._tool_allowed_domains = self.allowed_domains
+        else:
+            ctx._tool_allowed_domains = None
+
         async def run_browser_tasks() -> str | BaseModel | ActionClarification:
             def handle_login_requirement(
                 result: BrowserTaskOutput,
@@ -459,13 +465,9 @@ class BrowserToolForUrl(BrowserTool):
     `infrastructure_option` argument.
 
     Args:
-        url (str): The URL that this browser tool will navigate to for all tasks.
-        id (str, optional): Custom identifier for the tool. If not provided, will be generated
-            based on the URL's domain.
-        name (str, optional): Display name for the tool. If not provided, will be generated
-            based on the URL's domain.
-        description (str, optional): Custom description of the tool's purpose. If not provided,
-            will be generated with the URL.
+        id (str, optional): Custom identifier for the tool. Defaults to "browser_tool".
+        name (str, optional): Display name for the tool. Defaults to "Browser Tool".
+        description (str, optional): Custom description of the tool's purpose.
         infrastructure_option (BrowserInfrastructureOption, optional): The infrastructure
             provider to use. Can be either `BrowserInfrastructureOption.LOCAL` or
             `BrowserInfrastructureOption.REMOTE`. Defaults to
@@ -473,17 +475,22 @@ class BrowserToolForUrl(BrowserTool):
         custom_infrastructure_provider (BrowserInfrastructureProvider, optional): A custom
             infrastructure provider to use. If not provided, the infrastructure provider will be
             resolved from the `infrastructure_option` argument.
+        allowed_domains (list[str], optional): List of allowed domains for browser navigation.
 
     """
 
-    url: str = Field(
-        ...,
-        description="The URL to navigate to.",
+    allowed_domains: list[str] | None = Field(
+        default=None,
+        description="List of allowed domains for browser navigation.",
+    )
+    url: str | None = Field(
+        default=None,
+        description="The URL that this browser tool should navigate to.",
     )
 
     def __init__(
         self,
-        url: str,
+        url: str | None = None,
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         description: str | None = None,
@@ -494,10 +501,11 @@ class BrowserToolForUrl(BrowserTool):
         allowed_domains: list[str] | None = None,
     ) -> None:
         """Initialize the BrowserToolForUrl."""
-        
-        # Validate allowed_domains format using centralized validation
-        if allowed_domains is not None:
-            allowed_domains = self._validate_domains_list(allowed_domains)
+        # Validate allowed_domains format if provided
+        if allowed_domains:
+            for domain in allowed_domains:
+                if not isinstance(domain, str) or not domain.strip():
+                    raise ValueError(f"Invalid domain in allowed_domains: {domain}")
         
         super().__init__(
             id=id or f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}",
@@ -514,8 +522,9 @@ class BrowserToolForUrl(BrowserTool):
             custom_infrastructure_provider=custom_infrastructure_provider,
             structured_output_schema=structured_output_schema,
             allowed_domains=allowed_domains,
-            url=url,  # Pass url to parent init
         )
+        self.allowed_domains = allowed_domains
+        self.url = url
 
     def run(  # type: ignore reportIncompatibleMethodOverride
         self,
@@ -524,7 +533,9 @@ class BrowserToolForUrl(BrowserTool):
         task_data: list[Any] | str | None = None,
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserToolForUrl."""
-        return super().run(ctx, self.url, task, task_data)  # pragma: no cover
+        # Use the URL provided during initialization, or about:blank as fallback
+        url_to_use = self.url or "about:blank"
+        return super().run(ctx, url_to_use, task, task_data)
 
 
 class BrowserInfrastructureProvider(ABC):
