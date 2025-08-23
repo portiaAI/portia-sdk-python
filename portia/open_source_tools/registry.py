@@ -30,7 +30,8 @@ def _get_preferred_search_tool():
     from portia.config import Config, SearchProvider
     
     try:
-        config = Config()
+        # Try to create a minimal config to avoid model validation issues
+        config = Config(llm_provider="openai", default_model="openai/gpt-5-mini")
         has_openai_key = bool(config.openai_api_key and config.openai_api_key.get_secret_value().strip())
         has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
         search_provider = config.search_provider
