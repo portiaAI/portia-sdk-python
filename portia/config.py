@@ -277,6 +277,13 @@ def _safe_get_search_provider_from_env() -> SearchProvider:
     try:
         return SearchProvider(provider_str)
     except ValueError:
+        import warnings
+        warnings.warn(
+            f"Invalid search_provider '{provider_str}'. Valid options are 'openai' or 'tavily'. "
+            "Falling back to default selection.",
+            UserWarning,
+            stacklevel=2
+        )
         return SearchProvider.TAVILY  # Default fallback for invalid values
 
 

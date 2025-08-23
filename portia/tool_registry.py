@@ -742,22 +742,15 @@ class DefaultToolRegistry(ToolRegistry):
         has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
         search_provider = config.search_provider
         
+        # Import SearchProvider enum
+        from portia.config import SearchProvider
+        
         # Determine which search tool to use
         use_openai_search = False
-        if search_provider == "openai" and has_openai_key:
+        if search_provider == SearchProvider.OPENAI and has_openai_key:
             use_openai_search = True
-        elif search_provider == "tavily" and has_tavily_key:
+        elif search_provider == SearchProvider.TAVILY and has_tavily_key:
             use_openai_search = False
-        elif search_provider not in ["openai", "tavily"]:
-            # Invalid provider, warn and fall back to default logic
-            import warnings
-            warnings.warn(
-                f"Invalid search_provider '{search_provider}'. "
-                "Valid options are 'openai' or 'tavily'. Falling back to default selection.",
-                UserWarning,
-                stacklevel=2
-            )
-            use_openai_search = has_openai_key and not has_tavily_key
         else:
             # Default logic: use OpenAI if available and no Tavily key
             use_openai_search = has_openai_key and not has_tavily_key
