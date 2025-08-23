@@ -257,6 +257,27 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
+class SearchProvider(Enum):
+    """Enum for available search providers.
+
+    Attributes:
+        OPENAI: OpenAI search provider.
+        TAVILY: Tavily search provider.
+    """
+
+    OPENAI = "openai"
+    TAVILY = "tavily"
+
+
+def _safe_get_search_provider_from_env() -> SearchProvider:
+    """Get SearchProvider from environment variable with fallback to default."""
+    provider_str = os.getenv("PORTIA_SEARCH_PROVIDER", "tavily").lower()
+    try:
+        return SearchProvider(provider_str)
+    except ValueError:
+        return SearchProvider.TAVILY  # Default fallback for invalid values
+
+
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
 
 
@@ -473,18 +494,10 @@ class Config(BaseModel):
     )
 
     # Search Tool Options
-    search_provider: str = Field(
-        default_factory=lambda: os.getenv("PORTIA_SEARCH_PROVIDER", "tavily").lower(),
-        description="The search provider to use ('openai' or 'tavily'). Defaults to 'tavily'.",
+    search_provider: SearchProvider = Field(
+        default_factory=_safe_get_search_provider_from_env,
+        description="The search provider to use. Defaults to 'tavily'.",
     )
-
-    @field_validator("search_provider")
-    @classmethod
-    def validate_search_provider(cls, v: str) -> str:
-        """Validate that search_provider is one of the supported values."""
-        if v.lower() not in ["openai", "tavily"]:
-            raise ValueError(f"search_provider must be 'openai' or 'tavily', got '{v}'")
-        return v.lower()
 
     llm_redis_cache_url: str | None = Field(
         default_factory=lambda: os.getenv("LLM_REDIS_CACHE_URL"),
