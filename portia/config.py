@@ -242,6 +242,7 @@ class LogLevel(Enum):
     """Enum for available log levels.
 
     Attributes:
+        TRACE: Trace log level (very verbose; below DEBUG).
         DEBUG: Debug log level.
         INFO: Info log level.
         WARNING: Warning log level.
@@ -250,6 +251,7 @@ class LogLevel(Enum):
 
     """
 
+    TRACE = "TRACE"
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"

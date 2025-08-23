@@ -186,7 +186,7 @@ class LLMStep(StepV2):
     """A step that runs a given task through an LLM (without any tools)."""
 
     task: str = Field(description="The task to perform.")
-    inputs: list[Any | Reference] = Field(
+    inputs: list[Any] = Field(
         default_factory=list,
         description=(
             "The inputs for the task. The inputs can be references to previous step outputs / "
@@ -254,7 +254,7 @@ class InvokeToolStep(StepV2):
             "run."
         )
     )
-    args: dict[str, Any | Reference] = Field(
+    args: dict[str, Any] = Field(
         default_factory=dict,
         description=(
             "The args to call the tool with. The arg values can be references to previous step "
@@ -338,7 +338,7 @@ class FunctionStep(StepV2):
     """Calls a function with the given args (no LLM involved, just a direct function call)."""
 
     function: Callable[..., Any] = Field(description=("The function to call."))
-    args: dict[str, Any | Reference] = Field(
+    args: dict[str, Any] = Field(
         default_factory=dict,
         description=(
             "The args to call the function with. The arg values can be references to previous step "
@@ -411,7 +411,7 @@ class SingleToolAgentStep(StepV2):
 
     task: str = Field(description="The task to perform.")
     tool: str = Field(description="The tool to use.")
-    inputs: list[Any | Reference] = Field(
+    inputs: list[Any] = Field(
         default_factory=list,
         description=(
             "The inputs for the task. The inputs can be references to previous step outputs / "
