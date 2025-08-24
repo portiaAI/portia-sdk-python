@@ -2387,7 +2387,7 @@ class Portia:
 
         """
         final_output = LocalDataValue(
-            value=step_output.get_value(),
+            value=step_output.full_value(self.storage),
             summary=None,
         )
         if skip_summarization:

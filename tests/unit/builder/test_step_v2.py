@@ -491,6 +491,7 @@ class TestInvokeToolStep:
         step = InvokeToolStep(tool="mock_tool", step_name="run_tool", args={"query": "search term"})
         mock_run_data = Mock()
         mock_tool = Mock()
+        mock_tool.structured_output_schema = None
         mock_output = Mock()
         mock_output.get_value.return_value = "tool result"
         mock_tool._arun = AsyncMock(return_value=mock_output)
@@ -549,6 +550,43 @@ class TestInvokeToolStep:
             mock_model.aget_structured_response.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_invoke_tool_step_with_tool_output_schema(self) -> None:
+        """Test InvokeToolStep run with 1 regular value input and output schema."""
+        step = InvokeToolStep(
+            tool="mock_tool",
+            step_name="run_tool",
+        )
+        mock_run_data = Mock()
+        mock_tool = Mock()
+        mock_tool.structured_output_schema = MockOutputSchema
+        mock_output = Mock()
+        mock_output.get_value.return_value = "raw tool result"
+        mock_tool._arun = AsyncMock(return_value=mock_output)
+
+        # Mock the model and its aget_structured_response method
+        mock_model = Mock()
+        mock_model.aget_structured_response = AsyncMock(
+            return_value=MockOutputSchema(result="structured result", count=5)
+        )
+
+        with (
+            patch.object(mock_run_data.portia, "get_tool") as mock_get_tool,
+            patch.object(mock_run_data.portia.config, "get_default_model") as mock_get_model,
+            patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        ):
+            mock_get_tool.return_value = mock_tool
+            mock_get_model.return_value = mock_model
+            mock_ctx_class.return_value = Mock()
+
+            result = await step.run(mock_run_data)
+
+            assert isinstance(result, MockOutputSchema)
+            assert result.result == "structured result"
+            mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
+            mock_tool._arun.assert_called_once()
+            mock_model.aget_structured_response.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_invoke_tool_step_with_reference_input(self) -> None:
         """Test InvokeToolStep run with 1 reference input."""
         reference_input = StepOutput(0)
@@ -558,6 +596,7 @@ class TestInvokeToolStep:
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_tool = Mock()
+        mock_tool.structured_output_schema = None
         mock_output = Mock()
         mock_output.get_value.return_value = "tool result with reference"
         mock_tool._arun = AsyncMock(return_value=mock_output)
@@ -601,6 +640,7 @@ class TestInvokeToolStep:
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_tool = Mock()
+        mock_tool.structured_output_schema = None
         mock_output = Mock()
         mock_output.get_value.return_value = "mixed inputs result"
         mock_tool._arun = AsyncMock(return_value=mock_output)
@@ -641,7 +681,7 @@ class TestInvokeToolStep:
         step = InvokeToolStep(tool="mock_tool", step_name="run_tool", args={})
         mock_run_data = Mock()
         mock_tool = Mock()
-
+        mock_tool.structured_output_schema = None
         mock_clarification = Clarification(
             category=ClarificationCategory.ACTION,
             user_guidance="Need more information",
