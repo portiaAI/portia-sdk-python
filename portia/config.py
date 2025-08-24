@@ -30,6 +30,7 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    GrokGenerativeModel,
     LangChainGenerativeModel,
     LLMProvider,
     OpenAIGenerativeModel,
@@ -166,6 +167,12 @@ class LLMModel(Enum):
     AZURE_GPT_4_O_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
     AZURE_GPT_4_1 = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4.1")
     AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
+
+    # xAI Grok
+    GROK_2_BETA = Model(provider=LLMProvider.GROK, model_name="grok-2-beta")
+    GROK_2_VISION_BETA = Model(provider=LLMProvider.GROK, model_name="grok-2-vision-beta")
+    GROK_2_1212 = Model(provider=LLMProvider.GROK, model_name="grok-2-1212")
+    GROK_2_VISION_1212 = Model(provider=LLMProvider.GROK, model_name="grok-2-vision-1212")
 
     @property
     def api_name(self) -> str:
@@ -450,6 +457,10 @@ class Config(BaseModel):
         default_factory=lambda: (os.getenv("AZURE_OPENAI_ENDPOINT") or ""),
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
+    grok_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("GROK_API_KEY") or os.getenv("XAI_API_KEY") or ""),
+        description="The API Key for xAI Grok. Must be set if llm-provider is GROK",
+    )
     ollama_base_url: str = Field(
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
         description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
@@ -637,6 +648,8 @@ class Config(BaseModel):
                         return "azure-openai/o3-mini"
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
+                    case LLMProvider.GROK:
+                        return "grok/grok-2-1212"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -652,6 +665,8 @@ class Config(BaseModel):
                         return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
+                    case LLMProvider.GROK:
+                        return "grok/grok-2-1212"
                 return None
             case "default_model":
                 match llm_provider:
@@ -669,6 +684,8 @@ class Config(BaseModel):
                         return "azure-openai/gpt-4.1"
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
+                    case LLMProvider.GROK:
+                        return "grok/grok-2-1212"
                 return None
 
     @model_validator(mode="after")
@@ -879,6 +896,7 @@ class Config(BaseModel):
         - mistralai (requires portia-sdk-python[mistral] to be installed)
         - google (requires portia-sdk-python[google] to be installed)
         - azure-openai
+        - grok
 
         Args:
             model_string (str): The model string to parse. E.G. "openai/gpt-4o"
@@ -894,7 +912,7 @@ class Config(BaseModel):
         llm_provider = LLMProvider(provider)
         return self._construct_model_from_name(llm_provider, model_name)
 
-    def _construct_model_from_name(  # noqa: PLR0911
+    def _construct_model_from_name(  # noqa: PLR0911, C901
         self,
         llm_provider: LLMProvider,
         model_name: str,
@@ -974,6 +992,12 @@ class Config(BaseModel):
                     base_url=self.ollama_base_url,
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
+            case LLMProvider.GROK:
+                return GrokGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("grok_api_key"),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
+                )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
@@ -1007,6 +1031,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.AZURE_OPENAI
     if os.getenv("OPENROUTER_API_KEY") or kwargs.get("openrouter_api_key"):
         return LLMProvider.OPENROUTER
+    if os.getenv("GROK_API_KEY") or os.getenv("XAI_API_KEY") or kwargs.get("grok_api_key"):
+        return LLMProvider.GROK
     return None
 
 
