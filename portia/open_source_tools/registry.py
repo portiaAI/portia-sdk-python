@@ -1,6 +1,7 @@
 """Example registry containing simple tools."""
 
 import os
+import warnings
 
 from portia.common import validate_extras_dependencies
 from portia.open_source_tools.calculator_tool import CalculatorTool
@@ -11,14 +12,53 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.map_tool import MapTool
+from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 from portia.tool_registry import (
     ToolRegistry,
 )
 
+
+def _get_preferred_search_tool():
+    """Get the preferred search tool based on available API keys and user preference.
+    
+    Users can override the default selection by setting PORTIA_SEARCH_PROVIDER to either
+    'openai' or 'tavily'. Otherwise, OpenAI search is used if OPENAI_API_KEY is available
+    and TAVILY_API_KEY is not.
+    """
+    from portia.config import Config, SearchProvider
+    
+    try:
+        # Try to create a minimal config to avoid model validation issues
+        config = Config(llm_provider="openai", default_model="openai/gpt-5-mini")
+        has_openai_key = bool(config.openai_api_key and config.openai_api_key.get_secret_value().strip())
+        has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
+        search_provider = config.search_provider
+    except Exception:
+        # Fallback to env vars if config fails
+        has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+        has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
+        # Use the safe function to handle invalid values
+        from portia.config import _safe_get_search_provider_from_env
+        search_provider = _safe_get_search_provider_from_env()
+    
+    # If user explicitly sets the provider, honor their choice
+    if search_provider == SearchProvider.OPENAI and has_openai_key:
+        return OpenAISearchTool()
+    elif search_provider == SearchProvider.TAVILY and has_tavily_key:
+        return SearchTool()
+    
+    # Default automatic selection logic
+    # If user has OpenAI key but no Tavily key, use OpenAI search
+    if has_openai_key and not has_tavily_key:
+        return OpenAISearchTool()
+    # Otherwise, use Tavily search (default behavior)
+    else:
+        return SearchTool()
+
 example_tool_registry = ToolRegistry(
-    [CalculatorTool(), WeatherTool(), SearchTool(), LLMTool()],
+    [CalculatorTool(), WeatherTool(), _get_preferred_search_tool(), LLMTool()],
 )
 
 open_source_tool_registry = ToolRegistry(
@@ -31,7 +71,7 @@ open_source_tool_registry = ToolRegistry(
         ImageUnderstandingTool(),
         LLMTool(),
         MapTool(),
-        SearchTool(),
+        _get_preferred_search_tool(),
         WeatherTool(),
     ],
 )

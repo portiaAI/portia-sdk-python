@@ -259,6 +259,34 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
+class SearchProvider(Enum):
+    """Enum for available search providers.
+
+    Attributes:
+        OPENAI: OpenAI search provider.
+        TAVILY: Tavily search provider.
+    """
+
+    OPENAI = "openai"
+    TAVILY = "tavily"
+
+
+def _safe_get_search_provider_from_env() -> SearchProvider:
+    """Get SearchProvider from environment variable with fallback to default."""
+    provider_str = os.getenv("PORTIA_SEARCH_PROVIDER", "tavily").lower()
+    try:
+        return SearchProvider(provider_str)
+    except ValueError:
+        import warnings
+        warnings.warn(
+            f"Invalid search_provider '{provider_str}'. Valid options are 'openai' or 'tavily'. "
+            "Falling back to default selection.",
+            UserWarning,
+            stacklevel=2
+        )
+        return SearchProvider.TAVILY  # Default fallback for invalid values
+
+
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
 
 
@@ -472,6 +500,12 @@ class Config(BaseModel):
             "The AWS credentials profile name. Must be set if llm-provider is AMAZON, "
             "if not provided, aws_access_key_id and aws_secret_access_key must be provided"
         ),
+    )
+
+    # Search Tool Options
+    search_provider: SearchProvider = Field(
+        default_factory=_safe_get_search_provider_from_env,
+        description="The search provider to use. Defaults to 'tavily'.",
     )
 
     llm_redis_cache_url: str | None = Field(
