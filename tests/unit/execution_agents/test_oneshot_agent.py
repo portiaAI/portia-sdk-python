@@ -99,8 +99,8 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     output = agent.execute_sync()
 
+    assert mock_telemetry.capture.call_count == 2
     # Verify telemetry was captured with correct tool ID
-    mock_telemetry.capture.assert_called_once()
     call_args = mock_telemetry.capture.call_args[0][0]
     assert call_args.tool_id == tool.id
 
@@ -194,8 +194,8 @@ async def test_oneshot_agent_task_async(monkeypatch: pytest.MonkeyPatch) -> None
 
     output = await agent.execute_async()
 
+    assert mock_telemetry.capture.call_count == 2
     # Verify telemetry was captured with correct tool ID
-    mock_telemetry.capture.assert_called_once()
     call_args = mock_telemetry.capture.call_args[0][0]
     assert call_args.tool_id == tool.id
 

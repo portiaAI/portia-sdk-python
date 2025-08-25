@@ -16,6 +16,8 @@ from portia.builder.step_v2 import (
     StepV2,
 )
 from portia.plan import PlanInput
+from portia.telemetry.telemetry_service import ProductTelemetry
+from portia.telemetry.views import PlanV2BuildTelemetryEvent
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -329,4 +331,17 @@ class PlanBuilderV2:
                 "An endif must be called for all if_ steps. "
                 "Please add an endif for all if_ steps."
             )
+
+        step_type_counts: dict[str, int] = {}
+        for step in self.plan.steps:
+            step_type = step.__class__.__name__
+            step_type_counts[step_type] = step_type_counts.get(step_type, 0) + 1
+
+        telemetry = ProductTelemetry()
+        telemetry.capture(
+            PlanV2BuildTelemetryEvent(
+                plan_length=len(self.plan.steps), step_type_counts=step_type_counts
+            )
+        )
+
         return self.plan
