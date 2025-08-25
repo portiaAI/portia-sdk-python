@@ -31,41 +31,40 @@ jobs:
       github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'ready_to_eval')
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.head_ref || github.ref }}
-
-      - name: Checkout platform repo (skip if token missing)
-        id: checkout-platform
+      - name: Checkout portia-sdk-python repo
         uses: actions/checkout@v4
-        if: ${{ secrets.PORTIA_GH_TOKEN != '' }}
+        with:
+          path: portia-sdk-python
+          repository: portiaAI/portia-sdk-python
+          # For push events, use github.ref_name (branch name that was pushed)
+          # For pull_request_target, use github.event.pull_request.head.ref (PR branch)
+          # For workflow_dispatch, use github.ref_name
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.ref_name }}
+          token: ${{ secrets.PORTIA_GH_TOKEN }}
+
+      - name: Checkout platform repo
+        uses: actions/checkout@v4
         with:
           path: platform
           repository: portiaAI/platform
           token: ${{ secrets.PORTIA_GH_TOKEN }}
-          ref: main
-        continue-on-error: true
 
       - name: Install UV
         run: pip install uv
 
       - name: Install dependencies to SteelThread
-        if: ${{ steps.checkout-platform.outcome == 'success' }}
         working-directory: ./platform/steel_thread
         run: |
           uv add "portia-sdk-python[all] @ file://../../portia-sdk-python"
 
       - name: Install dependencies to Evals
         working-directory: ./platform/evals
-        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         run: |
           uv add "portia-sdk-python[all] @ file://../../portia-sdk-python"
 
       - name: Eval query planner
         id: eval_query_planner
         working-directory: ./platform/evals
-        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
@@ -74,7 +73,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           LLM_REDIS_CACHE_URL: ${{ secrets.LLM_REDIS_CACHE_URL }}
@@ -91,7 +89,6 @@ jobs:
       - name: Eval agent (execution)
         id: eval_execution_agent
         working-directory: ./platform/evals
-        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
@@ -100,7 +97,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PORTIA_API_KEY: ${{ secrets.PORTIA_EVAL_API_KEY }}
           PORTIA_API_ENDPOINT: ${{ secrets.PORTIA_EVAL_API_ENDPOINT }}
           LLM_REDIS_CACHE_URL: ${{ secrets.LLM_REDIS_CACHE_URL }}
@@ -120,7 +116,6 @@ jobs:
       - name: Eval agent (introspection)
         id: eval_agent_introspection
         working-directory: ./platform/evals
-        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
@@ -146,7 +141,6 @@ jobs:
       - name: Summary results
         id: summary_results
         working-directory: ./platform/evals
-        if: ${{ steps.checkout-platform.outcome == \'success\' }}
         env:
           LANGCHAIN_TRACING_V2: "true"
           LANGCHAIN_ENDPOINT: "https://api.smith.langchain.com"
@@ -198,10 +192,12 @@ jobs:
           fi
 
 
-      # Cache clearing steps completely removed - not needed for Groq feature testing
-      # - name: Setup Redis CLI
-      #   if: failure()  
-      #   uses: shogo82148/actions-setup-redis@v1
-      # - name: Clear LLM cache
-      #   if: failure()
-      #   run: echo "Cache clearing disabled - focusing on core evaluation"
+      - name: Setup Redis CLI
+        if: failure()
+        uses: shogo82148/actions-setup-redis@v1
+      - name: Clear LLM cache
+        if: failure()
+        working-directory: ./platform
+        run: |
+          echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
+          ./scripts/clear_llm_cache.sh
