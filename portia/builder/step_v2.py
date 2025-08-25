@@ -301,9 +301,10 @@ class InvokeToolStep(StepV2):
         if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
             output_value.plan_run_id = run_data.plan_run.id
 
+        output_schema = self.output_schema or tool.structured_output_schema
         if (
-            self.output_schema
-            and not isinstance(output_value, self.output_schema)
+            output_schema
+            and not isinstance(output_value, output_schema)
             and not isinstance(output_value, Clarification)
         ):
             model = run_data.portia.config.get_default_model()
@@ -314,7 +315,7 @@ class InvokeToolStep(StepV2):
                         content=f"Convert this output to the desired schema: {output}",
                     )
                 ],
-                self.output_schema,
+                output_schema,
             )
         return output_value
 
