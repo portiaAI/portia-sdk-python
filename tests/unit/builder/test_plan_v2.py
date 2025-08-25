@@ -347,3 +347,14 @@ class TestPlanV2:
         plan = PlanV2(steps=[], plan_inputs=[])
         assert len(plan.steps) == 0
         assert len(plan.plan_inputs) == 0
+
+    def test_pretty_plan(self) -> None:
+        """Test pretty print."""
+        plan = PlanV2(
+            steps=[MockStepV2("step1")],
+            plan_inputs=[PlanInput(name="input1", description="First input")],
+            final_output_schema=OutputSchema,
+        )
+
+        output = plan.pretty_print()
+        assert isinstance(output, str)
