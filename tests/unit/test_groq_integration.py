@@ -1,10 +1,14 @@
 """Unit tests for Groq model provider integration."""
 
+from typing import Any
+from unittest.mock import MagicMock, patch
+
 import pytest
+from langchain_core.messages import AIMessage
 from pydantic import SecretStr
 
 from portia.config import Config
-from portia.model import GroqGenerativeModel, LLMProvider
+from portia.model import GroqGenerativeModel, LLMProvider, Message
 
 
 def test_groq_provider_enum() -> None:
@@ -69,12 +73,15 @@ def test_groq_model_parsing() -> None:
     assert model.model_name == "llama3-8b-8192"
 
 
-@pytest.mark.parametrize("model_name", [
-    "llama3-8b-8192",
-    "llama3-70b-8192",
-    "mixtral-8x7b-32768",
-    "gemma-7b-it",
-])
+@pytest.mark.parametrize(
+    "model_name",
+    [
+        "llama3-8b-8192",
+        "llama3-70b-8192",
+        "mixtral-8x7b-32768",
+        "gemma-7b-it",
+    ],
+)
 def test_groq_model_names(model_name: str) -> None:
     """Test various Groq model names work correctly."""
     model = GroqGenerativeModel(
@@ -104,3 +111,59 @@ def test_groq_default_models() -> None:
 
     introspection_model = config.get_agent_default_model("introspection_model", LLMProvider.GROQ)
     assert introspection_model == "groq/llama3-8b-8192"
+
+
+@pytest.mark.asyncio
+async def test_groq_model_aget_response() -> None:
+    """Ensure Groq aget_response returns a proper Message."""
+    with patch("portia.model.ChatOpenAI") as mock_chat_cls:
+        mock_chat = MagicMock()
+
+        async def mock_ainvoke(*_: Any, **__: Any) -> AIMessage:
+            return AIMessage(content="Groq response")
+
+        mock_chat.ainvoke = mock_ainvoke
+        mock_chat_cls.return_value = mock_chat
+
+        model = GroqGenerativeModel(
+            model_name="llama3-8b-8192",
+            api_key=SecretStr("test-groq-api-key"),
+        )
+
+        messages = [Message(role="user", content="Hello")]
+        response = await model.aget_response(messages)
+
+        assert isinstance(response, Message)
+        assert response.role == "assistant"
+        assert response.content == "Groq response"
+
+
+class _StructuredOutputTestModel(MagicMock):
+    """Dummy structured output type for testing."""
+
+
+@pytest.mark.asyncio
+async def test_groq_model_aget_structured_response() -> None:
+    """Ensure Groq aget_structured_response returns the provided schema instance."""
+    with patch("portia.model.ChatOpenAI") as mock_chat_cls:
+        mock_chat = MagicMock()
+
+        structured_output = MagicMock()
+
+        async def mock_structured_ainvoke(*_: Any, **__: Any) -> _StructuredOutputTestModel:
+            return _StructuredOutputTestModel(test_field="Groq structured response")
+
+        structured_output.ainvoke = mock_structured_ainvoke
+        mock_chat.with_structured_output.return_value = structured_output
+        mock_chat_cls.return_value = mock_chat
+
+        model = GroqGenerativeModel(
+            model_name="llama3-8b-8192",
+            api_key=SecretStr("test-groq-api-key"),
+        )
+
+        messages = [Message(role="user", content="Hello")]
+        result = await model.aget_structured_response(messages, _StructuredOutputTestModel)
+
+        assert isinstance(result, _StructuredOutputTestModel)
+        assert getattr(result, "test_field", "") == "Groq structured response"
