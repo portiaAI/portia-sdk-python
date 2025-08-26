@@ -307,6 +307,7 @@ class OneShotAgent(BaseExecutionAgent):
                 agent_type="one_shot",
                 model=str(self.config.get_execution_model()),
                 sync=True,
+                tool_id=self.tool.id if self.tool else None,
             )
         )
 
@@ -331,6 +332,7 @@ class OneShotAgent(BaseExecutionAgent):
                 agent_type="one_shot",
                 model=str(self.config.get_execution_model()),
                 sync=False,
+                tool_id=self.tool.id if self.tool else None,
             )
         )
 

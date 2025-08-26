@@ -72,11 +72,13 @@ class PlanV2StepExecutionTelemetryEvent(BaseTelemetryEvent):
     Attributes:
         step_type: The type of the step being executed.
         success: Whether the step execution was successful.
+        tool_id: The identifier of the tool being used, if any.
 
     """
 
     step_type: str
     success: bool
+    tool_id: str | None
     name: str = "plan_v2_step_execution"  # type: ignore reportIncompatibleMethodOverride
 
 
@@ -118,10 +120,12 @@ class ExecutionAgentUsageTelemetryEvent(BaseTelemetryEvent):
         agent_type: The type of the execution agent (e.g., "one_shot", "default").
         model: The model being used.
         sync: Whether the agent was called synchronously.
+        tool_id: The identifier of the tool being used, if any.
 
     """
 
     agent_type: str
     model: str | None
     sync: bool
+    tool_id: str | None
     name: str = "execution_agent_usage"  # type: ignore reportIncompatibleMethodOverride

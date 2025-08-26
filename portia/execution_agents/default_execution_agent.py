@@ -714,6 +714,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
                 agent_type="default",
                 model=str(self.config.get_execution_model()),
                 sync=True,
+                tool_id=self.tool.id if self.tool else None,
             )
         )
 
