@@ -2797,9 +2797,7 @@ class Portia:
 
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
-            output_value = self._set_step_output(
-                output_value, run_data.plan_run, legacy_step
-            )
+            output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
             output = ReferenceValue(
                 value=output_value,
                 description=(f"Output from step '{step.step_name}' (Description: {step})"),
@@ -2836,9 +2834,6 @@ class Portia:
                     run_data.plan_run, run_data.legacy_plan, error_value
                 )
 
-            # Don't increment current step beyond the last step
-            if jump_to_step_index is None and i < len(plan.steps) - 1:
-                run_data.plan_run.current_step_index += 1
             if jump_to_step_index is not None:
                 logger().debug(f"Jumping to step {jump_to_step_index} from {i}")
                 run_data.plan_run.current_step_index = jump_to_step_index
