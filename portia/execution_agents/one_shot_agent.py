@@ -34,7 +34,7 @@ from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.logger import logger
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-from portia.telemetry.views import ToolCallTelemetryEvent
+from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -302,6 +302,15 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        self.telemetry.capture(
+            ExecutionAgentUsageTelemetryEvent(
+                agent_type="one_shot",
+                model=str(self.config.get_execution_model()),
+                sync=True,
+                tool_id=self.tool.id if self.tool else None,
+            )
+        )
+
         app = self._setup_graph(sync=True).compile()
         invocation_result = app.invoke({"messages": [], "step_inputs": []})
 
@@ -318,6 +327,15 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        self.telemetry.capture(
+            ExecutionAgentUsageTelemetryEvent(
+                agent_type="one_shot",
+                model=str(self.config.get_execution_model()),
+                sync=False,
+                tool_id=self.tool.id if self.tool else None,
+            )
+        )
+
         app = self._setup_graph(sync=False).compile()
         invocation_result = await app.ainvoke({"messages": [], "step_inputs": []})
         return process_output(
