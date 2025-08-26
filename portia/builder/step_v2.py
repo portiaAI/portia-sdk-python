@@ -538,13 +538,13 @@ class UserInputStep(StepV2):
                 plan_run_id=run_data.plan_run.id,
                 user_guidance=str(resolved_message),
                 options=self.options,
-                argument_name="user_input",
+                argument_name=run_data.plan.step_output_name(self),
                 source="User input step",
             )
         return InputClarification(
             plan_run_id=run_data.plan_run.id,
             user_guidance=str(resolved_message),
-            argument_name="user_input",
+            argument_name=run_data.plan.step_output_name(self),
             source="User input step",
         )
 
