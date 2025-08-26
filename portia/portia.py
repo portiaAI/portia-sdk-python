@@ -910,10 +910,11 @@ class Portia:
                         )
                     )
             except RuntimeError:
-                logger().error(
+                message = (
                     "run_plan should be called outside of an async context: Use arun_plan instead"
                 )
-                raise
+                logger().error(message)
+                raise RuntimeError(message) from None
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
@@ -2387,7 +2388,7 @@ class Portia:
 
         """
         final_output = LocalDataValue(
-            value=step_output.get_value(),
+            value=step_output.full_value(self.storage),
             summary=None,
         )
         if skip_summarization:

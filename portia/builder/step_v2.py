@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import itertools
 import re
 from abc import ABC, abstractmethod
@@ -305,9 +306,10 @@ class InvokeToolStep(StepV2):
         if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
             output_value.plan_run_id = run_data.plan_run.id
 
+        output_schema = self.output_schema or tool.structured_output_schema
         if (
-            self.output_schema
-            and not isinstance(output_value, self.output_schema)
+            output_schema
+            and not isinstance(output_value, output_schema)
             and not isinstance(output_value, Clarification)
         ):
             model = run_data.portia.config.get_default_model()
@@ -318,7 +320,7 @@ class InvokeToolStep(StepV2):
                         content=f"Convert this output to the desired schema: {output}",
                     )
                 ],
-                self.output_schema,
+                output_schema,
             )
         return output_value
 
@@ -339,7 +341,11 @@ class InvokeToolStep(StepV2):
 
 
 class FunctionStep(StepV2):
-    """Calls a function with the given args (no LLM involved, just a direct function call)."""
+    """Calls a function with the given args (no LLM involved, just a direct function call).
+
+    The function can be either synchronous or asynchronous. Async functions will be properly
+    awaited.
+    """
 
     function: Callable[..., Any] = Field(description=("The function to call."))
     args: dict[str, Any] = Field(
@@ -366,7 +372,11 @@ class FunctionStep(StepV2):
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the function."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-        output = self.function(**args)
+
+        if inspect.iscoroutinefunction(self.function):
+            output = await self.function(**args)
+        else:
+            output = self.function(**args)
 
         if isinstance(output, Clarification) and output.plan_run_id is None:
             output.plan_run_id = run_data.plan_run.id
