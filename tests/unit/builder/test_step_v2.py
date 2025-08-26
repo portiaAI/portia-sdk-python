@@ -1351,6 +1351,8 @@ class TestUserInputStep:
         mock_run_data.plan_run = Mock()
         mock_run_data.plan_run.id = PlanRunUUID()
         mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.step_output_name.return_value = "user_input"
 
         result = await step.run(mock_run_data)
 
@@ -1371,6 +1373,8 @@ class TestUserInputStep:
         mock_run_data.plan_run = Mock()
         mock_run_data.plan_run.id = PlanRunUUID()
         mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.step_output_name.return_value = "user_input"
 
         result = await step.run(mock_run_data)
 
