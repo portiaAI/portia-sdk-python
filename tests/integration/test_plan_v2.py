@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import BaseModel, Field
@@ -10,9 +11,16 @@ from pydantic import BaseModel, Field
 from portia import Config, LogLevel, Portia
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
+from portia.clarification_handler import ClarificationHandler
 from portia.config import StorageClass
+from portia.execution_hooks import ExecutionHooks
 from portia.plan_run import PlanRunState
 from portia.tool import Tool, ToolRunContext
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from portia.clarification import Clarification, MultipleChoiceClarification
 
 
 class CommodityPrice(BaseModel):
@@ -71,7 +79,7 @@ class FinalOutput(BaseModel):
 
 
 @pytest.mark.parametrize("is_async", [False, True])
-def test_example_builder(is_async: bool) -> None:
+def test_simple_builder(is_async: bool) -> None:
     """Test the example from example_builder.py."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
@@ -629,3 +637,80 @@ def test_conditional_plan_with_record_functions(input_value: int, expected_outpu
     final_output = plan_run.outputs.final_output.get_value()
     assert isinstance(final_output, ConditionalTestOutput)
     assert final_output.value_being_processed == expected_output
+
+
+class TestClarificationHandler(ClarificationHandler):
+    """Test clarification handler that automatically selects the laser-sharks-ballad poem."""
+
+    def handle_multiple_choice_clarification(
+        self,
+        clarification: MultipleChoiceClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle multiple choice clarification by selecting the laser-sharks-ballad poem."""
+        if clarification.argument_name == "filename" and "poem.txt" in str(clarification.options):
+            # Select the laser-sharks-ballad poem file
+            selected_option = "data/laser-sharks-ballad/poem.txt"
+            if selected_option in clarification.options:
+                on_resolution(clarification, selected_option)
+                return
+
+            # Fallback: select the first option that contains laser-sharks-ballad
+            for option in clarification.options:
+                if "laser-sharks-ballad" in option:
+                    on_resolution(clarification, option)
+                    return
+
+        # Default: select the first option
+        on_resolution(clarification, clarification.options[0])
+
+
+def test_plan_v2_file_reader_with_clarification_handler() -> None:
+    """Test PlanV2 with file reader tool that requires clarification handling."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+    )
+
+    # Create a clarification handler
+    clarification_handler = TestClarificationHandler()
+    execution_hooks = ExecutionHooks(clarification_handler=clarification_handler)
+
+    portia = Portia(config=config, execution_hooks=execution_hooks)
+
+    plan = (
+        PlanBuilderV2()
+        .single_tool_agent_step(
+            tool="file_reader_tool",
+            task="Read the poem in poem.txt from file.",
+            step_name="read_poem",
+        )
+        .llm_step(
+            task="Write a review of the poem",
+            inputs=[StepOutput("read_poem")],
+            step_name="review_poem",
+        )
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify that the poem was read successfully
+    read_poem_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert read_poem_output is not None
+    poem_content = read_poem_output.get_value()
+    assert isinstance(poem_content, str)
+    assert len(poem_content) > 0
+
+    # Verify it contains the laser sharks ballad content
+    assert "laser-shark" in poem_content.lower()
+
+    # Verify that a review was written
+    review_output = plan_run.outputs.step_outputs["$step_1_output"]
+    assert review_output is not None
+    review_content = review_output.get_value()
+    assert isinstance(review_content, str)
+    assert len(review_content) > 0
