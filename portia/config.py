@@ -12,7 +12,8 @@ import os
 import warnings
 from collections.abc import Container
 from enum import Enum
-from typing import Any, NamedTuple, Self, TypeVar
+from typing import Any, NamedTuple, Self, TypeVar, Optional
+from pathlib import Path
 
 from pydantic import (
     BaseModel,
@@ -407,75 +408,72 @@ class Config(BaseModel):
 
     # Portia Cloud Options
     portia_api_endpoint: str = Field(
-        default_factory=lambda: os.getenv("PORTIA_API_ENDPOINT") or "https://api.portialabs.ai",
+        default="https://api.portialabs.ai",
         description="The API endpoint for the Portia Cloud API",
     )
     portia_dashboard_url: str = Field(
-        default_factory=lambda: os.getenv("PORTIA_DASHBOARD_URL") or "https://app.portialabs.ai",
+        default="https://app.portialabs.ai", 
         description="The URL for the Portia Cloud Dashboard",
     )
     portia_api_key: SecretStr | None = Field(
-        default_factory=lambda: (
-            SecretStr(os.environ["PORTIA_API_KEY"]) if "PORTIA_API_KEY" in os.environ else None
-        ),
+        default=None,
         description="The API Key for the Portia Cloud API available from the dashboard at https://app.portialabs.ai",
     )
 
     # LLM API Keys
     openrouter_api_key: SecretStr = Field(
-        default_factory=lambda: SecretStr(os.getenv("OPENROUTER_API_KEY") or ""),
+        default=SecretStr(""),
         description="The API Key for OpenRouter. Must be set if llm-provider is OPENROUTER",
     )
     openai_api_key: SecretStr = Field(
-        default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""),
-        description="The API Key for OpenAI. Must be set if llm-provider is OPENAI",
+        default=SecretStr(""),
+        description="The API Key for OpenAI. Must be set if llm-provider is OPENAI", 
     )
     anthropic_api_key: SecretStr = Field(
-        default_factory=lambda: SecretStr(os.getenv("ANTHROPIC_API_KEY") or ""),
+        default=SecretStr(""),
         description="The API Key for Anthropic. Must be set if llm-provider is ANTHROPIC",
     )
     mistralai_api_key: SecretStr = Field(
-        default_factory=lambda: SecretStr(os.getenv("MISTRAL_API_KEY") or ""),
+        default=SecretStr(""),
         description="The API Key for Mistral AI. Must be set if llm-provider is MISTRALAI",
     )
     google_api_key: SecretStr = Field(
-        default_factory=lambda: SecretStr(os.getenv("GOOGLE_API_KEY") or ""),
+        default=SecretStr(""),
         description="The API Key for Google Generative AI. Must be set if llm-provider is GOOGLE",
     )
     azure_openai_api_key: SecretStr = Field(
-        default_factory=lambda: SecretStr(os.getenv("AZURE_OPENAI_API_KEY") or ""),
+        default=SecretStr(""),
         description="The API Key for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
     azure_openai_endpoint: str = Field(
-        default_factory=lambda: (os.getenv("AZURE_OPENAI_ENDPOINT") or ""),
+        default="",
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
     ollama_base_url: str = Field(
-        default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
+        default="http://localhost:11434/v1",
         description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
     )
     aws_access_key_id: str = Field(
-        default_factory=lambda: os.getenv("AWS_ACCESS_KEY_ID") or "",
+        default="",
         description="The AWS access key ID. Must be set if llm-provider is AMAZON",
     )
     aws_secret_access_key: str = Field(
-        default_factory=lambda: os.getenv("AWS_SECRET_ACCESS_KEY") or "",
+        default="",
         description="The AWS secret access key. Must be set if llm-provider is AMAZON",
     )
     aws_default_region: str = Field(
-        default_factory=lambda: os.getenv("AWS_DEFAULT_REGION") or "",
+        default="",
         description="The AWS default region. Must be set if llm-provider is AMAZON",
     )
     aws_credentials_profile_name: str | None = Field(
-        default_factory=lambda: os.getenv("AWS_CREDENTIALS_PROFILE_NAME") or None,
+        default=None,
         description=(
             "The AWS credentials profile name. Must be set if llm-provider is AMAZON, "
             "if not provided, aws_access_key_id and aws_secret_access_key must be provided"
         ),
     )
-
     llm_redis_cache_url: str | None = Field(
-        default_factory=lambda: os.getenv("LLM_REDIS_CACHE_URL"),
+        default=None,
         description="Optional Redis URL used for caching LLM responses. This URl should include "
         "the auth details if required for access to the cache.",
     )
@@ -532,12 +530,11 @@ class Config(BaseModel):
 
     # Storage Options
     storage_class: StorageClass = Field(
-        default_factory=lambda: StorageClass.CLOUD
-        if os.getenv("PORTIA_API_KEY")
-        else StorageClass.MEMORY,
-        description="Where to store Plans and PlanRuns. By default these will be kept in memory"
-        "if no API key is provided.",
-    )
+    default=StorageClass.MEMORY,  # Will be overridden by config loader logic
+    description="Where to store Plans and PlanRuns. By default these will be kept in memory"
+    "if no API key is provided.",
+)
+
 
     @field_validator("storage_class", mode="before")
     @classmethod
@@ -752,6 +749,90 @@ class Config(BaseModel):
 
         """
         return default_config(**kwargs)
+    
+    @classmethod
+    def from_local_config(
+        cls, 
+        profile: str = "default", 
+        config_file: Optional[Path] = None,
+        **overrides: Any
+    ) -> Config:
+        """Create Config instance from TOML profile with proper precedence.
+        
+        Precedence order (highest to lowest):
+        1. Direct code overrides (**overrides)
+        2. Config file values  
+        3. Environment variables
+        
+        Args:
+            profile: Profile name to load (default: "default")  
+            config_file: Optional path to config file
+            **overrides: Direct parameter overrides
+            
+        Returns:
+            Config instance with merged settings
+            
+        Example:
+            config = Config.from_local_config(profile="openai")
+            config = Config.from_local_config(profile="gemini", default_model="google/gemini-2.5-pro")
+        """
+        # Import here to avoid circular import
+        from portia.config_loader import get_config
+        
+        # Load configuration with proper precedence
+        config_dict = get_config(profile, config_file, **overrides)
+        
+        # Handle models configuration specially
+        models_config = {}
+        model_fields = ["default_model", "planning_model", "execution_model", 
+                    "introspection_model", "summarizer_model"]
+        
+        for field in model_fields:
+            if field in config_dict and config_dict[field]:
+                models_config[field] = config_dict.pop(field)
+        
+        if models_config:
+            config_dict["models"] = GenerativeModelsConfig(**models_config)
+        
+        # Convert string values to SecretStr for API keys (only if non-empty)
+        secret_fields = [
+            "portia_api_key", "openrouter_api_key", "openai_api_key", 
+            "anthropic_api_key", "mistralai_api_key", "google_api_key",
+            "azure_openai_api_key"
+        ]
+        
+        for field in secret_fields:
+            if field in config_dict and config_dict[field] and config_dict[field] != "":
+                config_dict[field] = SecretStr(config_dict[field])
+        
+        # Handle storage_class logic (replicate the original default_factory logic)
+        if "storage_class" not in config_dict or not config_dict["storage_class"]:
+            # Check if portia_api_key is available to decide default storage
+            has_portia_key = (
+                config_dict.get("portia_api_key") or 
+                os.getenv("PORTIA_API_KEY")
+            )
+            config_dict["storage_class"] = StorageClass.CLOUD if has_portia_key else StorageClass.MEMORY
+        
+        # Parse string enums
+        if "storage_class" in config_dict and isinstance(config_dict["storage_class"], str):
+            config_dict["storage_class"] = parse_str_to_enum(config_dict["storage_class"], StorageClass)
+        
+        if "execution_agent_type" in config_dict and isinstance(config_dict["execution_agent_type"], str):
+            config_dict["execution_agent_type"] = parse_str_to_enum(config_dict["execution_agent_type"], ExecutionAgentType)
+            
+        if "planning_agent_type" in config_dict and isinstance(config_dict["planning_agent_type"], str):
+            config_dict["planning_agent_type"] = parse_str_to_enum(config_dict["planning_agent_type"], PlanningAgentType)
+            
+        if "default_log_level" in config_dict and isinstance(config_dict["default_log_level"], str):
+            config_dict["default_log_level"] = parse_str_to_enum(config_dict["default_log_level"], LogLevel)
+        
+        # Parse llm_provider if it's a string
+        if "llm_provider" in config_dict and isinstance(config_dict["llm_provider"], str):
+            config_dict["llm_provider"] = parse_str_to_enum(config_dict["llm_provider"], LLMProvider)
+        
+        return cls(**config_dict)
+
 
     def has_api_key(self, name: str) -> bool:
         """Check if the given API Key is available."""
@@ -1085,16 +1166,61 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         introspection_model=kwargs_models.get("introspection_model"),
         summarizer_model=kwargs_models.get("summarizer_model"),
     )
+    env_overrides = {}
+    
+    # API Keys from environment
+    if os.getenv("PORTIA_API_KEY") and "portia_api_key" not in kwargs:
+        env_overrides["portia_api_key"] = SecretStr(os.getenv("PORTIA_API_KEY"))
+    if os.getenv("OPENAI_API_KEY") and "openai_api_key" not in kwargs:
+        env_overrides["openai_api_key"] = SecretStr(os.getenv("OPENAI_API_KEY"))
+    if os.getenv("ANTHROPIC_API_KEY") and "anthropic_api_key" not in kwargs:
+        env_overrides["anthropic_api_key"] = SecretStr(os.getenv("ANTHROPIC_API_KEY"))
+    if os.getenv("MISTRAL_API_KEY") and "mistralai_api_key" not in kwargs:
+        env_overrides["mistralai_api_key"] = SecretStr(os.getenv("MISTRAL_API_KEY"))
+    if os.getenv("GOOGLE_API_KEY") and "google_api_key" not in kwargs:
+        env_overrides["google_api_key"] = SecretStr(os.getenv("GOOGLE_API_KEY"))
+    if os.getenv("AZURE_OPENAI_API_KEY") and "azure_openai_api_key" not in kwargs:
+        env_overrides["azure_openai_api_key"] = SecretStr(os.getenv("AZURE_OPENAI_API_KEY"))
+    if os.getenv("AZURE_OPENAI_ENDPOINT") and "azure_openai_endpoint" not in kwargs:
+        env_overrides["azure_openai_endpoint"] = os.getenv("AZURE_OPENAI_ENDPOINT")
+    if os.getenv("OPENROUTER_API_KEY") and "openrouter_api_key" not in kwargs:
+        env_overrides["openrouter_api_key"] = SecretStr(os.getenv("OPENROUTER_API_KEY"))
+    
+    # Other environment variables
+    if os.getenv("PORTIA_API_ENDPOINT") and "portia_api_endpoint" not in kwargs:
+        env_overrides["portia_api_endpoint"] = os.getenv("PORTIA_API_ENDPOINT")
+    if os.getenv("PORTIA_DASHBOARD_URL") and "portia_dashboard_url" not in kwargs:
+        env_overrides["portia_dashboard_url"] = os.getenv("PORTIA_DASHBOARD_URL")
+    if os.getenv("OLLAMA_BASE_URL") and "ollama_base_url" not in kwargs:
+        env_overrides["ollama_base_url"] = os.getenv("OLLAMA_BASE_URL")
+    if os.getenv("AWS_ACCESS_KEY_ID") and "aws_access_key_id" not in kwargs:
+        env_overrides["aws_access_key_id"] = os.getenv("AWS_ACCESS_KEY_ID")
+    if os.getenv("AWS_SECRET_ACCESS_KEY") and "aws_secret_access_key" not in kwargs:
+        env_overrides["aws_secret_access_key"] = os.getenv("AWS_SECRET_ACCESS_KEY")
+    if os.getenv("AWS_DEFAULT_REGION") and "aws_default_region" not in kwargs:
+        env_overrides["aws_default_region"] = os.getenv("AWS_DEFAULT_REGION")
+    if os.getenv("AWS_CREDENTIALS_PROFILE_NAME") and "aws_credentials_profile_name" not in kwargs:
+        env_overrides["aws_credentials_profile_name"] = os.getenv("AWS_CREDENTIALS_PROFILE_NAME")
+    if os.getenv("LLM_REDIS_CACHE_URL") and "llm_redis_cache_url" not in kwargs:
+        env_overrides["llm_redis_cache_url"] = os.getenv("LLM_REDIS_CACHE_URL")
 
+    # Merge env overrides with kwargs (kwargs take precedence over env vars)
+    final_kwargs = {**env_overrides, **kwargs}
+
+    # Determine default storage class
     default_storage_class = (
-        StorageClass.CLOUD if os.getenv("PORTIA_API_KEY") else StorageClass.MEMORY
+        StorageClass.CLOUD if (os.getenv("PORTIA_API_KEY") or final_kwargs.get("portia_api_key"))
+        else StorageClass.MEMORY
     )
+    
     return Config(
         llm_provider=llm_provider,
         models=models,
-        feature_flags=kwargs.pop("feature_flags", {}),
-        storage_class=kwargs.pop("storage_class", default_storage_class),
-        planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
-        execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
-        **kwargs,
+        feature_flags=final_kwargs.pop("feature_flags", {}),
+        storage_class=final_kwargs.pop("storage_class", default_storage_class),
+        planning_agent_type=final_kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
+        execution_agent_type=final_kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
+        **final_kwargs,
     )
+
+    

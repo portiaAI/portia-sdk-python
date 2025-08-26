@@ -29,6 +29,13 @@ from portia.logger import logger
 from portia.portia import ExecutionHooks, Portia
 from portia.tool_registry import DefaultToolRegistry
 from portia.version import get_version
+import toml  # You may need: pip install toml
+from portia.config_loader import (
+    ConfigLoader, 
+    ensure_config_directory, 
+    get_config_file_path,
+    get_config
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -157,8 +164,13 @@ class CLIExecutionHooks(ExecutionHooks):
 
 
 @click.group(context_settings={"max_content_width": 240})
-def cli() -> None:
+@click.option('--profile', '-p', default=None, help='Configuration profile to use')
+@click.pass_context
+def cli(ctx, profile) -> None:
     """Portia CLI."""
+    ctx.ensure_object(dict)
+    ctx.obj['profile'] = profile
+
 
 
 @click.command()
@@ -170,12 +182,15 @@ def version() -> None:
 @click.command()
 @common_options
 @click.argument("query")
+@click.pass_context
 def run(
+    ctx,
     query: str,
     **kwargs,  # noqa: ANN003
 ) -> None:
     """Run a query."""
-    cli_config, config = _get_config(**kwargs)
+    profile = ctx.obj.get('profile') if ctx.obj else None
+    cli_config, config = _get_config(profile=profile, **kwargs)
 
     # Add the tool registry
     registry = DefaultToolRegistry(config)
@@ -203,12 +218,16 @@ def run(
 @click.command()
 @common_options
 @click.argument("query")
+@click.pass_context
 def plan(
+    ctx,
     query: str,
     **kwargs,  # noqa: ANN003
 ) -> None:
     """Plan a query."""
-    cli_config, config = _get_config(**kwargs)
+    profile = ctx.obj.get('profile') if ctx.obj else None
+    cli_config, config = _get_config(profile=profile, **kwargs)
+
     portia = Portia(config=config)
 
     output = portia.plan(query, end_user=cli_config.end_user_id)
@@ -218,36 +237,326 @@ def plan(
 
 @click.command()
 @common_options
+@click.pass_context
 def list_tools(
+    ctx,
     **kwargs,  # noqa: ANN003
 ) -> None:
     """List tools."""
-    cli_config, config = _get_config(**kwargs)
+    profile = ctx.obj.get('profile') if ctx.obj else None
+    cli_config, config = _get_config(profile=profile, **kwargs)
+
 
     for tool in DefaultToolRegistry(config).get_tools():
         click.echo(tool.pretty() + "\n")
+# Add these new CLI commands after the existing commands
+
+@click.group()
+def config():
+    """Manage Portia configuration profiles."""
+    pass
+
+@config.command()
+@click.argument('profile_name')
+@click.option('--template', '-t', 
+              type=click.Choice(['openai', 'anthropic', 'gemini', 'azure', 'mixed']),
+              help='Use a predefined template')
+def create(profile_name: str, template: str | None = None) -> None:
+    """Create a new configuration profile."""
+    config_file = get_config_file_path()
+    ensure_config_directory()
+    
+    # Create config file if it doesn't exist
+    if not config_file.exists():
+        initial_config = {"profile": {}}
+        with open(config_file, "w") as f:
+            toml.dump(initial_config, f)
+    
+    # Load existing config
+    with open(config_file, "r") as f:
+        data = toml.load(f)
+    
+    if "profile" not in data:
+        data["profile"] = {}
+    
+    # Check if profile already exists
+    if profile_name in data["profile"]:
+        if not click.confirm(f"Profile '{profile_name}' already exists. Overwrite?"):
+            return
+    
+    # Create profile with template or empty
+    if template:
+        profile_config = _get_template_config(template)
+    else:
+        profile_config = {
+            "llm_provider": "",
+            "default_model": "",
+            "storage_class": "MEMORY",
+            "default_log_level": "INFO"
+        }
+    
+    data["profile"][profile_name] = profile_config
+    
+    # Write back to file
+    with open(config_file, "w") as f:
+        toml.dump(data, f)
+    
+    click.echo(f"✅ Created profile '{profile_name}'")
+    if template:
+        click.echo(f"   Using template: {template}")
+
+@config.command('set-default')
+@click.argument('profile_name')
+def set_default(profile_name: str) -> None:
+    """Set the default profile."""
+    loader = ConfigLoader()
+    profiles = loader.list_profiles()
+    
+    if profile_name not in profiles:
+        click.echo(f"❌ Profile '{profile_name}' not found. Available: {', '.join(profiles)}")
+        return
+    
+    # Set environment variable (you could also store in config file)
+    import os
+    os.environ["PORTIA_DEFAULT_PROFILE"] = profile_name
+    
+    # For persistence, you could write to a separate file or section
+    config_dir = ensure_config_directory()
+    default_file = config_dir / "default_profile"
+    with open(default_file, "w") as f:
+        f.write(profile_name)
+    
+    click.echo(f"✅ Set default profile to '{profile_name}'")
+
+@config.command()
+@click.argument('profile_name')
+@click.argument('assignments', nargs=-1, required=True)
+def set(profile_name: str, assignments: tuple[str, ...]) -> None:
+    """Set configuration values for a profile.
+    
+    Example: portia-cli config set gemini execution_model=gemini default_model=google/gemini-2.5-pro
+    """
+    config_file = get_config_file_path()
+    
+    if not config_file.exists():
+        click.echo("❌ No config file found. Run 'portia-cli config create <profile>' first.")
+        return
+    
+    # Parse key=value assignments
+    updates = {}
+    for assignment in assignments:
+        if '=' not in assignment:
+            click.echo(f"❌ Invalid assignment: {assignment}. Use format key=value")
+            return
+        key, value = assignment.split('=', 1)
+        
+        # Handle boolean values
+        if value.lower() in ('true', 'false'):
+            value = value.lower() == 'true'
+        # Handle integer values
+        elif value.isdigit():
+            value = int(value)
+        # Handle None
+        elif value.lower() == 'null':
+            value = None
+        
+        updates[key] = value
+    
+    # Load and update config
+    with open(config_file, "r") as f:
+        data = toml.load(f)
+    
+    if "profile" not in data or profile_name not in data["profile"]:
+        click.echo(f"❌ Profile '{profile_name}' not found. Create it first.")
+        return
+    
+    # Update values
+    data["profile"][profile_name].update(updates)
+    
+    # Write back
+    with open(config_file, "w") as f:
+        toml.dump(data, f)
+    
+    click.echo(f"✅ Updated profile '{profile_name}':")
+    for key, value in updates.items():
+        click.echo(f"   {key} = {value}")
+
+@config.command()
+@click.argument('profile_name')
+@click.argument('key', required=False)
+def get(profile_name: str, key: str | None = None) -> None:
+    """Get configuration values from a profile."""
+    try:
+        loader = ConfigLoader()
+        profile_config = loader.load_config_from_toml(profile_name)
+        
+        if key:
+            if key in profile_config:
+                click.echo(f"{key} = {profile_config[key]}")
+            else:
+                click.echo(f"❌ Key '{key}' not found in profile '{profile_name}'")
+        else:
+            click.echo(f"Profile '{profile_name}' configuration:")
+            for k, v in profile_config.items():
+                click.echo(f"  {k} = {v}")
+                
+    except Exception as e:
+        click.echo(f"❌ Error loading profile '{profile_name}': {e}")
+
+@config.command('list')
+def list_profiles() -> None:
+    """List all configuration profiles."""
+    loader = ConfigLoader()
+    profiles = loader.list_profiles()
+    
+    if not profiles:
+        click.echo("No profiles found. Create one with 'portia-cli config create <name>'")
+        return
+    
+    # Get default profile
+    default_profile = loader.get_default_profile()
+    
+    click.echo("Available profiles:")
+    for profile in profiles:
+        marker = " (default)" if profile == default_profile else ""
+        click.echo(f"  • {profile}{marker}")
+
+@config.command()
+@click.argument('profile_name')
+@click.option('--force', is_flag=True, help='Delete without confirmation')
+def delete(profile_name: str, force: bool = False) -> None:
+    """Delete a configuration profile."""
+    config_file = get_config_file_path()
+    
+    if not config_file.exists():
+        click.echo("❌ No config file found.")
+        return
+    
+    with open(config_file, "r") as f:
+        data = toml.load(f)
+    
+    if "profile" not in data or profile_name not in data["profile"]:
+        click.echo(f"❌ Profile '{profile_name}' not found.")
+        return
+    
+    if not force and not click.confirm(f"Delete profile '{profile_name}'?"):
+        return
+    
+    del data["profile"][profile_name]
+    
+    with open(config_file, "w") as f:
+        toml.dump(data, f)
+    
+    click.echo(f"✅ Deleted profile '{profile_name}'")
+
+@config.command()
+def path() -> None:
+    """Show the path to the configuration file."""
+    config_file = get_config_file_path()
+    click.echo(f"Config file: {config_file}")
+    click.echo(f"Exists: {'Yes' if config_file.exists() else 'No'}")
+
+@config.command()
+@click.argument('profile_name', required=False)
+def validate(profile_name: str | None = None) -> None:
+    """Validate configuration profiles."""
+    loader = ConfigLoader()
+    
+    if profile_name:
+        profiles = [profile_name]
+    else:
+        profiles = loader.list_profiles()
+    
+    if not profiles:
+        click.echo("No profiles to validate.")
+        return
+    
+    for profile in profiles:
+        try:
+            config_dict = get_config(profile)
+            # Try to create a Config object to validate
+            from portia.config import Config
+            Config.from_local_config(profile)
+            click.echo(f"✅ Profile '{profile}' is valid")
+        except Exception as e:
+            click.echo(f"❌ Profile '{profile}' is invalid: {e}")
+
+def _get_template_config(template: str) -> dict:
+    """Get predefined template configurations."""
+    templates = {
+        'openai': {
+            'llm_provider': 'openai',
+            'default_model': 'openai/gpt-4.1',
+            'planning_model': 'openai/o3-mini',
+            'introspection_model': 'openai/o4-mini',
+            'storage_class': 'CLOUD',
+            'default_log_level': 'INFO',
+            'execution_agent_type': 'ONE_SHOT'
+        },
+        'anthropic': {
+            'llm_provider': 'anthropic', 
+            'default_model': 'anthropic/claude-3-5-sonnet-latest',
+            'planning_model': 'anthropic/claude-3-7-sonnet-latest',
+            'introspection_model': 'anthropic/claude-3-7-sonnet-latest',
+            'storage_class': 'CLOUD',
+            'default_log_level': 'INFO'
+        },
+        'gemini': {
+            'llm_provider': 'google',
+            'default_model': 'google/gemini-2.5-flash',
+            'planning_model': 'google/gemini-2.5-pro',
+            'introspection_model': 'google/gemini-2.5-flash',
+            'storage_class': 'CLOUD',
+            'default_log_level': 'INFO'
+        },
+        'azure': {
+            'llm_provider': 'azure_openai',
+            'default_model': 'azure-openai/gpt-4.1',
+            'planning_model': 'azure-openai/o3-mini',
+            'azure_openai_endpoint': 'https://your-resource.openai.azure.com/',
+            'storage_class': 'CLOUD',
+            'default_log_level': 'INFO'
+        },
+        'mixed': {
+            'default_model': 'openai/gpt-4.1',
+            'planning_model': 'anthropic/claude-3-7-sonnet-latest',
+            'execution_model': 'openai/gpt-4o',
+            'introspection_model': 'google/gemini-2.5-flash',
+            'storage_class': 'CLOUD',
+            'default_log_level': 'INFO'
+        }
+    }
+    return templates.get(template, {})
+
 
 
 def _get_config(
+    profile: str | None = None,
     **kwargs,  # noqa: ANN003
 ) -> tuple[CLIConfig, Config]:
     """Init config."""
     cli_config = CLIConfig(**kwargs)
     if cli_config.env_location == EnvLocation.ENV_FILE:
         load_dotenv(override=True)
+    
     try:
-        config = Config.from_default(**kwargs)
+        if profile:
+            # Use profile system
+            config = Config.from_local_config(profile=profile, **kwargs)
+        else:
+            # Use traditional method
+            config = Config.from_default(**kwargs)
     except InvalidConfigError as e:
         logger().error(e.message)
         sys.exit(1)
 
     return (cli_config, config)
 
-
 cli.add_command(version)
 cli.add_command(run)
 cli.add_command(plan)
 cli.add_command(list_tools)
+cli.add_command(config)
 
 if __name__ == "__main__":
     cli(obj={})
