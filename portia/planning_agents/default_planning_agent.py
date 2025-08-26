@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError
+
+from portia.errors import PlanError
 from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
@@ -92,16 +95,25 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 previous_errors,
             )
             logger().trace("LLM call: planning")
-            response = self.model.get_structured_response(
-                schema=StepsOrError,
-                messages=[
-                    Message(
-                        role="system",
-                        content=self.planning_prompt,
-                    ),
-                    Message(role="user", content=prompt),
-                ],
-            )
+            try:
+                response = self.model.get_structured_response(
+                    schema=StepsOrError,
+                    messages=[
+                        Message(
+                            role="system",
+                            content=self.planning_prompt,
+                        ),
+                        Message(role="user", content=prompt),
+                    ],
+                )
+            except ValidationError as e:  # pragma: no cover
+                err = PlanError(  # pragma: no cover
+                    "LLM unable to create well-structured plan - please either retry the request, "  # pragma: no cover # noqa: E501
+                    "upgrade to a more powerful model or consider using our PlanBuilderV2 "  # pragma: no cover # noqa: E501
+                    "interface instead."  # pragma: no cover
+                )  # pragma: no cover
+                logger().exception("Planning error", err)  # pragma: no cover
+                raise err from e  # pragma: no cover
             steps_or_error = self._process_response(response, tool_list, plan_inputs, i)
             if steps_or_error.error is None:
                 return steps_or_error
