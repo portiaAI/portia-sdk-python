@@ -910,10 +910,11 @@ class Portia:
                         )
                     )
             except RuntimeError:
-                logger().error(
+                message = (
                     "run_plan should be called outside of an async context: Use arun_plan instead"
                 )
-                raise
+                logger().error(message)
+                raise RuntimeError(message) from None
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
