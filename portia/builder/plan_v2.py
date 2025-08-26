@@ -85,47 +85,45 @@ class PlanV2(BaseModel):
         raise ValueError(f"Step {name} not found in plan")
 
     def pretty_print(self) -> str:
-            """Return the pretty print representation of the plan.
+        """Return the pretty print representation of the plan.
 
-            Returns:
-                str: A pretty print representation of the plan.
+        Returns:
+            str: A pretty print representation of the plan.
 
-            """
-            tools = []
-            legacy_steps = []
-            for step in self.steps:
-                legacy_step = step.to_legacy_step(self)
-                if legacy_step.tool_id:
-                    tools.append(legacy_step.tool_id)
-                legacy_steps.append(legacy_step)
+        """
+        tools = []
+        legacy_steps = []
+        for step in self.steps:
+            legacy_step = step.to_legacy_step(self)
+            if legacy_step.tool_id:
+                tools.append(legacy_step.tool_id)
+            legacy_steps.append(legacy_step)
 
-            unique_tools = sorted(set(tools))
+        unique_tools = sorted(set(tools))
 
-            portia_tools = [tool for tool in unique_tools if tool.startswith("portia:")]
-            other_tools = [tool for tool in unique_tools if not tool.startswith("portia:")]
-            tools_summary = f"{len(portia_tools)} portia tools, {len(other_tools)} other tools"
+        portia_tools = [tool for tool in unique_tools if tool.startswith("portia:")]
+        other_tools = [tool for tool in unique_tools if not tool.startswith("portia:")]
+        tools_summary = f"{len(portia_tools)} portia tools, {len(other_tools)} other tools"
 
-            inputs_section = ""
-            if self.plan_inputs:
-                inputs_section = (
-                    "Inputs:\n    "
-                    + "\n    ".join([input_.pretty_print() for input_ in self.plan_inputs])
-                    + "\n"
-                )
-
-            steps_section = "Steps:\n" + "\n".join([
-                step.pretty_print() for step in legacy_steps
-            ])
-
-            final_output_section = ""
-            if self.final_output_schema:
-                final_output_section = f"\nFinal Output Schema: {self.final_output_schema.__name__}"
-
-            return (
-                f"Task: {self.label}\n"
-                f"Tools Available Summary: {tools_summary}\n"
-                f"{inputs_section}"
-                f"{steps_section}\n"
-                f"Summarize Plan Output: {self.summarize}"
-                f"{final_output_section}"
+        inputs_section = ""
+        if self.plan_inputs:
+            inputs_section = (
+                "Inputs:\n    "
+                + "\n    ".join([input_.pretty_print() for input_ in self.plan_inputs])
+                + "\n"
             )
+
+        steps_section = "Steps:\n" + "\n".join([step.pretty_print() for step in legacy_steps])
+
+        final_output_section = ""
+        if self.final_output_schema:
+            final_output_section = f"\nFinal Output Schema: {self.final_output_schema.__name__}"
+
+        return (
+            f"Task: {self.label}\n"
+            f"Tools Available Summary: {tools_summary}\n"
+            f"{inputs_section}"
+            f"{steps_section}\n"
+            f"Summarize Plan Output: {self.summarize}"
+            f"{final_output_section}"
+        )
