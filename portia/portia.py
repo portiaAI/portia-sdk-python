@@ -2739,14 +2739,28 @@ class Portia:
             if i < run_data.plan_run.current_step_index:
                 logger().debug(f"Skipping step {i}: {step}")
                 continue
-
+            run_data.plan_run.current_step_index = i
             logger().info(f"Starting step {i}: {step}")
+
+            legacy_step = step.to_legacy_step(plan)
+
+            try:
+                self._handle_before_step_execution_hook(
+                    run_data.legacy_plan,
+                    run_data.plan_run,
+                    legacy_step,
+                )
+            except SkipExecutionError as e:
+                logger().info(f"Skipping step {i}: {e}")
+                if e.should_return:
+                    return run_data.plan_run
+                continue
 
             try:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
                 return self._handle_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, i, step.to_legacy_step(plan), e
+                    run_data.plan_run, run_data.legacy_plan, i, legacy_step, e
                 )
             jump_to_step_index: int | None = None
             if (
@@ -2784,7 +2798,7 @@ class Portia:
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
             output_value = self._set_step_output(
-                output_value, run_data.plan_run, step.to_legacy_step(plan)
+                output_value, run_data.plan_run, legacy_step
             )
             output = ReferenceValue(
                 value=output_value,
@@ -2797,7 +2811,7 @@ class Portia:
                     run_data.legacy_plan,
                     run_data.plan_run,
                     i,
-                    step.to_legacy_step(plan),
+                    legacy_step,
                     output_value,
                 ):
                     # No after_plan_run call here as the plan run will be resumed later
