@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.6.2"
+version = "0.7.2"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -37,6 +37,7 @@ dependencies = [
     "testcontainers[redis]>=4.10.0 ; python_version >= '3.9' and python_version < '4.0'",
     "instructor>=1.9.0 ; python_version >= '3.9' and python_version < '4.0'",
     "litellm>=1.74.9.post1",
+    "openai<1.99"
 ]
 
 [project.optional-dependencies]
@@ -178,6 +179,9 @@ omit = [
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
     "portia/cli.py",  # Best effort test coverage
+    "portia/portia.py", # TODO: Remove this once testing has been added for new PlanV2
+    "portia/builder/step_v2.py", # TODO: Remove this once testing has been added for string templating
+    "portia/builder/plan_builder_v2.py", # TODO: Remove this once testing has been added for string templating
 ]
 
 [tool.coverage.report]

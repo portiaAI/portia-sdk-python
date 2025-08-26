@@ -47,6 +47,7 @@ NotSet: Any = PydanticUndefined
 BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase", raise_error=False)
 
 T = TypeVar("T", bound=str | BaseModel)
+BM = TypeVar("BM", bound=BaseModel)
 
 
 class BrowserToolForUrlSchema(BaseModel):
@@ -255,60 +256,66 @@ class BrowserTool(Tool[str | BaseModel]):
         "browser-use's BrowserConfig.allowed_domains for built-in validation.",
     )
 
-    @field_validator('allowed_domains', mode='before')
+    @field_validator("allowed_domains", mode="before")
     @classmethod
     def validate_allowed_domains(cls, v: list[str] | None) -> list[str] | None:
         """Validate allowed_domains format and warn about security implications."""
         if v is None:
             return v
-        
+
         return cls._validate_domains_list(v)
-    
+
     @classmethod
     def _validate_domains_list(cls, domains: list[str]) -> list[str]:
         """Centralized validation for allowed_domains list.
-        
+
         Args:
             domains: List of domain strings to validate
-            
+
         Returns:
             Validated list of domains
-            
+
         Raises:
             ValueError: If domains format is invalid
+
         """
         if not isinstance(domains, list):
-            raise ValueError(f"Invalid allowed_domains: {domains}. Must be a list of non-empty strings.")
-            
+            raise ValueError(
+                f"Invalid allowed_domains: {domains}. Must be a list of non-empty strings."
+            )
+
         validated_domains = []
         for domain in domains:
             if not isinstance(domain, str) or not domain.strip():
-                raise ValueError(f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings.")
-            
+                raise ValueError(
+                    f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings."
+                )
+
             # Enhanced security warning based on browser-use documentation
             cls._warn_about_domain_security(domain)
             validated_domains.append(domain.strip())
-        
+
         return validated_domains
-    
+
     @classmethod
     def _warn_about_domain_security(cls, domain: str) -> None:
         """Warn about domain security implications based on browser-use patterns.
-        
+
         Based on browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!'
-        
+
         Args:
             domain: Domain string to check for security issues
+
         """
-        if '*' in domain:
-            if domain.startswith('*.'):
+        if "*" in domain:
+            if domain.startswith("*."):
                 # Pattern like '*.example.com' - high risk as per docs
                 logger().warning(
                     f"Wildcard domain '{domain}' matches ALL subdomains. "
                     "Per browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!' "
                     "Consider explicitly listing specific subdomains for better security."
                 )
-            elif domain == '*' or '/*' in domain:
+            elif domain == "*" or "/*" in domain:
                 # Extremely dangerous patterns
                 logger().warning(
                     f"Wildcard pattern '{domain}' allows access to ANY domain. "
@@ -321,28 +328,31 @@ class BrowserTool(Tool[str | BaseModel]):
                     "Per browser-use docs, be very cautious with wildcards. "
                     "Use full URLs with schemes (https://example.com) for security."
                 )
-        
+
         # Warn about missing scheme as recommended in docs
-        if not domain.startswith(('http://', 'https://')) and not domain.startswith('*'):
+        if not domain.startswith(("http://", "https://")) and not domain.startswith("*"):
             logger().info(
                 f"Domain '{domain}' lacks scheme. "
                 "Browser-use docs recommend full URLs like 'https://example.com' for clarity."
             )
-    
-    @classmethod 
-    def _create_browser_context_config(cls, allowed_domains: list[str] | None) -> BrowserContextConfig:
+
+    @classmethod
+    def _create_browser_context_config(
+        cls, allowed_domains: list[str] | None
+    ) -> BrowserContextConfig:
         """Create BrowserContextConfig with optional allowed_domains.
-        
+
         Args:
             allowed_domains: List of allowed domains or None
-            
+
         Returns:
             Configured BrowserContextConfig instance
+
         """
         if allowed_domains is not None:
             return BrowserContextConfig(allowed_domains=allowed_domains)
         return BrowserContextConfig()
-    
+
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -377,74 +387,87 @@ class BrowserTool(Tool[str | BaseModel]):
         self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
-        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
-        llm = model.to_langchain()
-
-        # Pass allowed_domains to infrastructure provider via context
-        if hasattr(self, 'allowed_domains'):
-            ctx._tool_allowed_domains = self.allowed_domains
-        else:
-            ctx._tool_allowed_domains = None
-
-        async def run_browser_tasks() -> str | BaseModel | ActionClarification:
-            def handle_login_requirement(
-                result: BrowserTaskOutput,
-            ) -> ActionClarification:
-                """Handle cases where login is required with an ActionClarification."""
-                if result.user_login_guidance is None or result.login_url is None:
-                    raise ToolHardError(
-                        "Expected user guidance and login URL if human login is required",
-                    )
-                return ActionClarification(
-                    user_guidance=result.user_login_guidance,
-                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
-                        ctx,
-                        result.login_url,
-                    ),
-                    plan_run_id=ctx.plan_run.id,
-                    require_confirmation=True,
-                    source="Browser tool",
-                )
-
-            output_schema = self.structured_output_schema if self.structured_output_schema else str
-            output_model = BrowserTaskOutput[output_schema]
-
-            async def run_agent_task(
-                task_description: str,
-                output_model: type[BaseModel],
-            ) -> BaseModel:
-                agent = Agent(
-                    task=task_description,
-                    llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx, self.allowed_domains),
-                    controller=Controller(output_model=output_model),
-                )
-                result = await agent.run()
-                return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
-
-            # Main task
-            task_to_complete = (
-                f"Go to {url} and complete the following task: {task}. The user may already be "
-                "logged in. If the user is NOT already logged in and at any point login is "
-                "required to complete the task, please return human_login_required=True, and the "
-                "url of the sign in page as well as what the user should do to sign in. "
-                "Additional data is available below: "
-                f"{self.process_task_data(task_data)}"
-            )
-
-            task_result = await run_agent_task(task_to_complete, output_model)
-            if task_result.human_login_required:  # type: ignore reportCallIssue
-                return handle_login_requirement(task_result)  # type: ignore reportCallIssue
-
-            self.infrastructure_provider.step_complete(ctx)
-            return task_result.task_output  # type: ignore reportCallIssue
-
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:  # pragma: no cover
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        return loop.run_until_complete(run_browser_tasks())
+        return loop.run_until_complete(self._run_browser_tasks(ctx, url, task, task_data))
+
+    async def arun(
+        self,
+        ctx: ToolRunContext,
+        url: str,
+        task: str,
+        task_data: list[Any] | str | None = None,
+    ) -> str | BaseModel | ActionClarification:
+        """Run the BrowserTool asynchronously."""
+        return await self._run_browser_tasks(ctx, url, task, task_data)
+
+    async def _run_browser_tasks(
+        self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
+    ) -> str | BaseModel | ActionClarification:
+        output_schema = self.structured_output_schema if self.structured_output_schema else str
+        output_model = BrowserTaskOutput[output_schema]
+        # Main task
+        task_to_complete = (
+            f"Go to {url} and complete the following task: {task}. The user may already be "
+            "logged in. If the user is NOT already logged in and at any point login is "
+            "required to complete the task, please return human_login_required=True, and the "
+            "url of the sign in page as well as what the user should do to sign in. "
+            "Additional data is available below: "
+            f"{self.process_task_data(task_data)}"
+        )
+
+        task_result = await self._run_agent_task(ctx, task_to_complete, output_model)
+        if task_result.human_login_required:
+            return self._handle_login_requirement(ctx, task_result)
+
+        self.infrastructure_provider.step_complete(ctx)
+        if task_result.task_output is None:
+            raise ToolHardError("Expected task output to be a string, got None")
+        return task_result.task_output
+
+    async def _run_agent_task(
+        self,
+        ctx: ToolRunContext,
+        task_description: str,
+        output_model: type[BM],
+    ) -> BM:
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+        llm = model.to_langchain()
+        agent = Agent(
+            task=task_description,
+            llm=llm,
+            browser=self.infrastructure_provider.setup_browser(ctx, self.allowed_domains),
+            controller=Controller(output_model=output_model),
+        )
+        result = await agent.run()
+        final_result = result.final_result()
+        if not isinstance(final_result, str):
+            raise ToolHardError(f"Expected final result to be a string, got {type(final_result)}")
+        return output_model.model_validate(json.loads(final_result))
+
+    def _handle_login_requirement(
+        self,
+        ctx: ToolRunContext,
+        result: BrowserTaskOutput,
+    ) -> ActionClarification:
+        """Handle cases where login is required with an ActionClarification."""
+        if result.user_login_guidance is None or result.login_url is None:
+            raise ToolHardError(
+                "Expected user guidance and login URL if human login is required",
+            )
+        return ActionClarification(
+            user_guidance=result.user_login_guidance,
+            action_url=self.infrastructure_provider.construct_auth_clarification_url(
+                ctx,
+                result.login_url,
+            ),
+            plan_run_id=ctx.plan_run.id,
+            require_confirmation=True,
+            source="Browser tool",
+        )
 
 
 class BrowserToolForUrl(BrowserTool):
@@ -506,9 +529,10 @@ class BrowserToolForUrl(BrowserTool):
             for domain in allowed_domains:
                 if not isinstance(domain, str) or not domain.strip():
                     raise ValueError(f"Invalid domain in allowed_domains: {domain}")
-        
+
         super().__init__(
-            id=id or f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}",
+            id=id
+            or f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}",
             name=name or f"Browser Tool for {url.replace('https://', '').replace('http://', '')}",
             description=description
             or (
@@ -542,14 +566,17 @@ class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
 
     @abstractmethod
-    def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
+    def setup_browser(
+        self, ctx: ToolRunContext, allowed_domains: list[str] | None = None
+    ) -> Browser:
         """Get a Browser instance.
 
         This is called at the start of every step using this tool.
-        
+
         Args:
             ctx: Tool run context
             allowed_domains: List of allowed domains for browser navigation
+
         """
 
     @abstractmethod
@@ -560,14 +587,17 @@ class BrowserInfrastructureProvider(ABC):
     def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g. release the session if needed."""
 
-    def _create_browser_context_config(self, allowed_domains: list[str] | None) -> BrowserContextConfig:
+    def _create_browser_context_config(
+        self, allowed_domains: list[str] | None
+    ) -> BrowserContextConfig:
         """Create BrowserContextConfig with optional allowed_domains.
-        
+
         Args:
             allowed_domains: List of allowed domains or None
-            
+
         Returns:
             Configured BrowserContextConfig instance
+
         """
         if allowed_domains is not None:
             return BrowserContextConfig(allowed_domains=allowed_domains)
@@ -586,7 +616,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         self.chrome_path = chrome_path or self.get_chrome_instance_path()
         self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
 
-    def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
+    def setup_browser(
+        self, ctx: ToolRunContext, allowed_domains: list[str] | None = None
+    ) -> Browser:
         """Get a Browser instance.
 
         Note: This provider does not support end_user_id.
@@ -606,7 +638,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "end users and so will be ignored.",
             )
         context_config = self._create_browser_context_config(allowed_domains)
-            
+
         return Browser(
             config=BrowserConfig(
                 chrome_instance_path=self.chrome_path,
@@ -874,7 +906,9 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(session_id)
             return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
 
-        def setup_browser(self, ctx: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:
+        def setup_browser(
+            self, ctx: ToolRunContext, allowed_domains: list[str] | None = None
+        ) -> Browser:
             """Set up a Browser instance connected to BrowserBase.
 
             Creates or retrieves a BrowserBase session and configures a Browser instance
@@ -891,7 +925,7 @@ if BROWSERBASE_AVAILABLE:
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
             context_config = self._create_browser_context_config(allowed_domains)
-                
+
             return Browser(
                 config=BrowserConfig(
                     cdp_url=session_connect_url,

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, ClassVar
+
 import pytest
 
-from portia import LLMProvider, PlanBuilder, PlanRunState, Portia, ToolRegistry
+from portia import LLMProvider, PlanBuilder, PlanRunState, Portia, ToolRegistry, ToolRunContext
 from portia.config import (
     Config,
     StorageClass,
@@ -15,6 +17,11 @@ from portia.open_source_tools.browser_tool import (
     BrowserToolForUrl,
 )
 from portia.open_source_tools.registry import open_source_tool_registry
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
+
+    from portia.clarification import ActionClarification
 
 STORAGE = [
     StorageClass.DISK,
@@ -144,3 +151,67 @@ def test_portia_multi_step_from_plan() -> None:
         in step_outputs["page_title"].get_value()
     )  # type: ignore reportOperatorIssue
     assert "Welcome" in step_outputs["blog_title"].get_value()  # type: ignore reportOperatorIssue
+
+
+class TestBrowserTool(BrowserTool):
+    """Test browser tool that tracks when arun is called."""
+
+    # Use class variable to track calls
+    arun_called: ClassVar[bool] = False
+
+    @classmethod
+    def reset_tracking(cls) -> None:
+        """Reset the tracking flag."""
+        cls.arun_called = False
+
+    async def arun(
+        self,
+        ctx: ToolRunContext,
+        url: str,
+        task: str,
+        task_data: list[Any] | str | None = None,
+    ) -> str | BaseModel | ActionClarification:
+        """Track that arun was called and then call the parent implementation."""
+        TestBrowserTool.arun_called = True
+        return await super().arun(ctx, url, task, task_data)
+
+
+@pytest.mark.daily
+@pytest.mark.flaky(reruns=3)
+@pytest.mark.asyncio
+async def test_portia_arun_calls_browser_tool_arun() -> None:
+    """Test that portia.arun calls browser_tool.arun method."""
+    config = Config.from_default(
+        llm_provider=LLMProvider.ANTHROPIC,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    # Reset tracking before test
+    TestBrowserTool.reset_tracking()
+
+    # Create a test browser tool that tracks arun calls
+    browser_tool = TestBrowserTool(infrastructure_option=BrowserInfrastructureOption.REMOTE)
+
+    tool_registry = ToolRegistry([browser_tool])
+    portia = Portia(config=config, tools=tool_registry)
+
+    query = (
+        "Go to the Portia website (https://www.portialabs.ai) and retrieve the title of the first "
+        "section of the homepage."
+    )
+
+    # Call portia.arun which should internally call browser_tool.arun
+    plan_run = await portia.arun(query)
+
+    # Verify that the browser tool's arun method was called
+    assert TestBrowserTool.arun_called, "browser_tool.arun method was not called"
+
+    # Verify that the plan run completed successfully
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output
+    assert (
+        "Build AI agents you can trust in regulated environments"
+        in plan_run.outputs.final_output.get_value()
+    )  # type: ignore reportOperatorIssue
+    for output in plan_run.outputs.step_outputs.values():
+        assert output.get_summary() is not None

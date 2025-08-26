@@ -10,6 +10,7 @@ from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
     SKIPPED_OUTPUT,
 )
+from portia.logger import logger
 from portia.model import Message
 from portia.token_check import exceeds_context_threshold
 
@@ -114,15 +115,13 @@ class FinalOutputSummarizer:
                 # summary = Field(description="The summary of the weather in london") # noqa: ERA001
                 fo_summary: str = Field(description="The summary of the plan output")
 
+            msg = self.summarizer_and_structured_output_prompt + context
+            logger().trace("LLM call: summarization (final output)")
             return model.get_structured_response(
-                [
-                    Message(
-                        content=self.summarizer_and_structured_output_prompt + context, role="user"
-                    )
-                ],
+                [Message(content=msg, role="user")],
                 SchemaWithSummary,
             )
-        response = model.get_response(
-            [Message(content=self.summarizer_only_prompt + context, role="user")],
-        )
+        msg = self.summarizer_only_prompt + context
+        logger().trace("LLM call: summarization (final output)")
+        response = model.get_response([Message(content=msg, role="user")])
         return str(response.content) if response.content else None

@@ -71,7 +71,7 @@ Use the following information to construct a plan in response to the following u
 {% endif %}{% if plan_inputs %}
 <PlanInputs>{% for input in plan_inputs %}
     <PlanInput name="{{input.name}}">
-        {{input.description}}
+        {% if input.description %}<PlanInput.Description>{{ input.description }}</PlanInput.Description>{% endif %}
     </PlanInput>{% endfor %}
 </PlanInputs>
 {% endif %}
