@@ -16,6 +16,7 @@ from portia.builder.step_v2 import (
     LLMStep,
     SingleToolAgentStep,
     StepV2,
+    UserInputStep,
     UserVerifyStep,
 )
 from portia.plan import PlanInput, Step
@@ -350,6 +351,38 @@ class TestPlanBuilderV2:
         assert isinstance(builder.plan.steps[0], UserVerifyStep)
         assert builder.plan.steps[0].message == "Check this"
         assert builder.plan.steps[0].step_name == "step_0"
+
+    def test_user_input_text_input_method(self) -> None:
+        """Test the user_input() method for text input."""
+        builder = PlanBuilderV2()
+
+        result = builder.user_input(message="Please enter your name")
+
+        assert result is builder
+        assert len(builder.plan.steps) == 1
+        assert isinstance(builder.plan.steps[0], UserInputStep)
+        assert builder.plan.steps[0].message == "Please enter your name"
+        assert builder.plan.steps[0].options is None
+        assert builder.plan.steps[0].step_name == "step_0"
+
+    def test_user_input_multiple_choice_method(self) -> None:
+        """Test the user_input() method for multiple choice."""
+        builder = PlanBuilderV2()
+        options = ["red", "green", "blue"]
+
+        result = builder.user_input(
+            message="Choose your favorite color",
+            options=options,
+            step_name="choose_color",
+        )
+
+        assert result is builder
+        assert len(builder.plan.steps) == 1
+        step = builder.plan.steps[0]
+        assert isinstance(step, UserInputStep)
+        assert step.message == "Choose your favorite color"
+        assert step.options == options
+        assert step.step_name == "choose_color"
 
     def test_final_output_method_basic(self) -> None:
         """Test the final_output() method with basic parameters."""

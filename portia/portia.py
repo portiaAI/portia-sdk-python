@@ -2791,7 +2791,8 @@ class Portia:
                 value=output_value,
                 description=(f"Output from step '{step.step_name}' (Description: {step})"),
             )
-            run_data.step_output_values.append(output)
+            if not isinstance(result, Clarification):
+                run_data.step_output_values.append(output)
 
             try:
                 if clarified_plan_run := self._handle_post_step_execution(

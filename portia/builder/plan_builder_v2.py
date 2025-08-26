@@ -14,6 +14,7 @@ from portia.builder.step_v2 import (
     LLMStep,
     SingleToolAgentStep,
     StepV2,
+    UserInputStep,
     UserVerifyStep,
 )
 from portia.plan import PlanInput
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from portia.common import Serializable
     from portia.tool import Tool
 
 
@@ -282,19 +284,57 @@ class PlanBuilderV2:
         """Add a step that prompts the user to verify the specified message before continuing.
 
         This step uses a UserVerificationClarification to interact with the user - you must ensure
-        you have a clarifiction handler setup that handles this type of clarification.
+        you have a clarification handler setup that handles this type of clarification.
 
         If the user accepts, then the plan will continue. If the user rejects, then this step will
-        raise a XXX.
+        raise a PlanRunExitError.
 
         Args:
-            message: The message the user needs to verify.
+            message: The message the user needs to verify. You can use inputs / outputs from
+              previous steps in this message and the corresponding value will be substituted in when
+              the plan is run - e.g.
+              message=f"Are you happy to proceed for user '{StepOutput(0)}'?"
             step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
         self.plan.steps.append(
             UserVerifyStep(
                 message=message,
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
+            )
+        )
+        return self
+
+    def user_input(
+        self,
+        *,
+        message: str,
+        options: list[Serializable] | None = None,
+        step_name: str | None = None,
+    ) -> PlanBuilderV2:
+        """Add a step that requests input from the user and sets the response as the step output.
+
+        This step uses a UserInputClarification / MultipleChoiceClarification (depending on whether
+        options are specified) to interact with the user - you must ensure you have a clarification
+        handler setup that handles this type of clarification.
+
+        Args:
+            message: The guidance message shown to the user. You can use inputs / outputs from
+              previous steps in this message and the corresponding value will be substituted in when
+              the plan is run - e.g.
+              message=f"Enter the value for user '{StepOutput(0)}':"
+            options: Available options for multiple choice. If None, creates text input.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
+
+        Returns:
+            Self for method chaining.
+
+        """
+        self.plan.steps.append(
+            UserInputStep(
+                message=message,
+                options=options,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
             )
