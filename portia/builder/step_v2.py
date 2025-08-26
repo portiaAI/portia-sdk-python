@@ -18,8 +18,15 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
-from portia.clarification import Clarification
-from portia.errors import ToolNotFoundError
+from portia.clarification import (
+    Clarification,
+    ClarificationCategory,
+    ClarificationType,
+    InputClarification,
+    MultipleChoiceClarification,
+    UserVerificationClarification,
+)
+from portia.errors import PlanRunExitError, ToolNotFoundError
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
@@ -457,6 +464,114 @@ class SingleToolAgentStep(StepV2):
             tool_id=self.tool,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class UserVerifyStep(StepV2):
+    """A step that asks the user to verify a message before continuing."""
+
+    message: str = Field(description="The message the user needs to verify.")
+
+    def __str__(self) -> str:
+        """Return a description of this step for logging purposes."""
+        return f"UserVerifyStep(message='{self.message}')"
+
+    @override
+    @traceable(name="User Verify Step - Run")
+    async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Run the user verification step."""
+        message = self._resolve_input_reference(self.message, run_data)
+
+        previous_clarification = run_data.plan_run.get_clarification_for_step(
+            ClarificationCategory.USER_VERIFICATION
+        )
+
+        if not previous_clarification or not previous_clarification.resolved:
+            return UserVerificationClarification(
+                plan_run_id=run_data.plan_run.id,
+                user_guidance=str(message),
+                source="User verify step",
+            )
+
+        if previous_clarification.response is False:
+            raise PlanRunExitError(f"User rejected verification: {message}")
+
+        return True
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this UserVerifyStep to a legacy Step."""
+        return Step(
+            task=f"User verification: {self.message}",
+            inputs=[],
+            tool_id=None,
+            output=plan.step_output_name(self),
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class UserInputStep(StepV2):
+    """A step that requests input from the user and returns the response.
+
+    If options are provided, creates a multiple choice clarification.
+    Otherwise, creates a text input clarification.
+    """
+
+    message: str = Field(description="The guidance message shown to the user.")
+    options: list[Any] | None = Field(
+        default=None,
+        description="Available options for multiple choice. If None, creates text input.",
+    )
+
+    def __str__(self) -> str:
+        """Return a description of this step for logging purposes."""
+        input_type = "multiple choice" if self.options else "text input"
+        return f"UserInputStep(type='{input_type}', message='{self.message}')"
+
+    def _create_clarification(self, run_data: RunContext) -> ClarificationType:
+        """Create the appropriate clarification based on whether options are provided."""
+        resolved_message = self._resolve_input_reference(self.message, run_data)
+
+        if self.options:
+            return MultipleChoiceClarification(
+                plan_run_id=run_data.plan_run.id,
+                user_guidance=str(resolved_message),
+                options=self.options,
+                argument_name=run_data.plan.step_output_name(self),
+                source="User input step",
+            )
+        return InputClarification(
+            plan_run_id=run_data.plan_run.id,
+            user_guidance=str(resolved_message),
+            argument_name=run_data.plan.step_output_name(self),
+            source="User input step",
+        )
+
+    @override
+    @traceable(name="User Input Step - Run")
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Run the user input step."""
+        clarification_type = (
+            ClarificationCategory.MULTIPLE_CHOICE if self.options else ClarificationCategory.INPUT
+        )
+
+        previous_clarification = run_data.plan_run.get_clarification_for_step(clarification_type)
+
+        if not previous_clarification or not previous_clarification.resolved:
+            return self._create_clarification(run_data)
+
+        return previous_clarification.response
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this UserInputStep to a legacy Step."""
+        input_type = "Multiple choice" if self.options else "Text input"
+        return Step(
+            task=f"User input ({input_type}): {self.message}",
+            inputs=[],
+            tool_id=None,
+            output=plan.step_output_name(self),
             condition=self._get_legacy_condition(plan),
         )
 

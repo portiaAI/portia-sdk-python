@@ -10,7 +10,8 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
-from portia.errors import ToolNotFoundError
+from portia.errors import PlanRunExitError, ToolNotFoundError
+from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -20,12 +21,19 @@ from portia.builder.step_v2 import (
     LLMStep,
     SingleToolAgentStep,
     StepV2,
+    UserInputStep,
+    UserVerifyStep,
 )
-from portia.clarification import ClarificationCategory
+from portia.clarification import (
+    ClarificationCategory,
+    InputClarification,
+    MultipleChoiceClarification,
+    UserVerificationClarification,
+)
 from portia.execution_agents.output import LocalDataValue
 from portia.model import Message
+from portia.plan import PlanInput, Variable
 from portia.plan import Step as PlanStep
-from portia.plan import Variable
 from portia.tool import Tool
 
 
@@ -1184,3 +1192,243 @@ class TestSingleToolAgent:
             assert len(legacy_step.inputs) == 2
             assert legacy_step.inputs[0].name == "query"
             assert legacy_step.inputs[1].name == "step_0_output"
+
+
+class TestUserVerifyStep:
+    """Test cases for the UserVerifyStep class."""
+
+    def test_user_verify_step_str(self) -> None:
+        """Test UserVerifyStep str method."""
+        step = UserVerifyStep(message="Please confirm this action", step_name="verify")
+        assert str(step) == "UserVerifyStep(message='Please confirm this action')"
+
+    def test_user_verify_step_to_legacy_step(self) -> None:
+        """Test UserVerifyStep to_legacy_step method."""
+        step = UserVerifyStep(message="Confirm deletion", step_name="confirm_delete")
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$confirm_delete_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "User verification: Confirm deletion"
+        assert legacy_step.inputs == []
+        assert legacy_step.tool_id is None
+        assert legacy_step.output == "$confirm_delete_output"
+        assert legacy_step.structured_output_schema is None
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_requests_clarification(self) -> None:
+        """Test that UserVerifyStep returns a clarification on first run."""
+        message = f"Proceed with {StepOutput(0)} for {Input('username')}?"
+        step = UserVerifyStep(message=message, step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+        mock_run_data.step_output_values = [
+            ReferenceValue(value=LocalDataValue(value="result"), description="step0")
+        ]
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, UserVerificationClarification)
+        assert result.user_guidance == "Proceed with result for Alice?"
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_user_confirms(self) -> None:
+        """Test that the step succeeds when user verifies."""
+        step = UserVerifyStep(message="Confirm?", step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = UserVerificationClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Confirm?",
+            response=True,
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        result = await step.run(mock_run_data)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_user_rejects(self) -> None:
+        """Test that the step raises error when user rejects."""
+        step = UserVerifyStep(message="Confirm?", step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = UserVerificationClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Confirm?",
+            response=False,
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        with pytest.raises(PlanRunExitError):
+            await step.run(mock_run_data)
+
+
+class TestUserInputStep:
+    """Test cases for the UserInputStep class."""
+
+    def test_user_input_step_str_text_input(self) -> None:
+        """Test UserInputStep str method for text input."""
+        step = UserInputStep(
+            message="Please provide input",
+            step_name="input",
+        )
+
+        assert str(step) == "UserInputStep(type='text input', message='Please provide input')"
+
+    def test_user_input_step_str_multiple_choice(self) -> None:
+        """Test UserInputStep str method for multiple choice."""
+        step = UserInputStep(
+            message="Choose an option",
+            step_name="choice",
+            options=["A", "B", "C"],
+        )
+
+        assert str(step) == "UserInputStep(type='multiple choice', message='Choose an option')"
+
+    def test_user_input_step_to_legacy_step_text_input(self) -> None:
+        """Test UserInputStep to_legacy_step method for text input."""
+        step = UserInputStep(
+            message="Enter your name",
+            step_name="name_input",
+        )
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$name_input_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "User input (Text input): Enter your name"
+        assert legacy_step.inputs == []
+        assert legacy_step.tool_id is None
+        assert legacy_step.output == "$name_input_output"
+        assert legacy_step.structured_output_schema is None
+
+    def test_user_input_step_to_legacy_step_multiple_choice(self) -> None:
+        """Test UserInputStep to_legacy_step method for multiple choice."""
+        step = UserInputStep(
+            message="Choose an option",
+            step_name="choice",
+            options=["A", "B", "C"],
+        )
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$choice_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "User input (Multiple choice): Choose an option"
+        assert legacy_step.inputs == []
+        assert legacy_step.tool_id is None
+        assert legacy_step.output == "$choice_output"
+        assert legacy_step.structured_output_schema is None
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_text_input_requests_clarification(self) -> None:
+        """Test that UserInputStep returns INPUT clarification on first run for text input."""
+        step = UserInputStep(
+            message="Please enter your name",
+            step_name="get_name",
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.step_output_name.return_value = "user_input"
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, InputClarification)
+        assert result.user_guidance == "Please enter your name"
+        assert result.argument_name == "user_input"
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_multiple_choice_requests_clarification(self) -> None:
+        """Test that UserInputStep returns MULTIPLE_CHOICE clarification when options provided."""
+        step = UserInputStep(
+            message="Choose your favorite color",
+            step_name="choose_color",
+            options=["red", "green", "blue"],
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.step_output_name.return_value = "user_input"
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, MultipleChoiceClarification)
+        assert result.user_guidance == "Choose your favorite color"
+        assert result.argument_name == "user_input"
+        assert result.options == ["red", "green", "blue"]
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_returns_response_when_resolved_text_input(self) -> None:
+        """Test that UserInputStep returns response when text input clarification is resolved."""
+        step = UserInputStep(
+            message="Please enter your name",
+            step_name="get_name",
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = InputClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Please enter your name",
+            argument_name="user_input",
+            response="Alice",
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        result = await step.run(mock_run_data)
+
+        assert result == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_returns_response_when_resolved_multiple_choice(
+        self,
+    ) -> None:
+        """Test UserInputStep returns response when multiple choice clarification resolved."""
+        step = UserInputStep(
+            message="Choose your favorite color",
+            step_name="choose_color",
+            options=["red", "green", "blue"],
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = MultipleChoiceClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Choose your favorite color",
+            argument_name="user_input",
+            options=["red", "green", "blue"],
+            response="blue",
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        result = await step.run(mock_run_data)
+
+        assert result == "blue"
