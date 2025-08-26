@@ -168,6 +168,7 @@ class PlanBuilderV2:
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
+        prompt: str | None = None,
     ) -> PlanBuilderV2:
         """Add a step that sends a query to the underlying LLM.
 
@@ -178,6 +179,7 @@ class PlanBuilderV2:
               additional context to the LLM when it is completing the task.
             output_schema: The schema of the output.
             step_name: Optional name for the step. If not provided, will be auto-generated.
+            prompt: Optional prompt to use for the LLM. If not provided, uses default from LLMTool.
 
         """
         self.plan.steps.append(
@@ -187,6 +189,7 @@ class PlanBuilderV2:
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
+                prompt=prompt,
             )
         )
         return self
