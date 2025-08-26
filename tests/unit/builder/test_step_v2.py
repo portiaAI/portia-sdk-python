@@ -278,7 +278,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Analysis complete"
             mock_llm_tool_class.assert_called_once_with(structured_output_schema=None)
@@ -302,7 +302,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Processed: Hello world"
             mock_llm_tool.arun.assert_called_once()
@@ -332,7 +332,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Summary: Previous step result"
             mock_llm_tool.arun.assert_called_once()
@@ -373,7 +373,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Report generated successfully"
             mock_llm_tool.arun.assert_called_once()
@@ -387,6 +387,68 @@ class TestLLMStep:
                 "Previous step Step 1 had output: Analysis complete",
             ]
             assert call_args[1]["task_data"] == expected_task_data
+
+    @pytest.mark.asyncio
+    async def test_llm_step_run_with_prompt(self) -> None:
+        """Test LLMStep run with custom prompt parameter."""
+        custom_prompt = "You are a helpful assistant. Please analyze the following data:"
+        step = LLMStep(
+            task="Analyze data",
+            step_name="analysis",
+            system_prompt=custom_prompt,
+            output_schema=MockOutputSchema,
+        )
+        mock_run_data = Mock()
+
+        with (
+            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+        ):
+            mock_llm_tool = Mock()
+            mock_llm_tool.arun = AsyncMock(return_value="Analysis complete")
+            mock_llm_tool_class.return_value = mock_llm_tool
+            mock_tool_ctx_class.return_value = Mock()
+
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Analysis complete"
+            # Verify LLMTool was constructed with the custom prompt
+            mock_llm_tool_class.assert_called_once_with(
+                structured_output_schema=MockOutputSchema, prompt=custom_prompt
+            )
+            mock_llm_tool.arun.assert_called_once()
+            call_args = mock_llm_tool.arun.call_args
+            assert call_args[1]["task"] == "Analyze data"
+            assert call_args[1]["task_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_llm_step_run_without_prompt(self) -> None:
+        """Test LLMStep run without prompt parameter (uses default)."""
+        step = LLMStep(
+            task="Analyze data",
+            step_name="analysis",
+            output_schema=MockOutputSchema,
+        )
+        mock_run_data = Mock()
+
+        with (
+            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+        ):
+            mock_llm_tool = Mock()
+            mock_llm_tool.arun = AsyncMock(return_value="Analysis complete")
+            mock_llm_tool_class.return_value = mock_llm_tool
+            mock_tool_ctx_class.return_value = Mock()
+
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Analysis complete"
+            # Verify LLMTool was constructed without prompt parameter
+            mock_llm_tool_class.assert_called_once_with(structured_output_schema=MockOutputSchema)
+            mock_llm_tool.arun.assert_called_once()
+            call_args = mock_llm_tool.arun.call_args
+            assert call_args[1]["task"] == "Analyze data"
+            assert call_args[1]["task_data"] == []
 
     def test_llm_step_to_legacy_step(self) -> None:
         """Test LLMStep to_legacy_step method."""
@@ -512,7 +574,7 @@ class TestInvokeToolStep:
             mock_get_tool.return_value = mock_tool
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "tool result"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
@@ -550,7 +612,7 @@ class TestInvokeToolStep:
             mock_get_model.return_value = mock_model
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, MockOutputSchema)
             assert result.result == "structured result"
@@ -587,7 +649,7 @@ class TestInvokeToolStep:
             mock_get_model.return_value = mock_model
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, MockOutputSchema)
             assert result.result == "structured result"
@@ -623,7 +685,7 @@ class TestInvokeToolStep:
             mock_get_value.return_value = mock_reference_value
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "tool result with reference"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
@@ -671,7 +733,7 @@ class TestInvokeToolStep:
             mock_get_value2.return_value = mock_ref2_value
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "mixed inputs result"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
@@ -707,7 +769,7 @@ class TestInvokeToolStep:
             mock_get_tool.return_value = mock_tool
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, Clarification)
             assert result.user_guidance == "Need more information"
@@ -731,7 +793,7 @@ class TestInvokeToolStep:
             mock_output.get_value.return_value = "mock result"
             mock_arun.return_value = mock_output
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "mock result"
 
@@ -745,7 +807,7 @@ class TestInvokeToolStep:
             mock_get_tool.return_value = None  # Tool not found
 
             with pytest.raises(ToolNotFoundError) as exc_info:
-                await step.run(mock_run_data)
+                await step.run(run_data=mock_run_data)
 
             assert "nonexistent_tool" in str(exc_info.value)
             mock_get_tool.assert_called_once_with("nonexistent_tool", mock_run_data.plan_run)
@@ -829,7 +891,7 @@ class TestFunctionStep:
         )
         mock_run_data = Mock()
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert result == "Result: 42"
 
@@ -849,7 +911,7 @@ class TestFunctionStep:
         with patch.object(reference_input, "get_value") as mock_get_value:
             mock_get_value.return_value = mock_reference_value
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Previous step: 10"
             mock_get_value.assert_called_once_with(mock_run_data)
@@ -869,7 +931,7 @@ class TestFunctionStep:
         step = FunctionStep(function=clarification_function, step_name="clarify", args={})
         mock_run_data = Mock()
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, Clarification)
         assert result.user_guidance == "Function needs clarification"
@@ -898,7 +960,7 @@ class TestFunctionStep:
         with patch.object(mock_run_data.portia.config, "get_default_model") as mock_get_model:
             mock_get_model.return_value = mock_model
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, MockOutputSchema)
             assert result.result == "converted output"
@@ -964,7 +1026,7 @@ class TestFunctionStep:
         )
         mock_run_data = Mock()
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert result == "Async Result: 42"
 
@@ -991,7 +1053,7 @@ class TestFunctionStep:
         with patch.object(reference_input, "get_value") as mock_get_value:
             mock_get_value.return_value = mock_reference_value
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Async Previous step: 10"
             mock_get_value.assert_called_once_with(mock_run_data)
@@ -1007,7 +1069,7 @@ class TestFunctionStep:
         step_sync = FunctionStep(function=sync_function, step_name="sync_test", args={"x": 21})
         mock_run_data = Mock()
 
-        result_sync = await step_sync.run(mock_run_data)
+        result_sync = await step_sync.run(run_data=mock_run_data)
         assert result_sync == 42
 
         # Test async function in async context
@@ -1017,7 +1079,7 @@ class TestFunctionStep:
 
         step_async = FunctionStep(function=async_function, step_name="async_test", args={"x": 21})
 
-        result_async = await step_async.run(mock_run_data)
+        result_async = await step_async.run(run_data=mock_run_data)
         assert result_async == 42
 
     @pytest.mark.asyncio
@@ -1038,7 +1100,7 @@ class TestFunctionStep:
         )
         mock_run_data = Mock()
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, Clarification)
         assert result.user_guidance == "Async function needs clarification"
@@ -1067,7 +1129,7 @@ class TestFunctionStep:
         )
         mock_run_data.portia.config.get_default_model.return_value = mock_model
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         # Verify the async function was called and awaited
         assert result.result == "converted output"
@@ -1139,7 +1201,7 @@ class TestSingleToolAgent:
         with patch.object(mock_run_data.portia, "get_agent_for_step") as mock_get_agent:
             mock_get_agent.return_value = mock_agent
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Agent execution result"
 
@@ -1235,7 +1297,7 @@ class TestUserVerifyStep:
             ReferenceValue(value=LocalDataValue(value="result"), description="step0")
         ]
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, UserVerificationClarification)
         assert result.user_guidance == "Proceed with result for Alice?"
@@ -1255,7 +1317,7 @@ class TestUserVerifyStep:
         )
         mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert result is True
 
@@ -1275,7 +1337,7 @@ class TestUserVerifyStep:
         mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
 
         with pytest.raises(PlanRunExitError):
-            await step.run(mock_run_data)
+            await step.run(run_data=mock_run_data)
 
 
 class TestUserInputStep:
@@ -1354,7 +1416,7 @@ class TestUserInputStep:
         mock_run_data.plan = Mock()
         mock_run_data.plan.step_output_name.return_value = "user_input"
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, InputClarification)
         assert result.user_guidance == "Please enter your name"
@@ -1376,7 +1438,7 @@ class TestUserInputStep:
         mock_run_data.plan = Mock()
         mock_run_data.plan.step_output_name.return_value = "user_input"
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, MultipleChoiceClarification)
         assert result.user_guidance == "Choose your favorite color"
@@ -1402,7 +1464,7 @@ class TestUserInputStep:
         )
         mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert result == "Alice"
 
@@ -1429,6 +1491,6 @@ class TestUserInputStep:
         )
         mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert result == "blue"
