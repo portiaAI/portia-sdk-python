@@ -247,3 +247,30 @@ async def test_tool_call_wrapper_arun_returns_none(mock_storage: MockStorage) ->
     expected_output = LocalDataValue(value=None).model_dump(mode="json")
     assert mock_storage.async_save_calls[0].output == expected_output
     assert len(mock_storage.async_end_user_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_tool_call_wrapper_arun_background_task_error_handling() -> None:
+    """Test that background task errors are handled gracefully."""
+
+    # Create a mock storage that raises an exception in async methods
+    class ErrorStorage(MockStorage):
+        async def asave_tool_call(self, record: ToolCallRecord) -> None:  # noqa: ARG002
+            raise Exception("Storage error")  # noqa: TRY002
+
+        async def asave_end_user(self, end_user: EndUser) -> None:  # noqa: ARG002
+            raise Exception("End user save error")  # noqa: TRY002
+
+    error_storage = ErrorStorage()
+    (_, plan_run) = get_test_plan_run()
+    wrapper = ToolCallWrapper(AdditionTool(), error_storage, plan_run)
+    ctx = get_test_tool_context()
+
+    # This should not raise an exception, even though the background tasks fail
+    result = await wrapper.arun(ctx, 1, 2)
+    assert result == 3
+
+    # Wait for background tasks to complete
+    import asyncio
+
+    await asyncio.sleep(0.01)

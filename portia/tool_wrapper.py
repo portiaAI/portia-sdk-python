@@ -172,7 +172,6 @@ class ToolCallWrapper(Tool):
         else:
             record = self._process_output(record, output, start_time)
         finally:
-            # Fire-and-forget background tasks
             await asyncio.gather(
                 self._storage.asave_tool_call(record),
                 self._storage.asave_end_user(ctx.end_user),
