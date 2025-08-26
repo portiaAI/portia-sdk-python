@@ -169,10 +169,9 @@ class LLMModel(Enum):
     AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
 
     # xAI Grok
-    GROK_2_BETA = Model(provider=LLMProvider.GROK, model_name="grok-2-beta")
-    GROK_2_VISION_BETA = Model(provider=LLMProvider.GROK, model_name="grok-2-vision-beta")
-    GROK_2_1212 = Model(provider=LLMProvider.GROK, model_name="grok-2-1212")
-    GROK_2_VISION_1212 = Model(provider=LLMProvider.GROK, model_name="grok-2-vision-1212")
+    GROK_4_0709 = Model(provider=LLMProvider.GROK, model_name="grok-4-0709")
+    GROK_3 = Model(provider=LLMProvider.GROK, model_name="grok-3")
+    GROK_3_MINI = Model(provider=LLMProvider.GROK, model_name="grok-3-mini")
 
     @property
     def api_name(self) -> str:
@@ -458,7 +457,7 @@ class Config(BaseModel):
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
     grok_api_key: SecretStr = Field(
-        default_factory=lambda: SecretStr(os.getenv("GROK_API_KEY") or os.getenv("XAI_API_KEY") or ""),
+        default_factory=lambda: SecretStr(os.getenv("XAI_API_KEY") or ""),
         description="The API Key for xAI Grok. Must be set if llm-provider is GROK",
     )
     ollama_base_url: str = Field(
@@ -649,7 +648,7 @@ class Config(BaseModel):
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
                     case LLMProvider.GROK:
-                        return "grok/grok-2-1212"
+                        return "grok/grok-4-0709"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -666,7 +665,7 @@ class Config(BaseModel):
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
                     case LLMProvider.GROK:
-                        return "grok/grok-2-1212"
+                        return "grok/grok-4-0709"
                 return None
             case "default_model":
                 match llm_provider:
@@ -685,7 +684,7 @@ class Config(BaseModel):
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
                     case LLMProvider.GROK:
-                        return "grok/grok-2-1212"
+                        return "grok/grok-3"
                 return None
 
     @model_validator(mode="after")
