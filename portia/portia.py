@@ -32,7 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import ReferenceValue
-from portia.builder.step_v2 import FunctionStep
+from portia.builder.step_v2 import ExitStepResult, FunctionStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -2799,6 +2799,30 @@ class Portia:
             ):
                 logger().debug("Exiting conditional branch")
                 branch_stack.pop()
+            elif isinstance(result, ExitStepResult):
+                logger().info(f"Exit step executed: {result.message}")
+                if result.error:
+                    logger().warning("Plan exiting due to error condition")
+
+                # Store the exit result and terminate execution
+                output_value = LocalDataValue(value=result)
+                output_value = self._set_step_output(
+                    output_value, run_data.plan_run, step.to_legacy_step(plan)
+                )
+                output = ReferenceValue(
+                    value=output_value,
+                    description=(f"Exit from step '{step.step_name}' (Description: {step})"),
+                )
+                run_data.step_output_values.append(output)
+
+                # Mark plan as complete and return
+                run_data.plan_run.current_step_index = len(plan.steps)
+                return self._post_plan_run_execution(
+                    run_data.legacy_plan,
+                    run_data.plan_run,
+                    output_value,
+                    skip_summarization=not plan.summarize and plan.final_output_schema is None,
+                )
 
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does

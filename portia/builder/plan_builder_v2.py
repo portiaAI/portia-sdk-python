@@ -8,6 +8,7 @@ from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClause
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
 from portia.builder.step_v2 import (
+    ExitStep,
     ConditionalStep,
     FunctionStep,
     InvokeToolStep,
@@ -304,6 +305,36 @@ class PlanBuilderV2:
             self.plan.steps.extend(plan.steps)
         else:
             self.plan.steps.extend(plan)
+        return self
+
+    def exit(
+        self,
+        *,
+        message: str = "",
+        error: bool = False,
+        step_name: str | None = None,
+    ) -> PlanBuilderV2:
+        """Add an exit step to the plan.
+
+        This step will cause the plan to exit gracefully when executed.
+        Useful for early termination based on conditions or errors.
+
+        Args:
+            message: The message to display when exiting. Can include references
+              to previous step outputs using {{ StepOutput(step_name) }} syntax.
+            error: Whether this exit represents an error condition.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
+
+        """
+
+        self.plan.steps.append(
+            ExitStep(
+                message=message,
+                error=error,
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
+            )
+        )
         return self
 
     def final_output(

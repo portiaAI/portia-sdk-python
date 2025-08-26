@@ -461,6 +461,70 @@ class SingleToolAgentStep(StepV2):
         )
 
 
+class ExitStep(StepV2):
+    """A step that causes the plan to exit gracefully.
+
+    This step allows for early termination of a plan with an optional message
+    and error flag. When executed, the plan will stop execution and return
+    the specified output.
+    """
+
+    message: str = Field(default="", description="The message to include when exiting the plan.")
+    error: bool = Field(
+        default=False, description="Whether this exit represents an error condition."
+    )
+
+    def __str__(self) -> str:
+        """Return a description of this step for logging purposes."""
+        error_indicator = " (ERROR)" if self.error else ""
+        message_info = f" - {self.message}" if self.message else ""
+        return f"ExitStep{error_indicator}{message_info}"
+
+    @override
+    @traceable(name="Exit Step - Run")
+    async def run(self, run_data: RunContext) -> ExitStepResult:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+        """Execute the exit step, causing the plan to terminate gracefully."""
+        # Resolve any references in the message
+        resolved_message = self._resolve_input_reference(self.message, run_data)
+        if isinstance(resolved_message, str):
+            message = resolved_message
+        else:
+            message = str(resolved_message) if resolved_message is not None else ""
+
+        return ExitStepResult(message=message, error=self.error)
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this ExitStep to a legacy Step."""
+        if self.error:
+            task = f"Exit plan with error: {self.message}"
+        elif self.message:
+            task = f"Exit plan: {self.message}"
+        else:
+            task = "Exit plan"
+            
+        return Step(
+            task=task,
+            inputs=[],
+            tool_id="exit_step",
+            output=plan.step_output_name(self),
+            structured_output_schema=None,
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class ExitStepResult(BaseModel):
+    """Result of an ExitStep execution.
+
+    This result indicates that the plan should exit gracefully.
+    """
+
+    message: str = Field(default="", description="The exit message to display.")
+    error: bool = Field(
+        default=False, description="Whether this exit represents an error condition."
+    )
+
+
 class ConditionalStep(StepV2):
     """A step that represents a conditional clause in a conditional block.
 
