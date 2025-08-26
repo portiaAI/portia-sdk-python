@@ -13,6 +13,7 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
+     UserVerifyStep,
     StepV2,
 )
 from portia.plan import PlanInput
@@ -271,6 +272,25 @@ class PlanBuilderV2:
                 task=task,
                 inputs=inputs or [],
                 output_schema=output_schema,
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
+            )
+        )
+        return self
+
+    def user_verify_step(
+        self, *, message: str, step_name: str | None = None
+    ) -> PlanBuilderV2:
+        """Add a step that requires user verification before continuing.
+
+        Args:
+            message: The message the user needs to verify.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
+
+        """
+        self.plan.steps.append(
+            UserVerifyStep(
+                message=message,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
             )

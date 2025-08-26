@@ -15,6 +15,7 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
+    UserVerifyStep,
     StepV2,
 )
 from portia.plan import PlanInput, Step
@@ -337,6 +338,18 @@ class TestPlanBuilderV2:
         assert step.inputs == inputs
         assert step.output_schema == OutputSchema
         assert step.step_name == "agent_step"
+
+    def test_user_verify_step_method(self) -> None:
+        """Test the user_verify_step() method."""
+        builder = PlanBuilderV2()
+
+        result = builder.user_verify_step(message="Check this")
+
+        assert result is builder
+        assert len(builder.plan.steps) == 1
+        assert isinstance(builder.plan.steps[0], UserVerifyStep)
+        assert builder.plan.steps[0].message == "Check this"
+        assert builder.plan.steps[0].step_name == "step_0"
 
     def test_final_output_method_basic(self) -> None:
         """Test the final_output() method with basic parameters."""

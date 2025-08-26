@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
-from portia.errors import ToolNotFoundError
+from portia.errors import ToolHardError, ToolNotFoundError
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -18,12 +18,13 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
+    UserVerifyStep,
     StepV2,
 )
 from portia.clarification import ClarificationCategory
 from portia.execution_agents.output import LocalDataValue
 from portia.model import Message
-from portia.plan import Step as PlanStep
+from portia.plan import PlanInput, Step as PlanStep
 from portia.plan import Variable
 from portia.tool import Tool
 
@@ -1018,3 +1019,74 @@ class TestSingleToolAgent:
             assert len(legacy_step.inputs) == 2
             assert legacy_step.inputs[0].name == "query"
             assert legacy_step.inputs[1].name == "step_0_output"
+
+
+class TestUserVerifyStep:
+    """Test cases for the UserVerifyStep class."""
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_requests_clarification(self) -> None:
+        """Test that UserVerifyStep returns a clarification on first run."""
+        message = f"Proceed with {StepOutput(0)} for {Input('username')}?"
+        step = UserVerifyStep(message=message, step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.portia = Mock()
+        mock_run_data.portia.storage = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = "run_id"
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run.plan_run_inputs = {
+            "username": LocalDataValue(value="Alice")
+        }
+        mock_run_data.step_output_values = [
+            ReferenceValue(value=LocalDataValue(value="result"), description="step0")
+        ]
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, UserVerificationClarification)
+        assert result.user_guidance == "Proceed with result for Alice?"
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_user_confirms(self) -> None:
+        """Test that the step succeeds when user verifies."""
+        step = UserVerifyStep(message="Confirm?", step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.portia = Mock()
+        mock_run_data.portia.storage = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = UserVerificationClarification(
+            plan_run_id="run_id",
+            user_guidance="Confirm?",
+            response=True,
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        result = await step.run(mock_run_data)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_user_rejects(self) -> None:
+        """Test that the step raises error when user rejects."""
+        step = UserVerifyStep(message="Confirm?", step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.portia = Mock()
+        mock_run_data.portia.storage = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = UserVerificationClarification(
+            plan_run_id="run_id",
+            user_guidance="Confirm?",
+            response=False,
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        with pytest.raises(ToolHardError):
+            await step.run(mock_run_data)
