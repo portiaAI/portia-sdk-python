@@ -395,7 +395,7 @@ class TestLLMStep:
         step = LLMStep(
             task="Analyze data",
             step_name="analysis",
-            prompt=custom_prompt,
+            system_prompt=custom_prompt,
             output_schema=MockOutputSchema,
         )
         mock_run_data = Mock()

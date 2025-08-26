@@ -205,7 +205,7 @@ class LLMStep(StepV2):
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
     )
-    prompt: str | None = Field(
+    system_prompt: str | None = Field(
         default=None,
         description=(
             "The prompt to use for the LLM. If not provided, uses default prompt from LLMTool."
@@ -221,8 +221,10 @@ class LLMStep(StepV2):
     @traceable(name="LLM Step - Run")
     async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the LLM query."""
-        if self.prompt:
-            llm_tool = LLMTool(structured_output_schema=self.output_schema, prompt=self.prompt)
+        if self.system_prompt:
+            llm_tool = LLMTool(
+                structured_output_schema=self.output_schema, prompt=self.system_prompt
+            )
         else:
             llm_tool = LLMTool(structured_output_schema=self.output_schema)
         tool_ctx = ToolRunContext(
