@@ -39,6 +39,7 @@ plan = (
         },
         output_schema=CommodityPriceWithCurrency,
     )
+    .user_verify(message=f"Do you want to proceed with the purchase? Price is {StepOutput(0)}")
     .function_step(
         function=lambda price_with_currency, purchase_quantity: (
             price_with_currency.price * purchase_quantity
@@ -48,6 +49,7 @@ plan = (
             "purchase_quantity": Input("purchase_quantity"),
         },
     )
+    .user_verify(message=f"Do you want to proceed with the purchase? Price is {StepOutput(0)}")
     .if_(
         condition=lambda total_price: total_price > 100,  # noqa: PLR2004
         args={"total_price": StepOutput(1)},

@@ -9,7 +9,8 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
-from portia.errors import ToolHardError, ToolNotFoundError
+from portia.errors import PlanRunExitError, ToolNotFoundError
+from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -18,14 +19,14 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
-    UserVerifyStep,
     StepV2,
+    UserVerifyStep,
 )
-from portia.clarification import ClarificationCategory
+from portia.clarification import ClarificationCategory, UserVerificationClarification
 from portia.execution_agents.output import LocalDataValue
 from portia.model import Message
-from portia.plan import PlanInput, Step as PlanStep
-from portia.plan import Variable
+from portia.plan import PlanInput, Variable
+from portia.plan import Step as PlanStep
 from portia.tool import Tool
 
 
@@ -1024,6 +1025,27 @@ class TestSingleToolAgent:
 class TestUserVerifyStep:
     """Test cases for the UserVerifyStep class."""
 
+    def test_user_verify_step_str(self) -> None:
+        """Test UserVerifyStep str method."""
+        step = UserVerifyStep(message="Please confirm this action", step_name="verify")
+        assert str(step) == "UserVerifyStep(message='Please confirm this action')"
+
+    def test_user_verify_step_to_legacy_step(self) -> None:
+        """Test UserVerifyStep to_legacy_step method."""
+        step = UserVerifyStep(message="Confirm deletion", step_name="confirm_delete")
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$confirm_delete_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "User verification: Confirm deletion"
+        assert legacy_step.inputs == []
+        assert legacy_step.tool_id is None
+        assert legacy_step.output == "$confirm_delete_output"
+        assert legacy_step.structured_output_schema is None
+
     @pytest.mark.asyncio
     async def test_user_verify_step_requests_clarification(self) -> None:
         """Test that UserVerifyStep returns a clarification on first run."""
@@ -1031,16 +1053,12 @@ class TestUserVerifyStep:
         step = UserVerifyStep(message=message, step_name="verify")
 
         mock_run_data = Mock()
-        mock_run_data.portia = Mock()
-        mock_run_data.portia.storage = Mock()
         mock_run_data.plan_run = Mock()
-        mock_run_data.plan_run.id = "run_id"
+        mock_run_data.plan_run.id = PlanRunUUID()
         mock_run_data.plan_run.get_clarification_for_step.return_value = None
         mock_run_data.plan = Mock()
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
-        mock_run_data.plan_run.plan_run_inputs = {
-            "username": LocalDataValue(value="Alice")
-        }
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
             ReferenceValue(value=LocalDataValue(value="result"), description="step0")
         ]
@@ -1056,11 +1074,9 @@ class TestUserVerifyStep:
         step = UserVerifyStep(message="Confirm?", step_name="verify")
 
         mock_run_data = Mock()
-        mock_run_data.portia = Mock()
-        mock_run_data.portia.storage = Mock()
         mock_run_data.plan_run = Mock()
         clarification = UserVerificationClarification(
-            plan_run_id="run_id",
+            plan_run_id=PlanRunUUID(),
             user_guidance="Confirm?",
             response=True,
             resolved=True,
@@ -1077,16 +1093,14 @@ class TestUserVerifyStep:
         step = UserVerifyStep(message="Confirm?", step_name="verify")
 
         mock_run_data = Mock()
-        mock_run_data.portia = Mock()
-        mock_run_data.portia.storage = Mock()
         mock_run_data.plan_run = Mock()
         clarification = UserVerificationClarification(
-            plan_run_id="run_id",
+            plan_run_id=PlanRunUUID(),
             user_guidance="Confirm?",
             response=False,
             resolved=True,
         )
         mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
 
-        with pytest.raises(ToolHardError):
+        with pytest.raises(PlanRunExitError):
             await step.run(mock_run_data)

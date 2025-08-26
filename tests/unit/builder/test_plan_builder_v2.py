@@ -15,8 +15,8 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
-    UserVerifyStep,
     StepV2,
+    UserVerifyStep,
 )
 from portia.plan import PlanInput, Step
 from portia.tool import Tool
@@ -343,7 +343,7 @@ class TestPlanBuilderV2:
         """Test the user_verify_step() method."""
         builder = PlanBuilderV2()
 
-        result = builder.user_verify_step(message="Check this")
+        result = builder.user_verify(message="Check this")
 
         assert result is builder
         assert len(builder.plan.steps) == 1

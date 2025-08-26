@@ -13,8 +13,8 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
-     UserVerifyStep,
     StepV2,
+    UserVerifyStep,
 )
 from portia.plan import PlanInput
 
@@ -278,10 +278,14 @@ class PlanBuilderV2:
         )
         return self
 
-    def user_verify_step(
-        self, *, message: str, step_name: str | None = None
-    ) -> PlanBuilderV2:
-        """Add a step that requires user verification before continuing.
+    def user_verify(self, *, message: str, step_name: str | None = None) -> PlanBuilderV2:
+        """Add a step that prompts the user to verify the specified message before continuing.
+
+        This step uses a UserVerificationClarification to interact with the user - you must ensure
+        you have a clarifiction handler setup that handles this type of clarification.
+
+        If the user accepts, then the plan will continue. If the user rejects, then this step will
+        raise a XXX.
 
         Args:
             message: The message the user needs to verify.

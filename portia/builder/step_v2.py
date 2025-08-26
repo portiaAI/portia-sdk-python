@@ -22,7 +22,7 @@ from portia.clarification import (
     ClarificationCategory,
     UserVerificationClarification,
 )
-from portia.errors import ToolHardError, ToolNotFoundError
+from portia.errors import PlanRunExitError, ToolNotFoundError
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
@@ -481,41 +481,16 @@ class UserVerifyStep(StepV2):
             )
 
         if previous_clarification.response is False:
-            raise ToolHardError(f"User rejected verification: {message}")
+            raise PlanRunExitError(f"User rejected verification: {message}")
 
         return True
-
-    def _extract_references(self) -> list[Reference]:
-        matches = re.findall(
-            r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", self.message
-        )
-        refs: list[Reference] = []
-        for ref_type, var_name in matches:
-            var_name = var_name.strip()
-            if ref_type == "StepOutput" and var_name.isdigit():
-                var_name = int(var_name)
-            ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)
-            refs.append(ref)
-        return refs
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
         """Convert this UserVerifyStep to a legacy Step."""
-        references = self._extract_references()
-        task_message = self.message
-        for ref in references:
-            name = self._resolve_input_names_for_printing(ref, plan)
-            pattern = (
-                r"\{\{\s*"
-                + ("StepOutput" if isinstance(ref, StepOutput) else "Input")
-                + r"\s*\(\s*"
-                + re.escape(str(ref.step if isinstance(ref, StepOutput) else ref.name))
-                + r"\s*\)\s*\}\}"
-            )
-            task_message = re.sub(pattern, str(name), task_message, count=1)
         return Step(
-            task=f"User verification: {task_message}",
-            inputs=self._inputs_to_legacy_plan_variables(references, plan),
+            task=f"User verification: {self.message}",
+            inputs=[],
             tool_id=None,
             output=plan.step_output_name(self),
             condition=self._get_legacy_condition(plan),
