@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -9,7 +10,8 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
-from portia.errors import ToolNotFoundError
+from portia.errors import PlanRunExitError, ToolNotFoundError
+from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -19,12 +21,19 @@ from portia.builder.step_v2 import (
     LLMStep,
     SingleToolAgentStep,
     StepV2,
+    UserInputStep,
+    UserVerifyStep,
 )
-from portia.clarification import ClarificationCategory
+from portia.clarification import (
+    ClarificationCategory,
+    InputClarification,
+    MultipleChoiceClarification,
+    UserVerificationClarification,
+)
 from portia.execution_agents.output import LocalDataValue
 from portia.model import Message
+from portia.plan import PlanInput, Variable
 from portia.plan import Step as PlanStep
-from portia.plan import Variable
 from portia.tool import Tool
 
 
@@ -40,7 +49,7 @@ def example_function(x: int, y: str) -> str:
     return f"{y}: {x}"
 
 
-class MockTool(Tool):
+class MockTool(Tool[str]):
     """Mock tool for testing."""
 
     def __init__(self) -> None:
@@ -269,7 +278,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Analysis complete"
             mock_llm_tool_class.assert_called_once_with(structured_output_schema=None)
@@ -293,7 +302,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Processed: Hello world"
             mock_llm_tool.arun.assert_called_once()
@@ -323,7 +332,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Summary: Previous step result"
             mock_llm_tool.arun.assert_called_once()
@@ -364,7 +373,7 @@ class TestLLMStep:
             mock_llm_tool_class.return_value = mock_llm_tool
             mock_tool_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Report generated successfully"
             mock_llm_tool.arun.assert_called_once()
@@ -378,6 +387,68 @@ class TestLLMStep:
                 "Previous step Step 1 had output: Analysis complete",
             ]
             assert call_args[1]["task_data"] == expected_task_data
+
+    @pytest.mark.asyncio
+    async def test_llm_step_run_with_prompt(self) -> None:
+        """Test LLMStep run with custom prompt parameter."""
+        custom_prompt = "You are a helpful assistant. Please analyze the following data:"
+        step = LLMStep(
+            task="Analyze data",
+            step_name="analysis",
+            system_prompt=custom_prompt,
+            output_schema=MockOutputSchema,
+        )
+        mock_run_data = Mock()
+
+        with (
+            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+        ):
+            mock_llm_tool = Mock()
+            mock_llm_tool.arun = AsyncMock(return_value="Analysis complete")
+            mock_llm_tool_class.return_value = mock_llm_tool
+            mock_tool_ctx_class.return_value = Mock()
+
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Analysis complete"
+            # Verify LLMTool was constructed with the custom prompt
+            mock_llm_tool_class.assert_called_once_with(
+                structured_output_schema=MockOutputSchema, prompt=custom_prompt
+            )
+            mock_llm_tool.arun.assert_called_once()
+            call_args = mock_llm_tool.arun.call_args
+            assert call_args[1]["task"] == "Analyze data"
+            assert call_args[1]["task_data"] == []
+
+    @pytest.mark.asyncio
+    async def test_llm_step_run_without_prompt(self) -> None:
+        """Test LLMStep run without prompt parameter (uses default)."""
+        step = LLMStep(
+            task="Analyze data",
+            step_name="analysis",
+            output_schema=MockOutputSchema,
+        )
+        mock_run_data = Mock()
+
+        with (
+            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+        ):
+            mock_llm_tool = Mock()
+            mock_llm_tool.arun = AsyncMock(return_value="Analysis complete")
+            mock_llm_tool_class.return_value = mock_llm_tool
+            mock_tool_ctx_class.return_value = Mock()
+
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Analysis complete"
+            # Verify LLMTool was constructed without prompt parameter
+            mock_llm_tool_class.assert_called_once_with(structured_output_schema=MockOutputSchema)
+            mock_llm_tool.arun.assert_called_once()
+            call_args = mock_llm_tool.arun.call_args
+            assert call_args[1]["task"] == "Analyze data"
+            assert call_args[1]["task_data"] == []
 
     def test_llm_step_to_legacy_step(self) -> None:
         """Test LLMStep to_legacy_step method."""
@@ -503,7 +574,7 @@ class TestInvokeToolStep:
             mock_get_tool.return_value = mock_tool
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "tool result"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
@@ -541,7 +612,7 @@ class TestInvokeToolStep:
             mock_get_model.return_value = mock_model
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, MockOutputSchema)
             assert result.result == "structured result"
@@ -578,7 +649,7 @@ class TestInvokeToolStep:
             mock_get_model.return_value = mock_model
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, MockOutputSchema)
             assert result.result == "structured result"
@@ -614,7 +685,7 @@ class TestInvokeToolStep:
             mock_get_value.return_value = mock_reference_value
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "tool result with reference"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
@@ -662,7 +733,7 @@ class TestInvokeToolStep:
             mock_get_value2.return_value = mock_ref2_value
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "mixed inputs result"
             mock_get_tool.assert_called_once_with("mock_tool", mock_run_data.plan_run)
@@ -698,7 +769,7 @@ class TestInvokeToolStep:
             mock_get_tool.return_value = mock_tool
             mock_ctx_class.return_value = Mock()
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, Clarification)
             assert result.user_guidance == "Need more information"
@@ -722,7 +793,7 @@ class TestInvokeToolStep:
             mock_output.get_value.return_value = "mock result"
             mock_arun.return_value = mock_output
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "mock result"
 
@@ -736,7 +807,7 @@ class TestInvokeToolStep:
             mock_get_tool.return_value = None  # Tool not found
 
             with pytest.raises(ToolNotFoundError) as exc_info:
-                await step.run(mock_run_data)
+                await step.run(run_data=mock_run_data)
 
             assert "nonexistent_tool" in str(exc_info.value)
             mock_get_tool.assert_called_once_with("nonexistent_tool", mock_run_data.plan_run)
@@ -820,7 +891,7 @@ class TestFunctionStep:
         )
         mock_run_data = Mock()
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert result == "Result: 42"
 
@@ -840,7 +911,7 @@ class TestFunctionStep:
         with patch.object(reference_input, "get_value") as mock_get_value:
             mock_get_value.return_value = mock_reference_value
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Previous step: 10"
             mock_get_value.assert_called_once_with(mock_run_data)
@@ -860,7 +931,7 @@ class TestFunctionStep:
         step = FunctionStep(function=clarification_function, step_name="clarify", args={})
         mock_run_data = Mock()
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, Clarification)
         assert result.user_guidance == "Function needs clarification"
@@ -889,7 +960,7 @@ class TestFunctionStep:
         with patch.object(mock_run_data.portia.config, "get_default_model") as mock_get_model:
             mock_get_model.return_value = mock_model
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert isinstance(result, MockOutputSchema)
             assert result.result == "converted output"
@@ -938,6 +1009,131 @@ class TestFunctionStep:
         """Test FunctionStep tool_id_is_local_function method."""
         assert FunctionStep.tool_id_is_local_function("local_function_example_function")
         assert not FunctionStep.tool_id_is_local_function("search_tool")
+
+    @pytest.mark.asyncio
+    async def test_function_step_with_async_function(self) -> None:
+        """Test FunctionStep run with async function."""
+
+        async def async_example_function(x: int, y: str) -> str:
+            # Simulate some async operation
+            await asyncio.sleep(0.001)
+            return f"{y}: {x}"
+
+        step = FunctionStep(
+            function=async_example_function,
+            step_name="async_calc",
+            args={"x": 42, "y": "Async Result"},
+        )
+        mock_run_data = Mock()
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Async Result: 42"
+
+    @pytest.mark.asyncio
+    async def test_function_step_with_async_function_reference_arg(self) -> None:
+        """Test FunctionStep run with async function and reference argument."""
+
+        async def async_reference_function(x: int, y: str) -> str:
+            await asyncio.sleep(0.001)
+            return f"{y}: {x}"
+
+        reference_input = StepOutput(0)
+        step = FunctionStep(
+            function=async_reference_function,
+            step_name="async_ref_calc",
+            args={"x": 10, "y": reference_input},
+        )
+        mock_run_data = Mock()
+        mock_run_data.portia.storage = Mock()
+
+        mock_data_value = LocalDataValue(value="Async Previous step")
+        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
+
+        with patch.object(reference_input, "get_value") as mock_get_value:
+            mock_get_value.return_value = mock_reference_value
+
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Async Previous step: 10"
+            mock_get_value.assert_called_once_with(mock_run_data)
+
+    @pytest.mark.asyncio
+    async def test_function_step_mixed_sync_async_context(self) -> None:
+        """Test that FunctionStep works correctly in both sync and async contexts."""
+
+        # Test sync function in async context
+        def sync_function(x: int) -> int:
+            return x * 2
+
+        step_sync = FunctionStep(function=sync_function, step_name="sync_test", args={"x": 21})
+        mock_run_data = Mock()
+
+        result_sync = await step_sync.run(run_data=mock_run_data)
+        assert result_sync == 42
+
+        # Test async function in async context
+        async def async_function(x: int) -> int:
+            await asyncio.sleep(0.001)
+            return x * 2
+
+        step_async = FunctionStep(function=async_function, step_name="async_test", args={"x": 21})
+
+        result_async = await step_async.run(run_data=mock_run_data)
+        assert result_async == 42
+
+    @pytest.mark.asyncio
+    async def test_function_step_async_function_with_clarification(self) -> None:
+        """Test FunctionStep run with async function that returns a clarification."""
+        from portia.clarification import Clarification
+
+        async def async_clarification_function() -> Clarification:
+            await asyncio.sleep(0.001)
+            return Clarification(
+                category=ClarificationCategory.ACTION,
+                user_guidance="Async function needs clarification",
+                plan_run_id=None,
+            )
+
+        step = FunctionStep(
+            function=async_clarification_function, step_name="async_clarify", args={}
+        )
+        mock_run_data = Mock()
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert isinstance(result, Clarification)
+        assert result.user_guidance == "Async function needs clarification"
+        assert result.plan_run_id == mock_run_data.plan_run.id
+
+    @pytest.mark.asyncio
+    async def test_function_step_async_function_with_output_schema(self) -> None:
+        """Test FunctionStep run with async function and output schema conversion."""
+
+        async def async_raw_output_function() -> str:
+            await asyncio.sleep(0.001)
+            return "raw output"
+
+        step = FunctionStep(
+            function=async_raw_output_function,
+            step_name="async_schema_test",
+            args={},
+            output_schema=MockOutputSchema,
+        )
+        mock_run_data = Mock()
+
+        # Mock the model and its aget_structured_response method
+        mock_model = Mock()
+        mock_model.aget_structured_response = AsyncMock(
+            return_value=MockOutputSchema(result="converted output", count=1)
+        )
+        mock_run_data.portia.config.get_default_model.return_value = mock_model
+
+        result = await step.run(run_data=mock_run_data)
+
+        # Verify the async function was called and awaited
+        assert result.result == "converted output"
+        mock_model.aget_structured_response.assert_called_once()
 
 
 class TestSingleToolAgent:
@@ -1005,7 +1201,7 @@ class TestSingleToolAgent:
         with patch.object(mock_run_data.portia, "get_agent_for_step") as mock_get_agent:
             mock_get_agent.return_value = mock_agent
 
-            result = await step.run(mock_run_data)
+            result = await step.run(run_data=mock_run_data)
 
             assert result == "Agent execution result"
 
@@ -1058,3 +1254,243 @@ class TestSingleToolAgent:
             assert len(legacy_step.inputs) == 2
             assert legacy_step.inputs[0].name == "query"
             assert legacy_step.inputs[1].name == "step_0_output"
+
+
+class TestUserVerifyStep:
+    """Test cases for the UserVerifyStep class."""
+
+    def test_user_verify_step_str(self) -> None:
+        """Test UserVerifyStep str method."""
+        step = UserVerifyStep(message="Please confirm this action", step_name="verify")
+        assert str(step) == "UserVerifyStep(message='Please confirm this action')"
+
+    def test_user_verify_step_to_legacy_step(self) -> None:
+        """Test UserVerifyStep to_legacy_step method."""
+        step = UserVerifyStep(message="Confirm deletion", step_name="confirm_delete")
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$confirm_delete_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "User verification: Confirm deletion"
+        assert legacy_step.inputs == []
+        assert legacy_step.tool_id is None
+        assert legacy_step.output == "$confirm_delete_output"
+        assert legacy_step.structured_output_schema is None
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_requests_clarification(self) -> None:
+        """Test that UserVerifyStep returns a clarification on first run."""
+        message = f"Proceed with {StepOutput(0)} for {Input('username')}?"
+        step = UserVerifyStep(message=message, step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+        mock_run_data.step_output_values = [
+            ReferenceValue(value=LocalDataValue(value="result"), description="step0")
+        ]
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert isinstance(result, UserVerificationClarification)
+        assert result.user_guidance == "Proceed with result for Alice?"
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_user_confirms(self) -> None:
+        """Test that the step succeeds when user verifies."""
+        step = UserVerifyStep(message="Confirm?", step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = UserVerificationClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Confirm?",
+            response=True,
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_user_rejects(self) -> None:
+        """Test that the step raises error when user rejects."""
+        step = UserVerifyStep(message="Confirm?", step_name="verify")
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = UserVerificationClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Confirm?",
+            response=False,
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        with pytest.raises(PlanRunExitError):
+            await step.run(run_data=mock_run_data)
+
+
+class TestUserInputStep:
+    """Test cases for the UserInputStep class."""
+
+    def test_user_input_step_str_text_input(self) -> None:
+        """Test UserInputStep str method for text input."""
+        step = UserInputStep(
+            message="Please provide input",
+            step_name="input",
+        )
+
+        assert str(step) == "UserInputStep(type='text input', message='Please provide input')"
+
+    def test_user_input_step_str_multiple_choice(self) -> None:
+        """Test UserInputStep str method for multiple choice."""
+        step = UserInputStep(
+            message="Choose an option",
+            step_name="choice",
+            options=["A", "B", "C"],
+        )
+
+        assert str(step) == "UserInputStep(type='multiple choice', message='Choose an option')"
+
+    def test_user_input_step_to_legacy_step_text_input(self) -> None:
+        """Test UserInputStep to_legacy_step method for text input."""
+        step = UserInputStep(
+            message="Enter your name",
+            step_name="name_input",
+        )
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$name_input_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "User input (Text input): Enter your name"
+        assert legacy_step.inputs == []
+        assert legacy_step.tool_id is None
+        assert legacy_step.output == "$name_input_output"
+        assert legacy_step.structured_output_schema is None
+
+    def test_user_input_step_to_legacy_step_multiple_choice(self) -> None:
+        """Test UserInputStep to_legacy_step method for multiple choice."""
+        step = UserInputStep(
+            message="Choose an option",
+            step_name="choice",
+            options=["A", "B", "C"],
+        )
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$choice_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "User input (Multiple choice): Choose an option"
+        assert legacy_step.inputs == []
+        assert legacy_step.tool_id is None
+        assert legacy_step.output == "$choice_output"
+        assert legacy_step.structured_output_schema is None
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_text_input_requests_clarification(self) -> None:
+        """Test that UserInputStep returns INPUT clarification on first run for text input."""
+        step = UserInputStep(
+            message="Please enter your name",
+            step_name="get_name",
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.step_output_name.return_value = "user_input"
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert isinstance(result, InputClarification)
+        assert result.user_guidance == "Please enter your name"
+        assert result.argument_name == "user_input"
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_multiple_choice_requests_clarification(self) -> None:
+        """Test that UserInputStep returns MULTIPLE_CHOICE clarification when options provided."""
+        step = UserInputStep(
+            message="Choose your favorite color",
+            step_name="choose_color",
+            options=["red", "green", "blue"],
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.step_output_name.return_value = "user_input"
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert isinstance(result, MultipleChoiceClarification)
+        assert result.user_guidance == "Choose your favorite color"
+        assert result.argument_name == "user_input"
+        assert result.options == ["red", "green", "blue"]
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_returns_response_when_resolved_text_input(self) -> None:
+        """Test that UserInputStep returns response when text input clarification is resolved."""
+        step = UserInputStep(
+            message="Please enter your name",
+            step_name="get_name",
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = InputClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Please enter your name",
+            argument_name="user_input",
+            response="Alice",
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_returns_response_when_resolved_multiple_choice(
+        self,
+    ) -> None:
+        """Test UserInputStep returns response when multiple choice clarification resolved."""
+        step = UserInputStep(
+            message="Choose your favorite color",
+            step_name="choose_color",
+            options=["red", "green", "blue"],
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        clarification = MultipleChoiceClarification(
+            plan_run_id=PlanRunUUID(),
+            user_guidance="Choose your favorite color",
+            argument_name="user_input",
+            options=["red", "green", "blue"],
+            response="blue",
+            resolved=True,
+        )
+        mock_run_data.plan_run.get_clarification_for_step.return_value = clarification
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "blue"

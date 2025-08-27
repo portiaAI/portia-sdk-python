@@ -83,7 +83,10 @@ from portia.storage import (
     StorageError,
 )
 from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
-from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
+from portia.telemetry.views import (
+    PlanV2StepExecutionTelemetryEvent,
+    PortiaFunctionCallTelemetryEvent,
+)
 from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
 from portia.tool_registry import (
     DefaultToolRegistry,
@@ -910,10 +913,11 @@ class Portia:
                         )
                     )
             except RuntimeError:
-                logger().error(
+                message = (
                     "run_plan should be called outside of an async context: Use arun_plan instead"
                 )
-                raise
+                logger().error(message)
+                raise RuntimeError(message) from None
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
@@ -2745,8 +2749,23 @@ class Portia:
             try:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
+                self.telemetry.capture(
+                    PlanV2StepExecutionTelemetryEvent(
+                        step_type=step.__class__.__name__,
+                        success=False,
+                        tool_id=step.to_legacy_step(plan).tool_id,
+                    )
+                )
                 return self._handle_execution_error(
                     run_data.plan_run, run_data.legacy_plan, i, step.to_legacy_step(plan), e
+                )
+            else:
+                self.telemetry.capture(
+                    PlanV2StepExecutionTelemetryEvent(
+                        step_type=step.__class__.__name__,
+                        success=True,
+                        tool_id=step.to_legacy_step(plan).tool_id,
+                    )
                 )
             jump_to_step_index: int | None = None
             if (
@@ -2790,7 +2809,8 @@ class Portia:
                 value=output_value,
                 description=(f"Output from step '{step.step_name}' (Description: {step})"),
             )
-            run_data.step_output_values.append(output)
+            if not isinstance(result, Clarification):
+                run_data.step_output_values.append(output)
 
             try:
                 if clarified_plan_run := self._handle_post_step_execution(
