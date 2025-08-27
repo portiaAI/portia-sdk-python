@@ -105,6 +105,13 @@ if TYPE_CHECKING:
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
 
 
+class StepOutputValue(ReferenceValue):
+    """Value that can be referenced by name."""
+
+    step_name: str = Field(description="The name of the referenced value.")
+    step_num: int = Field(description="The step number of the referenced value.")
+
+
 class RunContext(BaseModel):
     """Data that is returned from a step."""
 
@@ -114,7 +121,7 @@ class RunContext(BaseModel):
     legacy_plan: Plan = Field(description="The legacy plan representation.")
     plan_run: PlanRun = Field(description="The current plan run instance.")
     end_user: EndUser = Field(description="The end user executing the plan.")
-    step_output_values: list[ReferenceValue] = Field(
+    step_output_values: list[StepOutputValue] = Field(
         default_factory=list, description="Outputs set by the step."
     )
     portia: Portia = Field(description="The Portia client instance.")
@@ -2465,8 +2472,8 @@ class Portia:
         for clarification in clarifications:
             clarification.step = plan_run.current_step_index
             logger().info(
-                f"Clarification requested - category: {clarification.category}, "
-                f"user_guidance: {clarification.user_guidance}.",
+                f"Clarification requested - category: {clarification.category}, ",
+                user_guidance=clarification.user_guidance,
                 plan=str(plan_run.plan_id),
                 plan_run=str(plan_run.id),
             )
@@ -2823,12 +2830,15 @@ class Portia:
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
             output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
-            output = ReferenceValue(
-                value=output_value,
-                description=(f"Output from step '{step.step_name}' (Description: {step})"),
-            )
             if not is_clarification(result):
-                run_data.step_output_values.append(output)
+                run_data.step_output_values.append(
+                    StepOutputValue(
+                        step_name=step.step_name,
+                        step_num=i,
+                        value=output_value,
+                        description=(f"Output from step '{step.step_name}' (Description: {step})"),
+                    )
+                )
 
             try:
                 if clarified_plan_run := self._handle_post_step_execution(
@@ -2850,11 +2860,14 @@ class Portia:
                 )
                 error_value = LocalDataValue(value=str(e))
                 self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
-                error_output = ReferenceValue(
-                    value=error_value,
-                    description=(f"Error from step '{step.step_name}' (Description: {step})"),
+                run_data.step_output_values.append(
+                    StepOutputValue(
+                        step_name=step.step_name,
+                        step_num=i,
+                        value=error_value,
+                        description=f"Error from step '{step.step_name}' (Description: {step})",
+                    )
                 )
-                run_data.step_output_values.append(error_output)
                 # Skip the after_step_execution hook as we have already run it
                 return self._handle_plan_run_execution_error(
                     run_data.plan_run, run_data.legacy_plan, error_value
