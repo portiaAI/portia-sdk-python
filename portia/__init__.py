@@ -99,6 +99,9 @@ from portia.tool_registry import (
     ToolRegistry,
 )
 
+# Cost estimation related classes
+from portia.cost_estimator import CostEstimator
+
 # Define explicitly what should be available when using "from portia import *"
 __all__ = [
     "SUPPORTED_ANTHROPIC_MODELS",
@@ -112,6 +115,7 @@ __all__ = [
     "ClarificationType",
     "Config",
     "ConfigNotFoundError",
+    "CostEstimator",
     "CrawlTool",
     "CustomClarification",
     "DefaultToolRegistry",
