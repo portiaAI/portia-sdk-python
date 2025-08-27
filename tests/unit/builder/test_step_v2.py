@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
 from portia.errors import PlanRunExitError, ToolNotFoundError
+from portia.portia import StepOutputValue
 from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
@@ -1294,7 +1295,9 @@ class TestUserVerifyStep:
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="result"), description="step0")
+            StepOutputValue(
+                step_num=0, step_name="step_0", value=LocalDataValue(value="result"), description=""
+            )
         ]
 
         result = await step.run(run_data=mock_run_data)

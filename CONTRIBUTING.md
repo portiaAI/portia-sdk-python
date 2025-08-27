@@ -33,7 +33,7 @@ Paid contributions are shown in the [Issue](https://github.com/portiaAI/portia-s
 6. **Lint Your Code**: We use [ruff](https://github.com/charliermarsh/ruff) for linting. Please ensure your code passes all linting checks. We prefer per-line disables for rules rather than global ignores, and please leave comments explaining why you disable any rules.
 7. **Open a Pull Request**: Once you're happy with your changes, open a pull request. Ensure that your PR description clearly explains the changes and the problem it addresses. The **Release** section below has some useful tips on this process.
 8. **Code Review**: Your PR will be reviewed by the maintainers. They may suggest improvements or request changes. We will do our best to review your PRs promptly but we're still a tiny team with limited resource. Please bear with us 🙏
-10. **Merge Your PR**: Once approved, the author of the PR can merge the changes. 🚀
+10. **Merging your PR**: Once approved, we will merge your PR and run the necessary evals. 🚀
 
 ## Linting
 
