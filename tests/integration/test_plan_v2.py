@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import BaseModel, Field
@@ -10,9 +11,21 @@ from pydantic import BaseModel, Field
 from portia import Config, LogLevel, Portia
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
+from portia.clarification_handler import ClarificationHandler
 from portia.config import StorageClass
+from portia.execution_hooks import ExecutionHooks
 from portia.plan_run import PlanRunState
 from portia.tool import Tool, ToolRunContext
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from portia.clarification import (
+        Clarification,
+        InputClarification,
+        MultipleChoiceClarification,
+        UserVerificationClarification,
+    )
 
 
 class CommodityPrice(BaseModel):
@@ -26,6 +39,12 @@ class CommodityPriceWithCurrency(BaseModel):
 
     price: float
     currency: str
+
+
+class GoldPurchaseFinalOutput(BaseModel):
+    """Final output of the gold purchase plan."""
+
+    receipt: str
 
 
 class CurrencyConversionResult(BaseModel):
@@ -71,7 +90,7 @@ class FinalOutput(BaseModel):
 
 
 @pytest.mark.parametrize("is_async", [False, True])
-def test_example_builder(is_async: bool) -> None:
+def test_simple_builder(is_async: bool) -> None:
     """Test the example from example_builder.py."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
@@ -81,12 +100,12 @@ def test_example_builder(is_async: bool) -> None:
 
     plan = (
         PlanBuilderV2("Calculate gold purchase cost and write a poem")
-        .input(name="purchase_quantity", description="The quantity of gold to purchase in ounces")
+        .input(name="purchase_quantity", description="The quantity of gold to purchase in kilos")
         .invoke_tool_step(
             step_name="Search gold price",
             tool="search_tool",
             args={
-                "search_query": "What is the price of gold per ounce in USD?",
+                "search_query": "What is the price of gold per kilo in USD?",
             },
             output_schema=CommodityPriceWithCurrency,
         )
@@ -629,3 +648,238 @@ def test_conditional_plan_with_record_functions(input_value: int, expected_outpu
     final_output = plan_run.outputs.final_output.get_value()
     assert isinstance(final_output, ConditionalTestOutput)
     assert final_output.value_being_processed == expected_output
+
+
+class TestClarificationHandler(ClarificationHandler):
+    """Test clarification handler that automatically selects the laser-sharks-ballad poem."""
+
+    def handle_multiple_choice_clarification(
+        self,
+        clarification: MultipleChoiceClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle multiple choice clarification by selecting the laser-sharks-ballad poem."""
+        if clarification.argument_name == "filename" and "poem.txt" in str(clarification.options):
+            # Select the first option that contains laser-sharks
+            for option in clarification.options:
+                if "laser-sharks" in option:
+                    on_resolution(clarification, option)
+                    return
+        raise RuntimeError("Received unexpected clarification")
+
+
+def test_plan_v2_with_tool_clarification() -> None:
+    """Test PlanV2 with a tool that requires clarification handling."""
+    portia = Portia(
+        config=Config.from_default(
+            default_log_level=LogLevel.DEBUG,
+        ),
+        execution_hooks=ExecutionHooks(clarification_handler=TestClarificationHandler()),
+    )
+
+    plan = (
+        PlanBuilderV2()
+        # This step will throw a clarification as there are two poem.txt in the repo
+        .single_tool_agent_step(
+            tool="file_reader_tool",
+            task="Read the poem in poem.txt from file.",
+            step_name="read_poem",
+        )
+        .llm_step(
+            task="Write a review of the poem",
+            inputs=[StepOutput("read_poem")],
+            step_name="review_poem",
+        )
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify that the poem was read successfully
+    read_poem_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert read_poem_output is not None
+    poem_content = read_poem_output.get_value()
+    assert isinstance(poem_content, str)
+    assert len(poem_content) > 0
+    assert "laser-shark" in poem_content.lower()
+
+    # Verify that a review was written
+    review_output = plan_run.outputs.step_outputs["$step_1_output"]
+    assert review_output is not None
+    review_content = review_output.get_value()
+    assert isinstance(review_content, str)
+    assert len(review_content) > 0
+
+
+class ExampleBuilderClarificationHandler(ClarificationHandler):
+    """Test clarification handler for the example_builder.py plan."""
+
+    def handle_multiple_choice_clarification(
+        self,
+        clarification: MultipleChoiceClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle multiple choice clarification by selecting 100."""
+        if "How many kilos of gold" in clarification.user_guidance:
+            on_resolution(clarification, 2)
+            return
+        raise RuntimeError("Received unexpected multiple choice clarification")
+
+    def handle_input_clarification(
+        self,
+        clarification: InputClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle input clarification by returning '2' as string."""
+        if "How many kilos of gold" in clarification.user_guidance:
+            on_resolution(clarification, "2")
+            return
+        raise RuntimeError("Received unexpected input clarification")
+
+    def handle_user_verification_clarification(
+        self,
+        clarification: UserVerificationClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle user verification clarification by accepting."""
+        if "Do you want to proceed with the purchase" in clarification.user_guidance:
+            on_resolution(clarification, True)  # noqa: FBT003
+            return
+        raise RuntimeError("Received unexpected user verification clarification")
+
+
+# Rerun as occasionally Tavily doesn't give back the gold price
+@pytest.mark.flaky(reruns=3)
+@pytest.mark.parametrize(
+    (
+        "storage_class",
+        "user_input_options",
+        "currency_override",
+        "expected_currency",
+        "expected_user_input",
+    ),
+    [
+        # Test disk storage class with multi-choice clarification
+        (StorageClass.DISK, [1, 2, 5], "USD", "USD", 2),
+        # Test input clarification
+        (StorageClass.CLOUD, None, "USD", "USD", "2"),
+        # Test with default currency (EUR)
+        (StorageClass.CLOUD, [1, 2, 5], None, "EUR", 2),
+    ],
+)
+def test_example_builder_plan_scenarios(
+    storage_class: StorageClass,
+    user_input_options: list[int] | None,
+    currency_override: str | None,
+    expected_currency: str,
+    expected_user_input: int | str,
+) -> None:
+    """Test the gold purchase plan from example_builder.py with different scenarios."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        storage_class=storage_class,
+    )
+
+    portia = Portia(
+        config=config,
+        execution_hooks=ExecutionHooks(clarification_handler=ExampleBuilderClarificationHandler()),
+    )
+
+    def calculate_total_price(
+        price_with_currency: CommodityPriceWithCurrency, purchase_quantity: str | int
+    ) -> float:
+        """Calculate total price with string to int conversion."""
+        return price_with_currency.price * int(purchase_quantity)
+
+    plan = (
+        PlanBuilderV2("Buy some gold")
+        .input(
+            name="currency",
+            description="The currency to purchase the gold in",
+            default_value="EUR",
+        )
+        .invoke_tool_step(
+            step_name="Search gold price",
+            tool="search_tool",
+            args={
+                "search_query": f"What is the price of gold per kilo in {Input('currency')}?",
+            },
+            output_schema=CommodityPriceWithCurrency,
+        )
+        .user_input(
+            message="How many kilos of gold do you want to purchase?",
+            options=user_input_options,
+        )
+        .function_step(
+            step_name="Calculate total price",
+            function=calculate_total_price,
+            args={
+                "price_with_currency": StepOutput("Search gold price"),
+                "purchase_quantity": StepOutput(1),
+            },
+        )
+        .user_verify(
+            message=(
+                f"Do you want to proceed with the purchase? Price is "
+                f"{StepOutput('Calculate total price')}"
+            )
+        )
+        .if_(
+            condition=lambda total_price: total_price > 100,
+            args={"total_price": StepOutput("Calculate total price")},
+        )
+        .function_step(function=lambda: "Hey big spender!")
+        .else_()
+        .function_step(function=lambda: "We need more gold!")
+        .endif()
+        .llm_step(
+            task="Create a fake receipt for the purchase of gold.",
+            inputs=[StepOutput("Calculate total price"), Input("currency")],
+            step_name="Generate receipt",
+        )
+        .final_output(
+            output_schema=GoldPurchaseFinalOutput,
+        )
+        .build()
+    )
+
+    plan_run_inputs = {}
+    if currency_override is not None:
+        plan_run_inputs["currency"] = currency_override
+
+    plan_run = portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify the gold price was found with correct currency
+    gold_price_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert gold_price_output is not None
+    gold_price_data = gold_price_output.get_value()
+    assert isinstance(gold_price_data, CommodityPriceWithCurrency)
+    assert gold_price_data.price > 0
+    assert gold_price_data.currency == expected_currency
+
+    # Verify user input was correct type and value
+    user_input_output = plan_run.outputs.step_outputs["$step_1_output"]
+    assert user_input_output is not None
+    assert user_input_output.get_value() == expected_user_input
+
+    # Verify total price calculation
+    total_price_output = plan_run.outputs.step_outputs["$step_2_output"]
+    assert total_price_output is not None
+    total_price = total_price_output.get_value()
+    assert total_price == gold_price_data.price * 2
+
+    # Verify final output structure
+    final_output = plan_run.outputs.final_output.get_value()
+    assert isinstance(final_output, GoldPurchaseFinalOutput)
+    assert isinstance(final_output.receipt, str)
+    assert len(final_output.receipt) > 0

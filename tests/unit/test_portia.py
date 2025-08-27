@@ -3136,8 +3136,6 @@ def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia
             return "test result"
 
         def to_legacy_step(self, plan: PlanV2) -> Step:  # noqa: ARG002
-            from portia.plan import Step
-
             return Step(task="Mock task", tool_id="mock_tool", inputs=[], output="$result")
 
     plan_v2 = PlanV2(steps=[MockStepV2(step_name="test_step")], label="Test plan")

@@ -28,6 +28,7 @@ from portia.clarification import (
 )
 from portia.errors import PlanRunExitError, ToolNotFoundError
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
+from portia.execution_agents.execution_utils import is_clarification
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step, Variable
@@ -311,7 +312,9 @@ class InvokeToolStep(StepV2):
             plan_run=run_data.plan_run,
             plan=run_data.legacy_plan,
             config=run_data.portia.config,
-            clarifications=[],
+            clarifications=run_data.plan_run.get_clarifications_for_step(
+                run_data.plan_run.current_step_index
+            ),
         )
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
@@ -324,14 +327,18 @@ class InvokeToolStep(StepV2):
         if (
             output_schema
             and not isinstance(output_value, output_schema)
-            and not isinstance(output_value, Clarification)
+            and not is_clarification(output_value)
         ):
             model = run_data.portia.config.get_default_model()
             output_value = await model.aget_structured_response(
                 [
                     Message(
                         role="user",
-                        content=f"Convert this output to the desired schema: {output}",
+                        content=(
+                            f"The following was the output from a call to the tool '{tool.id}' "
+                            f"with args '{args}': {output}. Convert this output to the desired "
+                            f"schema: {output_schema}"
+                        ),
                     )
                 ],
                 output_schema,
@@ -405,7 +412,11 @@ class FunctionStep(StepV2):
                 [
                     Message(
                         role="user",
-                        content=f"Convert this output to the desired schema: {output}",
+                        content=(
+                            f"The following was the output from a call to the function "
+                            f"'{self.function.__name__}' with args '{args}': {output}. Convert "
+                            f"this output to the desired schema: {self.output_schema}"
+                        ),
                     )
                 ],
                 self.output_schema,
