@@ -100,12 +100,12 @@ def test_simple_builder(is_async: bool) -> None:
 
     plan = (
         PlanBuilderV2("Calculate gold purchase cost and write a poem")
-        .input(name="purchase_quantity", description="The quantity of gold to purchase in ounces")
+        .input(name="purchase_quantity", description="The quantity of gold to purchase in kilos")
         .invoke_tool_step(
             step_name="Search gold price",
             tool="search_tool",
             args={
-                "search_query": "What is the price of gold per ounce in USD?",
+                "search_query": "What is the price of gold per kilo in USD?",
             },
             output_schema=CommodityPriceWithCurrency,
         )
@@ -725,8 +725,8 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         on_error: Callable[[Clarification, object], None],  # noqa: ARG002
     ) -> None:
         """Handle multiple choice clarification by selecting 100."""
-        if "How many ounces of gold" in clarification.user_guidance:
-            on_resolution(clarification, 100)
+        if "How many kilos of gold" in clarification.user_guidance:
+            on_resolution(clarification, 2)
             return
         raise RuntimeError("Received unexpected multiple choice clarification")
 
@@ -736,9 +736,9 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         on_resolution: Callable[[Clarification, object], None],
         on_error: Callable[[Clarification, object], None],  # noqa: ARG002
     ) -> None:
-        """Handle input clarification by returning '100' as string."""
-        if "How many ounces of gold" in clarification.user_guidance:
-            on_resolution(clarification, "100")
+        """Handle input clarification by returning '2' as string."""
+        if "How many kilos of gold" in clarification.user_guidance:
+            on_resolution(clarification, "2")
             return
         raise RuntimeError("Received unexpected input clarification")
 
@@ -765,11 +765,11 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
     ),
     [
         # Test disk storage class with multi-choice clarification
-        (StorageClass.DISK, [50, 100, 200], "USD", "USD", 100),
+        (StorageClass.DISK, [1, 2, 5], "USD", "USD", 2),
         # Test input clarification
-        (StorageClass.CLOUD, None, "USD", "USD", "100"),
+        (StorageClass.CLOUD, None, "USD", "USD", "2"),
         # Test with default currency (GBP)
-        (StorageClass.CLOUD, [50, 100, 200], None, "GBP", 100),
+        (StorageClass.CLOUD, [1, 2, 5], None, "GBP", 2),
     ],
 )
 def test_example_builder_plan_scenarios(
@@ -807,12 +807,12 @@ def test_example_builder_plan_scenarios(
             step_name="Search gold price",
             tool="search_tool",
             args={
-                "search_query": f"What is the price of gold per ounce in {Input('currency')}?",
+                "search_query": f"What is the price of gold per kilo in {Input('currency')}?",
             },
             output_schema=CommodityPriceWithCurrency,
         )
         .user_input(
-            message="How many ounces of gold do you want to purchase?",
+            message="How many kilos of gold do you want to purchase?",
             options=user_input_options,
         )
         .function_step(
@@ -874,7 +874,7 @@ def test_example_builder_plan_scenarios(
     total_price_output = plan_run.outputs.step_outputs["$step_2_output"]
     assert total_price_output is not None
     total_price = total_price_output.get_value()
-    assert total_price == gold_price_data.price * 100
+    assert total_price == gold_price_data.price * 2
 
     # Verify final output structure
     final_output = plan_run.outputs.final_output.get_value()

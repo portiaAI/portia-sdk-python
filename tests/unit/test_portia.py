@@ -3150,5 +3150,11 @@ def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia
 
         # Run the async function, which should trigger the RuntimeError
         # because asyncio.Runner() cannot be used inside an already running event loop
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError) as exc_info:
             asyncio.run(async_function())
+
+        # The custom RuntimeError with the new error message is raised
+        assert (
+            "run_plan should be called outside of an async context: Use arun_plan instead"
+            in str(exc_info.value)
+        )
