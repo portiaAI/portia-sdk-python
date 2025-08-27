@@ -39,6 +39,58 @@ class DecoratedTool(Tool[T]):
     )
 
 
+# Create the Tool class dynamically
+def make_run_method(sig: inspect.Signature, fn: Callable) -> Callable:
+    """Make the run method for the tool."""
+
+    def run(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:  # noqa: ARG001
+        """Execute the original function."""
+        # Filter out 'ctx' parameter if the function doesn't expect it
+        func_params = set(sig.parameters.keys())
+        if "ctx" in func_params:
+            kwargs["ctx"] = ctx
+        elif "context" in func_params:
+            kwargs["context"] = ctx
+
+        # Call the original function with filtered kwargs
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in func_params}
+        return fn(**filtered_kwargs)
+
+    return run
+
+
+def make_arun_method(sig: inspect.Signature, fn: Callable) -> Callable:
+    """Make the arun method for the tool."""
+
+    async def arun(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:  # noqa: ARG001
+        """Execute the original function."""
+        # Filter out 'ctx' parameter if the function doesn't expect it
+        func_params = set(sig.parameters.keys())
+        if "ctx" in func_params:
+            kwargs["ctx"] = ctx
+        elif "context" in func_params:
+            kwargs["context"] = ctx
+
+        # Call the original function with filtered kwargs
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in func_params}
+        if inspect.iscoroutinefunction(fn):
+            return await fn(**filtered_kwargs)
+        # this line actually shouldn't be reached but the type checker doesn't know that
+        return fn(**filtered_kwargs)  # pragma: no cover
+
+    return arun
+
+
+def make_not_implemented_method() -> Callable:
+    """Make a run method that raises a NotImplementedError."""
+
+    def not_implemented_function(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:
+        """Not implemented. We should not be calling this method."""
+        raise NotImplementedError("Async Tool should use the arun method.")
+
+    return not_implemented_function
+
+
 def tool(fn: Callable[..., T]) -> type[DecoratedTool]:
     """Convert a function into a Tool class.
 
@@ -85,49 +137,6 @@ def tool(fn: Callable[..., T]) -> type[DecoratedTool]:
     # Determine output schema from return type
     tool_output_schema = _create_output_schema(type_hints, func_name)
 
-    # Create the Tool class dynamically
-    def make_run_method() -> Callable:
-        def run(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:  # noqa: ARG001
-            """Execute the original function."""
-            # Filter out 'ctx' parameter if the function doesn't expect it
-            func_params = set(sig.parameters.keys())
-            if "ctx" in func_params:
-                kwargs["ctx"] = ctx
-            elif "context" in func_params:
-                kwargs["context"] = ctx
-
-            # Call the original function with filtered kwargs
-            filtered_kwargs = {k: v for k, v in kwargs.items() if k in func_params}
-            return fn(**filtered_kwargs)
-
-        return run
-
-    def make_arun_method() -> Callable:
-        async def arun(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:  # noqa: ARG001
-            """Execute the original function."""
-            # Filter out 'ctx' parameter if the function doesn't expect it
-            func_params = set(sig.parameters.keys())
-            if "ctx" in func_params:
-                kwargs["ctx"] = ctx
-            elif "context" in func_params:
-                kwargs["context"] = ctx
-
-            # Call the original function with filtered kwargs
-            filtered_kwargs = {k: v for k, v in kwargs.items() if k in func_params}
-            if inspect.iscoroutinefunction(fn):
-                return await fn(**filtered_kwargs)
-            # this line actually shouldn't be reached but the type checker doesn't know that
-            return fn(**filtered_kwargs)  # pragma: no cover
-
-        return arun
-
-    def make_not_implemented_method() -> Callable:
-        def not_implemented_function(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:
-            """Not implemented. We should not be calling this method."""
-            raise NotImplementedError("Async Tool should use the arun method.")
-
-        return not_implemented_function
-
     class FunctionTool(DecoratedTool):
         """Dynamically created tool from function."""
 
@@ -137,7 +146,7 @@ def tool(fn: Callable[..., T]) -> type[DecoratedTool]:
         args_schema: type[BaseModel] = tool_args_schema
         output_schema: tuple[str, str] = tool_output_schema
 
-        run = make_run_method()
+        run = make_run_method(sig, fn)
 
     class AsyncFunctionTool(DecoratedTool):
         """Dynamically created async tool from function."""
@@ -149,7 +158,7 @@ def tool(fn: Callable[..., T]) -> type[DecoratedTool]:
         output_schema: tuple[str, str] = tool_output_schema
 
         run = make_not_implemented_method()
-        arun = make_arun_method()
+        arun = make_arun_method(sig, fn)
 
     class_to_return = AsyncFunctionTool if inspect.iscoroutinefunction(fn) else FunctionTool
     # Set class name for better debugging
