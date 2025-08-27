@@ -116,7 +116,8 @@ def tool(fn: Callable[..., T]) -> type[DecoratedTool]:
             filtered_kwargs = {k: v for k, v in kwargs.items() if k in func_params}
             if inspect.iscoroutinefunction(fn):
                 return await fn(**filtered_kwargs)
-            return fn(**filtered_kwargs)
+            # this line actually shouldn't be reached but the type checker doesn't know that
+            return fn(**filtered_kwargs)  # pragma: no cover
 
         return arun
 
