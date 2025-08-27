@@ -34,7 +34,7 @@ from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.logger import logger
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-from portia.telemetry.views import ToolCallTelemetryEvent
+from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -99,7 +99,6 @@ class OneShotToolCallingModel:
                 template_format="jinja2",
             ),
             HumanMessagePromptTemplate.from_template(
-                "Context for user input and past steps:\n{{ context }}\n"
                 "Task: {{ task }}\n"
                 "The system has a tool available named '{{ tool_name }}'.\n"
                 "Argument schema for the tool:\n{{ tool_args }}\n"
@@ -108,6 +107,8 @@ class OneShotToolCallingModel:
                 "You also have a clarification tool available with "
                 "argument schema:\n{{ clarification_tool_args }}\n"
                 "{% endif %}"
+                "\n\n----------\n\n"
+                "Context for user input and past steps:\n{{ context }}\n"
                 "\n\n----------\n\n"
                 "The following section contains previous errors. "
                 "Ensure your response avoids these errors. "
@@ -169,6 +170,7 @@ class OneShotToolCallingModel:
 
         """
         model, formatted_messages = self._setup_model(state)
+        logger().trace("LLM call: tool calling (one-shot)")
         response = model.invoke(formatted_messages)
         result = template_in_required_inputs(response, state["step_inputs"])
         return self._handle_execution_hooks(response) or {"messages": [result]}
@@ -240,6 +242,7 @@ class OneShotToolCallingModel:
 
         """
         model, formatted_messages = self._setup_model(state)
+        logger().trace("LLM call: tool calling (one-shot)")
         response = await model.ainvoke(formatted_messages)
         result = template_in_required_inputs(response, state["step_inputs"])
         return self._handle_execution_hooks(response) or {"messages": [result]}
@@ -299,10 +302,21 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        self.telemetry.capture(
+            ExecutionAgentUsageTelemetryEvent(
+                agent_type="one_shot",
+                model=str(self.config.get_execution_model()),
+                sync=True,
+                tool_id=self.tool.id if self.tool else None,
+            )
+        )
+
         app = self._setup_graph(sync=True).compile()
         invocation_result = app.invoke({"messages": [], "step_inputs": []})
 
-        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
+        return process_output(
+            self.step, invocation_result["messages"], self.tool, self.new_clarifications
+        )
 
     async def execute_async(self) -> Output:
         """Run the core execution logic of the task.
@@ -313,9 +327,20 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        self.telemetry.capture(
+            ExecutionAgentUsageTelemetryEvent(
+                agent_type="one_shot",
+                model=str(self.config.get_execution_model()),
+                sync=False,
+                tool_id=self.tool.id if self.tool else None,
+            )
+        )
+
         app = self._setup_graph(sync=False).compile()
         invocation_result = await app.ainvoke({"messages": [], "step_inputs": []})
-        return process_output(invocation_result["messages"], self.tool, self.new_clarifications)
+        return process_output(
+            self.step, invocation_result["messages"], self.tool, self.new_clarifications
+        )
 
     def _setup_graph(self, sync: bool) -> StateGraph:
         """Set up the graph for the agent."""

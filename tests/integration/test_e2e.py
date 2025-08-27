@@ -326,7 +326,7 @@ async def test_portia_arun_query_with_clarifications(
         ),
         steps=[clarification_step],
     )
-    portia.storage.save_plan(plan)
+    await portia.storage.asave_plan(plan)
 
     plan_run = await portia.arun_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
@@ -371,6 +371,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     plan_run = portia.resolve_clarification(
         plan_run.get_outstanding_clarifications()[0],
         "False",
+        plan_run,
     )
 
     portia.resume(plan_run)
@@ -413,6 +414,7 @@ async def test_portia_arun_query_with_clarifications_no_handler() -> None:
     plan_run = portia.resolve_clarification(
         plan_run.get_outstanding_clarifications()[0],
         "False",
+        plan_run,
     )
 
     portia.resume(plan_run)
@@ -563,7 +565,10 @@ async def test_portia_arun_query_with_soft_error(
     )
 
     class MyAdditionTool(AdditionTool):
-        def run(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
+        def run(self, _: ToolRunContext, a: int, b: int) -> int:
+            raise NotImplementedError("Shouldn't be called")
+
+        async def arun(self, _: ToolRunContext, a: int, b: int) -> int:  # noqa: ARG002
             raise ToolSoftError("Server Timeout")
 
     tool_registry = ToolRegistry([MyAdditionTool()])
@@ -612,6 +617,20 @@ def test_portia_run_query_with_multiple_clarifications(
         retries: int = 0
 
         def run(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+            # Avoid an endless loop of clarifications
+            if self.retries > 2:
+                raise ToolHardError("Tool failed after 2 retries")
+            if a == 1:
+                self.retries += 1
+                return InputClarification(
+                    plan_run_id=ctx.plan_run.id,
+                    argument_name="a",
+                    user_guidance="please try again",
+                    source="MyAdditionTool test tool",
+                )
+            return a + b
+
+        async def arun(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
             # Avoid an endless loop of clarifications
             if self.retries > 2:
                 raise ToolHardError("Tool failed after 2 retries")
@@ -697,6 +716,20 @@ async def test_portia_arun_query_with_multiple_clarifications(
         retries: int = 0
 
         def run(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
+            # Avoid an endless loop of clarifications
+            if self.retries > 2:
+                raise ToolHardError("Tool failed after 2 retries")
+            if a == 1:
+                self.retries += 1
+                return InputClarification(
+                    plan_run_id=ctx.plan_run.id,
+                    argument_name="a",
+                    user_guidance="please try again",
+                    source="MyAdditionTool test tool",
+                )
+            return a + b
+
+        async def arun(self, ctx: ToolRunContext, a: int, b: int) -> int | Clarification:  # type: ignore  # noqa: PGH003
             # Avoid an endless loop of clarifications
             if self.retries > 2:
                 raise ToolHardError("Tool failed after 2 retries")

@@ -46,6 +46,7 @@ NotSet: Any = PydanticUndefined
 BROWSERBASE_AVAILABLE = validate_extras_dependencies("tools-browser-browserbase", raise_error=False)
 
 T = TypeVar("T", bound=str | BaseModel)
+BM = TypeVar("BM", bound=BaseModel)
 
 
 class BrowserToolForUrlSchema(BaseModel):
@@ -278,68 +279,87 @@ class BrowserTool(Tool[str | BaseModel]):
         self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserTool."""
-        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
-        llm = model.to_langchain()
-
-        async def run_browser_tasks() -> str | BaseModel | ActionClarification:
-            def handle_login_requirement(
-                result: BrowserTaskOutput,
-            ) -> ActionClarification:
-                """Handle cases where login is required with an ActionClarification."""
-                if result.user_login_guidance is None or result.login_url is None:
-                    raise ToolHardError(
-                        "Expected user guidance and login URL if human login is required",
-                    )
-                return ActionClarification(
-                    user_guidance=result.user_login_guidance,
-                    action_url=self.infrastructure_provider.construct_auth_clarification_url(
-                        ctx,
-                        result.login_url,
-                    ),
-                    plan_run_id=ctx.plan_run.id,
-                    require_confirmation=True,
-                    source="Browser tool",
-                )
-
-            output_schema = self.structured_output_schema if self.structured_output_schema else str
-            output_model = BrowserTaskOutput[output_schema]
-
-            async def run_agent_task(
-                task_description: str,
-                output_model: type[BaseModel],
-            ) -> BaseModel:
-                agent = Agent(
-                    task=task_description,
-                    llm=llm,
-                    browser=self.infrastructure_provider.setup_browser(ctx),
-                    controller=Controller(output_model=output_model),
-                )
-                result = await agent.run()
-                return output_model.model_validate(json.loads(result.final_result()))  # type: ignore reportCallIssue
-
-            # Main task
-            task_to_complete = (
-                f"Go to {url} and complete the following task: {task}. The user may already be "
-                "logged in. If the user is NOT already logged in and at any point login is "
-                "required to complete the task, please return human_login_required=True, and the "
-                "url of the sign in page as well as what the user should do to sign in. "
-                "Additional data is available below: "
-                f"{self.process_task_data(task_data)}"
-            )
-
-            task_result = await run_agent_task(task_to_complete, output_model)
-            if task_result.human_login_required:  # type: ignore reportCallIssue
-                return handle_login_requirement(task_result)  # type: ignore reportCallIssue
-
-            self.infrastructure_provider.step_complete(ctx)
-            return task_result.task_output  # type: ignore reportCallIssue
-
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:  # pragma: no cover
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        return loop.run_until_complete(run_browser_tasks())
+        return loop.run_until_complete(self._run_browser_tasks(ctx, url, task, task_data))
+
+    async def arun(
+        self,
+        ctx: ToolRunContext,
+        url: str,
+        task: str,
+        task_data: list[Any] | str | None = None,
+    ) -> str | BaseModel | ActionClarification:
+        """Run the BrowserTool asynchronously."""
+        return await self._run_browser_tasks(ctx, url, task, task_data)
+
+    async def _run_browser_tasks(
+        self, ctx: ToolRunContext, url: str, task: str, task_data: list[Any] | str | None = None
+    ) -> str | BaseModel | ActionClarification:
+        output_schema = self.structured_output_schema if self.structured_output_schema else str
+        output_model = BrowserTaskOutput[output_schema]
+        # Main task
+        task_to_complete = (
+            f"Go to {url} and complete the following task: {task}. The user may already be "
+            "logged in. If the user is NOT already logged in and at any point login is "
+            "required to complete the task, please return human_login_required=True, and the "
+            "url of the sign in page as well as what the user should do to sign in. "
+            "Additional data is available below: "
+            f"{self.process_task_data(task_data)}"
+        )
+
+        task_result = await self._run_agent_task(ctx, task_to_complete, output_model)
+        if task_result.human_login_required:
+            return self._handle_login_requirement(ctx, task_result)
+
+        self.infrastructure_provider.step_complete(ctx)
+        if task_result.task_output is None:
+            raise ToolHardError("Expected task output to be a string, got None")
+        return task_result.task_output
+
+    async def _run_agent_task(
+        self,
+        ctx: ToolRunContext,
+        task_description: str,
+        output_model: type[BM],
+    ) -> BM:
+        model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+        llm = model.to_langchain()
+        agent = Agent(
+            task=task_description,
+            llm=llm,
+            browser=self.infrastructure_provider.setup_browser(ctx),
+            controller=Controller(output_model=output_model),
+        )
+        result = await agent.run()
+        final_result = result.final_result()
+        if not isinstance(final_result, str):
+            raise ToolHardError(f"Expected final result to be a string, got {type(final_result)}")
+        return output_model.model_validate(json.loads(final_result))
+
+    def _handle_login_requirement(
+        self,
+        ctx: ToolRunContext,
+        result: BrowserTaskOutput,
+    ) -> ActionClarification:
+        """Handle cases where login is required with an ActionClarification."""
+        if result.user_login_guidance is None or result.login_url is None:
+            raise ToolHardError(
+                "Expected user guidance and login URL if human login is required",
+            )
+        return ActionClarification(
+            user_guidance=result.user_login_guidance,
+            action_url=self.infrastructure_provider.construct_auth_clarification_url(
+                ctx,
+                result.login_url,
+            ),
+            plan_run_id=ctx.plan_run.id,
+            require_confirmation=True,
+            source="Browser tool",
+        )
 
 
 class BrowserToolForUrl(BrowserTool):

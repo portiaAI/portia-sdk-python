@@ -225,6 +225,7 @@ class Variable(BaseModel):
     )
     description: str = Field(
         description="A description of the output or plan input.",
+        default="",
     )
 
     def pretty_print(self) -> str:
