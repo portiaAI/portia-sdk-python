@@ -35,6 +35,9 @@ from portia.config import (
     default_config,
 )
 
+# Cost estimation related classes
+from portia.cost_estimator import CostEstimator
+
 # Error classes
 from portia.errors import (
     ConfigNotFoundError,
@@ -98,9 +101,6 @@ from portia.tool_registry import (
     PortiaToolRegistry,
     ToolRegistry,
 )
-
-# Cost estimation related classes
-from portia.cost_estimator import CostEstimator
 
 # Define explicitly what should be available when using "from portia import *"
 __all__ = [
