@@ -868,6 +868,7 @@ class TestInvokeToolStep:
         # Configure mock to return proper values for ToolCallRecord
         mock_run_data.plan_run.id = PlanRunUUID()
         mock_run_data.plan_run.current_step_index = 0
+        mock_run_data.portia.storage = AsyncMock()
 
         with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
             mock_ctx = Mock()
