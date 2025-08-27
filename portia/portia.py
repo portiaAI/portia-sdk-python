@@ -2751,7 +2751,6 @@ class Portia:
                 logger().debug(f"Skipping step {i}: {step}")
                 continue
             run_data.plan_run.current_step_index = i
-            logger().info(f"Starting step {i}: {step}")
 
             legacy_step = step.to_legacy_step(plan)
 
