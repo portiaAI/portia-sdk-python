@@ -73,15 +73,13 @@ class StepOutput(Reference):
     @override
     def get_value(self, run_data: RunContext) -> ReferenceValue | None:
         """Get the value of the step output."""
-        try:
-            if isinstance(self.step, int):
-                return run_data.step_output_values[self.step]
-            step_index = run_data.plan.idx_by_name(self.step)
-            val = run_data.step_output_values[step_index]
-        except (ValueError, IndexError):
-            logger().warning(f"Output value for step {self.step} not found")
-            return None
-        return val
+        for step_output in run_data.step_output_values:
+            if isinstance(self.step, int) and step_output.step_num == self.step:
+                return step_output
+            if isinstance(self.step, str) and step_output.step_name == self.step:
+                return step_output
+        logger().warning(f"Output value for step {self.step} not found")
+        return None
 
 
 class Input(Reference):
