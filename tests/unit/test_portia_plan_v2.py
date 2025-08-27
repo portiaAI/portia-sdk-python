@@ -71,13 +71,7 @@ class ReadyTestTool(Tool):
     args_schema: type[BaseModel] = _ArgsSchemaPlaceholder
     output_schema: tuple[str, str] = ("str", "Test output from ready tool")
 
-    # Define auth_url as a proper field
-    auth_url: str = "https://example.com/auth"
-
-    def __init__(self, is_ready: bool = False, auth_url: str = "https://example.com/auth") -> None:
-        """Initialize the tool with readiness state."""
-        super().__init__(auth_url=auth_url)
-        self._is_ready = is_ready
+    _is_ready: bool = False
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:
         """Check if tool is ready."""
@@ -87,7 +81,7 @@ class ReadyTestTool(Tool):
         clarification = ActionClarification(
             user_guidance="Please authenticate with the tool",
             plan_run_id=ctx.plan_run.id,
-            action_url=HttpUrl(self.auth_url),
+            action_url=HttpUrl("https://example.com/auth"),
             category=ClarificationCategory.ACTION,
         )
         return ReadyResponse(ready=False, clarifications=[clarification])
@@ -835,7 +829,7 @@ async def test_portia_wait_for_ready_backoff_period_plan_v2(portia: Portia) -> N
 @pytest.mark.asyncio
 async def test_portia_plan_v2_initial_readiness_check_with_action_clarification() -> None:
     """Test PlanV2 run_plan flow with initial tool readiness check requiring clarification."""
-    ready_tool = ReadyTestTool(is_ready=False, auth_url="https://example.com/authenticate")
+    ready_tool = ReadyTestTool()
 
     config = Config.from_default(
         openai_api_key=SecretStr("123"),
@@ -865,7 +859,7 @@ async def test_portia_plan_v2_initial_readiness_check_with_action_clarification(
     clarification = outstanding_clarifications[0]
     assert isinstance(clarification, ActionClarification)
     assert clarification.user_guidance == "Please authenticate with the tool"
-    assert str(clarification.action_url) == "https://example.com/authenticate"
+    assert str(clarification.action_url) == "https://example.com/auth"
     assert clarification.resolved is False
 
     ready_tool.mark_ready()
