@@ -280,7 +280,8 @@ class TestPlanBuilderV2:
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
         assert isinstance(builder.plan.steps[0], InvokeToolStep)
-        assert builder.plan.steps[0].tool == tool(example_function_for_testing)
+        assert builder.plan.steps[0].tool.id == "local_function_example_function_for_testing"  # pyright: ignore[reportAttributeAccessIssue]
+        assert builder.plan.steps[0].tool.name == "Local Function Example Function For Testing"  # pyright: ignore[reportAttributeAccessIssue]
         assert builder.plan.steps[0].args == {}
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
@@ -299,7 +300,8 @@ class TestPlanBuilderV2:
 
         step = builder.plan.steps[0]
         assert isinstance(step, InvokeToolStep)
-        assert step.function is example_function_for_testing
+        assert builder.plan.steps[0].tool.id == "local_function_example_function_for_testing"  # pyright: ignore[reportAttributeAccessIssue]
+        assert builder.plan.steps[0].tool.name == "Local Function Example Function For Testing"  # pyright: ignore[reportAttributeAccessIssue]
         assert step.args == args
         assert step.output_schema == OutputSchema
         assert step.step_name == "func_step"
@@ -561,8 +563,10 @@ class TestPlanBuilderV2:
         tool_step = InvokeToolStep(
             tool="search_tool", args={"query": "test"}, step_name="tool_step"
         )
-        func_step = FunctionStep(
-            function=example_function_for_testing, args={"x": 1, "y": "test"}, step_name="func_step"
+        func_step = InvokeToolStep(
+            tool=tool(example_function_for_testing)(),
+            args={"x": 1, "y": "test"},
+            step_name="func_step",
         )
         agent_step = SingleToolAgentStep(
             tool="agent_tool", task="Agent task", step_name="agent_step"
@@ -583,8 +587,8 @@ class TestPlanBuilderV2:
         steps = [
             LLMStep(task="First task", step_name="step1"),
             InvokeToolStep(tool="test_tool", args={"input": "test"}, step_name="step2"),
-            FunctionStep(
-                function=example_function_for_testing,
+            InvokeToolStep(
+                tool=tool(example_function_for_testing)(),
                 args={"x": 42, "y": "hello"},
                 step_name="step3",
             ),
