@@ -2016,7 +2016,6 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "click" },
-    { name = "groq" },
     { name = "instructor", marker = "python_full_version < '4.0'" },
     { name = "jinja2" },
     { name = "jsonref" },
@@ -2120,7 +2119,6 @@ requires-dist = [
     { name = "click", specifier = ">=8.1.7,<9" },
     { name = "google-genai", marker = "extra == 'all'", specifier = ">=1.18.0" },
     { name = "google-genai", marker = "extra == 'google'", specifier = ">=1.18.0" },
-    { name = "groq", specifier = ">=0.12.0,<1.0" },
     { name = "groq", marker = "extra == 'all'", specifier = ">=0.12.0,<1.0" },
     { name = "groq", marker = "extra == 'groq'", specifier = ">=0.12.0,<1.0" },
     { name = "instructor", marker = "python_full_version >= '3.9' and python_full_version < '4.0'", specifier = ">=1.9.0" },
