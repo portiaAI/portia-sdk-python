@@ -600,7 +600,6 @@ def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
             LLMProvider.AZURE_OPENAI,
         ),
         ({"OPENROUTER_API_KEY": "test-openrouter-api-key"}, LLMProvider.OPENROUTER),
-        ({"GROK_API_KEY": "test-grok-api-key"}, LLMProvider.GROK),
         ({"XAI_API_KEY": "test-xai-api-key"}, LLMProvider.GROK),
     ],
 )

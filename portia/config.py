@@ -684,7 +684,7 @@ class Config(BaseModel):
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
                     case LLMProvider.GROK:
-                        return "grok/grok-4-0709"
+                        return "grok/grok-3"
                 return None
 
     @model_validator(mode="after")
@@ -1030,7 +1030,7 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.AZURE_OPENAI
     if os.getenv("OPENROUTER_API_KEY") or kwargs.get("openrouter_api_key"):
         return LLMProvider.OPENROUTER
-    if os.getenv("GROK_API_KEY") or os.getenv("XAI_API_KEY") or kwargs.get("grok_api_key"):
+    if os.getenv("XAI_API_KEY") or kwargs.get("grok_api_key"):
         return LLMProvider.GROK
     return None
 
