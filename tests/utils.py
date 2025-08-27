@@ -271,14 +271,28 @@ class TestClarificationHandler(ClarificationHandler):  # noqa: D101
 class MockMcpSessionWrapper:
     """Wrapper for mocking out an MCP ClientSession for testing MCP integration."""
 
-    def __init__(self, session: MagicMock) -> None:
+    def __init__(self, session: MagicMock, exit_error: Exception | None = None) -> None:
         """Initialize the wrapper."""
         self.session = session
+        self.exit_error = exit_error
 
     @asynccontextmanager
     async def mock_mcp_session(self, _: McpClientConfig) -> AsyncIterator[ClientSession]:
         """Mock method to swap out with the mcp_session context manager."""
         yield self.session
+
+    async def __aenter__(self) -> ClientSession:
+        """Async enter."""
+        return self.session
+
+    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:  # noqa: PYI036
+        """Async exit."""
+        if self.exit_error is not None:
+            raise self.exit_error
+
+    def __call__(self, *args: Any, **kwargs: Any) -> MockMcpSessionWrapper:  # noqa: ARG002
+        """Async call."""
+        return self
 
 
 def get_mock_base_chat_model(
