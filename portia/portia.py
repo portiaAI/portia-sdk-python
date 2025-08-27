@@ -1099,7 +1099,7 @@ class Portia:
             )
         )
         if isinstance(plan, PlanV2):
-            if not plan_run:
+            if not plan_run:  # pragma: no cover
                 raise NotImplementedError(
                     "We do not yet support retrieving plan runs by ID with PlanV2"
                 )
@@ -1147,7 +1147,7 @@ class Portia:
         )
 
         if isinstance(plan, PlanV2):
-            if not plan_run:
+            if not plan_run:  # pragma: no cover
                 raise NotImplementedError(
                     "We do not yet support retrieving plan runs by ID with PlanV2"
                 )
@@ -1291,12 +1291,13 @@ class Portia:
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
 
-            for plan_input in plan.plan_inputs:
-                if plan_input.value is not None:
-                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
-                        value=plan_input.value
-                    )
-            return
+            # Pragma no cover as PlanV2 only uses async method
+            for plan_input in plan.plan_inputs:  # pragma: no cover
+                if plan_input.value is not None:  # pragma: no cover
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(  # pragma: no cover
+                        value=plan_input.value  # pragma: no cover
+                    )  # pragma: no cover
+            return  # pragma: no cover
 
         if plan_run_inputs and not plan.plan_inputs:
             logger().warning(
@@ -1320,8 +1321,9 @@ class Portia:
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
                         value=input_values_by_name[plan_input.name].value
                     )
-                elif plan_input.value is not None:
-                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                # Pragma no cover as PlanV2 only uses async method
+                elif plan_input.value is not None:  # pragma: no cover
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(  # pragma: no cover
                         value=plan_input.value
                     )
 
@@ -2769,8 +2771,6 @@ class Portia:
                 )
             except SkipExecutionError as e:
                 logger().info(f"Skipping step {i}: {e}")
-                if e.should_return:
-                    return run_data.plan_run
                 continue
 
             try:
