@@ -1060,8 +1060,7 @@ class TestFunctionStep:
             messages = call_args[0][0]
             assert len(messages) == 1
             assert isinstance(messages[0], Message)
-            expected_content = "Convert this output to the desired schema: raw function output"
-            assert expected_content in messages[0].content
+            assert "raw function output" in messages[0].content
 
     @pytest.mark.asyncio
     async def test_function_step_with_string_arg_template(self) -> None:

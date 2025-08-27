@@ -334,7 +334,11 @@ class InvokeToolStep(StepV2):
                 [
                     Message(
                         role="user",
-                        content=f"Convert this output to the desired schema: {output}",
+                        content=(
+                            f"The following was the output from a call to the tool '{tool.id}' "
+                            f"with args '{args}': {output}. Convert this output to the desired "
+                            f"schema: {output_schema}"
+                        ),
                     )
                 ],
                 output_schema,
@@ -408,7 +412,11 @@ class FunctionStep(StepV2):
                 [
                     Message(
                         role="user",
-                        content=f"Convert this output to the desired schema: {output}",
+                        content=(
+                            f"The following was the output from a call to the function "
+                            f"'{self.function.__name__}' with args '{args}': {output}. Convert "
+                            f"this output to the desired schema: {self.output_schema}"
+                        ),
                     )
                 ],
                 self.output_schema,

@@ -16,7 +16,7 @@ from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.reference import Input
 from portia.clarification import ActionClarification, ClarificationCategory
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, ExecutionAgentType, GenerativeModelsConfig, StorageClass
+from portia.config import Config, ExecutionAgentType, StorageClass
 from portia.errors import InvalidPlanRunStateError, ToolNotFoundError
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
@@ -110,35 +110,22 @@ def _build_addition_plan() -> PlanV2:
     )
 
 
-def _create_portia_with_storage(
-    storage_type: str, planning_model: MagicMock, tmp_dir: str | None = None
-) -> Portia:
+def _create_portia_with_storage(storage_type: str, tmp_dir: str) -> Portia:
     """Create a Portia instance with the specified storage type."""
     if storage_type == "disk":
-        if tmp_dir is None:
-            msg = "tmp_dir is required for disk storage"
-            raise ValueError(msg)
         config = Config.from_default(
             storage_class=StorageClass.DISK,
-            openai_api_key=SecretStr("123"),
             storage_dir=tmp_dir,
-            models=GenerativeModelsConfig(
-                planning_model=planning_model,
-            ),
+            openai_api_key=SecretStr("123"),
         )
     else:
-        config = Config.from_default(
-            openai_api_key=SecretStr("123"),
-            models=GenerativeModelsConfig(
-                planning_model=planning_model,
-            ),
-        )
+        config = Config.from_default(openai_api_key=SecretStr("123"))
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
     return Portia(config=config, tools=tool_registry)
 
 
 @pytest.mark.parametrize("storage_type", ["local", "disk"])
-def test_portia_run_plan_v2_sync_mainline(storage_type: str, planning_model: MagicMock) -> None:
+def test_portia_run_plan_v2_sync_mainline(storage_type: str) -> None:
     """Test running a PlanV2 synchronously works as expected for mainline case."""
     plan = (
         PlanBuilderV2("Test sync mainline")
@@ -147,9 +134,7 @@ def test_portia_run_plan_v2_sync_mainline(storage_type: str, planning_model: Mag
         .build()
     )
     with tempfile.TemporaryDirectory() as tmp_dir:
-        portia = _create_portia_with_storage(
-            storage_type, planning_model, tmp_dir if storage_type == "disk" else None
-        )
+        portia = _create_portia_with_storage(storage_type, tmp_dir)
         plan_run = portia.run_plan(plan)
 
         assert plan_run.state == PlanRunState.COMPLETE
@@ -168,9 +153,7 @@ def test_portia_run_plan_v2_sync_mainline(storage_type: str, planning_model: Mag
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("storage_type", ["local", "disk"])
-async def test_portia_run_plan_v2_async_mainline(
-    storage_type: str, planning_model: MagicMock
-) -> None:
+async def test_portia_run_plan_v2_async_mainline(storage_type: str) -> None:
     """Test running a PlanV2 asynchronously works as expected for mainline case."""
     plan = (
         PlanBuilderV2("Test async mainline")
@@ -179,9 +162,7 @@ async def test_portia_run_plan_v2_async_mainline(
         .build()
     )
     with tempfile.TemporaryDirectory() as tmp_dir:
-        portia = _create_portia_with_storage(
-            storage_type, planning_model, tmp_dir if storage_type == "disk" else None
-        )
+        portia = _create_portia_with_storage(storage_type, tmp_dir)
         end_user = await portia.ainitialize_end_user()
         plan_run = await portia.arun_plan(plan, end_user)
 
@@ -384,15 +365,21 @@ async def test_run_builder_plan_execution_hooks_with_skip(portia: Portia) -> Non
 class FinalOutputSchema(BaseModel):
     """Schema for final output testing."""
 
-    result: str = Field(description="The result value")
-    count: int = Field(description="The count value")
+    message: str = Field(description="The result value")
+    success: bool = Field(description="The count value")
+    # The summariser usually adds this automatically, but we add this here as we mock out the
+    # summariser
+    fo_summary: str | None = Field(default=None, description="Final output summary")
 
 
 class OverriddenOutputSchema(BaseModel):
     """Schema for overridden final output testing."""
 
     message: str = Field(description="The message value")
-    success: bool = Field(description="Success indicator")
+    error: bool = Field(description="Error indicator")
+    # The summariser usually adds this automatically, but we add this here as we mock out the
+    # summariser
+    fo_summary: str | None = Field(default=None, description="Final output summary")
 
 
 @pytest.mark.asyncio
@@ -418,14 +405,40 @@ async def test_portia_run_plan_v2_with_final_output_schema(
         .final_output(output_schema=plan_schema)
     ).build()
 
-    end_user = await portia.ainitialize_end_user()
-    plan_run = await portia.arun_plan(plan, end_user, structured_output_schema=runtime_schema)
+    # Mock the summarizer to just always return "test result"
+    mock_summarizer = mock.MagicMock()
+    ret_val = (
+        FinalOutputSchema(
+            message="test result",
+            success=True,
+            fo_summary="test result",
+        )
+        if expected_schema_type == FinalOutputSchema
+        else OverriddenOutputSchema(
+            message="test result",
+            error=True,
+            fo_summary="test result",
+        )
+    )
+    mock_summarizer.create_summary.return_value = ret_val
+
+    with mock.patch(
+        "portia.portia.FinalOutputSummarizer",
+        return_value=mock_summarizer,
+    ):
+        end_user = await portia.ainitialize_end_user()
+        plan_run = await portia.arun_plan(plan, end_user, structured_output_schema=runtime_schema)
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.plan_id == plan.id
     assert plan_run.structured_output_schema == expected_schema_type
     assert plan_run.outputs.final_output is not None
-    assert plan_run.outputs.final_output.get_value() == "test result"
+    assert plan_run.outputs.final_output.get_value().message == "test result"  #  pyright: ignore[reportOptionalMemberAccess]
+    assert mock_summarizer.create_summary.call_count == 1
+    assert (
+        mock_summarizer.create_summary.call_args.kwargs["plan_run"].structured_output_schema
+        == expected_schema_type
+    )
 
 
 @pytest.mark.asyncio
@@ -463,7 +476,9 @@ async def test_portia_run_plan_v2_with_clarification_error(
     plan = plan_builder.build()
 
     tool_registry = ToolRegistry([AdditionTool(), ClarificationTool()])
-    portia = Portia(config=Config.from_default(), tools=tool_registry)
+    portia = Portia(
+        config=Config.from_default(openai_api_key=SecretStr("123")), tools=tool_registry
+    )
 
     if use_clarification_handler:
         portia.execution_hooks = ExecutionHooks(clarification_handler=ErrorClarificationHandler())
@@ -515,7 +530,7 @@ async def test_portia_resume_plan_v2_not_ready(portia: Portia) -> None:
     plan_run = await portia._aget_plan_run_from_plan(legacy_plan, end_user, None)
     plan_run.state = PlanRunState.NOT_STARTED
 
-    # Resume should work even from NOT_STARTED state
+    # Resume should work from NOT_STARTED state
     result = await portia.aresume(plan_run, plan=plan)
 
     assert result.state == PlanRunState.COMPLETE
@@ -527,12 +542,7 @@ async def test_portia_resume_plan_v2_not_ready(portia: Portia) -> None:
 def test_portia_resume_plan_v2_after_clarification_success(
     use_clarification_handler: bool,
 ) -> None:
-    """Test resuming a PlanV2 after a clarification is resolved successfully.
-
-    Note: This test currently fails due to a bug in clarification handling where
-    resolved clarifications don't properly advance to the next step on resume.
-    The issue affects both sync and async modes equally.
-    """
+    """Test resuming a PlanV2 after a clarification is resolved successfully."""
     plan = (
         PlanBuilderV2("Test resume after clarification")
         .invoke_tool_step(
@@ -544,7 +554,9 @@ def test_portia_resume_plan_v2_after_clarification_success(
         .build()
     )
     tool_registry = ToolRegistry([ClarificationTool()])
-    portia = Portia(config=Config.from_default(), tools=tool_registry)
+    portia = Portia(
+        config=Config.from_default(openai_api_key=SecretStr("123")), tools=tool_registry
+    )
     if use_clarification_handler:
         portia.execution_hooks = ExecutionHooks(clarification_handler=SuccessClarificationHandler())
 
@@ -699,7 +711,6 @@ def test_portia_get_agent_for_step_with_default_execution_agent(portia: Portia) 
         tool_id="add_tool",
     )
 
-    # Ensure config is set to DEFAULT
     portia.config.execution_agent_type = ExecutionAgentType.DEFAULT
 
     agent = portia.get_agent_for_step(step, plan, plan_run)
@@ -720,7 +731,6 @@ def test_portia_get_agent_for_step_with_oneshot_execution_agent(portia: Portia) 
         tool_id="add_tool",
     )
 
-    # Set config to ONE_SHOT
     portia.config.execution_agent_type = ExecutionAgentType.ONE_SHOT
 
     agent = portia.get_agent_for_step(step, plan, plan_run)
@@ -773,7 +783,6 @@ async def test_portia_wait_for_ready_max_retries_plan_v2(portia: Portia) -> None
         .build()
     )
 
-    # Convert to legacy plan and create plan run
     legacy_plan = plan.to_legacy_plan(
         PlanContext(
             query=plan.label,
@@ -805,7 +814,6 @@ async def test_portia_wait_for_ready_backoff_period_plan_v2(portia: Portia) -> N
         .build()
     )
 
-    # Convert to legacy plan and create plan run
     legacy_plan = plan.to_legacy_plan(
         PlanContext(
             query=plan.label,

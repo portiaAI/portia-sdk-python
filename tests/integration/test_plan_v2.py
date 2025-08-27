@@ -669,8 +669,8 @@ class TestClarificationHandler(ClarificationHandler):
         raise RuntimeError("Received unexpected clarification")
 
 
-def test_plan_v2_file_reader_with_clarification_handler() -> None:
-    """Test PlanV2 with file reader tool that requires clarification handling."""
+def test_plan_v2_with_tool_clarification() -> None:
+    """Test PlanV2 with a tool that requires clarification handling."""
     portia = Portia(
         config=Config.from_default(
             default_log_level=LogLevel.DEBUG,
@@ -680,6 +680,7 @@ def test_plan_v2_file_reader_with_clarification_handler() -> None:
 
     plan = (
         PlanBuilderV2()
+        # This step will throw a clarification as there are two poem.txt in the repo
         .single_tool_agent_step(
             tool="file_reader_tool",
             task="Read the poem in poem.txt from file.",
@@ -704,8 +705,6 @@ def test_plan_v2_file_reader_with_clarification_handler() -> None:
     poem_content = read_poem_output.get_value()
     assert isinstance(poem_content, str)
     assert len(poem_content) > 0
-
-    # Verify it contains the laser sharks ballad content
     assert "laser-shark" in poem_content.lower()
 
     # Verify that a review was written
@@ -765,9 +764,9 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         "expected_user_input",
     ),
     [
-        # Test with disk storage class
+        # Test disk storage class with multi-choice clarification
         (StorageClass.DISK, [50, 100, 200], "USD", "USD", 100),
-        # Test with options set to None
+        # Test input clarification
         (StorageClass.CLOUD, None, "USD", "USD", "100"),
         # Test with default currency (GBP)
         (StorageClass.CLOUD, [50, 100, 200], None, "GBP", 100),
@@ -797,7 +796,6 @@ def test_example_builder_plan_scenarios(
         """Calculate total price with string to int conversion."""
         return price_with_currency.price * int(purchase_quantity)
 
-    # Build the plan with conditional user_input options
     plan = (
         PlanBuilderV2("Buy some gold")
         .input(

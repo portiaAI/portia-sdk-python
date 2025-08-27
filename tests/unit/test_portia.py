@@ -3127,7 +3127,7 @@ def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt(
 
 
 def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia: Portia) -> None:
-    """Test that run_plan with PlanV2 inside async context raises RuntimeError with error log."""
+    """Test that run_plan with PlanV2 inside async context raises RuntimeError."""
     import asyncio
 
     # Create a simple PlanV2 for testing
