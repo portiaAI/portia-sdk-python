@@ -174,6 +174,9 @@ def tool(fn: Callable[..., T]) -> type[DecoratedTool]:
 
 def _validate_function(fn: Callable) -> None:
     """Validate that the function is suitable for conversion to a tool."""
+    if not callable(fn):
+        raise TypeError("Decorated object must be callable")
+
     # Check that function has type hints for return type
     type_hints = get_type_hints(fn)
     if "return" not in type_hints:
