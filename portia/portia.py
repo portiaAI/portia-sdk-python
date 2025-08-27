@@ -55,6 +55,7 @@ from portia.errors import (
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
+from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import (
     LocalDataValue,
@@ -1469,7 +1470,11 @@ class Portia:
             # we'll go through this immediately.
             # If they're handled asynchronously,
             # we'll wait for the plan run to be ready.
-            plan_run = self.wait_for_ready(plan_run)
+            try:
+                plan_run = self.wait_for_ready(plan_run)
+            except InvalidPlanRunStateError:
+                logger().error("Plan run is not ready to resume after clarification")
+                return plan_run
 
         return plan_run
 
@@ -2667,12 +2672,6 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a Portia plan."""
-        legacy_plan = plan.to_legacy_plan(
-            PlanContext(
-                query=plan.label,
-                tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
-            ),
-        )
         if structured_output_schema:
             if plan.final_output_schema:
                 logger().warning(
@@ -2680,7 +2679,15 @@ class Portia:
                     "overwrites the final output schema set in the plan builder."
                 )
             plan.final_output_schema = structured_output_schema
-        plan_run = await self._aget_plan_run_from_plan(legacy_plan, end_user, plan_run_inputs)
+        legacy_plan = plan.to_legacy_plan(
+            PlanContext(
+                query=plan.label,
+                tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
+            ),
+        )
+        plan_run = await self._aget_plan_run_from_plan(
+            legacy_plan, end_user, plan_run_inputs, structured_output_schema
+        )
         return await self.resume_builder_plan(
             plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
         )
@@ -2821,7 +2828,7 @@ class Portia:
                 value=output_value,
                 description=(f"Output from step '{step.step_name}' (Description: {step})"),
             )
-            if not isinstance(result, Clarification):
+            if not is_clarification(result):
                 run_data.step_output_values.append(output)
 
             try:
