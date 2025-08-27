@@ -11,7 +11,6 @@ from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
 from portia.builder.step_v2 import (
-    FunctionStep,
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
@@ -21,6 +20,7 @@ from portia.builder.step_v2 import (
 )
 from portia.plan import PlanInput, Step
 from portia.tool import Tool
+from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
     from portia.portia import RunContext
@@ -279,8 +279,8 @@ class TestPlanBuilderV2:
 
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
-        assert isinstance(builder.plan.steps[0], FunctionStep)
-        assert builder.plan.steps[0].function is example_function_for_testing
+        assert isinstance(builder.plan.steps[0], InvokeToolStep)
+        assert builder.plan.steps[0].tool == tool(example_function_for_testing)
         assert builder.plan.steps[0].args == {}
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
@@ -298,7 +298,7 @@ class TestPlanBuilderV2:
         )
 
         step = builder.plan.steps[0]
-        assert isinstance(step, FunctionStep)
+        assert isinstance(step, InvokeToolStep)
         assert step.function is example_function_for_testing
         assert step.args == args
         assert step.output_schema == OutputSchema
@@ -463,7 +463,7 @@ class TestPlanBuilderV2:
         assert len(plan.steps) == 4
         assert isinstance(plan.steps[0], LLMStep)
         assert isinstance(plan.steps[1], InvokeToolStep)
-        assert isinstance(plan.steps[2], FunctionStep)
+        assert isinstance(plan.steps[2], InvokeToolStep)
         assert isinstance(plan.steps[3], SingleToolAgentStep)
         assert plan.final_output_schema == OutputSchema
         assert plan.summarize is True
@@ -538,7 +538,7 @@ class TestPlanBuilderV2:
         assert tool_step.args["query"].step == 0
 
         func_step = plan.steps[2]
-        assert isinstance(func_step, FunctionStep)
+        assert isinstance(func_step, InvokeToolStep)
         assert isinstance(func_step.args["y"], StepOutput)
         assert func_step.args["y"].step == 1
 
@@ -573,7 +573,7 @@ class TestPlanBuilderV2:
         assert len(builder.plan.steps) == 4
         assert isinstance(builder.plan.steps[0], LLMStep)
         assert isinstance(builder.plan.steps[1], InvokeToolStep)
-        assert isinstance(builder.plan.steps[2], FunctionStep)
+        assert isinstance(builder.plan.steps[2], InvokeToolStep)
         assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
 
     def test_add_steps_method_with_iterable(self) -> None:
@@ -680,10 +680,13 @@ class TestPlanBuilderV2:
 
     def test_add_step_and_add_steps_integration(self) -> None:
         """Test integration of add_step and add_steps methods together."""
-        step_batch = [
-            InvokeToolStep(tool="batch_tool", args={}, step_name="batch1"),
-            FunctionStep(function=example_function_for_testing, args={}, step_name="batch2"),
-        ]
+        step_batch = (
+            PlanBuilderV2()
+            .invoke_tool_step(tool="batch_tool", args={}, step_name="batch1")
+            .function_step(function=example_function_for_testing, args={}, step_name="batch2")
+            .build()
+        )
+
         builder = (
             PlanBuilderV2()
             .add_step(LLMStep(task="Individual step", step_name="individual"))

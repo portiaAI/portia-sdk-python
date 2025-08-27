@@ -20,11 +20,15 @@ from pydantic.fields import FieldInfo
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from portia.logger import logger
 from portia.tool import Tool, ToolRunContext
 
 # Type variables for the decorator
 P = inspect.Parameter
 T = TypeVar("T")
+
+
+LOCAL_FUNCTION_PREFIX = "local_function_"
 
 
 def tool(fn: Callable[..., T]) -> type[Tool[T]]:
@@ -56,7 +60,7 @@ def tool(fn: Callable[..., T]) -> type[Tool[T]]:
     _validate_function(fn)
 
     # Extract function metadata
-    func_name = fn.__name__
+    func_name = LOCAL_FUNCTION_PREFIX + fn.__name__
     description = (fn.__doc__ or "").strip()
 
     # Generate tool properties
@@ -115,13 +119,10 @@ def tool(fn: Callable[..., T]) -> type[Tool[T]]:
 
 def _validate_function(fn: Callable) -> None:
     """Validate that the function is suitable for conversion to a tool."""
-    if not callable(fn):
-        raise TypeError("Decorated object must be callable")
-
     # Check that function has type hints for return type
     type_hints = get_type_hints(fn)
     if "return" not in type_hints:
-        raise ValueError(f"Function '{fn.__name__}' must have a return type annotation")
+        logger().warning(f"Function '{fn.__name__}' has no return type annotation")
 
 
 def _snake_to_title_case(snake_str: str) -> str:

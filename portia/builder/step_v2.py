@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import inspect
 import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, override
+from typing import TYPE_CHECKING, Any, override
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -32,6 +31,7 @@ from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step, Variable
 from portia.tool import Tool, ToolRunContext
+from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -222,11 +222,16 @@ class LLMStep(StepV2):
     async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the LLM query."""
         if self.system_prompt:
-            llm_tool = LLMTool(
+            child_tool = LLMTool(
                 structured_output_schema=self.output_schema, prompt=self.system_prompt
             )
         else:
-            llm_tool = LLMTool(structured_output_schema=self.output_schema)
+            child_tool = LLMTool(structured_output_schema=self.output_schema)
+        llm_tool = ToolCallWrapper(
+            child_tool=child_tool,
+            storage=run_data.portia.storage,
+            plan_run=run_data.plan_run,
+        )
         tool_ctx = ToolRunContext(
             end_user=run_data.end_user,
             plan_run=run_data.plan_run,
@@ -302,7 +307,11 @@ class InvokeToolStep(StepV2):
         if isinstance(self.tool, str):
             tool = run_data.portia.get_tool(self.tool, run_data.plan_run)
         else:
-            tool = self.tool
+            tool = ToolCallWrapper(
+                child_tool=self.tool,
+                storage=run_data.portia.storage,
+                plan_run=run_data.plan_run,
+            )
         if not tool:
             raise ToolNotFoundError(self.tool if isinstance(self.tool, str) else self.tool.id)
 
@@ -341,97 +350,17 @@ class InvokeToolStep(StepV2):
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
         """Convert this InvokeToolStep to a legacy Step."""
-        inputs_desc = ", ".join(
+        args_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
         return Step(
-            task=f"Use tool {self._tool_name()} with inputs: {inputs_desc}",
+            task=f"Use tool {self._tool_name()} with args: {args_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=self._tool_name(),
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
         )
-
-
-class FunctionStep(StepV2):
-    """Calls a function with the given args (no LLM involved, just a direct function call).
-
-    The function can be either synchronous or asynchronous. Async functions will be properly
-    awaited.
-    """
-
-    function: Callable[..., Any] = Field(description=("The function to call."))
-    args: dict[str, Any] = Field(
-        default_factory=dict,
-        description=(
-            "The args to call the function with. The arg values can be references to previous step "
-            "outputs / plan inputs (using StepOutput / Input) or just plain values."
-        ),
-    )
-    output_schema: type[BaseModel] | None = Field(
-        default=None, description="The schema of the output."
-    )
-
-    _TOOL_ID_PREFIX: ClassVar[str] = "local_function_"
-
-    def __str__(self) -> str:
-        """Return a description of this step for logging purposes."""
-        output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        fn_name = getattr(self.function, "__name__", str(self.function))
-        return f"FunctionStep(function='{fn_name}', args={self.args}{output_info})"
-
-    @override
-    @traceable(name="Function Step - Run")
-    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the function."""
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-
-        if inspect.iscoroutinefunction(self.function):
-            output = await self.function(**args)
-        else:
-            output = self.function(**args)
-
-        if isinstance(output, Clarification) and output.plan_run_id is None:
-            output.plan_run_id = run_data.plan_run.id
-
-        if (
-            self.output_schema
-            and not isinstance(output, self.output_schema)
-            and not isinstance(output, Clarification)
-        ):
-            model = run_data.portia.config.get_default_model()
-            output = await model.aget_structured_response(
-                [
-                    Message(
-                        role="user",
-                        content=f"Convert this output to the desired schema: {output}",
-                    )
-                ],
-                self.output_schema,
-            )
-        return output
-
-    @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this FunctionStep to a legacy Step."""
-        inputs_desc = ", ".join(
-            [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
-        )
-        fn_name = getattr(self.function, "__name__", str(self.function))
-        return Step(
-            task=f"Run function {fn_name} with args: {inputs_desc}",
-            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
-            tool_id=f"{self._TOOL_ID_PREFIX}{fn_name}",
-            output=plan.step_output_name(self),
-            structured_output_schema=self.output_schema,
-            condition=self._get_legacy_condition(plan),
-        )
-
-    @classmethod
-    def tool_id_is_local_function(cls, tool_id: str) -> bool:
-        """Check if the tool id is a local function."""
-        return tool_id.startswith(cls._TOOL_ID_PREFIX)
 
 
 class SingleToolAgentStep(StepV2):
