@@ -7,7 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    TypeVar,
     cast,
     get_args,
     get_origin,
@@ -20,14 +19,27 @@ from pydantic.fields import FieldInfo
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from portia.common import SERIALIZABLE_TYPE_VAR
 from portia.tool import Tool, ToolRunContext
 
 # Type variables for the decorator
 P = inspect.Parameter
-T = TypeVar("T")
+T = SERIALIZABLE_TYPE_VAR
 
 
-def tool(fn: Callable[..., T]) -> type[Tool[T]]:
+class DecoratedTool(Tool[T]):
+    """Decorated tool class."""
+
+    id: str = Field(default="DecoratedTool", description="ID of the tool")
+    name: str = Field(default="DecoratedTool", description="Name of the tool")
+    description: str = Field(default="DecoratedTool", description="Description of the tool")
+    args_schema: type[BaseModel] = Field(default=BaseModel, description="Input schema of the tool")
+    output_schema: tuple[str, str] = Field(
+        default=("str", "Output from the tool"), description="Output schema of the tool"
+    )
+
+
+def tool(fn: Callable[..., T]) -> type[DecoratedTool]:
     """Convert a function into a Tool class.
 
     This decorator automatically creates a Tool subclass from a function by:
@@ -57,7 +69,7 @@ def tool(fn: Callable[..., T]) -> type[Tool[T]]:
 
     # Extract function metadata
     func_name = fn.__name__
-    description = (fn.__doc__ or "").strip()
+    tool_description = (fn.__doc__ or "").strip()
 
     # Generate tool properties
     tool_id = func_name
@@ -68,10 +80,10 @@ def tool(fn: Callable[..., T]) -> type[Tool[T]]:
     type_hints = get_type_hints(fn)
 
     # Create args schema from function parameters
-    args_schema = _create_args_schema(sig, func_name, fn)
+    tool_args_schema = _create_args_schema(sig, func_name, fn)
 
     # Determine output schema from return type
-    output_schema = _create_output_schema(type_hints, func_name)
+    tool_output_schema = _create_output_schema(type_hints, func_name)
 
     # Create the Tool class dynamically
     def make_run_method() -> Callable:
@@ -90,27 +102,60 @@ def tool(fn: Callable[..., T]) -> type[Tool[T]]:
 
         return run
 
-    class FunctionTool(Tool[T]):  # type: ignore[misc]
+    def make_arun_method() -> Callable:
+        async def arun(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:  # noqa: ARG001
+            """Execute the original function."""
+            # Filter out 'ctx' parameter if the function doesn't expect it
+            func_params = set(sig.parameters.keys())
+            if "ctx" in func_params:
+                kwargs["ctx"] = ctx
+            elif "context" in func_params:
+                kwargs["context"] = ctx
+
+            # Call the original function with filtered kwargs
+            filtered_kwargs = {k: v for k, v in kwargs.items() if k in func_params}
+            if inspect.iscoroutinefunction(fn):
+                return await fn(**filtered_kwargs)
+            return fn(**filtered_kwargs)
+
+        return arun
+
+    def make_not_implemented_method() -> Callable:
+        def not_implemented_function(self: Tool[T], ctx: ToolRunContext, **kwargs: Any) -> T:
+            """Not implemented. We should not be calling this method."""
+            raise NotImplementedError("Async Tool should use the arun method.")
+
+        return not_implemented_function
+
+    class FunctionTool(DecoratedTool):
         """Dynamically created tool from function."""
 
-        def __init__(self, **data: Any) -> None:
-            # Set all the class attributes from the closure
-            super().__init__(
-                id=tool_id,
-                name=tool_name,
-                description=description,
-                args_schema=args_schema,
-                output_schema=output_schema,
-                **data,
-            )
+        id: str = tool_id
+        name: str = tool_name
+        description: str = tool_description
+        args_schema: type[BaseModel] = tool_args_schema
+        output_schema: tuple[str, str] = tool_output_schema
 
         run = make_run_method()
 
-    # Set class name for better debugging
-    FunctionTool.__name__ = f"{_snake_to_title_case(func_name).replace(' ', '')}Tool"
-    FunctionTool.__qualname__ = FunctionTool.__name__
+    class AsyncFunctionTool(DecoratedTool):
+        """Dynamically created async tool from function."""
 
-    return FunctionTool
+        id: str = tool_id
+        name: str = tool_name
+        description: str = tool_description
+        args_schema: type[BaseModel] = tool_args_schema
+        output_schema: tuple[str, str] = tool_output_schema
+
+        run = make_not_implemented_method()
+        arun = make_arun_method()
+
+    class_to_return = AsyncFunctionTool if inspect.iscoroutinefunction(fn) else FunctionTool
+    # Set class name for better debugging
+    class_to_return.__name__ = f"{_snake_to_title_case(func_name).replace(' ', '')}Tool"
+    class_to_return.__qualname__ = class_to_return.__name__
+
+    return class_to_return
 
 
 def _validate_function(fn: Callable) -> None:
