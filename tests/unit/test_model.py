@@ -18,6 +18,7 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    GrokGenerativeModel,
     LangChainGenerativeModel,
     LLMProvider,
     Message,
@@ -1062,3 +1063,66 @@ def test_get_context_window_size(model_name: str, expected_result: int) -> None:
     result = model.get_context_window_size()
 
     assert result == expected_result
+
+
+@pytest.mark.asyncio
+async def test_grok_model_initialization() -> None:
+    """Test Grok model initialization."""
+    with mock.patch("portia.model.ChatOpenAI") as mock_chat_openai_cls:
+        mock_chat_openai = MagicMock()
+        mock_chat_openai_cls.return_value = mock_chat_openai
+
+        with mock.patch("portia.model.instructor") as mock_instructor:
+            mock_instructor.from_openai.return_value = MagicMock()
+
+            model = GrokGenerativeModel(
+                model_name="grok-2-1212",
+                api_key=SecretStr("test-api-key"),
+            )
+
+            assert model.model_name == "grok-2-1212"
+            assert model.provider == LLMProvider.GROK
+
+            mock_chat_openai_cls.assert_called_once()
+            call_kwargs = mock_chat_openai_cls.call_args[1]
+            assert call_kwargs["base_url"] == "https://api.x.ai/v1"
+            assert call_kwargs["model"] == "grok-2-1212"
+            assert call_kwargs["name"] == "grok-2-1212"
+
+
+@pytest.mark.asyncio
+async def test_grok_model_async_methods() -> None:
+    """Test Grok model async methods."""
+    with mock.patch("portia.model.ChatOpenAI") as mock_chat_openai_cls:
+        mock_chat_openai = MagicMock()
+
+        async def mock_ainvoke(*_: Any, **__: Any) -> AIMessage:
+            return AIMessage(content="Grok response")
+
+        mock_chat_openai.ainvoke = mock_ainvoke
+
+        structured_output = MagicMock()
+
+        async def mock_structured_ainvoke(*_: Any, **__: Any) -> StructuredOutputTestModel:
+            return StructuredOutputTestModel(test_field="Grok structured response")
+
+        structured_output.ainvoke = mock_structured_ainvoke
+        mock_chat_openai.with_structured_output.return_value = structured_output
+
+        mock_chat_openai_cls.return_value = mock_chat_openai
+
+        with mock.patch("portia.model.instructor") as mock_instructor:
+            mock_instructor.from_openai.return_value = MagicMock()
+
+            model = GrokGenerativeModel(
+                model_name="grok-2-1212",
+                api_key=SecretStr("test-api-key"),
+            )
+
+            messages = [Message(role="user", content="Hello")]
+            response = await model.aget_response(messages)
+            assert response.content == "Grok response"
+
+            result = await model.aget_structured_response(messages, StructuredOutputTestModel)
+            assert isinstance(result, StructuredOutputTestModel)
+            assert result.test_field == "Grok structured response"

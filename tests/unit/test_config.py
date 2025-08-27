@@ -600,6 +600,7 @@ def test_get_model(monkeypatch: pytest.MonkeyPatch) -> None:
             LLMProvider.AZURE_OPENAI,
         ),
         ({"OPENROUTER_API_KEY": "test-openrouter-api-key"}, LLMProvider.OPENROUTER),
+        ({"XAI_API_KEY": "test-xai-api-key"}, LLMProvider.GROK),
     ],
 )
 def test_llm_provider_default_from_api_keys_env_vars(
@@ -638,6 +639,7 @@ def test_llm_provider_default_from_api_keys_env_vars(
             LLMProvider.AZURE_OPENAI,
         ),
         ({"openrouter_api_key": "test-openrouter-api-key"}, LLMProvider.OPENROUTER),
+        ({"grok_api_key": "test-grok-api-key"}, LLMProvider.GROK),
     ],
 )
 def test_llm_provider_default_from_api_keys_config_kwargs(
@@ -720,6 +722,7 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
         ("mistralai", LLMProvider.MISTRALAI),
         ("openai", LLMProvider.OPENAI),
         ("amazon", LLMProvider.AMAZON),
+        ("grok", LLMProvider.GROK),
     ],
 )
 def test_parse_str_to_enum(value: str, expected: LLMProvider) -> None:
