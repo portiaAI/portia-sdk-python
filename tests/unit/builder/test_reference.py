@@ -9,6 +9,7 @@ from portia.builder.reference import Input, ReferenceValue, StepOutput, default_
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
+from portia.portia import StepOutputValue
 
 
 class TestDefaultStepName:
@@ -79,40 +80,60 @@ class TestStepOutput:
         """Test get_value method with integer step - successful case."""
         step_output = StepOutput(1)
 
-        # Create mock run data
         test_output = LocalDataValue(value="test result", summary="Test output")
-        mock_reference_value = ReferenceValue(value=test_output, description="Test output")
-
         mock_run_data = Mock()
-        mock_run_data.step_output_values = [None, mock_reference_value, None]  # Index 1 has value
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value=LocalDataValue(value="test"), description=""
+            ),
+            StepOutputValue(step_num=1, step_name="step_1", value=test_output, description=""),
+            StepOutputValue(
+                step_num=2, step_name="step_2", value=LocalDataValue(value="test"), description=""
+            ),
+        ]
 
         result = step_output.get_value(mock_run_data)
 
-        assert result is mock_reference_value
+        assert result.value is test_output  # pyright: ignore[reportOptionalMemberAccess]
 
     def test_get_value_with_string_step_success(self) -> None:
         """Test get_value method with string step - successful case."""
         step_output = StepOutput("my_step")
 
-        # Create mock run data
         test_output = LocalDataValue(value="test result", summary="Test output")
-        mock_reference_value = ReferenceValue(value=test_output, description="Test output")
-
         mock_run_data = Mock()
-        mock_run_data.plan.idx_by_name.return_value = 2  # Step is at index 2
-        mock_run_data.step_output_values = [None, None, mock_reference_value]  # Index 2 has value
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value=LocalDataValue(value="test"), description=""
+            ),
+            StepOutputValue(
+                step_num=1, step_name="step_1", value=LocalDataValue(value="test"), description=""
+            ),
+            StepOutputValue(step_num=2, step_name="my_step", value=test_output, description=""),
+        ]
 
         result = step_output.get_value(mock_run_data)
-
-        assert result is mock_reference_value
-        mock_run_data.plan.idx_by_name.assert_called_once_with("my_step")
+        assert result.value is test_output  # pyright: ignore[reportOptionalMemberAccess]
 
     def test_get_value_with_int_step_index_error(self) -> None:
         """Test get_value method with integer step - IndexError case."""
         step_output = StepOutput(5)  # Index out of range
 
         mock_run_data = Mock()
-        mock_run_data.step_output_values = [None, None]  # Only 2 elements, index 5 doesn't exist
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0,
+                step_name="step_0",
+                value=LocalDataValue(value="test"),
+                description="",
+            ),
+            StepOutputValue(
+                step_num=1,
+                step_name="step_1",
+                value=LocalDataValue(value="test"),
+                description="",
+            ),
+        ]
 
         result = step_output.get_value(mock_run_data)
 
@@ -123,7 +144,14 @@ class TestStepOutput:
         step_output = StepOutput("nonexistent_step")
 
         mock_run_data = Mock()
-        mock_run_data.plan.idx_by_name.side_effect = ValueError("Step not found")
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value=LocalDataValue(value="test"), description=""
+            ),
+            StepOutputValue(
+                step_num=1, step_name="step_1", value=LocalDataValue(value="test"), description=""
+            ),
+        ]
 
         result = step_output.get_value(mock_run_data)
 

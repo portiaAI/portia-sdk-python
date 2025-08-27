@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
 from portia.errors import PlanRunExitError, ToolNotFoundError
+from portia.portia import StepOutputValue
 from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
@@ -131,7 +132,12 @@ class TestStepV2Base:
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="step result"), description="Step 0")
+            StepOutputValue(
+                value=LocalDataValue(value="step result"),
+                description="Step 0",
+                step_name="test_step",
+                step_num=0,
+            )
         ]
 
         template = f"The result was {StepOutput(0)}"
@@ -482,7 +488,12 @@ class TestLLMStep:
         )
         mock_run_data = Mock()
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="step0"), description="s0")
+            StepOutputValue(
+                value=LocalDataValue(value="step0"),
+                description="s0",
+                step_name="summary",
+                step_num=0,
+            )
         ]
         mock_run_data.plan = Mock()
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
@@ -875,7 +886,12 @@ class TestInvokeToolStep:
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="result"), description="s0")
+            StepOutputValue(
+                value=LocalDataValue(value="result"),
+                description="s0",
+                step_name="run_tool",
+                step_num=0,
+            )
         ]
         mock_run_data.plan = Mock()
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
@@ -1073,7 +1089,12 @@ class TestFunctionStep:
         mock_run_data = Mock()
         mock_run_data.portia.storage = Mock()
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="result"), description="s0")
+            StepOutputValue(
+                value=LocalDataValue(value="result"),
+                description="s0",
+                step_name="calc",
+                step_num=0,
+            )
         ]
         mock_run_data.plan = Mock()
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
@@ -1457,7 +1478,9 @@ class TestUserVerifyStep:
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="result"), description="step0")
+            StepOutputValue(
+                step_num=0, step_name="step_0", value=LocalDataValue(value="result"), description=""
+            )
         ]
 
         result = await step.run(run_data=mock_run_data)
@@ -1518,7 +1541,12 @@ class TestUserVerifyStep:
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Bob")}
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="test_file.txt"), description="step0")
+            StepOutputValue(
+                value=LocalDataValue(value="test_file.txt"),
+                description="step0",
+                step_name="verify_action",
+                step_num=0,
+            )
         ]
 
         result = await step.run(mock_run_data)
@@ -1699,7 +1727,12 @@ class TestUserInputStep:
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="result"), description="s0")
+            StepOutputValue(
+                value=LocalDataValue(value="result"),
+                description="s0",
+                step_name="feedback",
+                step_num=0,
+            )
         ]
         mock_run_data.portia.storage = Mock()
 
