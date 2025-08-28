@@ -10,17 +10,7 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
-from portia.config import ExecutionAgentType
-from portia.errors import PlanRunExitError, ToolNotFoundError
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
-from portia.execution_agents.one_shot_agent import OneShotAgent
-from portia.prefixed_uuid import PlanRunUUID
-from portia.run_context import StepOutputValue
-
-if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
 from portia.builder.step_v2 import (
-    FunctionStep,
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
@@ -35,11 +25,21 @@ from portia.clarification import (
     MultipleChoiceClarification,
     UserVerificationClarification,
 )
+from portia.config import ExecutionAgentType
+from portia.errors import PlanRunExitError, ToolNotFoundError
+from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
+from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import LocalDataValue
-from portia.model import Message
+from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import PlanInput, Variable
 from portia.plan import Step as PlanStep
+from portia.prefixed_uuid import PlanRunUUID
+from portia.run_context import StepOutputValue
 from portia.tool import Tool
+from portia.tool_decorator import tool
+
+if TYPE_CHECKING:
+    from portia.builder.plan_v2 import PlanV2
 
 
 class MockOutputSchema(BaseModel):
@@ -52,6 +52,26 @@ class MockOutputSchema(BaseModel):
 def example_function(x: int, y: str) -> str:
     """Return formatted string for testing FunctionStep."""
     return f"{y}: {x}"
+
+
+@pytest.fixture
+def mock_llm_tool() -> Mock:
+    """Create a mock LLMTool for testing."""
+    real_llm_tool = LLMTool()
+    mock = Mock(
+        spec=LLMTool,
+        arun=AsyncMock(),
+        run=Mock(),
+        id="mock_llm_tool_id",
+        name="mock_llm_tool",
+        description="Mock LLM Tool",
+    )
+    mock.name = "mock_llm_tool"
+    mock.args_schema = real_llm_tool.args_schema
+    mock.output_schema = real_llm_tool.output_schema
+    mock.structured_output_schema = real_llm_tool.structured_output_schema
+    mock.should_summarize = real_llm_tool.should_summarize
+    return mock
 
 
 class MockTool(Tool[str]):
@@ -300,22 +320,21 @@ class TestLLMStep:
         """Test LLMStep run with no inputs."""
         step = LLMStep(task="Analyze data", step_name="analysis")
         mock_run_data = Mock()
+        mock_run_data.storage = Mock()
 
         with (
-            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
-            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
         ):
-            mock_llm_tool = Mock()
-            mock_llm_tool.arun = AsyncMock(return_value="Analysis complete")
-            mock_llm_tool_class.return_value = mock_llm_tool
-            mock_tool_ctx_class.return_value = Mock()
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
 
             result = await step.run(run_data=mock_run_data)
 
             assert result == "Analysis complete"
-            mock_llm_tool_class.assert_called_once_with(structured_output_schema=None)
-            mock_llm_tool.arun.assert_called_once()
-            call_args = mock_llm_tool.arun.call_args
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Analyze data"
             assert call_args[1]["task_data"] == []
 
@@ -324,21 +343,21 @@ class TestLLMStep:
         """Test LLMStep run with one regular value input."""
         step = LLMStep(task="Process text", step_name="process", inputs=["Hello world"])
         mock_run_data = Mock()
+        mock_run_data.storage = Mock()
 
         with (
-            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
-            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
         ):
-            mock_llm_tool = Mock()
-            mock_llm_tool.arun = AsyncMock(return_value="Processed: Hello world")
-            mock_llm_tool_class.return_value = mock_llm_tool
-            mock_tool_ctx_class.return_value = Mock()
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Processed: Hello world")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
 
             result = await step.run(run_data=mock_run_data)
 
             assert result == "Processed: Hello world"
-            mock_llm_tool.arun.assert_called_once()
-            call_args = mock_llm_tool.arun.call_args
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Process text"
             assert call_args[1]["task_data"] == ["Hello world"]
 
@@ -354,21 +373,20 @@ class TestLLMStep:
         mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
 
         with (
-            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
-            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
             patch.object(reference_input, "get_value") as mock_get_value,
         ):
             mock_get_value.return_value = mock_reference_value
-            mock_llm_tool = Mock()
-            mock_llm_tool.arun = AsyncMock(return_value="Summary: Previous step result")
-            mock_llm_tool_class.return_value = mock_llm_tool
-            mock_tool_ctx_class.return_value = Mock()
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Summary: Previous step result")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
 
             result = await step.run(run_data=mock_run_data)
 
             assert result == "Summary: Previous step result"
-            mock_llm_tool.arun.assert_called_once()
-            call_args = mock_llm_tool.arun.call_args
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Summarize result"
             expected_task_data = "Previous step Step 0 had output: Previous step result"
             assert call_args[1]["task_data"] == [expected_task_data]
@@ -393,23 +411,22 @@ class TestLLMStep:
         mock_ref2_value = ReferenceValue(value=mock_data_value2, description="Step 1")
 
         with (
-            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
-            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
             patch.object(ref1, "get_value") as mock_get_value1,
             patch.object(ref2, "get_value") as mock_get_value2,
         ):
             mock_get_value1.return_value = mock_ref1_value
             mock_get_value2.return_value = mock_ref2_value
-            mock_llm_tool = Mock()
-            mock_llm_tool.arun = AsyncMock(return_value="Report generated successfully")
-            mock_llm_tool_class.return_value = mock_llm_tool
-            mock_tool_ctx_class.return_value = Mock()
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Report generated successfully")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
 
             result = await step.run(run_data=mock_run_data)
 
             assert result == "Report generated successfully"
-            mock_llm_tool.arun.assert_called_once()
-            call_args = mock_llm_tool.arun.call_args
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Generate report"
 
             expected_task_data = [
@@ -431,25 +448,23 @@ class TestLLMStep:
             output_schema=MockOutputSchema,
         )
         mock_run_data = Mock()
+        mock_run_data.storage = Mock()
 
         with (
-            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
-            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
         ):
-            mock_llm_tool = Mock()
-            mock_llm_tool.arun = AsyncMock(return_value="Analysis complete")
-            mock_llm_tool_class.return_value = mock_llm_tool
-            mock_tool_ctx_class.return_value = Mock()
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
 
             result = await step.run(run_data=mock_run_data)
 
             assert result == "Analysis complete"
-            # Verify LLMTool was constructed with the custom prompt
-            mock_llm_tool_class.assert_called_once_with(
-                structured_output_schema=MockOutputSchema, prompt=custom_prompt
-            )
-            mock_llm_tool.arun.assert_called_once()
-            call_args = mock_llm_tool.arun.call_args
+            # Verify ToolCallWrapper was constructed and called properly
+            mock_tool_wrapper_class.assert_called_once()
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Analyze data"
             assert call_args[1]["task_data"] == []
 
@@ -462,23 +477,23 @@ class TestLLMStep:
             output_schema=MockOutputSchema,
         )
         mock_run_data = Mock()
+        mock_run_data.storage = Mock()
 
         with (
-            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
-            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
         ):
-            mock_llm_tool = Mock()
-            mock_llm_tool.arun = AsyncMock(return_value="Analysis complete")
-            mock_llm_tool_class.return_value = mock_llm_tool
-            mock_tool_ctx_class.return_value = Mock()
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
 
             result = await step.run(run_data=mock_run_data)
 
             assert result == "Analysis complete"
-            # Verify LLMTool was constructed without prompt parameter
-            mock_llm_tool_class.assert_called_once_with(structured_output_schema=MockOutputSchema)
-            mock_llm_tool.arun.assert_called_once()
-            call_args = mock_llm_tool.arun.call_args
+            # Verify ToolCallWrapper was constructed and called properly
+            mock_tool_wrapper_class.assert_called_once()
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Analyze data"
             assert call_args[1]["task_data"] == []
 
@@ -504,18 +519,18 @@ class TestLLMStep:
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
 
         with (
-            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
-            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
         ):
-            mock_llm_tool = Mock()
-            mock_llm_tool.arun = AsyncMock(return_value="done")
-            mock_llm_tool_class.return_value = mock_llm_tool
-            mock_tool_ctx_class.return_value = Mock()
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="done")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
 
             result = await step.run(mock_run_data)
 
+            mock_wrapper_instance.arun.assert_called_once()
             assert result == "done"
-            call_args = mock_llm_tool.arun.call_args
+            call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task_data"] == ["Use step0 and Alice"]
 
     def test_llm_step_to_legacy_step(self) -> None:
@@ -879,12 +894,17 @@ class TestInvokeToolStep:
         mock_tool = MockTool()
         step = InvokeToolStep(tool=mock_tool, step_name="run_tool", args={"input": "test input"})
         mock_run_data = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.current_step_index = 0
+        mock_run_data.storage = AsyncMock()
 
         with (
             patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
             patch.object(mock_tool, "_arun") as mock_arun,
         ):
-            mock_ctx_class.return_value = Mock()
+            mock_ctx = Mock()
+            mock_ctx.end_user.external_id = "test_user_id"
+            mock_ctx_class.return_value = mock_ctx
             mock_output = Mock()
             mock_output.get_value.return_value = "mock result"
             mock_arun.return_value = mock_output
@@ -912,6 +932,52 @@ class TestInvokeToolStep:
                 mock_run_data.storage,
                 mock_run_data.plan_run,
             )
+
+    @pytest.mark.asyncio
+    async def test_invoke_tool_step_with_function_tool(self) -> None:
+        """Test InvokeToolStep run with nonexistent tool_id raises ToolNotFoundError."""
+        tool_class = tool(example_function)
+        step = InvokeToolStep(
+            tool=tool_class(), step_name="run_tool", args={"x": 42, "y": "Result"}
+        )
+        mock_run_data = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.current_step_index = 0
+        mock_run_data.storage = AsyncMock()
+
+        with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
+            mock_ctx = Mock()
+            mock_ctx.end_user.external_id = "test_user_id"
+            mock_ctx_class.return_value = mock_ctx
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Result: 42"
+
+    @pytest.mark.asyncio
+    async def test_invoke_tool_step_with_async_function_tool(self) -> None:
+        """Test InvokeToolStep run with nonexistent tool_id raises ToolNotFoundError."""
+
+        async def async_example_function(x: int, y: str) -> str:
+            await asyncio.sleep(0.001)
+            return f"{y}: {x}"
+
+        tool_class = tool(async_example_function)
+        step = InvokeToolStep(
+            tool=tool_class(), step_name="run_tool", args={"x": 42, "y": "Result"}
+        )
+        mock_run_data = Mock()
+        # Configure mock to return proper values for ToolCallRecord
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.current_step_index = 0
+        mock_run_data.storage = AsyncMock()
+
+        with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
+            mock_ctx = Mock()
+            mock_ctx.end_user.external_id = "test_user_id"
+            mock_ctx_class.return_value = mock_ctx
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Result: 42"
 
     @pytest.mark.asyncio
     async def test_invoke_tool_step_with_string_arg_templates(self) -> None:
@@ -974,333 +1040,13 @@ class TestInvokeToolStep:
             legacy_step = step.to_legacy_step(mock_plan)
 
             assert isinstance(legacy_step, PlanStep)
-            assert (
-                legacy_step.task == "Use tool search_tool with inputs: query=$user_query, limit=10"
-            )
+            assert legacy_step.task == "Use tool search_tool with args: query=$user_query, limit=10"
             assert legacy_step.tool_id == "search_tool"
             assert legacy_step.output == "$search_output"
             assert legacy_step.structured_output_schema == MockOutputSchema
 
             assert len(legacy_step.inputs) == 1
             assert legacy_step.inputs[0].name == "user_query"
-
-
-class TestFunctionStep:
-    """Test cases for the FunctionStep class."""
-
-    def test_function_step_initialization(self) -> None:
-        """Test FunctionStep initialization."""
-        args = {"x": 42, "y": Input("user_input")}
-        step = FunctionStep(
-            function=example_function,
-            step_name="calc",
-            args=args,
-            output_schema=MockOutputSchema,
-        )
-
-        assert step.function is example_function
-        assert step.args == args
-        assert step.output_schema == MockOutputSchema
-
-    def test_function_step_str(self) -> None:
-        """Test FunctionStep str method."""
-        step = FunctionStep(
-            function=example_function,
-            step_name="calc",
-            args={"x": 42, "y": "test"},
-        )
-
-        assert str(step) == "FunctionStep(function='example_function', args={'x': 42, 'y': 'test'})"
-
-    def test_function_step_str_with_output_schema(self) -> None:
-        """Test FunctionStep str method with output schema."""
-        step = FunctionStep(
-            function=example_function,
-            step_name="calc",
-            args={"x": 42},
-            output_schema=MockOutputSchema,
-        )
-
-        assert (
-            str(step)
-            == "FunctionStep(function='example_function', args={'x': 42} -> MockOutputSchema)"
-        )
-
-    @pytest.mark.asyncio
-    async def test_function_step_with_normal_arg(self) -> None:
-        """Test FunctionStep run with normal arguments."""
-        step = FunctionStep(
-            function=example_function, step_name="calc", args={"x": 42, "y": "Result"}
-        )
-        mock_run_data = Mock()
-
-        result = await step.run(run_data=mock_run_data)
-
-        assert result == "Result: 42"
-
-    @pytest.mark.asyncio
-    async def test_function_step_with_reference_arg(self) -> None:
-        """Test FunctionStep run with reference argument."""
-        reference_input = StepOutput(0)
-        step = FunctionStep(
-            function=example_function, step_name="calc", args={"x": 10, "y": reference_input}
-        )
-        mock_run_data = Mock()
-        mock_run_data.storage = Mock()
-
-        mock_data_value = LocalDataValue(value="Previous step")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
-
-        with patch.object(reference_input, "get_value") as mock_get_value:
-            mock_get_value.return_value = mock_reference_value
-
-            result = await step.run(run_data=mock_run_data)
-
-            assert result == "Previous step: 10"
-            mock_get_value.assert_called_once_with(mock_run_data)
-
-    @pytest.mark.asyncio
-    async def test_function_step_no_args_with_clarification(self) -> None:
-        """Test FunctionStep run with no args that returns a clarification."""
-
-        def clarification_function() -> Clarification:
-            return Clarification(
-                category=ClarificationCategory.ACTION,
-                user_guidance="Function needs clarification",
-                plan_run_id=None,
-            )
-
-        step = FunctionStep(function=clarification_function, step_name="clarify", args={})
-        mock_run_data = Mock()
-
-        result = await step.run(run_data=mock_run_data)
-
-        assert isinstance(result, Clarification)
-        assert result.user_guidance == "Function needs clarification"
-        assert result.plan_run_id == mock_run_data.plan_run.id
-
-    @pytest.mark.asyncio
-    async def test_function_step_no_args_with_output_schema(self) -> None:
-        """Test FunctionStep run with no args and output schema conversion."""
-
-        def raw_output_function() -> str:
-            return "raw function output"
-
-        step = FunctionStep(
-            function=raw_output_function,
-            step_name="convert",
-            args={},
-            output_schema=MockOutputSchema,
-        )
-        mock_run_data = Mock()
-
-        mock_model = Mock()
-        mock_model.aget_structured_response = AsyncMock(
-            return_value=MockOutputSchema(result="converted output", count=1)
-        )
-
-        with patch.object(mock_run_data.config, "get_default_model") as mock_get_model:
-            mock_get_model.return_value = mock_model
-
-            result = await step.run(run_data=mock_run_data)
-
-            assert isinstance(result, MockOutputSchema)
-            assert result.result == "converted output"
-            assert result.count == 1
-            mock_model.aget_structured_response.assert_called_once()
-
-            # Verify the conversion message
-            call_args = mock_model.aget_structured_response.call_args
-            messages = call_args[0][0]
-            assert len(messages) == 1
-            assert isinstance(messages[0], Message)
-            assert "raw function output" in messages[0].content
-
-    @pytest.mark.asyncio
-    async def test_function_step_with_string_arg_template(self) -> None:
-        """Test FunctionStep run with arg string containing reference templates."""
-        step = FunctionStep(
-            function=example_function,
-            step_name="calc",
-            args={"x": 5, "y": f"Value {StepOutput(0)} and {Input('username')}"},
-        )
-        mock_run_data = Mock()
-        mock_run_data.storage = Mock()
-        mock_run_data.step_output_values = [
-            StepOutputValue(
-                value=LocalDataValue(value="result"),
-                description="s0",
-                step_name="calc",
-                step_num=0,
-            )
-        ]
-        mock_run_data.plan = Mock()
-        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
-        mock_run_data.plan_run = Mock()
-        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
-
-        result = await step.run(mock_run_data)
-
-        assert result == "Value result and Alice: 5"
-
-    def test_function_step_to_legacy_step(self) -> None:
-        """Test FunctionStep to_legacy_step method."""
-        args = {"x": Input("number"), "y": "constant"}
-        step = FunctionStep(
-            function=example_function,
-            step_name="calc",
-            args=args,
-            output_schema=MockOutputSchema,
-        )
-
-        mock_plan = Mock()
-        mock_plan.step_output_name.return_value = "$calc_output"
-
-        # Mock the get_legacy_name method on the Input reference
-        with patch.object(args["x"], "get_legacy_name") as mock_input_name:
-            mock_input_name.return_value = "number"
-
-            legacy_step = step.to_legacy_step(mock_plan)
-
-            assert isinstance(legacy_step, PlanStep)
-            assert (
-                legacy_step.task == "Run function example_function with args: x=$number, y=constant"
-            )
-            assert legacy_step.tool_id == "local_function_example_function"
-            assert legacy_step.output == "$calc_output"
-            assert legacy_step.structured_output_schema == MockOutputSchema
-
-            assert len(legacy_step.inputs) == 1
-            assert legacy_step.inputs[0].name == "number"
-
-    def test_function_step_tool_id_is_local_function(self) -> None:
-        """Test FunctionStep tool_id_is_local_function method."""
-        assert FunctionStep.tool_id_is_local_function("local_function_example_function")
-        assert not FunctionStep.tool_id_is_local_function("search_tool")
-
-    @pytest.mark.asyncio
-    async def test_function_step_with_async_function(self) -> None:
-        """Test FunctionStep run with async function."""
-
-        async def async_example_function(x: int, y: str) -> str:
-            # Simulate some async operation
-            await asyncio.sleep(0.001)
-            return f"{y}: {x}"
-
-        step = FunctionStep(
-            function=async_example_function,
-            step_name="async_calc",
-            args={"x": 42, "y": "Async Result"},
-        )
-        mock_run_data = Mock()
-
-        result = await step.run(run_data=mock_run_data)
-
-        assert result == "Async Result: 42"
-
-    @pytest.mark.asyncio
-    async def test_function_step_with_async_function_reference_arg(self) -> None:
-        """Test FunctionStep run with async function and reference argument."""
-
-        async def async_reference_function(x: int, y: str) -> str:
-            await asyncio.sleep(0.001)
-            return f"{y}: {x}"
-
-        reference_input = StepOutput(0)
-        step = FunctionStep(
-            function=async_reference_function,
-            step_name="async_ref_calc",
-            args={"x": 10, "y": reference_input},
-        )
-        mock_run_data = Mock()
-        mock_run_data.storage = Mock()
-
-        mock_data_value = LocalDataValue(value="Async Previous step")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
-
-        with patch.object(reference_input, "get_value") as mock_get_value:
-            mock_get_value.return_value = mock_reference_value
-
-            result = await step.run(run_data=mock_run_data)
-
-            assert result == "Async Previous step: 10"
-            mock_get_value.assert_called_once_with(mock_run_data)
-
-    @pytest.mark.asyncio
-    async def test_function_step_mixed_sync_async_context(self) -> None:
-        """Test that FunctionStep works correctly in both sync and async contexts."""
-
-        # Test sync function in async context
-        def sync_function(x: int) -> int:
-            return x * 2
-
-        step_sync = FunctionStep(function=sync_function, step_name="sync_test", args={"x": 21})
-        mock_run_data = Mock()
-
-        result_sync = await step_sync.run(run_data=mock_run_data)
-        assert result_sync == 42
-
-        # Test async function in async context
-        async def async_function(x: int) -> int:
-            await asyncio.sleep(0.001)
-            return x * 2
-
-        step_async = FunctionStep(function=async_function, step_name="async_test", args={"x": 21})
-
-        result_async = await step_async.run(run_data=mock_run_data)
-        assert result_async == 42
-
-    @pytest.mark.asyncio
-    async def test_function_step_async_function_with_clarification(self) -> None:
-        """Test FunctionStep run with async function that returns a clarification."""
-
-        async def async_clarification_function() -> Clarification:
-            await asyncio.sleep(0.001)
-            return Clarification(
-                category=ClarificationCategory.ACTION,
-                user_guidance="Async function needs clarification",
-                plan_run_id=None,
-            )
-
-        step = FunctionStep(
-            function=async_clarification_function, step_name="async_clarify", args={}
-        )
-        mock_run_data = Mock()
-
-        result = await step.run(run_data=mock_run_data)
-
-        assert isinstance(result, Clarification)
-        assert result.user_guidance == "Async function needs clarification"
-        assert result.plan_run_id == mock_run_data.plan_run.id
-
-    @pytest.mark.asyncio
-    async def test_function_step_async_function_with_output_schema(self) -> None:
-        """Test FunctionStep run with async function and output schema conversion."""
-
-        async def async_raw_output_function() -> str:
-            await asyncio.sleep(0.001)
-            return "raw output"
-
-        step = FunctionStep(
-            function=async_raw_output_function,
-            step_name="async_schema_test",
-            args={},
-            output_schema=MockOutputSchema,
-        )
-        mock_run_data = Mock()
-
-        # Mock the model and its aget_structured_response method
-        mock_model = Mock()
-        mock_model.aget_structured_response = AsyncMock(
-            return_value=MockOutputSchema(result="converted output", count=1)
-        )
-        mock_run_data.config.get_default_model.return_value = mock_model
-
-        result = await step.run(run_data=mock_run_data)
-
-        # Verify the async function was called and awaited
-        assert result.result == "converted output"
-        mock_model.aget_structured_response.assert_called_once()
 
 
 class TestSingleToolAgent:

@@ -118,6 +118,10 @@ class Input(Reference):
             logger().warning(f"Value not found for input {self.name}")
             return None
 
+        underlying_value = value.get_value()
+        if isinstance(underlying_value, Reference):
+            return underlying_value.get_value(run_data=run_data)
+
         return ReferenceValue(
             value=value,
             description=plan_input.description or "Input to plan",

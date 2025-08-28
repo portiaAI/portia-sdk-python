@@ -11,7 +11,6 @@ from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
 from portia.builder.step_v2 import (
-    FunctionStep,
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
@@ -21,6 +20,7 @@ from portia.builder.step_v2 import (
 )
 from portia.plan import PlanInput, Step
 from portia.tool import Tool
+from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
     from portia.run_context import RunContext
@@ -279,8 +279,10 @@ class TestPlanBuilderV2:
 
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
-        assert isinstance(builder.plan.steps[0], FunctionStep)
-        assert builder.plan.steps[0].function is example_function_for_testing
+        assert isinstance(builder.plan.steps[0], InvokeToolStep)
+        assert not isinstance(builder.plan.steps[0].tool, str)
+        assert builder.plan.steps[0].tool.id == "local_function_example_function_for_testing"
+        assert builder.plan.steps[0].tool.name == "Local Function Example Function For Testing"
         assert builder.plan.steps[0].args == {}
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
@@ -298,8 +300,10 @@ class TestPlanBuilderV2:
         )
 
         step = builder.plan.steps[0]
-        assert isinstance(step, FunctionStep)
-        assert step.function is example_function_for_testing
+        assert isinstance(step, InvokeToolStep)
+        assert not isinstance(step.tool, str)
+        assert step.tool.id == "local_function_example_function_for_testing"
+        assert step.tool.name == "Local Function Example Function For Testing"
         assert step.args == args
         assert step.output_schema == OutputSchema
         assert step.step_name == "func_step"
@@ -463,7 +467,7 @@ class TestPlanBuilderV2:
         assert len(plan.steps) == 4
         assert isinstance(plan.steps[0], LLMStep)
         assert isinstance(plan.steps[1], InvokeToolStep)
-        assert isinstance(plan.steps[2], FunctionStep)
+        assert isinstance(plan.steps[2], InvokeToolStep)
         assert isinstance(plan.steps[3], SingleToolAgentStep)
         assert plan.final_output_schema == OutputSchema
         assert plan.summarize is True
@@ -538,7 +542,7 @@ class TestPlanBuilderV2:
         assert tool_step.args["query"].step == 0
 
         func_step = plan.steps[2]
-        assert isinstance(func_step, FunctionStep)
+        assert isinstance(func_step, InvokeToolStep)
         assert isinstance(func_step.args["y"], StepOutput)
         assert func_step.args["y"].step == 1
 
@@ -561,8 +565,10 @@ class TestPlanBuilderV2:
         tool_step = InvokeToolStep(
             tool="search_tool", args={"query": "test"}, step_name="tool_step"
         )
-        func_step = FunctionStep(
-            function=example_function_for_testing, args={"x": 1, "y": "test"}, step_name="func_step"
+        func_step = InvokeToolStep(
+            tool=tool(example_function_for_testing)(),
+            args={"x": 1, "y": "test"},
+            step_name="func_step",
         )
         agent_step = SingleToolAgentStep(
             tool="agent_tool", task="Agent task", step_name="agent_step"
@@ -573,7 +579,7 @@ class TestPlanBuilderV2:
         assert len(builder.plan.steps) == 4
         assert isinstance(builder.plan.steps[0], LLMStep)
         assert isinstance(builder.plan.steps[1], InvokeToolStep)
-        assert isinstance(builder.plan.steps[2], FunctionStep)
+        assert isinstance(builder.plan.steps[2], InvokeToolStep)
         assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
 
     def test_add_steps_method_with_iterable(self) -> None:
@@ -583,8 +589,8 @@ class TestPlanBuilderV2:
         steps = [
             LLMStep(task="First task", step_name="step1"),
             InvokeToolStep(tool="test_tool", args={"input": "test"}, step_name="step2"),
-            FunctionStep(
-                function=example_function_for_testing,
+            InvokeToolStep(
+                tool=tool(example_function_for_testing)(),
                 args={"x": 42, "y": "hello"},
                 step_name="step3",
             ),
@@ -680,10 +686,13 @@ class TestPlanBuilderV2:
 
     def test_add_step_and_add_steps_integration(self) -> None:
         """Test integration of add_step and add_steps methods together."""
-        step_batch = [
-            InvokeToolStep(tool="batch_tool", args={}, step_name="batch1"),
-            FunctionStep(function=example_function_for_testing, args={}, step_name="batch2"),
-        ]
+        step_batch = (
+            PlanBuilderV2()
+            .invoke_tool_step(tool="batch_tool", args={}, step_name="batch1")
+            .function_step(function=example_function_for_testing, args={}, step_name="batch2")
+            .build()
+        )
+
         builder = (
             PlanBuilderV2()
             .add_step(LLMStep(task="Individual step", step_name="individual"))
@@ -701,3 +710,72 @@ class TestPlanBuilderV2:
         assert builder.plan.steps[2].step_name == "batch2"
         assert builder.plan.steps[3].step_name == "from_plan"
         assert builder.plan.steps[4].step_name == "final"
+
+    def test_add_steps_with_input_values_single_value(self) -> None:
+        """Test add_steps with input_values setting a single input value."""
+        builder = PlanBuilderV2()
+
+        sub_plan = (
+            PlanBuilderV2()
+            .input(name="sub_input", description="Input for sub plan")
+            .llm_step(task="Sub task", step_name="sub_step")
+            .build()
+        )
+
+        result = builder.add_steps(sub_plan, input_values={"sub_input": "provided_value"})
+
+        assert len(result.plan.plan_inputs) == 1
+        assert result.plan.plan_inputs[0].name == "sub_input"
+        assert result.plan.plan_inputs[0].value == "provided_value"
+
+    def test_add_steps_with_input_values_multiple_values_override_default(self) -> None:
+        """Test add_steps with input_values setting 2 out of 4 values, overriding default."""
+        builder = PlanBuilderV2()
+
+        sub_plan = (
+            PlanBuilderV2()
+            .input(name="input_no_default", description="Input without default")
+            .input(
+                name="input_with_default",
+                description="Input with default",
+                default_value="original_default",
+            )
+            .input(name="input_unchanged1", description="Unchanged input 1")
+            .input(
+                name="input_unchanged2",
+                description="Unchanged input 2",
+                default_value="unchanged_default",
+            )
+            .llm_step(task="Sub task", step_name="sub_step")
+            .build()
+        )
+
+        result = builder.add_steps(
+            sub_plan,
+            input_values={
+                "input_no_default": "new_value_no_default",
+                "input_with_default": "overridden_value",
+            },
+        )
+
+        assert len(result.plan.plan_inputs) == 4
+
+        inputs = {inp.name: inp for inp in result.plan.plan_inputs}
+        assert inputs["input_no_default"].value == "new_value_no_default"
+        assert inputs["input_with_default"].value == "overridden_value"  # Should override default
+        assert inputs["input_unchanged1"].value is None
+        assert inputs["input_unchanged2"].value == "unchanged_default"
+
+    def test_add_steps_with_input_values_invalid_input_name_error(self) -> None:
+        """Test add_steps raises error when input_values contains invalid input name."""
+        builder = PlanBuilderV2()
+
+        sub_plan = (
+            PlanBuilderV2()
+            .input(name="valid_input", description="Valid input")
+            .llm_step(task="Sub task", step_name="sub_step")
+            .build()
+        )
+
+        with pytest.raises(PlanBuilderError):
+            builder.add_steps(sub_plan, input_values={"invalid_input": "some_value"})

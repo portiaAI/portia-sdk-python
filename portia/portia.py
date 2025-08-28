@@ -31,7 +31,6 @@ from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import FunctionStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -88,6 +87,7 @@ from portia.telemetry.views import (
     PortiaFunctionCallTelemetryEvent,
 )
 from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
+from portia.tool_decorator import LOCAL_FUNCTION_PREFIX
 from portia.tool_registry import (
     DefaultToolRegistry,
     PortiaToolRegistry,
@@ -2603,7 +2603,7 @@ class Portia:
             if (
                 not step.tool_id
                 or step.tool_id in tools_remaining
-                or FunctionStep.tool_id_is_local_function(step.tool_id)
+                or step.tool_id.startswith(LOCAL_FUNCTION_PREFIX)
             ):
                 continue
             tools_remaining.add(step.tool_id)

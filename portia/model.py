@@ -650,7 +650,9 @@ class GroqGenerativeModel(OpenAIGenerativeModel):
         super(OpenAIGenerativeModel, self).__init__(client, model_name)
         self._instructor_client = instructor.from_openai(
             client=wrappers.wrap_openai(
-                OpenAI(api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1")
+                OpenAI(
+                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
+                )
             ),
             mode=instructor.Mode.JSON,
         )
