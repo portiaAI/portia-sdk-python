@@ -9,7 +9,6 @@ from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
 from portia.builder.step_v2 import (
     ConditionalStep,
-    FunctionStep,
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
@@ -20,6 +19,7 @@ from portia.builder.step_v2 import (
 from portia.plan import PlanInput
 from portia.telemetry.telemetry_service import ProductTelemetry
 from portia.telemetry.views import PlanV2BuildTelemetryEvent
+from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -243,16 +243,13 @@ class PlanBuilderV2:
             step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
-        self.plan.steps.append(
-            FunctionStep(
-                function=function,
-                args=args or {},
-                output_schema=output_schema,
-                step_name=step_name or default_step_name(len(self.plan.steps)),
-                conditional_block=self._current_conditional_block,
-            )
+        tool_class = tool(function)
+        return self.invoke_tool_step(
+            tool=tool_class(),
+            args=args,
+            output_schema=output_schema,
+            step_name=step_name,
         )
-        return self
 
     def single_tool_agent_step(
         self,
@@ -355,7 +352,11 @@ class PlanBuilderV2:
         self.plan.steps.append(step)
         return self
 
-    def add_steps(self, plan: PlanV2 | Iterable[StepV2]) -> PlanBuilderV2:
+    def add_steps(
+        self,
+        plan: PlanV2 | Iterable[StepV2],
+        input_values: dict[str, Any] | None = None,
+    ) -> PlanBuilderV2:
         """Add steps to the plan.
 
         Step can be provided as a sequence or as a plan. If provided as a plan, we will also take
@@ -372,6 +373,20 @@ class PlanBuilderV2:
             self.plan.steps.extend(plan.steps)
         else:
             self.plan.steps.extend(plan)
+
+        if input_values and isinstance(plan, PlanV2):
+            allowed_input_names = {p.name for p in plan.plan_inputs}
+            for input_name, input_value in input_values.items():
+                if input_name not in allowed_input_names:
+                    raise PlanBuilderError(
+                        f"Tried to provide value for input {input_name} not found in "
+                        "sub-plan passed into add_steps()."
+                    )
+                for plan_input in self.plan.plan_inputs:
+                    if plan_input.name == input_name:
+                        plan_input.value = input_value
+                        break
+
         return self
 
     def final_output(
@@ -396,8 +411,7 @@ class PlanBuilderV2:
         """Return the plan, ready to run."""
         if len(self._conditional_block_stack) > 0:
             raise PlanBuilderError(
-                "An endif must be called for all if_ steps. "
-                "Please add an endif for all if_ steps."
+                "An endif must be called for all if_ steps. Please add an endif for all if_ steps."
             )
 
         step_type_counts: dict[str, int] = {}
