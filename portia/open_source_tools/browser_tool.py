@@ -263,29 +263,13 @@ class BrowserTool(Tool[str | BaseModel]):
         if v is None:
             return v
 
-        return cls._validate_domains_list(v)
-
-    @classmethod
-    def _validate_domains_list(cls, domains: list[str]) -> list[str]:
-        """Centralized validation for allowed_domains list.
-
-        Args:
-            domains: List of domain strings to validate
-
-        Returns:
-            Validated list of domains
-
-        Raises:
-            ValueError: If domains format is invalid
-
-        """
-        if not isinstance(domains, list):
+        if not isinstance(v, list):
             raise ValueError(
-                f"Invalid allowed_domains: {domains}. Must be a list of non-empty strings."
+                f"Invalid allowed_domains: {v}. Must be a list of non-empty strings."
             )
 
         validated_domains = []
-        for domain in domains:
+        for domain in v:
             if not isinstance(domain, str) or not domain.strip():
                 raise ValueError(
                     f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings."
@@ -296,6 +280,7 @@ class BrowserTool(Tool[str | BaseModel]):
             validated_domains.append(domain.strip())
 
         return validated_domains
+
 
     @classmethod
     def _warn_about_domain_security(cls, domain: str) -> None:
@@ -319,14 +304,14 @@ class BrowserTool(Tool[str | BaseModel]):
                 # Extremely dangerous patterns
                 logger().warning(
                     f"Wildcard pattern '{domain}' allows access to ANY domain. "
-                    "This is extremely dangerous. Use specific domain patterns instead."
+                    "This can be dangerous. Use specific domain patterns instead."
                 )
             else:
                 # Other wildcard patterns
                 logger().warning(
                     f"Wildcard pattern '{domain}' may match unintended domains. "
                     "Per browser-use docs, be very cautious with wildcards. "
-                    "Use full URLs with schemes (https://example.com) for security."
+                    "Consider using full URLs with schemes (https://example.com) for security."
                 )
 
         # Warn about missing scheme as recommended in docs
@@ -683,15 +668,14 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         if chrome_path_from_env:
             return chrome_path_from_env
 
-        match sys.platform:
-            case "darwin":  # macOS
-                return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            case "win32":  # Windows
-                return r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-            case "linux":  # Linux
-                return "/usr/bin/google-chrome"
-            case _:
-                raise RuntimeError(f"Unsupported platform: {sys.platform}")
+        if sys.platform == "darwin":  # macOS
+            return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        elif sys.platform == "win32":  # Windows
+            return r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+        elif sys.platform == "linux":  # Linux
+            return "/usr/bin/google-chrome"
+        else:
+            raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
     def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g release the session."""

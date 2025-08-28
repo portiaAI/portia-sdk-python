@@ -825,28 +825,6 @@ def test_browser_tool_multiple_calls(
     )
 
 
-<<<<<<< HEAD
-# ===== ALLOWED DOMAINS FUNCTIONALITY TESTS =====
-
-
-
-
-def test_browser_tool_allowed_domains_parameter():
-    """Test that BrowserTool accepts allowed_domains parameter."""
-    allowed_domains = ["example.com", "trusted.org"]
-    browser_tool = BrowserTool(allowed_domains=allowed_domains)
-    assert browser_tool.allowed_domains == allowed_domains
-
-
-def test_browser_tool_for_url_allowed_domains_parameter():
-    """Test that BrowserToolForUrl accepts allowed_domains parameter."""
-    url = "https://example.com"
-    allowed_domains = ["example.com", "api.example.com"]
-    
-    tool = BrowserToolForUrl(url=url, allowed_domains=allowed_domains)
-    assert tool.url == url
-    assert tool.allowed_domains == allowed_domains
-=======
 @pytest.mark.asyncio
 async def test_browser_tool_arun_method(
     mock_browser_infrastructure_provider: BrowserInfrastructureProvider,
@@ -995,4 +973,3 @@ def test_browser_tool_final_result_not_string(
         # Verify Agent was called once
         assert mock_agent.call_count == 1
         assert mock_run.call_count == 1
->>>>>>> main
