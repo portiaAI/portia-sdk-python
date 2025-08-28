@@ -176,5 +176,97 @@ We love feedback and suggestions. Please join our <a href="https://discord.gg/Dv
 
 # ❤️ Contributors
 A heartfelt thank you to our growing list of contributors!
-<!-- readme: contributors -start -->
-<!-- readme: contributors -end -->
+<!-- readme: contributors,mounir/-,robbie-portia/-,emmaportia/-,sam-portia/-,Nathanjp91/-,tomSportia/-,OmarEl-Mohandes/- -start -->
+<table>
+	<tbody>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/fanlinwang">
+                    <img src="https://avatars.githubusercontent.com/u/25503130?v=4" width="100;" alt="fanlinwang"/>
+                    <br />
+                    <sub><b>fanlinwang</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/hannah-portia">
+                    <img src="https://avatars.githubusercontent.com/u/187275200?v=4" width="100;" alt="hannah-portia"/>
+                    <br />
+                    <sub><b>hannah-portia</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/asquare14">
+                    <img src="https://avatars.githubusercontent.com/u/22938709?v=4" width="100;" alt="asquare14"/>
+                    <br />
+                    <sub><b>Atibhi Agrawal</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/judy2k">
+                    <img src="https://avatars.githubusercontent.com/u/359772?v=4" width="100;" alt="judy2k"/>
+                    <br />
+                    <sub><b>Mark Smith</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/md-abid-hussain">
+                    <img src="https://avatars.githubusercontent.com/u/101964499?v=4" width="100;" alt="md-abid-hussain"/>
+                    <br />
+                    <sub><b>Md Abid Hussain</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/saitama142">
+                    <img src="https://avatars.githubusercontent.com/u/53933154?v=4" width="100;" alt="saitama142"/>
+                    <br />
+                    <sub><b>0u55</b></sub>
+                </a>
+            </td>
+		</tr>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/amorriscode">
+                    <img src="https://avatars.githubusercontent.com/u/16005567?v=4" width="100;" alt="amorriscode"/>
+                    <br />
+                    <sub><b>Anthony Morris</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/gaurava05">
+                    <img src="https://avatars.githubusercontent.com/u/45741026?v=4" width="100;" alt="gaurava05"/>
+                    <br />
+                    <sub><b>Gaurav Agarwal</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/jingkaihe">
+                    <img src="https://avatars.githubusercontent.com/u/1335938?v=4" width="100;" alt="jingkaihe"/>
+                    <br />
+                    <sub><b>Jingkai He</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ksingh-08">
+                    <img src="https://avatars.githubusercontent.com/u/148441103?v=4" width="100;" alt="ksingh-08"/>
+                    <br />
+                    <sub><b>Karan Singh</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/hemanthkotaprolu">
+                    <img src="https://avatars.githubusercontent.com/u/92506047?v=4" width="100;" alt="hemanthkotaprolu"/>
+                    <br />
+                    <sub><b>Kotaprolu Hemanth</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/sangwaboi">
+                    <img src="https://avatars.githubusercontent.com/u/182721678?v=4" width="100;" alt="sangwaboi"/>
+                    <br />
+                    <sub><b>Vishvendra Sangwan</b></sub>
+                </a>
+            </td>
+		</tr>
+	<tbody>
+</table>
+<!-- readme: contributors,mounir/-,robbie-portia/-,emmaportia/-,sam-portia/-,Nathanjp91/-,tomSportia/-,OmarEl-Mohandes/- -end -->
