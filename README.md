@@ -173,3 +173,8 @@ You can support our work best by leaving a star!
 ![star](https://github.com/user-attachments/assets/8df5e1d9-a0d4-40b4-9c51-945841744050)
 
 We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
+
+# ❤️ Contributors
+A heartfelt thank you to our growing list of contributors!
+<!-- readme: contributors, mounir/-, robbie-portia/-, emmaportia/-, sam-portia/-, Nathanjp91/-, tomSportia/-, OmarEl-Mohandes/- -start -->
+<!-- readme: contributors, mounir/-, robbie-portia/-, emmaportia/-, sam-portia/-, Nathanjp91/-, tomSportia/-, OmarEl-Mohandes/- -end -->
