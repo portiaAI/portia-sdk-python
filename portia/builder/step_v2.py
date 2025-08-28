@@ -502,7 +502,7 @@ class ExitStep(StepV2):
             task = f"Exit plan: {self.message}"
         else:
             task = "Exit plan"
-            
+
         return Step(
             task=task,
             inputs=[],

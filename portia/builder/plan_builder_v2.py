@@ -8,8 +8,8 @@ from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClause
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
 from portia.builder.step_v2 import (
-    ExitStep,
     ConditionalStep,
+    ExitStep,
     FunctionStep,
     InvokeToolStep,
     LLMStep,
@@ -326,7 +326,6 @@ class PlanBuilderV2:
             step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
-
         self.plan.steps.append(
             ExitStep(
                 message=message,
