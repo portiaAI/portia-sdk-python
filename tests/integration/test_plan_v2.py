@@ -788,6 +788,8 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         raise RuntimeError("Received unexpected user verification clarification")
 
 
+# Rerun as occasionally Tavily doesn't give back the gold price
+@pytest.mark.flaky(reruns=3)
 @pytest.mark.parametrize(
     (
         "storage_class",
@@ -801,8 +803,8 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         (StorageClass.DISK, [1, 2, 5], "USD", "USD", 2),
         # Test input clarification
         (StorageClass.CLOUD, None, "USD", "USD", "2"),
-        # Test with default currency (GBP)
-        (StorageClass.CLOUD, [1, 2, 5], None, "GBP", 2),
+        # Test with default currency (EUR)
+        (StorageClass.CLOUD, [1, 2, 5], None, "EUR", 2),
     ],
 )
 def test_example_builder_plan_scenarios(
@@ -834,7 +836,7 @@ def test_example_builder_plan_scenarios(
         .input(
             name="currency",
             description="The currency to purchase the gold in",
-            default_value="GBP",
+            default_value="EUR",
         )
         .invoke_tool_step(
             step_name="Search gold price",

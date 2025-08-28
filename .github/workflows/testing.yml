@@ -57,4 +57,5 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: |
           set -o pipefail
-          uv run pytest tests/integration -m "not daily" -n auto --cov --cov-append --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
+          # Previously -n auto but that started to overload backend
+          uv run pytest tests/integration -m "not daily" -n 4 --cov --cov-append --cov-fail-under 100 --log-cli-level=WARNING --junitxml=pytest.xml | tee pytest-coverage.txt
