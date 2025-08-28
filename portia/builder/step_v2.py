@@ -27,6 +27,7 @@ from portia.clarification import (
 )
 from portia.errors import PlanRunExitError, ToolNotFoundError
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
+from portia.execution_agents.execution_utils import is_clarification
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step, Variable
@@ -222,13 +223,13 @@ class LLMStep(StepV2):
     async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the LLM query."""
         if self.system_prompt:
-            child_tool = LLMTool(
+            llm_tool = LLMTool(
                 structured_output_schema=self.output_schema, prompt=self.system_prompt
             )
         else:
-            child_tool = LLMTool(structured_output_schema=self.output_schema)
-        llm_tool = ToolCallWrapper(
-            child_tool=child_tool,
+            llm_tool = LLMTool(structured_output_schema=self.output_schema)
+        wrapped_tool = ToolCallWrapper(
+            child_tool=llm_tool,
             storage=run_data.portia.storage,
             plan_run=run_data.plan_run,
         )
@@ -245,7 +246,7 @@ class LLMStep(StepV2):
             if (value := self._resolve_input_reference(_input, run_data)) is not None
             or not isinstance(_input, Reference)
         ]
-        return await llm_tool.arun(tool_ctx, task=self.task, task_data=task_data)
+        return await wrapped_tool.arun(tool_ctx, task=self.task, task_data=task_data)
 
     def _format_value(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
         """Get the value for an input."""
@@ -320,7 +321,9 @@ class InvokeToolStep(StepV2):
             plan_run=run_data.plan_run,
             plan=run_data.legacy_plan,
             config=run_data.portia.config,
-            clarifications=[],
+            clarifications=run_data.plan_run.get_clarifications_for_step(
+                run_data.plan_run.current_step_index
+            ),
         )
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
@@ -333,14 +336,18 @@ class InvokeToolStep(StepV2):
         if (
             output_schema
             and not isinstance(output_value, output_schema)
-            and not isinstance(output_value, Clarification)
+            and not is_clarification(output_value)
         ):
             model = run_data.portia.config.get_default_model()
             output_value = await model.aget_structured_response(
                 [
                     Message(
                         role="user",
-                        content=f"Convert this output to the desired schema: {output}",
+                        content=(
+                            f"The following was the output from a call to the tool '{tool.id}' "
+                            f"with args '{args}': {output}. Convert this output to the desired "
+                            f"schema: {output_schema}"
+                        ),
                     )
                 ],
                 output_schema,

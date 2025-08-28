@@ -280,8 +280,9 @@ class TestPlanBuilderV2:
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
         assert isinstance(builder.plan.steps[0], InvokeToolStep)
-        assert builder.plan.steps[0].tool.id == "local_function_example_function_for_testing"  # pyright: ignore[reportAttributeAccessIssue]
-        assert builder.plan.steps[0].tool.name == "Local Function Example Function For Testing"  # pyright: ignore[reportAttributeAccessIssue]
+        assert not isinstance(builder.plan.steps[0].tool, str)
+        assert builder.plan.steps[0].tool.id == "local_function_example_function_for_testing"
+        assert builder.plan.steps[0].tool.name == "Local Function Example Function For Testing"
         assert builder.plan.steps[0].args == {}
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
@@ -300,8 +301,9 @@ class TestPlanBuilderV2:
 
         step = builder.plan.steps[0]
         assert isinstance(step, InvokeToolStep)
-        assert builder.plan.steps[0].tool.id == "local_function_example_function_for_testing"  # pyright: ignore[reportAttributeAccessIssue]
-        assert builder.plan.steps[0].tool.name == "Local Function Example Function For Testing"  # pyright: ignore[reportAttributeAccessIssue]
+        assert not isinstance(step.tool, str)
+        assert step.tool.id == "local_function_example_function_for_testing"
+        assert step.tool.name == "Local Function Example Function For Testing"
         assert step.args == args
         assert step.output_schema == OutputSchema
         assert step.step_name == "func_step"
