@@ -31,6 +31,7 @@ from portia.execution_agents.conditional_evaluation_agent import ConditionalEval
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.execution_agents.output import LocalDataValue
 from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
@@ -76,6 +77,7 @@ class StepV2(BaseModel, ABC):
     ) -> Any | ReferenceValue | None:  # noqa: ANN401
         """Resolve input values by retrieving the ReferenceValue for any Reference inputs."""
         if isinstance(_input, str):
+            breakpoint()
             # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
             # from _input if it's a string
             matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", _input)
@@ -104,7 +106,19 @@ class StepV2(BaseModel, ABC):
                     )
                     result = re.sub(pattern, str(resolved_val), result, count=1)
                 return result
-        return _input.get_value(run_data) if isinstance(_input, Reference) else _input
+        elif isinstance(_input, Reference):
+            ref_value = _input.get_value(run_data)
+            return self._resolve_input_reference(ref_value, run_data)
+        elif (
+            # @@@ THIS IS NUTS - SORT OUT
+            isinstance(_input, ReferenceValue)
+            and isinstance(_input.value, LocalDataValue)
+            and isinstance(_input.value.get_value(), str)
+        ):
+            _input.value = self._resolve_input_reference(_input.value.get_value(), run_data)
+            return _input
+
+        return _input
 
     def _get_value_for_input(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
         """Get the value for an input that could come from a reference."""

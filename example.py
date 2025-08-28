@@ -1,73 +1,102 @@
-"""Simple Example."""
+"""A simple example of using the PlanBuilderV2."""
 
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
-from portia import (
-    Config,
-    FileReaderTool,
-    InMemoryToolRegistry,
-    LogLevel,
-    PlanRunState,
-    Portia,
-    example_tool_registry,
-)
+from portia import Input, PlanBuilderV2, Portia, StepOutput
 from portia.cli import CLIExecutionHooks
-from portia.end_user import EndUser
 
-load_dotenv()
+load_dotenv(override=True)
 
-portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry + InMemoryToolRegistry.from_local_tools([FileReaderTool()]),
+
+class CommodityPriceWithCurrency(BaseModel):
+    """Price of a commodity."""
+
+    price: float
+    currency: str
+
+
+class FinalOutput(BaseModel):
+    """Final output of the plan."""
+
+    receipt: str
+    email_address: str
+
+
+portia = Portia(execution_hooks=CLIExecutionHooks())
+
+mini_plan = (
+    PlanBuilderV2("Do a random step")
+    .input(
+        name="message", description="The message to display to the user", default_value="Skibidi"
+    )
+    .user_verify(message=f"{Input('message')}")
+    .build()
 )
 
-
-# Simple Example
-plan_run = portia.run(
-    "Get the temperature in London and Sydney and then add the two temperatures",
-)
-
-# We can also provide additional data about the end user to the process
-plan_run = portia.run(
-    "Please tell me a joke that is customized to my favorite sport",
-    end_user=EndUser(
-        external_id="user_789",
-        email="hello@portialabs.ai",
-        additional_data={
-            "favorite_sport": "football",
+plan = (
+    PlanBuilderV2("Buy some gold")
+    .input(name="currency", description="The currency to purchase the gold in", default_value="GBP")
+    .invoke_tool_step(
+        step_name="Search gold price",
+        tool="search_tool",
+        args={
+            "search_query": f"What is the price of gold per ounce in {Input('currency')}?",
         },
-    ),
-)
-
-# When we hit a clarification we can ask our end user for clarification then resume the process
-# There are two poem.txt files in the repo, so we get a clarification to select the correct one
-plan_run = portia.run(
-    "Read the poem.txt file and write a review of it",
-)
-# Update clarifications
-if plan_run.state == PlanRunState.NEED_CLARIFICATION:
-    for c in plan_run.get_outstanding_clarifications():
-        # Here you prompt the user for the response to the clarification
-        # via whatever mechanism makes sense for your use-case.
-        new_value = "data/laser-sharks-ballad/poem.txt"
-        plan_run = portia.resolve_clarification(
-            plan_run=plan_run,
-            clarification=c,
-            response=new_value,
+        output_schema=CommodityPriceWithCurrency,
+    )
+    .user_input(
+        message="How many ounces of gold do you want to purchase?",
+        options=[50, 100, 200],
+    )
+    .function_step(
+        step_name="Calculate total price",
+        function=lambda price_with_currency, purchase_quantity: (
+            price_with_currency.price * purchase_quantity
+        ),
+        args={
+            "price_with_currency": StepOutput("Search gold price"),
+            "purchase_quantity": StepOutput(1),
+        },
+    )
+    .add_steps(
+        mini_plan,
+        input_values={
+            "message": f"Do you want to proceed with the purchase? Price is "
+            f"{StepOutput('Calculate total price')}"
+        },
+    )
+    .user_verify(
+        message=(
+            f"Do you want to proceed with the purchase? Price is "
+            f"{StepOutput('Calculate total price')}"
         )
-    portia.resume(plan_run)
+    )
+    .if_(
+        condition=lambda total_price: total_price > 100,  # noqa: PLR2004
+        args={"total_price": StepOutput("Calculate total price")},
+    )
+    .function_step(function=lambda: print("Hey big spender!"))  # noqa: T201
+    .else_()
+    .function_step(function=lambda: print("We need more gold!"))  # noqa: T201
+    .endif()
+    .llm_step(
+        task="Create a fake receipt for the purchase of gold.",
+        inputs=[StepOutput("Calculate total price"), Input("currency")],
+    )
+    .single_tool_agent_step(
+        task="Send the receipt to Robbie in an email at not_an_email@portialabs.ai",
+        tool="portia:google:gmail:send_email",
+        inputs=[StepOutput(9)],
+    )
+    .final_output(
+        output_schema=FinalOutput,
+    )
+    .build()
+)
 
-# You can also pass in a clarification handler to manage clarifications
-portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry + InMemoryToolRegistry.from_local_tools([FileReaderTool()]),
-    execution_hooks=CLIExecutionHooks(),
+plan_run = portia.run_plan(
+    plan,
+    plan_run_inputs={"currency": "USD"},
 )
-plan_run = portia.run(
-    "Read the poem.txt file and write a review of it",
-)
-
-# You can pass inputs into a plan
-plan_run = portia.run(
-    "Get the temperature for the provided city", plan_run_inputs={"$city": "Lisbon"}
-)
+print(plan_run)  # noqa: T201
