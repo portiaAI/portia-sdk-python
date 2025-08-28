@@ -35,7 +35,7 @@ from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-from portia.telemetry.views import ToolCallTelemetryEvent
+from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -276,6 +276,7 @@ class ParserModel:
         errors = []
         tool_inputs: ToolInputs | None = None
         try:
+            logger().trace("LLM call: argument parsing")
             response = self.model.get_structured_response(
                 messages=[Message.from_langchain(m) for m in formatted_messages],
                 schema=ToolInputs,
@@ -416,6 +417,7 @@ class VerifierModel:
             tool_args=self.agent.tool.args_json_schema(),
             tool_description=self.agent.tool.description,
         )
+        logger().trace("LLM call: argument verification")
         response = self.model.get_structured_response(
             messages=[Message.from_langchain(m) for m in formatted_messages],
             schema=VerifiedToolInputs,
@@ -555,6 +557,7 @@ class ToolCallingModel:
         self.agent.telemetry.capture(
             ToolCallTelemetryEvent(tool_id=self.agent.tool.id if self.agent.tool else None)
         )
+        logger().trace("LLM call: tool calling")
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
                 verified_args=verified_args.model_dump_json(indent=2),
@@ -706,6 +709,15 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        self.telemetry.capture(
+            ExecutionAgentUsageTelemetryEvent(
+                agent_type="default",
+                model=str(self.config.get_execution_model()),
+                sync=True,
+                tool_id=self.tool.id if self.tool else None,
+            )
+        )
+
         if not self.tool:
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
 
@@ -790,6 +802,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         app = graph.compile()
         invocation_result = app.invoke({"messages": [], "step_inputs": []})
         return process_output(
+            self.step,
             invocation_result["messages"],
             self.tool,
             self.new_clarifications,

@@ -26,7 +26,7 @@ def test_basic_tool_decorator() -> None:
         return a + b
 
     # Create an instance of the tool
-    tool_instance = add_numbers()  # pyright: ignore[reportCallIssue]
+    tool_instance = add_numbers()
 
     # Check basic properties
     assert tool_instance.id == "add_numbers"
@@ -55,7 +55,7 @@ def test_tool_with_optional_parameters() -> None:
         """Greet a user with a custom greeting."""
         return f"{greeting}, {name}!"
 
-    tool_instance = greet_user()  # pyright: ignore[reportCallIssue]
+    tool_instance = greet_user()
     ctx = get_test_tool_context()
 
     # Test with default parameter
@@ -75,7 +75,7 @@ def test_tool_with_context_parameter() -> None:
         """Get the current user ID from context."""
         return ctx.end_user.external_id
 
-    tool_instance = get_user_id()  # pyright: ignore[reportCallIssue]
+    tool_instance = get_user_id()
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx)
@@ -90,7 +90,7 @@ def test_tool_with_context_named_context() -> None:
         """Get the current plan ID from context."""
         return str(context.plan_run.plan_id)
 
-    tool_instance = get_plan_id()  # pyright: ignore[reportCallIssue]
+    tool_instance = get_plan_id()
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx)
@@ -105,7 +105,7 @@ def test_tool_with_mixed_parameters() -> None:
         """Create a personalized message for the current user."""
         return f"{prefix} for {ctx.end_user.external_id}: {message}"
 
-    tool_instance = personalized_message()  # pyright: ignore[reportCallIssue]
+    tool_instance = personalized_message()
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx, message="Hello World")
@@ -125,7 +125,7 @@ def test_tool_with_complex_types() -> None:
             count = len(items)
         return {"total_items": len(items), "requested_count": count}
 
-    tool_instance = process_data()  # pyright: ignore[reportCallIssue]
+    tool_instance = process_data()
     ctx = get_test_tool_context()
 
     result = tool_instance.run(ctx, items=["a", "b", "c"])
@@ -149,7 +149,7 @@ def test_tool_raises_errors() -> None:
             raise ValueError("Unknown error")
         return "Success"
 
-    tool_instance = failing_tool()  # pyright: ignore[reportCallIssue]
+    tool_instance = failing_tool()
     ctx = get_test_tool_context()
 
     # Test successful execution
@@ -181,7 +181,7 @@ def test_weather_tool_example(monkeypatch: pytest.MonkeyPatch) -> None:
         return f"The current weather in {city} is sunny with a temperature of 22°C."
 
     # Create tool instance
-    tool_instance = weather_tool()  # pyright: ignore[reportCallIssue]
+    tool_instance = weather_tool()
 
     # Check properties match expected format
     assert tool_instance.id == "weather_tool"
@@ -209,7 +209,7 @@ def test_tool_class_naming() -> None:
         """Test custom tool functionality."""
         return value.upper()
 
-    tool_instance = my_custom_tool()  # pyright: ignore[reportCallIssue]
+    tool_instance = my_custom_tool()
 
     # Check the class name
     assert tool_instance.__class__.__name__ == "MyCustomToolTool"
@@ -246,7 +246,7 @@ def test_tool_args_schema_generation() -> None:
         """Tool with various parameter types."""
         return f"{required_str}-{optional_int}-{optional_bool}-{required_float}"
 
-    tool_instance = complex_tool()  # pyright: ignore[reportCallIssue]
+    tool_instance = complex_tool()
     schema = tool_instance.args_schema
 
     # Check required fields
@@ -276,7 +276,7 @@ def test_tool_to_langchain() -> None:
         """Convert text to uppercase for LangChain testing."""
         return text.upper()
 
-    tool_instance = simple_tool()  # pyright: ignore[reportCallIssue]
+    tool_instance = simple_tool()
     ctx = get_test_tool_context()
 
     # Convert to LangChain tool
@@ -296,7 +296,7 @@ def test_tool_serialization() -> None:
         """Tool that can be serialized."""
         return data
 
-    tool_instance = serializable_tool()  # pyright: ignore[reportCallIssue]
+    tool_instance = serializable_tool()
 
     # Test string representation
     str_repr = str(tool_instance)
@@ -319,7 +319,7 @@ def test_annotated_string_description() -> None:
         """Say hello to someone."""
         return f"Hello, {name}!"
 
-    tool_instance = say_hello()  # pyright: ignore[reportCallIssue]
+    tool_instance = say_hello()
 
     # Check that the tool was created properly
     assert tool_instance.id == "say_hello"
@@ -350,7 +350,7 @@ def test_annotated_field_description() -> None:
         """Calculate the area of a rectangle."""
         return length * width
 
-    tool_instance = calculate_area()  # pyright: ignore[reportCallIssue]
+    tool_instance = calculate_area()
 
     # Check that the tool was created properly
     assert tool_instance.id == "calculate_area"
@@ -391,7 +391,7 @@ def test_mixed_annotation_patterns() -> None:
         """Test function with mixed annotation patterns."""
         return f"{required_annotated}-{required_regular}-{optional_annotated}-{optional_regular}"
 
-    tool_instance = mixed_function()  # pyright: ignore[reportCallIssue]
+    tool_instance = mixed_function()
 
     # Check the args schema
     schema = tool_instance.args_schema
@@ -518,7 +518,7 @@ def test_field_with_custom_default() -> None:
         """Tool with Field default."""
         return f"Hello, {name}!"
 
-    tool_instance = tool_with_field_default()  # pyright: ignore[reportCallIssue]
+    tool_instance = tool_with_field_default()
 
     # Check the args schema
     schema = tool_instance.args_schema
@@ -559,7 +559,7 @@ def test_tool_description_length_validation() -> None:
 
     # The error should be raised when we instantiate the tool
     with pytest.raises(InvalidToolDescriptionError):
-        tool_class()  # pyright: ignore[reportCallIssue]
+        tool_class()
 
 
 def test_tool_with_context_parameter_name_invalid() -> None:

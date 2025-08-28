@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from langchain_core.messages import BaseMessage
 
     from portia.execution_agents.context import StepInput
+    from portia.plan import Step
     from portia.tool import Tool
 
 
@@ -150,6 +151,7 @@ def template_in_required_inputs(
 
 
 def process_output(  # noqa: C901 PLR0912
+    step: Step,
     messages: list[BaseMessage],
     tool: Tool | None = None,
     clarifications: list[Clarification] | None = None,
@@ -160,6 +162,7 @@ def process_output(  # noqa: C901 PLR0912
     It raises errors if the tool encounters issues and returns the appropriate output.
 
     Args:
+        step (Step): The step that produced the output.
         messages (list[BaseMessage]): The set of messages received from the agent's plan_run.
         tool (Tool | None): The tool associated with the agent, if any.
         clarifications (list[Clarification] | None): A list of clarifications, if any.
@@ -215,6 +218,14 @@ def process_output(  # noqa: C901 PLR0912
         return LocalDataValue(
             value=output.get_value(),
             summary=output.get_summary() or output.serialize_value(),
+        )
+
+    if step.structured_output_schema:
+        # If there is a structured output schema, then it is stored in the last tool call's value
+        final_value = output_values[-1].get_value()
+        return LocalDataValue(
+            value=final_value,
+            summary=output_values[-1].get_summary() or output_values[-1].serialize_value(),
         )
 
     values = []

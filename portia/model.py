@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from contextvars import ContextVar
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
@@ -23,6 +25,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
 from portia.common import validate_extras_dependencies
+from portia.logger import logger
 from portia.token_check import estimate_tokens
 
 if TYPE_CHECKING:
@@ -89,6 +92,7 @@ class LLMProvider(Enum):
         MISTRALAI: MistralAI provider.
         GOOGLE: Google Generative AI provider.
         AZURE_OPENAI: Azure OpenAI provider.
+        GROQ: Groq provider.
 
     """
 
@@ -100,6 +104,8 @@ class LLMProvider(Enum):
     AZURE_OPENAI = "azure-openai"
     CUSTOM = "custom"
     OLLAMA = "ollama"
+    OPENROUTER = "openrouter"
+    GROQ = "groq"
     GOOGLE_GENERATIVE_AI = "google"  # noqa: PIE796 - Alias for GOOGLE member
 
 
@@ -119,6 +125,14 @@ class GenerativeModel(ABC):
 
         """
         self.model_name = model_name
+
+    def _log_llm_call(self, messages: list[Message]) -> None:
+        """Log TRACE level information about the LLM call."""
+        with suppress(Exception):
+            if messages:
+                content_preview = " ".join(msg.content.replace("\n", " ") for msg in messages)
+                preview = content_preview[:120]
+                logger().trace(f"LLM call: model={self!s} msg={preview!r}")
 
     @abstractmethod
     def get_response(self, messages: list[Message]) -> Message:
@@ -223,6 +237,7 @@ class LangChainGenerativeModel(GenerativeModel):
 
     def get_response(self, messages: list[Message]) -> Message:
         """Get response using LangChain model."""
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = self._client.invoke(langchain_messages)
         return Message.from_langchain(response)
@@ -244,6 +259,7 @@ class LangChainGenerativeModel(GenerativeModel):
             BaseModelT: The structured response from the model.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = structured_client.invoke(langchain_messages)
@@ -258,6 +274,7 @@ class LangChainGenerativeModel(GenerativeModel):
             messages (list[Message]): The list of messages to send to the model.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         response = await self._client.ainvoke(langchain_messages)
         return Message.from_langchain(response)
@@ -276,6 +293,7 @@ class LangChainGenerativeModel(GenerativeModel):
             **kwargs: Additional keyword arguments to pass to the with_structured_output method.
 
         """
+        super()._log_llm_call(messages)
         langchain_messages = [msg.to_langchain() for msg in messages]
         structured_client = self._client.with_structured_output(schema, **kwargs)
         response = await structured_client.ainvoke(langchain_messages)
@@ -462,6 +480,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -506,6 +525,7 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor asynchronously."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return await self._acached_instructor_call(
             client=self._instructor_client_async,
@@ -516,6 +536,133 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             seed=self._seed,
             **self._model_kwargs,
         )
+
+
+class OpenRouterGenerativeModel(OpenAIGenerativeModel):
+    """OpenRouter model implementation."""
+
+    provider: LLMProvider = LLMProvider.OPENROUTER
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with OpenRouter client.
+
+        Args:
+            model_name: OpenRouter model to use
+            api_key: API key for OpenRouter
+            seed: Random seed for model generation
+            max_retries: Maximum number of retries
+            temperature: Temperature parameter
+            **kwargs: Additional keyword arguments to pass to ChatOpenAI
+
+        """
+        self._model_kwargs = kwargs.copy()
+        if "disabled_params" not in kwargs:
+            # This is a workaround for o3 mini to avoid parallel tool calls.
+            # See https://github.com/langchain-ai/langchain/issues/25357
+            kwargs["disabled_params"] = {"parallel_tool_calls": None}
+        # Unfortunately you get errors from o3 mini with Langchain unless you set
+        # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini", "gpt-5") else temperature
+
+        # OpenRouter is compatible with the ChatOpenAI client, so we use this client
+        # with the openrouter URL
+        client = ChatOpenAI(
+            name=model_name,
+            model=model_name,
+            seed=seed,
+            api_key=api_key,
+            max_retries=max_retries,
+            temperature=temperature,
+            base_url="https://openrouter.ai/api/v1",
+            **kwargs,
+        )
+        super(OpenAIGenerativeModel, self).__init__(client, model_name)
+        self._instructor_client = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                OpenAI(api_key=api_key.get_secret_value(), base_url="https://openrouter.ai/api/v1")
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._instructor_client_async = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                AsyncOpenAI(
+                    api_key=api_key.get_secret_value(), base_url="https://openrouter.ai/api/v1"
+                )
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._seed = seed
+
+
+class GroqGenerativeModel(OpenAIGenerativeModel):
+    """Groq model implementation."""
+
+    provider: LLMProvider = LLMProvider.GROQ
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Groq client.
+
+        Args:
+            model_name: Groq model to use
+            api_key: API key for Groq
+            seed: Random seed for model generation
+            max_retries: Maximum number of retries
+            temperature: Temperature parameter
+            **kwargs: Additional keyword arguments to pass to ChatOpenAI
+
+        """
+        self._model_kwargs = kwargs.copy()
+        if "disabled_params" not in kwargs:
+            # This is a workaround for some models to avoid parallel tool calls.
+            # See https://github.com/langchain-ai/langchain/issues/25357
+            kwargs["disabled_params"] = {"parallel_tool_calls": None}
+
+        # Groq is compatible with the ChatOpenAI client, so we use this client
+        # with the groq URL
+        client = ChatOpenAI(
+            name=model_name,
+            model=model_name,
+            seed=seed,
+            api_key=api_key,
+            max_retries=max_retries,
+            temperature=temperature,
+            base_url="https://api.groq.com/openai/v1",
+            **kwargs,
+        )
+        super(OpenAIGenerativeModel, self).__init__(client, model_name)
+        self._instructor_client = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                OpenAI(api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1")
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._instructor_client_async = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                AsyncOpenAI(
+                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
+                )
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._seed = seed
 
 
 class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
@@ -621,6 +768,7 @@ class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -696,7 +844,23 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
             api_key=api_key,
             **kwargs,
         )
+        kwargs_no_thinking = copy.deepcopy(kwargs)
+        kwargs_no_thinking.get("model_kwargs", {}).pop("thinking", None)
+        # You cannot use structured output with thinking enabled, or you get an error saying
+        # 'Thinking may not be enabled when tool_choice forces tool use'.
+        # So we create a separate client for structured output.
+        # NB Instructor can be used, because it doesn't use the tool_choice API.
+        # See https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#extended-thinking-with-tool-use
+        self._non_thinking_client = ChatAnthropic(
+            model_name=model_name,
+            timeout=timeout,
+            max_retries=max_retries,
+            max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
+            api_key=api_key,
+            **kwargs_no_thinking,
+        )
         super().__init__(client, model_name)
+
         self._instructor_client = instructor.from_anthropic(
             client=wrappers.wrap_anthropic(
                 Anthropic(api_key=api_key.get_secret_value()),
@@ -751,7 +915,11 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return self.get_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._non_thinking_client.with_structured_output(
+            schema,
+            include_raw=True,
+            **kwargs,
+        )
         raw_response = structured_client.invoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
@@ -773,6 +941,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return self._cached_instructor_call(
             client=self._instructor_client,
@@ -824,7 +993,11 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         if schema.__name__ in ("StepsOrError", "PreStepIntrospection"):
             return await self.aget_structured_response_instructor(messages, schema)
         langchain_messages = [msg.to_langchain() for msg in messages]
-        structured_client = self._client.with_structured_output(schema, include_raw=True, **kwargs)
+        structured_client = self._non_thinking_client.with_structured_output(
+            schema,
+            include_raw=True,
+            **kwargs,
+        )
         raw_response = await structured_client.ainvoke(langchain_messages)
         if not isinstance(raw_response, dict):
             raise TypeError(f"Expected dict, got {type(raw_response).__name__}.")
@@ -846,6 +1019,7 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
         schema: type[BaseModelT],
     ) -> BaseModelT:
         """Get structured response using instructor asynchronously."""
+        super()._log_llm_call(messages)
         instructor_messages = [map_message_to_instructor(msg) for msg in messages]
         return await self._acached_instructor_call(
             client=self._instructor_client_async,
@@ -932,6 +1106,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             schema: type[BaseModelT],
         ) -> BaseModelT:
             """Get structured response using instructor."""
+            super()._log_llm_call(messages)
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return self._cached_instructor_call(
                 client=self._instructor_client,
@@ -984,6 +1159,7 @@ if validate_extras_dependencies("mistralai", raise_error=False):
             schema: type[BaseModelT],
         ) -> BaseModelT:
             """Get structured response using instructor asynchronously."""
+            super()._log_llm_call(messages)
             instructor_messages = [map_message_to_instructor(msg) for msg in messages]
             return await self._acached_instructor_call(
                 client=self._instructor_client_async,

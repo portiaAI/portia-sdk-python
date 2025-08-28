@@ -2,7 +2,15 @@
 
 from dotenv import load_dotenv
 
-from portia import Config, LogLevel, PlanRunState, Portia, example_tool_registry
+from portia import (
+    Config,
+    FileReaderTool,
+    InMemoryToolRegistry,
+    LogLevel,
+    PlanRunState,
+    Portia,
+    example_tool_registry,
+)
 from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
 
@@ -10,7 +18,7 @@ load_dotenv()
 
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
+    tools=example_tool_registry + InMemoryToolRegistry.from_local_tools([FileReaderTool()]),
 )
 
 
@@ -32,18 +40,16 @@ plan_run = portia.run(
 )
 
 # When we hit a clarification we can ask our end user for clarification then resume the process
+# There are two poem.txt files in the repo, so we get a clarification to select the correct one
 plan_run = portia.run(
-    "Get the temperature in <location> and London and then add the two temperatures",
+    "Read the poem.txt file and write a review of it",
 )
-
-# Fetch run
-plan_run = portia.storage.get_plan_run(plan_run.id)
 # Update clarifications
 if plan_run.state == PlanRunState.NEED_CLARIFICATION:
     for c in plan_run.get_outstanding_clarifications():
         # Here you prompt the user for the response to the clarification
         # via whatever mechanism makes sense for your use-case.
-        new_value = "Sydney"
+        new_value = "data/laser-sharks-ballad/poem.txt"
         plan_run = portia.resolve_clarification(
             plan_run=plan_run,
             clarification=c,
@@ -54,11 +60,11 @@ if plan_run.state == PlanRunState.NEED_CLARIFICATION:
 # You can also pass in a clarification handler to manage clarifications
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry,
+    tools=example_tool_registry + InMemoryToolRegistry.from_local_tools([FileReaderTool()]),
     execution_hooks=CLIExecutionHooks(),
 )
 plan_run = portia.run(
-    "Get the temperature in <location> and London and then add the two temperatures",
+    "Read the poem.txt file and write a review of it",
 )
 
 # You can pass inputs into a plan

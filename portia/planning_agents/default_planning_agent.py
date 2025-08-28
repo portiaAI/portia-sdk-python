@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError
+
+from portia.errors import PlanError
+from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsOrError
@@ -16,7 +19,6 @@ if TYPE_CHECKING:
     from portia.plan import Plan, PlanInput, Step
     from portia.tool import Tool
 
-logger = logging.getLogger(__name__)
 
 DEFAULT_PLANNING_PROMPT = """
 You are an outstanding task planner. Your job is to provide a detailed plan of action in the form
@@ -92,16 +94,26 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 plan_inputs,
                 previous_errors,
             )
-            response = self.model.get_structured_response(
-                schema=StepsOrError,
-                messages=[
-                    Message(
-                        role="system",
-                        content=self.planning_prompt,
-                    ),
-                    Message(role="user", content=prompt),
-                ],
-            )
+            logger().trace("LLM call: planning")
+            try:
+                response = self.model.get_structured_response(
+                    schema=StepsOrError,
+                    messages=[
+                        Message(
+                            role="system",
+                            content=self.planning_prompt,
+                        ),
+                        Message(role="user", content=prompt),
+                    ],
+                )
+            except ValidationError as e:  # pragma: no cover
+                err = PlanError(  # pragma: no cover
+                    "LLM unable to create well-structured plan - please either retry the request, "  # pragma: no cover # noqa: E501
+                    "upgrade to a more powerful model or consider using our PlanBuilderV2 "  # pragma: no cover # noqa: E501
+                    "interface instead."  # pragma: no cover
+                )  # pragma: no cover
+                logger().exception("Planning error", err)  # pragma: no cover
+                raise err from e  # pragma: no cover
             steps_or_error = self._process_response(response, tool_list, plan_inputs, i)
             if steps_or_error.error is None:
                 return steps_or_error
@@ -173,6 +185,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
                 plan_inputs,
                 previous_errors,
             )
+            logger().trace("LLM call: planning")
             response = await self.model.aget_structured_response(
                 schema=StepsOrError,
                 messages=[

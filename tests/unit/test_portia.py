@@ -16,6 +16,8 @@ import httpx
 import pytest
 from pydantic import BaseModel, HttpUrl, SecretStr
 
+from portia.builder.plan_v2 import PlanV2
+from portia.builder.step_v2 import StepV2
 from portia.clarification import (
     ActionClarification,
     Clarification,
@@ -60,7 +62,7 @@ from portia.plan import (
 )
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
-from portia.portia import ExecutionHooks, Portia
+from portia.portia import ExecutionHooks, Portia, RunContext
 from portia.prefixed_uuid import ClarificationUUID
 from portia.storage import StorageError
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
@@ -671,8 +673,8 @@ def test_portia_run_invalid_state(portia: Portia, planning_model: MagicMock) -> 
     # Set invalid state
     plan_run.state = PlanRunState.COMPLETE
 
-    with pytest.raises(InvalidPlanRunStateError):
-        portia.resume(plan_run)
+    result = portia.resume(plan_run)
+    assert result == plan_run
 
 
 def test_portia_wait_for_ready(
@@ -889,7 +891,7 @@ def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
         ),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan_run = portia.run(query)
 
@@ -1069,7 +1071,7 @@ def test_portia_run_query_with_memory(
         ),
         mock.patch.object(
             portia_with_agent_memory,
-            "_get_agent_for_step",
+            "get_agent_for_step",
             return_value=mock_step_agent,
         ),
     ):
@@ -1161,7 +1163,7 @@ def test_portia_resolve_clarification_error(portia: Portia) -> None:
     portia.storage.save_plan(plan2)
     portia.storage.save_plan_run(plan_run2)
     with pytest.raises(InvalidPlanRunStateError):
-        portia.resolve_clarification(clarification, "test")
+        portia.resolve_clarification(clarification, "test", plan_run)
 
     with pytest.raises(InvalidPlanRunStateError):
         portia.resolve_clarification(clarification, "test", plan_run)
@@ -1206,7 +1208,7 @@ def test_portia_get_tool_for_step_none_tool_id() -> None:
         tool_id=None,
     )
 
-    tool = portia._get_tool_for_step(step, plan_run)
+    tool = portia.get_tool(step.tool_id, plan_run)
     assert tool is None
 
 
@@ -1223,7 +1225,7 @@ def test_get_llm_tool() -> None:
         tool_id=LLMTool.LLM_TOOL_ID,
     )
 
-    tool = portia._get_tool_for_step(step, plan_run)
+    tool = portia.get_tool(step.tool_id, plan_run)
     assert tool is not None
     assert isinstance(tool._child_tool, LLMTool)  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -1348,7 +1350,7 @@ def test_portia_handle_clarification(planning_model: MagicMock) -> None:
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
         ),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan = portia.plan("Raise a clarification")
         plan_run = portia.create_plan_run(plan)
@@ -1394,6 +1396,7 @@ def test_portia_error_clarification(portia: Portia, planning_model: MagicMock) -
             source="Test portia error clarification",
         ),
         error=ValueError("test error"),
+        plan_run=plan_run,
     )
     assert plan_run.state == PlanRunState.FAILED
 
@@ -1445,7 +1448,7 @@ def test_portia_run_with_introspection_skip(portia: Portia, planning_model: Magi
 
     with (
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan_run = portia.run("Test query with skipped step")
 
@@ -1513,7 +1516,7 @@ def test_portia_run_with_introspection_complete(portia: Portia, planning_model: 
 
     with (
         mock.patch.object(portia, "_generate_introspection_outcome", custom_handle_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         # Run the test
         plan_run = portia.run("Test query with early completed execution")
@@ -1719,7 +1722,7 @@ def test_portia_resume_with_skipped_steps(portia: Portia) -> None:
 
     with (
         mock.patch.object(portia, "_get_introspection_agent", return_value=mock_introspection),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
         mock.patch("portia.portia.FinalOutputSummarizer", return_value=mock_summarizer),
     ):
         result_plan_run = portia.resume(plan_run)
@@ -1824,7 +1827,7 @@ def test_portia_run_with_plan_run_inputs(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
         ),
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_step_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_step_agent),
     ):
         plan_run = portia.run(
             query="Add the two numbers together",
@@ -1987,7 +1990,7 @@ def test_portia_run_plan_with_plan_run_inputs(
         return
 
     # Mock the get_agent_for_step method to return our mock agent
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
 
     assert plan_run.plan_id == plan.id
@@ -2000,8 +2003,8 @@ def test_portia_run_plan_with_plan_run_inputs(
 
 def test_portia_run_plan_with_missing_inputs(portia: Portia) -> None:
     """Test that run_plan raises error when required inputs are missing."""
-    required_input1 = PlanInput(name="$required1", description="Required input 1", value="value 1")
-    required_input2 = PlanInput(name="$required2", description="Required input 2", value="value 2")
+    required_input1 = PlanInput(name="$required1", description="Required input 1")
+    required_input2 = PlanInput(name="$required2", description="Required input 2")
 
     plan = Plan(
         plan_context=PlanContext(query="Plan requiring inputs", tool_ids=["add_tool"]),
@@ -2183,7 +2186,7 @@ def test_portia_execution_step_hooks(portia: Portia, planning_model: MagicMock) 
     mock_summarizer_agent.create_summary.return_value = None
 
     with (
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -2239,7 +2242,7 @@ def test_portia_execution_step_hooks_with_error(portia: Portia, planning_model: 
     mock_agent = MagicMock()
     mock_agent.execute_sync.side_effect = ValueError("Test execution error")
 
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = portia.run("Test execution hooks with error")
     assert plan_run.state == PlanRunState.FAILED
 
@@ -2276,7 +2279,7 @@ def test_portia_execution_step_hooks_with_skip(portia: Portia, planning_model: M
     mock_summarizer_agent.create_summary.return_value = None
 
     with (
-        mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent),
+        mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent),
         mock.patch(
             "portia.portia.FinalOutputSummarizer",
             return_value=mock_summarizer_agent,
@@ -2315,7 +2318,7 @@ def test_portia_execution_step_hooks_after_step_exception(
     step_1_result = LocalDataValue(value="Step 1 result")
     mock_agent.execute_sync.return_value = step_1_result
 
-    with mock.patch.object(portia, "_get_agent_for_step", return_value=mock_agent):
+    with mock.patch.object(portia, "get_agent_for_step", return_value=mock_agent):
         plan_run = portia.run("Test after_step_execution hook exception")
 
     assert plan_run.state == PlanRunState.FAILED
@@ -2689,9 +2692,10 @@ class CustomPortia(Portia):
         super().__init__(*args, **kwargs)
         self.forced_clarifications = forced_clarifications
 
-    def _get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
+    def get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
+        """Get the agent for a step."""
         if step.task == "raise_clarification":
-            tool = self._get_tool_for_step(step, plan_run)
+            tool = self.get_tool(step.tool_id, plan_run)
             return RaiseClarificationAgent(
                 plan=plan,
                 plan_run=plan_run,
@@ -2701,7 +2705,7 @@ class CustomPortia(Portia):
                 tool=tool,
                 forced_clarifications=self.forced_clarifications,
             )
-        return super()._get_agent_for_step(step, plan, plan_run)
+        return super().get_agent_for_step(step, plan, plan_run)
 
 
 def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() -> None:
@@ -3065,3 +3069,92 @@ def test_portia_resolve_example_plans_with_plan_id_strings(portia: Portia) -> No
     assert len(resolved_plans) == 2
     assert resolved_plans[0].id == example_plan_1.id
     assert resolved_plans[1].id == example_plan_2.id
+
+
+def test_portia_resolve_example_plans_none(portia: Portia) -> None:
+    """Test that None example_plans returns None."""
+    result = portia._resolve_example_plans(None)
+    assert result is None
+
+
+def test_portia_resolve_single_example_plan_invalid_type(portia: Portia) -> None:
+    """Test that invalid example plan type raises TypeError."""
+    with pytest.raises(TypeError, match="Invalid example plan type"):
+        portia._resolve_single_example_plan(123)  # type: ignore[arg-type]
+
+
+def test_portia_load_plan_by_uuid_exception(portia: Portia) -> None:
+    """Test that loading plan by UUID with exception raises PlanNotFoundError."""
+    plan_uuid = PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
+
+    with (
+        mock.patch.object(portia.storage, "get_plan", side_effect=Exception("Storage error")),
+        pytest.raises(PlanNotFoundError),
+    ):
+        portia._load_plan_by_uuid(plan_uuid)
+
+
+def test_portia_resolve_string_example_plan_invalid_format(portia: Portia) -> None:
+    """Test that invalid string format raises ValueError."""
+    with pytest.raises(ValueError, match="must be a plan ID"):
+        portia._resolve_string_example_plan("invalid-plan-id")
+
+
+def test_portia_resolve_string_example_plan_not_found(portia: Portia) -> None:
+    """Test that non-existent plan ID raises PlanNotFoundError."""
+    plan_uuid = PlanUUID.from_string("plan-12345678-1234-5678-1234-567812345678")
+
+    with (
+        mock.patch.object(portia, "_load_plan_by_uuid", side_effect=PlanNotFoundError(plan_uuid)),
+        pytest.raises(PlanNotFoundError),
+    ):
+        portia._resolve_string_example_plan("plan-12345678-1234-5678-1234-567812345678")
+
+
+def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt(
+    portia: Portia,
+) -> None:
+    """Test that KeyboardInterrupt is handled correctly."""
+    plan, plan_run = get_test_plan_run()
+
+    with (
+        mock.patch.object(portia, "_execute_plan_run", side_effect=KeyboardInterrupt()),
+        mock.patch.object(portia.storage, "save_plan_run"),
+    ):
+        result = portia.execute_plan_run_and_handle_clarifications(plan, plan_run)
+
+        assert result.state == PlanRunState.FAILED
+
+
+def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia: Portia) -> None:
+    """Test that run_plan with PlanV2 inside async context raises RuntimeError."""
+    import asyncio
+
+    # Create a simple PlanV2 for testing
+    class MockStepV2(StepV2):
+        async def run(self, run_data: RunContext) -> str:  # noqa: ARG002
+            return "test result"
+
+        def to_legacy_step(self, plan: PlanV2) -> Step:  # noqa: ARG002
+            return Step(task="Mock task", tool_id="mock_tool", inputs=[], output="$result")
+
+    plan_v2 = PlanV2(steps=[MockStepV2(step_name="test_step")], label="Test plan")
+
+    # Mock the run_builder_plan method to avoid actual execution
+    with mock.patch.object(portia, "run_builder_plan") as mock_run_builder:
+        mock_run_builder.return_value = None
+
+        # Create an async function that calls run_plan inside an event loop
+        async def async_function() -> PlanRun:
+            return portia.run_plan(plan_v2)
+
+        # Run the async function, which should trigger the RuntimeError
+        # because asyncio.Runner() cannot be used inside an already running event loop
+        with pytest.raises(RuntimeError) as exc_info:
+            asyncio.run(async_function())
+
+        # The custom RuntimeError with the new error message is raised
+        assert (
+            "run_plan should be called outside of an async context: Use arun_plan instead"
+            in str(exc_info.value)
+        )
