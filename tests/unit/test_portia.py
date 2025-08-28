@@ -47,8 +47,7 @@ from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.open_source_tools.llm_tool import LLMTool
-from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
+from portia.open_source_tools.registry import open_source_tool_registry
 from portia.plan import (
     Plan,
     PlanBuilder,
@@ -62,7 +61,7 @@ from portia.plan import (
 )
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
-from portia.portia import ExecutionHooks, Portia, RunContext
+from portia.portia import ExecutionHooks, Portia
 from portia.prefixed_uuid import ClarificationUUID
 from portia.storage import StorageError
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
@@ -74,6 +73,7 @@ from portia.tool import (
     _ArgsSchemaPlaceholder,
 )
 from portia.tool_registry import ToolRegistry
+from portia.tool_wrapper import ToolCallWrapper
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -89,6 +89,7 @@ if TYPE_CHECKING:
     from pytest_httpx import HTTPXMock
 
     from portia.common import Serializable
+    from portia.run_context import RunContext
 
 
 def test_portia_local_default_config_with_api_keys() -> None:
@@ -1193,41 +1194,6 @@ def test_portia_resolve_clarification(portia: Portia, telemetry: MagicMock) -> N
     )
 
     assert plan_run.state == PlanRunState.READY_TO_RESUME
-
-
-def test_portia_get_tool_for_step_none_tool_id() -> None:
-    """Test that when step.tool_id is None, LLMTool is used as fallback."""
-    portia = Portia(config=get_test_config(), tools=[AdditionTool()])
-    plan, plan_run = get_test_plan_run()
-
-    # Create a step with no tool_id
-    step = Step(
-        task="Some task",
-        inputs=[],
-        output="$output",
-        tool_id=None,
-    )
-
-    tool = portia.get_tool(step.tool_id, plan_run)
-    assert tool is None
-
-
-def test_get_llm_tool() -> None:
-    """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
-    portia = Portia(config=get_test_config(), tools=example_tool_registry)
-    plan, plan_run = get_test_plan_run()
-
-    # Create a step with no tool_id
-    step = Step(
-        task="Some task",
-        inputs=[],
-        output="$output",
-        tool_id=LLMTool.LLM_TOOL_ID,
-    )
-
-    tool = portia.get_tool(step.tool_id, plan_run)
-    assert tool is not None
-    assert isinstance(tool._child_tool, LLMTool)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_portia_run_plan(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
@@ -2695,7 +2661,12 @@ class CustomPortia(Portia):
     def get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
         """Get the agent for a step."""
         if step.task == "raise_clarification":
-            tool = self.get_tool(step.tool_id, plan_run)
+            tool = ToolCallWrapper.from_tool_id(
+                step.tool_id,
+                self.tool_registry,
+                self.storage,
+                plan_run,
+            )
             return RaiseClarificationAgent(
                 plan=plan,
                 plan_run=plan_run,
