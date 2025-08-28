@@ -737,14 +737,8 @@ class DefaultToolRegistry(ToolRegistry):
         ]
         
         if os.getenv("TAVILY_API_KEY"):
-            tools.extend([
-                SearchTool(),
-                MapTool(),
-                ExtractTool(),
-                CrawlTool(),
-            ])
+            tools.extend([SearchTool(), MapTool(), ExtractTool(), CrawlTool()])
         if os.getenv("OPENAI_API_KEY") and not os.getenv("TAVILY_API_KEY"):
-            from portia.open_source_tools.openai_search_tool import OpenAISearchTool
             tools.append(OpenAISearchTool())
         
         if os.getenv("OPENWEATHERMAP_API_KEY"):

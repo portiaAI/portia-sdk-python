@@ -22,8 +22,8 @@ from portia.tool_registry import (
 def _get_preferred_search_tool():
     """Get the preferred search tool based on available API keys.
     
-    Uses OpenAI search if OPENAI_API_KEY is available and TAVILY_API_KEY is not.
-    Otherwise uses Tavily search (default behavior).
+    Uses OpenAI search if OPENAI_API_KEY is available but no TAVILY_API_KEY.
+    Otherwise, uses Tavily search (default behavior).
     """
     has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
     has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
