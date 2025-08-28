@@ -176,7 +176,7 @@ We love feedback and suggestions. Please join our <a href="https://discord.gg/Dv
 
 # ❤️ Contributors
 A heartfelt thank you to our growing list of contributors!
-<!-- readme: contributors,mounir/-,robbie-portia/-,emmaportia/-,sam-portia/-,Nathanjp91/-,tomSportia/-,OmarEl-Mohandes/- -start -->
+<!-- readme: contributors,mounir-portia/-,robbie-portia/-,emmaportia/-,sam-portia/-,Nathanjp91/-,TomSPortia/-,OmarEl-Mohandes/-,portiaAI-bot/- -start -->
 <table>
 	<tbody>
 		<tr>
