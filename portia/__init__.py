@@ -5,7 +5,7 @@ from __future__ import annotations
 from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import FunctionStep, InvokeToolStep, LLMStep, SingleToolAgentStep
+from portia.builder.step_v2 import InvokeToolStep, LLMStep, SingleToolAgentStep
 
 # Clarification related classes
 from portia.clarification import (
@@ -122,7 +122,6 @@ __all__ = [
     "ExtractTool",
     "FileReaderTool",
     "FileWriterTool",
-    "FunctionStep",
     "GenerativeModel",
     "GenerativeModelsConfig",
     "InMemoryToolRegistry",

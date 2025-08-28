@@ -255,3 +255,16 @@ class StorageError(PortiaBaseError):
     def __init__(self, cause: Exception | str) -> None:
         """Set custom error message."""
         super().__init__(cause)
+
+
+class PlanRunExitError(PortiaBaseError):
+    """Raised when a step ascertains that a plan run should be exited.
+
+    Args:
+        reason (str): The reason for exiting the plan run.
+
+    """
+
+    def __init__(self, reason: str) -> None:
+        """Set custom error message."""
+        super().__init__(reason)

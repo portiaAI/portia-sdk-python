@@ -6,7 +6,7 @@ import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, override
+from typing import TYPE_CHECKING, Any, override
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -17,13 +17,22 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
-from portia.clarification import Clarification
-from portia.errors import ToolNotFoundError
+from portia.clarification import (
+    Clarification,
+    ClarificationCategory,
+    ClarificationType,
+    InputClarification,
+    MultipleChoiceClarification,
+    UserVerificationClarification,
+)
+from portia.errors import PlanRunExitError, ToolNotFoundError
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
+from portia.execution_agents.execution_utils import is_clarification
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step, Variable
 from portia.tool import Tool, ToolRunContext
+from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -197,6 +206,12 @@ class LLMStep(StepV2):
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
     )
+    system_prompt: str | None = Field(
+        default=None,
+        description=(
+            "The prompt to use for the LLM. If not provided, uses default prompt from LLMTool."
+        ),
+    )
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -207,7 +222,17 @@ class LLMStep(StepV2):
     @traceable(name="LLM Step - Run")
     async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the LLM query."""
-        llm_tool = LLMTool(structured_output_schema=self.output_schema)
+        if self.system_prompt:
+            llm_tool = LLMTool(
+                structured_output_schema=self.output_schema, prompt=self.system_prompt
+            )
+        else:
+            llm_tool = LLMTool(structured_output_schema=self.output_schema)
+        wrapped_tool = ToolCallWrapper(
+            child_tool=llm_tool,
+            storage=run_data.portia.storage,
+            plan_run=run_data.plan_run,
+        )
         tool_ctx = ToolRunContext(
             end_user=run_data.end_user,
             plan_run=run_data.plan_run,
@@ -221,7 +246,7 @@ class LLMStep(StepV2):
             if (value := self._resolve_input_reference(_input, run_data)) is not None
             or not isinstance(_input, Reference)
         ]
-        return await llm_tool.arun(tool_ctx, task=self.task, task_data=task_data)
+        return await wrapped_tool.arun(tool_ctx, task=self.task, task_data=task_data)
 
     def _format_value(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
         """Get the value for an input."""
@@ -283,7 +308,11 @@ class InvokeToolStep(StepV2):
         if isinstance(self.tool, str):
             tool = run_data.portia.get_tool(self.tool, run_data.plan_run)
         else:
-            tool = self.tool
+            tool = ToolCallWrapper(
+                child_tool=self.tool,
+                storage=run_data.portia.storage,
+                plan_run=run_data.plan_run,
+            )
         if not tool:
             raise ToolNotFoundError(self.tool if isinstance(self.tool, str) else self.tool.id)
 
@@ -292,7 +321,9 @@ class InvokeToolStep(StepV2):
             plan_run=run_data.plan_run,
             plan=run_data.legacy_plan,
             config=run_data.portia.config,
-            clarifications=[],
+            clarifications=run_data.plan_run.get_clarifications_for_step(
+                run_data.plan_run.current_step_index
+            ),
         )
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
@@ -301,109 +332,42 @@ class InvokeToolStep(StepV2):
         if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
             output_value.plan_run_id = run_data.plan_run.id
 
+        output_schema = self.output_schema or tool.structured_output_schema
         if (
-            self.output_schema
-            and not isinstance(output_value, self.output_schema)
-            and not isinstance(output_value, Clarification)
+            output_schema
+            and not isinstance(output_value, output_schema)
+            and not is_clarification(output_value)
         ):
             model = run_data.portia.config.get_default_model()
             output_value = await model.aget_structured_response(
                 [
                     Message(
                         role="user",
-                        content=f"Convert this output to the desired schema: {output}",
+                        content=(
+                            f"The following was the output from a call to the tool '{tool.id}' "
+                            f"with args '{args}': {output}. Convert this output to the desired "
+                            f"schema: {output_schema}"
+                        ),
                     )
                 ],
-                self.output_schema,
+                output_schema,
             )
         return output_value
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
         """Convert this InvokeToolStep to a legacy Step."""
-        inputs_desc = ", ".join(
+        args_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
         return Step(
-            task=f"Use tool {self._tool_name()} with inputs: {inputs_desc}",
+            task=f"Use tool {self._tool_name()} with args: {args_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=self._tool_name(),
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
         )
-
-
-class FunctionStep(StepV2):
-    """Calls a function with the given args (no LLM involved, just a direct function call)."""
-
-    function: Callable[..., Any] = Field(description=("The function to call."))
-    args: dict[str, Any] = Field(
-        default_factory=dict,
-        description=(
-            "The args to call the function with. The arg values can be references to previous step "
-            "outputs / plan inputs (using StepOutput / Input) or just plain values."
-        ),
-    )
-    output_schema: type[BaseModel] | None = Field(
-        default=None, description="The schema of the output."
-    )
-
-    _TOOL_ID_PREFIX: ClassVar[str] = "local_function_"
-
-    def __str__(self) -> str:
-        """Return a description of this step for logging purposes."""
-        output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        fn_name = getattr(self.function, "__name__", str(self.function))
-        return f"FunctionStep(function='{fn_name}', args={self.args}{output_info})"
-
-    @override
-    @traceable(name="Function Step - Run")
-    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the function."""
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-        output = self.function(**args)
-
-        if isinstance(output, Clarification) and output.plan_run_id is None:
-            output.plan_run_id = run_data.plan_run.id
-
-        if (
-            self.output_schema
-            and not isinstance(output, self.output_schema)
-            and not isinstance(output, Clarification)
-        ):
-            model = run_data.portia.config.get_default_model()
-            output = await model.aget_structured_response(
-                [
-                    Message(
-                        role="user",
-                        content=f"Convert this output to the desired schema: {output}",
-                    )
-                ],
-                self.output_schema,
-            )
-        return output
-
-    @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this FunctionStep to a legacy Step."""
-        inputs_desc = ", ".join(
-            [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
-        )
-        fn_name = getattr(self.function, "__name__", str(self.function))
-        return Step(
-            task=f"Run function {fn_name} with args: {inputs_desc}",
-            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
-            tool_id=f"{self._TOOL_ID_PREFIX}{fn_name}",
-            output=plan.step_output_name(self),
-            structured_output_schema=self.output_schema,
-            condition=self._get_legacy_condition(plan),
-        )
-
-    @classmethod
-    def tool_id_is_local_function(cls, tool_id: str) -> bool:
-        """Check if the tool id is a local function."""
-        return tool_id.startswith(cls._TOOL_ID_PREFIX)
 
 
 class SingleToolAgentStep(StepV2):
@@ -447,6 +411,114 @@ class SingleToolAgentStep(StepV2):
             tool_id=self.tool,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class UserVerifyStep(StepV2):
+    """A step that asks the user to verify a message before continuing."""
+
+    message: str = Field(description="The message the user needs to verify.")
+
+    def __str__(self) -> str:
+        """Return a description of this step for logging purposes."""
+        return f"UserVerifyStep(message='{self.message}')"
+
+    @override
+    @traceable(name="User Verify Step - Run")
+    async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Run the user verification step."""
+        message = self._resolve_input_reference(self.message, run_data)
+
+        previous_clarification = run_data.plan_run.get_clarification_for_step(
+            ClarificationCategory.USER_VERIFICATION
+        )
+
+        if not previous_clarification or not previous_clarification.resolved:
+            return UserVerificationClarification(
+                plan_run_id=run_data.plan_run.id,
+                user_guidance=str(message),
+                source="User verify step",
+            )
+
+        if previous_clarification.response is False:
+            raise PlanRunExitError(f"User rejected verification: {message}")
+
+        return True
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this UserVerifyStep to a legacy Step."""
+        return Step(
+            task=f"User verification: {self.message}",
+            inputs=[],
+            tool_id=None,
+            output=plan.step_output_name(self),
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class UserInputStep(StepV2):
+    """A step that requests input from the user and returns the response.
+
+    If options are provided, creates a multiple choice clarification.
+    Otherwise, creates a text input clarification.
+    """
+
+    message: str = Field(description="The guidance message shown to the user.")
+    options: list[Any] | None = Field(
+        default=None,
+        description="Available options for multiple choice. If None, creates text input.",
+    )
+
+    def __str__(self) -> str:
+        """Return a description of this step for logging purposes."""
+        input_type = "multiple choice" if self.options else "text input"
+        return f"UserInputStep(type='{input_type}', message='{self.message}')"
+
+    def _create_clarification(self, run_data: RunContext) -> ClarificationType:
+        """Create the appropriate clarification based on whether options are provided."""
+        resolved_message = self._resolve_input_reference(self.message, run_data)
+
+        if self.options:
+            return MultipleChoiceClarification(
+                plan_run_id=run_data.plan_run.id,
+                user_guidance=str(resolved_message),
+                options=self.options,
+                argument_name=run_data.plan.step_output_name(self),
+                source="User input step",
+            )
+        return InputClarification(
+            plan_run_id=run_data.plan_run.id,
+            user_guidance=str(resolved_message),
+            argument_name=run_data.plan.step_output_name(self),
+            source="User input step",
+        )
+
+    @override
+    @traceable(name="User Input Step - Run")
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Run the user input step."""
+        clarification_type = (
+            ClarificationCategory.MULTIPLE_CHOICE if self.options else ClarificationCategory.INPUT
+        )
+
+        previous_clarification = run_data.plan_run.get_clarification_for_step(clarification_type)
+
+        if not previous_clarification or not previous_clarification.resolved:
+            return self._create_clarification(run_data)
+
+        return previous_clarification.response
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this UserInputStep to a legacy Step."""
+        input_type = "Multiple choice" if self.options else "Text input"
+        return Step(
+            task=f"User input ({input_type}): {self.message}",
+            inputs=[],
+            tool_id=None,
+            output=plan.step_output_name(self),
             condition=self._get_legacy_condition(plan),
         )
 
