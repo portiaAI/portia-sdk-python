@@ -181,6 +181,27 @@ A heartfelt thank you to our growing list of contributors!
 	<tbody>
 		<tr>
             <td align="center">
+                <a href="https://github.com/OmarEl-Mohandes">
+                    <img src="https://avatars.githubusercontent.com/u/1239788?v=4" width="100;" alt="OmarEl-Mohandes"/>
+                    <br />
+                    <sub><b>Omar ElMohandes</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/Nathanjp91">
+                    <img src="https://avatars.githubusercontent.com/u/9366646?v=4" width="100;" alt="Nathanjp91"/>
+                    <br />
+                    <sub><b>Nathan Perkins</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/TomSPortia">
+                    <img src="https://avatars.githubusercontent.com/u/187272827?v=4" width="100;" alt="TomSPortia"/>
+                    <br />
+                    <sub><b>TomSPortia</b></sub>
+                </a>
+            </td>
+            <td align="center">
                 <a href="https://github.com/fanlinwang">
                     <img src="https://avatars.githubusercontent.com/u/25503130?v=4" width="100;" alt="fanlinwang"/>
                     <br />
@@ -192,6 +213,22 @@ A heartfelt thank you to our growing list of contributors!
                     <img src="https://avatars.githubusercontent.com/u/187275200?v=4" width="100;" alt="hannah-portia"/>
                     <br />
                     <sub><b>hannah-portia</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/portiaAI-bot">
+                    <img src="https://avatars.githubusercontent.com/u/220206162?v=4" width="100;" alt="portiaAI-bot"/>
+                    <br />
+                    <sub><b>portiaAI-bot</b></sub>
+                </a>
+            </td>
+		</tr>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/mounir-portia">
+                    <img src="https://avatars.githubusercontent.com/u/172489328?v=4" width="100;" alt="mounir-portia"/>
+                    <br />
+                    <sub><b>Momo</b></sub>
                 </a>
             </td>
             <td align="center">
@@ -222,8 +259,6 @@ A heartfelt thank you to our growing list of contributors!
                     <sub><b>0u55</b></sub>
                 </a>
             </td>
-		</tr>
-		<tr>
             <td align="center">
                 <a href="https://github.com/amorriscode">
                     <img src="https://avatars.githubusercontent.com/u/16005567?v=4" width="100;" alt="amorriscode"/>
@@ -231,6 +266,8 @@ A heartfelt thank you to our growing list of contributors!
                     <sub><b>Anthony Morris</b></sub>
                 </a>
             </td>
+		</tr>
+		<tr>
             <td align="center">
                 <a href="https://github.com/gaurava05">
                     <img src="https://avatars.githubusercontent.com/u/45741026?v=4" width="100;" alt="gaurava05"/>
