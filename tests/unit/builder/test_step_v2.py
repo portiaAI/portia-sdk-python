@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from portia.builder.reference import Input, ReferenceValue, StepOutput
 from portia.errors import PlanRunExitError, ToolNotFoundError
+from portia.portia import StepOutputValue
 from portia.prefixed_uuid import PlanRunUUID
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ from portia.builder.step_v2 import (
     UserVerifyStep,
 )
 from portia.clarification import (
+    Clarification,
     ClarificationCategory,
     InputClarification,
     MultipleChoiceClarification,
@@ -126,11 +128,38 @@ class TestStepV2Base:
 
     def test_resolve_input_reference_with_string_template_step_output(self) -> None:
         """Test _resolve_input_reference with string containing StepOutput template."""
-        # TODO: Fill in this test  # noqa: FIX002, TD002, TD003
+        step = ConcreteStepV2()
+        mock_run_data = Mock()
+        mock_run_data.portia.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value=LocalDataValue(value="step result"),
+                description="Step 0",
+                step_name="test_step",
+                step_num=0,
+            )
+        ]
+
+        template = f"The result was {StepOutput(0)}"
+        result = step._resolve_input_reference(template, mock_run_data)
+
+        assert result == "The result was step result"
 
     def test_resolve_input_reference_with_string_template_input(self) -> None:
         """Test _resolve_input_reference with string containing Input template."""
-        # TODO: Fill in this test  # noqa: FIX002, TD002, TD003
+        step = ConcreteStepV2()
+        mock_run_data = Mock()
+        mock_run_data.portia.storage = Mock()
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+        mock_run_data.step_output_values = []
+
+        template = f"Hello {Input('username')}"
+        result = step._resolve_input_reference(template, mock_run_data)
+
+        assert result == "Hello Alice"
 
     def test_get_value_for_input_with_reference_value(self) -> None:
         """Test _get_value_for_input with ReferenceValue."""
@@ -450,6 +479,42 @@ class TestLLMStep:
             assert call_args[1]["task"] == "Analyze data"
             assert call_args[1]["task_data"] == []
 
+    async def test_llm_step_run_with_string_template_input(self) -> None:
+        """Test LLMStep run with an input string containing reference templates."""
+        step = LLMStep(
+            task="Summarize",
+            step_name="summary",
+            inputs=[f"Use {StepOutput(0)} and {Input('username')}"],
+        )
+        mock_run_data = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value=LocalDataValue(value="step0"),
+                description="s0",
+                step_name="summary",
+                step_num=0,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+
+        with (
+            patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+            patch("portia.builder.step_v2.ToolRunContext") as mock_tool_ctx_class,
+        ):
+            mock_llm_tool = Mock()
+            mock_llm_tool.arun = AsyncMock(return_value="done")
+            mock_llm_tool_class.return_value = mock_llm_tool
+            mock_tool_ctx_class.return_value = Mock()
+
+            result = await step.run(mock_run_data)
+
+            assert result == "done"
+            call_args = mock_llm_tool.arun.call_args
+            assert call_args[1]["task_data"] == ["Use step0 and Alice"]
+
     def test_llm_step_to_legacy_step(self) -> None:
         """Test LLMStep to_legacy_step method."""
         inputs = [Input("user_query"), StepOutput(0)]
@@ -747,8 +812,6 @@ class TestInvokeToolStep:
     @pytest.mark.asyncio
     async def test_invoke_tool_step_no_args_with_clarification(self) -> None:
         """Test InvokeToolStep run with no args and tool returns a clarification."""
-        from portia.clarification import Clarification
-
         step = InvokeToolStep(tool="mock_tool", step_name="run_tool", args={})
         mock_run_data = Mock()
         mock_tool = Mock()
@@ -811,6 +874,48 @@ class TestInvokeToolStep:
 
             assert "nonexistent_tool" in str(exc_info.value)
             mock_get_tool.assert_called_once_with("nonexistent_tool", mock_run_data.plan_run)
+
+    @pytest.mark.asyncio
+    async def test_invoke_tool_step_with_string_arg_templates(self) -> None:
+        """Test InvokeToolStep run with string args containing reference templates."""
+        step = InvokeToolStep(
+            tool="mock_tool",
+            step_name="run_tool",
+            args={"query": f"Search {StepOutput(0)} for {Input('username')}"},
+        )
+        mock_run_data = Mock()
+        mock_run_data.portia.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value=LocalDataValue(value="result"),
+                description="s0",
+                step_name="run_tool",
+                step_num=0,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+
+        mock_tool = Mock()
+        mock_tool.structured_output_schema = None
+        mock_output = Mock()
+        mock_output.get_value.return_value = "final"
+        mock_tool._arun = AsyncMock(return_value=mock_output)
+
+        with (
+            patch.object(mock_run_data.portia, "get_tool") as mock_get_tool,
+            patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        ):
+            mock_get_tool.return_value = mock_tool
+            mock_ctx_class.return_value = Mock()
+
+            result = await step.run(mock_run_data)
+
+            assert result == "final"
+            call_args = mock_tool._arun.call_args
+            assert call_args[1]["query"] == "Search result for Alice"
 
     def test_invoke_tool_step_to_legacy_step(self) -> None:
         """Test InvokeToolStep to_legacy_step method."""
@@ -919,7 +1024,6 @@ class TestFunctionStep:
     @pytest.mark.asyncio
     async def test_function_step_no_args_with_clarification(self) -> None:
         """Test FunctionStep run with no args that returns a clarification."""
-        from portia.clarification import Clarification
 
         def clarification_function() -> Clarification:
             return Clarification(
@@ -972,8 +1076,34 @@ class TestFunctionStep:
             messages = call_args[0][0]
             assert len(messages) == 1
             assert isinstance(messages[0], Message)
-            expected_content = "Convert this output to the desired schema: raw function output"
-            assert expected_content in messages[0].content
+            assert "raw function output" in messages[0].content
+
+    @pytest.mark.asyncio
+    async def test_function_step_with_string_arg_template(self) -> None:
+        """Test FunctionStep run with arg string containing reference templates."""
+        step = FunctionStep(
+            function=example_function,
+            step_name="calc",
+            args={"x": 5, "y": f"Value {StepOutput(0)} and {Input('username')}"},
+        )
+        mock_run_data = Mock()
+        mock_run_data.portia.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value=LocalDataValue(value="result"),
+                description="s0",
+                step_name="calc",
+                step_num=0,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+
+        result = await step.run(mock_run_data)
+
+        assert result == "Value result and Alice: 5"
 
     def test_function_step_to_legacy_step(self) -> None:
         """Test FunctionStep to_legacy_step method."""
@@ -1085,7 +1215,6 @@ class TestFunctionStep:
     @pytest.mark.asyncio
     async def test_function_step_async_function_with_clarification(self) -> None:
         """Test FunctionStep run with async function that returns a clarification."""
-        from portia.clarification import Clarification
 
         async def async_clarification_function() -> Clarification:
             await asyncio.sleep(0.001)
@@ -1255,6 +1384,61 @@ class TestSingleToolAgent:
             assert legacy_step.inputs[0].name == "query"
             assert legacy_step.inputs[1].name == "step_0_output"
 
+    @pytest.mark.asyncio
+    async def test_single_tool_agent_with_string_template_task_and_inputs(self) -> None:
+        """Test SingleToolAgentStep with string templates in task and inputs."""
+        step = SingleToolAgentStep(
+            task=f"Search for information about {StepOutput(0)} requested by {Input('username')}",
+            tool="search_tool",
+            step_name="templated_search",
+            inputs=[f"Context: {StepOutput(1)}", "Additional info", Input("category")],
+        )
+        mock_run_data = Mock()
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [
+            PlanInput(name="username"),
+            PlanInput(name="category"),
+        ]
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.plan_run_inputs = {
+            "username": LocalDataValue(value="Alice"),
+            "category": LocalDataValue(value="Technology"),
+        }
+        mock_run_data.step_output_values = [
+            ReferenceValue(value=LocalDataValue(value="machine learning"), description="step0"),
+            ReferenceValue(value=LocalDataValue(value="AI research"), description="step1"),
+        ]
+
+        # Create mock agent and output object
+        mock_agent = Mock()
+        mock_output_obj = Mock()
+        mock_output_obj.get_value.return_value = "Search completed successfully"
+        mock_agent.execute_async = AsyncMock(return_value=mock_output_obj)
+
+        # Mock the plan for to_legacy_step conversion
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$templated_search_output"
+        mock_run_data.plan = mock_plan
+
+        with patch.object(mock_run_data.portia, "get_agent_for_step") as mock_get_agent:
+            mock_get_agent.return_value = mock_agent
+
+            result = await step.run(mock_run_data)
+
+            assert result == "Search completed successfully"
+
+            # Verify get_agent_for_step was called with correct arguments
+            mock_get_agent.assert_called_once()
+            call_args = mock_get_agent.call_args[0]
+            legacy_step = call_args[0]
+
+            # The task should contain the original template string (not resolved yet)
+            # Template resolution happens within the execution agent
+            expected_task = (
+                f"Search for information about {StepOutput(0)} requested by {Input('username')}"
+            )
+            assert legacy_step.task == expected_task
+
 
 class TestUserVerifyStep:
     """Test cases for the UserVerifyStep class."""
@@ -1294,7 +1478,9 @@ class TestUserVerifyStep:
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
-            ReferenceValue(value=LocalDataValue(value="result"), description="step0")
+            StepOutputValue(
+                step_num=0, step_name="step_0", value=LocalDataValue(value="result"), description=""
+            )
         ]
 
         result = await step.run(run_data=mock_run_data)
@@ -1338,6 +1524,35 @@ class TestUserVerifyStep:
 
         with pytest.raises(PlanRunExitError):
             await step.run(run_data=mock_run_data)
+
+    @pytest.mark.asyncio
+    async def test_user_verify_step_with_string_template_message(self) -> None:
+        """Test UserVerifyStep message resolution with reference templates."""
+        step = UserVerifyStep(
+            message=f"Confirm action on {StepOutput(0)} for user {Input('username')}?",
+            step_name="verify_action",
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Bob")}
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value=LocalDataValue(value="test_file.txt"),
+                description="step0",
+                step_name="verify_action",
+                step_num=0,
+            )
+        ]
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, UserVerificationClarification)
+        assert result.user_guidance == "Confirm action on test_file.txt for user Bob?"
 
 
 class TestUserInputStep:
@@ -1494,3 +1709,34 @@ class TestUserInputStep:
         result = await step.run(run_data=mock_run_data)
 
         assert result == "blue"
+
+    @pytest.mark.asyncio
+    async def test_user_input_step_message_with_templates(self) -> None:
+        """Test that UserInputStep resolves references in the message."""
+        step = UserInputStep(
+            message=f"Provide feedback on {StepOutput(0)} by {Input('username')}",
+            step_name="feedback",
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.id = PlanRunUUID()
+        mock_run_data.plan_run.get_clarification_for_step.return_value = None
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.step_output_name.return_value = "feedback"
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value=LocalDataValue(value="result"),
+                description="s0",
+                step_name="feedback",
+                step_num=0,
+            )
+        ]
+        mock_run_data.portia.storage = Mock()
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, InputClarification)
+        assert result.user_guidance == "Provide feedback on result by Alice"

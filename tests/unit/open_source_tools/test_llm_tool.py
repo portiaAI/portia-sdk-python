@@ -145,6 +145,12 @@ def test_process_task_data_with_complex_objects() -> None:
     assert result == "TestObject\n{'nested': 'value'}"
 
 
+def test_process_task_data_with_dict() -> None:
+    """Test that process_task_data correctly handles dictionary input."""
+    result = LLMTool.process_task_data({"key": "value", "key2": "value2"})
+    assert result == "key: value\nkey2: value2"
+
+
 # Async tests for LLMTool.arun function
 @pytest.mark.asyncio
 async def test_llm_tool_async_plan_run(

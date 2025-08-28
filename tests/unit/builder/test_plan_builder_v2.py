@@ -701,3 +701,72 @@ class TestPlanBuilderV2:
         assert builder.plan.steps[2].step_name == "batch2"
         assert builder.plan.steps[3].step_name == "from_plan"
         assert builder.plan.steps[4].step_name == "final"
+
+    def test_add_steps_with_input_values_single_value(self) -> None:
+        """Test add_steps with input_values setting a single input value."""
+        builder = PlanBuilderV2()
+
+        sub_plan = (
+            PlanBuilderV2()
+            .input(name="sub_input", description="Input for sub plan")
+            .llm_step(task="Sub task", step_name="sub_step")
+            .build()
+        )
+
+        result = builder.add_steps(sub_plan, input_values={"sub_input": "provided_value"})
+
+        assert len(result.plan.plan_inputs) == 1
+        assert result.plan.plan_inputs[0].name == "sub_input"
+        assert result.plan.plan_inputs[0].value == "provided_value"
+
+    def test_add_steps_with_input_values_multiple_values_override_default(self) -> None:
+        """Test add_steps with input_values setting 2 out of 4 values, overriding default."""
+        builder = PlanBuilderV2()
+
+        sub_plan = (
+            PlanBuilderV2()
+            .input(name="input_no_default", description="Input without default")
+            .input(
+                name="input_with_default",
+                description="Input with default",
+                default_value="original_default",
+            )
+            .input(name="input_unchanged1", description="Unchanged input 1")
+            .input(
+                name="input_unchanged2",
+                description="Unchanged input 2",
+                default_value="unchanged_default",
+            )
+            .llm_step(task="Sub task", step_name="sub_step")
+            .build()
+        )
+
+        result = builder.add_steps(
+            sub_plan,
+            input_values={
+                "input_no_default": "new_value_no_default",
+                "input_with_default": "overridden_value",
+            },
+        )
+
+        assert len(result.plan.plan_inputs) == 4
+
+        inputs = {inp.name: inp for inp in result.plan.plan_inputs}
+        assert inputs["input_no_default"].value == "new_value_no_default"
+        assert inputs["input_with_default"].value == "overridden_value"  # Should override default
+        assert inputs["input_unchanged1"].value is None
+        assert inputs["input_unchanged2"].value == "unchanged_default"
+
+    def test_add_steps_with_input_values_invalid_input_name_error(self) -> None:
+        """Test add_steps raises error when input_values contains invalid input name."""
+        builder = PlanBuilderV2()
+
+        sub_plan = (
+            PlanBuilderV2()
+            .input(name="valid_input", description="Valid input")
+            .llm_step(task="Sub task", step_name="sub_step")
+            .build()
+        )
+
+        with pytest.raises(PlanBuilderError):
+            builder.add_steps(sub_plan, input_values={"invalid_input": "some_value"})
