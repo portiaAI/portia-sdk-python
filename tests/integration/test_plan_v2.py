@@ -883,3 +883,104 @@ def test_example_builder_plan_scenarios(
     assert isinstance(final_output, GoldPurchaseFinalOutput)
     assert isinstance(final_output.receipt, str)
     assert len(final_output.receipt) > 0
+
+
+def test_plan_v2_input_linking_with_add_steps() -> None:
+    """Test input linking between top-level plan and sub-plan using add_steps with input_values."""
+    config = Config.from_default()
+    portia = Portia(config=config)
+
+    # Create sub-plan with 4 inputs (2 with defaults, 2 without)
+    sub_plan = (
+        PlanBuilderV2("Sub-plan with multiple inputs")
+        .input(name="sub_input_no_default_1", description="Sub input 1 without default")
+        .input(name="sub_input_no_default_2", description="Sub input 2 without default")
+        .input(
+            name="sub_input_with_default_1",
+            description="Sub input 1 with default",
+            default_value="original_default_1",
+        )
+        .input(
+            name="sub_input_with_default_2",
+            description="Sub input 2 with default",
+            default_value="original_default_2",
+        )
+        .function_step(
+            function=lambda: "sub_plan_executed",
+            step_name="sub_execution_step",
+        )
+        .build()
+    )
+
+    # Create top-level plan with 2 inputs (1 with default, 1 without)
+    plan = (
+        PlanBuilderV2("Top-level plan with input linking")
+        .input(name="top_input_no_default", description="Top input without default")
+        .input(
+            name="top_input_with_default",
+            description="Top input with default",
+            default_value="top_default_value",
+        )
+        .function_step(
+            function=lambda: 100,
+            step_name="first_number",
+        )
+        .function_step(
+            function=lambda: 200,
+            step_name="second_number",
+        )
+        # Add sub-plan steps with input values for 2 of the 4 sub-plan inputs
+        .add_steps(
+            sub_plan,
+            input_values={
+                "sub_input_no_default_1": StepOutput("first_number"),
+                "sub_input_with_default_1": StepOutput("second_number"),
+            },
+        )
+        # Final step that outputs all input values for verification
+        .function_step(
+            function=lambda **kwargs: {
+                "top_input_no_default": kwargs["top_no_def"],
+                "top_input_with_default": kwargs["top_with_def"],
+                "sub_input_no_default_1": kwargs["sub_no_def_1"],
+                "sub_input_no_default_2": kwargs["sub_no_def_2"],
+                "sub_input_with_default_1": kwargs["sub_with_def_1"],
+                "sub_input_with_default_2": kwargs["sub_with_def_2"],
+            },
+            args={
+                "top_no_def": Input("top_input_no_default"),
+                "top_with_def": Input("top_input_with_default"),
+                "sub_no_def_1": Input("sub_input_no_default_1"),
+                "sub_no_def_2": Input("sub_input_no_default_2"),
+                "sub_with_def_1": Input("sub_input_with_default_1"),
+                "sub_with_def_2": Input("sub_input_with_default_2"),
+            },
+            step_name="collect_all_inputs",
+        )
+        .build()
+    )
+
+    # Run the plan with only 2 input values:
+    # - One for top-level plan without default
+    # - One for sub-plan without default that wasn't set via input_values
+    plan_run = portia.run_plan(
+        plan,
+        plan_run_inputs={
+            "top_input_no_default": "top_value",
+            "sub_input_no_default_2": "sub_value",
+        },
+    )
+
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Verify final step collected all input values correctly
+    final_output = plan_run.outputs.step_outputs["$step_3_output"]
+    all_inputs = final_output.get_value()
+
+    # Verify all input values are as expected
+    assert all_inputs["top_input_no_default"] == "top_value"  # pyright: ignore[reportOptionalSubscript]
+    assert all_inputs["top_input_with_default"] == "top_default_value"  # pyright: ignore[reportOptionalSubscript]
+    assert all_inputs["sub_input_no_default_1"] == "override_no_default"  # pyright: ignore[reportOptionalSubscript]
+    assert all_inputs["sub_input_no_default_2"] == "sub_value"  # pyright: ignore[reportOptionalSubscript]
+    assert all_inputs["sub_input_with_default_1"] == "override_with_default"  # pyright: ignore[reportOptionalSubscript]
+    assert all_inputs["sub_input_with_default_2"] == "original_default_2"  # pyright: ignore[reportOptionalSubscript]

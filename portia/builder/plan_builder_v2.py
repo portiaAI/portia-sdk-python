@@ -355,7 +355,11 @@ class PlanBuilderV2:
         self.plan.steps.append(step)
         return self
 
-    def add_steps(self, plan: PlanV2 | Iterable[StepV2]) -> PlanBuilderV2:
+    def add_steps(
+        self,
+        plan: PlanV2 | Iterable[StepV2],
+        input_values: dict[str, Any] | None = None,
+    ) -> PlanBuilderV2:
         """Add steps to the plan.
 
         Step can be provided as a sequence or as a plan. If provided as a plan, we will also take
@@ -372,6 +376,20 @@ class PlanBuilderV2:
             self.plan.steps.extend(plan.steps)
         else:
             self.plan.steps.extend(plan)
+
+        if input_values and isinstance(plan, PlanV2):
+            allowed_input_names = {p.name for p in plan.plan_inputs}
+            for input_name, input_value in input_values.items():
+                if input_name not in allowed_input_names:
+                    raise PlanBuilderError(
+                        f"Tried to provide value for input {input_name} not found in "
+                        "sub-plan passed into add_steps()."
+                    )
+                for plan_input in self.plan.plan_inputs:
+                    if plan_input.name == input_name:
+                        plan_input.value = input_value
+                        break
+
         return self
 
     def final_output(
@@ -396,8 +414,7 @@ class PlanBuilderV2:
         """Return the plan, ready to run."""
         if len(self._conditional_block_stack) > 0:
             raise PlanBuilderError(
-                "An endif must be called for all if_ steps. "
-                "Please add an endif for all if_ steps."
+                "An endif must be called for all if_ steps. Please add an endif for all if_ steps."
             )
 
         step_type_counts: dict[str, int] = {}
