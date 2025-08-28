@@ -978,9 +978,9 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
     all_inputs = final_output.get_value()
 
     # Verify all input values are as expected
-    assert all_inputs["top_input_no_default"] == "top_value"  # pyright: ignore[reportOptionalSubscript]
-    assert all_inputs["top_input_with_default"] == "top_default_value"  # pyright: ignore[reportOptionalSubscript]
-    assert all_inputs["sub_input_no_default_1"] == "override_no_default"  # pyright: ignore[reportOptionalSubscript]
-    assert all_inputs["sub_input_no_default_2"] == "sub_value"  # pyright: ignore[reportOptionalSubscript]
-    assert all_inputs["sub_input_with_default_1"] == "override_with_default"  # pyright: ignore[reportOptionalSubscript]
-    assert all_inputs["sub_input_with_default_2"] == "original_default_2"  # pyright: ignore[reportOptionalSubscript]
+    assert all_inputs.get("top_input_no_default", "") == "top_value"
+    assert all_inputs.get("top_input_with_default") == "top_default_value"
+    assert all_inputs.get("sub_input_no_default_1", "") == "override_no_default"
+    assert all_inputs.get("sub_input_no_default_2", "") == "sub_value"
+    assert all_inputs.get("sub_input_with_default_1", "") == "override_with_default"
+    assert all_inputs.get("sub_input_with_default_2", "") == "original_default_2"
