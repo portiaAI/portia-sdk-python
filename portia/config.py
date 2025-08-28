@@ -684,7 +684,7 @@ class Config(BaseModel):
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
                     case LLMProvider.GROK:
-                        return "grok/grok-3"
+                        return "grok/grok-4-0709"
                 return None
 
     @model_validator(mode="after")
