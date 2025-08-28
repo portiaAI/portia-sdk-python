@@ -92,6 +92,7 @@ class LLMProvider(Enum):
         MISTRALAI: MistralAI provider.
         GOOGLE: Google Generative AI provider.
         AZURE_OPENAI: Azure OpenAI provider.
+        GROQ: Groq provider.
 
     """
 
@@ -104,6 +105,7 @@ class LLMProvider(Enum):
     CUSTOM = "custom"
     OLLAMA = "ollama"
     OPENROUTER = "openrouter"
+    GROQ = "groq"
     GOOGLE_GENERATIVE_AI = "google"  # noqa: PIE796 - Alias for GOOGLE member
 
 
@@ -594,6 +596,70 @@ class OpenRouterGenerativeModel(OpenAIGenerativeModel):
             client=wrappers.wrap_openai(
                 AsyncOpenAI(
                     api_key=api_key.get_secret_value(), base_url="https://openrouter.ai/api/v1"
+                )
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._seed = seed
+
+
+class GroqGenerativeModel(OpenAIGenerativeModel):
+    """Groq model implementation."""
+
+    provider: LLMProvider = LLMProvider.GROQ
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Groq client.
+
+        Args:
+            model_name: Groq model to use
+            api_key: API key for Groq
+            seed: Random seed for model generation
+            max_retries: Maximum number of retries
+            temperature: Temperature parameter
+            **kwargs: Additional keyword arguments to pass to ChatOpenAI
+
+        """
+        self._model_kwargs = kwargs.copy()
+        if "disabled_params" not in kwargs:
+            # This is a workaround for some models to avoid parallel tool calls.
+            # See https://github.com/langchain-ai/langchain/issues/25357
+            kwargs["disabled_params"] = {"parallel_tool_calls": None}
+
+        # Groq is compatible with the ChatOpenAI client, so we use this client
+        # with the groq URL
+        client = ChatOpenAI(
+            name=model_name,
+            model=model_name,
+            seed=seed,
+            api_key=api_key,
+            max_retries=max_retries,
+            temperature=temperature,
+            base_url="https://api.groq.com/openai/v1",
+            **kwargs,
+        )
+        super(OpenAIGenerativeModel, self).__init__(client, model_name)
+        self._instructor_client = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                OpenAI(
+                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
+                )
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._instructor_client_async = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                AsyncOpenAI(
+                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
                 )
             ),
             mode=instructor.Mode.JSON,
