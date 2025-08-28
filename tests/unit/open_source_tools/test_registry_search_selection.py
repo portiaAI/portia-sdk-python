@@ -46,8 +46,6 @@ class TestDefaultToolRegistrySearchSelection:
     def _create_test_config(self) -> Config:
         """Create a test config for testing."""
         return Config(
-            portia_api_endpoint="https://api.porita.dev",
-            portia_api_key="test-key",
             llm_provider="anthropic",
             default_model="anthropic/claude-3-5-sonnet-20241022",
             anthropic_api_key="sk-ant-test",
