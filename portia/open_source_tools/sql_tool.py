@@ -46,9 +46,28 @@ def _sqlite_authorizer(action, arg1, arg2, db_name, trigger_or_view):
         sqlite3.SQLITE_READ,      # Reading data from tables
         sqlite3.SQLITE_SELECT,    # SELECT statements
         sqlite3.SQLITE_FUNCTION,  # Using functions in queries
-        sqlite3.SQLITE_PRAGMA,    # PRAGMA statements (for table_info, etc.)
     ):
         return sqlite3.SQLITE_OK
+    
+    # Allow only specific safe, read-only PRAGMA statements
+    if action == sqlite3.SQLITE_PRAGMA:
+        pragma_name = arg1.lower() if arg1 else ""
+        # Only allow read-only PRAGMA operations
+        safe_pragmas = {
+            "table_info",        # Get table schema information
+            "table_list",        # List tables
+            "database_list",     # List databases 
+            "foreign_key_list",  # List foreign keys
+            "index_list",        # List indexes
+            "index_info",        # Get index information
+            "schema_version",    # Get schema version
+            "user_version",      # Get user version (read-only)
+            "compile_options",   # Get compile options
+        }
+        if pragma_name in safe_pragmas:
+            return sqlite3.SQLITE_OK
+        # Deny potentially dangerous PRAGMA operations
+        return sqlite3.SQLITE_DENY
     
     # Deny all other operations (INSERT, UPDATE, DELETE, CREATE, etc.)
     return sqlite3.SQLITE_DENY
@@ -235,9 +254,10 @@ class RunSQLTool(BaseSQLTool):
     id: str = "run_sql"
     name: str = "Run SQL Query"
     description: str = (
-        "Execute read-only SQL SELECT queries against a database. "
-        "Only SELECT queries are allowed. Default adapter is SQLite. "
-        "Configure via env (SQLITE_DB_PATH) or pass config_json with adapter parameters."
+        "Execute read-only SQL SELECT queries against a database. Only SELECT queries are allowed. "
+        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
+        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
+        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
     )
     args_schema: Type[RunSQLArgs] = RunSQLArgs
 
@@ -260,8 +280,9 @@ class ListTablesTool(BaseSQLTool):
     name: str = "List Database Tables"
     description: str = (
         "List all available tables in the database. "
-        "Default adapter is SQLite. Configure via env (SQLITE_DB_PATH) or "
-        "pass config_json with adapter parameters."
+        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
+        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
+        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
     )
     args_schema: Type[ListTablesArgs] = ListTablesArgs
 
@@ -283,9 +304,10 @@ class GetTableSchemasTool(BaseSQLTool):
     id: str = "get_table_schemas"
     name: str = "Get Table Schemas"
     description: str = (
-        "Get detailed schema information (columns, types, etc.) for specified tables. "
-        "Default adapter is SQLite. Configure via env (SQLITE_DB_PATH) or "
-        "pass config_json with adapter parameters."
+        "Get detailed schema information (columns, types, etc.) for specified tables. Returns column details including name, type, nullability, and primary key info. "
+        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
+        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
+        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
     )
     args_schema: Type[GetTableSchemasArgs] = GetTableSchemasArgs
 
@@ -307,9 +329,10 @@ class CheckSQLTool(BaseSQLTool):
     id: str = "check_sql"
     name: str = "Check SQL Query"
     description: str = (
-        "Check if a SQL query is valid without executing it. Uses EXPLAIN to validate. "
-        "Only SELECT queries are allowed. Default adapter is SQLite. "
-        "Configure via env (SQLITE_DB_PATH) or pass config_json with adapter parameters."
+        "Check if a SQL query is valid without executing it. Uses EXPLAIN to validate syntax and table/column references. Only SELECT queries are allowed. Returns {ok: true} for valid queries or {ok: false, error: 'message'} for invalid ones. "
+        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
+        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
+        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
     )
     args_schema: Type[CheckSQLArgs] = CheckSQLArgs
 
@@ -320,71 +343,3 @@ class CheckSQLTool(BaseSQLTool):
         return adapter.check_sql(args.query)
 
 
-# Legacy class for backward compatibility (deprecated)
-class SQLToolArgs(BaseModel):
-    """Deprecated: Arguments for the legacy SQLTool. Use specific tools instead."""
-
-    action: str = Field(
-        ...,
-        description=("Action to perform: run_sql | list_tables | get_table_schemas | check_sql"),
-    )
-    query: str | None = Field(default=None, description="SQL query for run_sql/check_sql")
-    tables: list[str] | None = Field(default=None, description="Tables for get_table_schemas")
-    config_json: str | None = Field(
-        default=None,
-        description=(
-            'Adapter configuration as pure JSON string (e.g., {"db_path": "/tmp/db.sqlite"})'
-        ),
-    )
-
-    @model_validator(mode="after")
-    def _validate_fields(self) -> SQLToolArgs:
-        match self.action:
-            case "run_sql" | "check_sql":
-                if not self.query:
-                    raise ValueError("'query' is required for this action")
-            case "get_table_schemas":
-                if not self.tables:
-                    raise ValueError("'tables' is required for this action")
-            case "list_tables":
-                pass
-            case _:
-                raise ValueError("Unsupported action")
-        return self
-
-
-class SQLTool(BaseSQLTool):
-    """Deprecated: Generic SQL tool with actions. Use specific tools instead.
-
-    This class is kept for backward compatibility. New code should use:
-    - RunSQLTool for executing queries
-    - ListTablesTool for listing tables  
-    - GetTableSchemasTool for getting schemas
-    - CheckSQLTool for validating queries
-    """
-
-    id: str = "sql_tool"
-    name: str = "SQL Tool (Deprecated)"
-    description: str = (
-        "DEPRECATED: Use specific tools instead (run_sql, list_tables, get_table_schemas, check_sql). "
-        "Run read-only SQL operations through a pluggable adapter. Only SELECT queries are allowed. "
-        "Default adapter is SQLite. Configure via env (SQLITE_DB_PATH) or pass config_json with adapter parameters."
-    )
-    args_schema: Type[SQLToolArgs] = SQLToolArgs
-
-    def run(self, _: ToolRunContext, **kwargs: Any) -> Any:  
-        """Dispatch to the configured adapter based on the requested action."""
-        args = SQLToolArgs.model_validate(kwargs)
-        adapter = self._get_adapter(args.config_json)
-
-        match args.action:
-            case "run_sql":
-                return adapter.run_sql(args.query or "")
-            case "list_tables":
-                return adapter.list_tables()
-            case "get_table_schemas":
-                return adapter.get_table_schemas(args.tables or [])
-            case "check_sql":
-                return adapter.check_sql(args.query or "")
-            case _:  
-                raise ToolSoftError("Unsupported action")
