@@ -26,17 +26,23 @@ from portia.clarification import (
     MultipleChoiceClarification,
     UserVerificationClarification,
 )
+from portia.config import ExecutionAgentType
 from portia.errors import PlanRunExitError, ToolNotFoundError
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
+from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
+from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step, Variable
 from portia.tool import Tool, ToolRunContext
+from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.portia import RunContext
+    from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+    from portia.run_context import RunContext
 
 
 class StepV2(BaseModel, ABC):
@@ -86,7 +92,7 @@ class StepV2(BaseModel, ABC):
                     ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
                     resolved = self._resolve_input_reference(ref, run_data)
                     resolved_val = (
-                        resolved.value.full_value(run_data.portia.storage)
+                        resolved.value.full_value(run_data.storage)
                         if isinstance(resolved, ReferenceValue)
                         else resolved
                     )
@@ -106,7 +112,7 @@ class StepV2(BaseModel, ABC):
         resolved_input = self._resolve_input_reference(_input, run_data)
 
         if isinstance(resolved_input, ReferenceValue):
-            return resolved_input.value.full_value(run_data.portia.storage)
+            return resolved_input.value.full_value(run_data.storage)
         return resolved_input
 
     def _resolve_input_names_for_printing(
@@ -232,7 +238,7 @@ class LLMStep(StepV2):
             end_user=run_data.end_user,
             plan_run=run_data.plan_run,
             plan=run_data.legacy_plan,
-            config=run_data.portia.config,
+            config=run_data.config,
             clarifications=[],
         )
         task_data = [
@@ -249,7 +255,7 @@ class LLMStep(StepV2):
             return _input
         return (
             f"Previous step {_input.description} had output: "
-            f"{_input.value.full_value(run_data.portia.storage)}"
+            f"{_input.value.full_value(run_data.storage)}"
         )
 
     @override
@@ -301,7 +307,12 @@ class InvokeToolStep(StepV2):
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the tool."""
         if isinstance(self.tool, str):
-            tool = run_data.portia.get_tool(self.tool, run_data.plan_run)
+            tool = ToolCallWrapper.from_tool_id(
+                self.tool,
+                run_data.tool_registry,
+                run_data.storage,
+                run_data.plan_run,
+            )
         else:
             tool = self.tool
         if not tool:
@@ -311,7 +322,7 @@ class InvokeToolStep(StepV2):
             end_user=run_data.end_user,
             plan_run=run_data.plan_run,
             plan=run_data.legacy_plan,
-            config=run_data.portia.config,
+            config=run_data.config,
             clarifications=run_data.plan_run.get_clarifications_for_step(
                 run_data.plan_run.current_step_index
             ),
@@ -329,7 +340,7 @@ class InvokeToolStep(StepV2):
             and not isinstance(output_value, output_schema)
             and not is_clarification(output_value)
         ):
-            model = run_data.portia.config.get_default_model()
+            model = run_data.config.get_default_model()
             output_value = await model.aget_structured_response(
                 [
                     Message(
@@ -407,7 +418,7 @@ class FunctionStep(StepV2):
             and not isinstance(output, self.output_schema)
             and not isinstance(output, Clarification)
         ):
-            model = run_data.portia.config.get_default_model()
+            model = run_data.config.get_default_model()
             output = await model.aget_structured_response(
                 [
                     Message(
@@ -471,11 +482,42 @@ class SingleToolAgentStep(StepV2):
     @traceable(name="Single Tool Agent Step - Run")
     async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
-        agent = run_data.portia.get_agent_for_step(
-            self.to_legacy_step(run_data.plan), run_data.legacy_plan, run_data.plan_run
-        )
+        agent = self._get_agent_for_step(run_data)
         output_obj = await agent.execute_async()
         return output_obj.get_value()
+
+    def _get_agent_for_step(
+        self,
+        run_data: RunContext,
+    ) -> BaseExecutionAgent:
+        """Get the appropriate agent for executing the step."""
+        tool = ToolCallWrapper.from_tool_id(
+            self.tool,
+            run_data.tool_registry,
+            run_data.storage,
+            run_data.plan_run,
+        )
+        cls: type[BaseExecutionAgent]
+        match run_data.config.execution_agent_type:
+            case ExecutionAgentType.ONE_SHOT:
+                cls = OneShotAgent
+            case ExecutionAgentType.DEFAULT:
+                cls = DefaultExecutionAgent
+        cls = OneShotAgent if isinstance(tool, LLMTool) else cls
+        logger().debug(
+            f"Using agent: {type(cls).__name__}",
+            plan=str(run_data.plan.id),
+            plan_run=str(run_data.plan_run.id),
+        )
+        return cls(
+            run_data.legacy_plan,
+            run_data.plan_run,
+            run_data.config,
+            run_data.storage,
+            run_data.end_user,
+            tool,
+            execution_hooks=run_data.execution_hooks,
+        )
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
@@ -645,7 +687,7 @@ class ConditionalStep(StepV2):
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         if isinstance(self.condition, str):
             condition_str = self._get_value_for_input(self.condition, run_data)
-            agent = ConditionalEvaluationAgent(run_data.portia.config)
+            agent = ConditionalEvaluationAgent(run_data.config)
             conditional_result = await agent.execute(condition_str, args)
         else:
             conditional_result = self.condition(**args)

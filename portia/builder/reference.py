@@ -12,7 +12,7 @@ from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.portia import RunContext
+    from portia.run_context import RunContext
 
 
 def default_step_name(step_index: int) -> str:

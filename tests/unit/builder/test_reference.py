@@ -9,7 +9,7 @@ from portia.builder.reference import Input, ReferenceValue, StepOutput, default_
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
-from portia.portia import StepOutputValue
+from portia.run_context import StepOutputValue
 
 
 class TestDefaultStepName:

@@ -23,7 +23,7 @@ from portia.plan import PlanInput, Step
 from portia.tool import Tool
 
 if TYPE_CHECKING:
-    from portia.portia import RunContext
+    from portia.run_context import RunContext
 
 
 class OutputSchema(BaseModel):

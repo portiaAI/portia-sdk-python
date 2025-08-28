@@ -27,11 +27,10 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from langsmith import traceable
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import ReferenceValue
 from portia.builder.step_v2 import FunctionStep
 from portia.clarification import (
     Clarification,
@@ -51,7 +50,6 @@ from portia.errors import (
     PlanError,
     PlanNotFoundError,
     SkipExecutionError,
-    ToolNotFoundError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
@@ -76,6 +74,7 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
+from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
     MAX_OUTPUT_LOG_LENGTH,
     DiskFileStorage,
@@ -103,28 +102,6 @@ if TYPE_CHECKING:
     from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
-
-
-class StepOutputValue(ReferenceValue):
-    """Value that can be referenced by name."""
-
-    step_name: str = Field(description="The name of the referenced value.")
-    step_num: int = Field(description="The step number of the referenced value.")
-
-
-class RunContext(BaseModel):
-    """Data that is returned from a step."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    plan: PlanV2 = Field(description="The Portia plan being executed.")
-    legacy_plan: Plan = Field(description="The legacy plan representation.")
-    plan_run: PlanRun = Field(description="The current plan run instance.")
-    end_user: EndUser = Field(description="The end user executing the plan.")
-    step_output_values: list[StepOutputValue] = Field(
-        default_factory=list, description="Outputs set by the step."
-    )
-    portia: Portia = Field(description="The Portia client instance.")
 
 
 class Portia:
@@ -2489,24 +2466,6 @@ class Portia:
         self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
         return plan_run
 
-    def get_tool(self, tool_id: str | None, plan_run: PlanRun) -> Tool | None:
-        """Get the tool for a step."""
-        if not tool_id:
-            return None
-        try:
-            child_tool = self.tool_registry.get_tool(tool_id)
-        except ToolNotFoundError:
-            # Special case LLMTool so it doesn't need to be in all tool registries
-            if tool_id == LLMTool.LLM_TOOL_ID:
-                child_tool = LLMTool()
-            else:
-                raise  # pragma: no cover
-        return ToolCallWrapper(
-            child_tool=child_tool,
-            storage=self.storage,
-            plan_run=plan_run,
-        )
-
     def get_agent_for_step(
         self,
         step: Step,
@@ -2524,7 +2483,12 @@ class Portia:
             BaseAgent: The agent to execute the step.
 
         """
-        tool = self.get_tool(step.tool_id, plan_run)
+        tool = ToolCallWrapper.from_tool_id(
+            step.tool_id,
+            self.tool_registry,
+            self.storage,
+            plan_run,
+        )
         cls: type[BaseExecutionAgent]
         match self.config.execution_agent_type:
             case ExecutionAgentType.ONE_SHOT:
@@ -2644,7 +2608,12 @@ class Portia:
                 continue
             tools_remaining.add(step.tool_id)
 
-            tool = self.get_tool(step.tool_id, plan_run)
+            tool = ToolCallWrapper.from_tool_id(
+                step.tool_id,
+                self.tool_registry,
+                self.storage,
+                plan_run,
+            )
             if not tool:
                 continue  # pragma: no cover - Should not happen if tool_id is set - defensive check
             if tool.id.startswith("portia:"):
@@ -2726,7 +2695,10 @@ class Portia:
             legacy_plan=legacy_plan,
             plan_run=plan_run,
             end_user=end_user or await self.ainitialize_end_user(plan_run.end_user_id),
-            portia=self,
+            config=self.config,
+            tool_registry=self.tool_registry,
+            storage=self.storage,
+            execution_hooks=self.execution_hooks,
         )
 
         try:
