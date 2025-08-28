@@ -50,6 +50,7 @@ class TestDefaultToolRegistrySearchSelection:
             portia_api_key="test-key",
             llm_provider="anthropic",
             default_model="anthropic/claude-3-5-sonnet-20241022",
+            anthropic_api_key="sk-ant-test",
         )
 
     def test_default_registry_no_keys(self) -> None:
@@ -65,8 +66,8 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_only_openai_key(self) -> None:
         """Test DefaultToolRegistry with only OpenAI key."""
-        config = self._create_test_config()
         with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=True):
+            config = self._create_test_config()
             registry = DefaultToolRegistry(config)
             tools = registry.get_tools()
             
@@ -76,8 +77,8 @@ class TestDefaultToolRegistrySearchSelection:
 
     def test_default_registry_only_tavily_key(self) -> None:
         """Test DefaultToolRegistry with only Tavily key."""
-        config = self._create_test_config()
         with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test"}, clear=True):
+            config = self._create_test_config()
             registry = DefaultToolRegistry(config)
             tools = registry.get_tools()
             

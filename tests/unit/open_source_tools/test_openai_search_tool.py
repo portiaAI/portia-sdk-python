@@ -8,7 +8,7 @@ import pytest
 
 from portia.errors import ToolHardError, ToolSoftError
 from portia.open_source_tools.openai_search_tool import OpenAISearchTool
-from tests.unit.tool_test_utils import get_test_tool_context
+from tests.utils import get_test_tool_context
 
 
 # Original tests for backward compatibility and integration with Response API
