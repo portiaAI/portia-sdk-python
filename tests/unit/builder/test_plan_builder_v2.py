@@ -11,6 +11,7 @@ from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
 from portia.builder.step_v2 import (
+    ExitStep,
     FunctionStep,
     InvokeToolStep,
     LLMStep,
@@ -655,3 +656,205 @@ class TestPlanBuilderV2:
         assert builder.plan.steps[2].step_name == "batch2"
         assert builder.plan.steps[3].step_name == "from_plan"
         assert builder.plan.steps[4].step_name == "final"
+
+
+class TestPlanBuilderV2Exit:
+    """Test cases for the PlanBuilderV2.exit() method."""
+
+    def test_exit_method_basic_usage(self) -> None:
+        """Test basic usage of the exit() method."""
+        builder = PlanBuilderV2()
+
+        result = builder.exit(message="Basic exit message")
+
+        assert len(result.plan.steps) == 1
+        step = result.plan.steps[0]
+        assert step.step_name == "step_0"
+        assert isinstance(step, ExitStep)
+        assert step.message == "Basic exit message"
+        assert step.error is False
+        assert step.conditional_block is None
+
+    def test_exit_method_with_error_flag(self) -> None:
+        """Test exit() method with error flag set to True."""
+        builder = PlanBuilderV2()
+
+        result = builder.exit(message="Error occurred", error=True)
+
+        assert len(result.plan.steps) == 1
+        step = result.plan.steps[0]
+        assert step.step_name == "step_0"
+        assert isinstance(step, ExitStep)
+        assert step.message == "Error occurred"
+        assert step.error is True
+
+    def test_exit_method_with_custom_step_name(self) -> None:
+        """Test exit() method with custom step name."""
+        builder = PlanBuilderV2()
+
+        result = builder.exit(message="Custom exit", step_name="my_exit_step")
+
+        assert len(result.plan.steps) == 1
+        step = result.plan.steps[0]
+        assert step.step_name == "my_exit_step"
+        assert isinstance(step, ExitStep)
+        assert step.message == "Custom exit"
+        assert step.error is False
+
+    def test_exit_method_with_empty_message(self) -> None:
+        """Test exit() method with empty message."""
+        builder = PlanBuilderV2()
+
+        result = builder.exit()
+
+        assert len(result.plan.steps) == 1
+        step = result.plan.steps[0]
+        assert step.step_name == "step_0"
+        assert isinstance(step, ExitStep)
+        assert step.message == ""
+        assert step.error is False
+
+    def test_exit_method_with_message_references(self) -> None:
+        """Test exit() method with message containing references."""
+        builder = PlanBuilderV2()
+
+        result = builder.exit(message="Processing {{ StepOutput(0) }}")
+
+        assert len(result.plan.steps) == 1
+        step = result.plan.steps[0]
+        assert step.step_name == "step_0"
+        assert isinstance(step, ExitStep)
+        assert step.message == "Processing {{ StepOutput(0) }}"
+        assert step.error is False
+
+    def test_exit_method_chaining(self) -> None:
+        """Test that exit() method returns self for chaining."""
+        builder = PlanBuilderV2()
+
+        result = builder.exit(message="First exit").exit(message="Second exit")
+
+        assert len(result.plan.steps) == 2
+        exit_step_1 = result.plan.steps[0]
+        assert isinstance(exit_step_1, ExitStep)
+        assert exit_step_1.message == "First exit"
+        exit_step_2 = result.plan.steps[1]
+        assert isinstance(exit_step_2, ExitStep)
+        assert exit_step_2.message == "Second exit"
+
+    def test_exit_method_within_conditional_block(self) -> None:
+        """Test exit() method within a conditional block."""
+        builder = PlanBuilderV2()
+
+        result = (
+            builder.if_(condition="test_condition").exit(message="Exit within conditional").endif()
+        )
+
+        assert len(result.plan.steps) == 3  # if_ + exit + endif
+        exit_step = result.plan.steps[1]
+        assert isinstance(exit_step, ExitStep)
+        assert exit_step.message == "Exit within conditional"
+        assert exit_step.conditional_block is not None
+        assert exit_step.conditional_block == result.plan.steps[0].conditional_block
+
+    def test_exit_method_within_nested_conditional_blocks(self) -> None:
+        """Test exit() method within nested conditional blocks."""
+        builder = PlanBuilderV2()
+
+        result = (
+            builder.if_(condition="outer_condition")
+            .if_(condition="inner_condition")
+            .exit(message="Exit in nested conditional")
+            .endif()
+            .endif()
+        )
+
+        assert len(result.plan.steps) == 5  # outer_if + inner_if + exit + inner_endif + outer_endif
+        exit_step = result.plan.steps[2]
+        assert isinstance(exit_step, ExitStep)
+        assert exit_step.message == "Exit in nested conditional"
+        assert exit_step.conditional_block is not None
+        # Should be in the inner conditional block
+        assert exit_step.conditional_block == result.plan.steps[1].conditional_block
+
+    def test_exit_method_after_other_steps(self) -> None:
+        """Test exit() method after adding other types of steps."""
+        builder = PlanBuilderV2()
+
+        result = (
+            builder.llm_step(task="First task")
+            .invoke_tool_step(tool="test_tool", args={})
+            .exit(message="Exit after other steps")
+        )
+
+        assert len(result.plan.steps) == 3
+        assert result.plan.steps[0].__class__.__name__ == "LLMStep"
+        assert result.plan.steps[1].__class__.__name__ == "InvokeToolStep"
+        assert result.plan.steps[2].__class__.__name__ == "ExitStep"
+        exit_step = result.plan.steps[2]
+        assert isinstance(exit_step, ExitStep)
+        assert exit_step.message == "Exit after other steps"
+
+    def test_exit_method_with_complex_workflow(self) -> None:
+        """Test exit() method in a complex workflow with conditionals and other steps."""
+        builder = PlanBuilderV2()
+
+        result = (
+            builder.input(name="user_input", description="User input")
+            .if_(condition="check_condition")
+            .llm_step(task="Process input")
+            .if_(condition="should_exit")
+            .exit(message="Early exit condition met", error=False)
+            .endif()
+            .invoke_tool_step(tool="continue_tool", args={})
+            .endif()
+            .exit(message="Normal completion")
+        )
+
+        assert (
+            len(result.plan.steps) == 8
+        )  # 8 steps total
+        # Check that the exit step is properly placed within the conditional
+        exit_step = result.plan.steps[3]
+        assert isinstance(exit_step, ExitStep)
+        assert exit_step.message == "Early exit condition met"
+        assert exit_step.conditional_block is not None
+
+        # Check final exit step
+        final_exit = result.plan.steps[7]
+        assert isinstance(final_exit, ExitStep)
+        assert final_exit.message == "Normal completion"
+        assert final_exit.conditional_block is None
+
+    def test_exit_method_error_handling_scenario(self) -> None:
+        """Test exit() method for error handling scenarios."""
+        builder = PlanBuilderV2()
+
+        result = (
+            builder.if_(condition="check_for_error")
+            .exit(message="We encountered an error in processing: {{ StepOutput(0) }}", error=True)
+            .endif()
+        )
+
+        assert len(result.plan.steps) == 3  # if_ + exit + endif
+        exit_step = result.plan.steps[1]
+        assert isinstance(exit_step, ExitStep)
+        assert exit_step.message == "We encountered an error in processing: {{ StepOutput(0) }}"
+        assert exit_step.error is True
+        assert exit_step.conditional_block is not None
+
+    def test_exit_method_early_completion_scenario(self) -> None:
+        """Test exit() method for early completion scenarios."""
+        builder = PlanBuilderV2()
+
+        result = (
+            builder.if_(condition="test_condition")
+            .exit(message="Completing as the document has already been created")
+            .endif()
+        )
+
+        assert len(result.plan.steps) == 3  # if_ + exit + endif
+        exit_step = result.plan.steps[1]
+        assert isinstance(exit_step, ExitStep)
+        assert exit_step.message == "Completing as the document has already been created"
+        assert exit_step.error is False
+        assert exit_step.conditional_block is not None
