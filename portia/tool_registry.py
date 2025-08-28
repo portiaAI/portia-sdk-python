@@ -63,7 +63,6 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.map_tool import MapTool
-from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 from portia.tool import PortiaMcpTool, PortiaRemoteTool, Tool
@@ -737,32 +736,16 @@ class DefaultToolRegistry(ToolRegistry):
             ImageUnderstandingTool(),
         ]
         
-        # Search tool selection logic with Config support
-        has_openai_key = bool(config.openai_api_key and config.openai_api_key.get_secret_value().strip()) or bool(os.getenv("OPENAI_API_KEY"))
-        has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
-        search_provider = config.search_provider
-        
-        # Import SearchProvider enum
-        from portia.config import SearchProvider
-        
-        # Determine which search tool to use
-        use_openai_search = False
-        if search_provider == SearchProvider.OPENAI and has_openai_key:
-            use_openai_search = True
-        elif search_provider == SearchProvider.TAVILY and has_tavily_key:
-            use_openai_search = False
-        else:
-            # Default logic: use OpenAI if available and no Tavily key
-            use_openai_search = has_openai_key and not has_tavily_key
-        
-        if use_openai_search and has_openai_key:
+        if os.getenv("TAVILY_API_KEY"):
+            tools.extend([
+                SearchTool(),
+                MapTool(),
+                ExtractTool(),
+                CrawlTool(),
+            ])
+        if os.getenv("OPENAI_API_KEY") and not os.getenv("TAVILY_API_KEY"):
+            from portia.open_source_tools.openai_search_tool import OpenAISearchTool
             tools.append(OpenAISearchTool())
-        elif has_tavily_key:
-            # Add Tavily-based tools
-            tools.append(SearchTool())
-            tools.append(MapTool())
-            tools.append(ExtractTool())
-            tools.append(CrawlTool())
         
         if os.getenv("OPENWEATHERMAP_API_KEY"):
             tools.append(WeatherTool())
