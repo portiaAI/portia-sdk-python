@@ -259,7 +259,6 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
-
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
 
 

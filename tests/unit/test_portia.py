@@ -145,12 +145,9 @@ def test_portia_local_default_config_without_api_keys() -> None:
         # open_source_tool_registry if Mistral API key is set, and isn't in the default tool
         # registry Unfortunately this is determined when the registry file is imported, so we
         # can't just mock the Mistral API key here.
-        # NOTE: OpenAI search tool is now included when OPENAI_API_KEY is present
-        # Missing tools from open_source_tool_registry in default registry:
-        # - crawl_tool, extract_tool, map_tool, weather_tool (4 tools missing)
-        # The search_tool from open_source_tool_registry is replaced by openai_search_tool in default registry
-        # CI environment may have additional tools (browser, PDF reader) that aren't in default registry
-        expected_diff = len(open_source_tool_registry.get_tools()) - 6  # 6 is the expected default registry size
+        expected_diff = 6
+        if os.getenv("MISTRAL_API_KEY"):
+            expected_diff = 7
 
         assert (
             len(portia.tool_registry.get_tools())

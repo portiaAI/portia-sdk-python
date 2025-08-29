@@ -1,7 +1,6 @@
 """Example registry containing simple tools."""
 
 import os
-import warnings
 
 from portia.common import validate_extras_dependencies
 from portia.open_source_tools.calculator_tool import CalculatorTool
@@ -18,26 +17,8 @@ from portia.tool_registry import (
     ToolRegistry,
 )
 
-
-def _get_preferred_search_tool():
-    """Get the preferred search tool based on available API keys.
-    
-    Uses OpenAI search if OPENAI_API_KEY is available but no TAVILY_API_KEY.
-    Otherwise, uses Tavily search (default behavior).
-    """
-    has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
-    has_tavily_key = bool(os.getenv("TAVILY_API_KEY"))
-    
-    # If user has OpenAI key but no Tavily key, use OpenAI search
-    if has_openai_key and not has_tavily_key:
-        from portia.open_source_tools.openai_search_tool import OpenAISearchTool
-        return OpenAISearchTool()
-    # Otherwise, use Tavily search (default behavior)
-    else:
-        return SearchTool()
-
 example_tool_registry = ToolRegistry(
-    [CalculatorTool(), WeatherTool(), _get_preferred_search_tool(), LLMTool()],
+    [CalculatorTool(), WeatherTool(), SearchTool(), LLMTool()],
 )
 
 open_source_tool_registry = ToolRegistry(
@@ -50,7 +31,7 @@ open_source_tool_registry = ToolRegistry(
         ImageUnderstandingTool(),
         LLMTool(),
         MapTool(),
-        _get_preferred_search_tool(),
+        SearchTool(),
         WeatherTool(),
     ],
 )

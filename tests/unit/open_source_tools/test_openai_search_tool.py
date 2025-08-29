@@ -11,7 +11,6 @@ from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 from tests.utils import get_test_tool_context
 
 
-# Original tests for backward compatibility and integration with Response API
 def test_openai_search_tool_missing_api_key() -> None:
     """Test that OpenAISearchTool raises ToolHardError if API key is missing."""
     with patch("os.getenv", return_value=""):
