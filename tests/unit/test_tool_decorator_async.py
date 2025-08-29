@@ -30,10 +30,10 @@ async def test_basic_tool_decorator_async() -> None:
     tool_instance = add_numbers()
 
     # Check basic properties
-    assert tool_instance.id == "add_numbers"
-    assert tool_instance.name == "Add Numbers"
+    assert tool_instance.id == "local_function_add_numbers"
+    assert tool_instance.name == "Local Function Add Numbers"
     assert tool_instance.description == "Add two numbers together."
-    assert tool_instance.output_schema == ("int", "Output from add_numbers function")
+    assert tool_instance.output_schema == ("int", "Output from local_function_add_numbers function")
 
     # Test args schema
     schema = tool_instance.args_schema
@@ -194,10 +194,13 @@ async def test_weather_tool_example(monkeypatch: pytest.MonkeyPatch) -> None:
     tool_instance = weather_tool()
 
     # Check properties match expected format
-    assert tool_instance.id == "weather_tool"
-    assert tool_instance.name == "Weather Tool"
+    assert tool_instance.id == "local_function_weather_tool"
+    assert tool_instance.name == "Local Function Weather Tool"
     assert tool_instance.description == "Retrieve the weather of the provided city."
-    assert tool_instance.output_schema == ("str", "Output from weather_tool function")
+    assert tool_instance.output_schema == (
+        "str",
+        "Output from local_function_weather_tool function",
+    )
 
     # Check args schema has city parameter
     schema = tool_instance.args_schema
@@ -223,19 +226,8 @@ async def test_tool_class_naming() -> None:
     tool_instance = my_custom_tool()
 
     # Check the class name
-    assert tool_instance.__class__.__name__ == "MyCustomToolTool"
-    assert tool_instance.__class__.__qualname__ == "MyCustomToolTool"
-
-
-def test_tool_validation_missing_return_type() -> None:
-    """Test that tools without return type annotations are rejected."""
-
-    async def invalid_tool_func(a: int, b: int):  # type: ignore[no-untyped-def]  # noqa: ANN202
-        """Invalid tool function."""
-        return a + b
-
-    with pytest.raises(ValueError, match="must have a return type annotation"):
-        tool(invalid_tool_func)
+    assert tool_instance.__class__.__name__ == "LocalFunctionMyCustomToolTool"
+    assert tool_instance.__class__.__qualname__ == "LocalFunctionMyCustomToolTool"
 
 
 def test_tool_validation_non_callable() -> None:
@@ -296,7 +288,7 @@ async def test_tool_to_langchain() -> None:
     lc_tool = tool_instance.to_langchain(ctx)
 
     # Check properties
-    assert lc_tool.name == "Simple_Tool"
+    assert lc_tool.name == "Local_Function_Simple_Tool"
     assert "convert text to uppercase for langchain testing" in lc_tool.description.lower()
     assert lc_tool.args_schema == tool_instance.args_schema
 
@@ -337,8 +329,8 @@ async def test_annotated_string_description() -> None:
     tool_instance = say_hello()
 
     # Check that the tool was created properly
-    assert tool_instance.id == "say_hello"
-    assert tool_instance.name == "Say Hello"
+    assert tool_instance.id == "local_function_say_hello"
+    assert tool_instance.name == "Local Function Say Hello"
     assert tool_instance.description == "Say hello to someone."
 
     # Check the args schema
@@ -369,8 +361,8 @@ async def test_annotated_field_description() -> None:
     tool_instance = calculate_area()
 
     # Check that the tool was created properly
-    assert tool_instance.id == "calculate_area"
-    assert tool_instance.name == "Calculate Area"
+    assert tool_instance.id == "local_function_calculate_area"
+    assert tool_instance.name == "Local Function Calculate Area"
 
     # Check the args schema
     schema = tool_instance.args_schema
@@ -424,7 +416,7 @@ async def test_mixed_annotation_patterns() -> None:
     assert fields["required_regular"].annotation is int
     description = fields["required_regular"].description
     assert description is not None
-    assert "Parameter required_regular for mixed_function" in description
+    assert "Parameter required_regular for local_function_mixed_function" in description
 
     # Check optional_annotated
     assert "optional_annotated" in fields
@@ -584,9 +576,11 @@ def test_tool_with_context_parameter_name_invalid() -> None:
     """Test that tool with context parameter name invalid raises an error."""
     with pytest.raises(
         ValueError,
-        match="Tool tool_with_context_parameter_name_invalid has a ToolRunContext parameter that "
-        "is not named 'ctx' or 'context'. This is not allowed as it causes errors when the tool "
-        "inputs are validated.",
+        match=(
+            "Tool local_function_tool_with_context_parameter_name_invalid has a ToolRunContext "
+            "parameter that is not named 'ctx' or 'context'. This is not allowed as it causes "
+            "errors when the tool inputs are validated."
+        ),
     ):
 
         @tool

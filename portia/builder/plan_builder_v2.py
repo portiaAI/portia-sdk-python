@@ -9,7 +9,6 @@ from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import default_step_name
 from portia.builder.step_v2 import (
     ConditionalStep,
-    FunctionStep,
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
@@ -20,6 +19,7 @@ from portia.builder.step_v2 import (
 from portia.plan import PlanInput
 from portia.telemetry.telemetry_service import ProductTelemetry
 from portia.telemetry.views import PlanV2BuildTelemetryEvent
+from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -243,16 +243,13 @@ class PlanBuilderV2:
             step_name: Optional name for the step. If not provided, will be auto-generated.
 
         """
-        self.plan.steps.append(
-            FunctionStep(
-                function=function,
-                args=args or {},
-                output_schema=output_schema,
-                step_name=step_name or default_step_name(len(self.plan.steps)),
-                conditional_block=self._current_conditional_block,
-            )
+        tool_class = tool(function)
+        return self.invoke_tool_step(
+            tool=tool_class(),
+            args=args,
+            output_schema=output_schema,
+            step_name=step_name,
         )
-        return self
 
     def single_tool_agent_step(
         self,

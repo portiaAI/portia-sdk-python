@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel
 
+from portia.builder.conditionals import ConditionalBlockClauseType
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput
 from portia.builder.step_v2 import (
-    FunctionStep,
+    ConditionalStep,
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
@@ -21,9 +22,10 @@ from portia.builder.step_v2 import (
 )
 from portia.plan import PlanInput, Step
 from portia.tool import Tool
+from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
-    from portia.portia import RunContext
+    from portia.run_context import RunContext
 
 
 class OutputSchema(BaseModel):
@@ -279,8 +281,10 @@ class TestPlanBuilderV2:
 
         assert result is builder  # Should return self for chaining
         assert len(builder.plan.steps) == 1
-        assert isinstance(builder.plan.steps[0], FunctionStep)
-        assert builder.plan.steps[0].function is example_function_for_testing
+        assert isinstance(builder.plan.steps[0], InvokeToolStep)
+        assert not isinstance(builder.plan.steps[0].tool, str)
+        assert builder.plan.steps[0].tool.id == "local_function_example_function_for_testing"
+        assert builder.plan.steps[0].tool.name == "Local Function Example Function For Testing"
         assert builder.plan.steps[0].args == {}
         assert builder.plan.steps[0].output_schema is None
         assert builder.plan.steps[0].step_name == "step_0"
@@ -298,8 +302,10 @@ class TestPlanBuilderV2:
         )
 
         step = builder.plan.steps[0]
-        assert isinstance(step, FunctionStep)
-        assert step.function is example_function_for_testing
+        assert isinstance(step, InvokeToolStep)
+        assert not isinstance(step.tool, str)
+        assert step.tool.id == "local_function_example_function_for_testing"
+        assert step.tool.name == "Local Function Example Function For Testing"
         assert step.args == args
         assert step.output_schema == OutputSchema
         assert step.step_name == "func_step"
@@ -463,7 +469,7 @@ class TestPlanBuilderV2:
         assert len(plan.steps) == 4
         assert isinstance(plan.steps[0], LLMStep)
         assert isinstance(plan.steps[1], InvokeToolStep)
-        assert isinstance(plan.steps[2], FunctionStep)
+        assert isinstance(plan.steps[2], InvokeToolStep)
         assert isinstance(plan.steps[3], SingleToolAgentStep)
         assert plan.final_output_schema == OutputSchema
         assert plan.summarize is True
@@ -538,7 +544,7 @@ class TestPlanBuilderV2:
         assert tool_step.args["query"].step == 0
 
         func_step = plan.steps[2]
-        assert isinstance(func_step, FunctionStep)
+        assert isinstance(func_step, InvokeToolStep)
         assert isinstance(func_step.args["y"], StepOutput)
         assert func_step.args["y"].step == 1
 
@@ -561,8 +567,10 @@ class TestPlanBuilderV2:
         tool_step = InvokeToolStep(
             tool="search_tool", args={"query": "test"}, step_name="tool_step"
         )
-        func_step = FunctionStep(
-            function=example_function_for_testing, args={"x": 1, "y": "test"}, step_name="func_step"
+        func_step = InvokeToolStep(
+            tool=tool(example_function_for_testing)(),
+            args={"x": 1, "y": "test"},
+            step_name="func_step",
         )
         agent_step = SingleToolAgentStep(
             tool="agent_tool", task="Agent task", step_name="agent_step"
@@ -573,7 +581,7 @@ class TestPlanBuilderV2:
         assert len(builder.plan.steps) == 4
         assert isinstance(builder.plan.steps[0], LLMStep)
         assert isinstance(builder.plan.steps[1], InvokeToolStep)
-        assert isinstance(builder.plan.steps[2], FunctionStep)
+        assert isinstance(builder.plan.steps[2], InvokeToolStep)
         assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
 
     def test_add_steps_method_with_iterable(self) -> None:
@@ -583,8 +591,8 @@ class TestPlanBuilderV2:
         steps = [
             LLMStep(task="First task", step_name="step1"),
             InvokeToolStep(tool="test_tool", args={"input": "test"}, step_name="step2"),
-            FunctionStep(
-                function=example_function_for_testing,
+            InvokeToolStep(
+                tool=tool(example_function_for_testing)(),
                 args={"x": 42, "y": "hello"},
                 step_name="step3",
             ),
@@ -680,10 +688,13 @@ class TestPlanBuilderV2:
 
     def test_add_step_and_add_steps_integration(self) -> None:
         """Test integration of add_step and add_steps methods together."""
-        step_batch = [
-            InvokeToolStep(tool="batch_tool", args={}, step_name="batch1"),
-            FunctionStep(function=example_function_for_testing, args={}, step_name="batch2"),
-        ]
+        step_batch = (
+            PlanBuilderV2()
+            .invoke_tool_step(tool="batch_tool", args={}, step_name="batch1")
+            .function_step(function=example_function_for_testing, args={}, step_name="batch2")
+            .build()
+        )
+
         builder = (
             PlanBuilderV2()
             .add_step(LLMStep(task="Individual step", step_name="individual"))
@@ -701,6 +712,273 @@ class TestPlanBuilderV2:
         assert builder.plan.steps[2].step_name == "batch2"
         assert builder.plan.steps[3].step_name == "from_plan"
         assert builder.plan.steps[4].step_name == "final"
+
+    def test_basic_if_endif_block(self) -> None:
+        """Test basic if-endif conditional block."""
+        builder = PlanBuilderV2()
+
+        def test_condition() -> bool:
+            return True
+
+        result = builder.if_(test_condition).llm_step(task="Inside if block").endif()
+
+        assert result is builder
+        assert len(builder.plan.steps) == 3
+
+        # Check if step
+        if_step = builder.plan.steps[0]
+        assert isinstance(if_step, ConditionalStep)
+        assert if_step.condition is test_condition
+        assert if_step.args == {}
+        assert if_step.block_clause_type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
+        assert if_step.clause_index_in_block == 0
+        assert if_step.step_name == "step_0"
+
+        # Check LLM step inside block
+        llm_step = builder.plan.steps[1]
+        assert isinstance(llm_step, LLMStep)
+        assert llm_step.task == "Inside if block"
+        assert llm_step.conditional_block is not None
+        assert llm_step.conditional_block is if_step.conditional_block
+
+        # Check endif step
+        endif_step = builder.plan.steps[2]
+        assert isinstance(endif_step, ConditionalStep)
+        assert endif_step.block_clause_type == ConditionalBlockClauseType.END_CONDITION_BLOCK
+        assert endif_step.clause_index_in_block == 1
+        assert endif_step.conditional_block is if_step.conditional_block
+
+    def test_if_else_endif_block(self) -> None:
+        """Test if-else-endif conditional block."""
+        builder = PlanBuilderV2()
+
+        def test_condition() -> bool:
+            return False
+
+        result = (
+            builder.if_(test_condition)
+            .llm_step(task="Inside if block")
+            .else_()
+            .llm_step(task="Inside else block")
+            .endif()
+        )
+
+        assert result is builder
+        assert len(builder.plan.steps) == 5
+
+        # Check if step
+        if_step = builder.plan.steps[0]
+        assert isinstance(if_step, ConditionalStep)
+        assert if_step.block_clause_type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
+
+        # Check else step
+        else_step = builder.plan.steps[2]
+        assert isinstance(else_step, ConditionalStep)
+        assert else_step.block_clause_type == ConditionalBlockClauseType.ALTERNATE_CLAUSE
+        assert else_step.clause_index_in_block == 1
+        assert else_step.conditional_block is if_step.conditional_block
+
+        # Check endif step
+        endif_step = builder.plan.steps[4]
+        assert isinstance(endif_step, ConditionalStep)
+        assert endif_step.block_clause_type == ConditionalBlockClauseType.END_CONDITION_BLOCK
+
+    def test_if_else_if_else_endif_block(self) -> None:
+        """Test if-else_if-else-endif conditional block."""
+        builder = PlanBuilderV2()
+
+        def first_condition() -> bool:
+            return False
+
+        def second_condition() -> bool:
+            return True
+
+        result = (
+            builder.if_(first_condition)
+            .llm_step(task="Inside if block")
+            .else_if_(second_condition)
+            .llm_step(task="Inside else_if block")
+            .else_()
+            .llm_step(task="Inside else block")
+            .endif()
+        )
+
+        assert result is builder
+        assert len(builder.plan.steps) == 7
+
+        # Check if step
+        if_step = builder.plan.steps[0]
+        assert isinstance(if_step, ConditionalStep)
+        assert if_step.condition is first_condition
+        assert if_step.block_clause_type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
+        assert if_step.clause_index_in_block == 0
+
+        # Check else_if step
+        elif_step = builder.plan.steps[2]
+        assert isinstance(elif_step, ConditionalStep)
+        assert elif_step.condition is second_condition
+        assert elif_step.block_clause_type == ConditionalBlockClauseType.ALTERNATE_CLAUSE
+        assert elif_step.clause_index_in_block == 1
+        assert elif_step.conditional_block is if_step.conditional_block
+
+        # Check else step
+        else_step = builder.plan.steps[4]
+        assert isinstance(else_step, ConditionalStep)
+        assert else_step.block_clause_type == ConditionalBlockClauseType.ALTERNATE_CLAUSE
+        assert else_step.clause_index_in_block == 2
+        assert else_step.conditional_block is if_step.conditional_block
+
+        # Check endif step
+        endif_step = builder.plan.steps[6]
+        assert isinstance(endif_step, ConditionalStep)
+        assert endif_step.block_clause_type == ConditionalBlockClauseType.END_CONDITION_BLOCK
+        assert endif_step.clause_index_in_block == 3
+        assert endif_step.conditional_block is if_step.conditional_block
+
+    def test_nested_if_blocks(self) -> None:
+        """Test nested if blocks."""
+        builder = PlanBuilderV2()
+
+        def outer_condition() -> bool:
+            return True
+
+        def inner_condition() -> bool:
+            return False
+
+        result = (
+            builder.if_(outer_condition)
+            .llm_step(task="Outer if block")
+            .if_(inner_condition)
+            .llm_step(task="Inner if block")
+            .else_()
+            .llm_step(task="Inner else block")
+            .endif()
+            .llm_step(task="Back to outer if")
+            .endif()
+        )
+
+        assert result is builder
+        assert len(builder.plan.steps) == 9
+
+        # Check outer if
+        outer_if = builder.plan.steps[0]
+        assert isinstance(outer_if, ConditionalStep)
+        assert outer_if.condition is outer_condition
+        assert outer_if.conditional_block.parent_conditional_block is None  # pyright: ignore[reportOptionalMemberAccess]
+
+        # Check inner if
+        inner_if = builder.plan.steps[2]
+        assert isinstance(inner_if, ConditionalStep)
+        assert inner_if.condition is inner_condition
+        assert inner_if.conditional_block.parent_conditional_block is outer_if.conditional_block  # pyright: ignore[reportOptionalMemberAccess]
+
+        # Check inner else
+        inner_else = builder.plan.steps[4]
+        assert isinstance(inner_else, ConditionalStep)
+        assert inner_else.conditional_block is inner_if.conditional_block
+
+        # Check inner endif
+        inner_endif = builder.plan.steps[6]
+        assert isinstance(inner_endif, ConditionalStep)
+        assert inner_endif.conditional_block is inner_if.conditional_block
+
+        # Check outer endif
+        outer_endif = builder.plan.steps[8]
+        assert isinstance(outer_endif, ConditionalStep)
+        assert outer_endif.conditional_block is outer_if.conditional_block
+
+    def test_conditional_with_string_condition(self) -> None:
+        """Test conditional block with string condition."""
+        builder = PlanBuilderV2()
+
+        result = builder.if_("len(input_data) > 0").llm_step(task="Process data").endif()
+
+        assert result is builder
+        if_step = builder.plan.steps[0]
+        assert isinstance(if_step, ConditionalStep)
+        assert if_step.condition == "len(input_data) > 0"
+
+    def test_conditional_with_args(self) -> None:
+        """Test conditional block with arguments."""
+        builder = PlanBuilderV2()
+
+        def test_condition(value: int) -> bool:
+            return value > 10
+
+        args = {"value": Input("user_input")}
+        result = builder.if_(test_condition, args).llm_step(task="High value processing").endif()
+
+        assert result is builder
+        if_step = builder.plan.steps[0]
+        assert isinstance(if_step, ConditionalStep)
+        assert if_step.condition is test_condition
+        assert if_step.args == args
+
+    def test_else_if_without_if_raises_error(self) -> None:
+        """Test that else_if_ raises error when called without if_."""
+        builder = PlanBuilderV2()
+
+        def test_condition() -> bool:
+            return True
+
+        with pytest.raises(
+            PlanBuilderError, match="else_if_ must be called from a conditional block"
+        ):
+            builder.else_if_(test_condition)
+
+    def test_else_without_if_raises_error(self) -> None:
+        """Test that else_ raises error when called without if_."""
+        builder = PlanBuilderV2()
+
+        with pytest.raises(PlanBuilderError, match="else_ must be called from a conditional block"):
+            builder.else_()
+
+    def test_endif_without_if_raises_error(self) -> None:
+        """Test that endif raises error when called without if_."""
+        builder = PlanBuilderV2()
+
+        with pytest.raises(PlanBuilderError, match="endif must be called from a conditional block"):
+            builder.endif()
+
+    def test_build_with_missing_endif_raises_error(self) -> None:
+        """Test that build() raises error when endif is missing."""
+        builder = PlanBuilderV2()
+
+        def test_condition() -> bool:
+            return True
+
+        builder.if_(test_condition).llm_step(task="Inside if block")
+        # Missing endif()
+
+        with pytest.raises(PlanBuilderError, match="An endif must be called for all if_ steps"):
+            builder.build()
+
+    def test_conditional_method_chaining(self) -> None:
+        """Test that conditional methods return self for chaining."""
+        builder = PlanBuilderV2()
+
+        def condition1() -> bool:
+            return True
+
+        def condition2() -> bool:
+            return False
+
+        result = (
+            builder.input(name="test_input")
+            .if_(condition1)
+            .llm_step(task="First branch")
+            .else_if_(condition2)
+            .invoke_tool_step(tool="test_tool", args={"query": Input("test_input")})
+            .else_()
+            .function_step(function=example_function_for_testing, args={"x": 1, "y": "test"})
+            .endif()
+            .llm_step(task="After conditional")
+        )
+
+        assert result is builder
+        plan = builder.build()
+        assert len(plan.steps) == 8  # if, llm, else_if, tool, else, func, endif, final_llm
+        assert len(plan.plan_inputs) == 1
 
     def test_add_steps_with_input_values_single_value(self) -> None:
         """Test add_steps with input_values setting a single input value."""

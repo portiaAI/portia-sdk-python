@@ -432,6 +432,39 @@ def test_plan_v2_unclosed_conditionals_complex() -> None:
         )
 
 
+def test_plan_v2_else_if_before_if_raises_error() -> None:
+    """Test that using else_if before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_if_(condition=lambda: True)
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_else_before_if_raises_error() -> None:
+    """Test that using else before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_endif_before_if_raises_error() -> None:
+    """Test that using endif before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .endif()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
 def test_plan_v2_conditional_if_without_else_if() -> None:
     """Test else_if is optional."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -885,6 +918,25 @@ def test_example_builder_plan_scenarios(
     assert len(final_output.receipt) > 0
 
 
+def collect_fn(
+    top_no_def: str,
+    top_with_def: str,
+    sub_no_def_1: str,
+    sub_no_def_2: str,
+    sub_with_def_1: str,
+    sub_with_def_2: str,
+) -> dict[str, str]:
+    """Collect all input values."""
+    return {
+        "top_input_no_default": top_no_def,
+        "top_input_with_default": top_with_def,
+        "sub_input_no_default_1": sub_no_def_1,
+        "sub_input_no_default_2": sub_no_def_2,
+        "sub_input_with_default_1": sub_with_def_1,
+        "sub_input_with_default_2": sub_with_def_2,
+    }
+
+
 def test_plan_v2_input_linking_with_add_steps() -> None:
     """Test input linking between top-level plan and sub-plan using add_steps with input_values."""
     config = Config.from_default()
@@ -939,14 +991,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
         )
         # Final step that outputs all input values for verification
         .function_step(
-            function=lambda **kwargs: {
-                "top_input_no_default": kwargs["top_no_def"],
-                "top_input_with_default": kwargs["top_with_def"],
-                "sub_input_no_default_1": kwargs["sub_no_def_1"],
-                "sub_input_no_default_2": kwargs["sub_no_def_2"],
-                "sub_input_with_default_1": kwargs["sub_with_def_1"],
-                "sub_input_with_default_2": kwargs["sub_with_def_2"],
-            },
+            function=collect_fn,
             args={
                 "top_no_def": Input("top_input_no_default"),
                 "top_with_def": Input("top_input_with_default"),
