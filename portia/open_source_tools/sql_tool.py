@@ -212,12 +212,12 @@ class BaseSQLTool(Tool[Any]):
     output_schema: tuple[str, str] = ("json", "JSON result for the SQL operation")
 
     # Use a private attribute to avoid Pydantic BaseModel field restrictions
-    _adapter: SQLAdapter = PrivateAttr()
+    _adapter: SQLAdapter | None = PrivateAttr(default=None)
 
     def __init__(self, adapter: SQLAdapter | None = None) -> None:
         """Initialize the tool with an optional adapter (defaults to SQLite)."""
         super().__init__()
-        self._adapter = adapter or self._adapter_from_env()
+        self._adapter = adapter
 
     def _adapter_from_env(self) -> SQLAdapter:
         """Create an adapter from environment variables (SQLite only for now)."""
@@ -235,12 +235,18 @@ class BaseSQLTool(Tool[Any]):
             raise ToolSoftError(f"Invalid config_json: {e}") from e
         db_path = cfg.get("db_path")
         if not isinstance(db_path, str) or not db_path:
-            raise ToolSoftError("config_json must include a non-empty 'db_path' for SQLite")
+            raise ToolSoftError(
+                "config_json must include a non-empty 'db_path' for SQLite"
+            )
         return SQLiteAdapter(SQLiteConfig(db_path=db_path))
 
     def _get_adapter(self, config_json: str | None = None) -> SQLAdapter:
         """Get the appropriate adapter based on config."""
-        return self._adapter_from_config_json(config_json) or self._adapter
+        return (
+            self._adapter_from_config_json(config_json)
+            or self._adapter
+            or self._adapter_from_env()
+        )
 
 
 class RunSQLArgs(BaseSQLToolArgs):
@@ -304,11 +310,8 @@ class GetTableSchemasTool(BaseSQLTool):
     id: str = "get_table_schemas"
     name: str = "Get Table Schemas"
     description: str = (
-        "Get detailed schema information (columns, types, etc.) for specified tables. Returns column details including name, type, nullability, and primary key info. "
-        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
-        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
-        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
-    )
+                "Get detailed schema information (columns, types, etc.) for specified tables. "        "Returns column details including name, type, nullability, and primary key info. "        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "        'config_json format: {"db_path": "/path/to/database.db"} where db_path is the SQLite database file path. '        'Use ":memory": for in-memory database. Default: :memory: if no config provided.'    )
+    
     args_schema: Type[GetTableSchemasArgs] = GetTableSchemasArgs
 
     def run(self, _: ToolRunContext, **kwargs: Any) -> Any:
@@ -328,12 +331,11 @@ class CheckSQLTool(BaseSQLTool):
 
     id: str = "check_sql"
     name: str = "Check SQL Query"
-    description: str = (
-        "Check if a SQL query is valid without executing it. Uses EXPLAIN to validate syntax and table/column references. Only SELECT queries are allowed. Returns {ok: true} for valid queries or {ok: false, error: 'message'} for invalid ones. "
-        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
-        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
-        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
-    )
+    description: str = """Check if a SQL query is valid without executing it. Uses EXPLAIN to validate syntax and table/column references.
+        Only SELECT queries are allowed. Returns {ok: true} for valid queries or {ok: false, error: 'message'} for invalid ones.
+        Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter.
+        config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path.
+        Use \":memory:\" for in-memory database. Default: :memory: if no config provided."""
     args_schema: Type[CheckSQLArgs] = CheckSQLArgs
 
     def run(self, _: ToolRunContext, **kwargs: Any) -> Any:
