@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
 
-from portia.clarification_handler import ClarificationHandler  # noqa: TC001 - pydantic
+from portia.clarification_handler import ClarificationHandler  
 from portia.cli_clarification_handler import CLIClarificationHandler
 from portia.config import Config, GenerativeModelsConfig
 from portia.errors import InvalidConfigError
@@ -495,7 +495,6 @@ def _get_template_config(template: str) -> dict:
             'execution_agent_type': 'ONE_SHOT'
         }
     elif template == 'mixed':
-        # For 'mixed', you can still use hardcoded or combine as needed
         return {
             'default_model': Config(llm_provider=LLMProvider.OPENAI).get_agent_default_model('default_model', LLMProvider.OPENAI),
             'planning_model': Config(llm_provider=LLMProvider.ANTHROPIC).get_agent_default_model('planning_model', LLMProvider.ANTHROPIC),
@@ -505,7 +504,6 @@ def _get_template_config(template: str) -> dict:
             'default_log_level': 'INFO'
         }
     else:
-        # Fallback: minimal config
         return {
             "llm_provider": "",
             "default_model": "",

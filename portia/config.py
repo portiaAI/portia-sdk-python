@@ -365,8 +365,7 @@ class GenerativeModelsConfig(BaseModel):
         return new_data
 
 
-# By default, cache for 1 day. Most of our prompts have the current date in them, so we don't
-# need to cache for longer than a day.
+
 CACHE_TTL_SECONDS = 60 * 60 * 24
 
 
@@ -506,8 +505,6 @@ class Config(BaseModel):
     def parse_feature_flags(self) -> Self:
         """Add feature flags if not provided."""
         self.feature_flags = {
-            # Fill here with any default feature flags.
-            # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             **self.feature_flags,
         }
@@ -549,9 +546,6 @@ class Config(BaseModel):
     )
 
     # Logging Options
-
-    # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
-    # where as setting it to ERROR will only display ERROR and above.
     default_log_level: LogLevel = Field(
         default=LogLevel.INFO,
         description="The log level to log at. Only respected when the default logger is used.",
@@ -563,19 +557,17 @@ class Config(BaseModel):
         """Parse default_log_level to enum if string provided."""
         return parse_str_to_enum(value, LogLevel)
 
-    # default_log_sink controls where default logs are sent. By default this is STDOUT (sys.stdout)
-    # but can also be set to STDERR (sys.stderr)
-    # or to a file by setting this to a file path ("./logs.txt")
+
     default_log_sink: str = Field(
         default="sys.stdout",
         description="Where to send logs. By default logs will be sent to sys.stdout",
     )
-    # json_log_serialize sets whether logs are JSON serialized before sending to the log sink.
+    
     json_log_serialize: bool = Field(
         default=False,
         description="Whether to serialize logs to JSON",
     )
-    # Agent Options
+   
     execution_agent_type: ExecutionAgentType = Field(
         default=ExecutionAgentType.ONE_SHOT,
         description="The default agent type to use.",
@@ -587,7 +579,7 @@ class Config(BaseModel):
         """Parse execution_agent_type to enum if string provided."""
         return parse_str_to_enum(value, ExecutionAgentType)
 
-    # PlanningAgent Options
+    
     planning_agent_type: PlanningAgentType = Field(
         default=PlanningAgentType.DEFAULT,
         description="The default planning_agent_type to use.",
@@ -1110,7 +1102,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         warnings.warn("No API keys found for any LLM provider", stacklevel=2, category=UserWarning)
         llm_provider = None
 
-    # Handle deprecated llm_model_name keyword argument
+    
     if llm_model_name := kwargs.pop("llm_model_name", None):
         warnings.warn(
             "llm_model_name is deprecated and will be removed in a future version. Use "
@@ -1168,7 +1160,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     )
     env_overrides = {}
     
-    # API Keys from environment
+    
     if os.getenv("PORTIA_API_KEY") and "portia_api_key" not in kwargs:
         env_overrides["portia_api_key"] = SecretStr(os.getenv("PORTIA_API_KEY"))
     if os.getenv("OPENAI_API_KEY") and "openai_api_key" not in kwargs:
@@ -1186,7 +1178,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     if os.getenv("OPENROUTER_API_KEY") and "openrouter_api_key" not in kwargs:
         env_overrides["openrouter_api_key"] = SecretStr(os.getenv("OPENROUTER_API_KEY"))
     
-    # Other environment variables
+    
     if os.getenv("PORTIA_API_ENDPOINT") and "portia_api_endpoint" not in kwargs:
         env_overrides["portia_api_endpoint"] = os.getenv("PORTIA_API_ENDPOINT")
     if os.getenv("PORTIA_DASHBOARD_URL") and "portia_dashboard_url" not in kwargs:
@@ -1207,7 +1199,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     # Merge env overrides with kwargs (kwargs take precedence over env vars)
     final_kwargs = {**env_overrides, **kwargs}
 
-    # Determine default storage class
+   
     default_storage_class = (
         StorageClass.CLOUD if (os.getenv("PORTIA_API_KEY") or final_kwargs.get("portia_api_key"))
         else StorageClass.MEMORY

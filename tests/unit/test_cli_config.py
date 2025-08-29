@@ -50,7 +50,7 @@ def mock_portia_cls() -> MagicMock:
 @pytest.fixture(autouse=True)
 def mock_config_get_generative_model() -> None:
     """Avoid real model initialization inside CLI."""
-    # Remove the typo patch
+    
     with patch.object(Config, "get_generative_model") as mock_get_generative_model:
         mock_get_generative_model.return_value = MagicMock(spec=GenerativeModel)
         yield None
@@ -199,7 +199,7 @@ def test_cli_list_tools(temp_config_dir: Path) -> None:
     """Test listing available tools."""
     llm_tool = LLMTool()
     with patch("portia.cli.DefaultToolRegistry", autospec=True) as mock_tool_registry:
-        mock_tool_registry.return_value.get_tools.return_value = [llm_tool]  # <-- Fix here
+        mock_tool_registry.return_value.get_tools.return_value = [llm_tool]  
         runner = CliRunner()
         result = runner.invoke(cli, ["list-tools"])
     assert result.exit_code == 0
