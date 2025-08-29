@@ -8,7 +8,11 @@ from pathlib import Path
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from portia.clarification import Clarification, MultipleChoiceClarification
+from portia.clarification import (
+    Clarification,
+    MultipleChoiceClarification,
+    UserVerificationClarification,
+)
 from portia.errors import ToolHardError
 from portia.tool import Tool, ToolRunContext
 
@@ -59,6 +63,18 @@ class FileReaderTool(Tool[str]):
 
         alt_file_paths = self.find_file(file_path)
         if alt_file_paths:
+            # Handle single file match with UserVerificationClarification
+            if len(alt_file_paths) == 1:
+                return UserVerificationClarification(
+                    plan_run_id=ctx.plan_run.id,
+                    user_guidance=(
+                        f"Found {filename} at: {alt_file_paths[0]}. "
+                        "Do you want to read this file?"
+                    ),
+                    source="File reader tool",
+                )
+
+            # Handle multiple file matches with MultipleChoiceClarification
             return MultipleChoiceClarification(
                 plan_run_id=ctx.plan_run.id,
                 argument_name="filename",
