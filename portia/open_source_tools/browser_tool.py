@@ -321,9 +321,8 @@ class BrowserTool(Tool[str | BaseModel]):
                 "Browser-use docs recommend full URLs like 'https://example.com' for clarity."
             )
 
-    @classmethod
     def _create_browser_context_config(
-        cls, allowed_domains: list[str] | None
+        self, allowed_domains: list[str] | None
     ) -> BrowserContextConfig:
         """Create BrowserContextConfig with optional allowed_domains.
 
@@ -516,9 +515,8 @@ class BrowserToolForUrl(BrowserTool):
                     raise ValueError(f"Invalid domain in allowed_domains: {domain}")
 
         super().__init__(
-            id=id
-            or f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}",
-            name=name or f"Browser Tool for {url.replace('https://', '').replace('http://', '')}",
+            id=id or "browser_tool",
+            name=name or "Browser Tool",
             description=description
             or (
                 f"Browser tool specifically configured for {url}. Can be used to navigate to this URL and complete tasks. "
@@ -572,21 +570,6 @@ class BrowserInfrastructureProvider(ABC):
     def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g. release the session if needed."""
 
-    def _create_browser_context_config(
-        self, allowed_domains: list[str] | None
-    ) -> BrowserContextConfig:
-        """Create BrowserContextConfig with optional allowed_domains.
-
-        Args:
-            allowed_domains: List of allowed domains or None
-
-        Returns:
-            Configured BrowserContextConfig instance
-
-        """
-        if allowed_domains is not None:
-            return BrowserContextConfig(allowed_domains=allowed_domains)
-        return BrowserContextConfig()
 
 
 class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):

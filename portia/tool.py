@@ -604,47 +604,48 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
         # Handle Clarifications
         if isinstance(output_value, list) and output_value and "category" in output_value[0]:
             clarification = output_value[0]
-            if clarification["category"] == ClarificationCategory.ACTION:
-                return LocalDataValue(
-                    value=ActionClarification(
-                        plan_run_id=ctx.plan_run.id,
-                        id=ClarificationUUID.from_string(clarification["id"]),
-                        action_url=HttpUrl(clarification["action_url"]),
-                        user_guidance=clarification["user_guidance"],
-                        source="Portia remote tool",
-                    ),
-                )
-            elif clarification["category"] == ClarificationCategory.INPUT:
-                return LocalDataValue(
-                    value=InputClarification(
-                        plan_run_id=ctx.plan_run.id,
-                        id=ClarificationUUID.from_string(clarification["id"]),
-                        argument_name=clarification["argument_name"],
-                        user_guidance=clarification["user_guidance"],
-                        source="Portia remote tool",
-                    ),
-                )
-            elif clarification["category"] == ClarificationCategory.MULTIPLE_CHOICE:
-                return LocalDataValue(
-                    value=MultipleChoiceClarification(
-                        plan_run_id=ctx.plan_run.id,
-                        id=ClarificationUUID.from_string(clarification["id"]),
-                        argument_name=clarification["argument_name"],
-                        user_guidance=clarification["user_guidance"],
-                        options=clarification["options"],
-                        source="Portia remote tool",
-                    ),
-                )
-            elif clarification["category"] == ClarificationCategory.VALUE_CONFIRMATION:
-                return LocalDataValue(
-                    value=ValueConfirmationClarification(
-                        plan_run_id=ctx.plan_run.id,
-                        id=ClarificationUUID.from_string(clarification["id"]),
-                        argument_name=clarification["argument_name"],
-                        user_guidance=clarification["user_guidance"],
-                        source="Portia remote tool",
-                    ),
-                )
+            match clarification["category"]:
+                case ClarificationCategory.ACTION:
+                    return LocalDataValue(
+                        value=ActionClarification(
+                            plan_run_id=ctx.plan_run.id,
+                            id=ClarificationUUID.from_string(clarification["id"]),
+                            action_url=HttpUrl(clarification["action_url"]),
+                            user_guidance=clarification["user_guidance"],
+                            source="Portia remote tool",
+                        ),
+                    )
+                case ClarificationCategory.INPUT:
+                    return LocalDataValue(
+                        value=InputClarification(
+                            plan_run_id=ctx.plan_run.id,
+                            id=ClarificationUUID.from_string(clarification["id"]),
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                            source="Portia remote tool",
+                        ),
+                    )
+                case ClarificationCategory.MULTIPLE_CHOICE:
+                    return LocalDataValue(
+                        value=MultipleChoiceClarification(
+                            plan_run_id=ctx.plan_run.id,
+                            id=ClarificationUUID.from_string(clarification["id"]),
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                            options=clarification["options"],
+                            source="Portia remote tool",
+                        ),
+                    )
+                case ClarificationCategory.VALUE_CONFIRMATION:
+                    return LocalDataValue(
+                        value=ValueConfirmationClarification(
+                            plan_run_id=ctx.plan_run.id,
+                            id=ClarificationUUID.from_string(clarification["id"]),
+                            argument_name=clarification["argument_name"],
+                            user_guidance=clarification["user_guidance"],
+                            source="Portia remote tool",
+                        ),
+                    )
         return output
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:

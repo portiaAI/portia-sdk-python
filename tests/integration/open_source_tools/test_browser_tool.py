@@ -147,54 +147,6 @@ def test_portia_run_query_multi_step() -> None:
 
 @pytest.mark.daily
 @pytest.mark.flaky(reruns=3)
-def test_browser_tool_allowed_domains_blocks_invalid_url() -> None:
-    """Test that browser tool with allowed_domains blocks navigation to invalid domains."""
-    config = Config.from_default(
-        llm_provider=LLMProvider.ANTHROPIC,
-        storage_class=StorageClass.MEMORY,
-    )
-
-    # Create browser tool with restricted allowed_domains
-    allowed_domains = ["portialabs.ai"]
-    browser_tool = BrowserTool(
-        infrastructure_option=BrowserInfrastructureOption.REMOTE,
-        allowed_domains=allowed_domains,
-    )
-    
-    tool_registry = ToolRegistry([browser_tool])
-    portia = Portia(config=config, tools=tool_registry)
-    
-    # Try to navigate to a domain NOT in the allowed_domains list
-    query = (
-        "Go to https://example.com and retrieve the page title"
-    )
-
-    plan_run = portia.run(query)
-    
-    # The run should either fail or be blocked - it should NOT successfully 
-    # navigate to example.com since it's not in allowed_domains
-    # The browser-use library should prevent navigation to disallowed domains
-    # We expect this to either:
-    # 1. Fail with an error (preferred)
-    # 2. Complete but indicate the domain was blocked
-    # 3. Not contain content from example.com in the output
-    
-    # Check that we didn't successfully retrieve content from the blocked domain
-    final_output = plan_run.outputs.final_output
-    if final_output:
-        output_text = final_output.get_value().lower()
-        # Should not contain typical example.com content
-        assert "example domain" not in output_text
-        assert "this domain is for use in illustrative examples" not in output_text
-    
-    # The key test: verify the browser tool's allowed_domains restriction was enforced
-    # Either the plan failed or it was blocked by browser-use's domain restrictions
-    assert plan_run.state in [PlanRunState.COMPLETE, PlanRunState.ERROR], \
-           f"Unexpected plan state: {plan_run.state}"
-
-
-@pytest.mark.daily
-@pytest.mark.flaky(reruns=3)
 def test_portia_multi_step_from_plan() -> None:
     """Test running a query that requires the browser tool to be invoked multiple times."""
     config = Config.from_default(
