@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.execution_agents.output import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
@@ -33,7 +32,7 @@ class Reference(BaseModel, ABC):
         raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
-    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
+    def get_value(self, run_data: RunContext) -> Any | None:  # noqa: ANN401
         """Get the value of the reference."""
         raise NotImplementedError  # pragma: no cover
 
@@ -71,15 +70,24 @@ class StepOutput(Reference):
         return f"{{{{ StepOutput({self.step}) }}}}"
 
     @override
-    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
+    def get_value(self, run_data: RunContext) -> Any | None:
         """Get the value of the step output."""
         for step_output in run_data.step_output_values:
             if isinstance(self.step, int) and step_output.step_num == self.step:
-                return step_output
+                return step_output.value
             if isinstance(self.step, str) and step_output.step_name == self.step:
-                return step_output
+                return step_output.value
         logger().warning(f"Output value for step {self.step} not found")
         return None
+
+    def get_description(self, run_data: RunContext) -> str:
+        """Get the description of the step output."""
+        for step_output in run_data.step_output_values:
+            if isinstance(self.step, int) and step_output.step_num == self.step:
+                return step_output.description
+            if isinstance(self.step, str) and step_output.step_name == self.step:
+                return step_output.description
+        return ""
 
 
 class Input(Reference):
@@ -105,7 +113,7 @@ class Input(Reference):
         return self.name
 
     @override
-    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
+    def get_value(self, run_data: RunContext) -> Any | None:
         """Get the value of the input."""
         plan_input = next(
             (_input for _input in run_data.plan.plan_inputs if _input.name == self.name), None
@@ -113,19 +121,12 @@ class Input(Reference):
         if not plan_input:
             logger().warning(f"Input {self.name} not found in plan")
             return None
-        value = run_data.plan_run.plan_run_inputs.get(self.name)
-        if not value:
+        local_data_value = run_data.plan_run.plan_run_inputs.get(self.name)
+        if not local_data_value:
             logger().warning(f"Value not found for input {self.name}")
             return None
-
-        underlying_value = value.get_value()
-        if isinstance(underlying_value, Reference):
-            return underlying_value.get_value(run_data=run_data)
-
-        return ReferenceValue(
-            value=value,
-            description=plan_input.description or "Input to plan",
-        )
+        value = local_data_value.get_value()
+        return value.get_value(run_data=run_data) if isinstance(value, Reference) else value
 
     def __str__(self) -> str:
         """Get the string representation of the input."""
@@ -133,10 +134,3 @@ class Input(Reference):
         # in PlanBuilderV2 steps. The double braces are used when the plan is running to template
         # the input value so it can be substituted at runtime.
         return f"{{{{ Input({self.name}) }}}}"
-
-
-class ReferenceValue(BaseModel):
-    """Value that can be referenced."""
-
-    value: Output = Field(description="The referenced value.")
-    description: str = Field(description="Description of the referenced value.", default="")

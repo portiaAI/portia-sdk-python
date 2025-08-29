@@ -2807,7 +2807,7 @@ class Portia:
                     StepOutputValue(
                         step_name=step.step_name,
                         step_num=i,
-                        value=output_value,
+                        value=result,
                         description=(f"Output from step '{step.step_name}' (Description: {step})"),
                     )
                 )
@@ -2836,7 +2836,7 @@ class Portia:
                     StepOutputValue(
                         step_name=step.step_name,
                         step_num=i,
-                        value=error_value,
+                        value=str(e),
                         description=f"Error from step '{step.step_name}' (Description: {step})",
                     )
                 )
