@@ -25,7 +25,7 @@ from portia.tool import Tool
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
-    from portia.portia import RunContext
+    from portia.run_context import RunContext
 
 
 class OutputSchema(BaseModel):
