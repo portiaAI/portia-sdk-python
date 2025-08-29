@@ -233,13 +233,13 @@ def test_profile_precedence(temp_config_dir: Path) -> None:
     with open(config_file, "w") as f:
         toml.dump(data, f)
 
-    # Mock _get_config so the CLI uses a controlled config and avoids network
+    
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch("portia.cli._get_config") as mock_get_config:
             mock_cli_config = Mock()
             mock_config = Mock()
 
-            # Ensure SecretStr for keys, but plain string for URLs/endpoints
+           
             def must_get_side_effect(*args, **kwargs):
                 key = args[0] if args else None
                 if key and "key" in str(key).lower():
@@ -254,14 +254,14 @@ def test_profile_precedence(temp_config_dir: Path) -> None:
 
             mock_get_config.return_value = (mock_cli_config, mock_config)
 
-            # Avoid real tool registry init and usage
+            
             with patch("portia.tool_registry.DefaultToolRegistry") as MockRegistry:
                 mock_registry = MockRegistry.return_value
                 mock_tool = Mock()
                 mock_tool.pretty.return_value = "Mock Tool\nDescription: A test tool"
                 mock_registry.get_tools.return_value = [mock_tool]
 
-                # Patch httpx.Client.get to avoid real HTTP requests
+                
                 with patch("httpx.Client.get") as mock_httpx_get:
                     mock_httpx_get.return_value = Mock(status_code=200, json=lambda: {"tools": []})
 
@@ -275,21 +275,21 @@ def test_profile_precedence(temp_config_dir: Path) -> None:
                     
 def test_cli_config_create_and_list(temp_config_dir):
         runner = CliRunner()
-        # Create a new profile
+       
         result = runner.invoke(cli, ["config", "create", "myprofile"])
         assert result.exit_code == 0
-        # List profiles and check new profile is present
+        
         result = runner.invoke(cli, ["config", "list"])
         assert "myprofile" in result.output
 
 def test_cli_config_set_and_get(temp_config_dir):
     runner = CliRunner()
-    # Create profile first
+    
     runner.invoke(cli, ["config", "create", "myprofile"])
-    # Set a value
+    
     result = runner.invoke(cli, ["config", "set", "myprofile", "llm_provider=openai"])
     assert result.exit_code == 0
-    # Get the value
+    
     result = runner.invoke(cli, ["config", "get", "myprofile", "llm_provider"])
     assert "openai" in result.output
 
@@ -297,17 +297,17 @@ def test_cli_config_set_default_and_get(temp_config_dir):
     runner = CliRunner()
     runner.invoke(cli, ["config", "create", "foo"])
     runner.invoke(cli, ["config", "create", "bar"])
-    # Set default profile
+   
     result = runner.invoke(cli, ["config", "set-default", "bar"])
     assert result.exit_code == 0
-    # Get default profile
+    
     result = runner.invoke(cli, ["config", "get", "bar"])
     assert result.exit_code == 0
 
 def test_cli_config_delete(temp_config_dir):
     runner = CliRunner()
     runner.invoke(cli, ["config", "create", "todelete"])
-    # Delete the profile, confirm with 'y'
+   
     result = runner.invoke(cli, ["config", "delete", "todelete"], input="y\n")
     assert result.exit_code == 0
     result = runner.invoke(cli, ["config", "list"])
@@ -322,6 +322,5 @@ def test_cli_config_path(temp_config_dir):
 def test_cli_config_validate(temp_config_dir):
     runner = CliRunner()
     runner.invoke(cli, ["config", "create", "validprofile"])
-    # Should succeed for a valid (empty) profile
     result = runner.invoke(cli, ["config", "validate", "validprofile"])
     assert result.exit_code == 0

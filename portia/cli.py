@@ -78,7 +78,7 @@ def generate_cli_option_from_pydantic_field(
     """Generate a click option from a pydantic field."""
     option_name = field.replace("_", "-")
 
-    # Don't support passing API Keys as options as it leaks them to history/logs etc
+    
     if option_name.endswith("api-key"):
         return f
 
@@ -184,10 +184,10 @@ def run(
     profile = ctx.obj.get('profile') if ctx.obj else None
     cli_config, config = _get_config(profile=profile, **kwargs)
 
-    # Add the tool registry
+   
     registry = DefaultToolRegistry(config)
 
-    # Run the query
+   
     portia = Portia(
         config=config,
         tools=(
@@ -258,25 +258,25 @@ def create(profile_name: str, template: str | None = None) -> None:
     config_file = get_config_file_path()
     ensure_config_directory()
     
-    # Create config file if it doesn't exist
+    
     if not config_file.exists():
         initial_config = {"profile": {}}
         with open(config_file, "w") as f:
             toml.dump(initial_config, f)
     
-    # Load existing config
+    
     with open(config_file, "r") as f:
         data = toml.load(f)
     
     if "profile" not in data:
         data["profile"] = {}
     
-    # Check if profile already exists
+    
     if profile_name in data["profile"]:
         if not click.confirm(f"Profile '{profile_name}' already exists. Overwrite?"):
             return
     
-    # Create profile with template or empty
+    
     if template:
         profile_config = _get_template_config(template)
     else:
@@ -289,7 +289,7 @@ def create(profile_name: str, template: str | None = None) -> None:
     
     data["profile"][profile_name] = profile_config
     
-    # Write back to file
+   
     with open(config_file, "w") as f:
         toml.dump(data, f)
     
@@ -308,11 +308,11 @@ def set_default(profile_name: str) -> None:
         click.echo(f"❌ Profile '{profile_name}' not found. Available: {', '.join(profiles)}")
         return
     
-    # Set environment variable (you could also store in config file)
+    
     import os
     os.environ["PORTIA_DEFAULT_PROFILE"] = profile_name
     
-    # For persistence, you could write to a separate file or section
+    
     config_dir = ensure_config_directory()
     default_file = config_dir / "default_profile"
     with open(default_file, "w") as f:
@@ -334,7 +334,7 @@ def set(profile_name: str, assignments: tuple[str, ...]) -> None:
         click.echo("❌ No config file found. Run 'portia-cli config create <profile>' first.")
         return
     
-    # Parse key=value assignments
+   
     updates = {}
     for assignment in assignments:
         if '=' not in assignment:
@@ -342,19 +342,19 @@ def set(profile_name: str, assignments: tuple[str, ...]) -> None:
             return
         key, value = assignment.split('=', 1)
         
-        # Handle boolean values
+        
         if value.lower() in ('true', 'false'):
             value = value.lower() == 'true'
-        # Handle integer values
+        
         elif value.isdigit():
             value = int(value)
-        # Handle None
+        
         elif value.lower() == 'null':
             value = None
         
         updates[key] = value
     
-    # Load and update config
+   
     with open(config_file, "r") as f:
         data = toml.load(f)
     
@@ -362,10 +362,10 @@ def set(profile_name: str, assignments: tuple[str, ...]) -> None:
         click.echo(f"❌ Profile '{profile_name}' not found. Create it first.")
         return
     
-    # Update values
+    
     data["profile"][profile_name].update(updates)
     
-    # Write back
+    
     with open(config_file, "w") as f:
         toml.dump(data, f)
     
@@ -515,7 +515,7 @@ def _get_template_config(template: str) -> dict:
 
 def _get_config(
     profile: str | None = None,
-    **kwargs,  # noqa: ANN003
+    **kwargs,  
 ) -> tuple[CLIConfig, Config]:
     """Init config."""
     cli_config = CLIConfig(**kwargs)
@@ -524,10 +524,8 @@ def _get_config(
     
     try:
         if profile:
-            # Use profile system
             config = Config.from_local_config(profile=profile, **kwargs)
         else:
-            # Use traditional method
             config = Config.from_default(**kwargs)
     except InvalidConfigError as e:
         logger().error(e.message)
