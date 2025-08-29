@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from portia.clarification import MultipleChoiceClarification
+from portia.clarification import MultipleChoiceClarification, UserVerificationClarification
 from portia.errors import ToolHardError
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from tests.utils import get_test_tool_context
@@ -103,7 +103,7 @@ def test_file_reader_tool_unsupported_format(tmp_path: Path) -> None:
 
 
 def test_file_reader_tool_file_alt_files(tmp_path: Path) -> None:
-    """Test that FileReaderTool raises an error when file is not found."""
+    """Test that FileReaderTool returns UserVerificationClarification for single file match."""
     tool = FileReaderTool()
     ctx = get_test_tool_context()
     filename = tmp_path / "non_existent.txt"
@@ -116,12 +116,38 @@ def test_file_reader_tool_file_alt_files(tmp_path: Path) -> None:
     alt_filename.write_text(content, encoding="utf-8")
 
     output = tool.run(ctx, str(filename))
+    # Single file match should return UserVerificationClarification
+    assert isinstance(output, UserVerificationClarification)
+    assert "Do you want to read this file?" in output.user_guidance
+    assert str(alt_filename) in output.user_guidance
+
+
+def test_file_reader_tool_multiple_alt_files(tmp_path: Path) -> None:
+    """Test that FileReaderTool returns MultipleChoiceClarification for multiple file matches."""
+    tool = FileReaderTool()
+    ctx = get_test_tool_context()
+    filename = tmp_path / "non_existent.txt"
+
+    # Create multiple matching files
+    subfolder1 = tmp_path / "test1"
+    subfolder1.mkdir()
+    alt_filename1 = subfolder1 / "non_existent.txt"
+    alt_filename1.write_text("Hello from file 1!", encoding="utf-8")
+
+    subfolder2 = tmp_path / "test2"
+    subfolder2.mkdir()
+    alt_filename2 = subfolder2 / "non_existent.txt"
+    alt_filename2.write_text("Hello from file 2!", encoding="utf-8")
+
+    output = tool.run(ctx, str(filename))
+    # Multiple file matches should return MultipleChoiceClarification
     assert isinstance(output, MultipleChoiceClarification)
     assert isinstance(output.options, list)
-    assert len(output.options) == 1
-    assert output.options[0] == str(alt_filename)
+    assert len(output.options) == 2
+    assert str(alt_filename1) in output.options
+    assert str(alt_filename2) in output.options
+    assert "Pick one to continue:" in output.user_guidance
     assert str(filename) in output.user_guidance
-    assert str(alt_filename) in output.user_guidance
 
 
 def test_file_reader_tool_file_no_files(tmp_path: Path) -> None:
