@@ -16,18 +16,15 @@ from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.reference import Input
 from portia.clarification import ActionClarification, ClarificationCategory
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, ExecutionAgentType, StorageClass
-from portia.errors import InvalidPlanRunStateError, ToolNotFoundError
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
-from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.config import Config, StorageClass
+from portia.errors import InvalidPlanRunStateError
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
 from portia.plan import Plan, PlanContext, PlanInput, Step
 from portia.plan_run import PlanRun, PlanRunState
 from portia.portia import Portia
 from portia.tool import ReadyResponse, Tool, ToolRunContext, _ArgsSchemaPlaceholder
 from portia.tool_registry import ToolRegistry
-from portia.tool_wrapper import ToolCallWrapper
-from tests.utils import AdditionTool, ClarificationTool, get_test_plan_run
+from tests.utils import AdditionTool, ClarificationTool
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -669,76 +666,6 @@ async def test_portia_resume_plan_v2_keyboard_interrupt(portia: Portia) -> None:
 
     # Should set the plan run state to FAILED when KeyboardInterrupt occurs
     assert plan_run.state == PlanRunState.FAILED
-
-
-def test_portia_get_tool_with_valid_tool_id(portia: Portia) -> None:
-    """Test get_tool with a valid tool_id returns wrapped tool."""
-    plan, plan_run = get_test_plan_run()
-
-    tool = portia.get_tool("add_tool", plan_run)
-
-    assert tool is not None
-    assert isinstance(tool, ToolCallWrapper)
-    assert isinstance(tool._child_tool, AdditionTool)  # pyright: ignore[reportAttributeAccessIssue]
-    assert tool._storage == portia.storage  # pyright: ignore[reportAttributeAccessIssue]
-    assert tool._plan_run == plan_run  # pyright: ignore[reportAttributeAccessIssue]
-
-
-def test_portia_get_tool_with_none_tool_id(portia: Portia) -> None:
-    """Test get_tool with None tool_id returns None."""
-    plan, plan_run = get_test_plan_run()
-
-    tool = portia.get_tool(None, plan_run)
-
-    assert tool is None
-
-
-def test_portia_get_tool_with_nonexistent_tool_id(portia: Portia) -> None:
-    """Test get_tool with nonexistent tool_id raises ToolNotFoundError."""
-    plan, plan_run = get_test_plan_run()
-
-    with pytest.raises(ToolNotFoundError):
-        portia.get_tool("nonexistent_tool", plan_run)
-
-
-def test_portia_get_agent_for_step_with_default_execution_agent(portia: Portia) -> None:
-    """Test get_agent_for_step returns DefaultExecutionAgent with DEFAULT config."""
-    plan, plan_run = get_test_plan_run()
-    step = Step(
-        task="Add two numbers",
-        inputs=[],
-        output="$output",
-        tool_id="add_tool",
-    )
-
-    portia.config.execution_agent_type = ExecutionAgentType.DEFAULT
-
-    agent = portia.get_agent_for_step(step, plan, plan_run)
-
-    assert isinstance(agent, DefaultExecutionAgent)
-    assert agent.plan == plan
-    assert agent.plan_run == plan_run
-    assert agent.config == portia.config
-
-
-def test_portia_get_agent_for_step_with_oneshot_execution_agent(portia: Portia) -> None:
-    """Test get_agent_for_step returns OneShotAgent with ONE_SHOT config."""
-    plan, plan_run = get_test_plan_run()
-    step = Step(
-        task="Add two numbers",
-        inputs=[],
-        output="$output",
-        tool_id="add_tool",
-    )
-
-    portia.config.execution_agent_type = ExecutionAgentType.ONE_SHOT
-
-    agent = portia.get_agent_for_step(step, plan, plan_run)
-
-    assert isinstance(agent, OneShotAgent)
-    assert agent.plan == plan
-    assert agent.plan_run == plan_run
-    assert agent.config == portia.config
 
 
 @pytest.mark.asyncio

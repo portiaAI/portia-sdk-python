@@ -564,8 +564,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return a pretty string representation of the tool."""
         title = f"| {self.name} ({self.id}) |"
         return (
-            f"{'-' * len(title)}\n{title}\n{'-' * len(title)}"
-            f"\n{self._generate_tool_description()}"
+            f"{'-' * len(title)}\n{title}\n{'-' * len(title)}\n{self._generate_tool_description()}"
         )
 
 

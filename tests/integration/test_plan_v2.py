@@ -885,6 +885,25 @@ def test_example_builder_plan_scenarios(
     assert len(final_output.receipt) > 0
 
 
+def collect_fn(
+    top_no_def: str,
+    top_with_def: str,
+    sub_no_def_1: str,
+    sub_no_def_2: str,
+    sub_with_def_1: str,
+    sub_with_def_2: str,
+) -> dict[str, str]:
+    """Collect all input values."""
+    return {
+        "top_input_no_default": top_no_def,
+        "top_input_with_default": top_with_def,
+        "sub_input_no_default_1": sub_no_def_1,
+        "sub_input_no_default_2": sub_no_def_2,
+        "sub_input_with_default_1": sub_with_def_1,
+        "sub_input_with_default_2": sub_with_def_2,
+    }
+
+
 def test_plan_v2_input_linking_with_add_steps() -> None:
     """Test input linking between top-level plan and sub-plan using add_steps with input_values."""
     config = Config.from_default()
@@ -939,14 +958,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
         )
         # Final step that outputs all input values for verification
         .function_step(
-            function=lambda **kwargs: {
-                "top_input_no_default": kwargs["top_no_def"],
-                "top_input_with_default": kwargs["top_with_def"],
-                "sub_input_no_default_1": kwargs["sub_no_def_1"],
-                "sub_input_no_default_2": kwargs["sub_no_def_2"],
-                "sub_input_with_default_1": kwargs["sub_with_def_1"],
-                "sub_input_with_default_2": kwargs["sub_with_def_2"],
-            },
+            function=collect_fn,
             args={
                 "top_no_def": Input("top_input_no_default"),
                 "top_with_def": Input("top_input_with_default"),
