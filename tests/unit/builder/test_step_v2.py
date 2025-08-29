@@ -1596,7 +1596,7 @@ class TestConditionalStep:
 
             assert isinstance(result, ConditionalStepResult)
             assert result.conditional_result is True
-            mock_agent_class.assert_called_once_with(mock_run_data.portia.config)
+            mock_agent_class.assert_called_once_with(mock_run_data.config)
             mock_agent.execute.assert_called_once_with("x > 5", {"x": 10})
 
     def test_conditional_step_to_legacy_step_with_function_condition(self) -> None:
