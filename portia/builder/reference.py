@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.execution_agents.output import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
@@ -120,11 +119,20 @@ class Input(Reference):
 
         underlying_value = value.get_value()
         if isinstance(underlying_value, Reference):
-            return underlying_value.get_value(run_data=run_data)
+            value = underlying_value.get_value(run_data=run_data)
+            if not isinstance(value, ReferenceValue):
+                # @@@ SORT ERROR
+                raise ValueError(f"Expected ReferenceValue, got {type(value)}")
+            return ReferenceValue(
+                value=value.value,
+                description=plan_input.description
+                or value.description
+                or f"Input '{self.name}' to plan",
+            )
 
         return ReferenceValue(
-            value=value,
-            description=plan_input.description or "Input to plan",
+            value=underlying_value,
+            description=plan_input.description or value.summary or f"Input '{self.name}' to plan",
         )
 
     def __str__(self) -> str:
@@ -138,5 +146,5 @@ class Input(Reference):
 class ReferenceValue(BaseModel):
     """Value that can be referenced."""
 
-    value: Output = Field(description="The referenced value.")
+    value: Any = Field(description="The referenced value.")
     description: str = Field(description="Description of the referenced value.", default="")
