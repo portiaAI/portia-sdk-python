@@ -952,7 +952,10 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
         .add_steps(
             sub_plan,
             input_values={
-                "sub_input_no_default_1": StepOutput("first_number"),
+                "sub_input_no_default_1": (
+                    f"Number 1: {StepOutput('first_number')}. "
+                    f"Number 2: {StepOutput('second_number')}"
+                ),
                 "sub_input_with_default_1": StepOutput("second_number"),
             },
         )
@@ -993,7 +996,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
     assert all_inputs is not None
     assert all_inputs.get("top_input_no_default", "") == "top_value"
     assert all_inputs.get("top_input_with_default") == "top_default_value"
-    assert all_inputs.get("sub_input_no_default_1", "") == 100
+    assert all_inputs.get("sub_input_no_default_1", "") == "Number 1: 100. Number 2: 200"
     assert all_inputs.get("sub_input_no_default_2", "") == "sub_value"
     assert all_inputs.get("sub_input_with_default_1", "") == 200
     assert all_inputs.get("sub_input_with_default_2", "") == "original_default_2"

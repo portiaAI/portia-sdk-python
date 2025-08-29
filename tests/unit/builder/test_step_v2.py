@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from pydantic import BaseModel
 
-from portia.builder.reference import Input, ReferenceValue, StepOutput
+from portia.builder.reference import Input, StepOutput
 from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
@@ -156,7 +156,7 @@ class TestStepV2Base:
         mock_run_data.storage = Mock()
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="step result"),
+                value="step result",
                 description="Step 0",
                 step_name="test_step",
                 step_num=0,
@@ -184,31 +184,35 @@ class TestStepV2Base:
 
         assert result == "Hello Alice"
 
-    def test_get_value_for_input_with_reference_value(self) -> None:
-        """Test _get_value_for_input with ReferenceValue."""
+    def test_resolve_input_reference_with_string_template_step_both(self) -> None:
+        """Test _resolve_input_reference with string containing StepOutput template."""
         step = ConcreteStepV2()
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="step result",
+                description="Step 0",
+                step_name="test_step",
+                step_num=0,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
 
-        reference_input = StepOutput(0)
+        template = f"The input was '{Input('username')}' and the result was '{StepOutput(0)}'"
+        result = step._resolve_input_reference(template, mock_run_data)
 
-        mock_data_value = LocalDataValue(value="extracted_value")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
+        assert result == "The input was 'Alice' and the result was 'step result'"
 
-        with patch.object(reference_input, "get_value") as mock_get_value:
-            mock_get_value.return_value = mock_reference_value
-
-            result = step._get_value_for_input(reference_input, mock_run_data)
-
-            assert result == "extracted_value"
-            mock_get_value.assert_called_once_with(mock_run_data)
-
-    def test_get_value_for_input_with_regular_value(self) -> None:
-        """Test _get_value_for_input with regular value."""
+    def test_resolve_input_reference_with_regular_value(self) -> None:
+        """Test _resolve_input_reference with regular value."""
         step = ConcreteStepV2()
         mock_run_data = Mock()
 
-        result = step._get_value_for_input("regular_value", mock_run_data)
+        result = step._resolve_input_reference("regular_value", mock_run_data)
         assert result == "regular_value"
 
     def test_resolve_input_names_for_printing_with_reference(self) -> None:
@@ -369,15 +373,12 @@ class TestLLMStep:
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
 
-        mock_data_value = LocalDataValue(value="Previous step result")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
-
         with (
             patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
             patch("portia.builder.step_v2.ToolRunContext"),
             patch.object(reference_input, "get_value") as mock_get_value,
         ):
-            mock_get_value.return_value = mock_reference_value
+            mock_get_value.return_value = "Previous step result"
             mock_wrapper_instance = Mock()
             mock_wrapper_instance.arun = AsyncMock(return_value="Summary: Previous step result")
             mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -404,20 +405,14 @@ class TestLLMStep:
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
 
-        mock_data_value1 = LocalDataValue(value="John")
-        mock_ref1_value = ReferenceValue(value=mock_data_value1, description="User input")
-
-        mock_data_value2 = LocalDataValue(value="Analysis complete")
-        mock_ref2_value = ReferenceValue(value=mock_data_value2, description="Step 1")
-
         with (
             patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
             patch("portia.builder.step_v2.ToolRunContext"),
             patch.object(ref1, "get_value") as mock_get_value1,
             patch.object(ref2, "get_value") as mock_get_value2,
         ):
-            mock_get_value1.return_value = mock_ref1_value
-            mock_get_value2.return_value = mock_ref2_value
+            mock_get_value1.return_value = "User input"
+            mock_get_value2.return_value = "Step 1"
             mock_wrapper_instance = Mock()
             mock_wrapper_instance.arun = AsyncMock(return_value="Report generated successfully")
             mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -507,7 +502,7 @@ class TestLLMStep:
         mock_run_data = Mock()
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="step0"),
+                value="step0",
                 description="s0",
                 step_name="summary",
                 step_num=0,
@@ -770,17 +765,13 @@ class TestInvokeToolStep:
         mock_output.get_value.return_value = "tool result with reference"
         mock_tool._arun = AsyncMock(return_value=mock_output)
 
-        # Create proper ReferenceValue that the real methods can work with
-        mock_data_value = LocalDataValue(value="previous step output")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
-
         with (
             patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
             patch.object(reference_input, "get_value") as mock_get_value,
             patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
         ):
             mock_get_tool.return_value = mock_tool
-            mock_get_value.return_value = mock_reference_value
+            mock_get_value.return_value = "Step 1"
             mock_ctx_class.return_value = Mock()
 
             result = await step.run(run_data=mock_run_data)
@@ -819,12 +810,6 @@ class TestInvokeToolStep:
         mock_output.get_value.return_value = "mixed inputs result"
         mock_tool._arun = AsyncMock(return_value=mock_output)
 
-        mock_data_value1 = LocalDataValue(value="user question")
-        mock_ref1_value = ReferenceValue(value=mock_data_value1, description="User input")
-
-        mock_data_value2 = LocalDataValue(value="step 1 output")
-        mock_ref2_value = ReferenceValue(value=mock_data_value2, description="Step 1")
-
         with (
             patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
             patch.object(ref1, "get_value") as mock_get_value1,
@@ -832,8 +817,8 @@ class TestInvokeToolStep:
             patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
         ):
             mock_get_tool.return_value = mock_tool
-            mock_get_value1.return_value = mock_ref1_value
-            mock_get_value2.return_value = mock_ref2_value
+            mock_get_value1.return_value = "User input"
+            mock_get_value2.return_value = "Step 1"
             mock_ctx_class.return_value = Mock()
 
             result = await step.run(run_data=mock_run_data)
@@ -991,7 +976,7 @@ class TestInvokeToolStep:
         mock_run_data.storage = Mock()
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="result"),
+                value="result",
                 description="s0",
                 step_name="run_tool",
                 step_num=0,
@@ -1205,13 +1190,13 @@ class TestSingleToolAgent:
             StepOutputValue(
                 step_num=0,
                 step_name="step0",
-                value=LocalDataValue(value="machine learning"),
+                value="machine learning",
                 description="step0",
             ),
             StepOutputValue(
                 step_num=1,
                 step_name="step1",
-                value=LocalDataValue(value="AI research"),
+                value="AI research",
                 description="step1",
             ),
         ]
@@ -1286,9 +1271,7 @@ class TestUserVerifyStep:
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
-            StepOutputValue(
-                step_num=0, step_name="step_0", value=LocalDataValue(value="result"), description=""
-            )
+            StepOutputValue(step_num=0, step_name="step_0", value="result", description="")
         ]
 
         result = await step.run(run_data=mock_run_data)
@@ -1350,7 +1333,7 @@ class TestUserVerifyStep:
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Bob")}
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="test_file.txt"),
+                value="test_file.txt",
                 description="step0",
                 step_name="verify_action",
                 step_num=0,
@@ -1536,7 +1519,7 @@ class TestUserInputStep:
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="result"),
+                value="result",
                 description="s0",
                 step_name="feedback",
                 step_num=0,

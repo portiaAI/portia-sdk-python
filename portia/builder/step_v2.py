@@ -75,11 +75,11 @@ class StepV2(BaseModel, ABC):
         value: Any | Reference,  # noqa: ANN401
         run_data: RunContext,
     ) -> Any | None:  # noqa: ANN401
-        """Resolve input values by retrieving the ReferenceValue for any Reference inputs.
+        """Resolve any references in the provided value to their actual values.
 
-        value could be any value - a plain value (which is left untouched), a Reference (which is
-        returned as a ReferenceValue) or a string containing references (which is returned with the
-        references templated in).
+        If value is a Reference (e.g. Input or StepOutput), then the value that Reference refers to
+        is returned. If the value is a string with a Reference in it, then the string is returned
+        with the reference values templated in. Any other value is returned unchanged.
         """
         if isinstance(value, Reference):
             value = value.get_value(run_data)
@@ -96,6 +96,7 @@ class StepV2(BaseModel, ABC):
         # If there are matches, replace each {{ StepOutput(var_name) }}
         # or {{ Input(var_name) }} with its resolved value.
         if matches:
+            result = value
             for ref_type, var_name in matches:
                 var_name = var_name.strip()  # noqa: PLW2901
                 if ref_type == "StepOutput" and var_name.isdigit():
@@ -109,7 +110,7 @@ class StepV2(BaseModel, ABC):
                     + re.escape(str(var_name))
                     + r"\s*\)\s*\}\}"
                 )
-                result = re.sub(pattern, str(resolved), value, count=1)
+                result = re.sub(pattern, str(resolved), result, count=1)
             return result
         return value
 
