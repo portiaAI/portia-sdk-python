@@ -1,12 +1,3 @@
-"""CLI Implementation.
-
-Usage:
-
-portia-cli run "add 4 + 8" - run a query
-portia-cli plan "add 4 + 8" - plan a query
-portia-cli list-tools
-"""
-
 from __future__ import annotations
 
 import builtins
@@ -29,13 +20,14 @@ from portia.logger import logger
 from portia.portia import ExecutionHooks, Portia
 from portia.tool_registry import DefaultToolRegistry
 from portia.version import get_version
-import toml  # You may need: pip install toml
+import toml  
 from portia.config_loader import (
     ConfigLoader, 
     ensure_config_directory, 
     get_config_file_path,
     get_config
 )
+from portia.config import LLMProvider,Config
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -186,7 +178,7 @@ def version() -> None:
 def run(
     ctx,
     query: str,
-    **kwargs,  # noqa: ANN003
+    **kwargs,  
 ) -> None:
     """Run a query."""
     profile = ctx.obj.get('profile') if ctx.obj else None
@@ -222,7 +214,7 @@ def run(
 def plan(
     ctx,
     query: str,
-    **kwargs,  # noqa: ANN003
+    **kwargs,  
 ) -> None:
     """Plan a query."""
     profile = ctx.obj.get('profile') if ctx.obj else None
@@ -240,7 +232,7 @@ def plan(
 @click.pass_context
 def list_tools(
     ctx,
-    **kwargs,  # noqa: ANN003
+    **kwargs,  
 ) -> None:
     """List tools."""
     profile = ctx.obj.get('profile') if ctx.obj else None
@@ -249,7 +241,7 @@ def list_tools(
 
     for tool in DefaultToolRegistry(config).get_tools():
         click.echo(tool.pretty() + "\n")
-# Add these new CLI commands after the existing commands
+
 
 @click.group()
 def config():
@@ -482,51 +474,44 @@ def validate(profile_name: str | None = None) -> None:
             click.echo(f"❌ Profile '{profile}' is invalid: {e}")
 
 def _get_template_config(template: str) -> dict:
-    """Get predefined template configurations."""
-    templates = {
-        'openai': {
-            'llm_provider': 'openai',
-            'default_model': 'openai/gpt-4.1',
-            'planning_model': 'openai/o3-mini',
-            'introspection_model': 'openai/o4-mini',
+    """Get predefined template configurations using Config defaults."""
+    provider_map = {
+        'openai': LLMProvider.OPENAI,
+        'anthropic': LLMProvider.ANTHROPIC,
+        'gemini': LLMProvider.GOOGLE,
+        'azure': LLMProvider.AZURE_OPENAI,
+    }
+    if template in provider_map:
+        provider = provider_map[template]
+        # Use Config logic to get default models for this provider
+        config = Config(llm_provider=provider)
+        return {
+            'llm_provider': provider.value,
+            'default_model': config.get_agent_default_model('default_model', provider),
+            'planning_model': config.get_agent_default_model('planning_model', provider),
+            'introspection_model': config.get_agent_default_model('introspection_model', provider),
             'storage_class': 'CLOUD',
             'default_log_level': 'INFO',
             'execution_agent_type': 'ONE_SHOT'
-        },
-        'anthropic': {
-            'llm_provider': 'anthropic', 
-            'default_model': 'anthropic/claude-3-5-sonnet-latest',
-            'planning_model': 'anthropic/claude-3-7-sonnet-latest',
-            'introspection_model': 'anthropic/claude-3-7-sonnet-latest',
-            'storage_class': 'CLOUD',
-            'default_log_level': 'INFO'
-        },
-        'gemini': {
-            'llm_provider': 'google',
-            'default_model': 'google/gemini-2.5-flash',
-            'planning_model': 'google/gemini-2.5-pro',
-            'introspection_model': 'google/gemini-2.5-flash',
-            'storage_class': 'CLOUD',
-            'default_log_level': 'INFO'
-        },
-        'azure': {
-            'llm_provider': 'azure_openai',
-            'default_model': 'azure-openai/gpt-4.1',
-            'planning_model': 'azure-openai/o3-mini',
-            'azure_openai_endpoint': 'https://your-resource.openai.azure.com/',
-            'storage_class': 'CLOUD',
-            'default_log_level': 'INFO'
-        },
-        'mixed': {
-            'default_model': 'openai/gpt-4.1',
-            'planning_model': 'anthropic/claude-3-7-sonnet-latest',
-            'execution_model': 'openai/gpt-4o',
-            'introspection_model': 'google/gemini-2.5-flash',
+        }
+    elif template == 'mixed':
+        # For 'mixed', you can still use hardcoded or combine as needed
+        return {
+            'default_model': Config(llm_provider=LLMProvider.OPENAI).get_agent_default_model('default_model', LLMProvider.OPENAI),
+            'planning_model': Config(llm_provider=LLMProvider.ANTHROPIC).get_agent_default_model('planning_model', LLMProvider.ANTHROPIC),
+            'execution_model': Config(llm_provider=LLMProvider.OPENAI).get_agent_default_model('execution_model', LLMProvider.OPENAI),
+            'introspection_model': Config(llm_provider=LLMProvider.GOOGLE).get_agent_default_model('introspection_model', LLMProvider.GOOGLE),
             'storage_class': 'CLOUD',
             'default_log_level': 'INFO'
         }
-    }
-    return templates.get(template, {})
+    else:
+        # Fallback: minimal config
+        return {
+            "llm_provider": "",
+            "default_model": "",
+            "storage_class": "MEMORY",
+            "default_log_level": "INFO"
+        }
 
 
 
