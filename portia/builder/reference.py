@@ -80,6 +80,15 @@ class StepOutput(Reference):
         logger().warning(f"Output value for step {self.step} not found")
         return None
 
+    def get_description(self, run_data: RunContext) -> str:
+        """Get the description of the step output."""
+        for step_output in run_data.step_output_values:
+            if isinstance(self.step, int) and step_output.step_num == self.step:
+                return step_output.description
+            if isinstance(self.step, str) and step_output.step_name == self.step:
+                return step_output.description
+        return ""
+
 
 class Input(Reference):
     """A reference to a plan input.

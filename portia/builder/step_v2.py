@@ -261,11 +261,7 @@ class LLMStep(StepV2):
     def _get_ref_description(self, ref: Reference, run_data: RunContext) -> str:
         """Get the description of a reference."""
         if isinstance(ref, StepOutput):
-            if isinstance(ref.step, int):
-                step_idx = ref.step
-            else:
-                step_idx = run_data.plan.idx_by_name(ref.step)
-            return run_data.step_output_values[step_idx].description
+            return ref.get_description(run_data)
         if isinstance(ref, Input):
             plan_input = self._plan_input_from_name(ref.name, run_data)
             if plan_input.description:
@@ -355,7 +351,6 @@ class InvokeToolStep(StepV2):
             ),
         )
         args = {k: self._resolve_input_reference(v, run_data) for k, v in self.args.items()}
-
         output = await tool._arun(tool_ctx, **args)  # noqa: SLF001
         output_value = output.get_value()
         if isinstance(output_value, Clarification) and output_value.plan_run_id is None:

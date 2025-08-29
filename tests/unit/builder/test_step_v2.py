@@ -372,6 +372,14 @@ class TestLLMStep:
         step = LLMStep(task="Summarize result", step_name="summarize", inputs=[reference_input])
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="previous step result",
+                description="Step 0",
+                step_name="summarize",
+                step_num=0,
+            )
+        ]
 
         with (
             patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
@@ -389,7 +397,7 @@ class TestLLMStep:
             mock_wrapper_instance.arun.assert_called_once()
             call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Summarize result"
-            expected_task_data = "Previous step Step 0 had output: Previous step result"
+            expected_task_data = LocalDataValue(value="Previous step result", summary="Step 0")
             assert call_args[1]["task_data"] == [expected_task_data]
 
     @pytest.mark.asyncio
@@ -404,6 +412,18 @@ class TestLLMStep:
         )
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="Analysis complete",
+                description="The output of step 1",
+                step_name="summarize",
+                step_num=1,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [
+            PlanInput(name="user_name", description="The name of the user")
+        ]
 
         with (
             patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
@@ -411,8 +431,8 @@ class TestLLMStep:
             patch.object(ref1, "get_value") as mock_get_value1,
             patch.object(ref2, "get_value") as mock_get_value2,
         ):
-            mock_get_value1.return_value = "User input"
-            mock_get_value2.return_value = "Step 1"
+            mock_get_value1.return_value = "John"
+            mock_get_value2.return_value = "Analysis complete"
             mock_wrapper_instance = Mock()
             mock_wrapper_instance.arun = AsyncMock(return_value="Report generated successfully")
             mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -426,9 +446,9 @@ class TestLLMStep:
 
             expected_task_data = [
                 "Context info",
-                "Previous step User input had output: John",
+                LocalDataValue(value="John", summary="The name of the user"),
                 "Additional data",
-                "Previous step Step 1 had output: Analysis complete",
+                LocalDataValue(value="Analysis complete", summary="The output of step 1"),
             ]
             assert call_args[1]["task_data"] == expected_task_data
 
@@ -771,7 +791,7 @@ class TestInvokeToolStep:
             patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
         ):
             mock_get_tool.return_value = mock_tool
-            mock_get_value.return_value = "Step 1"
+            mock_get_value.return_value = "previous step output"
             mock_ctx_class.return_value = Mock()
 
             result = await step.run(run_data=mock_run_data)
@@ -817,8 +837,8 @@ class TestInvokeToolStep:
             patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
         ):
             mock_get_tool.return_value = mock_tool
-            mock_get_value1.return_value = "User input"
-            mock_get_value2.return_value = "Step 1"
+            mock_get_value1.return_value = "user question"
+            mock_get_value2.return_value = "step 1 output"
             mock_ctx_class.return_value = Mock()
 
             result = await step.run(run_data=mock_run_data)

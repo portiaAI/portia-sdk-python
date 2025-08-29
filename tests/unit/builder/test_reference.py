@@ -143,6 +143,56 @@ class TestStepOutput:
 
         assert result is None
 
+    def test_get_description_with_int_step(self) -> None:
+        """Test get_description method with integer step - successful case."""
+        step_output = StepOutput(0)
+
+        mock_run_data = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value="test", description="First step output"
+            ),
+        ]
+
+        result = step_output.get_description(mock_run_data)
+
+        assert result == "First step output"
+
+    def test_get_description_with_string_step(self) -> None:
+        """Test get_description method with string step - successful case."""
+        step_output = StepOutput("my_step")
+
+        mock_run_data = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value="test", description="First step output"
+            ),
+            StepOutputValue(
+                step_num=1, step_name="my_step", value="test", description="Second step output"
+            ),
+        ]
+
+        result = step_output.get_description(mock_run_data)
+        assert result == "Second step output"
+
+    def test_get_description_with_invalid_step(self) -> None:
+        """Test get_description method with invalid step - returns empty string."""
+        step_output = StepOutput("nonexistent_step")
+
+        mock_run_data = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value="test", description="First step output"
+            ),
+            StepOutputValue(
+                step_num=1, step_name="step_1", value="test", description="Second step output"
+            ),
+        ]
+
+        result = step_output.get_description(mock_run_data)
+
+        assert result == ""
+
 
 class TestInput:
     """Test cases for the Input class."""
@@ -225,7 +275,7 @@ class TestInput:
 
         result = input_ref.get_value(mock_run_data)
 
-        assert result == "step_output_0"
+        assert result == "test"
 
     def test_get_value_input_not_found_in_plan(self) -> None:
         """Test get_value method - input not found in plan."""
