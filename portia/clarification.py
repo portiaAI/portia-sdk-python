@@ -9,7 +9,10 @@ and value confirmations.
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Self
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 from pydantic import (
     BaseModel,
