@@ -157,7 +157,9 @@ class StepV2(BaseModel, ABC):
                 None,
             )
             if active_clause_step_index is None:
-                raise ValueError(f"Cannot determine active conditional for step {self.step_name}")
+                raise ValueError(
+                    f"Cannot determine active conditional for step {self.step_name}"
+                )  # pragma: no cover
 
             if (
                 current_step_index == block.clause_step_indexes[0]
