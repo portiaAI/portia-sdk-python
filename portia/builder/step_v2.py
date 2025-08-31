@@ -53,6 +53,9 @@ class StepV2(BaseModel, ABC):
     conditional_block: ConditionalBlock | None = Field(
         default=None, description="The conditional block this step is part of, if any."
     )
+    loop_block: LoopBlock | None = Field(
+        default=None, description="The loop block this step is part of, if any."
+    )
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
@@ -608,13 +611,13 @@ class ConditionalStep(StepV2):
 
     @override
     @traceable(name="Conditional Step - Run")
-    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+    async def run(self, run_data: RunContext) -> Any:
         """Run the conditional step."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         if isinstance(self.condition, str):
             condition_str = self._get_value_for_input(self.condition, run_data)
             agent = ConditionalEvaluationAgent(run_data.config)
-            conditional_result = await agent.execute(condition_str, args)
+            conditional_result = await agent.execute(conditional=str(condition_str), arguments=args)
         else:
             conditional_result = self.condition(**args)
         next_clause_step_index = (
@@ -642,6 +645,72 @@ class ConditionalStep(StepV2):
             )
         return Step(
             task=f"Conditional clause: {cond_str}",
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
+            tool_id=None,
+            output=plan.step_output_name(self),
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class LoopStep(StepV2):
+    condition: Callable[..., bool] | str = Field(
+        description=(
+            "The boolean predicate to check. If evaluated to true, the steps within this loop "
+            "will be evaluated - otherwise they will be skipped and we jump to the next loop."
+        )
+    )
+    args: dict[str, Reference | Any] = Field(
+        default_factory=dict, description="The args to check the condition with."
+    )
+    clause_index_in_block: int = Field(description="The index of the clause in the loop block")
+    steps: list[StepV2] = Field(description="The steps to execute within the loop.")
+    current_step_index: int = Field(description="The index of the current step in the loop.")
+    step_outputs: list[list[Any]] = Field(description="The outputs of the steps in the loop, stored in the order they were executed.")
+
+    @property
+    def final_output(self) -> Any:
+        """Get the final output of the loop."""
+        return self.step_outputs[-1][-1]
+
+    @override
+    @traceable(name="Conditional Step - Run")
+    async def run(self, run_data: RunContext) -> Any:
+        """Run the conditional step."""
+        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+        if self.current_step_index == 0:
+            self.step_outputs.append([])
+        if isinstance(self.condition, str):
+            condition_str = self._get_value_for_input(self.condition, run_data)
+            agent = ConditionalEvaluationAgent(run_data.config)
+            conditional_result = await agent.execute(conditional=str(condition_str), arguments=args)
+        else:
+            conditional_result = self.condition(**args)
+        next_clause_step_index = (
+            self.block.clause_step_indexes[self.clause_index_in_block + 1]
+            if self.clause_index_in_block < len(self.block.clause_step_indexes) - 1
+            else self.block.clause_step_indexes[self.clause_index_in_block]
+        )
+        return ConditionalStepResult(
+            type=self.block_clause_type,
+            conditional_result=conditional_result,
+            next_clause_step_index=next_clause_step_index,
+            end_condition_block_step_index=self.block.clause_step_indexes[-1],
+        )
+
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this LoopStep to a PlanStep."""
+        if isinstance(self.condition, str):
+            cond_str = self.condition
+        else:
+            cond_str = (
+                "If result of "
+                + getattr(self.condition, "__name__", str(self.condition))
+                + " is true"
+            )
+        return Step(
+            task=f"Loop clause: {cond_str}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=None,
             output=plan.step_output_name(self),
