@@ -8,7 +8,6 @@ predict token usage for various components of a plan's execution, including:
 - **Execution Agent:** The main LLM responsible for carrying out a plan step.
 - **Introspection Agent:** A dedicated LLM for evaluating conditional logic in a plan.
 - **LLM Tool Calls:** Direct usage of generative models as tools within a step.
-- **Other Operations:** Ad-hoc operations like summarization of large inputs or outputs.
 
 The `CostEstimator` class uses these token estimates, combined with model-specific
 pricing data (`MODEL_PRICING`), to calculate a total estimated cost for an entire plan,
@@ -95,8 +94,7 @@ MODEL_PRICING = {
 class CostEstimator:
     """Estimates the monetary cost of executing a plan within the Portia SDK.
 
-    This class provides a comprehensive framework for calculating plan costs...
-    ... (add the rest of the detailed docstring here)
+    This class provides a comprehensive framework for calculating plan costs.
     """
 
     def __init__(
@@ -471,8 +469,9 @@ Return only JSON with keys: input_tokens, output_tokens (integers only).
         return other_costs
 
     def _step_has_condition(self, step: Step) -> bool:
-        """Check if a step has conditional logic requiring introspection agent."""
-        return hasattr(step, "condition") or "condition" in str(step).lower()
+        """Check if a step has a non-empty condition requiring introspection agent."""
+        condition = getattr(step, "condition", None)
+        return condition is not None and str(condition).strip() != ""
 
     def _is_llm_tool(self, step: Step) -> bool:
         """Check if a step uses LLM-based tools."""
