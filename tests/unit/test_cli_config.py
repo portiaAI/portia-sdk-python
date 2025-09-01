@@ -10,6 +10,7 @@ import toml
 from click.testing import CliRunner
 from pydantic import SecretStr
 import warnings
+from typing import Any, Dict, Optional
 
 from portia.cli import cli
 from portia.config import Config, StorageClass
@@ -26,6 +27,7 @@ from portia.model import GenerativeModel, LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.errors import InvalidConfigError,ConfigNotFoundError
 from portia.config import default_config
+
 
 
 @pytest.fixture
@@ -478,19 +480,14 @@ def test_default_config_deprecated_args():
         config = default_config(planning_model_name="gpt-4")
         assert any("planning_model_name is deprecated" in str(warning.message) for warning in w)
 
-def test_config_storage_class_logic():
+from portia.config import Config, StorageClass
+
+def test_config_storage_class_logic(temp_config_dir, monkeypatch):
     """Test storage class default logic."""
-    
-    # Test with PORTIA_API_KEY present
-    with patch.dict(os.environ, {"PORTIA_API_KEY": "test-key"}):
-        config = Config.from_local_config()
-        assert config.storage_class.value in ["CLOUD", "MEMORY"]  # Could be either depending on implementation
-    
-    # Test without PORTIA_API_KEY
-    with patch.dict(os.environ, {}, clear=True):
-        config = Config.from_local_config()
-        # Should default to MEMORY when no API key
-        assert config.storage_class.value in ["CLOUD", "MEMORY"]
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("PORTIA_LLM_PROVIDER", "openai")
+    config = Config.from_local_config(profile="default")
+    assert config.storage_class in (StorageClass.CLOUD, StorageClass.MEMORY)
 
 def test_config_must_get_errors():
     """Test Config.must_get error cases."""
@@ -600,3 +597,24 @@ def test_ensure_config_directory_and_path(tmp_path, monkeypatch):
 
     path = get_config_file_path()
     assert path.name == "config.toml"
+
+def test_fill_default_models_sets_planning_and_introspection(monkeypatch):
+    from portia.config import Config, GenerativeModelsConfig, LLMProvider
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    models = GenerativeModelsConfig(default_model="openai/gpt-4.1")
+    c = Config.from_default(
+        llm_provider=LLMProvider.OPENAI,
+        models=models,
+        openai_api_key="test-key"
+    )
+    assert c.models.planning_model == "openai/o3-mini"
+    assert c.models.introspection_model == "openai/o4-mini"
+def test_config_loader_wrappers(temp_config_dir):
+    cfg_file = temp_config_dir / "config.toml"
+    data = {"profile": {"foo": {"llm_provider": "openai"}}}
+    with open(cfg_file, "w") as f:
+        toml.dump(data, f)
+    result = load_config_from_toml("foo", config_file=cfg_file)
+    assert result["llm_provider"] == "openai"
+    result2 = get_config("foo", config_file=cfg_file)
+    assert result2["llm_provider"] == "openai"

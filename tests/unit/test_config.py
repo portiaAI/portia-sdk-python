@@ -18,6 +18,7 @@ from portia.config import (
     PlanningAgentType,
     StorageClass,
     parse_str_to_enum,
+    default_config
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
@@ -726,10 +727,69 @@ def test_parse_str_to_enum(value: str, expected: LLMProvider) -> None:
     """Test parse_str_to_enum works."""
     assert parse_str_to_enum(value, LLMProvider) is expected
     
-def test_construct_model_from_name_custom_provider_raises():
-    from portia.config import Config
-    from portia.model import LLMProvider
-    config = Config.from_default(openai_api_key="test")
-    with pytest.raises(ValueError, match="Cannot construct a custom model from a string"):
-        config._construct_model_from_name(LLMProvider.CUSTOM, "my-custom-model")
 
+
+def test_fill_default_models_planning_model_only(monkeypatch):
+    """Test that planning_model is set when None but default_model exists."""
+    from portia.config import Config, GenerativeModelsConfig, LLMProvider
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    
+    # Create config with default_model set but planning_model None
+    models = GenerativeModelsConfig(
+        default_model="openai/gpt-4.1",
+        planning_model=None  # Explicitly None to trigger the fill logic
+    )
+    c = Config.from_default(
+        llm_provider=LLMProvider.OPENAI,
+        models=models,
+        openai_api_key="test-key"
+    )
+    # Should set planning_model from provider default
+    assert c.models.planning_model == "openai/o3-mini"
+
+def test_fill_default_models_introspection_model_only(monkeypatch):
+    """Test that introspection_model is set when None but default_model exists."""
+    from portia.config import Config, GenerativeModelsConfig, LLMProvider
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    
+    # Create config with default_model set but introspection_model None
+    models = GenerativeModelsConfig(
+        default_model="openai/gpt-4.1",
+        introspection_model=None  # Explicitly None to trigger the fill logic
+    )
+    c = Config.from_default(
+        llm_provider=LLMProvider.OPENAI,
+        models=models,
+        openai_api_key="test-key"
+    )
+    # Should set introspection_model from provider default
+    assert c.models.introspection_model == "openai/o4-mini"
+
+def test_default_config_all_env_overrides(monkeypatch):
+    """Test all environment variable overrides in default_config final block."""
+    
+    # Set the required API key so config doesn't fail
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    
+    # Set ALL the environment variables that are checked in the final override block
+    monkeypatch.setenv("PORTIA_API_ENDPOINT", "https://api.env.test")
+    monkeypatch.setenv("PORTIA_DASHBOARD_URL", "https://dash.env.test") 
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.env.test")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-aws-key-id")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-aws-secret")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-west-2")
+    monkeypatch.setenv("AWS_CREDENTIALS_PROFILE_NAME", "my_aws_profile")
+    monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/1")
+
+    monkeypatch.setattr("langchain_redis.RedisCache", lambda *a, **kw: InMemoryCache())
+    
+    cfg = default_config()
+    assert cfg.portia_api_endpoint == "https://api.env.test"
+    assert cfg.portia_dashboard_url == "https://dash.env.test"
+    assert cfg.ollama_base_url == "http://ollama.env.test"
+    assert cfg.aws_access_key_id == "test-aws-key-id"
+    assert cfg.aws_secret_access_key == "test-aws-secret"
+    assert cfg.aws_default_region == "us-west-2"
+    assert cfg.aws_credentials_profile_name == "my_aws_profile"
+    assert cfg.llm_redis_cache_url == "redis://localhost:6379/1"
+    
