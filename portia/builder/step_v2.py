@@ -31,11 +31,12 @@ from portia.execution_agents.conditional_evaluation_agent import ConditionalEval
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.execution_agents.react_agent import ReActAgent
 from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step, Variable
-from portia.tool import Tool, ToolRunContext
+from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
@@ -238,13 +239,7 @@ class LLMStep(StepV2):
             storage=run_data.storage,
             plan_run=run_data.plan_run,
         )
-        tool_ctx = ToolRunContext(
-            end_user=run_data.end_user,
-            plan_run=run_data.plan_run,
-            plan=run_data.legacy_plan,
-            config=run_data.config,
-            clarifications=[],
-        )
+        tool_ctx = run_data.get_tool_run_ctx()
         task_data = [
             self._format_value(value, run_data)
             for _input in self.inputs or []
@@ -326,15 +321,7 @@ class InvokeToolStep(StepV2):
         if not tool:
             raise ToolNotFoundError(self.tool if isinstance(self.tool, str) else self.tool.id)
 
-        tool_ctx = ToolRunContext(
-            end_user=run_data.end_user,
-            plan_run=run_data.plan_run,
-            plan=run_data.legacy_plan,
-            config=run_data.config,
-            clarifications=run_data.plan_run.get_clarifications_for_step(
-                run_data.plan_run.current_step_index
-            ),
-        )
+        tool_ctx = run_data.get_tool_run_ctx()
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
 
         output = await tool._arun(tool_ctx, **args)  # noqa: SLF001
@@ -400,7 +387,7 @@ class SingleToolAgentStep(StepV2):
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"SingleToolAgentStep(tool='{self.tool}', query='{self.task}'{output_info})"
+        return f"SingleToolAgentStep(task='{self.task}', tool='{self.tool}', {output_info})"
 
     @override
     @traceable(name="Single Tool Agent Step - Run")
@@ -453,6 +440,67 @@ class SingleToolAgentStep(StepV2):
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
+        )
+
+
+class ReActAgentStep(StepV2):
+    """A step that uses a ReAct agent to complete a task."""
+
+    task: str = Field(description="The task to perform.")
+    tools: list[str] = Field(description="The tools to use.")
+    inputs: list[Any] = Field(
+        default_factory=list,
+        description=(
+            "The inputs for the task. The inputs can be references to previous step outputs / "
+            "plan inputs (using StepOutput / Input) or just plain values. They are passed in as "
+            "additional context to the agent when it is completing the task."
+        ),
+    )
+    output_schema: type[BaseModel] | None = Field(
+        default=None, description="The schema of the output."
+    )
+
+    def __str__(self) -> str:
+        """Return a description of this step for logging purposes."""
+        output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
+        return f"ReActAgentStep(task='{self.task}', tools='{self.tools}', {output_info})"
+
+    @override
+    @traceable(name="ReAct Agent Step - Run")
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+        """Run the agent step."""
+        agent = self._get_agent_for_step(run_data)
+        output_obj = await agent.execute_async()
+        return output_obj.get_value()
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this SingleToolAgentStep to a Step."""
+        return Step(
+            task=self.task,
+            inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
+            tool_id=",".join(self.tools),
+            output=plan.step_output_name(self),
+            structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
+        )
+
+    def _get_agent_for_step(
+        self,
+        run_data: RunContext,
+    ) -> BaseExecutionAgent:
+        """Get the appropriate agent for executing the step."""
+        tools = [
+            ToolCallWrapper.from_tool_id(
+                tool, run_data.tool_registry, run_data.storage, run_data.plan_run
+            )
+            for tool in self.tools
+        ]
+        return ReActAgent(
+            self.task,
+            self.inputs,
+            tools,
+            run_data,
         )
 
 

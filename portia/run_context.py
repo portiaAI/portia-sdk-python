@@ -10,6 +10,8 @@ from portia.execution_hooks import ExecutionHooks
 from portia.plan import Plan
 from portia.plan_run import PlanRun
 from portia.storage import Storage
+from portia.telemetry.telemetry_service import BaseProductTelemetry
+from portia.tool import ToolRunContext
 from portia.tool_registry import ToolRegistry
 
 
@@ -36,3 +38,14 @@ class RunContext(BaseModel):
     storage: Storage = Field(description="The Portia storage.")
     tool_registry: ToolRegistry = Field(description="The Portia tool registry.")
     execution_hooks: ExecutionHooks = Field(description="The Portia execution hooks.")
+    telemetry: BaseProductTelemetry = Field(description="The Portia telemetry service.")
+
+    def get_tool_run_ctx(self) -> ToolRunContext:
+        """Get the tool run context."""
+        return ToolRunContext(
+            end_user=self.end_user,
+            plan_run=self.plan_run,
+            plan=self.plan,
+            config=self.config,
+            clarifications=self.plan_run.get_clarifications_for_step(),
+        )
