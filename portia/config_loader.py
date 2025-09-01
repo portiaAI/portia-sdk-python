@@ -13,18 +13,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
-
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        raise ImportError(
-            "tomli is required for Python < 3.11. Install with: pip install tomli"
-        )
-
+import tomllib
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 
 
@@ -131,12 +120,7 @@ class ConfigLoader:
                 f"Available profiles: {available_profiles}"
             )
         
-        profile_config = profiles[profile].copy()
-        
-        
-        if "feature_flags" in profile_config:
-            pass
-        
+        profile_config = profiles[profile].copy()       
         return profile_config
     
     def merge_with_env(self, config: Dict[str, Any]) -> Dict[str, Any]:

@@ -725,3 +725,11 @@ def test_provider_default_models_with_reasoning_openai(monkeypatch: pytest.Monke
 def test_parse_str_to_enum(value: str, expected: LLMProvider) -> None:
     """Test parse_str_to_enum works."""
     assert parse_str_to_enum(value, LLMProvider) is expected
+    
+def test_construct_model_from_name_custom_provider_raises():
+    from portia.config import Config
+    from portia.model import LLMProvider
+    config = Config.from_default(openai_api_key="test")
+    with pytest.raises(ValueError, match="Cannot construct a custom model from a string"):
+        config._construct_model_from_name(LLMProvider.CUSTOM, "my-custom-model")
+

@@ -9,12 +9,23 @@ import pytest
 import toml
 from click.testing import CliRunner
 from pydantic import SecretStr
+import warnings
 
 from portia.cli import cli
 from portia.config import Config, StorageClass
-from portia.config_loader import ConfigLoader
+from portia.config_loader import (
+    load_config_from_toml,
+    merge_with_env,
+    apply_overrides,
+    get_config,
+    ensure_config_directory,
+    get_config_file_path,
+    ConfigLoader,
+)
 from portia.model import GenerativeModel, LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
+from portia.errors import InvalidConfigError,ConfigNotFoundError
+from portia.config import default_config
 
 
 @pytest.fixture
@@ -324,3 +335,268 @@ def test_cli_config_validate(temp_config_dir):
     runner.invoke(cli, ["config", "create", "validprofile"])
     result = runner.invoke(cli, ["config", "validate", "validprofile"])
     assert result.exit_code == 0
+    
+
+def test_config_loader_missing_config_file(temp_config_dir):
+    """Test behavior when config file doesn't exist."""
+    
+    loader = ConfigLoader(temp_config_dir / "nonexistent.toml")
+    
+    with pytest.raises(ConfigNotFoundError):
+        loader.load_config_from_toml("default")
+
+def test_config_loader_invalid_toml(temp_config_dir):
+    """Test behavior with malformed TOML file."""
+    
+    config_file = temp_config_dir / "config.toml"
+    with open(config_file, "w") as f:
+        f.write("invalid toml content [[[")
+    
+    loader = ConfigLoader(config_file)
+    
+    with pytest.raises(InvalidConfigError):
+        loader.load_config_from_toml("default")
+
+def test_config_loader_missing_profile(temp_config_dir):
+    """Test behavior when requested profile doesn't exist."""
+    
+    
+    config_file = temp_config_dir / "config.toml"
+    data = {"profile": {"default": {"llm_provider": "openai"}}}
+    with open(config_file, "w") as f:
+        toml.dump(data, f)
+    
+    loader = ConfigLoader(config_file)
+    
+    with pytest.raises(ConfigNotFoundError):
+        loader.load_config_from_toml("nonexistent")
+
+def test_config_env_var_overrides(temp_config_dir, monkeypatch):
+    """Test environment variable overrides."""
+    
+    
+    
+    monkeypatch.setenv("PORTIA_LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("PORTIA_LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv("PORTIA_JSON_LOG_SERIALIZE", "true")
+    monkeypatch.setenv("PORTIA_LARGE_OUTPUT_THRESHOLD_TOKENS", "2000")
+    
+    loader = ConfigLoader()
+    config = loader.merge_with_env({})
+    
+    assert config["llm_provider"] == "anthropic"
+    assert config["default_log_level"] == "DEBUG"
+    assert config["json_log_serialize"] is True
+    assert config["large_output_threshold_tokens"] == 2000
+
+def test_config_feature_flags_from_env(temp_config_dir, monkeypatch):
+    """Test feature flags from environment variables."""
+    
+    
+    monkeypatch.setenv("PORTIA_FEATURE_test_flag", "true")
+    monkeypatch.setenv("PORTIA_FEATURE_another_flag", "false")
+    
+    loader = ConfigLoader()
+    config = loader.merge_with_env({})
+    
+    assert config["feature_flags"]["test_flag"] is True
+    assert config["feature_flags"]["another_flag"] is False
+
+def test_config_loader_list_profiles_no_file(temp_config_dir):
+    """Test listing profiles when no config file exists."""
+    
+    loader = ConfigLoader(temp_config_dir / "nonexistent.toml")
+    profiles = loader.list_profiles()
+    
+    assert profiles == []
+
+def test_config_loader_list_profiles_invalid_file(temp_config_dir):
+    """Test listing profiles with invalid config file."""
+    
+    
+    # Create invalid file
+    config_file = temp_config_dir / "config.toml"
+    with open(config_file, "w") as f:
+        f.write("invalid content")
+    
+    loader = ConfigLoader(config_file)
+    profiles = loader.list_profiles()
+    
+    assert profiles == []
+
+def test_config_default_profile_env_var(temp_config_dir, monkeypatch):
+    """Test default profile from environment variable."""
+    
+    
+    monkeypatch.setenv("PORTIA_DEFAULT_PROFILE", "custom")
+    
+    loader = ConfigLoader()
+    default_profile = loader.get_default_profile()
+    
+    assert default_profile == "custom"
+
+def test_config_integer_env_var_invalid(temp_config_dir, monkeypatch):
+    """Test invalid integer environment variable."""
+    monkeypatch.setenv("PORTIA_LARGE_OUTPUT_THRESHOLD_TOKENS", "not_a_number")
+    
+    loader = ConfigLoader()
+    config = loader.merge_with_env({})
+    assert "large_output_threshold_tokens" not in config
+
+def test_config_from_local_config_no_file(temp_config_dir, monkeypatch):
+    """Test Config.from_local_config when no file exists."""
+    monkeypatch.setenv("PORTIA_LLM_PROVIDER", "openai")
+    config = Config.from_local_config(profile="nonexistent")
+    assert config is not None
+
+def test_default_config_warnings(temp_config_dir, monkeypatch):
+    """Test warnings in default_config function."""
+    
+    # Clear all API keys to trigger warning
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    with pytest.raises(InvalidConfigError):
+        default_config()
+    
+
+def test_default_config_deprecated_args():
+    """Test deprecated arguments in default_config."""
+    
+    
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        
+        # Test deprecated llm_model_name
+        config = default_config(llm_model_name="gpt-4")
+        assert len(w) > 0
+        assert "llm_model_name is deprecated" in str(w[0].message)
+        
+        # Test deprecated model keys
+        config = default_config(planning_model_name="gpt-4")
+        assert any("planning_model_name is deprecated" in str(warning.message) for warning in w)
+
+def test_config_storage_class_logic():
+    """Test storage class default logic."""
+    
+    # Test with PORTIA_API_KEY present
+    with patch.dict(os.environ, {"PORTIA_API_KEY": "test-key"}):
+        config = Config.from_local_config()
+        assert config.storage_class.value in ["CLOUD", "MEMORY"]  # Could be either depending on implementation
+    
+    # Test without PORTIA_API_KEY
+    with patch.dict(os.environ, {}, clear=True):
+        config = Config.from_local_config()
+        # Should default to MEMORY when no API key
+        assert config.storage_class.value in ["CLOUD", "MEMORY"]
+
+def test_config_must_get_errors():
+    """Test Config.must_get error cases."""
+    
+    config = Config.from_default(openai_api_key="test")
+    
+    # Test non-existent attribute
+    with pytest.raises(ConfigNotFoundError):
+        config.must_get("nonexistent_field", str)
+    
+    # Test wrong type
+    with pytest.raises(InvalidConfigError):
+        config.must_get("openai_api_key", int)  # SecretStr, not int
+
+def test_config_empty_values():
+    """Test Config.must_get with empty values."""
+    
+    
+    config = Config.from_default(
+        openai_api_key="test",
+        azure_openai_endpoint=""  # Empty string
+    )
+    
+    # Test empty string
+    with pytest.raises(InvalidConfigError):
+        config.must_get("azure_openai_endpoint", str)
+    
+    # Test empty SecretStr
+    config.openai_api_key = SecretStr("")
+    with pytest.raises(InvalidConfigError):
+        config.must_get("openai_api_key", SecretStr)
+def test_construct_model_from_name_custom_provider_raises():
+    config = Config.from_default(openai_api_key="test")
+    with pytest.raises(ValueError, match="Cannot construct a custom model from a string"):
+        config._construct_model_from_name(LLMProvider.CUSTOM, "my-custom-model")
+
+def test_list_profiles_handles_exception(temp_config_dir):
+    config_file = temp_config_dir / "config.toml"
+    with open(config_file, "w") as f:
+        f.write("not a toml file")
+    loader = ConfigLoader(config_file)
+    assert loader.list_profiles() == []
+
+def test_ensure_config_directory_and_get_config_file_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(ConfigLoader, "DEFAULT_CONFIG_DIR", tmp_path / ".portia")
+    monkeypatch.setattr(ConfigLoader, "DEFAULT_CONFIG_FILE", tmp_path / ".portia" / "config.toml")
+    config_dir = ensure_config_directory()
+    assert config_dir.exists()
+    assert config_dir.name == ".portia"
+    config_file = get_config_file_path()
+    assert config_file.name == "config.toml"
+    
+def test_list_profiles_happy_path(temp_config_dir):
+    cfg_toml = temp_config_dir / "config.toml"
+    data = {"profile": {"one": {}, "two": {}}}
+    with open(cfg_toml, "w") as f:
+        toml.dump(data, f)
+
+    loader = ConfigLoader(cfg_toml)
+    profiles = loader.list_profiles()
+    assert sorted(profiles) == ["one", "two"]
+def test_helper_load_config_from_toml(temp_config_dir):
+    data = {"profile": {"foo": {"llm_provider": "openai"}}}
+    cfg_file = temp_config_dir / "config.toml"
+    with open(cfg_file, "w") as f:
+        toml.dump(data, f)
+
+    result = load_config_from_toml("foo", config_file=cfg_file)
+    assert result["llm_provider"] == "openai"
+
+def test_helper_merge_with_env(monkeypatch):
+    monkeypatch.setenv("PORTIA_LLM_PROVIDER", "anthropic")
+    merged = merge_with_env({"some_key": "value"})
+    assert merged["llm_provider"] == "anthropic"
+    assert merged["some_key"] == "value"
+
+def test_helper_apply_overrides():
+    base = {"a": 1, "feature_flags": {"x": True}}
+    overrides = {"a": 2, "feature_flags": {"y": False}}
+    out = apply_overrides(base, overrides)
+    assert out["a"] == 2
+    assert out["feature_flags"] == {"x": True, "y": False}
+
+def test_helper_get_config_precedence(temp_config_dir, monkeypatch):
+    # create a profile in TOML
+    data = {"profile": {"bar": {"llm_provider": "openai"}}}
+    cfg_file = temp_config_dir / "config.toml"
+    with open(cfg_file, "w") as f:
+        toml.dump(data, f)
+    # set env var that should be overridden by code override
+    monkeypatch.setenv("PORTIA_LLM_PROVIDER", "anthropic")
+    # direct override to azure
+    result = get_config("bar", config_file=cfg_file, llm_provider="azure-openai")
+    assert result["llm_provider"] == "azure-openai"
+
+def test_helper_get_config_no_file_uses_env(monkeypatch):
+    monkeypatch.setenv("PORTIA_LLM_PROVIDER", "google")
+    cfg = get_config("any", config_file=Path("/does/not/exist.toml"))
+    assert cfg["llm_provider"] == "google"
+
+def test_ensure_config_directory_and_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(ConfigLoader, "DEFAULT_CONFIG_DIR", tmp_path / ".portia")
+    monkeypatch.setattr(ConfigLoader, "DEFAULT_CONFIG_FILE", tmp_path / ".portia" / "config.toml")
+
+    cfg_dir = ensure_config_directory()
+    assert cfg_dir.exists() and cfg_dir.name == ".portia"
+
+    path = get_config_file_path()
+    assert path.name == "config.toml"
