@@ -496,8 +496,8 @@ class BrowserToolForUrl(BrowserTool):
                     raise ValueError(f"Invalid domain in allowed_domains: {domain}")
 
         super().__init__(
-            id=id or "browser_tool",
-            name=name or "Browser Tool",
+            id=id or (f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}" if url else "browser_tool"),
+            name=name or (f"Browser Tool for {url.replace('https://', '').replace('http://', '')}" if url else "Browser Tool"),
             description=description
             or (
                 f"Browser tool specifically configured for {url}. Can be used to navigate to this URL and complete tasks. "
