@@ -82,6 +82,7 @@ class ToolRunContext(BaseModel):
     plan: Plan
     config: Config
     clarifications: ClarificationListType
+    tool: Union["Tool", None] = None
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
@@ -223,9 +224,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
     ) -> SERIALIZABLE_TYPE_VAR | Clarification:
         """Async run the tool.
 
-        This is the method that tools should implement if they want to provide an async method for
-        running the tool. When calling this method, you should likely call the _arun method instead.
-
         Args:
             ctx (ToolRunContext): The context for the tool.
             *args (Any): Additional positional arguments for the tool function.
@@ -247,7 +245,6 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Async run the tool.
 
         This method must be implemented by subclasses to define the tool's specific behavior.
-        This is the method that should be called internally by anything calling a tool.
         """
         try:
             output = await self.arun(ctx, *args, **kwargs)
@@ -564,7 +561,8 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return a pretty string representation of the tool."""
         title = f"| {self.name} ({self.id}) |"
         return (
-            f"{'-' * len(title)}\n{title}\n{'-' * len(title)}\n{self._generate_tool_description()}"
+            f"{'-' * len(title)}\n{title}\n{'-' * len(title)}"
+            f"\n{self._generate_tool_description()}"
         )
 
 

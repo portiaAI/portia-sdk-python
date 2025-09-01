@@ -61,8 +61,7 @@ class Clarification(BaseModel, ABC):
         default_factory=ClarificationUUID,
         description="A unique ID for this clarification",
     )
-    plan_run_id: PlanRunUUID | None = Field(
-        default=None,
+    plan_run_id: PlanRunUUID = Field(
         description="The run this clarification is for",
     )
     category: ClarificationCategory = Field(
