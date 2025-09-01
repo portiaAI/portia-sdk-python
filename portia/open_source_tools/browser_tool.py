@@ -284,9 +284,7 @@ class BrowserTool(Tool[str | BaseModel]):
 
     @classmethod
     def _warn_about_domain_security(cls, domain: str) -> None:
-        """Warn about domain security implications based on browser-use patterns.
-
-        Based on browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!'
+        """Warn about domain security implications for wildcard patterns.
 
         Args:
             domain: Domain string to check for security issues
@@ -294,10 +292,9 @@ class BrowserTool(Tool[str | BaseModel]):
         """
         if "*" in domain:
             if domain.startswith("*."):
-                # Pattern like '*.example.com' - high risk as per docs
+                # Pattern like '*.example.com' - matches all subdomains
                 logger().warning(
                     f"Wildcard domain '{domain}' matches ALL subdomains. "
-                    "Per browser-use docs: 'Make sure _all_ the subdomains are safe for the agent!' "
                     "Consider explicitly listing specific subdomains for better security."
                 )
             elif domain == "*" or "/*" in domain:
@@ -310,7 +307,6 @@ class BrowserTool(Tool[str | BaseModel]):
                 # Other wildcard patterns
                 logger().warning(
                     f"Wildcard pattern '{domain}' may match unintended domains. "
-                    "Per browser-use docs, be very cautious with wildcards. "
                     "Consider using full URLs with schemes (https://example.com) for security."
                 )
 
@@ -321,21 +317,6 @@ class BrowserTool(Tool[str | BaseModel]):
                 "Browser-use docs recommend full URLs like 'https://example.com' for clarity."
             )
 
-    def _create_browser_context_config(
-        self, allowed_domains: list[str] | None
-    ) -> BrowserContextConfig:
-        """Create BrowserContextConfig with optional allowed_domains.
-
-        Args:
-            allowed_domains: List of allowed domains or None
-
-        Returns:
-            Configured BrowserContextConfig instance
-
-        """
-        if allowed_domains is not None:
-            return BrowserContextConfig(allowed_domains=allowed_domains)
-        return BrowserContextConfig()
 
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
@@ -547,6 +528,22 @@ class BrowserToolForUrl(BrowserTool):
 
 class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
+
+    def _create_browser_context_config(
+        self, allowed_domains: list[str] | None
+    ) -> BrowserContextConfig:
+        """Create BrowserContextConfig with optional allowed_domains.
+
+        Args:
+            allowed_domains: List of allowed domains or None
+
+        Returns:
+            Configured BrowserContextConfig instance
+
+        """
+        if allowed_domains is not None:
+            return BrowserContextConfig(allowed_domains=allowed_domains)
+        return BrowserContextConfig()
 
     @abstractmethod
     def setup_browser(
