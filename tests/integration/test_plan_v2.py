@@ -432,6 +432,39 @@ def test_plan_v2_unclosed_conditionals_complex() -> None:
         )
 
 
+def test_plan_v2_else_if_before_if_raises_error() -> None:
+    """Test that using else_if before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_if_(condition=lambda: True)
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_else_before_if_raises_error() -> None:
+    """Test that using else before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_endif_before_if_raises_error() -> None:
+    """Test that using endif before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .endif()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
 def test_plan_v2_conditional_if_without_else_if() -> None:
     """Test else_if is optional."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
