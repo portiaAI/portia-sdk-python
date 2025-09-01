@@ -518,6 +518,7 @@ class TestLLMStep:
             assert call_args[1]["task"] == "Analyze data"
             assert call_args[1]["task_data"] == []
 
+    @pytest.mark.asyncio
     async def test_llm_step_run_with_string_template_input(self) -> None:
         """Test LLMStep run with an input string containing reference templates."""
         step = LLMStep(
@@ -594,6 +595,61 @@ class TestLLMStep:
             mock_input_name.assert_called_once_with(mock_plan)
             mock_stepoutput_name.assert_called_once_with(mock_plan)
             mock_plan.step_output_name.assert_called_once_with(step)
+
+    @pytest.mark.asyncio
+    async def test_llm_step_run_linked_inputs(self) -> None:
+        """Test LLMStep run with 2 inputs, one that refers to a Step Output."""
+        ref1 = Input("user_name")
+        ref2 = Input("user_height")
+        step = LLMStep(
+            task="Generate report",
+            step_name="report",
+            inputs=["Context info", ref1, "Additional data", ref2],
+        )
+        mock_run_data = Mock()
+        mock_run_data.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="Analysis complete",
+                description="The output of step 1",
+                step_name="summarize",
+                step_num=1,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        # A plan input being the output value from another step can happen with linked plans using
+        # .add_steps().
+        mock_run_data.plan.plan_inputs = [
+            PlanInput(name="user_name"),
+            PlanInput(name="user_height", value=StepOutput(1)),
+        ]
+
+        with (
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
+            patch.object(ref1, "get_value") as mock_get_value1,
+            patch.object(ref2, "get_value") as mock_get_value2,
+        ):
+            mock_get_value1.return_value = "John"
+            mock_get_value2.return_value = "6ft"
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Report generated successfully")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Report generated successfully"
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
+            assert call_args[1]["task"] == "Generate report"
+
+            expected_task_data = [
+                "Context info",
+                LocalDataValue(value="John", summary=""),
+                "Additional data",
+                LocalDataValue(value="6ft", summary="The output of step 1"),
+            ]
+            assert call_args[1]["task_data"] == expected_task_data
 
 
 class TestInvokeToolStep:

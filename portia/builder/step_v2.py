@@ -277,7 +277,7 @@ class LLMStep(StepV2):
         for plan_input in run_data.plan.plan_inputs:
             if plan_input.name == name:
                 return plan_input
-        raise ValueError(f"Plan input {name} not found")
+        raise ValueError(f"Plan input {name} not found")  # pragma: no cover
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
