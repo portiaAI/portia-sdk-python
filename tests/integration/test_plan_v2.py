@@ -432,6 +432,39 @@ def test_plan_v2_unclosed_conditionals_complex() -> None:
         )
 
 
+def test_plan_v2_else_if_before_if_raises_error() -> None:
+    """Test that using else_if before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_if_(condition=lambda: True)
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_else_before_if_raises_error() -> None:
+    """Test that using else before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_endif_before_if_raises_error() -> None:
+    """Test that using endif before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .endif()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
 def test_plan_v2_conditional_if_without_else_if() -> None:
     """Test else_if is optional."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -952,7 +985,10 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
         .add_steps(
             sub_plan,
             input_values={
-                "sub_input_no_default_1": StepOutput("first_number"),
+                "sub_input_no_default_1": (
+                    f"Number 1: {StepOutput('first_number')}. "
+                    f"Number 2: {StepOutput('second_number')}"
+                ),
                 "sub_input_with_default_1": StepOutput("second_number"),
             },
         )
@@ -993,7 +1029,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
     assert all_inputs is not None
     assert all_inputs.get("top_input_no_default", "") == "top_value"
     assert all_inputs.get("top_input_with_default") == "top_default_value"
-    assert all_inputs.get("sub_input_no_default_1", "") == 100
+    assert all_inputs.get("sub_input_no_default_1", "") == "Number 1: 100. Number 2: 200"
     assert all_inputs.get("sub_input_no_default_2", "") == "sub_value"
     assert all_inputs.get("sub_input_with_default_1", "") == 200
     assert all_inputs.get("sub_input_with_default_2", "") == "original_default_2"

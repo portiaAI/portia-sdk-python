@@ -9,8 +9,14 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from pydantic import BaseModel
 
-from portia.builder.reference import Input, ReferenceValue, StepOutput
+from portia.builder.conditionals import (
+    ConditionalBlock,
+    ConditionalBlockClauseType,
+    ConditionalStepResult,
+)
+from portia.builder.reference import Input, StepOutput
 from portia.builder.step_v2 import (
+    ConditionalStep,
     InvokeToolStep,
     LLMStep,
     SingleToolAgentStep,
@@ -156,7 +162,7 @@ class TestStepV2Base:
         mock_run_data.storage = Mock()
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="step result"),
+                value="step result",
                 description="Step 0",
                 step_name="test_step",
                 step_num=0,
@@ -184,31 +190,35 @@ class TestStepV2Base:
 
         assert result == "Hello Alice"
 
-    def test_get_value_for_input_with_reference_value(self) -> None:
-        """Test _get_value_for_input with ReferenceValue."""
+    def test_resolve_input_reference_with_string_template_step_both(self) -> None:
+        """Test _resolve_input_reference with string containing StepOutput template."""
         step = ConcreteStepV2()
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="step result",
+                description="Step 0",
+                step_name="test_step",
+                step_num=0,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+        mock_run_data.plan_run = Mock()
+        mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
 
-        reference_input = StepOutput(0)
+        template = f"The input was '{Input('username')}' and the result was '{StepOutput(0)}'"
+        result = step._resolve_input_reference(template, mock_run_data)
 
-        mock_data_value = LocalDataValue(value="extracted_value")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
+        assert result == "The input was 'Alice' and the result was 'step result'"
 
-        with patch.object(reference_input, "get_value") as mock_get_value:
-            mock_get_value.return_value = mock_reference_value
-
-            result = step._get_value_for_input(reference_input, mock_run_data)
-
-            assert result == "extracted_value"
-            mock_get_value.assert_called_once_with(mock_run_data)
-
-    def test_get_value_for_input_with_regular_value(self) -> None:
-        """Test _get_value_for_input with regular value."""
+    def test_resolve_input_reference_with_regular_value(self) -> None:
+        """Test _resolve_input_reference with regular value."""
         step = ConcreteStepV2()
         mock_run_data = Mock()
 
-        result = step._get_value_for_input("regular_value", mock_run_data)
+        result = step._resolve_input_reference("regular_value", mock_run_data)
         assert result == "regular_value"
 
     def test_resolve_input_names_for_printing_with_reference(self) -> None:
@@ -368,16 +378,21 @@ class TestLLMStep:
         step = LLMStep(task="Summarize result", step_name="summarize", inputs=[reference_input])
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
-
-        mock_data_value = LocalDataValue(value="Previous step result")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="previous step result",
+                description="Step 0",
+                step_name="summarize",
+                step_num=0,
+            )
+        ]
 
         with (
             patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
             patch("portia.builder.step_v2.ToolRunContext"),
             patch.object(reference_input, "get_value") as mock_get_value,
         ):
-            mock_get_value.return_value = mock_reference_value
+            mock_get_value.return_value = "Previous step result"
             mock_wrapper_instance = Mock()
             mock_wrapper_instance.arun = AsyncMock(return_value="Summary: Previous step result")
             mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -388,7 +403,7 @@ class TestLLMStep:
             mock_wrapper_instance.arun.assert_called_once()
             call_args = mock_wrapper_instance.arun.call_args
             assert call_args[1]["task"] == "Summarize result"
-            expected_task_data = "Previous step Step 0 had output: Previous step result"
+            expected_task_data = LocalDataValue(value="Previous step result", summary="Step 0")
             assert call_args[1]["task_data"] == [expected_task_data]
 
     @pytest.mark.asyncio
@@ -403,12 +418,18 @@ class TestLLMStep:
         )
         mock_run_data = Mock()
         mock_run_data.storage = Mock()
-
-        mock_data_value1 = LocalDataValue(value="John")
-        mock_ref1_value = ReferenceValue(value=mock_data_value1, description="User input")
-
-        mock_data_value2 = LocalDataValue(value="Analysis complete")
-        mock_ref2_value = ReferenceValue(value=mock_data_value2, description="Step 1")
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="Analysis complete",
+                description="The output of step 1",
+                step_name="summarize",
+                step_num=1,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        mock_run_data.plan.plan_inputs = [
+            PlanInput(name="user_name", description="The name of the user")
+        ]
 
         with (
             patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
@@ -416,8 +437,8 @@ class TestLLMStep:
             patch.object(ref1, "get_value") as mock_get_value1,
             patch.object(ref2, "get_value") as mock_get_value2,
         ):
-            mock_get_value1.return_value = mock_ref1_value
-            mock_get_value2.return_value = mock_ref2_value
+            mock_get_value1.return_value = "John"
+            mock_get_value2.return_value = "Analysis complete"
             mock_wrapper_instance = Mock()
             mock_wrapper_instance.arun = AsyncMock(return_value="Report generated successfully")
             mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -431,9 +452,9 @@ class TestLLMStep:
 
             expected_task_data = [
                 "Context info",
-                "Previous step User input had output: John",
+                LocalDataValue(value="John", summary="The name of the user"),
                 "Additional data",
-                "Previous step Step 1 had output: Analysis complete",
+                LocalDataValue(value="Analysis complete", summary="The output of step 1"),
             ]
             assert call_args[1]["task_data"] == expected_task_data
 
@@ -497,6 +518,7 @@ class TestLLMStep:
             assert call_args[1]["task"] == "Analyze data"
             assert call_args[1]["task_data"] == []
 
+    @pytest.mark.asyncio
     async def test_llm_step_run_with_string_template_input(self) -> None:
         """Test LLMStep run with an input string containing reference templates."""
         step = LLMStep(
@@ -507,7 +529,7 @@ class TestLLMStep:
         mock_run_data = Mock()
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="step0"),
+                value="step0",
                 description="s0",
                 step_name="summary",
                 step_num=0,
@@ -573,6 +595,61 @@ class TestLLMStep:
             mock_input_name.assert_called_once_with(mock_plan)
             mock_stepoutput_name.assert_called_once_with(mock_plan)
             mock_plan.step_output_name.assert_called_once_with(step)
+
+    @pytest.mark.asyncio
+    async def test_llm_step_run_linked_inputs(self) -> None:
+        """Test LLMStep run with 2 inputs, one that refers to a Step Output."""
+        ref1 = Input("user_name")
+        ref2 = Input("user_height")
+        step = LLMStep(
+            task="Generate report",
+            step_name="report",
+            inputs=["Context info", ref1, "Additional data", ref2],
+        )
+        mock_run_data = Mock()
+        mock_run_data.storage = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                value="Analysis complete",
+                description="The output of step 1",
+                step_name="summarize",
+                step_num=1,
+            )
+        ]
+        mock_run_data.plan = Mock()
+        # A plan input being the output value from another step can happen with linked plans using
+        # .add_steps().
+        mock_run_data.plan.plan_inputs = [
+            PlanInput(name="user_name"),
+            PlanInput(name="user_height", value=StepOutput(1)),
+        ]
+
+        with (
+            patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+            patch("portia.builder.step_v2.ToolRunContext"),
+            patch.object(ref1, "get_value") as mock_get_value1,
+            patch.object(ref2, "get_value") as mock_get_value2,
+        ):
+            mock_get_value1.return_value = "John"
+            mock_get_value2.return_value = "6ft"
+            mock_wrapper_instance = Mock()
+            mock_wrapper_instance.arun = AsyncMock(return_value="Report generated successfully")
+            mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+            result = await step.run(run_data=mock_run_data)
+
+            assert result == "Report generated successfully"
+            mock_wrapper_instance.arun.assert_called_once()
+            call_args = mock_wrapper_instance.arun.call_args
+            assert call_args[1]["task"] == "Generate report"
+
+            expected_task_data = [
+                "Context info",
+                LocalDataValue(value="John", summary=""),
+                "Additional data",
+                LocalDataValue(value="6ft", summary="The output of step 1"),
+            ]
+            assert call_args[1]["task_data"] == expected_task_data
 
 
 class TestInvokeToolStep:
@@ -770,17 +847,13 @@ class TestInvokeToolStep:
         mock_output.get_value.return_value = "tool result with reference"
         mock_tool._arun = AsyncMock(return_value=mock_output)
 
-        # Create proper ReferenceValue that the real methods can work with
-        mock_data_value = LocalDataValue(value="previous step output")
-        mock_reference_value = ReferenceValue(value=mock_data_value, description="Step 0")
-
         with (
             patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
             patch.object(reference_input, "get_value") as mock_get_value,
             patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
         ):
             mock_get_tool.return_value = mock_tool
-            mock_get_value.return_value = mock_reference_value
+            mock_get_value.return_value = "previous step output"
             mock_ctx_class.return_value = Mock()
 
             result = await step.run(run_data=mock_run_data)
@@ -819,12 +892,6 @@ class TestInvokeToolStep:
         mock_output.get_value.return_value = "mixed inputs result"
         mock_tool._arun = AsyncMock(return_value=mock_output)
 
-        mock_data_value1 = LocalDataValue(value="user question")
-        mock_ref1_value = ReferenceValue(value=mock_data_value1, description="User input")
-
-        mock_data_value2 = LocalDataValue(value="step 1 output")
-        mock_ref2_value = ReferenceValue(value=mock_data_value2, description="Step 1")
-
         with (
             patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
             patch.object(ref1, "get_value") as mock_get_value1,
@@ -832,8 +899,8 @@ class TestInvokeToolStep:
             patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
         ):
             mock_get_tool.return_value = mock_tool
-            mock_get_value1.return_value = mock_ref1_value
-            mock_get_value2.return_value = mock_ref2_value
+            mock_get_value1.return_value = "user question"
+            mock_get_value2.return_value = "step 1 output"
             mock_ctx_class.return_value = Mock()
 
             result = await step.run(run_data=mock_run_data)
@@ -991,7 +1058,7 @@ class TestInvokeToolStep:
         mock_run_data.storage = Mock()
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="result"),
+                value="result",
                 description="s0",
                 step_name="run_tool",
                 step_num=0,
@@ -1205,13 +1272,13 @@ class TestSingleToolAgent:
             StepOutputValue(
                 step_num=0,
                 step_name="step0",
-                value=LocalDataValue(value="machine learning"),
+                value="machine learning",
                 description="step0",
             ),
             StepOutputValue(
                 step_num=1,
                 step_name="step1",
-                value=LocalDataValue(value="AI research"),
+                value="AI research",
                 description="step1",
             ),
         ]
@@ -1286,9 +1353,7 @@ class TestUserVerifyStep:
         mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
-            StepOutputValue(
-                step_num=0, step_name="step_0", value=LocalDataValue(value="result"), description=""
-            )
+            StepOutputValue(step_num=0, step_name="step_0", value="result", description="")
         ]
 
         result = await step.run(run_data=mock_run_data)
@@ -1350,7 +1415,7 @@ class TestUserVerifyStep:
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Bob")}
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="test_file.txt"),
+                value="test_file.txt",
                 description="step0",
                 step_name="verify_action",
                 step_num=0,
@@ -1361,6 +1426,334 @@ class TestUserVerifyStep:
 
         assert isinstance(result, UserVerificationClarification)
         assert result.user_guidance == "Confirm action on test_file.txt for user Bob?"
+
+
+class TestConditionalStep:
+    """Test cases for the ConditionalStep class."""
+
+    def test_conditional_step_good_initialization(self) -> None:
+        """Test ConditionalStep initialization with valid parameters."""
+        conditional_block = ConditionalBlock(
+            clause_step_indexes=[0, 5, 10],
+            parent_conditional_block=None,
+        )
+
+        def test_condition(x: int) -> bool:
+            return x > 0
+
+        step = ConditionalStep(
+            step_name="test_conditional",
+            conditional_block=conditional_block,
+            condition=test_condition,
+            args={"x": 5},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        assert step.step_name == "test_conditional"
+        assert step.conditional_block == conditional_block
+        assert step.condition == test_condition
+        assert step.args == {"x": 5}
+        assert step.clause_index_in_block == 0
+        assert step.block_clause_type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
+
+    def test_conditional_step_initialization_with_string_condition(self) -> None:
+        """Test ConditionalStep initialization with string condition."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 3])
+
+        step = ConditionalStep(
+            step_name="string_conditional",
+            conditional_block=conditional_block,
+            condition="user_input > 10",
+            args={"user_input": Input("number")},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        assert step.condition == "user_input > 10"
+
+    def test_conditional_step_validation_none_conditional_block(self) -> None:
+        """Test that ConditionalStep raises ValueError when conditional_block is None."""
+
+        def test_condition() -> bool:
+            return True
+
+        with pytest.raises(ValueError, match="Conditional block is required for ConditionSteps"):
+            ConditionalStep(
+                step_name="invalid_conditional",
+                conditional_block=None,
+                condition=test_condition,
+                args={},
+                clause_index_in_block=0,
+                block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+            )
+
+    def test_conditional_step_block_property_good_case(self) -> None:
+        """Test ConditionalStep block property returns the conditional block."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 2, 4])
+
+        step = ConditionalStep(
+            step_name="test_conditional",
+            conditional_block=conditional_block,
+            condition=lambda: True,
+            args={},
+            clause_index_in_block=1,
+            block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
+        )
+
+        assert step.block == conditional_block
+        assert isinstance(step.block, ConditionalBlock)
+
+    def test_conditional_step_block_property_error_case(self) -> None:
+        """Test ConditionalStep block property raises error for invalid conditional_block type."""
+        # This test creates an invalid state that shouldn't normally occur due to validation
+        step = ConditionalStep(
+            step_name="test_conditional",
+            conditional_block=ConditionalBlock(clause_step_indexes=[0]),
+            condition=lambda: True,
+            args={},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        # Manually set conditional_block to invalid type to test error case
+        step.conditional_block = "invalid_type"  # type: ignore[assignment]
+
+        with pytest.raises(TypeError, match="Conditional block is not a ConditionalBlock"):
+            _ = step.block
+
+    def test_conditional_step_str(self) -> None:
+        """Test ConditionalStep str method."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 3])
+
+        def test_function() -> bool:
+            return True
+
+        step = ConditionalStep(
+            step_name="test_conditional",
+            conditional_block=conditional_block,
+            condition=test_function,
+            args={"value": 42},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        result = str(step)
+        assert "ConditionalStep" in result
+        assert "test_function" in result or str(test_function) in result
+        assert "NEW_CONDITIONAL_BLOCK" in result
+        assert "{'value': 42}" in result
+
+    @pytest.mark.asyncio
+    async def test_conditional_step_run_with_function_condition_true(self) -> None:
+        """Test ConditionalStep run with function condition that returns True."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 5, 10, 15])
+
+        def test_condition(x: int) -> bool:
+            return x > 5
+
+        step = ConditionalStep(
+            step_name="test_conditional",
+            conditional_block=conditional_block,
+            condition=test_condition,
+            args={"x": 10},
+            clause_index_in_block=1,  # Second clause (else_if)
+            block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
+        )
+
+        mock_run_data = Mock()
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, ConditionalStepResult)
+        assert result.type == ConditionalBlockClauseType.ALTERNATE_CLAUSE
+        assert result.conditional_result is True
+        assert result.next_clause_step_index == 10  # Next clause
+        assert result.end_condition_block_step_index == 15  # Last clause (endif)
+
+    @pytest.mark.asyncio
+    async def test_conditional_step_run_with_function_condition_false(self) -> None:
+        """Test ConditionalStep run with function condition that returns False."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 3])
+
+        def test_condition(x: int) -> bool:
+            return x > 10
+
+        step = ConditionalStep(
+            step_name="test_conditional",
+            conditional_block=conditional_block,
+            condition=test_condition,
+            args={"x": 5},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        mock_run_data = Mock()
+
+        result = await step.run(mock_run_data)
+
+        assert isinstance(result, ConditionalStepResult)
+        assert result.conditional_result is False
+        assert result.next_clause_step_index == 3
+        assert result.end_condition_block_step_index == 3
+
+    @pytest.mark.asyncio
+    async def test_conditional_step_run_with_reference_args(self) -> None:
+        """Test ConditionalStep run with reference arguments."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 4])
+        reference_input = StepOutput(0)
+
+        def test_condition(value: int) -> bool:
+            return value > 0
+
+        step = ConditionalStep(
+            step_name="test_conditional",
+            conditional_block=conditional_block,
+            condition=test_condition,
+            args={"value": reference_input},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        mock_run_data = Mock()
+        mock_run_data.portia.storage = Mock()
+
+        with patch.object(reference_input, "get_value") as mock_get_value:
+            mock_get_value.return_value = 42
+
+            result = await step.run(mock_run_data)
+
+            assert isinstance(result, ConditionalStepResult)
+            assert result.conditional_result is True
+            mock_get_value.assert_called_once_with(mock_run_data)
+
+    @pytest.mark.asyncio
+    async def test_conditional_step_run_with_string_condition(self) -> None:
+        """Test ConditionalStep run with string condition."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 2])
+
+        step = ConditionalStep(
+            step_name="string_conditional",
+            conditional_block=conditional_block,
+            condition="x > 5",
+            args={"x": 10},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        mock_run_data = Mock()
+        mock_agent = Mock()
+        mock_agent.execute = AsyncMock(return_value=True)
+
+        with patch("portia.builder.step_v2.ConditionalEvaluationAgent") as mock_agent_class:
+            mock_agent_class.return_value = mock_agent
+
+            result = await step.run(mock_run_data)
+
+            assert isinstance(result, ConditionalStepResult)
+            assert result.conditional_result is True
+            mock_agent_class.assert_called_once_with(mock_run_data.config)
+            mock_agent.execute.assert_called_once_with("x > 5", {"x": 10})
+
+    def test_conditional_step_to_legacy_step_with_function_condition(self) -> None:
+        """Test ConditionalStep to_legacy_step with function condition."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 3])
+
+        def my_test_function(x: int) -> bool:
+            return x > 0
+
+        step = ConditionalStep(
+            step_name="function_conditional",
+            conditional_block=conditional_block,
+            condition=my_test_function,
+            args={"x": Input("user_input")},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$function_conditional_output"
+
+        with (
+            patch.object(step.args["x"], "get_legacy_name") as mock_input_name,
+            patch.object(step, "_get_legacy_condition") as mock_legacy_condition,
+        ):
+            mock_input_name.return_value = "user_input"
+            mock_legacy_condition.return_value = "test condition"
+
+            legacy_step = step.to_legacy_step(mock_plan)
+
+            assert isinstance(legacy_step, PlanStep)
+            assert legacy_step.task == "Conditional clause: If result of my_test_function is true"
+            assert legacy_step.tool_id is None
+            assert legacy_step.output == "$function_conditional_output"
+            assert legacy_step.condition == "test condition"
+
+            # Verify inputs conversion
+            assert len(legacy_step.inputs) == 1
+            assert legacy_step.inputs[0].name == "user_input"
+
+            mock_legacy_condition.assert_called_once_with(mock_plan)
+
+    def test_conditional_step_to_legacy_step_with_string_condition(self) -> None:
+        """Test ConditionalStep to_legacy_step with string condition."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 2])
+
+        step = ConditionalStep(
+            step_name="string_conditional",
+            conditional_block=conditional_block,
+            condition="user_age >= 18",
+            args={"user_age": Input("age")},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$string_conditional_output"
+
+        with (
+            patch.object(step.args["user_age"], "get_legacy_name") as mock_input_name,
+            patch.object(step, "_get_legacy_condition") as mock_legacy_condition,
+        ):
+            mock_input_name.return_value = "age"
+            mock_legacy_condition.return_value = "legacy condition string"
+
+            legacy_step = step.to_legacy_step(mock_plan)
+
+            assert isinstance(legacy_step, PlanStep)
+            assert legacy_step.task == "Conditional clause: user_age >= 18"
+            assert legacy_step.tool_id is None
+            assert legacy_step.output == "$string_conditional_output"
+            assert legacy_step.condition == "legacy condition string"
+
+            assert len(legacy_step.inputs) == 1
+            assert legacy_step.inputs[0].name == "age"
+
+    def test_conditional_step_to_legacy_step_with_lambda_function(self) -> None:
+        """Test ConditionalStep to_legacy_step with lambda function condition."""
+        conditional_block = ConditionalBlock(clause_step_indexes=[0, 1])
+
+        lambda_condition = lambda x: x > 5  # noqa: E731
+
+        step = ConditionalStep(
+            step_name="lambda_conditional",
+            conditional_block=conditional_block,
+            condition=lambda_condition,
+            args={},
+            clause_index_in_block=0,
+            block_clause_type=ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK,
+        )
+
+        mock_plan = Mock()
+        mock_plan.step_output_name.return_value = "$lambda_conditional_output"
+
+        with patch.object(step, "_get_legacy_condition") as mock_legacy_condition:
+            mock_legacy_condition.return_value = None
+
+            legacy_step = step.to_legacy_step(mock_plan)
+
+            assert "If result of" in legacy_step.task
+            assert "is true" in legacy_step.task
 
 
 class TestUserInputStep:
@@ -1536,7 +1929,7 @@ class TestUserInputStep:
         mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
         mock_run_data.step_output_values = [
             StepOutputValue(
-                value=LocalDataValue(value="result"),
+                value="result",
                 description="s0",
                 step_name="feedback",
                 step_num=0,

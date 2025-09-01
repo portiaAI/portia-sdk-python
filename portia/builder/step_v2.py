@@ -16,7 +16,7 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
-from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
+from portia.builder.reference import Input, Reference, StepOutput
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -31,11 +31,12 @@ from portia.execution_agents.conditional_evaluation_agent import ConditionalEval
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.react_agent import ReActAgent
 from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Step, Variable
+from portia.plan import PlanInput, Step, Variable
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
 
@@ -72,54 +73,53 @@ class StepV2(BaseModel, ABC):
 
     def _resolve_input_reference(
         self,
-        _input: Any,  # noqa: ANN401
+        value: Any | Reference,  # noqa: ANN401
         run_data: RunContext,
-    ) -> Any | ReferenceValue | None:  # noqa: ANN401
-        """Resolve input values by retrieving the ReferenceValue for any Reference inputs."""
-        if isinstance(_input, str):
-            # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
-            # from _input if it's a string
-            matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", _input)
+    ) -> Any | None:  # noqa: ANN401
+        """Resolve any references in the provided value to their actual values.
 
-            # If there are matches, replace each {{ StepOutput(var_name) }}
-            # or {{ Input(var_name) }} with its resolved value.
-            if isinstance(_input, str) and matches:
-                result = _input
-                for ref_type, var_name in matches:
-                    var_name = var_name.strip()  # noqa: PLW2901
-                    if ref_type == "StepOutput" and var_name.isdigit():
-                        var_name = int(var_name)  # noqa: PLW2901
-                    ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
-                    resolved = self._resolve_input_reference(ref, run_data)
-                    resolved_val = (
-                        resolved.value.full_value(run_data.storage)
-                        if isinstance(resolved, ReferenceValue)
-                        else resolved
-                    )
-                    pattern = (
-                        r"\{\{\s*"
-                        + re.escape(ref_type)
-                        + r"\s*\(\s*"
-                        + re.escape(str(var_name))
-                        + r"\s*\)\s*\}\}"
-                    )
-                    result = re.sub(pattern, str(resolved_val), result, count=1)
-                return result
-        return _input.get_value(run_data) if isinstance(_input, Reference) else _input
+        If value is a Reference (e.g. Input or StepOutput), then the value that Reference refers to
+        is returned. If the value is a string with a Reference in it, then the string is returned
+        with the reference values templated in. Any other value is returned unchanged.
+        """
+        if isinstance(value, Reference):
+            value = value.get_value(run_data)
+            return self._resolve_input_reference(value, run_data)
+        if isinstance(value, str):
+            return self._template_input_references(value, run_data)
+        return value
 
-    def _get_value_for_input(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
-        """Get the value for an input that could come from a reference."""
-        resolved_input = self._resolve_input_reference(_input, run_data)
+    def _template_input_references(self, value: str, run_data: RunContext) -> str:
+        # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
+        # from _input if it's a string
+        matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", value)
 
-        if isinstance(resolved_input, ReferenceValue):
-            return resolved_input.value.full_value(run_data.storage)
-        return resolved_input
+        # If there are matches, replace each {{ StepOutput(var_name) }}
+        # or {{ Input(var_name) }} with its resolved value.
+        if matches:
+            result = value
+            for ref_type, var_name in matches:
+                var_name = var_name.strip()  # noqa: PLW2901
+                if ref_type == "StepOutput" and var_name.isdigit():
+                    var_name = int(var_name)  # noqa: PLW2901
+                ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
+                resolved = self._resolve_input_reference(ref, run_data)
+                pattern = (
+                    r"\{\{\s*"
+                    + re.escape(ref_type)
+                    + r"\s*\(\s*"
+                    + re.escape(str(var_name))
+                    + r"\s*\)\s*\}\}"
+                )
+                result = re.sub(pattern, str(resolved), result, count=1)
+            return result
+        return value
 
     def _resolve_input_names_for_printing(
         self,
         _input: Any,  # noqa: ANN401
         plan: PlanV2,
-    ) -> Any | ReferenceValue | None:  # noqa: ANN401
+    ) -> Any | None:  # noqa: ANN401
         """Resolve inputs to their value (if not a reference) or to their name (if reference).
 
         Useful for printing inputs before the plan is run.
@@ -158,7 +158,9 @@ class StepV2(BaseModel, ABC):
                 None,
             )
             if active_clause_step_index is None:
-                raise ValueError(f"Cannot determine active conditional for step {self.step_name}")
+                raise ValueError(
+                    f"Cannot determine active conditional for step {self.step_name}"
+                )  # pragma: no cover
 
             if (
                 current_step_index == block.clause_step_indexes[0]
@@ -240,22 +242,37 @@ class LLMStep(StepV2):
             plan_run=run_data.plan_run,
         )
         tool_ctx = run_data.get_tool_run_ctx()
-        task_data = [
-            self._format_value(value, run_data)
-            for _input in self.inputs or []
-            if (value := self._resolve_input_reference(_input, run_data)) is not None
-            or not isinstance(_input, Reference)
-        ]
+        task_data = []
+        for _input in self.inputs:
+            if isinstance(_input, Reference):
+                description = self._get_ref_description(_input, run_data)
+                value = self._resolve_input_reference(_input, run_data)
+                value = LocalDataValue(value=value, summary=description)
+            else:
+                value = self._resolve_input_reference(_input, run_data)
+            if value is not None or not isinstance(_input, Reference):
+                task_data.append(value)
+
         return await wrapped_tool.arun(tool_ctx, task=self.task, task_data=task_data)
 
-    def _format_value(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
-        """Get the value for an input."""
-        if not isinstance(_input, ReferenceValue):
-            return _input
-        return (
-            f"Previous step {_input.description} had output: "
-            f"{_input.value.full_value(run_data.storage)}"
-        )
+    def _get_ref_description(self, ref: Reference, run_data: RunContext) -> str:
+        """Get the description of a reference."""
+        if isinstance(ref, StepOutput):
+            return ref.get_description(run_data)
+        if isinstance(ref, Input):
+            plan_input = self._plan_input_from_name(ref.name, run_data)
+            if plan_input.description:
+                return plan_input.description
+            if isinstance(plan_input.value, Reference):
+                return self._get_ref_description(plan_input.value, run_data)
+        return ""
+
+    def _plan_input_from_name(self, name: str, run_data: RunContext) -> PlanInput:
+        """Get the plan input from the name."""
+        for plan_input in run_data.plan.plan_inputs:
+            if plan_input.name == name:
+                return plan_input
+        raise ValueError(f"Plan input {name} not found")  # pragma: no cover
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
@@ -322,8 +339,7 @@ class InvokeToolStep(StepV2):
             raise ToolNotFoundError(self.tool if isinstance(self.tool, str) else self.tool.id)
 
         tool_ctx = run_data.get_tool_run_ctx()
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-
+        args = {k: self._resolve_input_reference(v, run_data) for k, v in self.args.items()}
         output = await tool._arun(tool_ctx, **args)  # noqa: SLF001
         output_value = output.get_value()
         if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
@@ -517,7 +533,7 @@ class UserVerifyStep(StepV2):
     @traceable(name="User Verify Step - Run")
     async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Run the user verification step."""
-        message = self._resolve_input_reference(self.message, run_data)
+        message = self._template_input_references(self.message, run_data)
 
         previous_clarification = run_data.plan_run.get_clarification_for_step(
             ClarificationCategory.USER_VERIFICATION
@@ -567,7 +583,7 @@ class UserInputStep(StepV2):
 
     def _create_clarification(self, run_data: RunContext) -> ClarificationType:
         """Create the appropriate clarification based on whether options are provided."""
-        resolved_message = self._resolve_input_reference(self.message, run_data)
+        resolved_message = self._template_input_references(self.message, run_data)
 
         if self.options:
             return MultipleChoiceClarification(
@@ -656,9 +672,9 @@ class ConditionalStep(StepV2):
     @traceable(name="Conditional Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the conditional step."""
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+        args = {k: self._resolve_input_reference(v, run_data) for k, v in self.args.items()}
         if isinstance(self.condition, str):
-            condition_str = self._get_value_for_input(self.condition, run_data)
+            condition_str = self._template_input_references(self.condition, run_data)
             agent = ConditionalEvaluationAgent(run_data.config)
             conditional_result = await agent.execute(condition_str, args)
         else:
