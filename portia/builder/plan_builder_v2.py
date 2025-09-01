@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
-from portia.builder.loops import LoopBlock
+from portia.builder.loops import LoopBlock, LoopBlockClauseType
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Reference, default_step_name
 from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
+    LoopStep,
     LLMStep,
     SingleToolAgentStep,
     StepV2,
@@ -100,24 +101,54 @@ class PlanBuilderV2:
         args: dict[str, Any] | None = None,
         step_name: str | None = None,
     ) -> PlanBuilderV2:
-            """Add a step that checks a condition or loops over a reference variable."""
-            loop_block = LoopBlock(
-                start_step_index=len(self.plan.steps),
-                end_step_index=None,
+        """Add a step that checks a condition or loops over a reference variable."""
+        if condition and over:
+            raise PlanBuilderError("condition and over cannot both be set.")
+        if not condition and not over:
+            raise PlanBuilderError("condition or over must be set.")
+        loop_block = LoopBlock(
+            start_step_index=len(self.plan.steps),
+            end_step_index=None,
+        )
+        self._block_stack.append(loop_block)
+        self.plan.steps.append(
+            LoopStep(
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                condition=condition,
+                args=args or {},
+                loop_block=loop_block,
+                block_clause_type=LoopBlockClauseType.START,
+                start_index=len(self.plan.steps),
+                end_index=None,
             )
-            self._block_stack.append(loop_block)
-            self.plan.steps.append(
-                LoopStep(
-                    condition=condition,
-                    args=args or {},
-                    loop_block=loop_block,
-                    clause_index_in_block=0,
-                    steps=[],
-                    current_step_index=0,
-                    step_outputs=[],
-                )
+        )
+        return self
+
+
+    def endloop(self, step_name: str | None = None) -> PlanBuilderV2:
+        """Exit a loop block."""
+        if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], LoopBlock):
+            raise PlanBuilderError("endloop must be called from a loop block. Please add a loop first.")
+        self._block_stack[-1].end_step_index = len(self.plan.steps)
+        loop_block = self._block_stack[-1]
+        step_to_update = self.plan.steps[loop_block.start_step_index]
+        if not isinstance(step_to_update, LoopStep):
+            raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
+        step_to_update.end_index = len(self.plan.steps)
+        self.plan.steps.append(
+            LoopStep(
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                condition=step_to_update.condition,
+                over=step_to_update.over,
+                index=step_to_update.index,
+                block_clause_type=LoopBlockClauseType.END,
+                args={},
+                start_index=step_to_update.start_index,
+                end_index=len(self.plan.steps),
             )
-            return self
+        )
+        self._block_stack.pop()
+        return self
 
     def if_(
         self,
@@ -458,7 +489,7 @@ class PlanBuilderV2:
         """Return the plan, ready to run."""
         if len(self._block_stack) > 0:
             raise PlanBuilderError(
-                "An endif must be called for all if_ steps. Please add an endif for all if_ steps."
+                "All blocks (loops and conditionals) must be closed. Please add an endif or endloop for all blocks."
             )
 
         step_type_counts: dict[str, int] = {}

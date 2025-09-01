@@ -16,6 +16,7 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
+from portia.builder.loops import LoopBlock, LoopBlockClauseType, LoopStepResult
 from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
 from portia.clarification import (
     Clarification,
@@ -653,29 +654,40 @@ class ConditionalStep(StepV2):
 
 
 class LoopStep(StepV2):
-    condition: Callable[..., bool] | str = Field(
+    """A step that represents a loop in a loop block.
+
+    I.E. loop, endloop clauses.
+    """
+
+    condition: Callable[..., bool] | str | None = Field(
         description=(
             "The boolean predicate to check. If evaluated to true, the steps within this loop "
             "will be evaluated - otherwise they will be skipped and we jump to the next loop."
         )
     )
+    over: Reference | None = Field(
+        default=None, description="The reference to loop over."
+    )
+    current_iteration: int = Field(default=0, description="The current iteration of the loop.")
     args: dict[str, Reference | Any] = Field(
         default_factory=dict, description="The args to check the condition with."
     )
-    clause_index_in_block: int = Field(description="The index of the clause in the loop block")
-    steps: list[StepV2] = Field(description="The steps to execute within the loop.")
-    current_step_index: int = Field(description="The index of the current step in the loop.")
-    step_outputs: list[list[Any]] = Field(description="The outputs of the steps in the loop, stored in the order they were executed.")
+    block_clause_type: LoopBlockClauseType
 
-    @property
-    def final_output(self) -> Any:
-        """Get the final output of the loop."""
-        return self.step_outputs[-1][-1]
+    def current_loop_variable(self, run_data: RunContext) -> ReferenceValue | None:
+        """Get the current loop variable if over is set."""
+        if self.over is None:
+            return None
+        values = self._get_value_for_input(self.over, run_data)
+        if not isinstance(values, list):
+            raise TypeError("Loop variable is not a list")
+        return values[self.current_iteration]
+
 
     @override
-    @traceable(name="Conditional Step - Run")
+    @traceable(name="Loop Step - Run")
     async def run(self, run_data: RunContext) -> Any:
-        """Run the conditional step."""
+        """Run the loop step."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
         if self.current_step_index == 0:
             self.step_outputs.append([])
