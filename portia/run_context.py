@@ -1,9 +1,10 @@
 """Context for a PlanV2 run."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import ReferenceValue
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_hooks import ExecutionHooks
@@ -13,9 +14,11 @@ from portia.storage import Storage
 from portia.tool_registry import ToolRegistry
 
 
-class StepOutputValue(ReferenceValue):
+class StepOutputValue(BaseModel):
     """Value that can be referenced by name."""
 
+    value: Any = Field(description="The referenced value.")
+    description: str = Field(description="Description of the referenced value.", default="")
     step_name: str = Field(description="The name of the referenced value.")
     step_num: int = Field(description="The step number of the referenced value.")
 
