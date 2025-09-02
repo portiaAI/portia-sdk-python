@@ -522,22 +522,20 @@ async def test_run_builder_plan_execution_hooks_after_step_error(portia: Portia)
 
 
 @pytest.mark.asyncio
-@patch("portia.portia.update_current_run")
+@patch("portia.portia.get_current_run_tree")
 async def test_run_builder_plan_appends_plan_run_to_trace_metadata(
-    update_current_run_mock: MagicMock, portia: Portia
+    mock_get_run_tree: MagicMock, portia: Portia
 ) -> None:
     """Ensure plan_run id is appended to trace metadata."""
-    plan = (
-        PlanBuilderV2("Trace metadata")
-        .function_step(function=lambda: "Step result")
-        .build()
-    )
+    mock_run_tree = MagicMock()
+    mock_get_run_tree.return_value = mock_run_tree
 
+    plan = PlanBuilderV2("Trace metadata").function_step(function=lambda: "Step result").build()
     plan_run = await portia.arun_plan(plan)
 
-    update_current_run_mock.assert_called_once()
-    metadata = update_current_run_mock.call_args.kwargs["metadata"]
-    assert metadata["plan_run_id"] == str(plan_run.id)
+    mock_run_tree.add_metadata.assert_called_once()
+    metadata_arg = mock_run_tree.add_metadata.call_args.args[0]
+    assert metadata_arg["plan_run_id"] == str(plan_run.id)
 
 
 class FinalOutputSchema(BaseModel):

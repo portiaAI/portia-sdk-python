@@ -26,7 +26,7 @@ import time
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from langsmith import traceable, update_current_run
+from langsmith import get_current_run_tree, traceable
 from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
@@ -2669,7 +2669,9 @@ class Portia:
         plan_run = await self.resume_builder_plan(
             plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
         )
-        update_current_run(metadata={"plan_run_id": str(plan_run.id)})
+        rt = get_current_run_tree()
+        if rt:
+            rt.add_metadata({"plan_run_id": str(plan_run.id)})
         return plan_run
 
     async def resume_builder_plan(
