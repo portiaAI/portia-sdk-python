@@ -59,6 +59,7 @@ amazon = [
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
 groq = ["groq>=0.12.0,<1.0"]
+meta = []
 tools-browser-local = [
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
