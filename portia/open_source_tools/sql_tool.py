@@ -1,7 +1,7 @@
 """SQL Tools with pluggable adapter and a default SQLite implementation.
 
-This module provides separate tools for different SQL operations against a database 
-via a pluggable adapter. By default, it ships with a SQLite adapter that can be 
+This module provides separate tools for different SQL operations against a database
+via a pluggable adapter. By default, it ships with a SQLite adapter that can be
 configured via environment variables or pure JSON config passed at call time.
 
 Available tools:
@@ -22,33 +22,41 @@ import json
 import os
 import sqlite3
 from dataclasses import dataclass
-from typing import Any, Type
+from typing import Any
 
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, Field, PrivateAttr
 
 from portia.errors import ToolHardError, ToolSoftError
 from portia.tool import Tool, ToolRunContext
 
-def _sqlite_authorizer(action, arg1, arg2, db_name, trigger_or_view):
+
+def _sqlite_authorizer(
+    action: int,
+    arg1: str | None,
+    _arg2: str | None,
+    _db_name: str | None,
+    _trigger_or_view: str | None,
+) -> int:
     """SQLite authorizer function that only allows SELECT operations.
-    
+
     Args:
         action: The SQLite action code (e.g., sqlite3.SQLITE_READ, sqlite3.SQLITE_SELECT)
-        arg1, arg2: Additional arguments depending on the action
+        arg1: First argument depending on the action (e.g., table name, column name)
+        arg2: Second argument depending on the action (e.g., column name)
         db_name: Database name
         trigger_or_view: Name of trigger or view, if applicable
-        
+
     Returns:
         sqlite3.SQLITE_OK for allowed operations, sqlite3.SQLITE_DENY for forbidden ones
+
     """
     # Allow read operations
     if action in (
         sqlite3.SQLITE_READ,      # Reading data from tables
         sqlite3.SQLITE_SELECT,    # SELECT statements
-        sqlite3.SQLITE_FUNCTION,  # Using functions in queries
-    ):
+    sqlite3.SQLITE_FUNCTION,  # Using functions in queries
+):
         return sqlite3.SQLITE_OK
-    
     # Allow only specific safe, read-only PRAGMA statements
     if action == sqlite3.SQLITE_PRAGMA:
         pragma_name = arg1.lower() if arg1 else ""
@@ -56,7 +64,7 @@ def _sqlite_authorizer(action, arg1, arg2, db_name, trigger_or_view):
         safe_pragmas = {
             "table_info",        # Get table schema information
             "table_list",        # List tables
-            "database_list",     # List databases 
+            "database_list",     # List databases
             "foreign_key_list",  # List foreign keys
             "index_list",        # List indexes
             "index_info",        # Get index information
@@ -68,7 +76,6 @@ def _sqlite_authorizer(action, arg1, arg2, db_name, trigger_or_view):
             return sqlite3.SQLITE_OK
         # Deny potentially dangerous PRAGMA operations
         return sqlite3.SQLITE_DENY
-    
     # Deny all other operations (INSERT, UPDATE, DELETE, CREATE, etc.)
     return sqlite3.SQLITE_DENY
 
@@ -76,21 +83,21 @@ def _sqlite_authorizer(action, arg1, arg2, db_name, trigger_or_view):
 class SQLAdapter:
     """Abstract adapter interface for SQL databases (read-only)."""
 
-    def run_sql(self, query: str) -> list[dict[str, Any]]:  
+    def run_sql(self, query: str) -> list[dict[str, Any]]:
         """Execute a read-only query and return rows as list of dicts."""
         raise NotImplementedError
 
-    def list_tables(self) -> list[str]:  
+    def list_tables(self) -> list[str]:
         """List available table names."""
         raise NotImplementedError
 
     def get_table_schemas(
         self, tables: list[str]
-    ) -> dict[str, list[dict[str, Any]]]:  
+    ) -> dict[str, list[dict[str, Any]]]:
         """Return column schemas for the given tables."""
         raise NotImplementedError
 
-    def check_sql(self, query: str) -> dict[str, Any]:  
+    def check_sql(self, query: str) -> dict[str, Any]:
         """Check if a query would run successfully (read-only)."""
         raise NotImplementedError
 
@@ -121,7 +128,7 @@ class SQLiteAdapter(SQLAdapter):
         else:
             uri = f"file:{self.config.db_path}?mode=ro"
             conn = sqlite3.connect(uri, uri=True)
-        
+
         # Set the authorizer to enforce read-only operations
         conn.set_authorizer(_sqlite_authorizer)
         conn.row_factory = sqlite3.Row
@@ -134,7 +141,7 @@ class SQLiteAdapter(SQLAdapter):
                 cur = conn.execute(query)
                 rows = cur.fetchall()
                 return [dict(r) for r in rows]
-        except sqlite3.Error as e:  
+        except sqlite3.Error as e:
             raise ToolHardError(f"SQLite error: {e}") from e
 
     def list_tables(self) -> list[str]:
@@ -147,7 +154,7 @@ class SQLiteAdapter(SQLAdapter):
                     "ORDER BY name"
                 )
                 return [r[0] for r in cur.fetchall()]
-        except sqlite3.Error as e:  
+        except sqlite3.Error as e:
             raise ToolHardError(f"SQLite error: {e}") from e
 
     def get_table_schemas(self, tables: list[str]) -> dict[str, list[dict[str, Any]]]:
@@ -169,7 +176,7 @@ class SQLiteAdapter(SQLAdapter):
                         }
                         for c in cols
                     ]
-        except sqlite3.Error as e:  
+        except sqlite3.Error as e:
             raise ToolHardError(f"SQLite error: {e}") from e
         else:
             return out
@@ -214,9 +221,10 @@ class BaseSQLTool(Tool[Any]):
     # Use a private attribute to avoid Pydantic BaseModel field restrictions
     _adapter: SQLAdapter | None = PrivateAttr(default=None)
 
-    def __init__(self, adapter: SQLAdapter | None = None) -> None:
+    def __init__(self, adapter: SQLAdapter | None = None, **kwargs: Any) -> None:
         """Initialize the tool with an optional adapter (defaults to SQLite)."""
-        super().__init__()
+        # Let subclasses handle their own initialization with their class attributes
+        super().__init__(**kwargs)
         self._adapter = adapter
 
     def _adapter_from_env(self) -> SQLAdapter:
@@ -251,6 +259,7 @@ class BaseSQLTool(Tool[Any]):
 
 class RunSQLArgs(BaseSQLToolArgs):
     """Arguments for running SQL queries."""
+
     query: str = Field(..., description="SQL query to execute (SELECT only)")
 
 
@@ -260,14 +269,15 @@ class RunSQLTool(BaseSQLTool):
     id: str = "run_sql"
     name: str = "Run SQL Query"
     description: str = (
-        "Execute read-only SQL SELECT queries against a database. Only SELECT queries are allowed. "
-        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
-        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
-        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
+        "Execute read-only SQL SELECT queries against a database. Only SELECT queries are "
+        "allowed. Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
+        'config_json format: {"db_path": "/path/to/database.db"} where db_path is the SQLite '
+        'database file path. Use ":memory:" for in-memory database. Default: :memory: if no '
+        "config provided."
     )
-    args_schema: Type[RunSQLArgs] = RunSQLArgs
+    args_schema: type[BaseModel] = RunSQLArgs
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> Any:
+    def run(self, _: ToolRunContext, **kwargs: Any) -> list[dict[str, Any]]:
         """Execute the SQL query and return results."""
         args = RunSQLArgs.model_validate(kwargs)
         adapter = self._get_adapter(args.config_json)
@@ -276,7 +286,8 @@ class RunSQLTool(BaseSQLTool):
 
 class ListTablesArgs(BaseSQLToolArgs):
     """Arguments for listing database tables."""
-    pass  # Only needs base config args
+
+    # Only needs base config args
 
 
 class ListTablesTool(BaseSQLTool):
@@ -285,14 +296,14 @@ class ListTablesTool(BaseSQLTool):
     id: str = "list_tables"
     name: str = "List Database Tables"
     description: str = (
-        "List all available tables in the database. "
-        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
-        "config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path. "
-        "Use \":memory:\" for in-memory database. Default: :memory: if no config provided."
+        "List all available tables in the database. Configuration: Set SQLITE_DB_PATH env var "
+        'or provide config_json parameter. config_json format: {"db_path": "/path/to/database.db"} '
+        'where db_path is the SQLite database file path. Use ":memory:" for in-memory database. '
+        "Default: :memory: if no config provided."
     )
-    args_schema: Type[ListTablesArgs] = ListTablesArgs
+    args_schema: type[BaseModel] = ListTablesArgs
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> Any:
+    def run(self, _: ToolRunContext, **kwargs: Any) -> list[str]:
         """List all tables in the database."""
         args = ListTablesArgs.model_validate(kwargs)
         adapter = self._get_adapter(args.config_json)
@@ -301,6 +312,7 @@ class ListTablesTool(BaseSQLTool):
 
 class GetTableSchemasArgs(BaseSQLToolArgs):
     """Arguments for getting table schemas."""
+
     tables: list[str] = Field(..., description="List of table names to get schemas for")
 
 
@@ -310,11 +322,17 @@ class GetTableSchemasTool(BaseSQLTool):
     id: str = "get_table_schemas"
     name: str = "Get Table Schemas"
     description: str = (
-                "Get detailed schema information (columns, types, etc.) for specified tables. "        "Returns column details including name, type, nullability, and primary key info. "        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "        'config_json format: {"db_path": "/path/to/database.db"} where db_path is the SQLite database file path. '        'Use ":memory": for in-memory database. Default: :memory: if no config provided.'    )
-    
-    args_schema: Type[GetTableSchemasArgs] = GetTableSchemasArgs
+        "Get detailed schema information (columns, types, etc.) for specified tables. "
+        "Returns column details including name, type, nullability, and primary key info. "
+        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
+        'config_json format: {"db_path": "/path/to/database.db"} where db_path is the '
+        'SQLite database file path. Use ":memory:" for in-memory database. '
+        "Default: :memory: if no config provided."
+    )
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> Any:
+    args_schema: type[BaseModel] = GetTableSchemasArgs
+
+    def run(self, _: ToolRunContext, **kwargs: Any) -> dict[str, list[dict[str, Any]]]:
         """Get schema information for the specified tables."""
         args = GetTableSchemasArgs.model_validate(kwargs)
         adapter = self._get_adapter(args.config_json)
@@ -323,6 +341,7 @@ class GetTableSchemasTool(BaseSQLTool):
 
 class CheckSQLArgs(BaseSQLToolArgs):
     """Arguments for checking SQL query validity."""
+
     query: str = Field(..., description="SQL query to validate (SELECT only)")
 
 
@@ -331,14 +350,18 @@ class CheckSQLTool(BaseSQLTool):
 
     id: str = "check_sql"
     name: str = "Check SQL Query"
-    description: str = """Check if a SQL query is valid without executing it. Uses EXPLAIN to validate syntax and table/column references.
-        Only SELECT queries are allowed. Returns {ok: true} for valid queries or {ok: false, error: 'message'} for invalid ones.
-        Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter.
-        config_json format: {\"db_path\": \"/path/to/database.db\"} where db_path is the SQLite database file path.
-        Use \":memory:\" for in-memory database. Default: :memory: if no config provided."""
-    args_schema: Type[CheckSQLArgs] = CheckSQLArgs
+    description: str = (
+        "Check if a SQL query is valid without executing it. Uses EXPLAIN to validate "
+        "syntax and table/column references. Only SELECT queries are allowed. Returns "
+        "{ok: true} for valid queries or {ok: false, error: 'message'} for invalid ones. "
+        "Configuration: Set SQLITE_DB_PATH env var or provide config_json parameter. "
+        'config_json format: {"db_path": "/path/to/database.db"} where db_path is the '
+        'SQLite database file path. Use ":memory:" for in-memory database. Default: '
+        ":memory: if no config provided."
+    )
+    args_schema: type[BaseModel] = CheckSQLArgs
 
-    def run(self, _: ToolRunContext, **kwargs: Any) -> Any:
+    def run(self, _: ToolRunContext, **kwargs: Any) -> dict[str, Any]:
         """Check the validity of the SQL query."""
         args = CheckSQLArgs.model_validate(kwargs)
         adapter = self._get_adapter(args.config_json)
