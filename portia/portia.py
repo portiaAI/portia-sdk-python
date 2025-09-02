@@ -49,6 +49,7 @@ from portia.errors import (
     PlanError,
     PlanNotFoundError,
     SkipExecutionError,
+    ToolNotFoundError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
@@ -68,14 +69,13 @@ from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.logger import logger, logger_manager
+from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
-    MAX_OUTPUT_LOG_LENGTH,
     DiskFileStorage,
     InMemoryStorage,
     PortiaCloudStorage,
@@ -2190,13 +2190,8 @@ class Portia:
             summary = plan_run.outputs.final_output.get_summary()
             if not summary:
                 summary = str(plan_run.outputs.final_output.get_value())
-            if len(summary) > MAX_OUTPUT_LOG_LENGTH:
-                summary = (  # pragma: no cover
-                    summary[:MAX_OUTPUT_LOG_LENGTH]
-                    + "...[truncated - only first 1000 characters shown]"
-                )
             logger().info(
-                f"Final output: {summary!s}",
+                f"Final output: {truncate_message(summary)!s}",
             )
 
     def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
@@ -2608,10 +2603,15 @@ class Portia:
                 or step.tool_id.startswith(LOCAL_FUNCTION_PREFIX)
             ):
                 continue
-            tools_remaining.add(step.tool_id)
 
+            if "," in step.tool_id:
+                tools_remaining.update(self.resolve_tool_id_with_comma(step.tool_id))
+            else:
+                tools_remaining.add(step.tool_id)
+
+        for tool_id in tools_remaining:
             tool = ToolCallWrapper.from_tool_id(
-                step.tool_id,
+                tool_id,
                 self.tool_registry,
                 self.storage,
                 plan_run,
@@ -2619,7 +2619,7 @@ class Portia:
             if not tool:
                 continue  # pragma: no cover - Should not happen if tool_id is set - defensive check
             if tool.id.startswith("portia:"):
-                portia_cloud_tool_ids_remaining.add(step.tool_id)
+                portia_cloud_tool_ids_remaining.add(tool_id)
             else:
                 ready_response = tool.ready(tool_run_context)
                 if not ready_response.ready:
@@ -2637,6 +2637,23 @@ class Portia:
             ready_clarifications.extend(portia_tools_ready_response.clarifications)
 
         return ready_clarifications
+
+    def resolve_tool_id_with_comma(self, tool_id: str) -> list[str]:
+        """Resolve a tool id with a comma in it to a list of tool ids to check.
+
+        Tools shouldn't really have commas in their ID - there are only 2 cases that can cause this:
+        1. The user put a comma in their tool ID
+        2. A PlanBuilderV2 ReAct agent uses a comma to split the fact it uses multiple tools in a single step
+
+        We prioritise checking for the first one and then, if that tool doesn't exist in the registry, we try
+        the next one. This is all pretty ugly though - really, we need to move away from the legacy Plan and allow
+        steps to use multiple tools.
+        """
+        try:
+            self.tool_registry.get_tool(tool_id)
+            return [tool_id]
+        except ToolNotFoundError:
+            return tool_id.split(",")
 
     @traceable(name="Portia - Run Plan")
     async def run_builder_plan(
@@ -2701,6 +2718,7 @@ class Portia:
             tool_registry=self.tool_registry,
             storage=self.storage,
             execution_hooks=self.execution_hooks,
+            telemetry=self.telemetry,
         )
 
         try:
@@ -2799,7 +2817,10 @@ class Portia:
                 logger().debug("Exiting conditional branch")
                 branch_stack.pop()
 
-            output_value = LocalDataValue(value=result)
+            if not isinstance(result, LocalDataValue):
+                output_value = LocalDataValue(value=result)
+            else:
+                output_value = result
             # This may persist the output to memory - store the memory value if it does
             output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
             if not is_clarification(result):

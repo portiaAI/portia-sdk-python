@@ -15,6 +15,7 @@ from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
     LLMStep,
+    ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
     UserInputStep,
@@ -346,6 +347,60 @@ class TestPlanBuilderV2:
         assert step.output_schema == OutputSchema
         assert step.step_name == "agent_step"
 
+    def test_react_agent_step_method_basic(self) -> None:
+        """Test the react_agent_step() method with basic parameters."""
+        builder = PlanBuilderV2()
+        tools = ["search_tool", "calculator_tool"]
+
+        result = builder.react_agent_step(task="Research and calculate", tools=tools)
+
+        assert result is builder  # Should return self for chaining
+        assert len(builder.plan.steps) == 1
+        assert isinstance(builder.plan.steps[0], ReActAgentStep)
+        assert builder.plan.steps[0].task == "Research and calculate"
+        assert builder.plan.steps[0].tools == tools
+        assert builder.plan.steps[0].inputs == []
+        assert builder.plan.steps[0].output_schema is None
+        assert builder.plan.steps[0].step_name == "step_0"
+        assert builder.plan.steps[0].tool_call_limit == 25
+        assert builder.plan.steps[0].allow_agent_clarifications is False
+
+    def test_react_agent_step_method_with_all_parameters(self) -> None:
+        """Test the react_agent_step() method with all parameters."""
+        builder = PlanBuilderV2()
+        tools = ["search_tool", "calculator_tool", "weather_tool"]
+        inputs = ["context", StepOutput(0), Input("user_query")]
+
+        builder.react_agent_step(
+            task="Complex multi-tool analysis",
+            tools=tools,
+            inputs=inputs,
+            output_schema=OutputSchema,
+            step_name="react_analysis",
+            allow_agent_clarifications=True,
+            tool_call_limit=50,
+        )
+
+        step = builder.plan.steps[0]
+        assert isinstance(step, ReActAgentStep)
+        assert step.task == "Complex multi-tool analysis"
+        assert step.tools == tools
+        assert step.inputs == inputs
+        assert step.output_schema == OutputSchema
+        assert step.step_name == "react_analysis"
+        assert step.allow_agent_clarifications is True
+        assert step.tool_call_limit == 50
+
+    def test_react_agent_step_method_single_tool(self) -> None:
+        """Test the react_agent_step() method with a single tool."""
+        builder = PlanBuilderV2()
+
+        builder.react_agent_step(task="Simple task", tools=["single_tool"])
+
+        step = builder.plan.steps[0]
+        assert isinstance(step, ReActAgentStep)
+        assert step.tools == ["single_tool"]
+
     def test_user_verify_step_method(self) -> None:
         """Test the user_verify_step() method."""
         builder = PlanBuilderV2()
@@ -457,7 +512,8 @@ class TestPlanBuilderV2:
             .llm_step(task="Analyze user info", inputs=[Input("user_name"), Input("user_age")])
             .invoke_tool_step(tool="search_tool", args={"query": StepOutput(0)})
             .function_step(function=example_function_for_testing, args={"x": 1, "y": "test"})
-            .single_tool_agent_step(tool="agent_tool", task="Final processing")
+            .single_tool_agent_step(tool="agent_tool", task="Agent processing")
+            .react_agent_step(task="Multi-tool analysis", tools=["tool1", "tool2"])
             .final_output(output_schema=OutputSchema, summarize=True)
         )
 
@@ -466,11 +522,12 @@ class TestPlanBuilderV2:
         # Verify the plan was built correctly
         plan = builder.build()
         assert len(plan.plan_inputs) == 2
-        assert len(plan.steps) == 4
+        assert len(plan.steps) == 5
         assert isinstance(plan.steps[0], LLMStep)
         assert isinstance(plan.steps[1], InvokeToolStep)
         assert isinstance(plan.steps[2], InvokeToolStep)
         assert isinstance(plan.steps[3], SingleToolAgentStep)
+        assert isinstance(plan.steps[4], ReActAgentStep)
         assert plan.final_output_schema == OutputSchema
         assert plan.summarize is True
 
@@ -498,11 +555,13 @@ class TestPlanBuilderV2:
         builder.invoke_tool_step(tool="tool1")
         builder.function_step(function=example_function_for_testing)
         builder.single_tool_agent_step(tool="agent_tool", task="Agent task")
+        builder.react_agent_step(task="ReAct task", tools=["tool1", "tool2"])
 
         assert builder.plan.steps[0].step_name == "step_0"
         assert builder.plan.steps[1].step_name == "step_1"
         assert builder.plan.steps[2].step_name == "step_2"
         assert builder.plan.steps[3].step_name == "step_3"
+        assert builder.plan.steps[4].step_name == "step_4"
 
     def test_custom_step_names_override_auto_generation(self) -> None:
         """Test that custom step names override auto-generation."""

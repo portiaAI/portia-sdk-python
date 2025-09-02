@@ -11,6 +11,7 @@ from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
     LLMStep,
+    ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
     UserInputStep,
@@ -277,6 +278,45 @@ class PlanBuilderV2:
                 task=task,
                 inputs=inputs or [],
                 output_schema=output_schema,
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
+            )
+        )
+        return self
+
+    def react_agent_step(
+        self,
+        *,
+        task: str,
+        tools: list[str] | None = None,
+        inputs: list[Any] | None = None,
+        output_schema: type[BaseModel] | None = None,
+        step_name: str | None = None,
+        allow_agent_clarifications: bool = False,
+        tool_call_limit: int = 25,
+    ) -> PlanBuilderV2:
+        """Add a step that uses a ReAct agent with multiple tools.
+
+        The ReAct agent uses reasoning and acting cycles to complete complex tasks
+        that may require multiple tool calls and decision making.
+
+        Args:
+            task: The task to perform.
+            tools: The list of tool IDs to make available to the agent.
+            inputs: The inputs to the task. If any of these values are instances of StepOutput or
+              Input, the corresponding values will be substituted in when the plan is run.
+            output_schema: The schema of the output.
+            step_name: Optional name for the step. If not provided, will be auto-generated.
+
+        """
+        self.plan.steps.append(
+            ReActAgentStep(
+                task=task,
+                tools=tools or [],
+                inputs=inputs or [],
+                output_schema=output_schema,
+                allow_agent_clarifications=allow_agent_clarifications,
+                tool_call_limit=tool_call_limit,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
             )

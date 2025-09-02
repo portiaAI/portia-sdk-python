@@ -463,7 +463,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         return (
             StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 func=partial(self._run, ctx),
@@ -471,13 +471,17 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             )
             if sync
             else StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 coroutine=partial(self._arun, ctx),
                 return_direct=True,
             )
         )
+
+    def get_langchain_name(self) -> str:
+        """Get the name of the tool for LangChain."""
+        return self.name.replace(" ", "_")
 
     def to_langchain_with_artifact(self, ctx: ToolRunContext, sync: bool = True) -> StructuredTool:
         """Return a LangChain representation of this tool with content and artifact.
@@ -498,7 +502,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         return (
             StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 func=partial(self._run_with_artifacts, ctx),
@@ -507,7 +511,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             )
             if sync
             else StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 coroutine=partial(self._arun_with_artifacts, ctx),

@@ -48,7 +48,7 @@ class RunContext(BaseModel):
         return ToolRunContext(
             end_user=self.end_user,
             plan_run=self.plan_run,
-            plan=self.plan,
+            plan=self.legacy_plan,
             config=self.config,
             clarifications=self.plan_run.get_clarifications_for_step(),
         )

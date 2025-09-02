@@ -89,6 +89,49 @@ class StepV2(BaseModel, ABC):
             return self._template_input_references(value, run_data)
         return value
 
+    def _resolve_input_references_with_descriptions(
+        self, inputs: list[Any], run_data: RunContext
+    ) -> Any:
+        """Resolve all references in a list of inputs, including descriptions.
+
+        For each value in inputs, if value is a Reference (e.g. Input or StepOutput), then the value
+        that Reference refers to is returned, in a LocalDataValue alongside a description. If the value
+        is a string with a Reference in it, then the string is returned with the reference values
+        templated in. Any other value is returned unchanged.
+
+        This method is primarily used to provide the inputs as additional information LLMs.
+        """
+        resolved_inputs = []
+        for _input in inputs:
+            if isinstance(_input, Reference):
+                description = self._get_ref_description(_input, run_data)
+                value = self._resolve_input_reference(_input, run_data)
+                value = LocalDataValue(value=value, summary=description)
+            else:
+                value = self._resolve_input_reference(_input, run_data)
+            if value is not None or not isinstance(_input, Reference):
+                resolved_inputs.append(value)
+        return resolved_inputs
+
+    def _get_ref_description(self, ref: Reference, run_data: RunContext) -> str:
+        """Get the description of a reference."""
+        if isinstance(ref, StepOutput):
+            return ref.get_description(run_data)
+        if isinstance(ref, Input):
+            plan_input = self._plan_input_from_name(ref.name, run_data)
+            if plan_input.description:
+                return plan_input.description
+            if isinstance(plan_input.value, Reference):
+                return self._get_ref_description(plan_input.value, run_data)
+        return ""
+
+    def _plan_input_from_name(self, name: str, run_data: RunContext) -> PlanInput:
+        """Get the plan input from the name."""
+        for plan_input in run_data.plan.plan_inputs:
+            if plan_input.name == name:
+                return plan_input
+        raise ValueError(f"Plan input {name} not found")  # pragma: no cover
+
     def _template_input_references(self, value: str, run_data: RunContext) -> str:
         # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
         # from _input if it's a string
@@ -241,38 +284,10 @@ class LLMStep(StepV2):
             storage=run_data.storage,
             plan_run=run_data.plan_run,
         )
+
         tool_ctx = run_data.get_tool_run_ctx()
-        task_data = []
-        for _input in self.inputs:
-            if isinstance(_input, Reference):
-                description = self._get_ref_description(_input, run_data)
-                value = self._resolve_input_reference(_input, run_data)
-                value = LocalDataValue(value=value, summary=description)
-            else:
-                value = self._resolve_input_reference(_input, run_data)
-            if value is not None or not isinstance(_input, Reference):
-                task_data.append(value)
-
+        task_data = self._resolve_input_references_with_descriptions(self.inputs, run_data)
         return await wrapped_tool.arun(tool_ctx, task=self.task, task_data=task_data)
-
-    def _get_ref_description(self, ref: Reference, run_data: RunContext) -> str:
-        """Get the description of a reference."""
-        if isinstance(ref, StepOutput):
-            return ref.get_description(run_data)
-        if isinstance(ref, Input):
-            plan_input = self._plan_input_from_name(ref.name, run_data)
-            if plan_input.description:
-                return plan_input.description
-            if isinstance(plan_input.value, Reference):
-                return self._get_ref_description(plan_input.value, run_data)
-        return ""
-
-    def _plan_input_from_name(self, name: str, run_data: RunContext) -> PlanInput:
-        """Get the plan input from the name."""
-        for plan_input in run_data.plan.plan_inputs:
-            if plan_input.name == name:
-                return plan_input
-        raise ValueError(f"Plan input {name} not found")  # pragma: no cover
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
@@ -403,15 +418,14 @@ class SingleToolAgentStep(StepV2):
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"SingleToolAgentStep(task='{self.task}', tool='{self.tool}', {output_info})"
+        return f"SingleToolAgentStep(task='{self.task}', tool='{self.tool}'{output_info})"
 
     @override
     @traceable(name="Single Tool Agent Step - Run")
     async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
         agent = self._get_agent_for_step(run_data)
-        output_obj = await agent.execute_async()
-        return output_obj.get_value()
+        return await agent.execute_async()
 
     def _get_agent_for_step(
         self,
@@ -475,6 +489,13 @@ class ReActAgentStep(StepV2):
     output_schema: type[BaseModel] | None = Field(
         default=None, description="The schema of the output."
     )
+    tool_call_limit: int = Field(
+        default=25, description="The maximum number of tool calls to make."
+    )
+    allow_agent_clarifications: bool = Field(
+        default=False,
+        description="Whether to allow the agent to ask clarifying questions to the user if it is unable to proceed.",
+    )
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -486,8 +507,30 @@ class ReActAgentStep(StepV2):
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
         agent = self._get_agent_for_step(run_data)
-        output_obj = await agent.execute_async()
-        return output_obj.get_value()
+        return await agent.execute()
+
+    def _get_agent_for_step(
+        self,
+        run_data: RunContext,
+    ) -> ReActAgent:
+        """Get the appropriate agent for executing the step."""
+        tools = [
+            ToolCallWrapper.from_tool_id(
+                tool, run_data.tool_registry, run_data.storage, run_data.plan_run
+            )
+            for tool in self.tools
+        ]
+        task_data = self._resolve_input_references_with_descriptions(self.inputs, run_data)
+
+        return ReActAgent(
+            self.task,
+            task_data,
+            tools,
+            run_data,
+            self.tool_call_limit,
+            self.allow_agent_clarifications,
+            self.output_schema,
+        )
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
@@ -499,24 +542,6 @@ class ReActAgentStep(StepV2):
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
-        )
-
-    def _get_agent_for_step(
-        self,
-        run_data: RunContext,
-    ) -> BaseExecutionAgent:
-        """Get the appropriate agent for executing the step."""
-        tools = [
-            ToolCallWrapper.from_tool_id(
-                tool, run_data.tool_registry, run_data.storage, run_data.plan_run
-            )
-            for tool in self.tools
-        ]
-        return ReActAgent(
-            self.task,
-            self.inputs,
-            tools,
-            run_data,
         )
 
 

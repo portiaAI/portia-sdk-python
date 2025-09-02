@@ -28,12 +28,11 @@ portia = Portia(execution_hooks=CLIExecutionHooks())
 plan = (
     PlanBuilderV2("Buy some gold")
     .input(name="currency", description="The currency to purchase the gold in", default_value="GBP")
-    .invoke_tool_step(
+    .react_agent_step(
         step_name="Search gold price",
-        tool="search_tool",
-        args={
-            "search_query": f"What is the price of gold per ounce in {Input('currency')}?",
-        },
+        tools=["search_tool"],
+        task="Search the price of gold",
+        inputs=[Input("currency")],
         output_schema=CommodityPriceWithCurrency,
     )
     .user_input(
