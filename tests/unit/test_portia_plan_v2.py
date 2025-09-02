@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
@@ -519,6 +519,25 @@ async def test_run_builder_plan_execution_hooks_after_step_error(portia: Portia)
     plan_run = await portia.arun_plan(plan)
 
     assert plan_run.state == PlanRunState.FAILED
+
+
+@pytest.mark.asyncio
+@patch("portia.portia.update_current_run")
+async def test_run_builder_plan_appends_plan_run_to_trace_metadata(
+    update_current_run_mock: MagicMock, portia: Portia
+) -> None:
+    """Ensure plan_run id is appended to trace metadata."""
+    plan = (
+        PlanBuilderV2("Trace metadata")
+        .function_step(function=lambda: "Step result")
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    update_current_run_mock.assert_called_once()
+    metadata = update_current_run_mock.call_args.kwargs["metadata"]
+    assert metadata["plan_run_id"] == str(plan_run.id)
 
 
 class FinalOutputSchema(BaseModel):
