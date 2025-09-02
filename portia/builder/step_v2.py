@@ -6,7 +6,7 @@ import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import TYPE_CHECKING, Any, Self, override, Sequence
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -687,7 +687,7 @@ class LoopStep(StepV2):
     args: dict[str, Reference | Any] = Field(
         default_factory=dict, description="The args to check the condition with."
     )
-    block_clause_type: LoopBlockType
+    loop_block_type: LoopBlockType
     start_index: int | None = Field(default=None, description="The start index of the loop.")
     end_index: int | None = Field(default=None, description="The end index of the loop.")
 
@@ -706,8 +706,8 @@ class LoopStep(StepV2):
         if self.over is None:
             return None
         values = self._resolve_input_reference(self.over, run_data)
-        if not isinstance(values, list):
-            raise TypeError("Loop variable is not a list")
+        if not isinstance(values, Sequence):
+            raise TypeError("Loop variable is not indexable")
         return values[self.index]
 
 
@@ -716,15 +716,10 @@ class LoopStep(StepV2):
     async def run(self, run_data: RunContext) -> Any:
         """Run the loop step."""
         args = {k: self._resolve_input_reference(v, run_data) for k, v in self.args.items()}
-        match self.block_clause_type:
-            case LoopBlockType.START:
+        match self.loop_block_type, self.loop_type:
+            case LoopBlockType.START, LoopType.CONDITIONAL:
                 if self.condition is None:
-                    return LoopStepResult(
-                        type=self.block_clause_type,
-                        loop_result=True,
-                        start_index=self.start_index or 0,
-                        end_index=self.end_index or 0,
-                    )
+                    raise ValueError("Condition is required for conditional loop")
                 if isinstance(self.condition, str):
                     condition_str = self._resolve_input_reference(self.condition, run_data)
                     agent = ConditionalEvaluationAgent(run_data.config)
@@ -732,8 +727,25 @@ class LoopStep(StepV2):
                 else:
                     conditional_result = self.condition(**args)
                 return LoopStepResult(
-                    type=self.block_clause_type,
+                    type=self.loop_block_type,
                     loop_result=conditional_result,
+                    start_index=self.start_index or 0,
+                    end_index=self.end_index or 0,
+                )
+            case LoopBlockType.START, LoopType.FOR_EACH:
+                if self.over is None:
+                    raise ValueError("Over is required for for-each loop")
+                value = self.current_loop_variable(run_data)
+                return LoopStepResult(
+                    type=self.loop_block_type,
+                    loop_result=value is not None,
+                    start_index=self.start_index or 0,
+                    end_index=self.end_index or 0,
+                )
+            case LoopBlockType.END, _:
+                return LoopStepResult(
+                    type=self.loop_block_type,
+                    loop_result=True,
                     start_index=self.start_index or 0,
                     end_index=self.end_index or 0,
                 )
