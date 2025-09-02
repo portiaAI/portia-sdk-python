@@ -17,15 +17,18 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ConfigDict
 
 from portia.common import combine_args_kwargs
+from portia.errors import ToolNotFoundError
 from portia.execution_agents.execution_utils import is_clarification
 from portia.logger import logger
-from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
+from portia.open_source_tools.llm_tool import LLMTool
+from portia.storage import AdditionalStorage, Storage, ToolCallRecord, ToolCallStatus
 from portia.tool import ReadyResponse, Tool, ToolRunContext
 
 if TYPE_CHECKING:
     from portia.clarification import Clarification
     from portia.execution_agents.output import Output
     from portia.plan_run import PlanRun
+    from portia.tool_registry import ToolRegistry
 
 
 MAX_OUTPUT_LOG_LENGTH = 1000
@@ -73,6 +76,31 @@ class ToolCallWrapper(Tool):
         self._child_tool = child_tool
         self._storage = storage
         self._plan_run = plan_run
+
+    @classmethod
+    def from_tool_id(
+        cls,
+        tool_id: str | None,
+        tool_registry: ToolRegistry,
+        storage: Storage,
+        plan_run: PlanRun,
+    ) -> ToolCallWrapper | None:
+        """Get a ToolCallWrapper for a tool with specified id."""
+        if not tool_id:
+            return None
+        try:
+            child_tool = tool_registry.get_tool(tool_id)
+        except ToolNotFoundError:
+            # Special case LLMTool so it doesn't need to be in all tool registries
+            if tool_id == LLMTool.LLM_TOOL_ID:
+                child_tool = LLMTool()
+            else:
+                raise  # pragma: no cover
+        return ToolCallWrapper(
+            child_tool=child_tool,
+            storage=storage,
+            plan_run=plan_run,
+        )
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:
         """Check if the child tool is ready and return ReadyResponse."""

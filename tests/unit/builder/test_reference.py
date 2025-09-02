@@ -5,11 +5,11 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Input, ReferenceValue, StepOutput, default_step_name
+from portia.builder.reference import Input, StepOutput, default_step_name
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
-from portia.portia import StepOutputValue
+from portia.run_context import StepOutputValue
 
 
 class TestDefaultStepName:
@@ -80,40 +80,30 @@ class TestStepOutput:
         """Test get_value method with integer step - successful case."""
         step_output = StepOutput(1)
 
-        test_output = LocalDataValue(value="test result", summary="Test output")
         mock_run_data = Mock()
         mock_run_data.step_output_values = [
-            StepOutputValue(
-                step_num=0, step_name="step_0", value=LocalDataValue(value="test"), description=""
-            ),
-            StepOutputValue(step_num=1, step_name="step_1", value=test_output, description=""),
-            StepOutputValue(
-                step_num=2, step_name="step_2", value=LocalDataValue(value="test"), description=""
-            ),
+            StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+            StepOutputValue(step_num=1, step_name="step_1", value="test result", description=""),
+            StepOutputValue(step_num=2, step_name="step_2", value="test", description=""),
         ]
 
         result = step_output.get_value(mock_run_data)
 
-        assert result.value is test_output  # pyright: ignore[reportOptionalMemberAccess]
+        assert result == "test result"
 
     def test_get_value_with_string_step_success(self) -> None:
         """Test get_value method with string step - successful case."""
         step_output = StepOutput("my_step")
 
-        test_output = LocalDataValue(value="test result", summary="Test output")
         mock_run_data = Mock()
         mock_run_data.step_output_values = [
-            StepOutputValue(
-                step_num=0, step_name="step_0", value=LocalDataValue(value="test"), description=""
-            ),
-            StepOutputValue(
-                step_num=1, step_name="step_1", value=LocalDataValue(value="test"), description=""
-            ),
-            StepOutputValue(step_num=2, step_name="my_step", value=test_output, description=""),
+            StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+            StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
+            StepOutputValue(step_num=2, step_name="my_step", value="test result", description=""),
         ]
 
         result = step_output.get_value(mock_run_data)
-        assert result.value is test_output  # pyright: ignore[reportOptionalMemberAccess]
+        assert result == "test result"
 
     def test_get_value_with_int_step_index_error(self) -> None:
         """Test get_value method with integer step - IndexError case."""
@@ -124,13 +114,13 @@ class TestStepOutput:
             StepOutputValue(
                 step_num=0,
                 step_name="step_0",
-                value=LocalDataValue(value="test"),
+                value="test",
                 description="",
             ),
             StepOutputValue(
                 step_num=1,
                 step_name="step_1",
-                value=LocalDataValue(value="test"),
+                value="test",
                 description="",
             ),
         ]
@@ -145,17 +135,63 @@ class TestStepOutput:
 
         mock_run_data = Mock()
         mock_run_data.step_output_values = [
-            StepOutputValue(
-                step_num=0, step_name="step_0", value=LocalDataValue(value="test"), description=""
-            ),
-            StepOutputValue(
-                step_num=1, step_name="step_1", value=LocalDataValue(value="test"), description=""
-            ),
+            StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+            StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
         ]
 
         result = step_output.get_value(mock_run_data)
 
         assert result is None
+
+    def test_get_description_with_int_step(self) -> None:
+        """Test get_description method with integer step - successful case."""
+        step_output = StepOutput(0)
+
+        mock_run_data = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value="test", description="First step output"
+            ),
+        ]
+
+        result = step_output.get_description(mock_run_data)
+
+        assert result == "First step output"
+
+    def test_get_description_with_string_step(self) -> None:
+        """Test get_description method with string step - successful case."""
+        step_output = StepOutput("my_step")
+
+        mock_run_data = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value="test", description="First step output"
+            ),
+            StepOutputValue(
+                step_num=1, step_name="my_step", value="test", description="Second step output"
+            ),
+        ]
+
+        result = step_output.get_description(mock_run_data)
+        assert result == "Second step output"
+
+    def test_get_description_with_invalid_step(self) -> None:
+        """Test get_description method with invalid step - returns empty string."""
+        step_output = StepOutput("nonexistent_step")
+
+        mock_run_data = Mock()
+        mock_run_data.step_output_values = [
+            StepOutputValue(
+                step_num=0, step_name="step_0", value="test", description="First step output"
+            ),
+            StepOutputValue(
+                step_num=1, step_name="step_1", value="test", description="Second step output"
+            ),
+        ]
+
+        result = step_output.get_description(mock_run_data)
+
+        assert result == ""
 
 
 class TestInput:
@@ -197,9 +233,7 @@ class TestInput:
 
         result = input_ref.get_value(mock_run_data)
 
-        assert isinstance(result, ReferenceValue)
-        assert result.value is test_output
-        assert result.description == "The user's name"
+        assert result == "John Doe"
 
     def test_get_value_success_no_description(self) -> None:
         """Test get_value method - successful case with no description."""
@@ -218,9 +252,30 @@ class TestInput:
 
         result = input_ref.get_value(mock_run_data)
 
-        assert isinstance(result, ReferenceValue)
-        assert result.value is test_output
-        assert result.description == "Input to plan"  # Default description
+        assert result == "secret-key-123"
+
+    def test_get_value_with_reference(self) -> None:
+        """Test get_value method - successful case with no description."""
+        input_ref = Input("api_key")
+
+        # Create mock plan input with a reference to a step output.
+        # This can haopen in nested sub-plans
+        mock_plan_input = PlanInput(name="api_key", value=StepOutput(0))
+
+        # Create mock output value
+        test_output = LocalDataValue(value=StepOutput(0))
+
+        # Create mock run data
+        mock_run_data = Mock()
+        mock_run_data.plan.plan_inputs = [mock_plan_input]
+        mock_run_data.plan_run.plan_run_inputs = {"api_key": test_output}
+        mock_run_data.step_output_values = [
+            StepOutputValue(step_num=0, step_name="step_output_0", value="test", description=""),
+        ]
+
+        result = input_ref.get_value(mock_run_data)
+
+        assert result == "test"
 
     def test_get_value_input_not_found_in_plan(self) -> None:
         """Test get_value method - input not found in plan."""
@@ -270,26 +325,6 @@ class TestInput:
             mock_logger().warning.assert_called_once_with(
                 "Value not found for input optional_input"
             )
-
-
-class TestReferenceValue:
-    """Test cases for the ReferenceValue class."""
-
-    def test_reference_value_initialization(self) -> None:
-        """Test ReferenceValue initialization."""
-        test_output = LocalDataValue(value="test data", summary="Test summary")
-        ref_value = ReferenceValue(value=test_output, description="Test description")
-
-        assert ref_value.value is test_output
-        assert ref_value.description == "Test description"
-
-    def test_reference_value_default_description(self) -> None:
-        """Test ReferenceValue with default description."""
-        test_output = LocalDataValue(value="test data", summary="Test summary")
-        ref_value = ReferenceValue(value=test_output)
-
-        assert ref_value.value is test_output
-        assert ref_value.description == ""
 
 
 class TestIntegration:
