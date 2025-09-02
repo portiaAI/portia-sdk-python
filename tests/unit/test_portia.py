@@ -108,14 +108,15 @@ def test_portia_local_default_config_with_api_keys() -> None:
         portia = Portia()
         assert str(portia.config) == str(Config.from_default())
 
-        # BrowserTool is in open_source_tool_registry but not in the default tool registry
-        # avaialble to the Portia instance. PDF reader is in open_source_tool_registry if
+        # BrowserTool and 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
+        # are in open_source_tool_registry but not in the default tool registry
+        # available to the Portia instance. PDF reader is in open_source_tool_registry if
         # Mistral API key is set, and isn't in the default tool registry.
         # Unfortunately this is determined when the registry file is imported, so we can't just mock
         # the Mistral API key here.
-        expected_diff = 1
+        expected_diff = 5  # browser_tool + 4 SQL tools
         if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 2
+            expected_diff = 6  # + pdf_reader_tool
 
         assert (
             len(portia.tool_registry.get_tools())
@@ -140,15 +141,16 @@ def test_portia_local_default_config_without_api_keys() -> None:
         portia = Portia()
         assert str(portia.config) == str(Config.from_default())
 
-        # BrowserTool, SearchTool, WeatherTool, CrawlTool, ExtractTool, MapTool
+        # BrowserTool, SearchTool, WeatherTool, CrawlTool, ExtractTool, MapTool,
+        # and 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
         # are in open_source_tool_registry but not in the
-        # default tool registry avaialble to the Portia instance. PDF reader is in
+        # default tool registry available to the Portia instance. PDF reader is in
         # open_source_tool_registry if Mistral API key is set, and isn't in the default tool
         # registry Unfortunately this is determined when the registry file is imported, so we
         # can't just mock the Mistral API key here.
-        expected_diff = 6
+        expected_diff = 10  # All tools except the 5 that are in the default registry
         if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 7
+            expected_diff = 11  # + pdf_reader_tool
 
         assert (
             len(portia.tool_registry.get_tools())
