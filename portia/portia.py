@@ -32,7 +32,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import ReferenceValue
-from portia.builder.step_v2 import FunctionStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -55,6 +54,7 @@ from portia.errors import (
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
+from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import (
     LocalDataValue,
@@ -83,8 +83,12 @@ from portia.storage import (
     StorageError,
 )
 from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
-from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
+from portia.telemetry.views import (
+    PlanV2StepExecutionTelemetryEvent,
+    PortiaFunctionCallTelemetryEvent,
+)
 from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
+from portia.tool_decorator import LOCAL_FUNCTION_PREFIX
 from portia.tool_registry import (
     DefaultToolRegistry,
     PortiaToolRegistry,
@@ -101,6 +105,13 @@ if TYPE_CHECKING:
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
 
 
+class StepOutputValue(ReferenceValue):
+    """Value that can be referenced by name."""
+
+    step_name: str = Field(description="The name of the referenced value.")
+    step_num: int = Field(description="The step number of the referenced value.")
+
+
 class RunContext(BaseModel):
     """Data that is returned from a step."""
 
@@ -110,7 +121,7 @@ class RunContext(BaseModel):
     legacy_plan: Plan = Field(description="The legacy plan representation.")
     plan_run: PlanRun = Field(description="The current plan run instance.")
     end_user: EndUser = Field(description="The end user executing the plan.")
-    step_output_values: list[ReferenceValue] = Field(
+    step_output_values: list[StepOutputValue] = Field(
         default_factory=list, description="Outputs set by the step."
     )
     portia: Portia = Field(description="The Portia client instance.")
@@ -910,10 +921,11 @@ class Portia:
                         )
                     )
             except RuntimeError:
-                logger().error(
+                message = (
                     "run_plan should be called outside of an async context: Use arun_plan instead"
                 )
-                raise
+                logger().error(message)
+                raise RuntimeError(message) from None
 
         plan_run = self._get_plan_run_from_plan(
             plan, end_user, plan_run_inputs, structured_output_schema
@@ -1465,7 +1477,11 @@ class Portia:
             # we'll go through this immediately.
             # If they're handled asynchronously,
             # we'll wait for the plan run to be ready.
-            plan_run = self.wait_for_ready(plan_run)
+            try:
+                plan_run = self.wait_for_ready(plan_run)
+            except InvalidPlanRunStateError:
+                logger().error("Plan run is not ready to resume after clarification")
+                return plan_run
 
         return plan_run
 
@@ -2387,7 +2403,7 @@ class Portia:
 
         """
         final_output = LocalDataValue(
-            value=step_output.get_value(),
+            value=step_output.full_value(self.storage),
             summary=None,
         )
         if skip_summarization:
@@ -2456,8 +2472,8 @@ class Portia:
         for clarification in clarifications:
             clarification.step = plan_run.current_step_index
             logger().info(
-                f"Clarification requested - category: {clarification.category}, "
-                f"user_guidance: {clarification.user_guidance}.",
+                f"Clarification requested - category: {clarification.category}, ",
+                user_guidance=clarification.user_guidance,
                 plan=str(plan_run.plan_id),
                 plan_run=str(plan_run.id),
             )
@@ -2623,7 +2639,7 @@ class Portia:
             if (
                 not step.tool_id
                 or step.tool_id in tools_remaining
-                or FunctionStep.tool_id_is_local_function(step.tool_id)
+                or step.tool_id.startswith(LOCAL_FUNCTION_PREFIX)
             ):
                 continue
             tools_remaining.add(step.tool_id)
@@ -2663,12 +2679,6 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a Portia plan."""
-        legacy_plan = plan.to_legacy_plan(
-            PlanContext(
-                query=plan.label,
-                tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
-            ),
-        )
         if structured_output_schema:
             if plan.final_output_schema:
                 logger().warning(
@@ -2676,7 +2686,15 @@ class Portia:
                     "overwrites the final output schema set in the plan builder."
                 )
             plan.final_output_schema = structured_output_schema
-        plan_run = await self._aget_plan_run_from_plan(legacy_plan, end_user, plan_run_inputs)
+        legacy_plan = plan.to_legacy_plan(
+            PlanContext(
+                query=plan.label,
+                tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
+            ),
+        )
+        plan_run = await self._aget_plan_run_from_plan(
+            legacy_plan, end_user, plan_run_inputs, structured_output_schema
+        )
         return await self.resume_builder_plan(
             plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
         )
@@ -2739,14 +2757,42 @@ class Portia:
             if i < run_data.plan_run.current_step_index:
                 logger().debug(f"Skipping step {i}: {step}")
                 continue
+            run_data.plan_run.current_step_index = i
 
-            logger().info(f"Starting step {i}: {step}")
+            legacy_step = step.to_legacy_step(plan)
+
+            try:
+                self._handle_before_step_execution_hook(
+                    run_data.legacy_plan,
+                    run_data.plan_run,
+                    legacy_step,
+                )
+            except SkipExecutionError as e:
+                logger().info(f"Skipping step {i}: {e}")
+                if e.should_return:
+                    return run_data.plan_run
+                continue
 
             try:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
+                self.telemetry.capture(
+                    PlanV2StepExecutionTelemetryEvent(
+                        step_type=step.__class__.__name__,
+                        success=False,
+                        tool_id=step.to_legacy_step(plan).tool_id,
+                    )
+                )
                 return self._handle_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, i, step.to_legacy_step(plan), e
+                    run_data.plan_run, run_data.legacy_plan, i, legacy_step, e
+                )
+            else:
+                self.telemetry.capture(
+                    PlanV2StepExecutionTelemetryEvent(
+                        step_type=step.__class__.__name__,
+                        success=True,
+                        tool_id=step.to_legacy_step(plan).tool_id,
+                    )
                 )
             jump_to_step_index: int | None = None
             if (
@@ -2783,21 +2829,23 @@ class Portia:
 
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
-            output_value = self._set_step_output(
-                output_value, run_data.plan_run, step.to_legacy_step(plan)
-            )
-            output = ReferenceValue(
-                value=output_value,
-                description=(f"Output from step '{step.step_name}' (Description: {step})"),
-            )
-            run_data.step_output_values.append(output)
+            output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
+            if not is_clarification(result):
+                run_data.step_output_values.append(
+                    StepOutputValue(
+                        step_name=step.step_name,
+                        step_num=i,
+                        value=output_value,
+                        description=(f"Output from step '{step.step_name}' (Description: {step})"),
+                    )
+                )
 
             try:
                 if clarified_plan_run := self._handle_post_step_execution(
                     run_data.legacy_plan,
                     run_data.plan_run,
                     i,
-                    step.to_legacy_step(plan),
+                    legacy_step,
                     output_value,
                 ):
                     # No after_plan_run call here as the plan run will be resumed later
@@ -2812,19 +2860,19 @@ class Portia:
                 )
                 error_value = LocalDataValue(value=str(e))
                 self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
-                error_output = ReferenceValue(
-                    value=error_value,
-                    description=(f"Error from step '{step.step_name}' (Description: {step})"),
+                run_data.step_output_values.append(
+                    StepOutputValue(
+                        step_name=step.step_name,
+                        step_num=i,
+                        value=error_value,
+                        description=f"Error from step '{step.step_name}' (Description: {step})",
+                    )
                 )
-                run_data.step_output_values.append(error_output)
                 # Skip the after_step_execution hook as we have already run it
                 return self._handle_plan_run_execution_error(
                     run_data.plan_run, run_data.legacy_plan, error_value
                 )
 
-            # Don't increment current step beyond the last step
-            if jump_to_step_index is None and i < len(plan.steps) - 1:
-                run_data.plan_run.current_step_index += 1
             if jump_to_step_index is not None:
                 logger().debug(f"Jumping to step {jump_to_step_index} from {i}")
                 run_data.plan_run.current_step_index = jump_to_step_index

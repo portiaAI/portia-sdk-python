@@ -432,6 +432,10 @@ class Config(BaseModel):
         default_factory=lambda: SecretStr(os.getenv("OPENROUTER_API_KEY") or ""),
         description="The API Key for OpenRouter. Must be set if llm-provider is OPENROUTER",
     )
+    groq_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("GROQ_API_KEY") or ""),
+        description="The API Key for Groq. Must be set if llm-provider is GROQ",
+    )
     openai_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY") or ""),
         description="The API Key for OpenAI. Must be set if llm-provider is OPENAI",
@@ -649,6 +653,8 @@ class Config(BaseModel):
                         return "openrouter/moonshotai/kimi-k2"
                     case LLMProvider.GROK:
                         return "grok/grok-4-0709"
+                    case LLMProvider.GROQ:
+                        return "groq/llama3-70b-8192"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -666,6 +672,8 @@ class Config(BaseModel):
                         return "azure-openai/o4-mini"
                     case LLMProvider.GROK:
                         return "grok/grok-4-0709"
+                    case LLMProvider.GROQ:
+                        return "groq/llama3-8b-8192"
                 return None
             case "default_model":
                 match llm_provider:
@@ -685,6 +693,8 @@ class Config(BaseModel):
                         return "openrouter/moonshotai/kimi-k2"
                     case LLMProvider.GROK:
                         return "grok/grok-4-0709"
+                    case LLMProvider.GROQ:
+                        return "groq/llama3-8b-8192"
                 return None
 
     @model_validator(mode="after")
@@ -911,7 +921,7 @@ class Config(BaseModel):
         llm_provider = LLMProvider(provider)
         return self._construct_model_from_name(llm_provider, model_name)
 
-    def _construct_model_from_name(  # noqa: PLR0911, C901
+    def _construct_model_from_name(  # noqa: PLR0911,C901
         self,
         llm_provider: LLMProvider,
         model_name: str,
@@ -931,6 +941,15 @@ class Config(BaseModel):
                 return OpenRouterGenerativeModel(
                     model_name=model_name,
                     api_key=self.must_get_api_key("openrouter_api_key"),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
+                )
+            case LLMProvider.GROQ:
+                validate_extras_dependencies("groq", raise_error=True)
+                from portia.model import GroqGenerativeModel
+
+                return GroqGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("groq_api_key"),
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.OPENAI:
@@ -1032,6 +1051,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.OPENROUTER
     if os.getenv("XAI_API_KEY") or kwargs.get("grok_api_key"):
         return LLMProvider.GROK
+    if os.getenv("GROQ_API_KEY") or kwargs.get("groq_api_key"):
+        return LLMProvider.GROQ
     return None
 
 

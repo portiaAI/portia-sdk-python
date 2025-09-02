@@ -3127,7 +3127,7 @@ def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt(
 
 
 def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia: Portia) -> None:
-    """Test that run_plan with PlanV2 inside async context raises RuntimeError with error log."""
+    """Test that run_plan with PlanV2 inside async context raises RuntimeError."""
     import asyncio
 
     # Create a simple PlanV2 for testing
@@ -3136,8 +3136,6 @@ def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia
             return "test result"
 
         def to_legacy_step(self, plan: PlanV2) -> Step:  # noqa: ARG002
-            from portia.plan import Step
-
             return Step(task="Mock task", tool_id="mock_tool", inputs=[], output="$result")
 
     plan_v2 = PlanV2(steps=[MockStepV2(step_name="test_step")], label="Test plan")
@@ -3155,6 +3153,8 @@ def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia
         with pytest.raises(RuntimeError) as exc_info:
             asyncio.run(async_function())
 
-        # The original RuntimeError from asyncio.Runner() is re-raised
-        # The custom error message is logged but not part of the exception
-        assert "Cannot run the event loop while another loop is running" in str(exc_info.value)
+        # The custom RuntimeError with the new error message is raised
+        assert (
+            "run_plan should be called outside of an async context: Use arun_plan instead"
+            in str(exc_info.value)
+        )

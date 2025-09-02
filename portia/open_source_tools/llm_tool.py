@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 from portia.logger import logger
 from portia.model import GenerativeModel, Message
+from portia.telemetry.telemetry_service import ProductTelemetry
+from portia.telemetry.views import LLMToolUsageTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 
@@ -18,11 +20,11 @@ class LLMToolSchema(BaseModel):
         ...,
         description="The task to be completed by the LLM tool",
     )
-    task_data: list[Any] | str | None = Field(
+    task_data: dict[str, Any] | list[Any] | str | None = Field(
         default=None,
         description="Task data that should be used to complete the task. "
-        "Can be a string, a list of strings, "
-        "or a list of objects that will be converted to strings. "
+        "Can be a string, a list of strings, a dictionary of strings or "
+        "a list of objects that will be converted to strings. "
         "Important: This should include all relevant data in their entirety, "
         "from the first to the last character (i.e. NOT a summary).",
     )
@@ -77,11 +79,12 @@ class LLMTool(Tool[str | BaseModel]):
     )
 
     @staticmethod
-    def process_task_data(task_data: list[Any] | str | None) -> str:
+    def process_task_data(task_data: dict[str, Any] | list[Any] | str | None) -> str:
         """Process task_data into a string, handling different input types.
 
         Args:
-            task_data: Data that can be a None, a string or a list of objects.
+            task_data: Data that can be a None, a string, a list of objects or
+            a dictionary of objects.
 
         Returns:
             A string representation of the data, with list items joined by newlines.
@@ -93,13 +96,23 @@ class LLMTool(Tool[str | BaseModel]):
         if isinstance(task_data, str):
             return task_data
 
+        if isinstance(task_data, dict):
+            return "\n".join(f"{key}: {value}" for key, value in task_data.items())
+
         return "\n".join(str(item) for item in task_data)
 
     def run(
-        self, ctx: ToolRunContext, task: str, task_data: list[Any] | str | None = None
+        self,
+        ctx: ToolRunContext,
+        task: str,
+        task_data: dict[str, Any] | list[Any] | str | None = None,
     ) -> str | BaseModel:
         """Run the LLMTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+
+        telemetry = ProductTelemetry()
+        telemetry.capture(LLMToolUsageTelemetryEvent(model=str(model), sync=True))
+
         messages = self._get_messages(task, task_data)
         logger().trace("LLM call: llm-tool")
         if self.structured_output_schema:
@@ -109,10 +122,17 @@ class LLMTool(Tool[str | BaseModel]):
         return str(response.content)
 
     async def arun(
-        self, ctx: ToolRunContext, task: str, task_data: list[Any] | str | None = None
+        self,
+        ctx: ToolRunContext,
+        task: str,
+        task_data: dict[str, Any] | list[Any] | str | None = None,
     ) -> str | BaseModel:
         """Run the LLMTool asynchronously."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
+
+        telemetry = ProductTelemetry()
+        telemetry.capture(LLMToolUsageTelemetryEvent(model=str(model), sync=False))
+
         messages = self._get_messages(task, task_data)
         logger().trace("LLM call: llm-tool")
         if self.structured_output_schema:
@@ -120,7 +140,11 @@ class LLMTool(Tool[str | BaseModel]):
         response = await model.aget_response(messages)
         return str(response.content)
 
-    def _get_messages(self, task: str, task_data: list[Any] | str | None = None) -> list[Message]:
+    def _get_messages(
+        self,
+        task: str,
+        task_data: dict[str, Any] | list[Any] | str | None = None,
+    ) -> list[Message]:
         """Get the messages for the LLMTool."""
         context = (
             "Additional context for the LLM tool to use to complete the task, provided by the "
