@@ -108,6 +108,7 @@ class LLMProvider(Enum):
     OPENROUTER = "openrouter"
     GROK = "grok"
     GROQ = "groq"
+    META = "meta"
     GOOGLE_GENERATIVE_AI = "google"  # noqa: PIE796 - Alias for GOOGLE member
 
 
@@ -652,7 +653,9 @@ class GroqGenerativeModel(OpenAIGenerativeModel):
         super(OpenAIGenerativeModel, self).__init__(client, model_name)
         self._instructor_client = instructor.from_openai(
             client=wrappers.wrap_openai(
-                OpenAI(api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1")
+                OpenAI(
+                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
+                )
             ),
             mode=instructor.Mode.JSON,
         )
@@ -661,6 +664,69 @@ class GroqGenerativeModel(OpenAIGenerativeModel):
                 AsyncOpenAI(
                     api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
                 )
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._seed = seed
+
+
+class MetaLlamaGenerativeModel(OpenAIGenerativeModel):
+    """Meta hosted Llama model implementation.
+
+    Uses an OpenAI-compatible endpoint provided by Meta (or a managed Llama Stack distribution)
+    configured via a base URL.
+    """
+
+    provider: LLMProvider = LLMProvider.META
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        base_url: str,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Meta hosted Llama client.
+
+        Args:
+            model_name: Llama model to use
+            api_key: API key for the Meta hosted Llama API
+            base_url: OpenAI-compatible base URL for the Meta hosted Llama API
+            seed: Random seed for model generation
+            max_retries: Maximum number of retries
+            temperature: Temperature parameter
+            **kwargs: Additional keyword arguments to pass to ChatOpenAI
+
+        """
+        self._model_kwargs = kwargs.copy()
+        if "disabled_params" not in kwargs:
+            # Avoid parallel tool calls where unsupported
+            kwargs["disabled_params"] = {"parallel_tool_calls": None}
+
+        client = ChatOpenAI(
+            name=model_name,
+            model=model_name,
+            seed=seed,
+            api_key=api_key,
+            max_retries=max_retries,
+            temperature=temperature,
+            base_url=base_url,
+            **kwargs,
+        )
+        super(OpenAIGenerativeModel, self).__init__(client, model_name)
+        self._instructor_client = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                OpenAI(api_key=api_key.get_secret_value(), base_url=base_url)
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._instructor_client_async = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                AsyncOpenAI(api_key=api_key.get_secret_value(), base_url=base_url)
             ),
             mode=instructor.Mode.JSON,
         )
