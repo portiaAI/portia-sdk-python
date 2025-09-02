@@ -21,3 +21,7 @@ You can run linting in the codebase by running the following commands, but only 
 All python commands should be run with `uv run` and python should never be called directly for anything. 
 
 If this doesn't work, you may need to install uv with pip install uv, making sure to run `uv sync --all-extras --all-groups` after to ensure all dependencies are installed.
+
+## Testing
+
+When writing pytest tests, you should only write tests using methods - don't use class tests.
