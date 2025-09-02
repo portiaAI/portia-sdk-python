@@ -16,7 +16,7 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
-from portia.builder.loops import LoopBlock, LoopBlockClauseType, LoopStepResult
+from portia.builder.loops import LoopBlock, LoopBlockType, LoopStepResult, LoopType
 from portia.builder.reference import Input, Reference, StepOutput
 from portia.clarification import (
     Clarification,
@@ -105,7 +105,7 @@ class StepV2(BaseModel, ABC):
                 var_name = var_name.strip()  # noqa: PLW2901
                 if ref_type == "StepOutput" and var_name.isdigit():
                     var_name = int(var_name)  # noqa: PLW2901
-                ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
+                ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(str(var_name))
                 resolved = self._resolve_input_reference(ref, run_data)
                 pattern = (
                     r"\{\{\s*"
@@ -682,11 +682,12 @@ class LoopStep(StepV2):
     over: Reference | None = Field(
         default=None, description="The reference to loop over."
     )
+    loop_type: LoopType
     index: int = Field(default=0, description="The current index of the loop.")
     args: dict[str, Reference | Any] = Field(
         default_factory=dict, description="The args to check the condition with."
     )
-    block_clause_type: LoopBlockClauseType
+    block_clause_type: LoopBlockType
     start_index: int | None = Field(default=None, description="The start index of the loop.")
     end_index: int | None = Field(default=None, description="The end index of the loop.")
 
@@ -700,11 +701,11 @@ class LoopStep(StepV2):
             raise ValueError("Condition and over cannot both be None")
         return self
 
-    def current_loop_variable(self, run_data: RunContext) -> ReferenceValue | None:
+    def current_loop_variable(self, run_data: RunContext) -> Any | None:  # noqa: ANN401
         """Get the current loop variable if over is set."""
         if self.over is None:
             return None
-        values = self._get_value_for_input(self.over, run_data)
+        values = self._resolve_input_reference(self.over, run_data)
         if not isinstance(values, list):
             raise TypeError("Loop variable is not a list")
         return values[self.index]
@@ -714,16 +715,18 @@ class LoopStep(StepV2):
     @traceable(name="Loop Step - Run")
     async def run(self, run_data: RunContext) -> Any:
         """Run the loop step."""
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+        args = {k: self._resolve_input_reference(v, run_data) for k, v in self.args.items()}
         match self.block_clause_type:
-            case LoopBlockClauseType.START:
+            case LoopBlockType.START:
                 if self.condition is None:
                     return LoopStepResult(
                         type=self.block_clause_type,
                         loop_result=True,
+                        start_index=self.start_index or 0,
+                        end_index=self.end_index or 0,
                     )
                 if isinstance(self.condition, str):
-                    condition_str = self._get_value_for_input(self.condition, run_data)
+                    condition_str = self._resolve_input_reference(self.condition, run_data)
                     agent = ConditionalEvaluationAgent(run_data.config)
                     conditional_result = await agent.execute(conditional=str(condition_str), arguments=args)
                 else:
@@ -731,8 +734,8 @@ class LoopStep(StepV2):
                 return LoopStepResult(
                     type=self.block_clause_type,
                     loop_result=conditional_result,
-                    start_loop_block_step_index=self.block.start_step_index,
-                    end_loop_block_step_index=self.block.end_step_index,
+                    start_index=self.start_index or 0,
+                    end_index=self.end_index or 0,
                 )
 
 

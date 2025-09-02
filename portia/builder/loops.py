@@ -29,8 +29,8 @@ class LoopBlock(BaseModel):
             raise ValueError("Start and end step indexes cannot both be None")
         return self
 
-class LoopBlockClauseType(StrEnum):
-    """The type of loop block clause."""
+class LoopBlockType(StrEnum):
+    """The type of loop block."""
 
     START = "START"
     END = "END"
@@ -45,14 +45,14 @@ class LoopStepResult(BaseModel):
     """Output of a loop step.
 
     Args:
-        type: The type of loop block clause that was executed.
+        type: The type of loop block that was executed.
         loop_result: The result of the loop predicate evaluation.
         start_loop_block_step_index: The step index of the start loop block (loop).
         end_loop_block_step_index: The step index of the end loop block (endloop).
 
     """
 
-    type: LoopBlockClauseType
+    type: LoopBlockType
     loop_result: bool
     start_index: int
     end_index: int

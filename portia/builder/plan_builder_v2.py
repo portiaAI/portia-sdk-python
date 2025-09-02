@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
-from portia.builder.loops import LoopBlock, LoopBlockClauseType, LoopType
+from portia.builder.loops import LoopBlock, LoopBlockType, LoopType
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Reference, default_step_name
 from portia.builder.step_v2 import (
@@ -76,9 +76,7 @@ class PlanBuilderV2:
             return None
         last_block = self._block_stack[-1]
         if not isinstance(last_block, ConditionalBlock):
-            raise PlanBuilderError(
-                "if_ must be called from a conditional block. Please add an if_ first."
-            )
+            return None
         return last_block
 
     @property
@@ -88,9 +86,7 @@ class PlanBuilderV2:
             return None
         last_block = self._block_stack[-1]
         if not isinstance(last_block, LoopBlock):
-            raise PlanBuilderError(
-                "_loop must be called from a loop block. Please add a loop first."
-            )
+            return None
         return last_block
 
 
@@ -115,10 +111,11 @@ class PlanBuilderV2:
         self.plan.steps.append(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
+                over=over,
                 condition=condition,
                 args=args or {},
                 loop_block=loop_block,
-                block_clause_type=LoopBlockClauseType.START,
+                block_clause_type=LoopBlockType.START,
                 loop_type=loop_type,
                 start_index=len(self.plan.steps),
                 end_index=None,
@@ -143,7 +140,7 @@ class PlanBuilderV2:
                 condition=start_loop_step.condition,
                 over=start_loop_step.over,
                 index=start_loop_step.index,
-                block_clause_type=LoopBlockClauseType.END,
+                block_clause_type=LoopBlockType.END,
                 loop_type=start_loop_step.loop_type,
                 args={},
                 start_index=start_loop_step.start_index,

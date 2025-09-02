@@ -30,6 +30,7 @@ from langsmith import traceable
 from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
+from portia.builder.loops import LoopBlockType, LoopStepResult
 from portia.builder.plan_v2 import PlanV2
 from portia.clarification import (
     Clarification,
@@ -2768,6 +2769,8 @@ class Portia:
             match result:
                 case ConditionalStepResult():
                     jump_to_step_index = self._handle_conditional_step(result, branch_stack)
+                case LoopStepResult():
+                    jump_to_step_index = self._handle_loop_step(result)
                 case _:
                     jump_to_step_index = None
 
@@ -2830,6 +2833,19 @@ class Portia:
             output_value,
             skip_summarization=not plan.summarize and plan.final_output_schema is None,
         )
+
+    def _handle_loop_step(self, result: LoopStepResult) -> int | None:
+        """Handle a loop step."""
+        match result.type, result.loop_result:
+            case LoopBlockType.START, True:
+                logger().debug("Running loop")
+                return None # just iterate the loop as usual
+            case LoopBlockType.END, _: # only care about conditional at start of a loop
+                logger().debug("Returning to loop start")
+                return result.start_index
+            case (LoopBlockType.START, False):
+                logger().debug("Loop condition is false, jumping to exit")
+                return result.end_index + 1
 
     def _handle_conditional_step(
         self, result: ConditionalStepResult, branch_stack: list[ConditionalStepResult]
