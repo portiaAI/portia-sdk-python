@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -19,7 +20,7 @@ class PlanV2(BaseModel):
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")
     steps: list[StepV2] = Field(description="The steps to be executed in the plan.")
     plan_inputs: list[PlanInput] = Field(
-        default=[],
+        default_factory=list,
         description="The inputs required by the plan.",
     )
     summarize: bool = Field(default=False, description="Whether to summarize the plan output.")
@@ -32,7 +33,7 @@ class PlanV2(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_plan(self) -> PlanV2:
+    def validate_plan(self) -> Self:
         """Validate the plan."""
         # Check for duplicate step names
         step_names = [step.step_name for step in self.steps]
