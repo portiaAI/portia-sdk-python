@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
-from portia.builder.loops import LoopBlock, LoopBlockClauseType
+from portia.builder.loops import LoopBlock, LoopBlockClauseType, LoopType
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Reference, default_step_name
 from portia.builder.step_v2 import (
@@ -106,6 +106,7 @@ class PlanBuilderV2:
             raise PlanBuilderError("condition and over cannot both be set.")
         if not condition and not over:
             raise PlanBuilderError("condition or over must be set.")
+        loop_type = LoopType.CONDITIONAL if condition else LoopType.FOR_EACH
         loop_block = LoopBlock(
             start_step_index=len(self.plan.steps),
             end_step_index=None,
@@ -118,6 +119,7 @@ class PlanBuilderV2:
                 args=args or {},
                 loop_block=loop_block,
                 block_clause_type=LoopBlockClauseType.START,
+                loop_type=loop_type,
                 start_index=len(self.plan.steps),
                 end_index=None,
             )
@@ -131,19 +133,20 @@ class PlanBuilderV2:
             raise PlanBuilderError("endloop must be called from a loop block. Please add a loop first.")
         self._block_stack[-1].end_step_index = len(self.plan.steps)
         loop_block = self._block_stack[-1]
-        step_to_update = self.plan.steps[loop_block.start_step_index]
-        if not isinstance(step_to_update, LoopStep):
+        start_loop_step = self.plan.steps[loop_block.start_step_index]
+        if not isinstance(start_loop_step, LoopStep):
             raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
-        step_to_update.end_index = len(self.plan.steps)
+        start_loop_step.end_index = len(self.plan.steps)
         self.plan.steps.append(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
-                condition=step_to_update.condition,
-                over=step_to_update.over,
-                index=step_to_update.index,
+                condition=start_loop_step.condition,
+                over=start_loop_step.over,
+                index=start_loop_step.index,
                 block_clause_type=LoopBlockClauseType.END,
+                loop_type=start_loop_step.loop_type,
                 args={},
-                start_index=step_to_update.start_index,
+                start_index=start_loop_step.start_index,
                 end_index=len(self.plan.steps),
             )
         )

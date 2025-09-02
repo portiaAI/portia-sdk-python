@@ -35,6 +35,12 @@ class LoopBlockClauseType(StrEnum):
     START = "START"
     END = "END"
 
+class LoopType(StrEnum):
+    """The type of loop."""
+
+    CONDITIONAL = "CONDITIONAL"
+    FOR_EACH = "FOR_EACH"
+
 class LoopStepResult(BaseModel):
     """Output of a loop step.
 

@@ -6,10 +6,10 @@ import itertools
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, Self, override
 
 from langsmith import traceable
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from portia.builder.conditionals import (
     ConditionalBlock,
@@ -668,11 +668,23 @@ class LoopStep(StepV2):
     over: Reference | None = Field(
         default=None, description="The reference to loop over."
     )
-    current_iteration: int = Field(default=0, description="The current iteration of the loop.")
+    index: int = Field(default=0, description="The current index of the loop.")
     args: dict[str, Reference | Any] = Field(
         default_factory=dict, description="The args to check the condition with."
     )
     block_clause_type: LoopBlockClauseType
+    start_index: int | None = Field(default=None, description="The start index of the loop.")
+    end_index: int | None = Field(default=None, description="The end index of the loop.")
+
+
+    @model_validator(mode="after")
+    def validate_start_end_indexes(self) -> Self:
+        """Validate the start and end indexes."""
+        if self.start_index is None and self.end_index is None:
+            raise ValueError("Start and end indexes cannot both be None")
+        if self.condition is None and self.over is None:
+            raise ValueError("Condition and over cannot both be None")
+        return self
 
     def current_loop_variable(self, run_data: RunContext) -> ReferenceValue | None:
         """Get the current loop variable if over is set."""
@@ -681,7 +693,7 @@ class LoopStep(StepV2):
         values = self._get_value_for_input(self.over, run_data)
         if not isinstance(values, list):
             raise TypeError("Loop variable is not a list")
-        return values[self.current_iteration]
+        return values[self.index]
 
 
     @override
@@ -689,25 +701,25 @@ class LoopStep(StepV2):
     async def run(self, run_data: RunContext) -> Any:
         """Run the loop step."""
         args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-        if self.current_step_index == 0:
-            self.step_outputs.append([])
-        if isinstance(self.condition, str):
-            condition_str = self._get_value_for_input(self.condition, run_data)
-            agent = ConditionalEvaluationAgent(run_data.config)
-            conditional_result = await agent.execute(conditional=str(condition_str), arguments=args)
-        else:
-            conditional_result = self.condition(**args)
-        next_clause_step_index = (
-            self.block.clause_step_indexes[self.clause_index_in_block + 1]
-            if self.clause_index_in_block < len(self.block.clause_step_indexes) - 1
-            else self.block.clause_step_indexes[self.clause_index_in_block]
-        )
-        return ConditionalStepResult(
-            type=self.block_clause_type,
-            conditional_result=conditional_result,
-            next_clause_step_index=next_clause_step_index,
-            end_condition_block_step_index=self.block.clause_step_indexes[-1],
-        )
+        match self.block_clause_type:
+            case LoopBlockClauseType.START:
+                if self.condition is None:
+                    return LoopStepResult(
+                        type=self.block_clause_type,
+                        loop_result=True,
+                    )
+                if isinstance(self.condition, str):
+                    condition_str = self._get_value_for_input(self.condition, run_data)
+                    agent = ConditionalEvaluationAgent(run_data.config)
+                    conditional_result = await agent.execute(conditional=str(condition_str), arguments=args)
+                else:
+                    conditional_result = self.condition(**args)
+                return LoopStepResult(
+                    type=self.block_clause_type,
+                    loop_result=conditional_result,
+                    start_loop_block_step_index=self.block.start_step_index,
+                    end_loop_block_step_index=self.block.end_step_index,
+                )
 
 
     @override
