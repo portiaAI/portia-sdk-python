@@ -17,7 +17,7 @@ class ReActClarificationToolSchema(BaseModel):
 
 
 class ReActClarificationTool(Tool[InputClarification]):
-    """Raises a clarification if the agent is unsure of an argument."""
+    """Raises a clarification if the agent does not have enough information to proceed."""
 
     id: str = "clarification_tool"
     name: str = "Clarification tool"

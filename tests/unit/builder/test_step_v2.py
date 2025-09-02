@@ -1481,13 +1481,13 @@ async def test_react_agent_step_run() -> None:
         )
 
         mock_react_agent_class.assert_called_once_with(
-            "Research and calculate",
-            ["context"],
-            [mock_tool1, mock_tool2],
-            mock_run_data,
-            30,
-            True,
-            None,
+            task="Research and calculate",
+            task_data=["context"],
+            tools=[mock_tool1, mock_tool2],
+            run_data=mock_run_data,
+            tool_call_limit=30,
+            allow_agent_clarifications=True,
+            output_schema=None,
         )
 
         mock_agent.execute.assert_called_once()
@@ -1538,9 +1538,9 @@ async def test_react_agent_step_run_with_reference_resolution() -> None:
         assert result.value == "ReAct execution with string interpolation"
 
         mock_react_agent_class.assert_called_once()
-        call_args = mock_react_agent_class.call_args[0]
+        call_kwargs = mock_react_agent_class.call_args.kwargs
 
-        task_data = call_args[1]
+        task_data = call_kwargs["task_data"]
         assert len(task_data) == 3
         assert task_data[0] == "Static context"
         assert isinstance(task_data[1], LocalDataValue)

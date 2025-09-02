@@ -57,7 +57,7 @@ class StepV2(BaseModel, ABC):
     )
 
     @abstractmethod
-    async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
+    async def run(self, run_data: RunContext) -> Any | LocalDataValue:  # noqa: ANN401
         """Execute the step."""
         raise NotImplementedError  # pragma: no cover
 
@@ -91,13 +91,13 @@ class StepV2(BaseModel, ABC):
 
     def _resolve_input_references_with_descriptions(
         self, inputs: list[Any], run_data: RunContext
-    ) -> Any:
+    ) -> list[LocalDataValue | Any]:
         """Resolve all references in a list of inputs, including descriptions.
 
         For each value in inputs, if value is a Reference (e.g. Input or StepOutput), then the value
-        that Reference refers to is returned, in a LocalDataValue alongside a description. If the value
-        is a string with a Reference in it, then the string is returned with the reference values
-        templated in. Any other value is returned unchanged.
+        that Reference refers to is returned, in a LocalDataValue alongside a description. If the
+        value is a string with a Reference in it, then the string is returned with the reference
+        values templated in. Any other value is returned unchanged.
 
         This method is primarily used to provide the inputs as additional information LLMs.
         """
@@ -422,7 +422,7 @@ class SingleToolAgentStep(StepV2):
 
     @override
     @traceable(name="Single Tool Agent Step - Run")
-    async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the agent step."""
         agent = self._get_agent_for_step(run_data)
         return await agent.execute_async()
@@ -494,7 +494,10 @@ class ReActAgentStep(StepV2):
     )
     allow_agent_clarifications: bool = Field(
         default=False,
-        description="Whether to allow the agent to ask clarifying questions to the user if it is unable to proceed.",
+        description=(
+            "Whether to allow the agent to ask clarifying questions to the user "
+            "if it is unable to proceed."
+        ),
     )
 
     def __str__(self) -> str:
@@ -515,21 +518,25 @@ class ReActAgentStep(StepV2):
     ) -> ReActAgent:
         """Get the appropriate agent for executing the step."""
         tools = [
-            ToolCallWrapper.from_tool_id(
-                tool, run_data.tool_registry, run_data.storage, run_data.plan_run
-            )
+            tool_wrapper
             for tool in self.tools
+            if (
+                tool_wrapper := ToolCallWrapper.from_tool_id(
+                    tool, run_data.tool_registry, run_data.storage, run_data.plan_run
+                )
+            )
+            is not None
         ]
         task_data = self._resolve_input_references_with_descriptions(self.inputs, run_data)
 
         return ReActAgent(
-            self.task,
-            task_data,
-            tools,
-            run_data,
-            self.tool_call_limit,
-            self.allow_agent_clarifications,
-            self.output_schema,
+            task=self.task,
+            task_data=task_data,
+            tools=tools,
+            run_data=run_data,
+            tool_call_limit=self.tool_call_limit,
+            allow_agent_clarifications=self.allow_agent_clarifications,
+            output_schema=self.output_schema,
         )
 
     @override

@@ -27,15 +27,23 @@ portia = Portia(execution_hooks=CLIExecutionHooks())
 
 plan = (
     PlanBuilderV2("Buy some gold")
-    .input(name="currency", description="The currency to purchase the gold in", default_value="GBP")
+    .input(name="country", description="The country to purchase the gold in", default_value="UK")
+    .invoke_tool_step(
+        step_name="Search currency",
+        tool="search_tool",
+        args={
+            "search_query": f"What is the currency in {Input('country')}?",
+        },
+    )
     .react_agent_step(
         step_name="Search gold price",
-        tools=["search_tool"],
-        task="Search the price of gold",
-        inputs=[Input("currency")],
+        tools=["search_tool", "calculator_tool"],
+        task=f"What is the price of gold per ounce in {Input('country')}?",
+        inputs=[StepOutput(0)],
         output_schema=CommodityPriceWithCurrency,
     )
     .user_input(
+        step_name="Purchase quantity",
         message="How many ounces of gold do you want to purchase?",
         options=[50, 100, 200],
     )
@@ -46,7 +54,7 @@ plan = (
         ),
         args={
             "price_with_currency": StepOutput("Search gold price"),
-            "purchase_quantity": StepOutput(1),
+            "purchase_quantity": StepOutput("Purchase quantity"),
         },
     )
     .user_verify(
@@ -64,13 +72,14 @@ plan = (
     .function_step(function=lambda: print("We need more gold!"))  # noqa: T201
     .endif()
     .llm_step(
+        step_name="Generate receipt",
         task="Create a fake receipt for the purchase of gold.",
-        inputs=[StepOutput("Calculate total price"), Input("currency")],
+        inputs=[StepOutput("Calculate total price"), StepOutput("Purchase quantity")],
     )
     .single_tool_agent_step(
         task="Send the receipt to Robbie in an email at not_an_email@portialabs.ai",
         tool="portia:google:gmail:send_email",
-        inputs=[StepOutput(9)],
+        inputs=[StepOutput("Generate receipt")],
     )
     .final_output(
         output_schema=FinalOutput,
@@ -80,6 +89,6 @@ plan = (
 
 plan_run = portia.run_plan(
     plan,
-    plan_run_inputs={"currency": "USD"},
+    plan_run_inputs={"country": "Spain"},
 )
 print(plan_run)  # noqa: T201

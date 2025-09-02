@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -25,6 +26,9 @@ from tests.utils import (
     get_test_tool_context,
 )
 
+if TYPE_CHECKING:
+    from portia.tool import ToolRunContext
+
 
 class OutputSchema(BaseModel):
     """Test structured output schema."""
@@ -40,17 +44,17 @@ class MultiplyTool(AdditionTool):
     name: str = "Multiply Tool"
     description: str = "Multiply two numbers together"
 
-    def run(self, ctx, a: int, b: int) -> int:
+    def run(self, _: ToolRunContext, a: int, b: int) -> int:
         """Multiply the numbers."""
         return a * b
 
-    async def arun(self, ctx, a: int, b: int) -> int:
+    async def arun(self, _: ToolRunContext, a: int, b: int) -> int:
         """Multiply the numbers asynchronously."""
         return a * b
 
 
 @pytest.fixture
-def mock_run_context():
+def mock_run_context() -> RunContext:
     """Create a mock run context for testing."""
     plan, plan_run = get_test_plan_run()
     config = get_test_config()
@@ -67,7 +71,7 @@ def mock_run_context():
     return run_context
 
 
-def test_react_agent_initialization(mock_run_context: RunContext):
+def test_react_agent_initialization(mock_run_context: RunContext) -> None:
     """Test ReActAgent can be properly initialized."""
     tools = [AdditionTool(), MultiplyTool()]
     agent = ReActAgent(
@@ -83,12 +87,12 @@ def test_react_agent_initialization(mock_run_context: RunContext):
     assert agent.task_data == {"key": "value"}
     assert len(agent.tools) == 2
     assert agent.tool_call_limit == 20
-    assert agent.allow_agent_clarifications == True
+    assert agent.allow_agent_clarifications is True
     assert agent.run_data == mock_run_context
 
 
 @pytest.mark.asyncio
-async def test_react_agent_immediate_final_result(mock_run_context: RunContext):
+async def test_react_agent_immediate_final_result(mock_run_context: RunContext) -> None:
     """Test agent that calls final result tool immediately without any other tool calls."""
     mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
     mock_model_response = AIMessage(
@@ -131,11 +135,11 @@ async def test_react_agent_immediate_final_result(mock_run_context: RunContext):
 
 
 @pytest.mark.asyncio
-async def test_react_agent_single_tool_call_then_final_result(mock_run_context):
-    """Test agent runs with single tool call, then calls final result tool - no structured output."""
+async def test_react_agent_single_tool_call_then_final_result(mock_run_context: RunContext) -> None:
+    """Test agent runs with single tool call, then calls final result tool - no structured."""
     mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
     mock_agent_model = get_mock_generative_model()
-    mock_agent_model.to_langchain().ainvoke.side_effect = [
+    mock_agent_model.to_langchain().ainvoke.side_effect = [  # pyright: ignore[reportAttributeAccessIssue]
         AIMessage(
             content="I'll add the numbers first",
             tool_calls=[
@@ -177,17 +181,19 @@ async def test_react_agent_single_tool_call_then_final_result(mock_run_context):
         assert result.summary == "Addition completed successfully"
 
         # Check that task_data is correctly passed through to the model
-        for call in mock_agent_model.to_langchain().ainvoke.call_args_list:
+        for call in mock_agent_model.to_langchain().ainvoke.call_args_list:  # pyright: ignore[reportAttributeAccessIssue]
             assert "test123" in call[0][0][1].content
             assert "456789" in call[0][0][1].content
 
 
 @pytest.mark.asyncio
-async def test_react_agent_multiple_tool_calls_then_final_result(mock_run_context):
-    """Test agent runs with 3 tool calls to 2 different tools, then final result (simplified without structured output)."""
+async def test_react_agent_multiple_tool_calls_then_final_result(
+    mock_run_context: RunContext,
+) -> None:
+    """Test agent runs with 3 tool calls to 2 different tools, then final result."""
     mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
     mock_agent_model = get_mock_generative_model()
-    mock_agent_model.to_langchain().ainvoke.side_effect = [
+    mock_agent_model.to_langchain().ainvoke.side_effect = [  # pyright: ignore[reportAttributeAccessIssue]
         AIMessage(
             content="First I'll add 2 and 3",
             tool_calls=[
@@ -253,11 +259,11 @@ async def test_react_agent_multiple_tool_calls_then_final_result(mock_run_contex
 
 
 @pytest.mark.asyncio
-async def test_react_agent_with_clarification_tool(mock_run_context: RunContext):
+async def test_react_agent_with_clarification_tool(mock_run_context: RunContext) -> None:
     """Test agent calls clarification tool and we receive clarification as output."""
     mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
     mock_agent_model = get_mock_generative_model()
-    mock_agent_model.to_langchain().ainvoke.side_effect = [
+    mock_agent_model.to_langchain().ainvoke.side_effect = [  # pyright: ignore[reportAttributeAccessIssue]
         AIMessage(
             content="I need clarification",
             tool_calls=[
@@ -328,17 +334,17 @@ async def test_react_agent_with_clarification_tool(mock_run_context: RunContext)
         assert result.summary == "Addition completed successfully"
 
         # Verify that the second call to the model included the clarification response
-        second_call_args = mock_agent_model.to_langchain().ainvoke.call_args_list[1]
+        second_call_args = mock_agent_model.to_langchain().ainvoke.call_args_list[1]  # pyright: ignore[reportAttributeAccessIssue]
         assert "You should add the numbers" in second_call_args[0][0][1].content
 
 
 @pytest.mark.asyncio
-async def test_react_agent_recursion_limit_error(mock_run_context):
+async def test_react_agent_recursion_limit_error(mock_run_context: RunContext) -> None:
     """Test that an error is thrown when recursion limit is hit."""
     mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
     call_counter = 0
 
-    def generate_response(*args, **kwargs):
+    def generate_response(*_args: object, **_kwargs: object) -> AIMessage:
         nonlocal call_counter
         call_counter += 1
         return AIMessage(
@@ -354,11 +360,9 @@ async def test_react_agent_recursion_limit_error(mock_run_context):
         )
 
     mock_agent_model = get_mock_generative_model()
-    mock_agent_model.to_langchain().ainvoke.side_effect = generate_response
+    mock_agent_model.to_langchain().ainvoke.side_effect = generate_response  # type: ignore[reportAttributeAccessIssue]
 
-    with (
-        mock.patch("portia.config.Config.get_planning_model", return_value=mock_agent_model),
-    ):
+    with mock.patch("portia.config.Config.get_planning_model", return_value=mock_agent_model):
         tools = [AdditionTool()]
         agent = ReActAgent(
             task="Keep adding numbers",
@@ -373,7 +377,7 @@ async def test_react_agent_recursion_limit_error(mock_run_context):
 
 
 @pytest.mark.asyncio
-async def test_react_agent_execution_hooks_called(mock_run_context: RunContext):
+async def test_react_agent_execution_hooks_called(mock_run_context: RunContext) -> None:
     """Test that execution hooks are called correctly."""
     mock_run_context.execution_hooks = ExecutionHooks(
         before_tool_call=mock.MagicMock(return_value=None), after_tool_call=mock.MagicMock()
@@ -421,7 +425,7 @@ async def test_react_agent_execution_hooks_called(mock_run_context: RunContext):
 
 
 @pytest.mark.asyncio
-async def test_react_agent_prestep_clarification(mock_run_context: RunContext):
+async def test_react_agent_prestep_clarification(mock_run_context: RunContext) -> None:
     """Test pre-step execution hook that throws a clarification."""
     mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
     before_tool_call_mock = mock.MagicMock(
@@ -442,9 +446,7 @@ async def test_react_agent_prestep_clarification(mock_run_context: RunContext):
     )
     mock_agent_model = get_mock_generative_model(response)
 
-    with (
-        mock.patch("portia.config.Config.get_planning_model", return_value=mock_agent_model),
-    ):
+    with mock.patch("portia.config.Config.get_planning_model", return_value=mock_agent_model):
         tools = [AdditionTool()]
         agent = ReActAgent(
             task="Add numbers",
@@ -462,7 +464,7 @@ async def test_react_agent_prestep_clarification(mock_run_context: RunContext):
 
 
 @pytest.mark.asyncio
-async def test_final_result_tool():
+async def test_final_result_tool() -> None:
     """Test FinalResultTool functionality."""
     # Test basic functionality - FinalResultTool returns the final result as string
     tool = FinalResultTool()

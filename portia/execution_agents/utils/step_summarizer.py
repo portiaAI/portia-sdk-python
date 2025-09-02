@@ -26,8 +26,8 @@ if TYPE_CHECKING:
     from portia.tool import Tool
 
 
-class SummaryModel(BaseModel):
-    """Protocol for the model ouput as a summary."""
+class SummarizerOutputModel(BaseModel):
+    """Protocol for the summarizer output model."""
 
     so_summary: str
 
@@ -212,7 +212,7 @@ Here is original task:
 
     def _get_summarizer_structured_schema(
         self, tool_output: str, last_message: ToolMessage
-    ) -> tuple[type[BaseModel], type[SummaryModel]] | tuple[None, None]:
+    ) -> tuple[type[BaseModel], type[SummarizerOutputModel]] | tuple[None, None]:
         """Get the structured schema for the summarizer.
 
         Args:
@@ -233,7 +233,7 @@ Here is original task:
         ):
             return (None, None)
 
-        class SummarizerOutput(SummaryModel, schema):
+        class SummarizerOutput(SummarizerOutputModel, schema):
             """Summarizer output model.
 
             This is a combination of the summarizer output model and the schema.

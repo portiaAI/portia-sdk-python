@@ -330,7 +330,7 @@ def logger() -> LoggerInterface:
     return logger_manager.logger
 
 
-def truncate_message(msg: Any, max_chars: int = 1000) -> str:
+def truncate_message(msg: Any, max_chars: int = 1000) -> str:  # noqa: ANN401
     """Truncate a message for logging."""
     msg_str = str(msg)
     if len(msg_str) > max_chars:

@@ -307,6 +307,8 @@ class PlanBuilderV2:
               Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
             step_name: Optional name for the step. If not provided, will be auto-generated.
+            allow_agent_clarifications: Whether to allow the agent to ask clarifying questions.
+            tool_call_limit: Maximum number of tool calls the agent can make.
 
         """
         self.plan.steps.append(

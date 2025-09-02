@@ -14,19 +14,20 @@ from langchain_core.prompts import (
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from portia.errors import InvalidAgentError, ToolHardError, ToolNotFoundError, ToolSoftError
 from portia.execution_agents.execution_utils import AgentNode, is_clarification
 from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.react_clarification_tool import ReActClarificationTool
-from portia.execution_agents.utils.step_summarizer import SummaryModel
 from portia.logger import logger, truncate_message
 from portia.model import Message
 from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from langchain.tools import StructuredTool
 
     from portia.clarification import Clarification
@@ -46,15 +47,17 @@ class WrappedToolNode(ToolNode):
         self.run_data = run_data
         self.tools = tools
 
-    async def ainvoke(self, input: Any, config: Any = None, **kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+    async def ainvoke(self, input: Any, config: Any = None, **kwargs: Any) -> dict[str, Any]:  # noqa: A002, ANN401
         """Execute tools asynchronously with logging."""
         last_message = input["messages"][-1]
-        tool_names = set()
-        tool = None
         if not isinstance(last_message, AIMessage) or not last_message.tool_calls:
             raise ToolSoftError(  # pragma: no cover - we should never end up here
                 "ReAct agent tried to use a tool without specifying the call to make"
             )
+
+        tool_names = set()
+        tool = None
+        tool_name = None
         for tool_call in last_message.tool_calls:
             tool_name = tool_call.get("name", "unknown tool")
             tool_names.add(tool_name)
@@ -74,7 +77,7 @@ class WrappedToolNode(ToolNode):
             if clarification:
                 return {
                     "messages": ToolMessage(
-                        content=clarification,
+                        content=str(clarification),
                         artifact=LocalDataValue(value=clarification),
                         tool_call_id=last_message.tool_calls[0]["id"],
                         name=tool.get_langchain_name(),
@@ -119,7 +122,7 @@ class FinalResultTool(Tool[str]):
         "The final result of the task",
     )
 
-    def run(self, ctx: ToolRunContext, final_result: str) -> str:
+    def run(self, ctx: ToolRunContext, final_result: str) -> str:  # noqa: ARG002
         """Run the FinalResultTool."""
         logger().info(f"Final result returned by ReAct agent: {truncate_message(final_result)}")
         return final_result
@@ -251,7 +254,9 @@ class ReasoningNode:
                 if isinstance(msg, ToolMessage)
                 else "Message"
             )
-            msg_content = msg.content if msg.content else msg.tool_calls if msg.tool_calls else ""
+            msg_content = (
+                msg.tool_calls if isinstance(msg, AIMessage) and msg.tool_calls else msg.content
+            )
             conversation_snippets.append(f"<{tag}>{msg_content}</{tag}>")
         return (
             "\n".join(conversation_snippets) if conversation_snippets else "(no prior conversation)"
@@ -272,7 +277,7 @@ class ReActAgent:
         self,
         task: str,
         task_data: dict[str, Any] | list[Any] | str | None,
-        tools: list[Tool],
+        tools: Sequence[Tool],
         run_data: RunContext,
         tool_call_limit: int = 25,
         allow_agent_clarifications: bool = False,
@@ -281,7 +286,7 @@ class ReActAgent:
         """Initialize the ReActAgent."""
         self.task = task
         self.task_data = task_data
-        self.tools = tools
+        self.tools = list(tools)
         self.run_data = run_data
         self.tool_call_limit = tool_call_limit
         self.allow_agent_clarifications = allow_agent_clarifications
@@ -343,7 +348,7 @@ class ReActAgent:
                 config={"recursion_limit": self.tool_call_limit * 2},
             )
         except GraphRecursionError as e:
-            raise InvalidAgentError(f"ReAct agent reached tool call limit: {e}")
+            raise InvalidAgentError("ReAct agent reached tool call limit") from e
 
         return self.process_output(invocation_result["messages"])
 
@@ -359,8 +364,10 @@ class ReActAgent:
                 return self._create_output_with_summary(message.artifact)
 
         if messages and (last_message := messages[-1]):
-            if isinstance(last_message.artifact, LocalDataValue) and is_clarification(
-                last_message.artifact.value
+            if (
+                isinstance(last_message, ToolMessage)
+                and isinstance(last_message.artifact, LocalDataValue)
+                and is_clarification(last_message.artifact.value)
             ):
                 return last_message.artifact
             # Fallback to the last message content
@@ -372,37 +379,35 @@ class ReActAgent:
 
     def _create_output_with_summary(self, final_result: LocalDataValue) -> LocalDataValue:
         """Create output with summary and handle structured output if needed."""
-        step = self.run_data.plan.steps[self.run_data.plan_run.current_step_index]
-
         if self.output_schema:
-
-            class SummarizerOutput(self.output_schema, SummaryModel):
-                """Summary model."""
-
-                so_summary: str = Field(description="A summary of the final result")
+            summarizer_output_model = create_model(
+                "SummarizerOutput",
+                __base__=self.output_schema,
+                so_summary=(str, Field(description="A summary of the final result")),
+            )
 
             result = self.run_data.config.get_summarizer_model().get_structured_response(
                 [
                     Message(
                         content=(
-                            f"The task '{step.task}' had final result: {final_result.value}. "
+                            f"The task '{self.task}' had final result: {final_result.value}. "
                             "Please coerce the final result to the output schema and add a summary "
                             "of the final result."
                         ),
                         role="user",
                     )
                 ],
-                SummarizerOutput,
+                summarizer_output_model,
             )
             processed_result = self.output_schema.model_validate(result.model_dump())
-            summary = result.so_summary
+            summary = result.so_summary  # pyright: ignore[reportAttributeAccessIssue]
         else:
             processed_result = final_result.value
             summary_result = self.run_data.config.get_summarizer_model().get_response(
                 [
                     Message(
                         content=(
-                            f"Summarize the following final result to the task '{step.task}': "
+                            f"Summarize the following final result to the task '{self.task}': "
                             f"{final_result.value}"
                         ),
                         role="user",
@@ -424,6 +429,7 @@ def next_state_after_tool_call(
     last_message = state["messages"][-1]
     if (
         last_message
+        and isinstance(last_message, ToolMessage)
         and isinstance(last_message.artifact, LocalDataValue)
         and is_clarification(last_message.artifact.value)
     ):

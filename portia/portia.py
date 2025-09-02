@@ -2643,17 +2643,19 @@ class Portia:
 
         Tools shouldn't really have commas in their ID - there are only 2 cases that can cause this:
         1. The user put a comma in their tool ID
-        2. A PlanBuilderV2 ReAct agent uses a comma to split the fact it uses multiple tools in a single step
+        2. A PlanBuilderV2 ReAct agent uses a comma to split the fact it uses multiple tools
+           in a single step
 
-        We prioritise checking for the first one and then, if that tool doesn't exist in the registry, we try
-        the next one. This is all pretty ugly though - really, we need to move away from the legacy Plan and allow
-        steps to use multiple tools.
+        We prioritise checking for the first one and then, if that tool doesn't exist in the
+        registry, we try the next one. This is all pretty ugly though - really, we need to move
+        away from the legacy Plan and allow steps to use multiple tools.
         """
         try:
             self.tool_registry.get_tool(tool_id)
-            return [tool_id]
         except ToolNotFoundError:
             return tool_id.split(",")
+        else:
+            return [tool_id]
 
     @traceable(name="Portia - Run Plan")
     async def run_builder_plan(
@@ -2817,18 +2819,20 @@ class Portia:
                 logger().debug("Exiting conditional branch")
                 branch_stack.pop()
 
+            # Some steps output a LocalDataValue so they can attach a summary to the output, but
+            # we don't enforce that all steps do this so we need to handle both cases.
             if not isinstance(result, LocalDataValue):
-                output_value = LocalDataValue(value=result)
+                local_output_value = LocalDataValue(value=result)
             else:
-                output_value = result
+                local_output_value = result
             # This may persist the output to memory - store the memory value if it does
-            output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
+            output_value = self._set_step_output(local_output_value, run_data.plan_run, legacy_step)
             if not is_clarification(result):
                 run_data.step_output_values.append(
                     StepOutputValue(
                         step_name=step.step_name,
                         step_num=i,
-                        value=result,
+                        value=local_output_value.value,
                         description=(f"Output from step '{step.step_name}' (Description: {step})"),
                     )
                 )
