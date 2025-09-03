@@ -62,9 +62,8 @@ def temp_sqlite_db() -> Generator[Path, None, None]:
     tmp_path.unlink(missing_ok=True)
 
 
-
-
 # Tests for the new specific tools
+
 
 def test_run_sql_tool(temp_sqlite_db: Path, test_context: ToolRunContext) -> None:
     """RunSQLTool executes SELECT queries and returns results."""
@@ -160,15 +159,9 @@ def test_check_sql_tool_valid_and_invalid(
 def test_sqlite_authorizer() -> None:
     """Test the SQLite authorizer function covers all branches."""
     # Test allowed operations
-    assert (
-        _sqlite_authorizer(sqlite3.SQLITE_READ, None, None, None, None) == sqlite3.SQLITE_OK
-    )
-    assert (
-        _sqlite_authorizer(sqlite3.SQLITE_SELECT, None, None, None, None) == sqlite3.SQLITE_OK
-    )
-    assert (
-        _sqlite_authorizer(sqlite3.SQLITE_FUNCTION, None, None, None, None) == sqlite3.SQLITE_OK
-    )
+    assert _sqlite_authorizer(sqlite3.SQLITE_READ, None, None, None, None) == sqlite3.SQLITE_OK
+    assert _sqlite_authorizer(sqlite3.SQLITE_SELECT, None, None, None, None) == sqlite3.SQLITE_OK
+    assert _sqlite_authorizer(sqlite3.SQLITE_FUNCTION, None, None, None, None) == sqlite3.SQLITE_OK
 
     # Test allowed PRAGMA operations
     assert (
@@ -195,15 +188,9 @@ def test_sqlite_authorizer() -> None:
     )
 
     # Test denied operations
-    assert (
-        _sqlite_authorizer(sqlite3.SQLITE_INSERT, None, None, None, None) == sqlite3.SQLITE_DENY
-    )
-    assert (
-        _sqlite_authorizer(sqlite3.SQLITE_UPDATE, None, None, None, None) == sqlite3.SQLITE_DENY
-    )
-    assert (
-        _sqlite_authorizer(sqlite3.SQLITE_DELETE, None, None, None, None) == sqlite3.SQLITE_DENY
-    )
+    assert _sqlite_authorizer(sqlite3.SQLITE_INSERT, None, None, None, None) == sqlite3.SQLITE_DENY
+    assert _sqlite_authorizer(sqlite3.SQLITE_UPDATE, None, None, None, None) == sqlite3.SQLITE_DENY
+    assert _sqlite_authorizer(sqlite3.SQLITE_DELETE, None, None, None, None) == sqlite3.SQLITE_DENY
 
 
 def test_sql_adapter_abstract_methods() -> None:
@@ -278,7 +265,6 @@ def test_sqlite_adapter_memory_db() -> None:
     finally:
         # Cleanup
         tmp_path.unlink(missing_ok=True)
-
 
 
 def test_sqlite_adapter_error_handling() -> None:
@@ -373,10 +359,7 @@ def test_tools_with_env_config(test_context: ToolRunContext, temp_sqlite_db: Pat
         tool = RunSQLTool()
 
         # Now test the tool with existing data
-        result = tool._run(
-            test_context,
-            query="SELECT * FROM users LIMIT 1"
-        )
+        result = tool._run(test_context, query="SELECT * FROM users LIMIT 1")
         rows = result.get_value()
         assert rows is not None
         assert len(rows) == 1
