@@ -52,25 +52,25 @@ def _sqlite_authorizer(
     """
     # Allow read operations
     if action in (
-        sqlite3.SQLITE_READ,      # Reading data from tables
-        sqlite3.SQLITE_SELECT,    # SELECT statements
-    sqlite3.SQLITE_FUNCTION,  # Using functions in queries
-):
+        sqlite3.SQLITE_READ,  # Reading data from tables
+        sqlite3.SQLITE_SELECT,  # SELECT statements
+        sqlite3.SQLITE_FUNCTION,  # Using functions in queries
+    ):
         return sqlite3.SQLITE_OK
     # Allow only specific safe, read-only PRAGMA statements
     if action == sqlite3.SQLITE_PRAGMA:
         pragma_name = arg1.lower() if arg1 else ""
         # Only allow read-only PRAGMA operations
         safe_pragmas = {
-            "table_info",        # Get table schema information
-            "table_list",        # List tables
-            "database_list",     # List databases
+            "table_info",  # Get table schema information
+            "table_list",  # List tables
+            "database_list",  # List databases
             "foreign_key_list",  # List foreign keys
-            "index_list",        # List indexes
-            "index_info",        # Get index information
-            "schema_version",    # Get schema version
-            "user_version",      # Get user version (read-only)
-            "compile_options",   # Get compile options
+            "index_list",  # List indexes
+            "index_info",  # Get index information
+            "schema_version",  # Get schema version
+            "user_version",  # Get user version (read-only)
+            "compile_options",  # Get compile options
         }
         if pragma_name in safe_pragmas:
             return sqlite3.SQLITE_OK
@@ -91,9 +91,7 @@ class SQLAdapter:
         """List available table names."""
         raise NotImplementedError
 
-    def get_table_schemas(
-        self, tables: list[str]
-    ) -> dict[str, list[dict[str, Any]]]:
+    def get_table_schemas(self, tables: list[str]) -> dict[str, list[dict[str, Any]]]:
         """Return column schemas for the given tables."""
         raise NotImplementedError
 
@@ -243,17 +241,13 @@ class BaseSQLTool(Tool[Any]):
             raise ToolSoftError(f"Invalid config_json: {e}") from e
         db_path = cfg.get("db_path")
         if not isinstance(db_path, str) or not db_path:
-            raise ToolSoftError(
-                "config_json must include a non-empty 'db_path' for SQLite"
-            )
+            raise ToolSoftError("config_json must include a non-empty 'db_path' for SQLite")
         return SQLiteAdapter(SQLiteConfig(db_path=db_path))
 
     def _get_adapter(self, config_json: str | None = None) -> SQLAdapter:
         """Get the appropriate adapter based on config."""
         return (
-            self._adapter_from_config_json(config_json)
-            or self._adapter
-            or self._adapter_from_env()
+            self._adapter_from_config_json(config_json) or self._adapter or self._adapter_from_env()
         )
 
 
@@ -366,5 +360,3 @@ class CheckSQLTool(BaseSQLTool):
         args = CheckSQLArgs.model_validate(kwargs)
         adapter = self._get_adapter(args.config_json)
         return adapter.check_sql(args.query)
-
-

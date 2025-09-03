@@ -11,8 +11,8 @@ from portia.builder.reference import Reference, default_step_name
 from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
-    LoopStep,
     LLMStep,
+    LoopStep,
     SingleToolAgentStep,
     StepV2,
     UserInputStep,
@@ -89,7 +89,6 @@ class PlanBuilderV2:
             return None
         return last_block
 
-
     def loop(
         self,
         condition: Callable[..., bool] | str | None = None,
@@ -123,11 +122,12 @@ class PlanBuilderV2:
         )
         return self
 
-
     def endloop(self, step_name: str | None = None) -> PlanBuilderV2:
         """Exit a loop block."""
         if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], LoopBlock):
-            raise PlanBuilderError("endloop must be called from a loop block. Please add a loop first.")
+            raise PlanBuilderError(
+                "endloop must be called from a loop block. Please add a loop first."
+            )
         self._block_stack[-1].end_step_index = len(self.plan.steps)
         loop_block = self._block_stack[-1]
         start_loop_step = self.plan.steps[loop_block.start_step_index]
@@ -191,8 +191,7 @@ class PlanBuilderV2:
                 args=args or {},
                 step_name=default_step_name(len(self.plan.steps)),
                 conditional_block=self._block_stack[-1],
-                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes)
-                - 1,
+                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes) - 1,
                 block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
             )
         )
@@ -211,8 +210,7 @@ class PlanBuilderV2:
                 args={},
                 step_name=default_step_name(len(self.plan.steps)),
                 conditional_block=self._block_stack[-1],
-                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes)
-                - 1,
+                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes) - 1,
                 block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
             )
         )
@@ -231,8 +229,7 @@ class PlanBuilderV2:
                 args={},
                 step_name=default_step_name(len(self.plan.steps)),
                 conditional_block=self._block_stack[-1],
-                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes)
-                - 1,
+                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes) - 1,
                 block_clause_type=ConditionalBlockClauseType.END_CONDITION_BLOCK,
             )
         )
@@ -489,7 +486,7 @@ class PlanBuilderV2:
         """Return the plan, ready to run."""
         if len(self._block_stack) > 0:
             raise PlanBuilderError(
-                "All blocks (loops and conditionals) must be closed. Please add an endif or endloop for all blocks."
+                "All blocks must be closed. Please add an endif or endloop for all blocks."
             )
 
         step_type_counts: dict[str, int] = {}

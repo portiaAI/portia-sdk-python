@@ -2780,7 +2780,7 @@ class Portia:
             output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
             if not is_clarification(result):
                 run_data.step_output_values.append(
-                     StepOutputValue(
+                    StepOutputValue(
                         step_name=step.step_name,
                         step_num=index,
                         value=result,
@@ -2837,14 +2837,14 @@ class Portia:
 
     def _handle_loop_step(self, result: LoopStepResult) -> int | None:
         """Handle a loop step."""
-        match result.type, result.loop_result:
+        match result.block_type, result.loop_result:
             case LoopBlockType.START, True:
                 logger().debug("Running loop")
-                return None # just iterate the loop as usual
-            case LoopBlockType.END, _: # only care about conditional at start of a loop
+                return None  # just iterate the loop as usual
+            case LoopBlockType.END, True:
                 logger().debug("Returning to loop start")
                 return result.start_index
-            case (LoopBlockType.START, False):
+            case (_, False):
                 logger().debug("Loop condition is false, jumping to exit")
                 return result.end_index + 1
 

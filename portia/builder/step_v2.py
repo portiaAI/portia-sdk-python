@@ -5,8 +5,8 @@ from __future__ import annotations
 import itertools
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Self, override, Sequence
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, Self, override
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -679,9 +679,7 @@ class LoopStep(StepV2):
             "will be evaluated - otherwise they will be skipped and we jump to the next loop."
         )
     )
-    over: Reference | None = Field(
-        default=None, description="The reference to loop over."
-    )
+    over: Reference | None = Field(default=None, description="The reference to loop over.")
     loop_type: LoopType
     index: int = Field(default=0, description="The current index of the loop.")
     args: dict[str, Reference | Any] = Field(
@@ -690,7 +688,6 @@ class LoopStep(StepV2):
     loop_block_type: LoopBlockType
     start_index: int | None = Field(default=None, description="The start index of the loop.")
     end_index: int | None = Field(default=None, description="The end index of the loop.")
-
 
     @model_validator(mode="after")
     def validate_start_end_indexes(self) -> Self:
@@ -713,24 +710,25 @@ class LoopStep(StepV2):
         except IndexError:
             return None
 
-
     @override
     @traceable(name="Loop Step - Run")
     async def run(self, run_data: RunContext) -> Any:
         """Run the loop step."""
         args = {k: self._resolve_input_reference(v, run_data) for k, v in self.args.items()}
         match self.loop_block_type, self.loop_type:
-            case LoopBlockType.START, LoopType.CONDITIONAL:
+            case LoopBlockType.END, LoopType.CONDITIONAL:
                 if self.condition is None:
                     raise ValueError("Condition is required for conditional loop")
                 if isinstance(self.condition, str):
                     condition_str = self._resolve_input_reference(self.condition, run_data)
                     agent = ConditionalEvaluationAgent(run_data.config)
-                    conditional_result = await agent.execute(conditional=str(condition_str), arguments=args)
+                    conditional_result = await agent.execute(
+                        conditional=str(condition_str), arguments=args
+                    )
                 else:
                     conditional_result = self.condition(**args)
                 return LoopStepResult(
-                    type=self.loop_block_type,
+                    block_type=self.loop_block_type,
                     loop_result=conditional_result,
                     start_index=self.start_index or 0,
                     end_index=self.end_index or 0,
@@ -741,20 +739,21 @@ class LoopStep(StepV2):
                 value = self.current_loop_variable(run_data)
                 self.index += 1
                 return LoopStepResult(
-                    type=self.loop_block_type,
+                    block_type=self.loop_block_type,
                     loop_result=value is not None,
                     value=value,
                     start_index=self.start_index or 0,
                     end_index=self.end_index or 0,
                 )
-            case LoopBlockType.END, _:
+            case _:
+                # conditional loops are evaluated at end of loop execution
+                # for-each loops are evaluated at end of loop execution
                 return LoopStepResult(
-                    type=self.loop_block_type,
+                    block_type=self.loop_block_type,
                     loop_result=True,
                     start_index=self.start_index or 0,
                     end_index=self.end_index or 0,
                 )
-
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:

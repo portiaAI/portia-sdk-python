@@ -1638,7 +1638,7 @@ async def test_conditional_step_run_with_function_condition_false() -> None:
 
     mock_run_data = Mock()
 
-    result = await step.run(mock_run_data)
+    result = await step.run(run_data=mock_run_data)
 
     assert isinstance(result, ConditionalStepResult)
     assert result.conditional_result is False
@@ -1996,7 +1996,7 @@ async def test_user_input_step_message_with_templates() -> None:
     ]
     mock_run_data.storage = Mock()
 
-    result = await step.run(mock_run_data)
+    result = await step.run(run_data=mock_run_data)
 
     assert isinstance(result, InputClarification)
     assert result.user_guidance == "Provide feedback on result by Alice"

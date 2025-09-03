@@ -18,9 +18,8 @@ class LoopBlock(BaseModel):
 
     """
 
-    start_step_index: int = Field(description="The index of the first step in the loop.") 
+    start_step_index: int = Field(description="The index of the first step in the loop.")
     end_step_index: int | None = Field(description="The index of the last step in the loop.")
-
 
     @model_validator(mode="after")
     def validate_start_end_step_indexes(self) -> Self:
@@ -29,17 +28,20 @@ class LoopBlock(BaseModel):
             raise ValueError("Start and end step indexes cannot both be None")
         return self
 
+
 class LoopBlockType(StrEnum):
     """The type of loop block."""
 
     START = "START"
     END = "END"
 
+
 class LoopType(StrEnum):
     """The type of loop."""
 
     CONDITIONAL = "CONDITIONAL"
     FOR_EACH = "FOR_EACH"
+
 
 class LoopStepResult(BaseModel):
     """Output of a loop step.
@@ -52,7 +54,7 @@ class LoopStepResult(BaseModel):
 
     """
 
-    type: LoopBlockType
+    block_type: LoopBlockType
     value: Any | None = Field(default=None, description="The value of the loop step.")
     loop_result: bool
     start_index: int
