@@ -21,13 +21,6 @@ class LoopBlock(BaseModel):
     start_step_index: int = Field(description="The index of the first step in the loop.")
     end_step_index: int | None = Field(description="The index of the last step in the loop.")
 
-    @model_validator(mode="after")
-    def validate_start_end_step_indexes(self) -> Self:
-        """Validate the start and end step indexes."""
-        if self.start_step_index is None and self.end_step_index is None:
-            raise ValueError("Start and end step indexes cannot both be None")
-        return self
-
 
 class LoopBlockType(StrEnum):
     """The type of loop block."""

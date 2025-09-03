@@ -1660,3 +1660,36 @@ def test_end_loop_sets_end_index() -> None:
     end_loop_step = plan.steps[start_loop_step.end_index]
     assert isinstance(end_loop_step, LoopStep)
     assert end_loop_step.loop_block_type == LoopBlockType.END
+
+
+def test_end_loop_no_loop_block_error() -> None:
+    """Test that end_loop raises PlanBuilderError when no loop block exists."""
+    builder = PlanBuilderV2()
+    
+    # Try to end a loop without starting one
+    with pytest.raises(PlanBuilderError, match="endloop must be called from a loop block. Please add a loop first."):
+        builder.end_loop()
+
+
+def test_end_loop_non_loop_step_error() -> None:
+    """Test that end_loop raises PlanBuilderError when start step is not a LoopStep."""
+    builder = PlanBuilderV2()
+    
+    # Add a non-loop step first
+    builder.llm_step(task="Some step")
+    
+    # Start a loop (this will create a loop block)
+    builder.loop(condition=lambda: True)
+    
+    # Manually manipulate the block stack to point to a non-loop step
+    # This simulates a corrupted state where the start_step_index points to wrong step type
+    loop_block = builder._current_loop_block
+    assert loop_block is not None
+    
+    # Change the start_step_index to point to the LLM step instead of the loop step
+    loop_block.start_step_index = 0  # Points to the LLM step, not the loop step
+    
+    # Now try to end the loop - it should fail because step 0 is not a LoopStep
+    with pytest.raises(PlanBuilderError, match="The step at the start of the loop is not a LoopStep"):
+        builder.end_loop()
+

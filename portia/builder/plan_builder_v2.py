@@ -90,9 +90,7 @@ class PlanBuilderV2:
         if len(self._block_stack) == 0:
             return None
         last_block = self._block_stack[-1]
-        if not isinstance(last_block, ConditionalBlock):
-            return None
-        return last_block
+        return last_block if isinstance(last_block, ConditionalBlock) else None
 
     @property
     def _current_loop_block(self) -> LoopBlock | None:
@@ -100,9 +98,7 @@ class PlanBuilderV2:
         if len(self._block_stack) == 0:
             return None
         last_block = self._block_stack[-1]
-        if not isinstance(last_block, LoopBlock):
-            return None
-        return last_block
+        return last_block if isinstance(last_block, LoopBlock) else None
 
     def loop(
         self,
@@ -139,12 +135,11 @@ class PlanBuilderV2:
 
     def end_loop(self, step_name: str | None = None) -> PlanBuilderV2:
         """Exit a loop block."""
-        if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], LoopBlock):
+        if len(self._block_stack) == 0 or not (loop_block := self._current_loop_block):
             raise PlanBuilderError(
                 "endloop must be called from a loop block. Please add a loop first."
             )
-        self._block_stack[-1].end_step_index = len(self.plan.steps)
-        loop_block = self._block_stack[-1]
+        loop_block.end_step_index = len(self.plan.steps)
         start_loop_step = self.plan.steps[loop_block.start_step_index]
         if not isinstance(start_loop_step, LoopStep):
             raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
