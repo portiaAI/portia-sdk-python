@@ -708,7 +708,10 @@ class LoopStep(StepV2):
         values = self._resolve_input_reference(self.over, run_data)
         if not isinstance(values, Sequence):
             raise TypeError("Loop variable is not indexable")
-        return values[self.index]
+        try:
+            return values[self.index]
+        except IndexError:
+            return None
 
 
     @override
@@ -736,9 +739,11 @@ class LoopStep(StepV2):
                 if self.over is None:
                     raise ValueError("Over is required for for-each loop")
                 value = self.current_loop_variable(run_data)
+                self.index += 1
                 return LoopStepResult(
                     type=self.loop_block_type,
                     loop_result=value is not None,
+                    value=value,
                     start_index=self.start_index or 0,
                     end_index=self.end_index or 0,
                 )

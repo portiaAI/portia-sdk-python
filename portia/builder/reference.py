@@ -72,7 +72,7 @@ class StepOutput(Reference):
     @override
     def get_value(self, run_data: RunContext) -> Any | None:
         """Get the value of the step output."""
-        for step_output in run_data.step_output_values:
+        for step_output in run_data.step_output_values[::-1]:
             if isinstance(self.step, int) and step_output.step_num == self.step:
                 return step_output.value
             if isinstance(self.step, str) and step_output.step_name == self.step:

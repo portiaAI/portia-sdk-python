@@ -2771,6 +2771,7 @@ class Portia:
                     jump_to_step_index = self._handle_conditional_step(result, branch_stack)
                 case LoopStepResult():
                     jump_to_step_index = self._handle_loop_step(result)
+                    result = result.value if result.value is not None else result.loop_result
                 case _:
                     jump_to_step_index = None
 
@@ -2779,7 +2780,7 @@ class Portia:
             output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
             if not is_clarification(result):
                 run_data.step_output_values.append(
-                    StepOutputValue(
+                     StepOutputValue(
                         step_name=step.step_name,
                         step_num=index,
                         value=result,

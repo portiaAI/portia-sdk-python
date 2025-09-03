@@ -1670,7 +1670,7 @@ async def test_conditional_step_run_with_reference_args() -> None:
     with patch.object(reference_input, "get_value") as mock_get_value:
         mock_get_value.return_value = 42
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, ConditionalStepResult)
         assert result.conditional_result is True
@@ -1698,12 +1698,12 @@ async def test_conditional_step_run_with_string_condition() -> None:
     with patch("portia.builder.step_v2.ConditionalEvaluationAgent") as mock_agent_class:
         mock_agent_class.return_value = mock_agent
 
-        result = await step.run(mock_run_data)
+        result = await step.run(run_data=mock_run_data)
 
         assert isinstance(result, ConditionalStepResult)
         assert result.conditional_result is True
         mock_agent_class.assert_called_once_with(mock_run_data.config)
-        mock_agent.execute.assert_called_once_with("x > 5", {"x": 10})
+        mock_agent.execute.assert_called_once_with(conditional="x > 5", arguments={"x": 10})
 
 
 def test_conditional_step_to_legacy_step_with_function_condition() -> None:

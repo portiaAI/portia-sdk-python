@@ -1,7 +1,7 @@
 """Types to support Loops."""
 
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -53,6 +53,7 @@ class LoopStepResult(BaseModel):
     """
 
     type: LoopBlockType
+    value: Any | None = Field(default=None, description="The value of the loop step.")
     loop_result: bool
     start_index: int
     end_index: int

@@ -979,7 +979,7 @@ def test_build_with_missing_endif_raises_error() -> None:
     builder.if_(test_condition).llm_step(task="Inside if block")
     # Missing endif()
 
-    with pytest.raises(PlanBuilderError, match="An endif must be called for all if_ steps"):
+    with pytest.raises(PlanBuilderError, match="Please add an endif or endloop for all blocks."):
         builder.build()
 
 
