@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
 from portia import LLMProvider, PlanRunState, Portia, ToolRegistry
@@ -22,19 +23,19 @@ def test_openai_search_tool_integration() -> None:
     # Create tool registry with OpenAI search tool
     tool_registry = ToolRegistry([OpenAISearchTool()])
     portia = Portia(config=config, tools=tool_registry)
-    
+
     # Test search query
     query = "What is the capital of France?"
 
     plan_run = portia.run(query)
-    
+
     # Verify the run completed successfully
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output
-    
+
     final_output = plan_run.outputs.final_output.get_value()
     assert "Paris" in final_output
-    
+
     # Verify step outputs exist
     for output in plan_run.outputs.step_outputs.values():
         assert output.get_summary() is not None

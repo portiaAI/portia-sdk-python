@@ -1,8 +1,7 @@
 """Unit tests for OpenAI Search Tool."""
 
 import json
-import warnings
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -13,36 +12,40 @@ from tests.utils import get_test_tool_context
 
 def test_openai_search_tool_missing_api_key() -> None:
     """Test that OpenAISearchTool raises ToolHardError if API key is missing."""
-    with patch("os.getenv", return_value=""):
-        with pytest.raises(ToolHardError, match="OPENAI_API_KEY is required"):
-            OpenAISearchTool()
+    with (
+        patch("os.getenv", return_value=""),
+        pytest.raises(ToolHardError, match="OPENAI_API_KEY is required"),
+    ):
+        OpenAISearchTool()
 
 
 def test_openai_search_tool_successful_response() -> None:
     """Test that OpenAISearchTool successfully processes a valid response."""
     mock_api_key = "sk-test-api-key"
-    
+
     # Mock JSON response in the expected format
     json_response = {
         "results": [
             {
                 "url": "https://en.wikipedia.org/wiki/Paris",
                 "title": "Paris - Wikipedia",
-                "content": "The capital of France is Paris, a city known for its rich history and culture."
+                "content": (
+                    "The capital of France is Paris, a city known for its rich history and culture."
+                ),
             },
             {
                 "url": "https://britannica.com/place/Paris",
                 "title": "Paris | History, Geography & Culture | Britannica",
-                "content": "Paris is the capital and most populous city of France."
+                "content": "Paris is the capital and most populous city of France.",
             },
             {
                 "url": "https://example.com/france-capital",
                 "title": "France Capital Information",
-                "content": "Comprehensive information about France's capital city."
-            }
+                "content": "Comprehensive information about France's capital city.",
+            },
         ]
     }
-    
+
     mock_response = Mock()
     mock_response.output = Mock()
     mock_response.output.text = json.dumps(json_response)
@@ -52,11 +55,11 @@ def test_openai_search_tool_successful_response() -> None:
             mock_client = Mock()
             mock_client.responses.create.return_value = mock_response
             mock_openai.return_value = mock_client
-            
+
             tool = OpenAISearchTool()
             ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
-            
+
             # Should return all results (no MAX_RESULTS limit anymore)
             assert len(result) == 3
             assert all("url" in res for res in result)
@@ -69,18 +72,18 @@ def test_openai_search_tool_successful_response() -> None:
 def test_openai_search_tool_fewer_results_than_max() -> None:
     """Test that OpenAISearchTool successfully processes response with fewer results."""
     mock_api_key = "sk-test-api-key"
-    
+
     # Mock JSON response with single result
     json_response = {
         "results": [
             {
                 "url": "https://en.wikipedia.org/wiki/Paris",
                 "title": "Paris - Wikipedia",
-                "content": "The capital of France is Paris."
+                "content": "The capital of France is Paris.",
             }
         ]
     }
-    
+
     mock_response = Mock()
     mock_response.output = Mock()
     mock_response.output.text = json.dumps(json_response)
@@ -90,11 +93,11 @@ def test_openai_search_tool_fewer_results_than_max() -> None:
             mock_client = Mock()
             mock_client.responses.create.return_value = mock_response
             mock_openai.return_value = mock_client
-            
+
             tool = OpenAISearchTool()
             ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
-            
+
             # Should return only 1 result
             assert len(result) == 1
             assert result[0]["url"] == "https://en.wikipedia.org/wiki/Paris"
@@ -104,10 +107,10 @@ def test_openai_search_tool_fewer_results_than_max() -> None:
 def test_openai_search_tool_no_annotations() -> None:
     """Test that OpenAISearchTool handles response with empty results."""
     mock_api_key = "sk-test-api-key"
-    
+
     # Mock JSON response with empty results
     json_response = {"results": []}
-    
+
     mock_response = Mock()
     mock_response.output = Mock()
     mock_response.output.text = json.dumps(json_response)
@@ -121,7 +124,7 @@ def test_openai_search_tool_no_annotations() -> None:
             tool = OpenAISearchTool()
             ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
-            
+
             # Should return empty list when no results found
             assert result == []
 
@@ -130,9 +133,11 @@ def test_openai_search_tool_no_annotations() -> None:
 @pytest.mark.asyncio
 async def test_openai_search_tool_async_missing_api_key() -> None:
     """Test that OpenAISearchTool raises ToolHardError if API key is missing (async)."""
-    with patch("os.getenv", return_value=""):
-        with pytest.raises(ToolHardError, match="OPENAI_API_KEY is required"):
-            OpenAISearchTool()
+    with (
+        patch("os.getenv", return_value=""),
+        pytest.raises(ToolHardError, match="OPENAI_API_KEY is required"),
+    ):
+        OpenAISearchTool()
 
 
 @pytest.mark.asyncio
@@ -143,10 +148,11 @@ async def test_openai_search_tool_async_api_error() -> None:
     with patch("os.getenv", return_value=mock_api_key):
         with patch("portia.open_source_tools.openai_search_tool.AsyncOpenAI") as mock_async_openai:
             mock_client = Mock()
-            
+
             # Create an async mock that raises an exception
             async def mock_create(*args, **kwargs):
                 raise Exception("API error occurred")
+
             mock_client.responses.create = mock_create
             mock_async_openai.return_value = mock_client
 
@@ -160,23 +166,23 @@ async def test_openai_search_tool_async_api_error() -> None:
 async def test_openai_search_tool_async_successful_response() -> None:
     """Test that OpenAISearchTool successfully processes a valid response (async)."""
     mock_api_key = "sk-test-api-key"
-    
+
     # Mock JSON response in the expected format
     json_response = {
         "results": [
             {
                 "url": "https://en.wikipedia.org/wiki/Paris",
                 "title": "Paris - Wikipedia",
-                "content": "The capital of France is Paris."
+                "content": "The capital of France is Paris.",
             },
             {
                 "url": "https://britannica.com/place/Paris",
                 "title": "Paris | Britannica",
-                "content": "Paris is the capital city of France."
-            }
+                "content": "Paris is the capital city of France.",
+            },
         ]
     }
-    
+
     mock_response = Mock()
     mock_response.output = Mock()
     mock_response.output.text = json.dumps(json_response)
@@ -184,9 +190,11 @@ async def test_openai_search_tool_async_successful_response() -> None:
     with patch("os.getenv", return_value=mock_api_key):
         with patch("portia.open_source_tools.openai_search_tool.AsyncOpenAI") as mock_async_openai:
             mock_client = Mock()
+
             # Create an async mock
             async def mock_create(*args, **kwargs):
                 return mock_response
+
             mock_client.responses.create = mock_create
             mock_async_openai.return_value = mock_client
 
@@ -203,18 +211,18 @@ async def test_openai_search_tool_async_successful_response() -> None:
 async def test_openai_search_tool_async_different_query() -> None:
     """Test that OpenAISearchTool works with different search queries (async)."""
     mock_api_key = "sk-test-api-key"
-    
+
     # Mock JSON response for different query
     json_response = {
         "results": [
             {
                 "url": "https://example.com/election-results",
                 "title": "2020 Election Results",
-                "content": "Joe Biden won the 2020 US Presidential election."
+                "content": "Joe Biden won the 2020 US Presidential election.",
             }
         ]
     }
-    
+
     mock_response = Mock()
     mock_response.output = Mock()
     mock_response.output.text = json.dumps(json_response)
@@ -222,9 +230,11 @@ async def test_openai_search_tool_async_different_query() -> None:
     with patch("os.getenv", return_value=mock_api_key):
         with patch("portia.open_source_tools.openai_search_tool.AsyncOpenAI") as mock_async_openai:
             mock_client = Mock()
+
             # Create an async mock
             async def mock_create(*args, **kwargs):
                 return mock_response
+
             mock_client.responses.create = mock_create
             mock_async_openai.return_value = mock_client
 
@@ -240,7 +250,7 @@ async def test_openai_search_tool_async_different_query() -> None:
 def test_openai_search_tool_no_search_results() -> None:
     """Test that OpenAISearchTool handles invalid JSON gracefully."""
     mock_api_key = "sk-test-api-key"
-    
+
     # Mock response with invalid JSON that will fall back to basic response
     mock_response = Mock()
     mock_response.output = Mock()
@@ -255,7 +265,7 @@ def test_openai_search_tool_no_search_results() -> None:
             tool = OpenAISearchTool()
             ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
-            
+
             # Should fall back to basic response
             assert len(result) == 1
             assert result[0]["title"] == "Search Results"
@@ -265,18 +275,18 @@ def test_openai_search_tool_no_search_results() -> None:
 def test_openai_search_tool_different_query() -> None:
     """Test that OpenAISearchTool works with different search queries."""
     mock_api_key = "sk-test-api-key"
-    
+
     # Mock JSON response for different query
     json_response = {
         "results": [
             {
                 "url": "https://example.com/election-results",
                 "title": "2020 Election Results",
-                "content": "Joe Biden won the 2020 US Presidential election."
+                "content": "Joe Biden won the 2020 US Presidential election.",
             }
         ]
     }
-    
+
     mock_response = Mock()
     mock_response.output = Mock()
     mock_response.output.text = json.dumps(json_response)
