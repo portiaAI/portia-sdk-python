@@ -116,10 +116,10 @@ class StepV2(BaseModel, ABC):
         for _input in inputs:
             if isinstance(_input, Reference):
                 description = self._get_ref_description(_input, run_data)
-                value = self._resolve_input_reference(_input, run_data)
+                value = self._resolve_references(_input, run_data)
                 value = LocalDataValue(value=value, summary=description)
             else:
-                value = self._resolve_input_reference(_input, run_data)
+                value = self._resolve_references(_input, run_data)
             if value is not None or not isinstance(_input, Reference):
                 resolved_inputs.append(value)
         return resolved_inputs
@@ -143,7 +143,7 @@ class StepV2(BaseModel, ABC):
                 return plan_input
         raise ValueError(f"Plan input {name} not found")  # pragma: no cover
 
-    def _template_input_references(self, value: str, run_data: RunContext) -> str:
+    def _template_references(self, value: str, run_data: RunContext) -> str:
         """Replace any Reference objects in a string with their resolved values.
 
         For example, if the string is f"The result was {StepOutput(0)}", and the step output
@@ -571,10 +571,11 @@ class ReActAgentStep(StepV2):
             )
             is not None
         ]
+        task = self._template_references(self.task, run_data)
         task_data = self._resolve_input_references_with_descriptions(self.inputs, run_data)
 
         return ReActAgent(
-            task=self.task,
+            task=task,
             task_data=task_data,
             tools=tools,
             run_data=run_data,

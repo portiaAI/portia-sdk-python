@@ -49,7 +49,6 @@ from portia.errors import (
     PlanError,
     PlanNotFoundError,
     SkipExecutionError,
-    ToolNotFoundError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
@@ -2605,7 +2604,9 @@ class Portia:
                 continue
 
             if "," in step.tool_id:
-                tools_remaining.update(self.resolve_tool_id_with_comma(step.tool_id))
+                # A comma can only appear in the tool ID with PlanV2 ReAct agent steps where they
+                # are using more than one tool in a single step.
+                tools_remaining.update(step.tool_id.split(","))
             else:
                 tools_remaining.add(step.tool_id)
 
@@ -2637,25 +2638,6 @@ class Portia:
             ready_clarifications.extend(portia_tools_ready_response.clarifications)
 
         return ready_clarifications
-
-    def resolve_tool_id_with_comma(self, tool_id: str) -> list[str]:
-        """Resolve a tool id with a comma in it to a list of tool ids to check.
-
-        Tools shouldn't really have commas in their ID - there are only 2 cases that can cause this:
-        1. The user put a comma in their tool ID
-        2. A PlanBuilderV2 ReAct agent uses a comma to split the fact it uses multiple tools
-           in a single step
-
-        We prioritise checking for the first one and then, if that tool doesn't exist in the
-        registry, we try the next one. This is all pretty ugly though - really, we need to move
-        away from the legacy Plan and allow steps to use multiple tools.
-        """
-        try:
-            self.tool_registry.get_tool(tool_id)
-        except ToolNotFoundError:
-            return tool_id.split(",")
-        else:
-            return [tool_id]
 
     @traceable(name="Portia - Run Plan")
     async def run_builder_plan(

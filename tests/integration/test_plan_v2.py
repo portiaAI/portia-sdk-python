@@ -795,6 +795,7 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
 
 # Rerun as occasionally Tavily doesn't give back the gold price
 @pytest.mark.flaky(reruns=3)
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     (
         "storage_class",
@@ -812,7 +813,7 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         (StorageClass.CLOUD, [1, 2, 5], None, "GBP", 2),
     ],
 )
-def test_example_builder_plan_scenarios(
+async def test_example_builder_plan_scenarios(
     storage_class: StorageClass,
     user_input_options: list[int] | None,
     country_override: str | None,
@@ -897,7 +898,7 @@ def test_example_builder_plan_scenarios(
     if country_override is not None:
         plan_run_inputs["country"] = country_override
 
-    plan_run = portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
+    plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None

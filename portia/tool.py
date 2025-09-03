@@ -34,6 +34,7 @@ from pydantic import (
     HttpUrl,
     ValidationError,
     field_serializer,
+    field_validator,
     model_validator,
 )
 
@@ -142,6 +143,28 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "enabled. If not provided, the output will be the default output schema of the tool.run() "
         "method.",
     )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id_no_comma(cls, v: str) -> str:
+        """Ensure the tool ID does not contain commas.
+
+        Commas are used as delimiters in some contexts where multiple tool IDs
+        are concatenated, so individual tool IDs cannot contain commas.
+
+        Args:
+            v: The tool ID to validate.
+
+        Returns:
+            str: The validated tool ID.
+
+        Raises:
+            ValueError: If the tool ID contains a comma.
+
+        """
+        if "," in v:
+            raise ValueError("Tool ID cannot contain commas")
+        return v
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
         """Check whether the tool can be plan_run.

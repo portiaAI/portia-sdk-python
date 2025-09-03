@@ -1532,11 +1532,12 @@ async def test_react_agent_step_run() -> None:
 
 @pytest.mark.asyncio
 async def test_react_agent_step_run_with_reference_resolution() -> None:
-    """Test ReActAgentStep run method with reference resolution in task_data."""
+    """Test ReActAgentStep run method with reference resolution in task and task_data."""
     ref1 = Input("user_query")
     ref2 = StepOutput(1)
+    ref3 = Input("analysis_type")
     step = ReActAgentStep(
-        task="Research and analyze",
+        task=f"Research and analyze {ref3} using {ref2}",
         tools=["search_tool"],
         step_name="react_research",
         inputs=["Static context", ref1, f"String interpolation: {ref2}"],
@@ -1544,9 +1545,15 @@ async def test_react_agent_step_run_with_reference_resolution() -> None:
 
     mock_run_data = Mock()
     mock_run_data.plan = Mock()
-    mock_run_data.plan.plan_inputs = [PlanInput(name="user_query", description="The user's query")]
+    mock_run_data.plan.plan_inputs = [
+        PlanInput(name="user_query", description="The user's query"),
+        PlanInput(name="analysis_type", description="The type of analysis to perform"),
+    ]
     mock_run_data.plan_run = Mock()
-    mock_run_data.plan_run.plan_run_inputs = {"user_query": LocalDataValue(value="search query")}
+    mock_run_data.plan_run.plan_run_inputs = {
+        "user_query": LocalDataValue(value="search query"),
+        "analysis_type": LocalDataValue(value="sentiment analysis"),
+    }
     mock_run_data.step_output_values = [
         Mock(
             value="analysis result",
@@ -1577,6 +1584,8 @@ async def test_react_agent_step_run_with_reference_resolution() -> None:
         mock_react_agent_class.assert_called_once()
         call_kwargs = mock_react_agent_class.call_args.kwargs
 
+        resolved_task = call_kwargs["task"]
+        assert resolved_task == "Research and analyze sentiment analysis using analysis result"
         task_data = call_kwargs["task_data"]
         assert len(task_data) == 3
         assert task_data[0] == "Static context"
