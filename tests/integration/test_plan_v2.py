@@ -763,7 +763,7 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         on_error: Callable[[Clarification, object], None],  # noqa: ARG002
     ) -> None:
         """Handle multiple choice clarification by selecting 100."""
-        if "How many kilos of gold" in clarification.user_guidance:
+        if "How many ounces of gold" in clarification.user_guidance:
             on_resolution(clarification, 2)
             return
         raise RuntimeError("Received unexpected multiple choice clarification")
@@ -775,7 +775,7 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         on_error: Callable[[Clarification, object], None],  # noqa: ARG002
     ) -> None:
         """Handle input clarification by returning '2' as string."""
-        if "How many kilos of gold" in clarification.user_guidance:
+        if "How many ounces of gold" in clarification.user_guidance:
             on_resolution(clarification, "2")
             return
         raise RuntimeError("Received unexpected input clarification")
@@ -1050,6 +1050,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
     assert all_inputs.get("sub_input_with_default_2", "") == "original_default_2"
 
 
+@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
 @pytest.mark.parametrize("llm_provider", MODEL_PROVIDERS)
 @pytest.mark.asyncio
 async def test_react_agent_weather_research_and_poem(
@@ -1142,6 +1143,7 @@ class CountryClarificationHandler(ClarificationHandler):
         on_resolution(clarification, True)  # noqa: FBT003
 
 
+@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
 @pytest.mark.asyncio
 async def test_react_agent_weather_with_clarifications() -> None:
     """Test react agent weather lookup with clarification for country input."""

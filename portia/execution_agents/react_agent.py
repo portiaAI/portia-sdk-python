@@ -371,11 +371,13 @@ class ReActAgent:
             ):
                 return last_message.artifact
             # Fallback to the last message content
-            return LocalDataValue(
+            return LocalDataValue(  # pragma: no cover - we should never end up here
                 value=last_message.content,
                 summary=f"Task {self.task} finished with result: {last_message.content!s}",
             )
-        raise ToolHardError("React agent completed without result")
+        raise ToolHardError(
+            "React agent completed without result"
+        )  # pragma: no cover - we should never end up here
 
     def _create_output_with_summary(self, final_result: LocalDataValue) -> LocalDataValue:
         """Create output with summary and handle structured output if needed."""
