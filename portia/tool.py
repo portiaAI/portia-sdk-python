@@ -82,7 +82,6 @@ class ToolRunContext(BaseModel):
     plan: Plan
     config: Config
     clarifications: ClarificationListType
-    tool: Union["Tool", None] = None
 
 
 class _ArgsSchemaPlaceholder(BaseModel):

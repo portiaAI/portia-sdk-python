@@ -275,47 +275,29 @@ class BrowserTool(Tool[str | BaseModel]):
                     f"Invalid domain in allowed_domains: {domain}. Must be non-empty strings."
                 )
 
-            # Enhanced security warning based on browser-use documentation
-            cls._warn_about_domain_security(domain)
+            # Security validation based on browser-use documentation
+            if "*" in domain:
+                # Check for prohibited TLD wildcards
+                if ".*" in domain and not domain.endswith(".*"):
+                    logger().warning(
+                        f"Wildcard in TLD '{domain}' may not be allowed. "
+                        "Browser-use docs warn: 'Wildcards in TLD (e.g., example.*) are not allowed for security'. "
+                        "See: https://docs.browser-use.com/customize/browser-settings#allowed-domains"
+                    )
+                elif domain.startswith("*."):
+                    logger().info(
+                        f"Subdomain wildcard '{domain}' will match all subdomains. "
+                        "Ensure all subdomains are safe for agent access."
+                    )
+                elif domain == "*":
+                    logger().warning(
+                        f"Universal wildcard '{domain}' allows access to ANY domain. "
+                        "This can be dangerous. Use specific domain patterns instead."
+                    )
+
             validated_domains.append(domain.strip())
 
         return validated_domains
-
-
-    @classmethod
-    def _warn_about_domain_security(cls, domain: str) -> None:
-        """Warn about domain security implications for wildcard patterns.
-
-        Args:
-            domain: Domain string to check for security issues
-
-        """
-        if "*" in domain:
-            if domain.startswith("*."):
-                # Pattern like '*.example.com' - matches all subdomains
-                logger().warning(
-                    f"Wildcard domain '{domain}' matches ALL subdomains. "
-                    "Consider explicitly listing specific subdomains for better security."
-                )
-            elif domain == "*" or "/*" in domain:
-                # Extremely dangerous patterns
-                logger().warning(
-                    f"Wildcard pattern '{domain}' allows access to ANY domain. "
-                    "This can be dangerous. Use specific domain patterns instead."
-                )
-            else:
-                # Other wildcard patterns
-                logger().warning(
-                    f"Wildcard pattern '{domain}' may match unintended domains. "
-                    "Consider using full URLs with schemes (https://example.com) for security."
-                )
-
-        # Warn about missing scheme as recommended in docs
-        if not domain.startswith(("http://", "https://")) and not domain.startswith("*"):
-            logger().info(
-                f"Domain '{domain}' lacks scheme. "
-                "Browser-use docs recommend full URLs like 'https://example.com' for clarity."
-            )
 
 
     @cached_property
@@ -471,14 +453,14 @@ class BrowserToolForUrl(BrowserTool):
         default=None,
         description="List of allowed domains for browser navigation.",
     )
-    url: str | None = Field(
-        default=None,
+    url: str = Field(
+        ...,
         description="The URL that this browser tool should navigate to.",
     )
 
     def __init__(
         self,
-        url: str | None = None,
+        url: str,
         id: str | None = None,  # noqa: A002
         name: str | None = None,
         description: str | None = None,
@@ -521,29 +503,12 @@ class BrowserToolForUrl(BrowserTool):
         task_data: list[Any] | str | None = None,
     ) -> str | BaseModel | ActionClarification:
         """Run the BrowserToolForUrl."""
-        # Use the URL provided during initialization, or about:blank as fallback
-        url_to_use = self.url or "about:blank"
-        return super().run(ctx, url_to_use, task, task_data)
+        return super().run(ctx, self.url, task, task_data)
 
 
 class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
 
-    def _create_browser_context_config(
-        self, allowed_domains: list[str] | None
-    ) -> BrowserContextConfig:
-        """Create BrowserContextConfig with optional allowed_domains.
-
-        Args:
-            allowed_domains: List of allowed domains or None
-
-        Returns:
-            Configured BrowserContextConfig instance
-
-        """
-        if allowed_domains is not None:
-            return BrowserContextConfig(allowed_domains=allowed_domains)
-        return BrowserContextConfig()
 
     @abstractmethod
     def setup_browser(
@@ -602,7 +567,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        context_config = self._create_browser_context_config(allowed_domains)
+        context_config = BrowserContextConfig(allowed_domains=allowed_domains)
 
         return Browser(
             config=BrowserConfig(
@@ -888,7 +853,7 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
-            context_config = self._create_browser_context_config(allowed_domains)
+            context_config = BrowserContextConfig(allowed_domains=allowed_domains)
 
             return Browser(
                 config=BrowserConfig(
