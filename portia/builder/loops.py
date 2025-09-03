@@ -1,9 +1,9 @@
 """Types to support Loops."""
 
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class LoopBlock(BaseModel):
