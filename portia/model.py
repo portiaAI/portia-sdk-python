@@ -541,143 +541,11 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         )
 
 
-class OpenRouterGenerativeModel(OpenAIGenerativeModel):
-    """OpenRouter model implementation."""
+class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
+    """Generic OpenAI-compatible model implementation using a configurable base_url.
 
-    provider: LLMProvider = LLMProvider.OPENROUTER
-
-    def __init__(
-        self,
-        *,
-        model_name: str,
-        api_key: SecretStr,
-        seed: int = 343,
-        max_retries: int = 3,
-        temperature: float = 0,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize with OpenRouter client.
-
-        Args:
-            model_name: OpenRouter model to use
-            api_key: API key for OpenRouter
-            seed: Random seed for model generation
-            max_retries: Maximum number of retries
-            temperature: Temperature parameter
-            **kwargs: Additional keyword arguments to pass to ChatOpenAI
-
-        """
-        self._model_kwargs = kwargs.copy()
-        if "disabled_params" not in kwargs:
-            # This is a workaround for o3 mini to avoid parallel tool calls.
-            # See https://github.com/langchain-ai/langchain/issues/25357
-            kwargs["disabled_params"] = {"parallel_tool_calls": None}
-        # Unfortunately you get errors from o3 mini with Langchain unless you set
-        # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
-        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini", "gpt-5") else temperature
-
-        # OpenRouter is compatible with the ChatOpenAI client, so we use this client
-        # with the openrouter URL
-        client = ChatOpenAI(
-            name=model_name,
-            model=model_name,
-            seed=seed,
-            api_key=api_key,
-            max_retries=max_retries,
-            temperature=temperature,
-            base_url="https://openrouter.ai/api/v1",
-            **kwargs,
-        )
-        super(OpenAIGenerativeModel, self).__init__(client, model_name)
-        self._instructor_client = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                OpenAI(api_key=api_key.get_secret_value(), base_url="https://openrouter.ai/api/v1")
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                AsyncOpenAI(
-                    api_key=api_key.get_secret_value(), base_url="https://openrouter.ai/api/v1"
-                )
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._seed = seed
-
-
-class GroqGenerativeModel(OpenAIGenerativeModel):
-    """Groq model implementation."""
-
-    provider: LLMProvider = LLMProvider.GROQ
-
-    def __init__(
-        self,
-        *,
-        model_name: str,
-        api_key: SecretStr,
-        seed: int = 343,
-        max_retries: int = 3,
-        temperature: float = 0,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize with Groq client.
-
-        Args:
-            model_name: Groq model to use
-            api_key: API key for Groq
-            seed: Random seed for model generation
-            max_retries: Maximum number of retries
-            temperature: Temperature parameter
-            **kwargs: Additional keyword arguments to pass to ChatOpenAI
-
-        """
-        self._model_kwargs = kwargs.copy()
-        if "disabled_params" not in kwargs:
-            # This is a workaround for some models to avoid parallel tool calls.
-            # See https://github.com/langchain-ai/langchain/issues/25357
-            kwargs["disabled_params"] = {"parallel_tool_calls": None}
-
-        # Groq is compatible with the ChatOpenAI client, so we use this client
-        # with the groq URL
-        client = ChatOpenAI(
-            name=model_name,
-            model=model_name,
-            seed=seed,
-            api_key=api_key,
-            max_retries=max_retries,
-            temperature=temperature,
-            base_url="https://api.groq.com/openai/v1",
-            **kwargs,
-        )
-        super(OpenAIGenerativeModel, self).__init__(client, model_name)
-        self._instructor_client = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                OpenAI(
-                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
-                )
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                AsyncOpenAI(
-                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
-                )
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._seed = seed
-
-
-class MetaLlamaGenerativeModel(OpenAIGenerativeModel):
-    """Meta hosted Llama model implementation.
-
-    Uses an OpenAI-compatible endpoint provided by Meta (or a managed Llama Stack distribution)
-    configured via a base URL.
+    Subclasses should set the `provider` enum and call super().__init__ with a `base_url`.
     """
-
-    provider: LLMProvider = LLMProvider.META
 
     def __init__(
         self,
@@ -690,21 +558,10 @@ class MetaLlamaGenerativeModel(OpenAIGenerativeModel):
         temperature: float = 0,
         **kwargs: Any,
     ) -> None:
-        """Initialize with Meta hosted Llama client.
-
-        Args:
-            model_name: Llama model to use
-            api_key: API key for the Meta hosted Llama API
-            base_url: OpenAI-compatible base URL for the Meta hosted Llama API
-            seed: Random seed for model generation
-            max_retries: Maximum number of retries
-            temperature: Temperature parameter
-            **kwargs: Additional keyword arguments to pass to ChatOpenAI
-
-        """
+        """Initialize an OpenAI-compatible client with the provided base_url."""
         self._model_kwargs = kwargs.copy()
         if "disabled_params" not in kwargs:
-            # Avoid parallel tool calls where unsupported
+            # Some OpenAI-compatible endpoints do not support parallel tool calls
             kwargs["disabled_params"] = {"parallel_tool_calls": None}
 
         client = ChatOpenAI(
@@ -731,6 +588,94 @@ class MetaLlamaGenerativeModel(OpenAIGenerativeModel):
             mode=instructor.Mode.JSON,
         )
         self._seed = seed
+
+
+class OpenRouterGenerativeModel(OpenAICompatibleGenerativeModel):
+    """OpenRouter model implementation."""
+
+    provider: LLMProvider = LLMProvider.OPENROUTER
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with OpenRouter client."""
+        # OpenRouter specific temperature quirk for o3/o4/gpt-5
+        temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini", "gpt-5") else temperature
+        super().__init__(
+            model_name=model_name,
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
+            seed=seed,
+            max_retries=max_retries,
+            temperature=temperature,
+            **kwargs,
+        )
+
+
+class GroqGenerativeModel(OpenAICompatibleGenerativeModel):
+    """Groq model implementation."""
+
+    provider: LLMProvider = LLMProvider.GROQ
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Groq client."""
+        super().__init__(
+            model_name=model_name,
+            api_key=api_key,
+            base_url="https://api.groq.com/openai/v1",
+            seed=seed,
+            max_retries=max_retries,
+            temperature=temperature,
+            **kwargs,
+        )
+
+
+class MetaLlamaGenerativeModel(OpenAICompatibleGenerativeModel):
+    """Meta hosted Llama model implementation.
+
+    Uses an OpenAI-compatible endpoint provided by Meta (or a managed Llama Stack distribution)
+    configured via a base URL.
+    """
+
+    provider: LLMProvider = LLMProvider.META
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        base_url: str,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Meta hosted Llama client."""
+        super().__init__(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            seed=seed,
+            max_retries=max_retries,
+            temperature=temperature,
+            **kwargs,
+        )
 
 
 class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
