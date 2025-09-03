@@ -21,7 +21,7 @@ import json
 from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Generic, Self, TypeVar, Union
 
 import httpx
 import mcp
@@ -82,6 +82,7 @@ class ToolRunContext(BaseModel):
     plan: Plan
     config: Config
     clarifications: ClarificationListType
+    tool: Union["Tool", None] = None
 
 
 class _ArgsSchemaPlaceholder(BaseModel):

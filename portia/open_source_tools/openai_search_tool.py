@@ -175,7 +175,7 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
         
         try:
             # Get the response content as JSON
-            if hasattr(response.output, 'text'):
+            if hasattr(response.output, 'text') and response.output.text:
                 response_text = response.output.text
             elif isinstance(response.output, str):
                 response_text = response.output
@@ -185,9 +185,7 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
             parsed_response = json.loads(response_text)
             results = parsed_response.get('results', [])
             
-            if not results:
-                raise ToolSoftError("No search results found in OpenAI response")
-            
+            # Return empty list if no results found instead of raising error
             return results
         except (json.JSONDecodeError, AttributeError, KeyError):
             # Fallback to basic response if JSON parsing fails

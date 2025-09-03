@@ -12,7 +12,6 @@ from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 
 @pytest.mark.daily
 @pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set")
-@pytest.mark.flaky(reruns=3)
 def test_openai_search_tool_integration() -> None:
     """Test that OpenAI search tool works end-to-end."""
     config = Config.from_default(

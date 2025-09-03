@@ -120,8 +120,10 @@ def test_openai_search_tool_no_annotations() -> None:
 
             tool = OpenAISearchTool()
             ctx = get_test_tool_context()
-            with pytest.raises(ToolSoftError, match="No search results found in OpenAI response"):
-                tool.run(ctx, "What is the capital of France?")
+            result = tool.run(ctx, "What is the capital of France?")
+            
+            # Should return empty list when no results found
+            assert result == []
 
 
 # Async tests for OpenAISearchTool.arun function
