@@ -1,4 +1,4 @@
-"""A plan built using the PlanBuilder."""
+"""Data model for plans assembled with :class:`PlanBuilderV2`."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from portia.prefixed_uuid import PlanUUID
 
 
 class PlanV2(BaseModel):
-    """A sequence of steps to be run by Portia."""
+    """Ordered collection of :class:`StepV2` objects executed by Portia."""
 
     id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")
     steps: list[StepV2] = Field(description="The steps to be executed in the plan.")
@@ -34,7 +34,7 @@ class PlanV2(BaseModel):
 
     @model_validator(mode="after")
     def validate_plan(self) -> Self:
-        """Validate the plan."""
+        """Ensure step names and input names are unique."""
         # Check for duplicate step names
         step_names = [step.step_name for step in self.steps]
         if len(step_names) != len(set(step_names)):
@@ -52,7 +52,7 @@ class PlanV2(BaseModel):
         return self
 
     def to_legacy_plan(self, plan_context: PlanContext) -> Plan:
-        """Convert the Portia plan to a legacy plan."""
+        """Convert this plan to the legacy :class:`~portia.plan.Plan` type."""
         return Plan(
             id=self.id,
             plan_context=plan_context,
@@ -62,7 +62,11 @@ class PlanV2(BaseModel):
         )
 
     def step_output_name(self, step: int | str | StepV2) -> str:
-        """Get the name of the output of a step in the plan."""
+        """Return the variable name for a step's output.
+
+        If the step cannot be resolved, a placeholder name is returned so callers
+        can still reference the missing value.
+        """
         try:
             if isinstance(step, StepV2):
                 step_num = self.steps.index(step)
@@ -79,19 +83,18 @@ class PlanV2(BaseModel):
             return f"${default_step_name(step_num)}_output"
 
     def idx_by_name(self, name: str) -> int:
-        """Get the index of a step by name."""
+        """Return the index of the step with the given name.
+
+        Raises:
+            ValueError: If no step with ``name`` exists.
+        """
         for i, step in enumerate(self.steps):
             if step.step_name == name:
                 return i
         raise ValueError(f"Step {name} not found in plan")
 
     def pretty_print(self) -> str:
-        """Return the pretty print representation of the plan.
-
-        Returns:
-            str: A pretty print representation of the plan.
-
-        """
+        """Return a human-readable summary of the plan."""
         tools = []
         legacy_steps = []
         for step in self.steps:

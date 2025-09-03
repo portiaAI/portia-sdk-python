@@ -1,4 +1,4 @@
-"""Interface for steps that are run as part of a PlanV2."""
+"""Implementation of the various step types used in :class:`PlanV2`."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 
 class StepV2(BaseModel, ABC):
-    """Interface for steps that are run as part of a plan."""
+    """Abstract base class for all steps executed within a plan."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -57,16 +57,15 @@ class StepV2(BaseModel, ABC):
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
-        """Execute the step."""
+        """Execute the step and return its output."""
         raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this step to a Step from plan.py.
+        """Return the legacy :class:`~portia.plan.Step` representation.
 
-        A Step is the legacy representation of a step in the plan, and is still used in the
-        Portia backend. If this step doesn't need to be represented in the plan sent to the Portia
-        backend, return None.
+        The legacy step is still required by parts of the Portia backend. If the
+        step should not appear in the legacy plan, return ``None``.
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -75,11 +74,11 @@ class StepV2(BaseModel, ABC):
         value: Any | Reference,  # noqa: ANN401
         run_data: RunContext,
     ) -> Any | None:  # noqa: ANN401
-        """Resolve any references in the provided value to their actual values.
+        """Resolve any :class:`Reference` objects to their concrete values.
 
-        If value is a Reference (e.g. Input or StepOutput), then the value that Reference refers to
-        is returned. If the value is a string with a Reference in it, then the string is returned
-        with the reference values templated in. Any other value is returned unchanged.
+        Strings containing ``{{ StepOutput(...) }}`` or ``{{ Input(...) }}``
+        templates are rendered with the referenced values. Non-reference values
+        are returned unchanged.
         """
         if isinstance(value, Reference):
             value = value.get_value(run_data)
@@ -89,6 +88,7 @@ class StepV2(BaseModel, ABC):
         return value
 
     def _template_input_references(self, value: str, run_data: RunContext) -> str:
+        """Replace any reference templates in ``value`` with their resolved values."""
         # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
         # from _input if it's a string
         matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", value)
@@ -228,7 +228,7 @@ class LLMStep(StepV2):
     @override
     @traceable(name="LLM Step - Run")
     async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the LLM query."""
+        """Execute the LLM task and return its response."""
         if self.system_prompt:
             llm_tool = LLMTool(
                 structured_output_schema=self.output_schema, prompt=self.system_prompt
@@ -326,7 +326,7 @@ class InvokeToolStep(StepV2):
     @override
     @traceable(name="Invoke Tool Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the tool."""
+        """Execute the tool and return its result."""
         if isinstance(self.tool, str):
             tool = ToolCallWrapper.from_tool_id(
                 self.tool,
@@ -421,7 +421,7 @@ class SingleToolAgentStep(StepV2):
     @override
     @traceable(name="Single Tool Agent Step - Run")
     async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the agent step."""
+        """Run the agent and return its output."""
         agent = self._get_agent_for_step(run_data)
         output_obj = await agent.execute_async()
         return output_obj.get_value()
@@ -484,7 +484,11 @@ class UserVerifyStep(StepV2):
     @override
     @traceable(name="User Verify Step - Run")
     async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Run the user verification step."""
+        """Prompt the user for confirmation.
+
+        Returns ``True`` when confirmed, or a
+        :class:`UserVerificationClarification` if input is required.
+        """
         message = self._template_input_references(self.message, run_data)
 
         previous_clarification = run_data.plan_run.get_clarification_for_step(
@@ -555,7 +559,7 @@ class UserInputStep(StepV2):
     @override
     @traceable(name="User Input Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Run the user input step."""
+        """Request input from the user and return the response."""
         clarification_type = (
             ClarificationCategory.MULTIPLE_CHOICE if self.options else ClarificationCategory.INPUT
         )
@@ -623,7 +627,7 @@ class ConditionalStep(StepV2):
     @override
     @traceable(name="Conditional Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the conditional step."""
+        """Evaluate the condition and return a :class:`ConditionalStepResult`."""
         args = {k: self._resolve_input_reference(v, run_data) for k, v in self.args.items()}
         if isinstance(self.condition, str):
             condition_str = self._template_input_references(self.condition, run_data)
