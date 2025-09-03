@@ -2725,7 +2725,7 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:
+    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)

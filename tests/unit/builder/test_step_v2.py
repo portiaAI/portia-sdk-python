@@ -2022,6 +2022,7 @@ async def test_user_input_step_message_with_templates() -> None:
     assert result.user_guidance == "Provide feedback on analysis result by Alice"
     assert result.options == ["Good", "Bad - missing data", "Great job!", "Excellent"]
 
+
 # Test cases for LoopStep class
 
 

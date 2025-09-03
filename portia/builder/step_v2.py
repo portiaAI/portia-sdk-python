@@ -257,7 +257,7 @@ class LLMStep(StepV2):
 
     @override
     @traceable(name="LLM Step - Run")
-    async def run(self, run_data: RunContext) -> str | BaseModel:
+    async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Execute the LLM task and return its response."""
         if self.system_prompt:
             llm_tool = LLMTool(
@@ -364,7 +364,7 @@ class InvokeToolStep(StepV2):
 
     @override
     @traceable(name="Invoke Tool Step - Run")
-    async def run(self, run_data: RunContext) -> Any:
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Execute the tool and return its result."""
         if isinstance(self.tool, str):
             tool = ToolCallWrapper.from_tool_id(
@@ -468,7 +468,7 @@ class SingleToolAgentStep(StepV2):
 
     @override
     @traceable(name="Single Tool Agent Step - Run")
-    async def run(self, run_data: RunContext) -> None:
+    async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Run the agent and return its output."""
         agent = self._get_agent_for_step(run_data)
         output_obj = await agent.execute_async()
@@ -550,7 +550,7 @@ class UserVerifyStep(StepV2):
 
     @override
     @traceable(name="User Verify Step - Run")
-    async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:
+    async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Prompt the user for confirmation.
 
         Returns a UserVerificationClarification to get input from the user (if not already
@@ -721,7 +721,7 @@ class ConditionalStep(StepV2):
 
     @override
     @traceable(name="Conditional Step - Run")
-    async def run(self, run_data: RunContext) -> Any:
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Evaluate the condition and return a ConditionalStepResult."""
         args = {k: self._resolve_references(v, run_data) for k, v in self.args.items()}
         if isinstance(self.condition, str):
@@ -807,7 +807,7 @@ class LoopStep(StepV2):
 
     @override
     @traceable(name="Loop Step - Run")
-    async def run(self, run_data: RunContext) -> Any:
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Run the loop step."""
         args = {k: self._resolve_references(v, run_data) for k, v in self.args.items()}
         match self.loop_block_type, self.loop_type:
