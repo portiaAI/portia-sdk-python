@@ -122,7 +122,7 @@ class PlanBuilderV2:
         )
         return self
 
-    def endloop(self, step_name: str | None = None) -> PlanBuilderV2:
+    def end_loop(self, step_name: str | None = None) -> PlanBuilderV2:
         """Exit a loop block."""
         if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], LoopBlock):
             raise PlanBuilderError(
@@ -142,7 +142,7 @@ class PlanBuilderV2:
                 index=start_loop_step.index,
                 loop_block_type=LoopBlockType.END,
                 loop_type=start_loop_step.loop_type,
-                args={},
+                args=start_loop_step.args,
                 start_index=start_loop_step.start_index,
                 end_index=len(self.plan.steps),
             )
