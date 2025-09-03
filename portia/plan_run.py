@@ -118,7 +118,7 @@ class PlanRun(BaseModel):
         description="Outputs of the run including clarifications.",
     )
     plan_run_inputs: dict[str, LocalDataValue] = Field(
-        default={},
+        default_factory=dict,
         description="Dict mapping plan input names to their values.",
     )
 
