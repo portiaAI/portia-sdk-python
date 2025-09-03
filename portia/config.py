@@ -30,6 +30,7 @@ from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
+    GrokGenerativeModel,
     LangChainGenerativeModel,
     LLMProvider,
     OpenAIGenerativeModel,
@@ -166,6 +167,11 @@ class LLMModel(Enum):
     AZURE_GPT_4_O_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4o-mini")
     AZURE_GPT_4_1 = Model(provider=LLMProvider.AZURE_OPENAI, model_name="gpt-4.1")
     AZURE_O_3_MINI = Model(provider=LLMProvider.AZURE_OPENAI, model_name="o3-mini")
+
+    # xAI Grok
+    GROK_4_0709 = Model(provider=LLMProvider.GROK, model_name="grok-4-0709")
+    GROK_3 = Model(provider=LLMProvider.GROK, model_name="grok-3")
+    GROK_3_MINI = Model(provider=LLMProvider.GROK, model_name="grok-3-mini")
 
     @property
     def api_name(self) -> str:
@@ -454,6 +460,10 @@ class Config(BaseModel):
         default_factory=lambda: (os.getenv("AZURE_OPENAI_ENDPOINT") or ""),
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
+    grok_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("XAI_API_KEY") or ""),
+        description="The API Key for xAI Grok. Must be set if llm-provider is GROK",
+    )
     ollama_base_url: str = Field(
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
         description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
@@ -641,6 +651,8 @@ class Config(BaseModel):
                         return "azure-openai/o3-mini"
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
+                    case LLMProvider.GROK:
+                        return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-70b-8192"
                 return None
@@ -658,6 +670,8 @@ class Config(BaseModel):
                         return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     case LLMProvider.AZURE_OPENAI:
                         return "azure-openai/o4-mini"
+                    case LLMProvider.GROK:
+                        return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
                 return None
@@ -677,6 +691,8 @@ class Config(BaseModel):
                         return "azure-openai/gpt-4.1"
                     case LLMProvider.OPENROUTER:
                         return "openrouter/moonshotai/kimi-k2"
+                    case LLMProvider.GROK:
+                        return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
                 return None
@@ -889,6 +905,7 @@ class Config(BaseModel):
         - mistralai (requires portia-sdk-python[mistral] to be installed)
         - google (requires portia-sdk-python[google] to be installed)
         - azure-openai
+        - grok
 
         Args:
             model_string (str): The model string to parse. E.G. "openai/gpt-4o"
@@ -993,6 +1010,12 @@ class Config(BaseModel):
                     base_url=self.ollama_base_url,
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
+            case LLMProvider.GROK:
+                return GrokGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("grok_api_key"),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
+                )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
@@ -1026,6 +1049,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.AZURE_OPENAI
     if os.getenv("OPENROUTER_API_KEY") or kwargs.get("openrouter_api_key"):
         return LLMProvider.OPENROUTER
+    if os.getenv("XAI_API_KEY") or kwargs.get("grok_api_key"):
+        return LLMProvider.GROK
     if os.getenv("GROQ_API_KEY") or kwargs.get("groq_api_key"):
         return LLMProvider.GROQ
     return None

@@ -1,4 +1,8 @@
-"""A simple example of using the PlanBuilderV2."""
+"""A simple example of using the PlanBuilderV2.
+
+This example demonstrates how to build and execute a multi-step agentic workflow
+that combines tool calling, user interactions, conditional logic, and LLM tasks.
+"""
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -9,6 +13,7 @@ from portia.cli import CLIExecutionHooks
 load_dotenv()
 
 
+# Define output schemas using Pydantic - these structure the data returned by steps
 class CommodityPriceWithCurrency(BaseModel):
     """Price of a commodity."""
 
@@ -23,46 +28,59 @@ class FinalOutput(BaseModel):
     email_address: str
 
 
+# Initialize Portia with CLI hooks for interactive prompts and progress display
 portia = Portia(execution_hooks=CLIExecutionHooks())
 
+# Build a multi-step plan using our plan builder
 plan = (
-    PlanBuilderV2("Buy some gold")
+    PlanBuilderV2("Buy some gold")  # Plan description
+    # Define plan inputs - Input() references these throughout the plan
     .input(name="country", description="The country to purchase the gold in", default_value="UK")
+    # Call a search tool to get the currency for the provided country
     .invoke_tool_step(
         step_name="Search currency",
         tool="search_tool",
         args={
+            # You can reference inputs to the plan using Input()
             "search_query": f"What is the currency in {Input('country')}?",
         },
     )
+    # Use an agent (ReAct = Reasoning + Acting) with a search tool and a calculator tool to
+    # determine the price of gold in that country (with the correct currency)
     .react_agent_step(
         step_name="Search gold price",
         tools=["search_tool", "calculator_tool"],
         task=f"What is the price of gold per ounce in {Input('country')}?",
-        inputs=[StepOutput(0)],
-        output_schema=CommodityPriceWithCurrency,
+        # You can reference past outputs using StepOutput()
+        inputs=[StepOutput("Search currency")],
+        output_schema=CommodityPriceWithCurrency,  # Structure the agent's output
     )
+    # Interactive user input with predefined options to get the purchase quantity
     .user_input(
         step_name="Purchase quantity",
         message="How many ounces of gold do you want to purchase?",
         options=[50, 100, 200],
     )
+    # Pure function step for calculation of the total price
     .function_step(
         step_name="Calculate total price",
         function=lambda price_with_currency, purchase_quantity: (
             price_with_currency.price * purchase_quantity
         ),
         args={
-            "price_with_currency": StepOutput("Search gold price"),
+            # StepOutput can use either step name or number
+            "price_with_currency": StepOutput(1),
             "purchase_quantity": StepOutput("Purchase quantity"),
         },
     )
+    # User verification with dynamic message - this will exit the plan if the user rejects
     .user_verify(
         message=(
             f"Do you want to proceed with the purchase? Price is "
             f"{StepOutput('Calculate total price')}"
         )
     )
+    # Conditional logic based on calculated price
     .if_(
         condition=lambda total_price: total_price > 100,  # noqa: PLR2004
         args={"total_price": StepOutput("Calculate total price")},
@@ -71,22 +89,26 @@ plan = (
     .else_()
     .function_step(function=lambda: print("We need more gold!"))  # noqa: T201
     .endif()
+    # LLM step for generating a receipt using natural language instructions
     .llm_step(
         step_name="Generate receipt",
         task="Create a fake receipt for the purchase of gold.",
         inputs=[StepOutput("Calculate total price"), StepOutput("Purchase quantity")],
     )
+    # Single tool agent step - LLM uses a specific tool to complete a task
     .single_tool_agent_step(
         task="Send the receipt to Robbie in an email at not_an_email@portialabs.ai",
         tool="portia:google:gmail:send_email",
         inputs=[StepOutput("Generate receipt")],
     )
+    # Define the final output structure
     .final_output(
         output_schema=FinalOutput,
     )
-    .build()
+    .build()  # Build the plan object
 )
 
+# Execute the plan with runtime inputs (overrides default currency)
 plan_run = portia.run_plan(
     plan,
     plan_run_inputs={"country": "Spain"},
