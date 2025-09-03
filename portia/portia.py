@@ -26,7 +26,7 @@ import time
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from langsmith import traceable
+from langsmith import get_current_run_tree, traceable
 from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
@@ -2666,9 +2666,13 @@ class Portia:
         plan_run = await self._aget_plan_run_from_plan(
             legacy_plan, end_user, plan_run_inputs, structured_output_schema
         )
-        return await self.resume_builder_plan(
+        plan_run = await self.resume_builder_plan(
             plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
         )
+        rt = get_current_run_tree()
+        if rt:
+            rt.add_metadata({"plan_run_id": str(plan_run.id)})
+        return plan_run
 
     async def resume_builder_plan(
         self,
@@ -2720,18 +2724,16 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
+    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
 
         output_value = self._get_last_executed_step_output(run_data.legacy_plan, run_data.plan_run)
         branch_stack: list[ConditionalStepResult] = []
-        for i, step in enumerate(plan.steps):
-            if i < run_data.plan_run.current_step_index:
-                logger().debug(f"Skipping step {i}: {step}")
-                continue
-            run_data.plan_run.current_step_index = i
+        while run_data.plan_run.current_step_index < len(plan.steps):
+            index = run_data.plan_run.current_step_index
+            step = plan.steps[index]
 
             legacy_step = step.to_legacy_step(plan)
 
@@ -2742,7 +2744,8 @@ class Portia:
                     legacy_step,
                 )
             except SkipExecutionError as e:
-                logger().info(f"Skipping step {i}: {e}")
+                logger().info(f"Skipping step {index}: {e}")
+                run_data.plan_run.current_step_index = index + 1
                 continue
 
             try:
@@ -2756,7 +2759,7 @@ class Portia:
                     )
                 )
                 return self._handle_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, i, legacy_step, e
+                    run_data.plan_run, run_data.legacy_plan, index, legacy_step, e
                 )
             else:
                 self.telemetry.capture(
@@ -2766,38 +2769,11 @@ class Portia:
                         tool_id=step.to_legacy_step(plan).tool_id,
                     )
                 )
-            jump_to_step_index: int | None = None
-            if (
-                isinstance(result, ConditionalStepResult)
-                and result.type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
-            ):
-                logger().debug("Entering new conditional block")
-                branch_stack.append(result)
-                if not result.conditional_result:
-                    logger().debug("Conditional clause is false, jumping to next clause")
-                    jump_to_step_index = result.next_clause_step_index
-            elif (
-                isinstance(result, ConditionalStepResult)
-                and result.type == ConditionalBlockClauseType.ALTERNATE_CLAUSE
-            ):
-                stack_state = branch_stack[-1]
-                if stack_state.conditional_result:
-                    logger().debug("Previous conditional clause has already run, jumping to exit")
-                    # One of the branches has already run, so we jump to exit
-                    jump_to_step_index = stack_state.end_condition_block_step_index
-                elif result.conditional_result:
-                    logger().debug("Conditional clause is true, evaluating steps")
-                    # Overwrite the stack state with the new result
-                    branch_stack[-1] = result
-                elif not result.conditional_result:
-                    logger().debug("Conditional clause is false, jumping to next clause or exit")
-                    jump_to_step_index = result.next_clause_step_index
-            elif (
-                isinstance(result, ConditionalStepResult)
-                and result.type == ConditionalBlockClauseType.END_CONDITION_BLOCK
-            ):
-                logger().debug("Exiting conditional branch")
-                branch_stack.pop()
+            match result:
+                case ConditionalStepResult():
+                    jump_to_step_index = self._handle_conditional_step(result, branch_stack)
+                case _:
+                    jump_to_step_index = None
 
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
@@ -2806,7 +2782,7 @@ class Portia:
                 run_data.step_output_values.append(
                     StepOutputValue(
                         step_name=step.step_name,
-                        step_num=i,
+                        step_num=index,
                         value=result,
                         description=(f"Output from step '{step.step_name}' (Description: {step})"),
                     )
@@ -2816,7 +2792,7 @@ class Portia:
                 if clarified_plan_run := self._handle_post_step_execution(
                     run_data.legacy_plan,
                     run_data.plan_run,
-                    i,
+                    index,
                     legacy_step,
                     output_value,
                 ):
@@ -2825,7 +2801,7 @@ class Portia:
             except Exception as e:  # noqa: BLE001 - We want to capture all exceptions from the hook here
                 logger().error(
                     "Error in post-step stage for step {index}: {error}",
-                    index=i,
+                    index=index,
                     error=e,
                     plan=str(plan.id),
                     plan_run=str(run_data.plan_run.id),
@@ -2835,7 +2811,7 @@ class Portia:
                 run_data.step_output_values.append(
                     StepOutputValue(
                         step_name=step.step_name,
-                        step_num=i,
+                        step_num=index,
                         value=str(e),
                         description=f"Error from step '{step.step_name}' (Description: {step})",
                     )
@@ -2846,9 +2822,11 @@ class Portia:
                 )
 
             if jump_to_step_index is not None:
-                logger().debug(f"Jumping to step {jump_to_step_index} from {i}")
+                logger().debug(f"Jumping to step {jump_to_step_index} from {index}")
                 run_data.plan_run.current_step_index = jump_to_step_index
-            logger().info(f"Completed step {i}, result: {result}")
+            else:
+                run_data.plan_run.current_step_index = index + 1
+            logger().info(f"Completed step {index}, result: {result}")
 
         return self._post_plan_run_execution(
             run_data.legacy_plan,
@@ -2856,6 +2834,35 @@ class Portia:
             output_value,
             skip_summarization=not plan.summarize and plan.final_output_schema is None,
         )
+
+    def _handle_conditional_step(
+        self, result: ConditionalStepResult, branch_stack: list[ConditionalStepResult]
+    ) -> int | None:
+        """Handle a conditional step."""
+        match result.type:
+            case ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK:
+                logger().debug("Entering new conditional block")
+                branch_stack.append(result)
+                if not result.conditional_result:
+                    logger().debug("Conditional clause is false, jumping to next clause")
+                    return result.next_clause_step_index
+            case ConditionalBlockClauseType.ALTERNATE_CLAUSE:
+                stack_state = branch_stack[-1]
+                if stack_state.conditional_result:
+                    logger().debug("Previous conditional clause has already run, jumping to exit")
+                    # One of the branches has already run, so we jump to exit
+                    return stack_state.end_condition_block_step_index
+                if result.conditional_result:
+                    logger().debug("Conditional clause is true, evaluating steps")
+                    # Overwrite the stack state with the new result
+                    branch_stack[-1] = result
+                elif not result.conditional_result:
+                    logger().debug("Conditional clause is false, jumping to next clause or exit")
+                    return result.next_clause_step_index
+            case ConditionalBlockClauseType.END_CONDITION_BLOCK:
+                logger().debug("Exiting conditional branch")
+                branch_stack.pop()
+        return None
 
     @staticmethod
     def _log_models(config: Config) -> None:
