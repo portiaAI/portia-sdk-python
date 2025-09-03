@@ -14,11 +14,13 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
+from portia.builder.loops import LoopBlockType, LoopType
 from portia.builder.reference import Input, StepOutput
 from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
     LLMStep,
+    LoopStep,
     SingleToolAgentStep,
     StepV2,
     UserInputStep,
@@ -1463,7 +1465,7 @@ async def test_user_verify_step_with_string_template_message() -> None:
         )
     ]
 
-    result = await step.run(mock_run_data)
+    result = await step.run(run_data=mock_run_data)
 
     assert isinstance(result, UserVerificationClarification)
     assert result.user_guidance == "Confirm action on test_file.txt for user Bob?"
@@ -2000,3 +2002,477 @@ async def test_user_input_step_message_with_templates() -> None:
 
     assert isinstance(result, InputClarification)
     assert result.user_guidance == "Provide feedback on result by Alice"
+
+
+# Test cases for LoopStep class
+
+
+@pytest.fixture
+def mock_run_data() -> Mock:
+    """Create mock run data for testing LoopStep."""
+    mock_data = Mock()
+    mock_data.config = Mock()
+    mock_data.storage = Mock()
+    mock_data.step_output_values = []
+    mock_data.plan = Mock()
+    mock_data.plan_run = Mock()
+    return mock_data
+
+
+@pytest.fixture
+def mock_plan_v2() -> Mock:
+    """Create mock PlanV2 for testing LoopStep."""
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "loop_output"
+    return mock_plan
+
+
+def test_loop_step_initialization_with_condition() -> None:
+    """Test LoopStep initialization with condition."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=5,
+        args={"x": 10},
+    )
+
+    assert step.step_name == "test_loop"
+    assert step.condition is not None
+    assert step.loop_type == LoopType.CONDITIONAL
+    assert step.loop_block_type == LoopBlockType.END
+    assert step.start_index == 0
+    assert step.end_index == 5
+    assert step.args == {"x": 10}
+    assert step.over is None
+
+
+def test_loop_step_initialization_with_over() -> None:
+    """Test LoopStep initialization with over reference."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput(0),
+        loop_type=LoopType.FOR_EACH,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=3,
+        index=0,
+    )
+
+    assert step.step_name == "test_loop"
+    assert step.over is not None
+    assert step.loop_type == LoopType.FOR_EACH
+    assert step.loop_block_type == LoopBlockType.START
+    assert step.start_index == 0
+    assert step.end_index == 3
+    assert step.index == 0
+    assert step.condition is None
+
+
+def test_loop_step_validation_error_both_none() -> None:
+    """Test LoopStep validation error when both condition and over are None."""
+    with pytest.raises(ValueError, match="Condition and over cannot both be None"):
+        LoopStep(
+            step_name="test_loop",
+            condition=None,
+            over=None,
+            loop_type=LoopType.CONDITIONAL,
+            loop_block_type=LoopBlockType.END,
+            start_index=0,
+            end_index=5,
+        )
+
+
+def test_loop_step_validation_error_start_end_both_none() -> None:
+    """Test LoopStep validation error when both start_index and end_index are None."""
+    with pytest.raises(ValueError, match="Start and end indexes cannot both be None"):
+        LoopStep(
+            step_name="test_loop",
+            condition=lambda x: x > 0,
+            loop_type=LoopType.CONDITIONAL,
+            loop_block_type=LoopBlockType.END,
+            start_index=None,
+            end_index=None,
+        )
+
+
+def test_loop_step_validation_success() -> None:
+    """Test LoopStep validation success with valid parameters."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=5,
+    )
+
+    assert step.start_index == 0
+    assert step.end_index == 5
+
+
+def test_current_loop_variable_with_over() -> None:
+    """Test current_loop_variable method when over is set."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput(0),
+        loop_type=LoopType.FOR_EACH,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=3,
+        index=1,
+    )
+
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value=["a", "b", "c"],
+            description="s0",
+            step_name="test_step",
+            step_num=0,
+        )
+    ]
+
+    result = step.current_loop_variable(mock_run_data)
+    assert result == "b"
+
+
+def test_current_loop_variable_with_over_none() -> None:
+    """Test current_loop_variable method when over is None."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=5,
+    )
+
+    mock_run_data = Mock()
+    result = step.current_loop_variable(mock_run_data)
+    assert result is None
+
+
+def test_current_loop_variable_with_non_sequence() -> None:
+    """Test current_loop_variable method with non-sequence value."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput(0),
+        loop_type=LoopType.FOR_EACH,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=3,
+        index=0,
+    )
+
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value=42,  # Use an integer which is not indexable
+            description="s0",
+            step_name="test_step",
+            step_num=0,
+        )
+    ]
+
+    with pytest.raises(TypeError, match="Loop variable is not indexable"):
+        step.current_loop_variable(mock_run_data)
+
+
+def test_current_loop_variable_index_out_of_range() -> None:
+    """Test current_loop_variable method with index out of range."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput(0),
+        loop_type=LoopType.FOR_EACH,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=3,
+        index=5,
+    )
+
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value=["a", "b", "c"],
+            description="s0",
+            step_name="test_step",
+            step_num=0,
+        )
+    ]
+
+    result = step.current_loop_variable(mock_run_data)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_conditional_end_with_callable() -> None:
+    """Test LoopStep run method for conditional end loop with callable condition."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 5,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=10,
+        args={"x": 10},
+    )
+
+    mock_run_data = Mock()
+    result = await step.run(run_data=mock_run_data)
+
+    assert result.block_type == LoopBlockType.END
+    assert result.loop_result is True
+    assert result.start_index == 0
+    assert result.end_index == 10
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_conditional_end_with_string() -> None:
+    """Test LoopStep run method for conditional end loop with string condition."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition="x > 5",
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=10,
+        args={"x": 10},
+    )
+
+    mock_run_data = Mock()
+    mock_run_data.config = Mock()
+
+    with patch("portia.builder.step_v2.ConditionalEvaluationAgent") as mock_agent_class:
+        mock_agent = Mock()
+        mock_agent.execute = AsyncMock(return_value=True)
+        mock_agent_class.return_value = mock_agent
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result.block_type == LoopBlockType.END
+        assert result.loop_result is True
+        assert result.start_index == 0
+        assert result.end_index == 10
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_conditional_end_missing_condition() -> None:
+    """Test LoopStep run method for conditional end loop with missing condition."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput(0),  # Provide over since condition is None
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=10,
+    )
+
+    mock_run_data = Mock()
+
+    with pytest.raises(ValueError, match="Condition is required for conditional loop"):
+        await step.run(run_data=mock_run_data)
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_for_each_start() -> None:
+    """Test LoopStep run method for for-each start loop."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput(0),
+        loop_type=LoopType.FOR_EACH,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=3,
+        index=0,
+    )
+
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value=["a", "b", "c"],
+            description="s0",
+            step_name="test_step",
+            step_num=0,
+        )
+    ]
+
+    result = await step.run(run_data=mock_run_data)
+
+    assert result.block_type == LoopBlockType.START
+    assert result.loop_result is True
+    assert result.value == "a"
+    assert result.start_index == 0
+    assert result.end_index == 3
+    assert step.index == 1  # Should be incremented
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_for_each_start_missing_over() -> None:
+    """Test LoopStep run method for for-each start loop with missing over."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,  # Provide condition since over is None
+        loop_type=LoopType.FOR_EACH,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=3,
+    )
+
+    mock_run_data = Mock()
+
+    with pytest.raises(ValueError, match="Over is required for for-each loop"):
+        await step.run(run_data=mock_run_data)
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_for_each_start_no_value() -> None:
+    """Test LoopStep run method for for-each start loop with no value."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput(0),
+        loop_type=LoopType.FOR_EACH,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=3,
+        index=5,  # Out of range
+    )
+
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value=["a", "b", "c"],
+            description="s0",
+            step_name="test_step",
+            step_num=0,
+        )
+    ]
+
+    result = await step.run(run_data=mock_run_data)
+
+    assert result.block_type == LoopBlockType.START
+    assert result.loop_result is False
+    assert result.value is None
+    assert result.start_index == 0
+    assert result.end_index == 3
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_default_case() -> None:
+    """Test LoopStep run method for default case."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.START,
+        start_index=0,
+        end_index=5,
+    )
+
+    mock_run_data = Mock()
+    result = await step.run(run_data=mock_run_data)
+
+    assert result.block_type == LoopBlockType.START
+    assert result.loop_result is True
+    assert result.start_index == 0
+    assert result.end_index == 5
+
+
+@pytest.mark.asyncio
+async def test_loop_step_run_with_none_indexes() -> None:
+    """Test LoopStep run method with None start/end indexes."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,  # Provide at least one index
+        end_index=None,
+        args={"x": 10},
+    )
+
+    mock_run_data = Mock()
+    result = await step.run(run_data=mock_run_data)
+
+    assert result.start_index == 0
+    assert result.end_index == 0
+
+
+def test_loop_step_to_legacy_step_with_callable_condition() -> None:
+    """Test LoopStep to_legacy_step method with callable condition."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=5,
+        args={"x": 10},
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "loop_output"
+
+    result = step.to_legacy_step(mock_plan)
+
+    assert result.task == "Loop clause: If result of <lambda> is true"
+    assert result.output == "loop_output"
+    assert result.tool_id is None
+
+
+def test_loop_step_to_legacy_step_with_string_condition() -> None:
+    """Test LoopStep to_legacy_step method with string condition."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition="x > 0",
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=5,
+        args={"x": 10},
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "loop_output"
+
+    result = step.to_legacy_step(mock_plan)
+
+    assert result.task == "Loop clause: x > 0"
+    assert result.output == "loop_output"
+    assert result.tool_id is None
+
+
+def test_loop_step_to_legacy_step_with_reference_args() -> None:
+    """Test LoopStep to_legacy_step method with reference arguments."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=lambda x: x > 0,
+        loop_type=LoopType.CONDITIONAL,
+        loop_block_type=LoopBlockType.END,
+        start_index=0,
+        end_index=5,
+        args={"x": StepOutput(0), "y": Input("test_input")},
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "loop_output"
+
+    result = step.to_legacy_step(mock_plan)
+
+    assert result.task == "Loop clause: If result of <lambda> is true"
+    assert result.output == "loop_output"
+    assert result.tool_id is None
