@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest import mock
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
@@ -16,24 +16,22 @@ from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.reference import Input
 from portia.clarification import ActionClarification, ClarificationCategory
 from portia.clarification_handler import ClarificationHandler
-from portia.config import Config, ExecutionAgentType, StorageClass
-from portia.errors import InvalidPlanRunStateError, ToolNotFoundError
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
-from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.config import Config, StorageClass
+from portia.errors import InvalidPlanRunStateError
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
 from portia.plan import Plan, PlanContext, PlanInput, Step
 from portia.plan_run import PlanRun, PlanRunState
 from portia.portia import Portia
 from portia.tool import ReadyResponse, Tool, ToolRunContext, _ArgsSchemaPlaceholder
 from portia.tool_registry import ToolRegistry
-from portia.tool_wrapper import ToolCallWrapper
-from tests.utils import AdditionTool, ClarificationTool, get_test_plan_run
+from tests.utils import AdditionTool, ClarificationTool
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from portia.builder.plan_v2 import PlanV2
     from portia.clarification import Clarification
+    from portia.execution_agents.output import Output
 
 
 class ErrorClarificationHandler(ClarificationHandler):
@@ -93,6 +91,20 @@ class ReadyTestTool(Tool):
     def mark_ready(self) -> None:
         """Mark the tool as ready (simulate completing authentication)."""
         self._is_ready = True
+
+
+class ErrorTool(Tool):
+    """A tool that always raises an error for testing."""
+
+    id: str = "error_tool"
+    name: str = "Error Tool"
+    description: str = "A tool that always raises an error"
+    args_schema: type[BaseModel] = _ArgsSchemaPlaceholder
+    output_schema: tuple[str, str] = ("str", "Error output")
+
+    def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+        """Run the tool."""
+        raise RuntimeError("Tool execution failed")
 
 
 def _build_addition_plan() -> PlanV2:
@@ -307,6 +319,131 @@ def test_portia_run_plan_v2_missing_inputs(
     assert plan_run.outputs.final_output.get_value() == expected_output
 
 
+def _build_plan_with_multiple_default_inputs() -> PlanV2:
+    """Build a plan with multiple inputs, some with defaults and some without."""
+    return (
+        PlanBuilderV2("Test plan with multiple default inputs")
+        .input(name="required_input_1", description="This input is required")
+        .input(name="required_input_2", description="This input is also required")
+        .input(
+            name="optional_input_1",
+            description="This input has a default",
+            default_value="default_1",
+        )
+        .input(
+            name="optional_input_2",
+            description="This input also has a default",
+            default_value="default_2",
+        )
+        .function_step(
+            function=lambda a, b, c, d: f"{a}_{b}_{c}_{d}",
+            args={
+                "a": Input("required_input_1"),
+                "b": Input("required_input_2"),
+                "c": Input("optional_input_1"),
+                "d": Input("optional_input_2"),
+            },
+        )
+        .build()
+    )
+
+
+def _build_plan_with_all_default_inputs() -> PlanV2:
+    """Build a plan where all inputs have default values."""
+    return (
+        PlanBuilderV2("Test plan with all default inputs")
+        .input(
+            name="input_1",
+            description="This input has a default",
+            default_value="default_1",
+        )
+        .input(
+            name="input_2",
+            description="This input also has a default",
+            default_value="default_2",
+        )
+        .function_step(
+            function=lambda x, y: f"{x}_{y}",
+            args={"x": Input("input_1"), "y": Input("input_2")},
+        )
+        .build()
+    )
+
+
+@pytest.mark.parametrize(
+    ("plan_run_inputs", "expected_output"),
+    [
+        # Case 1: Some required inputs provided, optional inputs use defaults
+        (
+            {"required_input_1": "provided_1", "required_input_2": "provided_2"},
+            "provided_1_provided_2_default_1_default_2",
+        ),
+        # Case 2: Required inputs provided, some optional inputs provided, others use defaults
+        (
+            {
+                "required_input_1": "provided_1",
+                "required_input_2": "provided_2",
+                "optional_input_1": "custom_1",
+            },
+            "provided_1_provided_2_custom_1_default_2",
+        ),
+        # Case 3: All inputs provided
+        (
+            {
+                "required_input_1": "provided_1",
+                "required_input_2": "provided_2",
+                "optional_input_1": "custom_1",
+                "optional_input_2": "custom_2",
+            },
+            "provided_1_provided_2_custom_1_custom_2",
+        ),
+    ],
+)
+def test_portia_run_plan_v2_with_default_inputs_comprehensive(
+    portia: Portia,
+    plan_run_inputs: dict[str, object],
+    expected_output: str,
+) -> None:
+    """Test running a PlanV2 with various combinations of default and provided inputs."""
+    plan = _build_plan_with_multiple_default_inputs()
+    end_user = portia.initialize_end_user()
+
+    plan_run = asyncio.run(portia.arun_plan(plan, end_user, plan_run_inputs=plan_run_inputs))
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.plan_id == plan.id
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == expected_output
+
+
+@pytest.mark.parametrize(
+    ("plan_run_inputs", "expected_output"),
+    [
+        # Case 1: No inputs provided, all use defaults
+        ({}, "default_1_default_2"),
+        # Case 2: Some inputs provided, others use defaults
+        ({"input_1": "custom_1"}, "custom_1_default_2"),
+        # Case 3: All inputs provided (overriding defaults)
+        ({"input_1": "custom_1", "input_2": "custom_2"}, "custom_1_custom_2"),
+    ],
+)
+def test_portia_run_plan_v2_with_all_default_inputs(
+    portia: Portia,
+    plan_run_inputs: dict[str, object],
+    expected_output: str,
+) -> None:
+    """Test running a PlanV2 where all inputs have default values."""
+    plan = _build_plan_with_all_default_inputs()
+    end_user = portia.initialize_end_user()
+
+    plan_run = asyncio.run(portia.arun_plan(plan, end_user, plan_run_inputs=plan_run_inputs))
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.plan_id == plan.id
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == expected_output
+
+
 @pytest.mark.asyncio
 async def test_run_builder_plan_execution_hooks(portia: Portia) -> None:
     """Test that execution hooks are called when running a PlanV2."""
@@ -360,6 +497,45 @@ async def test_run_builder_plan_execution_hooks_with_skip(portia: Portia) -> Non
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert execution_hooks.after_step_execution.call_count == 1  # pyright: ignore[reportFunctionMemberAccess, reportOptionalMemberAccess]
+
+
+@pytest.mark.asyncio
+async def test_run_builder_plan_execution_hooks_after_step_error(portia: Portia) -> None:
+    """Test that an error in after_step_execution hook causes the plan to fail."""
+
+    def after_step_execution(plan: Plan, plan_run: PlanRun, step: Step, output: Output):  # noqa: ANN202, ARG001
+        raise RuntimeError("After step execution hook failed")
+
+    execution_hooks = ExecutionHooks(
+        after_step_execution=after_step_execution,
+    )
+    portia.execution_hooks = execution_hooks
+    plan = (
+        PlanBuilderV2("Test execution hooks after step error")
+        .function_step(function=lambda: "Step 1 result")
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.FAILED
+
+
+@pytest.mark.asyncio
+@patch("portia.portia.get_current_run_tree")
+async def test_run_builder_plan_appends_plan_run_to_trace_metadata(
+    mock_get_run_tree: MagicMock, portia: Portia
+) -> None:
+    """Ensure plan_run id is appended to trace metadata."""
+    mock_run_tree = MagicMock()
+    mock_get_run_tree.return_value = mock_run_tree
+
+    plan = PlanBuilderV2("Trace metadata").function_step(function=lambda: "Step result").build()
+    plan_run = await portia.arun_plan(plan)
+
+    mock_run_tree.add_metadata.assert_called_once()
+    metadata_arg = mock_run_tree.add_metadata.call_args.args[0]
+    assert metadata_arg["plan_run_id"] == str(plan_run.id)
 
 
 class FinalOutputSchema(BaseModel):
@@ -671,76 +847,6 @@ async def test_portia_resume_plan_v2_keyboard_interrupt(portia: Portia) -> None:
     assert plan_run.state == PlanRunState.FAILED
 
 
-def test_portia_get_tool_with_valid_tool_id(portia: Portia) -> None:
-    """Test get_tool with a valid tool_id returns wrapped tool."""
-    plan, plan_run = get_test_plan_run()
-
-    tool = portia.get_tool("add_tool", plan_run)
-
-    assert tool is not None
-    assert isinstance(tool, ToolCallWrapper)
-    assert isinstance(tool._child_tool, AdditionTool)  # pyright: ignore[reportAttributeAccessIssue]
-    assert tool._storage == portia.storage  # pyright: ignore[reportAttributeAccessIssue]
-    assert tool._plan_run == plan_run  # pyright: ignore[reportAttributeAccessIssue]
-
-
-def test_portia_get_tool_with_none_tool_id(portia: Portia) -> None:
-    """Test get_tool with None tool_id returns None."""
-    plan, plan_run = get_test_plan_run()
-
-    tool = portia.get_tool(None, plan_run)
-
-    assert tool is None
-
-
-def test_portia_get_tool_with_nonexistent_tool_id(portia: Portia) -> None:
-    """Test get_tool with nonexistent tool_id raises ToolNotFoundError."""
-    plan, plan_run = get_test_plan_run()
-
-    with pytest.raises(ToolNotFoundError):
-        portia.get_tool("nonexistent_tool", plan_run)
-
-
-def test_portia_get_agent_for_step_with_default_execution_agent(portia: Portia) -> None:
-    """Test get_agent_for_step returns DefaultExecutionAgent with DEFAULT config."""
-    plan, plan_run = get_test_plan_run()
-    step = Step(
-        task="Add two numbers",
-        inputs=[],
-        output="$output",
-        tool_id="add_tool",
-    )
-
-    portia.config.execution_agent_type = ExecutionAgentType.DEFAULT
-
-    agent = portia.get_agent_for_step(step, plan, plan_run)
-
-    assert isinstance(agent, DefaultExecutionAgent)
-    assert agent.plan == plan
-    assert agent.plan_run == plan_run
-    assert agent.config == portia.config
-
-
-def test_portia_get_agent_for_step_with_oneshot_execution_agent(portia: Portia) -> None:
-    """Test get_agent_for_step returns OneShotAgent with ONE_SHOT config."""
-    plan, plan_run = get_test_plan_run()
-    step = Step(
-        task="Add two numbers",
-        inputs=[],
-        output="$output",
-        tool_id="add_tool",
-    )
-
-    portia.config.execution_agent_type = ExecutionAgentType.ONE_SHOT
-
-    agent = portia.get_agent_for_step(step, plan, plan_run)
-
-    assert isinstance(agent, OneShotAgent)
-    assert agent.plan == plan
-    assert agent.plan_run == plan_run
-    assert agent.config == portia.config
-
-
 @pytest.mark.asyncio
 async def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
     """Test that final output is set even if summary generation fails with PlanV2."""
@@ -878,3 +984,32 @@ async def test_portia_plan_v2_initial_readiness_check_with_action_clarification(
     assert result.state == PlanRunState.COMPLETE
     assert result.outputs.final_output is not None
     assert result.outputs.final_output.get_value() == "Tool executed successfully"
+
+
+@pytest.mark.asyncio
+async def test_portia_plan_v2_tool_error_in_invoke_tool_step() -> None:
+    """Test PlanV2 run_plan flow when a tool raises an error during execution."""
+    error_tool = ErrorTool()
+
+    config = Config.from_default(
+        openai_api_key=SecretStr("123"),
+    )
+    tool_registry = ToolRegistry([error_tool])
+    portia = Portia(config=config, tools=tool_registry)
+
+    plan = (
+        PlanBuilderV2("Test tool error in invoke_tool_step")
+        .invoke_tool_step(
+            step_name="Use error tool",
+            tool="error_tool",
+            args={},
+        )
+        .build()
+    )
+
+    # Run the plan - should fail due to tool error
+    end_user = await portia.ainitialize_end_user()
+    plan_run = await portia.arun_plan(plan, end_user)
+
+    # Verify plan failed due to tool error
+    assert plan_run.state == PlanRunState.FAILED

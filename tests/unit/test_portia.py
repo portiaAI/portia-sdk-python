@@ -47,8 +47,7 @@ from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.open_source_tools.llm_tool import LLMTool
-from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
+from portia.open_source_tools.registry import open_source_tool_registry
 from portia.plan import (
     Plan,
     PlanBuilder,
@@ -62,7 +61,7 @@ from portia.plan import (
 )
 from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.base_planning_agent import StepsOrError
-from portia.portia import ExecutionHooks, Portia, RunContext
+from portia.portia import ExecutionHooks, Portia
 from portia.prefixed_uuid import ClarificationUUID
 from portia.storage import StorageError
 from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
@@ -74,6 +73,7 @@ from portia.tool import (
     _ArgsSchemaPlaceholder,
 )
 from portia.tool_registry import ToolRegistry
+from portia.tool_wrapper import ToolCallWrapper
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
@@ -89,6 +89,7 @@ if TYPE_CHECKING:
     from pytest_httpx import HTTPXMock
 
     from portia.common import Serializable
+    from portia.run_context import RunContext
 
 
 def test_portia_local_default_config_with_api_keys() -> None:
@@ -107,14 +108,15 @@ def test_portia_local_default_config_with_api_keys() -> None:
         portia = Portia()
         assert str(portia.config) == str(Config.from_default())
 
-        # BrowserTool is in open_source_tool_registry but not in the default tool registry
-        # avaialble to the Portia instance. PDF reader is in open_source_tool_registry if
+        # BrowserTool and 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
+        # are in open_source_tool_registry but not in the default tool registry
+        # available to the Portia instance. PDF reader is in open_source_tool_registry if
         # Mistral API key is set, and isn't in the default tool registry.
         # Unfortunately this is determined when the registry file is imported, so we can't just mock
         # the Mistral API key here.
-        expected_diff = 1
+        expected_diff = 5  # browser_tool + 4 SQL tools
         if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 2
+            expected_diff = 6  # + pdf_reader_tool
 
         assert (
             len(portia.tool_registry.get_tools())
@@ -139,9 +141,10 @@ def test_portia_local_default_config_without_api_keys() -> None:
         portia = Portia()
         assert str(portia.config) == str(Config.from_default())
 
-        # BrowserTool, SearchTool, WeatherTool, CrawlTool, ExtractTool, MapTool
+        # BrowserTool, SearchTool, WeatherTool, CrawlTool, ExtractTool, MapTool,
+        # and 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
         # are in open_source_tool_registry but not in the
-        # default tool registry avaialble to the Portia instance. PDF reader is in
+        # default tool registry available to the Portia instance. PDF reader is in
         # open_source_tool_registry if Mistral API key is set, and isn't in the default tool
         # registry Unfortunately this is determined when the registry file is imported, so we
         # can't just mock the Mistral API key here.
@@ -149,6 +152,7 @@ def test_portia_local_default_config_without_api_keys() -> None:
         expected_diff = 5  # 6 tools missing, but OpenAI search tool gets added
         if os.getenv("MISTRAL_API_KEY"):
             expected_diff = 6
+
 
         assert (
             len(portia.tool_registry.get_tools())
@@ -1194,41 +1198,6 @@ def test_portia_resolve_clarification(portia: Portia, telemetry: MagicMock) -> N
     )
 
     assert plan_run.state == PlanRunState.READY_TO_RESUME
-
-
-def test_portia_get_tool_for_step_none_tool_id() -> None:
-    """Test that when step.tool_id is None, LLMTool is used as fallback."""
-    portia = Portia(config=get_test_config(), tools=[AdditionTool()])
-    plan, plan_run = get_test_plan_run()
-
-    # Create a step with no tool_id
-    step = Step(
-        task="Some task",
-        inputs=[],
-        output="$output",
-        tool_id=None,
-    )
-
-    tool = portia.get_tool(step.tool_id, plan_run)
-    assert tool is None
-
-
-def test_get_llm_tool() -> None:
-    """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
-    portia = Portia(config=get_test_config(), tools=example_tool_registry)
-    plan, plan_run = get_test_plan_run()
-
-    # Create a step with no tool_id
-    step = Step(
-        task="Some task",
-        inputs=[],
-        output="$output",
-        tool_id=LLMTool.LLM_TOOL_ID,
-    )
-
-    tool = portia.get_tool(step.tool_id, plan_run)
-    assert tool is not None
-    assert isinstance(tool._child_tool, LLMTool)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_portia_run_plan(portia: Portia, planning_model: MagicMock, telemetry: MagicMock) -> None:
@@ -2696,7 +2665,12 @@ class CustomPortia(Portia):
     def get_agent_for_step(self, step: Step, plan: Plan, plan_run: PlanRun) -> BaseExecutionAgent:
         """Get the agent for a step."""
         if step.task == "raise_clarification":
-            tool = self.get_tool(step.tool_id, plan_run)
+            tool = ToolCallWrapper.from_tool_id(
+                step.tool_id,
+                self.tool_registry,
+                self.storage,
+                plan_run,
+            )
             return RaiseClarificationAgent(
                 plan=plan,
                 plan_run=plan_run,

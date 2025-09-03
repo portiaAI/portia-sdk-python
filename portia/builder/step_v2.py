@@ -1,4 +1,4 @@
-"""Interface for steps that are run as part of a PlanV2."""
+"""Implementation of the various step types used in :class:`PlanV2`."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
-from portia.builder.reference import Input, Reference, ReferenceValue, StepOutput
+from portia.builder.reference import Input, Reference, StepOutput
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -25,98 +25,120 @@ from portia.clarification import (
     MultipleChoiceClarification,
     UserVerificationClarification,
 )
+from portia.config import ExecutionAgentType
 from portia.errors import PlanRunExitError, ToolNotFoundError
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
+from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
+from portia.execution_agents.one_shot_agent import OneShotAgent
+from portia.execution_agents.output import LocalDataValue
+from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Step, Variable
+from portia.plan import PlanInput, Step, Variable
 from portia.tool import Tool, ToolRunContext
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.portia import RunContext
+    from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+    from portia.run_context import RunContext
 
 
 class StepV2(BaseModel, ABC):
-    """Interface for steps that are run as part of a plan."""
+    """Abstract base class for all steps executed within a plan.
+
+    Each step represents an action that can be performed during plan execution,
+    such as calling an LLM / agent, invoking a tool, or requesting user input.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    step_name: str = Field(description="The name of the step.")
+    step_name: str = Field(description="Unique name identifying this step within the plan.")
     conditional_block: ConditionalBlock | None = Field(
-        default=None, description="The conditional block this step is part of, if any."
+        default=None,
+        description="The conditional block containing this step, if part of conditional logic.",
     )
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401
-        """Execute the step."""
+        """Execute the step and return its output.
+
+        Returns:
+            The step's output value, which may be used by subsequent steps.
+
+        """
         raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this step to a Step from plan.py.
+        """Convert this step to the legacy Step format.
 
-        A Step is the legacy representation of a step in the plan, and is still used in the
-        Portia backend. If this step doesn't need to be represented in the plan sent to the Portia
-        backend, return None.
+        This is primarily used to determine how the steps should be presented in the Portia
+        Dashboard.
         """
         raise NotImplementedError  # pragma: no cover
 
-    def _resolve_input_reference(
+    def _resolve_references(
         self,
-        _input: Any,  # noqa: ANN401
+        value: Any | Reference,  # noqa: ANN401
         run_data: RunContext,
-    ) -> Any | ReferenceValue | None:  # noqa: ANN401
-        """Resolve input values by retrieving the ReferenceValue for any Reference inputs."""
-        if isinstance(_input, str):
-            # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
-            # from _input if it's a string
-            matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", _input)
+    ) -> Any | None:  # noqa: ANN401
+        """Resolve any Reference objects to their concrete values.
 
-            # If there are matches, replace each {{ StepOutput(var_name) }}
-            # or {{ Input(var_name) }} with its resolved value.
-            if isinstance(_input, str) and matches:
-                result = _input
-                for ref_type, var_name in matches:
-                    var_name = var_name.strip()  # noqa: PLW2901
-                    if ref_type == "StepOutput" and var_name.isdigit():
-                        var_name = int(var_name)  # noqa: PLW2901
-                    ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
-                    resolved = self._resolve_input_reference(ref, run_data)
-                    resolved_val = (
-                        resolved.value.full_value(run_data.portia.storage)
-                        if isinstance(resolved, ReferenceValue)
-                        else resolved
-                    )
-                    pattern = (
-                        r"\{\{\s*"
-                        + re.escape(ref_type)
-                        + r"\s*\(\s*"
-                        + re.escape(str(var_name))
-                        + r"\s*\)\s*\}\}"
-                    )
-                    result = re.sub(pattern, str(resolved_val), result, count=1)
-                return result
-        return _input.get_value(run_data) if isinstance(_input, Reference) else _input
+        This method handles 3 types of value:
+        * A Reference object - this will be resolved to its concrete value
+        * A string containing ``{{ StepOutput(...) }}`` or ``{{ Input(...) }}`` templates - these
+          will be rendered with the referenced values
+        * Any other value - this will be returned unchanged
+        """
+        if isinstance(value, Reference):
+            value = value.get_value(run_data)
+            return self._resolve_references(value, run_data)
+        if isinstance(value, str):
+            return self._template_references(value, run_data)
+        return value
 
-    def _get_value_for_input(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
-        """Get the value for an input that could come from a reference."""
-        resolved_input = self._resolve_input_reference(_input, run_data)
+    def _template_references(self, value: str, run_data: RunContext) -> str:
+        """Replace any Reference objects in a string with their resolved values.
 
-        if isinstance(resolved_input, ReferenceValue):
-            return resolved_input.value.full_value(run_data.portia.storage)
-        return resolved_input
+        For example, if the string is f"The result was {StepOutput(0)}", and the step output
+        value is "step result", then the string will be replaced with "The result was step result".
+        """
+        # Extract all instances of {{ StepOutput(var_name) }} or {{ Input(var_name) }}
+        # from _input if it's a string
+        matches = re.findall(r"\{\{\s*(StepOutput|Input)\s*\(\s*([\w\s]+)\s*\)\s*\}\}", value)
+
+        # If there are matches, replace each {{ StepOutput(var_name) }}
+        # or {{ Input(var_name) }} with its resolved value.
+        if matches:
+            result = value
+            for ref_type, var_name in matches:
+                var_name = var_name.strip()  # noqa: PLW2901
+                if ref_type == "StepOutput" and var_name.isdigit():
+                    var_name = int(var_name)  # noqa: PLW2901
+                ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
+                resolved = self._resolve_references(ref, run_data)
+                pattern = (
+                    r"\{\{\s*"
+                    + re.escape(ref_type)
+                    + r"\s*\(\s*"
+                    + re.escape(str(var_name))
+                    + r"\s*\)\s*\}\}"
+                )
+                result = re.sub(pattern, str(resolved), result, count=1)
+            return result
+        return value
 
     def _resolve_input_names_for_printing(
         self,
         _input: Any,  # noqa: ANN401
         plan: PlanV2,
-    ) -> Any | ReferenceValue | None:  # noqa: ANN401
-        """Resolve inputs to their value (if not a reference) or to their name (if reference).
+    ) -> Any | None:  # noqa: ANN401
+        """Resolve any References in the provided input to their name (note: not to their value).
 
-        Useful for printing inputs before the plan is run.
+        For example, StepOutput(0) will be resolved to "step_0_output", not the concrete value it
+        represents. This is useful for printing inputs before the plan is run.
         """
         if isinstance(_input, Reference):
             name = _input.get_legacy_name(plan)
@@ -152,7 +174,9 @@ class StepV2(BaseModel, ABC):
                 None,
             )
             if active_clause_step_index is None:
-                raise ValueError(f"Cannot determine active conditional for step {self.step_name}")
+                raise ValueError(
+                    f"Cannot determine active conditional for step {self.step_name}"
+                )  # pragma: no cover
 
             if (
                 current_step_index == block.clause_step_indexes[0]
@@ -192,24 +216,33 @@ class StepV2(BaseModel, ABC):
 
 
 class LLMStep(StepV2):
-    """A step that runs a given task through an LLM (without any tools)."""
+    """A step that executes a task using an LLM without any tool access.
 
-    task: str = Field(description="The task to perform.")
+    This step is used for pure language model tasks like text generation,
+    analysis, or transformation that don't require external tool calls.
+    """
+
+    task: str = Field(description="The natural language task for the LLM to perform.")
     inputs: list[Any] = Field(
         default_factory=list,
         description=(
-            "The inputs for the task. The inputs can be references to previous step outputs / "
-            "plan inputs (using StepOutput / Input) or just plain values. They are passed in as "
-            "additional context to the LLM when it is completing the task."
+            "Additional context data for the task. Can include references to previous step "
+            "outputs (using StepOutput) or plan inputs (using Input), or literal values. "
+            "These are provided as context to help the LLM complete the task."
         ),
     )
     output_schema: type[BaseModel] | None = Field(
-        default=None, description="The schema of the output."
+        default=None,
+        description=(
+            "Pydantic model class defining the expected structure of the LLM's response. "
+            "If provided, the output from the LLM will be coerced to match this schema."
+        ),
     )
     system_prompt: str | None = Field(
         default=None,
         description=(
-            "The prompt to use for the LLM. If not provided, uses default prompt from LLMTool."
+            "Custom system prompt to guide the LLM's behavior. If not specified, "
+            "the default LLMTool system prompt will be used."
         ),
     )
 
@@ -221,7 +254,7 @@ class LLMStep(StepV2):
     @override
     @traceable(name="LLM Step - Run")
     async def run(self, run_data: RunContext) -> str | BaseModel:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the LLM query."""
+        """Execute the LLM task and return its response."""
         if self.system_prompt:
             llm_tool = LLMTool(
                 structured_output_schema=self.output_schema, prompt=self.system_prompt
@@ -230,36 +263,51 @@ class LLMStep(StepV2):
             llm_tool = LLMTool(structured_output_schema=self.output_schema)
         wrapped_tool = ToolCallWrapper(
             child_tool=llm_tool,
-            storage=run_data.portia.storage,
+            storage=run_data.storage,
             plan_run=run_data.plan_run,
         )
         tool_ctx = ToolRunContext(
             end_user=run_data.end_user,
             plan_run=run_data.plan_run,
             plan=run_data.legacy_plan,
-            config=run_data.portia.config,
+            config=run_data.config,
             clarifications=[],
         )
-        task_data = [
-            self._format_value(value, run_data)
-            for _input in self.inputs or []
-            if (value := self._resolve_input_reference(_input, run_data)) is not None
-            or not isinstance(_input, Reference)
-        ]
+        task_data = []
+        for _input in self.inputs:
+            if isinstance(_input, Reference):
+                description = self._get_ref_description(_input, run_data)
+                value = self._resolve_references(_input, run_data)
+                value = LocalDataValue(value=value, summary=description)
+            else:
+                value = self._resolve_references(_input, run_data)
+            if value is not None or not isinstance(_input, Reference):
+                task_data.append(value)
+
         return await wrapped_tool.arun(tool_ctx, task=self.task, task_data=task_data)
 
-    def _format_value(self, _input: Any, run_data: RunContext) -> Any | None:  # noqa: ANN401
-        """Get the value for an input."""
-        if not isinstance(_input, ReferenceValue):
-            return _input
-        return (
-            f"Previous step {_input.description} had output: "
-            f"{_input.value.full_value(run_data.portia.storage)}"
-        )
+    def _get_ref_description(self, ref: Reference, run_data: RunContext) -> str:
+        """Get the description of a reference."""
+        if isinstance(ref, StepOutput):
+            return ref.get_description(run_data)
+        if isinstance(ref, Input):
+            plan_input = self._plan_input_from_name(ref.name, run_data)
+            if plan_input.description:
+                return plan_input.description
+            if isinstance(plan_input.value, Reference):
+                return self._get_ref_description(plan_input.value, run_data)
+        return ""
+
+    def _plan_input_from_name(self, name: str, run_data: RunContext) -> PlanInput:
+        """Get the plan input from the name."""
+        for plan_input in run_data.plan.plan_inputs:
+            if plan_input.name == name:
+                return plan_input
+        raise ValueError(f"Plan input {name} not found")  # pragma: no cover
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this LLMStep to a Step."""
+        """Convert this LLMStep to a legacy Step."""
         return Step(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
@@ -271,23 +319,32 @@ class LLMStep(StepV2):
 
 
 class InvokeToolStep(StepV2):
-    """A step that calls a tool with the given args (no LLM involved, just a direct tool call)."""
+    """A step that directly invokes a tool with specific arguments.
+
+    This performs a direct tool call without LLM involvement, making it suitable
+    for deterministic operations where you know exactly which tool to call and
+    what arguments to pass.
+    """
 
     tool: str | Tool = Field(
         description=(
-            "The tool to use. Should either be the id of the tool to run or the Tool instance to "
-            "run."
+            "The tool to invoke. Can be either a tool ID string (to lookup in the tool registry) "
+            "or a Tool instance to run directly."
         )
     )
     args: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "The args to call the tool with. The arg values can be references to previous step "
-            "outputs / plan inputs (using StepOutput / Input) or just plain values."
+            "Arguments to pass to the tool. Values can be references to previous step outputs "
+            "(using StepOutput), plan inputs (using Input), or literal values."
         ),
     )
     output_schema: type[BaseModel] | None = Field(
-        default=None, description="The schema of the output."
+        default=None,
+        description=(
+            "Pydantic model class to structure the tool's output. If provided, the raw tool "
+            "output will be converted to match this schema."
+        ),
     )
 
     def __str__(self) -> str:
@@ -304,13 +361,18 @@ class InvokeToolStep(StepV2):
     @override
     @traceable(name="Invoke Tool Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the tool."""
+        """Execute the tool and return its result."""
         if isinstance(self.tool, str):
-            tool = run_data.portia.get_tool(self.tool, run_data.plan_run)
+            tool = ToolCallWrapper.from_tool_id(
+                self.tool,
+                run_data.tool_registry,
+                run_data.storage,
+                run_data.plan_run,
+            )
         else:
             tool = ToolCallWrapper(
                 child_tool=self.tool,
-                storage=run_data.portia.storage,
+                storage=run_data.storage,
                 plan_run=run_data.plan_run,
             )
         if not tool:
@@ -320,13 +382,12 @@ class InvokeToolStep(StepV2):
             end_user=run_data.end_user,
             plan_run=run_data.plan_run,
             plan=run_data.legacy_plan,
-            config=run_data.portia.config,
+            config=run_data.config,
             clarifications=run_data.plan_run.get_clarifications_for_step(
                 run_data.plan_run.current_step_index
             ),
         )
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
-
+        args = {k: self._resolve_references(v, run_data) for k, v in self.args.items()}
         output = await tool._arun(tool_ctx, **args)  # noqa: SLF001
         output_value = output.get_value()
         if isinstance(output_value, Clarification) and output_value.plan_run_id is None:
@@ -338,7 +399,7 @@ class InvokeToolStep(StepV2):
             and not isinstance(output_value, output_schema)
             and not is_clarification(output_value)
         ):
-            model = run_data.portia.config.get_default_model()
+            model = run_data.config.get_default_model()
             output_value = await model.aget_structured_response(
                 [
                     Message(
@@ -371,20 +432,29 @@ class InvokeToolStep(StepV2):
 
 
 class SingleToolAgentStep(StepV2):
-    """A step where an LLM agent uses a single tool (calling it only once) to complete a task."""
+    """A step where an LLM agent intelligently uses a specific tool to complete a task.
 
-    task: str = Field(description="The task to perform.")
-    tool: str = Field(description="The tool to use.")
+    Unlike InvokeToolStep which requires you to specify exact tool arguments, this step
+    allows an LLM agent to determine how to use the tool based on the task description
+    and available context. The agent will call the tool at most once during execution.
+    """
+
+    task: str = Field(description="Natural language description of the task to accomplish.")
+    tool: str = Field(description="ID of the tool the agent should use to complete the task.")
     inputs: list[Any] = Field(
         default_factory=list,
         description=(
-            "The inputs for the task. The inputs can be references to previous step outputs / "
-            "plan inputs (using StepOutput / Input) or just plain values. They are passed in as "
-            "additional context to the agent when it is completing the task."
+            "Additional context data for the agent. Can include references to previous step "
+            "outputs (using StepOutput), plan inputs (using Input), or literal values. "
+            "The agent will use this context to determine how to call the tool."
         ),
     )
     output_schema: type[BaseModel] | None = Field(
-        default=None, description="The schema of the output."
+        default=None,
+        description=(
+            "Pydantic model class defining the expected structure of the agent's output. "
+            "If provided, the output from the agent will be coerced to match this schema."
+        ),
     )
 
     def __str__(self) -> str:
@@ -395,12 +465,43 @@ class SingleToolAgentStep(StepV2):
     @override
     @traceable(name="Single Tool Agent Step - Run")
     async def run(self, run_data: RunContext) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the agent step."""
-        agent = run_data.portia.get_agent_for_step(
-            self.to_legacy_step(run_data.plan), run_data.legacy_plan, run_data.plan_run
-        )
+        """Run the agent and return its output."""
+        agent = self._get_agent_for_step(run_data)
         output_obj = await agent.execute_async()
         return output_obj.get_value()
+
+    def _get_agent_for_step(
+        self,
+        run_data: RunContext,
+    ) -> BaseExecutionAgent:
+        """Get the appropriate agent for executing the step."""
+        tool = ToolCallWrapper.from_tool_id(
+            self.tool,
+            run_data.tool_registry,
+            run_data.storage,
+            run_data.plan_run,
+        )
+        cls: type[BaseExecutionAgent]
+        match run_data.config.execution_agent_type:
+            case ExecutionAgentType.ONE_SHOT:
+                cls = OneShotAgent
+            case ExecutionAgentType.DEFAULT:
+                cls = DefaultExecutionAgent
+        cls = OneShotAgent if isinstance(tool, LLMTool) else cls
+        logger().debug(
+            f"Using agent: {type(cls).__name__}",
+            plan=str(run_data.plan.id),
+            plan_run=str(run_data.plan_run.id),
+        )
+        return cls(
+            run_data.legacy_plan,
+            run_data.plan_run,
+            run_data.config,
+            run_data.storage,
+            run_data.end_user,
+            tool,
+            execution_hooks=run_data.execution_hooks,
+        )
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
@@ -416,9 +517,28 @@ class SingleToolAgentStep(StepV2):
 
 
 class UserVerifyStep(StepV2):
-    """A step that asks the user to verify a message before continuing."""
+    """A step that requests user confirmation before proceeding with plan execution.
 
-    message: str = Field(description="The message the user needs to verify.")
+    This step pauses execution to ask the user to verify or approve a message.
+    If the user rejects the verification, the plan execution will stop with an error.
+
+    This pauses plan execution and asks the user to confirm or reject the provided
+    message. The plan will only continue if the user confirms. If the user rejects,
+    the plan execution will stop with an error. This is useful for getting user approval before
+    taking important actions like sending emails, making purchases, or modifying data.
+
+    A UserVerificationClarification is used to get the verification from the user, so ensure you
+    have set up handling for this type of clarification in order to use this step. For more
+    details, see https://docs.portialabs.ai/understand-clarifications.
+
+    This step outputs True if the user confirms.
+    """
+
+    message: str = Field(
+        description="The message or action requiring user verification/approval. "
+        "It can include references to previous step outputs or plan inputs "
+        "(using Input / StepOutput references)"
+    )
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -427,8 +547,15 @@ class UserVerifyStep(StepV2):
     @override
     @traceable(name="User Verify Step - Run")
     async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Run the user verification step."""
-        message = self._resolve_input_reference(self.message, run_data)
+        """Prompt the user for confirmation.
+
+        Returns a UserVerificationClarification to get input from the user (if not already
+        provided).
+
+        If the user has already confirmed, returns True. Otherwise, if the user has rejected the
+        verification, raises a PlanRunExitError.
+        """
+        message = self._template_references(self.message, run_data)
 
         previous_clarification = run_data.plan_run.get_clarification_for_step(
             ClarificationCategory.USER_VERIFICATION
@@ -459,16 +586,30 @@ class UserVerifyStep(StepV2):
 
 
 class UserInputStep(StepV2):
-    """A step that requests input from the user and returns the response.
+    """A step that requests input from the user and returns their response.
 
-    If options are provided, creates a multiple choice clarification.
-    Otherwise, creates a text input clarification.
+    This pauses plan execution and prompts the user to provide input. If options are
+    provided, the user must choose from the given choices (multiple choice). If no
+    options are provided, the user can enter free-form text.
+
+    A Clarification (either InputClarification or MultipleChoiceClarification) is used to get
+    the input from the user, so ensure you have set up handling for the required type of
+    clarification in order to use this step. For more details, see
+    https://docs.portialabs.ai/understand-clarifications.
+
+    The user's response becomes the output of this step and can be referenced by
+    subsequent steps in the plan.
     """
 
-    message: str = Field(description="The guidance message shown to the user.")
+    message: str = Field(description="The prompt or question to display to the user.")
     options: list[Any] | None = Field(
         default=None,
-        description="Available options for multiple choice. If None, creates text input.",
+        description=(
+            "Available choices for multiple-choice input. If provided, the user must select "
+            "from these options. If None, allows free-form text input. Options can include "
+            "references to previous step outputs or plan inputs (using Input / StepOutput "
+            "references)"
+        ),
     )
 
     def __str__(self) -> str:
@@ -478,13 +619,14 @@ class UserInputStep(StepV2):
 
     def _create_clarification(self, run_data: RunContext) -> ClarificationType:
         """Create the appropriate clarification based on whether options are provided."""
-        resolved_message = self._resolve_input_reference(self.message, run_data)
+        resolved_message = self._template_references(self.message, run_data)
 
         if self.options:
+            options = [self._resolve_references(o, run_data) for o in self.options]
             return MultipleChoiceClarification(
                 plan_run_id=run_data.plan_run.id,
                 user_guidance=str(resolved_message),
-                options=self.options,
+                options=options,
                 argument_name=run_data.plan.step_output_name(self),
                 source="User input step",
             )
@@ -498,7 +640,7 @@ class UserInputStep(StepV2):
     @override
     @traceable(name="User Input Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Run the user input step."""
+        """Request input from the user and return the response."""
         clarification_type = (
             ClarificationCategory.MULTIPLE_CHOICE if self.options else ClarificationCategory.INPUT
         )
@@ -524,22 +666,32 @@ class UserInputStep(StepV2):
 
 
 class ConditionalStep(StepV2):
-    """A step that represents a conditional clause in a conditional block.
+    """A step that represents a conditional clause within a conditional execution block.
 
-    I.E. if, else-if, else, end-if clauses.
+    This step handles conditional logic such as if, else-if, else, and end-if statements
+    that control which subsequent steps should be executed based on runtime conditions.
     """
 
     condition: Callable[..., bool] | str = Field(
         description=(
-            "The boolean predicate to check. If evaluated to true, the steps within this clause "
-            "will be evaluated - otherwise they will be skipped and we jump to the next clause."
+            "The condition to evaluate for this clause. Can be a callable that returns a boolean, "
+            "or a string expression that will be evaluated by an LLM. If true, subsequent "
+            "steps in this clause will execute; if false, execution jumps to the next clause."
         )
     )
     args: dict[str, Reference | Any] = Field(
-        default_factory=dict, description="The args to check the condition with."
+        default_factory=dict,
+        description=(
+            "Arguments to pass to the condition. Values can be references to step outputs "
+            "(using StepOutput), plan inputs (using Input), or literal values."
+        ),
     )
-    clause_index_in_block: int = Field(description="The index of the clause in the condition block")
-    block_clause_type: ConditionalBlockClauseType
+    clause_index_in_block: int = Field(
+        description="The position of this clause within its conditional block (0-based index)."
+    )
+    block_clause_type: ConditionalBlockClauseType = Field(
+        description="The type of conditional clause (IF, ELIF, ELSE, or ENDIF)."
+    )
 
     @field_validator("conditional_block", mode="after")
     @classmethod
@@ -566,11 +718,11 @@ class ConditionalStep(StepV2):
     @override
     @traceable(name="Conditional Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
-        """Run the conditional step."""
-        args = {k: self._get_value_for_input(v, run_data) for k, v in self.args.items()}
+        """Evaluate the condition and return a ConditionalStepResult."""
+        args = {k: self._resolve_references(v, run_data) for k, v in self.args.items()}
         if isinstance(self.condition, str):
-            condition_str = self._get_value_for_input(self.condition, run_data)
-            agent = ConditionalEvaluationAgent(run_data.portia.config)
+            condition_str = self._template_references(self.condition, run_data)
+            agent = ConditionalEvaluationAgent(run_data.config)
             conditional_result = await agent.execute(condition_str, args)
         else:
             conditional_result = self.condition(**args)
@@ -588,7 +740,7 @@ class ConditionalStep(StepV2):
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this ConditionalStep to a PlanStep."""
+        """Convert this ConditionalStep to a legacy Step."""
         if isinstance(self.condition, str):
             cond_str = self.condition
         else:
