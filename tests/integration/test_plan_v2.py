@@ -89,6 +89,16 @@ class FinalOutput(BaseModel):
     example_similar_poem: str
 
 
+@pytest.fixture
+def local_portia() -> Portia:
+    """Create a local Portia instance."""
+    return Portia(
+        config=Config.from_default(
+            storage_class=StorageClass.MEMORY, default_log_level=LogLevel.DEBUG, portia_api_key=None
+        )
+    )
+
+
 @pytest.mark.parametrize("is_async", [False, True])
 def test_simple_builder(is_async: bool) -> None:
     """Test the example from example_builder.py."""
@@ -1038,10 +1048,8 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
 # Loop integration tests
 
 
-def test_plan_v2_loop_conditional_simple() -> None:
+def test_plan_v2_loop_conditional_simple(local_portia: Portia) -> None:
     """Test PlanV2 conditional loop - simple case that runs once."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
     counter = 0
 
@@ -1070,7 +1078,7 @@ def test_plan_v2_loop_conditional_simple() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     # Verify the loop executed correctly
@@ -1089,10 +1097,8 @@ def test_plan_v2_loop_conditional_simple() -> None:
     assert "loop_iteration_2" in condition_calls
 
 
-def test_plan_v2_loop_conditional_false() -> None:
+def test_plan_v2_loop_conditional_false(local_portia: Portia) -> None:
     """Test PlanV2 conditional loop - condition is false."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1118,7 +1124,7 @@ def test_plan_v2_loop_conditional_false() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     # Should execute: before_loop, condition_evaluated, after_loop
@@ -1127,10 +1133,8 @@ def test_plan_v2_loop_conditional_false() -> None:
     assert messages == expected_messages
 
 
-def test_plan_v2_loop_for_each_simple() -> None:
+def test_plan_v2_loop_for_each_simple(local_portia: Portia) -> None:
     """Test PlanV2 for-each loop with simple list."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1160,7 +1164,7 @@ def test_plan_v2_loop_for_each_simple() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     expected_messages = [
@@ -1173,10 +1177,8 @@ def test_plan_v2_loop_for_each_simple() -> None:
     assert messages == expected_messages
 
 
-def test_plan_v2_loop_for_each_empty_list() -> None:
+def test_plan_v2_loop_for_each_empty_list(local_portia: Portia) -> None:
     """Test PlanV2 for-each loop with empty list."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1206,7 +1208,7 @@ def test_plan_v2_loop_for_each_empty_list() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     # Should execute: before_loop, after_loop (no loop iterations)
@@ -1214,10 +1216,8 @@ def test_plan_v2_loop_for_each_empty_list() -> None:
     assert messages == expected_messages
 
 
-def test_plan_v2_loop_nested_conditional() -> None:
+def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
     """Test PlanV2 nested conditional loops."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
     outer_counter = 0
     inner_counter = 0
@@ -1261,7 +1261,7 @@ def test_plan_v2_loop_nested_conditional() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     # Verify the nested loops executed correctly
@@ -1293,17 +1293,12 @@ def test_plan_v2_loop_nested_conditional() -> None:
     assert inner_counter == 4
 
 
-def test_plan_v2_loop_inside_conditional() -> None:
+def test_plan_v2_loop_inside_conditional(local_portia: Portia) -> None:
     """Test PlanV2 loop inside conditional block."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
 
     def record_func(message: str) -> None:
         messages.append(message)
-
-    def generate_list() -> list[int]:
-        return [1, 2, 3]
 
     plan = (
         PlanBuilderV2(label="Test loop inside conditional")
@@ -1314,10 +1309,15 @@ def test_plan_v2_loop_inside_conditional() -> None:
         .function_step(
             function=lambda: record_func("if_start"),
         )
-        .loop(over=StepOutput("generate_items"))
+        .function_step(
+            function=lambda: list(range(3)),
+            step_name="generate_items",
+        )
+        .loop(over=StepOutput("generate_items"), step_name="Loop")
         .function_step(
             function=lambda item: record_func(f"loop_item_{item}"),
             args={"item": StepOutput("Loop")},
+            step_name="loop_item",
         )
         .end_loop()
         .function_step(
@@ -1334,45 +1334,24 @@ def test_plan_v2_loop_inside_conditional() -> None:
         .build()
     )
 
-    # Add the generate_items step that was referenced
-    from portia.builder.step_v2 import InvokeToolStep
-    from portia.tool_decorator import tool
-
-    @tool
-    def generate_list_tool() -> list[int]:
-        return generate_list()
-
-    plan.steps.insert(
-        1,
-        InvokeToolStep(
-            step_name="generate_items",
-            tool=generate_list_tool(),
-            args={},
-            output_schema=None,
-            conditional_block=None,
-        ),
-    )
-
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     # Should execute: start, if_start, loop_item_1, loop_item_2, loop_item_3, if_end, end
     expected_messages = [
         "start",
         "if_start",
+        "loop_item_0",
         "loop_item_1",
         "loop_item_2",
-        "loop_item_3",
         "if_end",
         "end",
     ]
     assert messages == expected_messages
 
 
-def test_plan_v2_loop_with_args() -> None:
+def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
     """Test PlanV2 conditional loop with arguments."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
     counter = 0
 
@@ -1401,7 +1380,7 @@ def test_plan_v2_loop_with_args() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     expected_messages = [
@@ -1418,19 +1397,18 @@ def test_plan_v2_loop_with_args() -> None:
     assert counter == 3
 
 
-def test_plan_v2_loop_string_condition() -> None:
+def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
     """Test PlanV2 conditional loop with string condition."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
     counter = 0
 
     def record_func(message: str) -> None:
         messages.append(message)
 
-    def increment_counter() -> int:
+    def increment_counter(message: str) -> int:
         nonlocal counter
         counter += 1
+        record_func(message)
         return counter
 
     plan = (
@@ -1438,9 +1416,10 @@ def test_plan_v2_loop_string_condition() -> None:
         .function_step(
             function=lambda: record_func("start"),
         )
-        .loop(condition="x < 3", args={"x": increment_counter})
+        .loop(condition="x < 3", args={"x": StepOutput("inside_loop")})
         .function_step(
-            function=lambda: record_func("inside_loop"),
+            function=lambda: increment_counter("inside_loop"),
+            step_name="inside_loop",
         )
         .end_loop()
         .function_step(
@@ -1449,7 +1428,7 @@ def test_plan_v2_loop_string_condition() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     # Should execute: start, inside_loop (3 times), end
@@ -1460,10 +1439,8 @@ def test_plan_v2_loop_string_condition() -> None:
     assert counter > 0
 
 
-def test_plan_v2_loop_complex_nested_structure() -> None:
+def test_plan_v2_loop_complex_nested_structure(local_portia: Portia) -> None:
     """Test PlanV2 complex nested structure with loops and conditionals."""
-    config = Config.from_default(storage_class=StorageClass.CLOUD)
-    portia = Portia(config=config)
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1512,7 +1489,7 @@ def test_plan_v2_loop_complex_nested_structure() -> None:
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
     # Should execute: start, then for each number 1-5:
