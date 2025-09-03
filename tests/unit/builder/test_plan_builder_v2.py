@@ -15,6 +15,7 @@ from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
     LLMStep,
+    LoopBlock,
     LoopBlockType,
     LoopStep,
     LoopType,
@@ -1573,3 +1574,89 @@ def test_complex_nested_structure() -> None:
 
     # Check final step
     assert steps[10].step_name == "step_10"
+
+
+def test_current_loop_block_property() -> None:
+    """Test the _current_loop_block property."""
+    builder = PlanBuilderV2()
+
+    # Initially, no loop block should be current
+    assert builder._current_loop_block is None
+
+    # Start a loop
+    builder.loop(condition=lambda: True)
+
+    # Now there should be a current loop block
+    current_block = builder._current_loop_block
+    assert current_block is not None
+    assert isinstance(current_block, LoopBlock)
+    assert current_block.start_step_index == 0
+
+    # End the loop
+    builder.end_loop()
+
+    # After ending the loop, no current loop block
+    assert builder._current_loop_block is None
+
+    # Test with nested loops
+    builder.loop(condition=lambda: True)
+    outer_block = builder._current_loop_block
+    assert outer_block is not None
+    assert outer_block.start_step_index > 0  # Should have some index
+
+    builder.loop(condition=lambda: True)
+    inner_block = builder._current_loop_block
+    assert inner_block is not None
+    assert (
+        inner_block.start_step_index > outer_block.start_step_index
+    )  # Inner should be after outer
+
+    # End inner loop
+    builder.end_loop()
+    # Should be back to outer loop
+    assert builder._current_loop_block is outer_block
+
+    # End outer loop
+    builder.end_loop()
+    # No current loop block
+    assert builder._current_loop_block is None
+
+
+def test_end_loop_sets_end_index() -> None:
+    """Test that end_loop properly sets the end_index of the start loop step."""
+    builder = PlanBuilderV2()
+
+    # Start a loop
+    builder.loop(condition=lambda: True, step_name="test_loop")
+
+    # Add some steps inside the loop
+    builder.llm_step(task="Step 1")
+    builder.llm_step(task="Step 2")
+
+    # End the loop
+    builder.end_loop()
+
+    # Build the plan to access the steps
+    plan = builder.build()
+
+    # Find the start loop step
+    start_loop_step = None
+    for step in plan.steps:
+        if isinstance(step, LoopStep) and step.loop_block_type == LoopBlockType.START:
+            start_loop_step = step
+            break
+
+    assert start_loop_step is not None
+    assert start_loop_step.step_name == "test_loop"
+
+    # Verify that the end_index is set correctly
+    # The end_index should point to the end_loop step
+    assert start_loop_step.end_index is not None
+    assert (
+        start_loop_step.end_index == len(plan.steps) - 1
+    )  # Should point to the last step (end_loop)
+
+    # Verify the end_loop step is at the expected index
+    end_loop_step = plan.steps[start_loop_step.end_index]
+    assert isinstance(end_loop_step, LoopStep)
+    assert end_loop_step.loop_block_type == LoopBlockType.END
