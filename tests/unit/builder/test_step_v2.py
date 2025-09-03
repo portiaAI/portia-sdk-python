@@ -136,10 +136,10 @@ def test_resolve_input_reference_with_non_reference() -> None:
     step = ConcreteStepV2()
     mock_run_data = Mock()
 
-    result = step._resolve_input_reference("plain_string", mock_run_data)
+    result = step._resolve_references("plain_string", mock_run_data)
     assert result == "plain_string"
 
-    result = step._resolve_input_reference(42, mock_run_data)
+    result = step._resolve_references(42, mock_run_data)
     assert result == 42
 
 
@@ -150,7 +150,7 @@ def test_resolve_input_reference_with_reference() -> None:
     reference = StepOutput(0)
 
     with patch.object(reference, "get_value", return_value="reference_result") as mock_get_value:
-        result = step._resolve_input_reference(reference, mock_run_data)
+        result = step._resolve_references(reference, mock_run_data)
 
         assert result == "reference_result"
         mock_get_value.assert_called_once_with(mock_run_data)
@@ -171,7 +171,7 @@ def test_resolve_input_reference_with_string_template_step_output() -> None:
     ]
 
     template = f"The result was {StepOutput(0)}"
-    result = step._resolve_input_reference(template, mock_run_data)
+    result = step._resolve_references(template, mock_run_data)
 
     assert result == "The result was step result"
 
@@ -188,7 +188,7 @@ def test_resolve_input_reference_with_string_template_input() -> None:
     mock_run_data.step_output_values = []
 
     template = f"Hello {Input('username')}"
-    result = step._resolve_input_reference(template, mock_run_data)
+    result = step._resolve_references(template, mock_run_data)
 
     assert result == "Hello Alice"
 
@@ -212,7 +212,7 @@ def test_resolve_input_reference_with_string_template_step_both() -> None:
     mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
 
     template = f"The input was '{Input('username')}' and the result was '{StepOutput(0)}'"
-    result = step._resolve_input_reference(template, mock_run_data)
+    result = step._resolve_references(template, mock_run_data)
 
     assert result == "The input was 'Alice' and the result was 'step result'"
 
@@ -222,7 +222,7 @@ def test_resolve_input_reference_with_regular_value() -> None:
     step = ConcreteStepV2()
     mock_run_data = Mock()
 
-    result = step._resolve_input_reference("regular_value", mock_run_data)
+    result = step._resolve_references("regular_value", mock_run_data)
     assert result == "regular_value"
 
 
@@ -1972,10 +1972,16 @@ async def test_user_input_step_returns_response_when_resolved_multiple_choice() 
 
 @pytest.mark.asyncio
 async def test_user_input_step_message_with_templates() -> None:
-    """Test that UserInputStep resolves references in the message."""
+    """Test that UserInputStep resolves references in the message and options."""
     step = UserInputStep(
         message=f"Provide feedback on {StepOutput(0)} by {Input('username')}",
         step_name="feedback",
+        options=[
+            "Good",
+            f"Bad - {StepOutput(1)}",
+            Input("Custom good phrase"),
+            "Excellent",
+        ],
     )
 
     mock_run_data = Mock()
@@ -1984,19 +1990,32 @@ async def test_user_input_step_message_with_templates() -> None:
     mock_run_data.plan_run.get_clarification_for_step.return_value = None
     mock_run_data.plan = Mock()
     mock_run_data.plan.step_output_name.return_value = "feedback"
-    mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
-    mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
+    mock_run_data.plan.plan_inputs = [
+        PlanInput(name="username"),
+        PlanInput(name="Custom good phrase"),
+    ]
+    mock_run_data.plan_run.plan_run_inputs = {
+        "username": LocalDataValue(value="Alice"),
+        "Custom good phrase": LocalDataValue(value="Great job!"),
+    }
     mock_run_data.step_output_values = [
         StepOutputValue(
-            value="result",
+            value="analysis result",
             description="s0",
             step_name="feedback",
             step_num=0,
-        )
+        ),
+        StepOutputValue(
+            value="missing data",
+            description="s1",
+            step_name="feedback",
+            step_num=1,
+        ),
     ]
     mock_run_data.storage = Mock()
 
     result = await step.run(mock_run_data)
 
-    assert isinstance(result, InputClarification)
-    assert result.user_guidance == "Provide feedback on result by Alice"
+    assert isinstance(result, MultipleChoiceClarification)
+    assert result.user_guidance == "Provide feedback on analysis result by Alice"
+    assert result.options == ["Good", "Bad - missing data", "Great job!", "Excellent"]

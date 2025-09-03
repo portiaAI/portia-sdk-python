@@ -1,4 +1,7 @@
-"""Fluent API for constructing :class:`PlanV2` instances."""
+"""Builder class for constructing :class:`PlanV2` instances.
+
+You can view an example of this class in use in example_builder.py.
+"""
 
 from __future__ import annotations
 
@@ -35,13 +38,16 @@ class PlanBuilderError(ValueError):
 
 
 class PlanBuilderV2:
-    """Chainable builder used to assemble Portia plans."""
+    """Chainable builder used to assemble Portia plans.
+
+    See example_builder.py for a complete example of how to use this class.
+    """
 
     def __init__(self, label: str = "Run the plan built with the Plan Builder") -> None:
         """Initialize the builder.
 
         Args:
-            label: Human readable label shown in the Portia dashboard.
+            label: Human readable label for the plan shown in the Portia dashboard.
 
         """
         self.plan = PlanV2(steps=[], label=label)
@@ -56,23 +62,25 @@ class PlanBuilderV2:
     ) -> PlanBuilderV2:
         """Add an input required by the plan.
 
+        Inputs are values that are provided when running the plan, rather than when building the
+        plan. You specify them with this .input() method when building the plan, and you can then
+        use the value in the plan by using Input() references in your plan steps. Then, when you run
+        the plan, you can pass in the value for the input and the references will all be substituted
+        with the value.
+
         Args:
             name: Name of the input.
-            description: Optional description shown to users.
-            default_value: Optional default value.
+            description: Optional description for the input. This can be useful when describing what
+              the input is used for, both to human users and when passing the input into language
+              models.
+            default_value: Optional default value to be used if no value is provided when running
+              the plan.
 
-        Returns:
-            Self for fluent chaining.
         """
         self.plan.plan_inputs.append(
             PlanInput(name=name, description=description, value=default_value)
         )
         return self
-
-    @property
-    def _current_conditional_block(self) -> ConditionalBlock | None:
-        """Return the current conditional block if one is active."""
-        return self._conditional_block_stack[-1] if len(self._conditional_block_stack) > 0 else None
 
     def if_(
         self,
@@ -81,8 +89,27 @@ class PlanBuilderV2:
     ) -> PlanBuilderV2:
         """Start a new conditional block.
 
-        Subsequent steps are executed only when the ``condition`` evaluates to
-        ``True``. Close the block with :py:meth:`endif`.
+        Steps after this if (and before any else, else_if, or endif) are executed only when the
+        `condition` evaluates to `True`. For example:
+
+        # This will run the llm step
+        PlanBuilderV2().if_(condition=lambda: True).llm_step(task="Will run").endif()
+
+        # This will not run the llm step
+        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run").endif()
+
+        After opening a conditional block with this if_ method, you must close the block with
+        .endif() later in the plan.
+
+        Note: it is if_() rather than if() because if is a keyword in Python.
+
+        Args:
+            condition: Condition to evaluate. This can either be a function that returns a boolean
+              (as with a traditional if statement) or a string that is evaluated for truth using a
+              language model.
+            args: Arguments passed to the condition function if it is a function. These are unused
+              if the condition is a string.
+
         """
         parent_block = self._current_conditional_block
         conditional_block = ConditionalBlock(
@@ -107,7 +134,38 @@ class PlanBuilderV2:
         condition: Callable[..., bool],
         args: dict[str, Any] | None = None,
     ) -> PlanBuilderV2:
-        """Add an ``else if`` clause to the current conditional block."""
+        """Add an `else if` clause to the current conditional block.
+
+        Steps after this else_if (and before any 'else' or 'endif') are executed only when the
+        `condition` evaluates to `True` and any previous conditions ('if' or 'else if') have been
+        evaluated to False. For example:
+
+        # This will run the llm step
+        PlanBuilderV2().if_(condition=lambda: False).else_if_(condition=lambda: True)
+        .llm_step(task="Will run").endif()
+
+        # This will not run the llm step
+        PlanBuilderV2().if_(condition=lambda: False).else_if_(condition=lambda: True)
+        .llm_step(task="Won't run").endif()
+
+        # This will not run the llm step
+        PlanBuilderV2().if_(condition=lambda: True).else_if_(condition=lambda: True)
+        .llm_step(task="Won't run").endif()
+
+        You must ensure that this conditional block is closed with an endif() call later in
+        the plan.
+
+        Note: it is else_if_() rather than else_if() to match if_ and else_, which must have an
+        underscore because they are keywords in Python.
+
+        Args:
+            condition: Condition to evaluate. This can either be a function that returns a boolean
+              (as with a traditional if statement) or a string that is evaluated for truth using a
+              language model.
+            args: Arguments passed to the condition function if it is a function. These are unused
+              if the condition is a string.
+
+        """
         if len(self._conditional_block_stack) == 0:
             raise PlanBuilderError(
                 "else_if_ must be called from a conditional block. Please add an if_ first."
@@ -127,7 +185,25 @@ class PlanBuilderV2:
         return self
 
     def else_(self) -> PlanBuilderV2:
-        """Add an ``else`` clause to the current conditional block."""
+        """Add an `else` clause to the current conditional block.
+
+        Steps after this else (and before any 'endif') are executed only when all previous
+        conditions ('if' and any 'else if') have been evaluated to False. For example:
+
+        # This will run the llm step in the else clause
+        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run")
+        .else_().llm_step(task="Will run").endif()
+
+        # This will not run the llm step in the else clause
+        PlanBuilderV2().if_(condition=lambda: True).llm_step(task="Will run")
+        .else_().llm_step(task="Won't run").endif()
+
+        You must ensure that this conditional block is closed with an endif() call later in
+        the plan.
+
+        Note: it is else_() rather than else() because else is a keyword in Python.
+
+        """
         if len(self._conditional_block_stack) == 0:
             raise PlanBuilderError(
                 "else_ must be called from a conditional block. Please add an if_ first."
@@ -147,7 +223,27 @@ class PlanBuilderV2:
         return self
 
     def endif(self) -> PlanBuilderV2:
-        """Close the most recently opened conditional block."""
+        """Close the most recently opened conditional block.
+
+        This method must be called to properly close any conditional block that was opened with
+        if_(). It marks the end of the conditional logic and allows the plan to continue with
+        unconditional steps. For example:
+
+        # Simple if-endif block
+        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run").endif()
+        .llm_step(task="Will run")
+
+        # Complex if-else_if-else-endif block
+        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run")
+        .else_if_(condition=lambda: False).llm_step(task="Won't run")
+        .else_().llm_step(task="Will run")
+        .endif()
+        .llm_step(task="Always runs after conditional")
+
+        Failing to call endif() after opening a conditional block with if_() will result in an
+        error when building the plan.
+
+        """
         if len(self._conditional_block_stack) == 0:
             raise PlanBuilderError(
                 "endif must be called from a conditional block. Please add an if_ first."
@@ -176,18 +272,24 @@ class PlanBuilderV2:
         step_name: str | None = None,
         system_prompt: str | None = None,
     ) -> PlanBuilderV2:
-        """Add a step that sends a task to the underlying LLM.
+        """Add a step that sends a task to an LLM.
+
+        The output from the step is a string (if no output schema is provided) or a structured
+        object (if an output schema is provided).
+
+        This just calls a raw LLM without access to tools. If you need to call tools, either use
+        a single_tool_agent_step(), a react_agent_step() or an invoke_tool_step().
 
         Args:
             task: Instruction given to the LLM.
             inputs: Optional additional context for the LLM. Values may reference
                 previous step outputs or plan inputs.
             output_schema: Expected schema of the result.
-            step_name: Optional explicit name; auto-generated if omitted.
-            system_prompt: Optional system prompt for the LLM.
+            step_name: Optional explicit name for the step. This allows its output to be referenced
+              via StepOutput("name_of_step") rather than by index.
+            system_prompt: Optional system prompt for the LLM - allows overriding the default system
+              prompt.
 
-        Returns:
-            Self for fluent chaining.
         """
         self.plan.steps.append(
             LLMStep(
@@ -211,14 +313,20 @@ class PlanBuilderV2:
     ) -> PlanBuilderV2:
         """Add a step that invokes a tool directly.
 
-        Args:
-            tool: Tool id, ``Tool`` instance, or callable to invoke.
-            args: Arguments passed to the tool. References are resolved at runtime.
-            output_schema: Expected schema of the result.
-            step_name: Optional explicit name; auto-generated if omitted.
+        This is a raw tool call without any LLM involvement. The args passed into this method have
+        any references resoled (e.g. Input or StepOutput) and are then directly used to call the
+        tool. This should be used when you know the exact arguments you want to pass the tool, and
+        you want to avoid the latency / non-determinism of using an LLM.
 
-        Returns:
-            Self for fluent chaining.
+        Args:
+            tool: The id of the tool to invoke, or the Tool instance to invoke.
+            args: Arguments passed to the tool. This can include references such as Input and
+              StepOutput whose values are resolved at runtime.
+            output_schema: Schema of the result. If the tool does not provide a result of this type,
+              then a language model will be used to coerce the output into this schema..
+            step_name: Optional explicit name for the step. This allows its output to be referenced
+              via StepOutput("name_of_step") rather than by index.
+
         """
         self.plan.steps.append(
             InvokeToolStep(
@@ -241,15 +349,21 @@ class PlanBuilderV2:
     ) -> PlanBuilderV2:
         """Add a step that calls a Python function.
 
-        Args:
-            function: Function to invoke.
-            args: Arguments passed to the function. References are resolved at
-                runtime.
-            output_schema: Expected schema of the result.
-            step_name: Optional explicit name; auto-generated if omitted.
+        This step directly calls a python function without any LLM involvement. It is useful for
+        incorporating custom logic, calculations, or data transformations into your plan.
 
-        Returns:
-            Self for fluent chaining.
+        The function is called synchronously if it's a regular function, or awaited if it's
+        an async function.
+
+        Args:
+            function: The Python function to call. Can be sync or async.
+            args: Arguments passed to the function as keyword arguments. This can include
+                references such as Input and StepOutput whose values are resolved at runtime.
+            output_schema: Schema for the result. If provided and the function output doesn't
+                match, a language model will be used to coerce the output into this schema.
+            step_name: Optional explicit name for the step. This allows its output to be
+                referenced via StepOutput("name_of_step") rather than by index.
+
         """
         tool_class = tool(function)
         return self.invoke_tool_step(
@@ -268,18 +382,29 @@ class PlanBuilderV2:
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
     ) -> PlanBuilderV2:
-        """Add a step where an agent uses a single tool to complete ``task``.
+        """Add a step where an agent uses a single tool to complete a task.
+
+        This creates an LLM agent that has access to exactly one tool and uses it once to complete
+        the specified task. The agent can reason about how to use the tool. This is more flexible
+        than invoke_tool_step() because the agent can adapt its tool usage based on the task and
+        inputs. Use this when you know which tool should be used, but want the agent to determine
+        the specific arguments.
+
+        This step outputs the result of the tool call if output schema is not provided. If an output
+        schema is provided, then the agent will coerce the result of the tool call to match this
+        schema.
 
         Args:
-            tool: Tool the agent may call once.
-            task: Natural language description of the goal.
-            inputs: Optional context for the agent. Values may reference prior
-                step outputs or plan inputs.
-            output_schema: Expected schema of the result.
-            step_name: Optional explicit name; auto-generated if omitted.
+            tool: The id of the tool the agent can use to complete the task.
+            task: Natural language description of what the agent should accomplish.
+            inputs: Optional context data for the agent. This can include references such as
+                Input and StepOutput whose values are resolved at runtime and provided as
+                context to the agent.
+            output_schema: Schema for the result. If provided, the agent will structure its
+                output to match this schema.
+            step_name: Optional explicit name for the step. This allows its output to be
+                referenced via StepOutput("name_of_step") rather than by index.
 
-        Returns:
-            Self for fluent chaining.
         """
         self.plan.steps.append(
             SingleToolAgentStep(
@@ -296,15 +421,24 @@ class PlanBuilderV2:
     def user_verify(self, *, message: str, step_name: str | None = None) -> PlanBuilderV2:
         """Add a user confirmation step.
 
-        The user must accept ``message`` for the plan to continue.
+        This pauses plan execution and asks the user to confirm or reject the provided
+        message. The plan will only continue if the user confirms. If the user rejects,
+        the plan execution will stop with an error. This is useful for getting user approval before
+        taking important actions like sending emails, making purchases, or modifying data.
+
+        A UserVerificationClarification is used to get the verification from the user, so ensure you
+        have set up handling for this type of clarification in order to use this step. For more
+        details, see https://docs.portialabs.ai/understand-clarifications.
+
+        This step outputs True if the user confirms.
 
         Args:
-            message: Text shown to the user. May include references to previous
-                steps or inputs.
-            step_name: Optional explicit name; auto-generated if omitted.
+            message: Text shown to the user for confirmation. This can include references
+                such as Input and StepOutput whose values are resolved at runtime before
+                being shown to the user.
+            step_name: Optional explicit name for the step. This allows its output to be
+                referenced via StepOutput("name_of_step") rather than by index.
 
-        Returns:
-            Self for fluent chaining.
         """
         self.plan.steps.append(
             UserVerifyStep(
@@ -324,18 +458,28 @@ class PlanBuilderV2:
     ) -> PlanBuilderV2:
         """Add a step that requests input from the user.
 
-        Depending on whether ``options`` are provided, the user is prompted with
-        free text or multiple choice input.
+        This pauses plan execution and prompts the user to provide input. If options are
+        provided, the user must choose from the given choices (multiple choice). If no
+        options are provided, the user can enter free-form text.
+
+        A Clarification (either InputClarification or MultipleChoiceClarification) is used to get
+        the input from the user, so ensure you have set up handling for the required type of
+        clarification in order to use this step. For more details, see
+        https://docs.portialabs.ai/understand-clarifications.
+
+        The user's response becomes the output of this step and can be referenced by
+        subsequent steps in the plan.
 
         Args:
-            message: Guidance shown to the user. May include references to
-                previous steps or inputs.
-            options: Choices for multiple choice prompts. ``None`` produces a
-                free-text input.
-            step_name: Optional explicit name; auto-generated if omitted.
+            message: Instruction or question shown to the user. This can include references
+                such as Input and StepOutput whose values are resolved at runtime before
+                being shown to the user.
+            options: List of choices for multiple choice prompts. If None, the user can
+                provide free-form text input. If provided, the user must select from
+                these options.
+            step_name: Optional explicit name for the step. This allows its output to be
+                referenced via StepOutput("name_of_step") rather than by index.
 
-        Returns:
-            Self for fluent chaining.
         """
         self.plan.steps.append(
             UserInputStep(
@@ -350,7 +494,13 @@ class PlanBuilderV2:
     def add_step(self, step: StepV2) -> PlanBuilderV2:
         """Add a pre-built step to the plan.
 
-        Useful for integrating custom step types.
+        This allows you to integrate custom step types that you've created by subclassing
+        StepV2, or to reuse steps that were created elsewhere. The step is added as-is
+        to the plan without any modification.
+
+        Args:
+            step: A pre-built step instance that inherits from StepV2.
+
         """
         self.plan.steps.append(step)
         return self
@@ -362,16 +512,34 @@ class PlanBuilderV2:
     ) -> PlanBuilderV2:
         """Add multiple steps or merge another plan into this builder.
 
-        Args:
-            plan: Iterable of steps or a ``PlanV2`` to merge.
-            input_values: Optional mapping of input names to default values when
-                ``plan`` is a ``PlanV2``.
+        This allows you to compose plans by merging smaller plans together, or to add
+        a sequence of pre-built steps all at once. When merging a PlanV2, both the
+        steps and the plan inputs are merged into the current builder.
 
-        Returns:
-            Self for fluent chaining.
+        This is useful for creating reusable sub-plans that can be incorporated into
+        larger workflows.
+
+        Args:
+            plan: Either a complete PlanV2 to merge (including its steps and inputs),
+                or any iterable of StepV2 instances to add to the current plan.
+            input_values: Optional mapping of inputs in the sub-plan to values. This is
+                only used when plan is a PlanV2, and is useful if a sub-plan has an input
+                and you want to provide a value for it from a step in the top-level plan.
+                For example:
+                sub_plan = builder.input(name="input_name").build()
+                top_plan = builder.llm_step(step_name="llm_step", task="Task")
+                           .add_steps(sub_plan, input_values={"input_name": StepOutput("llm_step")})
+                           .build()
+
+            input_values: Optional mapping of input names to default values. Only used
+                when plan is a PlanV2. These values will be set as default values for
+                the corresponding plan inputs.
 
         Raises:
-            PlanBuilderError: If duplicate inputs are detected.
+            PlanBuilderError: If duplicate input names are detected when merging plans,
+                or if you try to provide values for inputs that don't exist in the
+                sub-plan.
+
         """
         if isinstance(plan, PlanV2):
             # Ensure there are no duplicate plan inputs
@@ -404,22 +572,33 @@ class PlanBuilderV2:
         output_schema: type[BaseModel] | None = None,
         summarize: bool = False,
     ) -> PlanBuilderV2:
-        """Define the final output of the plan.
+        """Define the final output schema for the plan.
+
+        This configures how the plan's final result should be structured. The final output is
+        automatically derived from the last step's output, but if output_schema is provided and
+        the last step's output does not already match this schema, an LLM will be used to coerce
+        the output into this schema. If summarize is True, a summary of the plan run will also be
+        included as part of the final output.
 
         Args:
-            output_schema: Schema for the final output. If provided, an LLM will
-                coerce the output to match.
-            summarize: Whether to also return a summary of the final output.
+            output_schema: Pydantic model class that defines the structure of the final
+                output.
+            summarize: Whether to also generate a human-readable summary of the final
+                output in addition to the structured result.
 
-        Returns:
-            Self for fluent chaining.
         """
         self.plan.final_output_schema = output_schema
         self.plan.summarize = summarize
         return self
 
     def build(self) -> PlanV2:
-        """Finalize and return the built plan."""
+        """Finalize and return the built plan.
+
+        Raises:
+            PlanBuilderError: If there are any issues when building the plan (e.g. an if block is
+                opened without being closed).
+
+        """
         if len(self._conditional_block_stack) > 0:
             raise PlanBuilderError(
                 "An endif must be called for all if_ steps. Please add an endif for all if_ steps."
@@ -438,3 +617,8 @@ class PlanBuilderV2:
         )
 
         return self.plan
+
+    @property
+    def _current_conditional_block(self) -> ConditionalBlock | None:
+        """Return the current conditional block if one is active."""
+        return self._conditional_block_stack[-1] if len(self._conditional_block_stack) > 0 else None

@@ -15,26 +15,71 @@ from portia.prefixed_uuid import PlanUUID
 
 
 class PlanV2(BaseModel):
-    """Ordered collection of :class:`StepV2` objects executed by Portia."""
+    """An ordered collection of executable steps that can be executed by Portia.
 
-    id: PlanUUID = Field(default_factory=PlanUUID, description="The ID of the plan.")
-    steps: list[StepV2] = Field(description="The steps to be executed in the plan.")
+    A PlanV2 defines a sequence of StepV2 objects that are executed in order to accomplish a
+    specific task. Plans can include inputs, conditional logic, tool invocations, agent calls
+    and structured outputs.
+
+    This class is the successor to the Plan class in Portia. You should use this class rather than
+    the Plan class.
+    """
+
+    id: PlanUUID = Field(
+        default_factory=PlanUUID,
+        description="Unique identifier for the plan, automatically generated if not provided.",
+    )
+    steps: list[StepV2] = Field(
+        description=(
+            "Ordered sequence of steps to be executed. Each step is a StepV2 instance representing "
+            "a specific action, tool invocation, agent call or control flow element."
+        )
+    )
     plan_inputs: list[PlanInput] = Field(
         default_factory=list,
-        description="The inputs required by the plan.",
+        description=(
+            "Input for the plan. These are values that are provided when the plan is "
+            "executed, rather than when the plan is built. Steps in the plan can reference "
+            "their values using the Input reference (e.g. args={'value': Input('input_name')}) "
+            "and these are then resolved to the input value when the plan is executed."
+        ),
     )
-    summarize: bool = Field(default=False, description="Whether to summarize the plan output.")
+    summarize: bool = Field(
+        default=False,
+        description=(
+            "Whether to generate a summary of the plan execution results. When True, "
+            "Portia will create a concise summary of the key outputs and outcomes after "
+            "all steps have completed."
+        ),
+    )
     final_output_schema: type[BaseModel] | None = Field(
-        default=None, description="The schema of the final output of the plan."
+        default=None,
+        description=(
+            "Optional Pydantic model schema defining the expected structure of the plan's "
+            "final output. When provided, the plan execution results will be structured "
+            "to match this schema, enabling type-safe consumption of plan outputs."
+        ),
     )
     label: str = Field(
         default="Run the plan built with the Plan Builder",
-        description="The task that the plan is completing.",
+        description=(
+            "Human-readable description of the task or goal that this plan accomplishes. "
+            "This label is used for display purposes in the Portia dashboard and helps "
+            "users identify the plan's purpose."
+        ),
     )
 
     @model_validator(mode="after")
     def validate_plan(self) -> Self:
-        """Ensure step names and input names are unique."""
+        """Validate the plan structure and enforce uniqueness constraints.
+
+        Ensures that all step names and plan input names are unique within the plan,
+        preventing conflicts during execution and reference resolution.
+
+        Raises:
+            ValueError: If duplicate step names or plan input names are found.
+
+        """
         # Check for duplicate step names
         step_names = [step.step_name for step in self.steps]
         if len(step_names) != len(set(step_names)):
@@ -52,7 +97,16 @@ class PlanV2(BaseModel):
         return self
 
     def to_legacy_plan(self, plan_context: PlanContext) -> Plan:
-        """Convert this plan to the legacy :class:`~portia.plan.Plan` type."""
+        """Convert this plan to the legacy Plan format.
+
+        This method enables backward compatibility with systems that still use the
+        original plan representation. It transforms each StepV2 into its legacy
+        equivalent while preserving all execution semantics.
+
+        Args:
+            plan_context: Context information including the original query and tool registry.
+
+        """
         return Plan(
             id=self.id,
             plan_context=plan_context,
@@ -62,10 +116,18 @@ class PlanV2(BaseModel):
         )
 
     def step_output_name(self, step: int | str | StepV2) -> str:
-        """Return the variable name for a step's output.
+        """Generate the output variable name for a given step.
 
-        If the step cannot be resolved, a placeholder name is returned so callers
-        can still reference the missing value.
+        Creates a standardized variable name that can be used to reference the output
+        of a specific step. If the step cannot be resolved, returns a placeholder
+        name.
+
+        Args:
+            step: The step to get the output name for. Can be:
+                - int: Index of the step in the plan
+                - str: Name of the step
+                - StepV2: The step instance itself
+
         """
         try:
             if isinstance(step, StepV2):
@@ -83,10 +145,14 @@ class PlanV2(BaseModel):
             return f"${default_step_name(step_num)}_output"
 
     def idx_by_name(self, name: str) -> int:
-        """Return the index of the step with the given name.
+        """Find the index of a step by its name.
+
+        Searches through the plan's steps to find the one with the specified name
+        and returns its position in the execution order.
 
         Raises:
-            ValueError: If no step with ``name`` exists.
+            ValueError: If no step with the specified name exists in the plan.
+
         """
         for i, step in enumerate(self.steps):
             if step.step_name == name:
