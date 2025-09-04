@@ -859,13 +859,13 @@ class ConditionalStep(StepV2):
 class LoopStep(StepV2):
     """A step that represents a loop in a loop block.
 
-    I.E. loop, endloop clauses.
+    This step handles loop logic such as while, do-while, and for-each loops that
+    control which subsequent steps should be executed based on runtime conditions.
     """
 
     condition: Callable[..., bool] | str | None = Field(
         description=(
-            "The boolean predicate to check. If evaluated to true, the steps within this loop "
-            "will be evaluated - otherwise they will be skipped and we jump to the next step after the loop has finished. It is checked at the end of each iteration of the loop"
+            "The boolean predicate to check. If evaluated to true, the loop will continue."
         )
     )
     over: Reference | Sequence[Any] | None = Field(
@@ -903,9 +903,7 @@ class LoopStep(StepV2):
             raise ValueError("Condition cannot be set for for-each loop")
         if self.condition and self.over:
             raise ValueError("Condition and over cannot both be set")
-        if self.over is not None and (
-            self.loop_type == LoopType.WHILE or self.loop_type == LoopType.DO_WHILE
-        ):
+        if self.over is not None and self.loop_type in (LoopType.WHILE, LoopType.DO_WHILE):
             raise ValueError("Over cannot be set for while or do-while loop")
         return self
 

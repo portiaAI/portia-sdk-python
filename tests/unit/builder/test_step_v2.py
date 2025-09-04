@@ -2543,9 +2543,9 @@ async def test_loop_step_run_conditional_end_missing_condition() -> None:
 
     mock_run_data = Mock()
 
+    # Manually set condition to None to test the run method behavior
+    step.condition = None
     with pytest.raises(ValueError, match="Condition is required for loop step"):
-        # Manually set condition to None to test the run method behavior
-        step.condition = None
         await step.run(run_data=mock_run_data)
 
 
@@ -2600,9 +2600,9 @@ async def test_loop_step_run_for_each_start_missing_over() -> None:
 
     mock_run_data = Mock()
 
+    # Manually set over to None to test the run method behavior
+    step.over = None
     with pytest.raises(ValueError, match="Over is required for for-each loop"):
-        # Manually set over to None to test the run method behavior
-        step.over = None
         await step.run(run_data=mock_run_data)
 
 
@@ -2924,9 +2924,9 @@ async def test_loop_step_run_while_start_missing_condition() -> None:
 
     mock_run_data = Mock()
 
+    # Manually set condition to None to test the run method behavior
+    step.condition = None
     with pytest.raises(ValueError, match="Condition is required for loop step"):
-        # Manually set condition to None to test the run method behavior
-        step.condition = None
         await step.run(run_data=mock_run_data)
 
 
@@ -3077,8 +3077,10 @@ def test_current_loop_variable_with_non_sequence_resolved_value() -> None:
     mock_run_data = Mock()
 
     # Mock the _resolve_references method to return a non-sequence value (integer)
-    with patch.object(step, "_resolve_references", return_value=42), \
-         pytest.raises(TypeError, match="Loop variable is not indexable"):
+    with (
+        patch.object(step, "_resolve_references", return_value=42),
+        pytest.raises(TypeError, match="Loop variable is not indexable"),
+    ):
         step._current_loop_variable(mock_run_data)
 
 
@@ -3132,8 +3134,6 @@ def test_current_loop_variable_with_nested_sequences() -> None:
         loop_block_type=LoopBlockType.END,
         start_index=0,
         end_index=5,
-        # Access over[0] = [{"key": "value1"}, {"key": "value2"}],
-        # then [{"key": "value1"}, {"key": "value2"}][0]
         index=0,
     )
 
@@ -3153,8 +3153,6 @@ def test_current_loop_variable_with_mixed_types() -> None:
         loop_block_type=LoopBlockType.END,
         start_index=0,
         end_index=5,
-        # Access over[0] = ["string", 42, {"dict": "value"}, [1, 2, 3]],
-        # then ["string", 42, {"dict": "value"}, [1, 2, 3]][0]
         index=0,
     )
 

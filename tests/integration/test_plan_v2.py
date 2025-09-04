@@ -1606,7 +1606,6 @@ def test_plan_v2_do_while_loop_condition_checked_after(local_portia: Portia) -> 
     assert counter == 1
 
 
-
 def test_plan_v2_while_loop_with_args(local_portia: Portia) -> None:
     """Test while loop with arguments passed to condition function."""
     messages: list[str] = []
