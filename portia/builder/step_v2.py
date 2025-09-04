@@ -5,17 +5,18 @@ from __future__ import annotations
 import itertools
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, override
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, Self, override
 
 from langsmith import traceable
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from portia.builder.conditionals import (
     ConditionalBlock,
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
+from portia.builder.loops import LoopBlock, LoopStepResult, LoopStepType, LoopType
 from portia.builder.reference import Input, Reference, StepOutput
 from portia.clarification import (
     Clarification,
@@ -59,6 +60,9 @@ class StepV2(BaseModel, ABC):
     conditional_block: ConditionalBlock | None = Field(
         default=None,
         description="The conditional block containing this step, if part of conditional logic.",
+    )
+    loop_block: LoopBlock | None = Field(
+        default=None, description="The loop block this step is part of, if any."
     )
 
     @abstractmethod
@@ -161,7 +165,7 @@ class StepV2(BaseModel, ABC):
                 var_name = var_name.strip()  # noqa: PLW2901
                 if ref_type == "StepOutput" and var_name.isdigit():
                     var_name = int(var_name)  # noqa: PLW2901
-                ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(var_name)  # type: ignore reportArgumentType
+                ref = StepOutput(var_name) if ref_type == "StepOutput" else Input(str(var_name))
                 resolved = self._resolve_references(ref, run_data)
                 pattern = (
                     r"\{\{\s*"
@@ -640,7 +644,7 @@ class UserVerifyStep(StepV2):
 
     @override
     @traceable(name="User Verify Step - Run")
-    async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def run(self, run_data: RunContext) -> bool | UserVerificationClarification:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Prompt the user for confirmation.
 
         Returns a UserVerificationClarification to get input from the user (if not already
@@ -733,7 +737,7 @@ class UserInputStep(StepV2):
 
     @override
     @traceable(name="User Input Step - Run")
-    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Request input from the user and return the response."""
         clarification_type = (
             ClarificationCategory.MULTIPLE_CHOICE if self.options else ClarificationCategory.INPUT
@@ -817,7 +821,7 @@ class ConditionalStep(StepV2):
         if isinstance(self.condition, str):
             condition_str = self._template_references(self.condition, run_data)
             agent = ConditionalEvaluationAgent(run_data.config)
-            conditional_result = await agent.execute(condition_str, args)
+            conditional_result = await agent.execute(conditional=condition_str, arguments=args)
         else:
             conditional_result = self.condition(**args)
         next_clause_step_index = (
@@ -845,6 +849,144 @@ class ConditionalStep(StepV2):
             )
         return Step(
             task=f"Conditional clause: {cond_str}",
+            inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
+            tool_id=None,
+            output=plan.step_output_name(self),
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class LoopStep(StepV2):
+    """A step that represents a loop in a loop block.
+
+    This step handles loop logic such as while, do-while, and for-each loops that
+    control which subsequent steps should be executed based on runtime conditions.
+    """
+
+    condition: Callable[..., bool] | str | None = Field(
+        description=(
+            "The boolean predicate to check. If evaluated to true, the loop will continue."
+        )
+    )
+    over: Reference | Sequence[Any] | None = Field(
+        default=None, description="The reference to loop over."
+    )
+    loop_type: LoopType
+    index: int = Field(default=0, description="The current index of the loop.")
+    args: dict[str, Reference | Any] = Field(
+        default_factory=dict, description="The args to check the condition with."
+    )
+    loop_step_type: LoopStepType
+    start_index: int = Field(description="The start index of the loop.")
+    end_index: int | None = Field(default=None, description="The end index of the loop.")
+
+    @property
+    def start_index_value(self) -> int:
+        """Get the start index value."""
+        if self.start_index is None:
+            raise ValueError("Start index is None")
+        return self.start_index
+
+    @property
+    def end_index_value(self) -> int:
+        """Get the end index value."""
+        if self.end_index is None:
+            raise ValueError("End index is None")
+        return self.end_index
+
+    @model_validator(mode="after")
+    def validate_model(self) -> Self:
+        """Validate the start and end indexes."""
+        if self.condition is None and self.over is None:
+            raise ValueError("Condition and over cannot both be None")
+        if self.condition is not None and self.loop_type == LoopType.FOR_EACH:
+            raise ValueError("Condition cannot be set for for-each loop")
+        if self.condition and self.over:
+            raise ValueError("Condition and over cannot both be set")
+        if self.over is not None and self.loop_type in (LoopType.WHILE, LoopType.DO_WHILE):
+            raise ValueError("Over cannot be set for while or do-while loop")
+        return self
+
+    def _current_loop_variable(self, run_data: RunContext) -> Any | None:  # noqa: ANN401
+        """Get the current loop variable if over is set."""
+        if self.over is None:
+            return None
+        if isinstance(self.over, Sequence):
+            values = self.over[self.index]
+        else:
+            values = self._resolve_references(self.over, run_data)
+        if not isinstance(values, Sequence):
+            raise TypeError("Loop variable is not indexable")
+        try:
+            return values[self.index]
+        except IndexError:
+            return None
+
+    @override
+    @traceable(name="Loop Step - Run")
+    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+        """Run the loop step."""
+        args = {k: self._resolve_references(v, run_data) for k, v in self.args.items()}
+        match self.loop_step_type, self.loop_type:
+            case (LoopStepType.END, LoopType.DO_WHILE) | (LoopStepType.START, LoopType.WHILE):
+                return await self._handle_conditional_loop(run_data, args)
+            case LoopStepType.START, LoopType.FOR_EACH:
+                if self.over is None:
+                    raise ValueError("Over is required for for-each loop")
+                value = self._current_loop_variable(run_data)
+                self.index += 1
+                return LoopStepResult(
+                    step_type=self.loop_step_type,
+                    loop_result=value is not None,
+                    value=value,
+                    start_index=self.start_index_value,
+                    end_index=self.end_index_value,
+                )
+            case _:
+                # conditional loops are evaluated at end of loop execution
+                # for-each loops are evaluated at end of loop execution
+                return LoopStepResult(
+                    step_type=self.loop_step_type,
+                    loop_result=True,
+                    value=True,
+                    start_index=self.start_index_value,
+                    end_index=self.end_index_value,
+                )
+
+    async def _handle_conditional_loop(
+        self, run_data: RunContext, args: dict[str, Any]
+    ) -> LoopStepResult:
+        if self.condition is None:
+            raise ValueError("Condition is required for loop step")
+        if isinstance(self.condition, str):
+            template_reference = self._resolve_references(self.condition, run_data)
+            agent = ConditionalEvaluationAgent(run_data.config)
+            conditional_result = await agent.execute(
+                conditional=str(template_reference), arguments=args
+            )
+        else:
+            conditional_result = self.condition(**args)
+        return LoopStepResult(
+            step_type=self.loop_step_type,
+            loop_result=conditional_result,
+            value=conditional_result,
+            start_index=self.start_index_value,
+            end_index=self.end_index_value,
+        )
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this LoopStep to a PlanStep."""
+        if isinstance(self.condition, str):
+            cond_str = self.condition
+        else:
+            cond_str = (
+                "If result of "
+                + getattr(self.condition, "__name__", str(self.condition))
+                + " is true"
+            )
+        return Step(
+            task=f"Loop clause: {cond_str}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
             tool_id=None,
             output=plan.step_output_name(self),

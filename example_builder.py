@@ -114,3 +114,66 @@ plan_run = portia.run_plan(
     plan_run_inputs={"country": "Spain"},
 )
 print(plan_run)  # noqa: T201
+
+# example for_each loop
+plan = (
+    PlanBuilderV2("Buy some gold")
+    .function_step(function=lambda: [1, 2, 3], step_name="Items")  # create a list of items
+    .loop(
+        over=StepOutput("Items"), step_name="Loop"
+    )  # name the loop, iterate over the list of items
+    .function_step(
+        function=lambda item: item + 1, step_name="test_function", args={"item": StepOutput("Loop")}
+    )  # call the loop step to access current item
+    .end_loop(step_name="end_loop")
+).build()
+
+
+# example while loop
+class WhileCondition:
+    """Class that is used to track the number of times the condition has been run."""
+
+    counter = 0
+
+    def run(self) -> bool:  # noqa: D102
+        self.counter += 1
+        return self.counter <= 4  # noqa: PLR2004
+
+
+while_condition = WhileCondition()
+plan = (
+    PlanBuilderV2("Buy some gold")
+    .loop(
+        while_=while_condition.run, step_name="Loop"
+    )  # name the loop, iterate while the condition is true
+    .function_step(
+        function=lambda: print("Hello"),  # noqa: T201
+        step_name="test_function",
+    )  # call the loop step to access current item
+    .end_loop(step_name="end_loop")
+).build()
+
+# example do_while loop
+
+
+class Iterator:
+    """Class that is used to track the number of times the iterator has been run."""
+
+    counter = 0
+
+    def run(self) -> int:  # noqa: D102
+        self.counter += 1
+        return self.counter
+
+
+iterator = Iterator()
+plan = (
+    PlanBuilderV2("Buy some gold")
+    .loop(
+        do_while_=lambda x: x < 4,  # noqa: PLR2004
+        args={"x": StepOutput("test_function")},
+        step_name="Loop",
+    )  # can access the item from the loop as a variable as it gets evaluated at end of loop
+    .function_step(function=lambda: iterator.run(), step_name="test_function")
+    .end_loop(step_name="end_loop")
+).build()
