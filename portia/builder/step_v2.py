@@ -771,7 +771,7 @@ class LoopStep(StepV2):
     condition: Callable[..., bool] | str | None = Field(
         description=(
             "The boolean predicate to check. If evaluated to true, the steps within this loop "
-            "will be evaluated - otherwise they will be skipped and we jump to the next loop."
+            "will be evaluated - otherwise they will be skipped and we jump to the next step after the loop has finished. It is checked at the end of each iteration of the loop"
         )
     )
     over: Reference | None = Field(default=None, description="The reference to loop over.")
