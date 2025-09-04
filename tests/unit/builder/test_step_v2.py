@@ -19,6 +19,7 @@ from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
     LLMStep,
+    ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
     UserInputStep,
@@ -347,8 +348,9 @@ async def test_llm_step_run_no_inputs() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_wrapper_instance = Mock()
         mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
         mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -371,8 +373,9 @@ async def test_llm_step_run_one_regular_input() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_wrapper_instance = Mock()
         mock_wrapper_instance.arun = AsyncMock(return_value="Processed: Hello world")
         mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -404,9 +407,10 @@ async def test_llm_step_run_one_reference_input() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
         patch.object(reference_input, "get_value") as mock_get_value,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_get_value.return_value = "Previous step result"
         mock_wrapper_instance = Mock()
         mock_wrapper_instance.arun = AsyncMock(return_value="Summary: Previous step result")
@@ -449,10 +453,11 @@ async def test_llm_step_run_mixed_inputs() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
         patch.object(ref1, "get_value") as mock_get_value1,
         patch.object(ref2, "get_value") as mock_get_value2,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_get_value1.return_value = "John"
         mock_get_value2.return_value = "Analysis complete"
         mock_wrapper_instance = Mock()
@@ -490,8 +495,9 @@ async def test_llm_step_run_with_prompt() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_wrapper_instance = Mock()
         mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
         mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -520,8 +526,9 @@ async def test_llm_step_run_without_prompt() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_wrapper_instance = Mock()
         mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
         mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -561,8 +568,9 @@ async def test_llm_step_run_with_string_template_input() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_wrapper_instance = Mock()
         mock_wrapper_instance.arun = AsyncMock(return_value="done")
         mock_tool_wrapper_class.return_value = mock_wrapper_instance
@@ -647,10 +655,11 @@ async def test_llm_step_run_linked_inputs() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.ToolRunContext"),
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
         patch.object(ref1, "get_value") as mock_get_value1,
         patch.object(ref2, "get_value") as mock_get_value2,
     ):
+        mock_get_tool_run_ctx.return_value = Mock()
         mock_get_value1.return_value = "John"
         mock_get_value2.return_value = "6ft"
         mock_wrapper_instance = Mock()
@@ -755,10 +764,11 @@ async def test_invoke_tool_step_with_regular_value_input() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool.return_value = mock_tool
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(run_data=mock_run_data)
 
@@ -769,9 +779,7 @@ async def test_invoke_tool_step_with_regular_value_input() -> None:
             mock_run_data.storage,
             mock_run_data.plan_run,
         )
-        mock_tool._arun.assert_called_once()
-        call_args = mock_tool._arun.call_args
-        assert call_args[1]["query"] == "search term"
+        mock_tool._arun.assert_called_once_with(mock_tool_ctx, query="search term")
 
 
 @pytest.mark.asyncio
@@ -798,11 +806,12 @@ async def test_invoke_tool_step_with_regular_value_input_and_output_schema() -> 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
         patch.object(mock_run_data.config, "get_default_model") as mock_get_model,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool.return_value = mock_tool
         mock_get_model.return_value = mock_model
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(run_data=mock_run_data)
 
@@ -814,7 +823,7 @@ async def test_invoke_tool_step_with_regular_value_input_and_output_schema() -> 
             mock_run_data.storage,
             mock_run_data.plan_run,
         )
-        mock_tool._arun.assert_called_once()
+        mock_tool._arun.assert_called_once_with(mock_tool_ctx, query="search term")
         mock_model.aget_structured_response.assert_called_once()
 
 
@@ -841,11 +850,12 @@ async def test_invoke_tool_step_with_tool_output_schema() -> None:
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
         patch.object(mock_run_data.config, "get_default_model") as mock_get_model,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool.return_value = mock_tool
         mock_get_model.return_value = mock_model
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(run_data=mock_run_data)
 
@@ -857,7 +867,7 @@ async def test_invoke_tool_step_with_tool_output_schema() -> None:
             mock_run_data.storage,
             mock_run_data.plan_run,
         )
-        mock_tool._arun.assert_called_once()
+        mock_tool._arun.assert_called_once_with(mock_tool_ctx)
         mock_model.aget_structured_response.assert_called_once()
 
 
@@ -877,11 +887,12 @@ async def test_invoke_tool_step_with_reference_input() -> None:
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
         patch.object(reference_input, "get_value") as mock_get_value,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool.return_value = mock_tool
         mock_get_value.return_value = "previous step output"
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(run_data=mock_run_data)
 
@@ -892,9 +903,7 @@ async def test_invoke_tool_step_with_reference_input() -> None:
             mock_run_data.storage,
             mock_run_data.plan_run,
         )
-        mock_tool._arun.assert_called_once()
-        call_args = mock_tool._arun.call_args
-        assert call_args[1]["query"] == "previous step output"
+        mock_tool._arun.assert_called_once_with(mock_tool_ctx, query="previous step output")
 
 
 @pytest.mark.asyncio
@@ -924,12 +933,13 @@ async def test_invoke_tool_step_with_mixed_inputs() -> None:
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
         patch.object(ref1, "get_value") as mock_get_value1,
         patch.object(ref2, "get_value") as mock_get_value2,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool.return_value = mock_tool
         mock_get_value1.return_value = "user question"
         mock_get_value2.return_value = "step 1 output"
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(run_data=mock_run_data)
 
@@ -940,12 +950,13 @@ async def test_invoke_tool_step_with_mixed_inputs() -> None:
             mock_run_data.storage,
             mock_run_data.plan_run,
         )
-        mock_tool._arun.assert_called_once()
-        call_args = mock_tool._arun.call_args[1]
-        assert call_args["context"] == "static context"
-        assert call_args["user_input"] == "user question"
-        assert call_args["limit"] == 10
-        assert call_args["previous_result"] == "step 1 output"
+        mock_tool._arun.assert_called_once_with(
+            mock_tool_ctx,
+            context="static context",
+            user_input="user question",
+            limit=10,
+            previous_result="step 1 output",
+        )
 
 
 @pytest.mark.asyncio
@@ -966,10 +977,11 @@ async def test_invoke_tool_step_no_args_with_clarification() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool.return_value = mock_tool
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(run_data=mock_run_data)
 
@@ -982,7 +994,7 @@ async def test_invoke_tool_step_no_args_with_clarification() -> None:
             mock_run_data.storage,
             mock_run_data.plan_run,
         )
-        mock_tool._arun.assert_called_once_with(mock_ctx_class.return_value)
+        mock_tool._arun.assert_called_once_with(mock_tool_ctx)
 
 
 @pytest.mark.asyncio
@@ -996,12 +1008,12 @@ async def test_invoke_tool_step_with_tool_instance() -> None:
     mock_run_data.storage = AsyncMock()
 
     with (
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
         patch.object(mock_tool, "_arun") as mock_arun,
     ):
         mock_ctx = Mock()
         mock_ctx.end_user.external_id = "test_user_id"
-        mock_ctx_class.return_value = mock_ctx
+        mock_get_tool_run_ctx.return_value = mock_ctx
         mock_output = Mock()
         mock_output.get_value.return_value = "mock result"
         mock_arun.return_value = mock_output
@@ -1009,6 +1021,7 @@ async def test_invoke_tool_step_with_tool_instance() -> None:
         result = await step.run(run_data=mock_run_data)
 
         assert result == "mock result"
+        mock_arun.assert_called_once_with(mock_ctx, input="test input")
 
 
 @pytest.mark.asyncio
@@ -1042,10 +1055,10 @@ async def test_invoke_tool_step_with_function_tool() -> None:
     mock_run_data.plan_run.current_step_index = 0
     mock_run_data.storage = AsyncMock()
 
-    with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
+    with patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx:
         mock_ctx = Mock()
         mock_ctx.end_user.external_id = "test_user_id"
-        mock_ctx_class.return_value = mock_ctx
+        mock_get_tool_run_ctx.return_value = mock_ctx
         result = await step.run(run_data=mock_run_data)
 
         assert result == "Result: 42"
@@ -1067,10 +1080,10 @@ async def test_invoke_tool_step_with_async_function_tool() -> None:
     mock_run_data.plan_run.current_step_index = 0
     mock_run_data.storage = AsyncMock()
 
-    with patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class:
+    with patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx:
         mock_ctx = Mock()
         mock_ctx.end_user.external_id = "test_user_id"
-        mock_ctx_class.return_value = mock_ctx
+        mock_get_tool_run_ctx.return_value = mock_ctx
         result = await step.run(run_data=mock_run_data)
 
         assert result == "Result: 42"
@@ -1107,16 +1120,16 @@ async def test_invoke_tool_step_with_string_arg_templates() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool.return_value = mock_tool
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(mock_run_data)
 
         assert result == "final"
-        call_args = mock_tool._arun.call_args
-        assert call_args[1]["query"] == "Search result for Alice"
+        mock_tool._arun.assert_called_once_with(mock_tool_ctx, query="Search result for Alice")
 
 
 def test_invoke_tool_step_to_legacy_step() -> None:
@@ -1175,7 +1188,7 @@ def test_single_tool_agent_str() -> None:
         step_name="search",
     )
 
-    assert str(step) == "SingleToolAgentStep(tool='search_tool', query='Search for info')"
+    assert str(step) == "SingleToolAgentStep(task='Search for info', tool='search_tool')"
 
 
 def test_single_tool_agent_str_with_output_schema() -> None:
@@ -1188,7 +1201,7 @@ def test_single_tool_agent_str_with_output_schema() -> None:
     )
 
     expected_str = (
-        "SingleToolAgentStep(tool='search_tool', query='Search for info' -> MockOutputSchema)"
+        "SingleToolAgentStep(task='Search for info', tool='search_tool' -> MockOutputSchema)"
     )
     assert str(step) == expected_str
 
@@ -1218,12 +1231,11 @@ async def test_single_tool_agent_step_with_execution_agent_types(
     mock_run_data.execution_hooks = Mock()
 
     mock_tool = Mock()
-    mock_output = Mock()
-    mock_output.get_value.return_value = "Agent execution result"
+    mock_output = LocalDataValue(value="Agent execution result")
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
         patch.object(
             OneShotAgent, "execute_async", new_callable=AsyncMock, return_value=mock_output
         ) as mock_oneshot_execute,
@@ -1235,11 +1247,13 @@ async def test_single_tool_agent_step_with_execution_agent_types(
         ) as mock_default_execute,
     ):
         mock_get_tool.return_value = mock_tool
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(run_data=mock_run_data)
 
-        assert result == "Agent execution result"
+        assert isinstance(result, LocalDataValue)
+        assert result.value == "Agent execution result"
 
         if expected_one_shot:
             mock_oneshot_execute.assert_called_once()
@@ -1320,8 +1334,7 @@ async def test_single_tool_agent_with_string_template_task_and_inputs() -> None:
     ]
 
     # Create mock agent and output object
-    mock_output_obj = Mock()
-    mock_output_obj.get_value.return_value = "Search completed successfully"
+    mock_output_obj = LocalDataValue(value="Search completed successfully")
     mock_tool = Mock()
 
     # Mock the plan for to_legacy_step conversion
@@ -1331,17 +1344,19 @@ async def test_single_tool_agent_with_string_template_task_and_inputs() -> None:
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
-        patch("portia.builder.step_v2.ToolRunContext") as mock_ctx_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
         patch.object(
             OneShotAgent, "execute_async", new_callable=AsyncMock, return_value=mock_output_obj
         ),
     ):
         mock_get_tool.return_value = mock_tool
-        mock_ctx_class.return_value = Mock()
+        mock_tool_ctx = Mock()
+        mock_get_tool_run_ctx.return_value = mock_tool_ctx
 
         result = await step.run(mock_run_data)
 
-        assert result == "Search completed successfully"
+        assert isinstance(result, LocalDataValue)
+        assert result.value == "Search completed successfully"
 
         # The task should contain the original template string (not resolved yet)
         # Template resolution happens within the execution agent
@@ -1349,6 +1364,235 @@ async def test_single_tool_agent_with_string_template_task_and_inputs() -> None:
             f"Search for information about {StepOutput(0)} requested by {Input('username')}"
         )
         assert step.task == expected_task
+
+
+# Test cases for the ReActAgentStep class
+
+
+def test_react_agent_step_initialization() -> None:
+    """Test ReActAgentStep initialization."""
+    inputs = [Input("query"), "context"]
+    tools = ["search_tool", "calculator_tool"]
+    step = ReActAgentStep(
+        task="Research and calculate",
+        tools=tools,
+        step_name="react_agent",
+        inputs=inputs,
+        output_schema=MockOutputSchema,
+        tool_call_limit=50,
+        allow_agent_clarifications=True,
+    )
+
+    assert step.task == "Research and calculate"
+    assert step.tools == tools
+    assert step.inputs == inputs
+    assert step.output_schema == MockOutputSchema
+    assert step.step_name == "react_agent"
+    assert step.tool_call_limit == 50
+    assert step.allow_agent_clarifications is True
+
+
+def test_react_agent_step_initialization_defaults() -> None:
+    """Test ReActAgentStep initialization with default values."""
+    step = ReActAgentStep(
+        task="Simple task",
+        tools=["tool1"],
+        step_name="simple_react",
+    )
+
+    assert step.task == "Simple task"
+    assert step.tools == ["tool1"]
+    assert step.inputs == []
+    assert step.output_schema is None
+    assert step.tool_call_limit == 25  # default value
+    assert step.allow_agent_clarifications is False  # default value
+
+
+def test_react_agent_step_str() -> None:
+    """Test ReActAgentStep str method."""
+    tools = ["tool1", "tool2"]
+    step = ReActAgentStep(
+        task="Multi-tool task",
+        tools=tools,
+        step_name="react",
+    )
+
+    assert str(step) == f"ReActAgentStep(task='Multi-tool task', tools='{tools}', )"
+
+
+def test_react_agent_step_str_with_output_schema() -> None:
+    """Test ReActAgentStep str method with output schema."""
+    tools = ["tool1"]
+    step = ReActAgentStep(
+        task="Task with schema",
+        tools=tools,
+        step_name="react",
+        output_schema=MockOutputSchema,
+    )
+
+    expected_str = f"ReActAgentStep(task='Task with schema', tools='{tools}',  -> MockOutputSchema)"
+    assert str(step) == expected_str
+
+
+def test_react_agent_step_to_legacy_step() -> None:
+    """Test ReActAgentStep to_legacy_step method."""
+    inputs = [Input("query"), StepOutput(0)]
+    tools = ["search_tool", "calculator_tool"]
+    step = ReActAgentStep(
+        task="Research and calculate",
+        tools=tools,
+        step_name="react_agent",
+        inputs=inputs,
+        output_schema=MockOutputSchema,
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$react_agent_output"
+
+    with (
+        patch.object(inputs[0], "get_legacy_name") as mock_input_name,
+        patch.object(inputs[1], "get_legacy_name") as mock_step_output_name,
+    ):
+        mock_input_name.return_value = "query"
+        mock_step_output_name.return_value = "step_0_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "Research and calculate"
+        assert legacy_step.tool_id == "search_tool,calculator_tool"
+        assert legacy_step.output == "$react_agent_output"
+        assert legacy_step.structured_output_schema == MockOutputSchema
+
+        assert len(legacy_step.inputs) == 2
+        assert legacy_step.inputs[0].name == "query"
+        assert legacy_step.inputs[1].name == "step_0_output"
+
+
+@pytest.mark.asyncio
+async def test_react_agent_step_run() -> None:
+    """Test ReActAgentStep run method."""
+    tools = ["search_tool", "calculator_tool"]
+    step = ReActAgentStep(
+        task="Research and calculate",
+        tools=tools,
+        step_name="react_agent",
+        inputs=["context"],
+        tool_call_limit=30,
+        allow_agent_clarifications=True,
+    )
+
+    mock_run_data = Mock()
+
+    mock_tool1 = Mock()
+    mock_tool2 = Mock()
+    mock_output = LocalDataValue(value="ReAct agent execution result")
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
+        patch("portia.builder.step_v2.ReActAgent") as mock_react_agent_class,
+    ):
+        mock_get_tool.side_effect = [mock_tool1, mock_tool2]
+
+        mock_agent = Mock()
+        mock_agent.execute = AsyncMock(return_value=mock_output)
+        mock_react_agent_class.return_value = mock_agent
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert isinstance(result, LocalDataValue)
+        assert result.value == "ReAct agent execution result"
+
+        assert mock_get_tool.call_count == 2
+        mock_get_tool.assert_any_call(
+            "search_tool",
+            mock_run_data.tool_registry,
+            mock_run_data.storage,
+            mock_run_data.plan_run,
+        )
+        mock_get_tool.assert_any_call(
+            "calculator_tool",
+            mock_run_data.tool_registry,
+            mock_run_data.storage,
+            mock_run_data.plan_run,
+        )
+
+        mock_react_agent_class.assert_called_once_with(
+            task="Research and calculate",
+            task_data=["context"],
+            tools=[mock_tool1, mock_tool2],
+            run_data=mock_run_data,
+            tool_call_limit=30,
+            allow_agent_clarifications=True,
+            output_schema=None,
+        )
+
+        mock_agent.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_react_agent_step_run_with_reference_resolution() -> None:
+    """Test ReActAgentStep run method with reference resolution in task and task_data."""
+    ref1 = Input("user_query")
+    ref2 = StepOutput(1)
+    ref3 = Input("analysis_type")
+    step = ReActAgentStep(
+        task=f"Research and analyze {ref3} using {ref2}",
+        tools=["search_tool"],
+        step_name="react_research",
+        inputs=["Static context", ref1, f"String interpolation: {ref2}"],
+    )
+
+    mock_run_data = Mock()
+    mock_run_data.plan = Mock()
+    mock_run_data.plan.plan_inputs = [
+        PlanInput(name="user_query", description="The user's query"),
+        PlanInput(name="analysis_type", description="The type of analysis to perform"),
+    ]
+    mock_run_data.plan_run = Mock()
+    mock_run_data.plan_run.plan_run_inputs = {
+        "user_query": LocalDataValue(value="search query"),
+        "analysis_type": LocalDataValue(value="sentiment analysis"),
+    }
+    mock_run_data.step_output_values = [
+        Mock(
+            value="analysis result",
+            description="Analysis from step 1",
+            step_name="analysis",
+            step_num=1,
+        )
+    ]
+
+    mock_output = LocalDataValue(value="ReAct execution with string interpolation")
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
+        patch("portia.builder.step_v2.ReActAgent") as mock_react_agent_class,
+    ):
+        mock_tool = Mock()
+        mock_get_tool.return_value = mock_tool
+
+        mock_agent = Mock()
+        mock_agent.execute = AsyncMock(return_value=mock_output)
+        mock_react_agent_class.return_value = mock_agent
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert isinstance(result, LocalDataValue)
+        assert result.value == "ReAct execution with string interpolation"
+
+        mock_react_agent_class.assert_called_once()
+        call_kwargs = mock_react_agent_class.call_args.kwargs
+
+        resolved_task = call_kwargs["task"]
+        assert resolved_task == "Research and analyze sentiment analysis using analysis result"
+        task_data = call_kwargs["task_data"]
+        assert len(task_data) == 3
+        assert task_data[0] == "Static context"
+        assert isinstance(task_data[1], LocalDataValue)
+        assert task_data[1].value == "search query"
+        assert task_data[1].summary == "The user's query"
+        assert task_data[2] == "String interpolation: analysis result"
 
 
 # Test cases for the UserVerifyStep class
