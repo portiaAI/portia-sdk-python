@@ -15,6 +15,7 @@ from portia.logger import (
     SafeLogger,
     logger,
     logger_manager,
+    truncate_message,
 )
 
 
@@ -253,3 +254,81 @@ def test_formatter_sanitizes_stack_trace() -> None:
     assert " {value}" not in formatted
     # Stack traces should not be truncated by sanitizer when formatting exceptions
     assert "(truncated" not in formatted
+
+
+def test_truncate_message_short_message() -> None:
+    """Test that short messages are not truncated."""
+    short_message = "This is a short message"
+    result = truncate_message(short_message)
+    assert result == short_message
+
+
+def test_truncate_message_exactly_max_chars() -> None:
+    """Test message exactly at max_chars limit is not truncated."""
+    message = "a" * 1000
+    result = truncate_message(message)
+    assert result == message
+    assert len(result) == 1000
+
+
+def test_truncate_message_long_message_default_limit() -> None:
+    """Test that long messages are truncated with default limit."""
+    long_message = "a" * 1500
+    result = truncate_message(long_message)
+    expected = "a" * 1000 + "...[truncated - only first 1000 characters shown]"
+    assert result == expected
+    assert result.startswith("a" * 1000)
+    assert result.endswith("...[truncated - only first 1000 characters shown]")
+
+
+def test_truncate_message_long_message_custom_limit() -> None:
+    """Test that long messages are truncated with custom limit."""
+    long_message = "b" * 800
+    result = truncate_message(long_message, max_chars=500)
+    expected = "b" * 500 + "...[truncated - only first 1000 characters shown]"
+    assert result == expected
+    assert result.startswith("b" * 500)
+    assert result.endswith("...[truncated - only first 1000 characters shown]")
+
+
+def test_truncate_message_custom_limit_not_exceeded() -> None:
+    """Test message shorter than custom limit is not truncated."""
+    message = "short"
+    result = truncate_message(message, max_chars=10)
+    assert result == message
+
+
+def test_truncate_message_empty_string() -> None:
+    """Test empty string is handled correctly."""
+    result = truncate_message("")
+    assert result == ""
+
+
+def test_truncate_message_non_string_input() -> None:
+    """Test non-string inputs are converted to strings."""
+    # Test integer
+    result = truncate_message(42)
+    assert result == "42"
+
+    # Test list
+    result = truncate_message([1, 2, 3])
+    assert result == "[1, 2, 3]"
+
+    # Test dict
+    result = truncate_message({"key": "value"})
+    assert result == "{'key': 'value'}"
+
+    # Test None
+    result = truncate_message(None)
+    assert result == "None"
+
+
+def test_truncate_message_large_non_string_input() -> None:
+    """Test large non-string inputs are truncated after string conversion."""
+    large_list = list(range(1000))  # Creates a long string representation
+    result = truncate_message(large_list, max_chars=100)
+
+    # Should be truncated
+    assert len(result) > 100  # Due to truncation message
+    assert result.endswith("...[truncated - only first 1000 characters shown]")
+    assert result.startswith("[0, 1, 2,")

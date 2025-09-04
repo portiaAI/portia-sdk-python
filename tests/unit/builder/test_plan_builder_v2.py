@@ -15,6 +15,11 @@ from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
     LLMStep,
+    LoopBlock,
+    LoopStep,
+    LoopStepType,
+    LoopType,
+    ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
     UserInputStep,
@@ -352,6 +357,63 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
     assert step.inputs == inputs
     assert step.output_schema == OutputSchema
     assert step.step_name == "agent_step"
+
+
+def test_react_agent_step_method_basic() -> None:
+    """Test the react_agent_step() method with basic parameters."""
+    builder = PlanBuilderV2()
+    tools = ["search_tool", "calculator_tool"]
+
+    result = builder.react_agent_step(task="Research and calculate", tools=tools)
+
+    assert result is builder  # Should return self for chaining
+    assert len(builder.plan.steps) == 1
+    assert isinstance(builder.plan.steps[0], ReActAgentStep)
+    assert builder.plan.steps[0].task == "Research and calculate"
+    assert builder.plan.steps[0].tools == tools
+    assert builder.plan.steps[0].inputs == []
+    assert builder.plan.steps[0].output_schema is None
+    assert builder.plan.steps[0].step_name == "step_0"
+    assert builder.plan.steps[0].tool_call_limit == 25
+    assert builder.plan.steps[0].allow_agent_clarifications is False
+
+
+def test_react_agent_step_method_with_all_parameters() -> None:
+    """Test the react_agent_step() method with all parameters."""
+    builder = PlanBuilderV2()
+    tools = ["search_tool", "calculator_tool", "weather_tool"]
+    inputs = ["context", StepOutput(0), Input("user_query")]
+
+    builder.react_agent_step(
+        task="Complex multi-tool analysis",
+        tools=tools,
+        inputs=inputs,
+        output_schema=OutputSchema,
+        step_name="react_analysis",
+        allow_agent_clarifications=True,
+        tool_call_limit=50,
+    )
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.task == "Complex multi-tool analysis"
+    assert step.tools == tools
+    assert step.inputs == inputs
+    assert step.output_schema == OutputSchema
+    assert step.step_name == "react_analysis"
+    assert step.allow_agent_clarifications is True
+    assert step.tool_call_limit == 50
+
+
+def test_react_agent_step_method_single_tool() -> None:
+    """Test the react_agent_step() method with a single tool."""
+    builder = PlanBuilderV2()
+
+    builder.react_agent_step(task="Simple task", tools=["single_tool"])
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.tools == ["single_tool"]
 
 
 def test_user_verify_step_method() -> None:
@@ -979,7 +1041,7 @@ def test_build_with_missing_endif_raises_error() -> None:
     builder.if_(test_condition).llm_step(task="Inside if block")
     # Missing endif()
 
-    with pytest.raises(PlanBuilderError, match="An endif must be called for all if_ steps"):
+    with pytest.raises(PlanBuilderError, match="Please add an endif or endloop for all blocks."):
         builder.build()
 
 
@@ -1081,3 +1143,630 @@ def test_add_steps_with_input_values_invalid_input_name_error() -> None:
 
     with pytest.raises(PlanBuilderError):
         builder.add_steps(sub_plan, input_values={"invalid_input": "some_value"})
+
+
+# Loop tests
+
+
+def test_basic_loop_with_condition() -> None:
+    """Test basic loop with condition."""
+    builder = PlanBuilderV2()
+
+    def test_condition() -> bool:
+        return True
+
+    builder.loop(while_=test_condition).llm_step(task="Test step").end_loop()
+
+    plan = builder.build()
+    assert len(plan.steps) == 3
+    assert isinstance(plan.steps[0], LoopStep)
+    assert plan.steps[0].loop_type == LoopType.WHILE
+    assert plan.steps[0].loop_step_type == LoopStepType.START
+
+
+def test_basic_loop_over_condition() -> None:
+    """Test basic loop with condition."""
+    builder = PlanBuilderV2()
+
+    def test_condition() -> bool:
+        return True
+
+    result = builder.loop(while_=test_condition).llm_step(task="Inside loop").end_loop()
+
+    assert result is builder
+    assert len(builder.plan.steps) == 3
+
+    # Check loop step
+    loop_step = builder.plan.steps[0]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.condition is test_condition
+    assert loop_step.over is None
+    assert loop_step.loop_type == LoopType.WHILE
+    assert loop_step.loop_step_type == LoopStepType.START
+    assert loop_step.step_name == "step_0"
+
+    # Check LLM step inside loop
+    llm_step = builder.plan.steps[1]
+    assert isinstance(llm_step, LLMStep)
+    assert llm_step.task == "Inside loop"
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[2]
+    assert isinstance(end_loop_step, LoopStep)
+    assert end_loop_step.loop_step_type == LoopStepType.END
+    assert end_loop_step.loop_type == LoopType.WHILE
+    assert end_loop_step.condition is test_condition
+
+
+def test_basic_loop_over_reference() -> None:
+    """Test basic loop with over reference."""
+    builder = PlanBuilderV2()
+
+    result = (
+        builder.function_step(function=lambda: [1, 2, 3], step_name="items")
+        .loop(over=StepOutput("items"))
+        .llm_step(task="Process item")
+        .end_loop()
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 4
+
+    # Check function step
+    func_step = builder.plan.steps[0]
+    assert isinstance(func_step, InvokeToolStep)
+    assert func_step.step_name == "items"
+
+    # Check loop step
+    loop_step = builder.plan.steps[1]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.over == StepOutput("items")
+    assert loop_step.condition is None
+    assert loop_step.loop_type == LoopType.FOR_EACH
+    assert loop_step.loop_step_type == LoopStepType.START
+
+    # Check LLM step inside loop
+    llm_step = builder.plan.steps[2]
+    assert isinstance(llm_step, LLMStep)
+    assert llm_step.task == "Process item"
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[3]
+    assert isinstance(end_loop_step, LoopStep)
+    assert end_loop_step.loop_step_type == LoopStepType.END
+    assert end_loop_step.loop_type == LoopType.FOR_EACH
+
+
+def test_loop_with_args() -> None:
+    """Test loop with args parameter."""
+    builder = PlanBuilderV2()
+
+    def test_condition(x: int) -> bool:
+        return x > 0
+
+    result = (
+        builder.loop(while_=test_condition, args={"x": 5}).llm_step(task="Inside loop").end_loop()
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 3
+
+    # Check loop step
+    loop_step = builder.plan.steps[0]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.condition is test_condition
+    assert loop_step.args == {"x": 5}
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[2]
+    assert isinstance(end_loop_step, LoopStep)
+    assert end_loop_step.args == {"x": 5}
+
+
+def test_loop_with_custom_step_name() -> None:
+    """Test loop with custom step names."""
+    builder = PlanBuilderV2()
+
+    result = (
+        builder.loop(while_=lambda: True, step_name="custom_loop")
+        .llm_step(task="Inside loop")
+        .end_loop(step_name="custom_end_loop")
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 3
+
+    # Check loop step
+    loop_step = builder.plan.steps[0]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.step_name == "custom_loop"
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[2]
+    assert isinstance(end_loop_step, LoopStep)
+    assert end_loop_step.step_name == "custom_end_loop"
+
+
+def test_nested_loops() -> None:
+    """Test nested loops."""
+    builder = PlanBuilderV2()
+
+    result = (
+        builder.loop(while_=lambda: True, step_name="outer_loop")
+        .llm_step(task="Outer loop")
+        .loop(over=StepOutput("items"), step_name="inner_loop")
+        .llm_step(task="Inner loop")
+        .end_loop(step_name="inner_end")
+        .llm_step(task="Back to outer")
+        .end_loop(step_name="outer_end")
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 7
+
+    # Check outer loop
+    outer_loop = builder.plan.steps[0]
+    assert isinstance(outer_loop, LoopStep)
+    assert outer_loop.step_name == "outer_loop"
+    assert outer_loop.loop_type == LoopType.WHILE
+
+    # Check inner loop
+    inner_loop = builder.plan.steps[2]
+    assert isinstance(inner_loop, LoopStep)
+    assert inner_loop.step_name == "inner_loop"
+    assert inner_loop.loop_type == LoopType.FOR_EACH
+
+    # Check inner end_loop
+    inner_end = builder.plan.steps[4]
+    assert isinstance(inner_end, LoopStep)
+    assert inner_end.step_name == "inner_end"
+
+    # Check outer end_loop
+    outer_end = builder.plan.steps[6]
+    assert isinstance(outer_end, LoopStep)
+    assert outer_end.step_name == "outer_end"
+
+
+def test_loop_inside_if_block() -> None:
+    """Test loop inside if block."""
+    builder = PlanBuilderV2()
+
+    def test_condition() -> bool:
+        return True
+
+    result = (
+        builder.if_(test_condition)
+        .loop(while_=lambda: True)
+        .llm_step(task="Inside loop in if")
+        .end_loop()
+        .endif()
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 5
+
+    # Check if step
+    if_step = builder.plan.steps[0]
+    assert isinstance(if_step, ConditionalStep)
+
+    # Check loop step
+    loop_step = builder.plan.steps[1]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.loop_type == LoopType.WHILE
+
+    # Check LLM step inside loop
+    llm_step = builder.plan.steps[2]
+    assert isinstance(llm_step, LLMStep)
+    assert llm_step.task == "Inside loop in if"
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[3]
+    assert isinstance(end_loop_step, LoopStep)
+
+    # Check endif step
+    endif_step = builder.plan.steps[4]
+    assert isinstance(endif_step, ConditionalStep)
+
+
+def test_if_inside_loop_block() -> None:
+    """Test if block inside loop."""
+    builder = PlanBuilderV2()
+
+    def loop_condition() -> bool:
+        return True
+
+    def if_condition() -> bool:
+        return True
+
+    result = (
+        builder.loop(while_=loop_condition)
+        .if_(if_condition)
+        .llm_step(task="Inside if in loop")
+        .else_()
+        .llm_step(task="Inside else in loop")
+        .endif()
+        .end_loop()
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 7
+
+    # Check loop step
+    loop_step = builder.plan.steps[0]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.loop_type == LoopType.WHILE
+
+    # Check if step
+    if_step = builder.plan.steps[1]
+    assert isinstance(if_step, ConditionalStep)
+
+    # Check else step
+    else_step = builder.plan.steps[3]
+    assert isinstance(else_step, ConditionalStep)
+
+    # Check endif step
+    endif_step = builder.plan.steps[5]
+    assert isinstance(endif_step, ConditionalStep)
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[6]
+    assert isinstance(end_loop_step, LoopStep)
+
+
+def test_loop_inside_else_block() -> None:
+    """Test loop inside else block."""
+    builder = PlanBuilderV2()
+
+    def if_condition() -> bool:
+        return False
+
+    result = (
+        builder.if_(if_condition)
+        .llm_step(task="Inside if")
+        .else_()
+        .loop(over=StepOutput("items"))
+        .llm_step(task="Inside loop in else")
+        .end_loop()
+        .endif()
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 7
+
+    # Check if step
+    if_step = builder.plan.steps[0]
+    assert isinstance(if_step, ConditionalStep)
+
+    # Check else step
+    else_step = builder.plan.steps[2]
+    assert isinstance(else_step, ConditionalStep)
+
+    # Check loop step
+    loop_step = builder.plan.steps[3]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.loop_type == LoopType.FOR_EACH
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[5]
+    assert isinstance(end_loop_step, LoopStep)
+
+    # Check endif step
+    endif_step = builder.plan.steps[6]
+    assert isinstance(endif_step, ConditionalStep)
+
+
+def test_loop_inside_else_if_block() -> None:
+    """Test loop inside else_if block."""
+    builder = PlanBuilderV2()
+
+    def first_condition() -> bool:
+        return False
+
+    def second_condition() -> bool:
+        return True
+
+    result = (
+        builder.if_(first_condition)
+        .llm_step(task="Inside first if")
+        .else_if_(second_condition)
+        .loop(while_=lambda: True)
+        .llm_step(task="Inside loop in else_if")
+        .end_loop()
+        .else_()
+        .llm_step(task="Inside else")
+        .endif()
+    )
+
+    assert result is builder
+    assert len(builder.plan.steps) == 9
+
+    # Check first if step
+    first_if = builder.plan.steps[0]
+    assert isinstance(first_if, ConditionalStep)
+
+    # Check else_if step
+    else_if = builder.plan.steps[2]
+    assert isinstance(else_if, ConditionalStep)
+
+    # Check loop step
+    loop_step = builder.plan.steps[3]
+    assert isinstance(loop_step, LoopStep)
+
+    # Check end_loop step
+    end_loop_step = builder.plan.steps[5]
+    assert isinstance(end_loop_step, LoopStep)
+
+    # Check else step
+    else_step = builder.plan.steps[6]
+    assert isinstance(else_step, ConditionalStep)
+
+    # Check endif step
+    endif_step = builder.plan.steps[8]
+    assert isinstance(endif_step, ConditionalStep)
+
+
+def test_loop_with_string_condition() -> None:
+    """Test loop with string condition."""
+    builder = PlanBuilderV2()
+
+    result = builder.loop(while_="x > 0", args={"x": 5}).llm_step(task="Inside loop").end_loop()
+
+    assert result is builder
+    assert len(builder.plan.steps) == 3
+
+    # Check loop step
+    loop_step = builder.plan.steps[0]
+    assert isinstance(loop_step, LoopStep)
+    assert loop_step.condition == "x > 0"
+    assert loop_step.args == {"x": 5}
+
+
+def test_loop_error_condition_and_over_both_set() -> None:
+    """Test that loop raises error when both condition and over are set."""
+    builder = PlanBuilderV2()
+
+    with pytest.raises(PlanBuilderError, match="Only one of while_, do_while_, or over can be set"):
+        builder.loop(while_=lambda: True, over=StepOutput("items"))
+
+
+def test_loop_error_neither_condition_nor_over_set() -> None:
+    """Test that loop raises error when neither condition nor over is set."""
+    builder = PlanBuilderV2()
+
+    with pytest.raises(
+        PlanBuilderError, match="Exactly one of while_, do_while_, or over must be set"
+    ):
+        builder.loop()
+
+
+def test_end_loop_without_loop_raises_error() -> None:
+    """Test that end_loop raises error when called without a loop."""
+    builder = PlanBuilderV2()
+
+    with pytest.raises(PlanBuilderError, match="endloop must be called from a loop block"):
+        builder.end_loop()
+
+
+def test_end_loop_with_conditional_block_raises_error() -> None:
+    """Test that end_loop raises error when called from conditional block."""
+    builder = PlanBuilderV2()
+
+    builder.if_(lambda: True)
+    with pytest.raises(PlanBuilderError, match="endloop must be called from a loop block"):
+        builder.end_loop()
+
+
+def test_build_with_missing_end_loop_raises_error() -> None:
+    """Test that build raises error when loop is not closed."""
+    builder = PlanBuilderV2()
+
+    builder.loop(while_=lambda: True)
+    with pytest.raises(PlanBuilderError, match="All blocks must be closed"):
+        builder.build()
+
+
+def test_loop_method_chaining() -> None:
+    """Test that loop methods return self for chaining."""
+    builder = PlanBuilderV2()
+
+    result = (
+        builder.loop(while_=lambda: True)
+        .llm_step(task="Inside loop")
+        .end_loop()
+        .llm_step(task="After loop")
+    )
+
+    assert result is builder
+    plan = builder.build()
+    assert len(plan.steps) == 4  # loop, llm, end_loop, final_llm
+
+
+def test_complex_nested_structure() -> None:
+    """Test complex nested structure with loops and conditionals."""
+    builder = PlanBuilderV2()
+
+    result = (
+        builder.input(name="items", description="List of items")
+        .function_step(function=lambda: [1, 2, 3], step_name="generate_items")
+        .loop(over=StepOutput("generate_items"), step_name="outer_loop")
+        .if_(lambda item: item > 1)
+        .loop(while_=lambda: True, step_name="inner_loop")
+        .llm_step(task="Process item in inner loop")
+        .end_loop(step_name="inner_end")
+        .else_()
+        .llm_step(task="Process item in else")
+        .endif()
+        .end_loop(step_name="outer_end")
+        .llm_step(task="Final step")
+    )
+
+    assert result is builder
+    plan = builder.build()
+    assert (
+        len(plan.steps) == 11
+    )  # func, loop, if, loop, llm, end_loop, else, llm, endif, end_loop, final_llm
+    assert len(plan.plan_inputs) == 1
+
+    # Verify the structure
+    steps = plan.steps
+
+    # Check function step
+    assert steps[0].step_name == "generate_items"
+
+    # Check outer loop
+    assert steps[1].step_name == "outer_loop"
+    outer_loop_step = steps[1]
+    assert isinstance(outer_loop_step, LoopStep)
+    assert outer_loop_step.loop_type == LoopType.FOR_EACH
+
+    # Check if step
+    assert steps[2].step_name == "step_2"
+
+    # Check inner loop
+    assert steps[3].step_name == "inner_loop"
+    inner_loop_step = steps[3]
+    assert isinstance(inner_loop_step, LoopStep)
+    assert inner_loop_step.loop_type == LoopType.WHILE
+
+    # Check inner loop content
+    assert steps[4].step_name == "step_4"
+
+    # Check inner end_loop
+    assert steps[5].step_name == "inner_end"
+
+    # Check else step
+    assert steps[6].step_name == "step_6"
+
+    # Check else content
+    assert steps[7].step_name == "step_7"
+
+    # Check endif
+    assert steps[8].step_name == "step_8"
+
+    # Check outer end_loop
+    assert steps[9].step_name == "outer_end"
+
+    # Check final step
+    assert steps[10].step_name == "step_10"
+
+
+def test_current_loop_block_property() -> None:
+    """Test the _current_loop_block property."""
+    builder = PlanBuilderV2()
+
+    # Initially, no loop block should be current
+    assert builder._current_loop_block is None
+
+    # Start a loop
+    builder.loop(while_=lambda: True)
+
+    # Now there should be a current loop block
+    current_block = builder._current_loop_block
+    assert current_block is not None
+    assert isinstance(current_block, LoopBlock)
+    assert current_block.start_step_index == 0
+
+    # End the loop
+    builder.end_loop()
+
+    # After ending the loop, no current loop block
+    assert builder._current_loop_block is None
+
+    # Test with nested loops
+    builder.loop(while_=lambda: True)
+    outer_block = builder._current_loop_block
+    assert outer_block is not None
+    assert outer_block.start_step_index > 0  # Should have some index
+
+    builder.loop(while_=lambda: True)
+    inner_block = builder._current_loop_block
+    assert inner_block is not None
+    assert (
+        inner_block.start_step_index > outer_block.start_step_index
+    )  # Inner should be after outer
+
+    # End inner loop
+    builder.end_loop()
+    # Should be back to outer loop
+    assert builder._current_loop_block is outer_block
+
+    # End outer loop
+    builder.end_loop()
+    # No current loop block
+    assert builder._current_loop_block is None
+
+
+def test_end_loop_sets_end_index() -> None:
+    """Test that end_loop properly sets the end_index of the start loop step."""
+    builder = PlanBuilderV2()
+
+    # Start a loop
+    builder.loop(while_=lambda: True, step_name="test_loop")
+
+    # Add some steps inside the loop
+    builder.llm_step(task="Step 1")
+    builder.llm_step(task="Step 2")
+
+    # End the loop
+    builder.end_loop()
+
+    # Build the plan to access the steps
+    plan = builder.build()
+
+    # Find the start loop step
+    start_loop_step = None
+    for step in plan.steps:
+        if isinstance(step, LoopStep) and step.loop_step_type == LoopStepType.START:
+            start_loop_step = step
+            break
+
+    assert start_loop_step is not None
+    assert start_loop_step.step_name == "test_loop"
+
+    # Verify that the end_index is set correctly
+    # The end_index should point to the end_loop step
+    assert start_loop_step.end_index is not None
+    assert (
+        start_loop_step.end_index == len(plan.steps) - 1
+    )  # Should point to the last step (end_loop)
+
+    # Verify the end_loop step is at the expected index
+    end_loop_step = plan.steps[start_loop_step.end_index]
+    assert isinstance(end_loop_step, LoopStep)
+    assert end_loop_step.loop_step_type == LoopStepType.END
+
+
+def test_end_loop_no_loop_block_error() -> None:
+    """Test that end_loop raises PlanBuilderError when no loop block exists."""
+    builder = PlanBuilderV2()
+
+    # Try to end a loop without starting one
+    with pytest.raises(
+        PlanBuilderError, match="endloop must be called from a loop block. Please add a loop first."
+    ):
+        builder.end_loop()
+
+
+def test_end_loop_non_loop_step_error() -> None:
+    """Test that end_loop raises PlanBuilderError when start step is not a LoopStep."""
+    builder = PlanBuilderV2()
+
+    # Add a non-loop step first
+    builder.llm_step(task="Some step")
+
+    # Start a loop (this will create a loop block)
+    builder.loop(while_=lambda: True)
+
+    # Manually manipulate the block stack to point to a non-loop step
+    # This simulates a corrupted state where the start_step_index points to wrong step type
+    loop_block = builder._current_loop_block
+    assert loop_block is not None
+
+    # Change the start_step_index to point to the LLM step instead of the loop step
+    loop_block.start_step_index = 0  # Points to the LLM step, not the loop step
+
+    # Now try to end the loop - it should fail because step 0 is not a LoopStep
+    with pytest.raises(
+        PlanBuilderError, match="The step at the start of the loop is not a LoopStep"
+    ):
+        builder.end_loop()
