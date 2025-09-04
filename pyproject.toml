@@ -39,6 +39,7 @@ dependencies = [
     "litellm>=1.74.9.post1",
     "openai<1.99",
     "toml>=0.10.0"
+    ]
 
 [project.optional-dependencies]
 mistral = [
