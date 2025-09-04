@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
+from pydantic import BaseModel
+
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, StepOutput, default_step_name
 from portia.builder.step_v2 import LLMStep, StepV2
@@ -311,6 +313,29 @@ def test_get_value_with_path_step_not_found() -> None:
         mock_logger().warning.assert_called_once_with(
             "Output value for step nonexistent_step not found"
         )
+
+
+def test_get_value_with_path_pydantic_model() -> None:
+    """Test get_value method with path - successful case with Pydantic model."""
+
+    class UserProfile(BaseModel):
+        name: str
+        email: str
+
+    class UserData(BaseModel):
+        profile: UserProfile
+        age: int
+
+    step_output = StepOutput(0, path="profile.name")
+
+    mock_data = UserData(profile=UserProfile(name="John Doe", email="john@example.com"), age=30)
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value=mock_data, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == "John Doe"
 
 
 def test_get_description_with_int_step() -> None:
@@ -635,6 +660,39 @@ def test_input_get_value_with_path_index_out_of_range() -> None:
 
     result = input_ref.get_value(mock_run_data)
     assert result is None
+
+
+def test_input_get_value_with_path_pydantic_model() -> None:
+    """Test Input get_value method with path - successful case with Pydantic model."""
+
+    class Address(BaseModel):
+        street: str
+        city: str
+        country: str
+
+    class UserProfile(BaseModel):
+        name: str
+        email: str
+        address: Address
+
+    input_ref = Input("user_profile", path="address.city")
+
+    mock_data = UserProfile(
+        name="Jane Smith",
+        email="jane@example.com",
+        address=Address(street="123 Main St", city="New York", country="USA"),
+    )
+
+    # Create mock plan input
+    mock_plan_input = PlanInput(name="user_profile", description="User profile data")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+    mock_run_data.plan_run.plan_run_inputs = {"user_profile": LocalDataValue(value=mock_data)}
+
+    result = input_ref.get_value(mock_run_data)
+    assert result == "New York"
 
 
 # Integration tests for reference classes

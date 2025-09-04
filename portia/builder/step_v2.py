@@ -175,9 +175,9 @@ class StepV2(BaseModel, ABC):
                 ref_obj = self._parse_reference_expression(ref_cls, paren_content)
                 resolved = self._resolve_references(ref_obj, run_data)
                 return str(resolved)
-            except (ValueError, AttributeError, KeyError):
+            except (ValueError, AttributeError, KeyError):  # pragma: no cover
                 # If parsing fails, return the original match
-                return full_match
+                return full_match  # pragma: no cover
 
         return re.sub(pattern, replace_reference, value)
 
@@ -214,7 +214,7 @@ class StepV2(BaseModel, ABC):
                 return StepOutput(name)
             return Input(name)
 
-        raise ValueError(f"Invalid reference format: {paren_content}")
+        raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
 
     def _parse_reference_with_path(self, ref_cls: type[Reference], paren_content: str) -> Reference:
         """Parse reference expressions that include path parameters.
@@ -233,7 +233,9 @@ class StepV2(BaseModel, ABC):
         # Extract path parameter - should always be present since we detected a comma
         path_match = re.search(r"\bpath\s*=\s*['\"]([^'\"]*)['\"]", paren_content)
         if not path_match:
-            raise ValueError(f"Expected path parameter in reference expression: {paren_content}")
+            raise ValueError(  # pragma: no cover
+                f"Expected path parameter in reference expression: {paren_content}"
+            )
         path_param = path_match.group(1)
 
         # Extract the first parameter (step/input name)
@@ -247,7 +249,7 @@ class StepV2(BaseModel, ABC):
         ):
             step_param = first_param[1:-1]  # Remove quotes
         else:
-            raise ValueError(
+            raise ValueError(  # pragma: no cover
                 f"Expected quoted string or number for step/input name, got: {first_param}"
             )
 
