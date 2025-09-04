@@ -1048,7 +1048,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
 # Loop integration tests
 
 
-def test_plan_v2_loop_conditional_simple(local_portia: Portia) -> None:
+def test_plan_v2_while_loop_conditional_simple(local_portia: Portia) -> None:
     """Test PlanV2 conditional loop - simple case that runs once."""
     messages: list[str] = []
     counter = 0
@@ -1060,14 +1060,14 @@ def test_plan_v2_loop_conditional_simple(local_portia: Portia) -> None:
         nonlocal counter
         counter += 1
         record_func(f"loop_iteration_{counter}")
-        return counter < 2  # Run twice (counter 1 and 2)
+        return counter < 2  # Run once
 
     plan = (
-        PlanBuilderV2(label="Test conditional loop")
+        PlanBuilderV2(label="Test while loop")
         .function_step(
             function=lambda: record_func("before_loop"),
         )
-        .loop(condition=increment_and_check)
+        .loop(while_=increment_and_check)
         .function_step(
             function=lambda: record_func("inside_loop"),
         )
@@ -1088,7 +1088,7 @@ def test_plan_v2_loop_conditional_simple(local_portia: Portia) -> None:
 
     # Check that the loop body executed multiple times
     loop_executions = [msg for msg in messages if msg == "inside_loop"]
-    assert len(loop_executions) == 2
+    assert len(loop_executions) == 1
 
     # Check that condition function was called
     condition_calls = [msg for msg in messages if msg.startswith("loop_iteration_")]
@@ -1097,7 +1097,7 @@ def test_plan_v2_loop_conditional_simple(local_portia: Portia) -> None:
     assert "loop_iteration_2" in condition_calls
 
 
-def test_plan_v2_loop_conditional_false(local_portia: Portia) -> None:
+def test_plan_v2_while_loop_conditional_false(local_portia: Portia) -> None:
     """Test PlanV2 conditional loop - condition is false."""
     messages: list[str] = []
 
@@ -1109,11 +1109,11 @@ def test_plan_v2_loop_conditional_false(local_portia: Portia) -> None:
         return False
 
     plan = (
-        PlanBuilderV2(label="Test conditional loop that is false")
+        PlanBuilderV2(label="Test while loop that is false")
         .function_step(
             function=lambda: record_func("before_loop"),
         )
-        .loop(condition=always_false)
+        .loop(while_=always_false)
         .function_step(
             function=lambda: record_func("inside_loop"),
         )
@@ -1129,7 +1129,7 @@ def test_plan_v2_loop_conditional_false(local_portia: Portia) -> None:
 
     # Should execute: before_loop, condition_evaluated, after_loop
     # Note: conditional loops always run at least once to evaluate the condition
-    expected_messages = ["before_loop", "inside_loop", "condition_evaluated", "after_loop"]
+    expected_messages = ["before_loop", "condition_evaluated", "after_loop"]
     assert messages == expected_messages
 
 
@@ -1242,11 +1242,11 @@ def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
         .function_step(
             function=lambda: record_func("start"),
         )
-        .loop(condition=outer_condition)
+        .loop(while_=outer_condition)
         .function_step(
             function=lambda: record_func("outer_loop_start"),
         )
-        .loop(condition=inner_condition)
+        .loop(while_=inner_condition)
         .function_step(
             function=lambda: record_func("inner_loop"),
         )
@@ -1270,12 +1270,12 @@ def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
 
     # Check that outer loop executed multiple times
     outer_starts = [msg for msg in messages if msg == "outer_loop_start"]
-    assert len(outer_starts) == 3  # outer_counter < 3 means it runs 3 times (1, 2, 3)
+    assert len(outer_starts) == 2  # outer_counter < 3 means it runs 2 times (1, 2)
 
     # Check that inner loop executed multiple times
     inner_loops = [msg for msg in messages if msg == "inner_loop"]
     assert (
-        len(inner_loops) == 4
+        len(inner_loops) == 1
     )  # inner loop runs multiple times per outer iteration due to condition evaluation
 
     # Check that condition functions were called
@@ -1285,12 +1285,12 @@ def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
     assert "outer_condition_2" in outer_conditions
 
     inner_conditions = [msg for msg in messages if msg.startswith("inner_condition_")]
-    assert len(inner_conditions) == 4
+    assert len(inner_conditions) == 3
     assert "inner_condition_1" in inner_conditions
     assert "inner_condition_2" in inner_conditions
 
     assert outer_counter == 3
-    assert inner_counter == 4
+    assert inner_counter == 3
 
 
 def test_plan_v2_loop_inside_conditional(local_portia: Portia) -> None:
@@ -1369,7 +1369,7 @@ def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
         .function_step(
             function=lambda: record_func("start"),
         )
-        .loop(condition=condition_with_args, args={"x": 42, "y": "test"})
+        .loop(while_=condition_with_args, args={"x": 42, "y": "test"})
         .function_step(
             function=lambda: record_func("inside_loop"),
         )
@@ -1385,7 +1385,6 @@ def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
 
     expected_messages = [
         "start",
-        "inside_loop",
         "condition_eval_1_x_42_y_test",
         "inside_loop",
         "condition_eval_2_x_42_y_test",
@@ -1416,7 +1415,7 @@ def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
         .function_step(
             function=lambda: record_func("start"),
         )
-        .loop(condition="x < 3", args={"x": StepOutput("inside_loop")})
+        .loop(while_="x < 3", args={"x": StepOutput("inside_loop")})
         .function_step(
             function=lambda: increment_counter("inside_loop"),
             step_name="inside_loop",
@@ -1431,12 +1430,9 @@ def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
     plan_run = local_portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
 
-    # Should execute: start, inside_loop (3 times), end
-    # String conditions are evaluated by the conditional evaluation agent
-    # The exact behavior depends on the agent, but it should run the loop
     assert "start" in messages
     assert "end" in messages
-    assert counter > 0
+    assert counter == 0
 
 
 def test_plan_v2_loop_complex_nested_structure(local_portia: Portia) -> None:
@@ -1507,3 +1503,224 @@ def test_plan_v2_loop_complex_nested_structure(local_portia: Portia) -> None:
     assert "positive_even_4" in messages
     assert "odd_number_5" in messages
     assert "end" in messages
+
+
+# New tests demonstrating while vs do_while differences
+
+
+def test_plan_v2_while_loop_condition_checked_first(local_portia: Portia) -> None:
+    """Test that while loop checks condition before executing body."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def condition_false_initially() -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_check_{counter}")
+        return False  # Always false, so body should never execute
+
+    plan = (
+        PlanBuilderV2(label="Test while loop - condition checked first")
+        .function_step(
+            function=lambda: record_func("before_while"),
+        )
+        .loop(while_=condition_false_initially)
+        .function_step(
+            function=lambda: record_func("inside_while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_while"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # While loop: condition is checked first, body never executes if false
+    expected_messages = ["before_while", "condition_check_1", "after_while"]
+    assert messages == expected_messages
+    assert counter == 1
+
+
+def test_plan_v2_do_while_loop_condition_checked_after(local_portia: Portia) -> None:
+    """Test that do_while loop executes body first, then checks condition."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def condition_false_after_first_execution() -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_check_{counter}")
+        return False  # False after first check, but body should execute once
+
+    plan = (
+        PlanBuilderV2(label="Test do_while loop - body executes first")
+        .function_step(
+            function=lambda: record_func("before_do_while"),
+        )
+        .loop(do_while_=condition_false_after_first_execution)
+        .function_step(
+            function=lambda: record_func("inside_do_while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_do_while"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Do-while loop: body executes first, then condition is checked
+    expected_messages = [
+        "before_do_while",
+        "inside_do_while_body",
+        "condition_check_1",
+        "after_do_while",
+    ]
+    assert messages == expected_messages
+    assert counter == 1
+
+
+
+def test_plan_v2_while_loop_with_args(local_portia: Portia) -> None:
+    """Test while loop with arguments passed to condition function."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def while_condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"while_condition_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test while loop with arguments")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=while_condition_with_args, args={"x": 100, "y": "test"})
+        .function_step(
+            function=lambda: record_func("while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "start",
+        "while_condition_1_x_100_y_test",
+        "while_body",
+        "while_condition_2_x_100_y_test",
+        "while_body",
+        "while_condition_3_x_100_y_test",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+
+
+def test_plan_v2_do_while_loop_with_args(local_portia: Portia) -> None:
+    """Test do_while loop with arguments passed to condition function."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def do_while_condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"do_while_condition_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test do_while loop with arguments")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(do_while_=do_while_condition_with_args, args={"x": 200, "y": "example"})
+        .function_step(
+            function=lambda: record_func("do_while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "start",
+        "do_while_body",
+        "do_while_condition_1_x_200_y_example",
+        "do_while_body",
+        "do_while_condition_2_x_200_y_example",
+        "do_while_body",
+        "do_while_condition_3_x_200_y_example",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+
+
+def test_plan_v2_do_while_loop_string_condition(local_portia: Portia) -> None:
+    """Test do_while loop with string condition."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def increment_counter() -> int:
+        nonlocal counter
+        counter += 1
+        record_func(f"counter_{counter}")
+        return counter
+
+    plan = (
+        PlanBuilderV2(label="Test do_while loop with string condition")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(do_while_="x < 3", args={"x": StepOutput("counter_step")})
+        .function_step(
+            function=increment_counter,
+            step_name="counter_step",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # String conditions are evaluated by the conditional evaluation agent
+    # The exact behavior depends on the agent, but it should run the loop
+    assert "start" in messages
+    assert "end" in messages
+    assert counter > 0

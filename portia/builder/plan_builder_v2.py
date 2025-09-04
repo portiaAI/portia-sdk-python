@@ -27,7 +27,7 @@ from portia.telemetry.views import PlanV2BuildTelemetryEvent
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
 
     from pydantic import BaseModel
 
@@ -102,17 +102,33 @@ class PlanBuilderV2:
 
     def loop(
         self,
-        condition: Callable[..., bool] | str | None = None,
-        over: Reference | None = None,
+        while_: Callable[..., bool] | str | None = None,
+        do_while_: Callable[..., bool] | str | None = None,
+        over: Reference | Sequence[Any] | None = None,
         args: dict[str, Any] | None = None,
         step_name: str | None = None,
     ) -> PlanBuilderV2:
         """Add a step that checks a condition or loops over a reference variable."""
-        if condition and over:
-            raise PlanBuilderError("condition and over cannot both be set.")
-        if not condition and not over:
-            raise PlanBuilderError("condition or over must be set.")
-        loop_type = LoopType.CONDITIONAL if condition else LoopType.FOR_EACH
+        # Validate that exactly one of while_, do_while_, or over is set
+        loop_params = [while_, do_while_, over]
+        set_params = [param for param in loop_params if param is not None]
+
+        if len(set_params) == 0:
+            raise PlanBuilderError("Exactly one of while_, do_while_, or over must be set.")
+        if len(set_params) > 1:
+            raise PlanBuilderError("Only one of while_, do_while_, or over can be set.")
+
+        # Determine loop type and condition
+        if over is not None:
+            loop_type = LoopType.FOR_EACH
+            condition = None
+        elif while_ is not None:
+            loop_type = LoopType.WHILE
+            condition = while_
+        else:  # do_while_ is not None
+            loop_type = LoopType.DO_WHILE
+            condition = do_while_
+
         loop_block = LoopBlock(
             start_step_index=len(self.plan.steps),
             end_step_index=None,

@@ -1089,7 +1089,23 @@ def test_add_steps_with_input_values_invalid_input_name_error() -> None:
 
 # Loop tests
 
+
 def test_basic_loop_with_condition() -> None:
+    """Test basic loop with condition."""
+    builder = PlanBuilderV2()
+
+    def test_condition() -> bool:
+        return True
+
+    builder.loop(while_=test_condition).llm_step(task="Test step").end_loop()
+
+    plan = builder.build()
+    assert len(plan.steps) == 3
+    assert isinstance(plan.steps[0], LoopStep)
+    assert plan.steps[0].loop_type == LoopType.WHILE
+    assert plan.steps[0].loop_block_type == LoopBlockType.START
+
+
 def test_basic_loop_over_condition() -> None:
     """Test basic loop with condition."""
     builder = PlanBuilderV2()
@@ -1097,7 +1113,7 @@ def test_basic_loop_over_condition() -> None:
     def test_condition() -> bool:
         return True
 
-    result = builder.loop(condition=test_condition).llm_step(task="Inside loop").end_loop()
+    result = builder.loop(while_=test_condition).llm_step(task="Inside loop").end_loop()
 
     assert result is builder
     assert len(builder.plan.steps) == 3
@@ -1107,7 +1123,7 @@ def test_basic_loop_over_condition() -> None:
     assert isinstance(loop_step, LoopStep)
     assert loop_step.condition is test_condition
     assert loop_step.over is None
-    assert loop_step.loop_type == LoopType.CONDITIONAL
+    assert loop_step.loop_type == LoopType.WHILE
     assert loop_step.loop_block_type == LoopBlockType.START
     assert loop_step.step_name == "step_0"
 
@@ -1120,7 +1136,7 @@ def test_basic_loop_over_condition() -> None:
     end_loop_step = builder.plan.steps[2]
     assert isinstance(end_loop_step, LoopStep)
     assert end_loop_step.loop_block_type == LoopBlockType.END
-    assert end_loop_step.loop_type == LoopType.CONDITIONAL
+    assert end_loop_step.loop_type == LoopType.WHILE
     assert end_loop_step.condition is test_condition
 
 
@@ -1171,9 +1187,7 @@ def test_loop_with_args() -> None:
         return x > 0
 
     result = (
-        builder.loop(condition=test_condition, args={"x": 5})
-        .llm_step(task="Inside loop")
-        .end_loop()
+        builder.loop(while_=test_condition, args={"x": 5}).llm_step(task="Inside loop").end_loop()
     )
 
     assert result is builder
@@ -1196,7 +1210,7 @@ def test_loop_with_custom_step_name() -> None:
     builder = PlanBuilderV2()
 
     result = (
-        builder.loop(condition=lambda: True, step_name="custom_loop")
+        builder.loop(while_=lambda: True, step_name="custom_loop")
         .llm_step(task="Inside loop")
         .end_loop(step_name="custom_end_loop")
     )
@@ -1220,7 +1234,7 @@ def test_nested_loops() -> None:
     builder = PlanBuilderV2()
 
     result = (
-        builder.loop(condition=lambda: True, step_name="outer_loop")
+        builder.loop(while_=lambda: True, step_name="outer_loop")
         .llm_step(task="Outer loop")
         .loop(over=StepOutput("items"), step_name="inner_loop")
         .llm_step(task="Inner loop")
@@ -1236,7 +1250,7 @@ def test_nested_loops() -> None:
     outer_loop = builder.plan.steps[0]
     assert isinstance(outer_loop, LoopStep)
     assert outer_loop.step_name == "outer_loop"
-    assert outer_loop.loop_type == LoopType.CONDITIONAL
+    assert outer_loop.loop_type == LoopType.WHILE
 
     # Check inner loop
     inner_loop = builder.plan.steps[2]
@@ -1264,7 +1278,7 @@ def test_loop_inside_if_block() -> None:
 
     result = (
         builder.if_(test_condition)
-        .loop(condition=lambda: True)
+        .loop(while_=lambda: True)
         .llm_step(task="Inside loop in if")
         .end_loop()
         .endif()
@@ -1280,7 +1294,7 @@ def test_loop_inside_if_block() -> None:
     # Check loop step
     loop_step = builder.plan.steps[1]
     assert isinstance(loop_step, LoopStep)
-    assert loop_step.loop_type == LoopType.CONDITIONAL
+    assert loop_step.loop_type == LoopType.WHILE
 
     # Check LLM step inside loop
     llm_step = builder.plan.steps[2]
@@ -1307,7 +1321,7 @@ def test_if_inside_loop_block() -> None:
         return True
 
     result = (
-        builder.loop(condition=loop_condition)
+        builder.loop(while_=loop_condition)
         .if_(if_condition)
         .llm_step(task="Inside if in loop")
         .else_()
@@ -1322,7 +1336,7 @@ def test_if_inside_loop_block() -> None:
     # Check loop step
     loop_step = builder.plan.steps[0]
     assert isinstance(loop_step, LoopStep)
-    assert loop_step.loop_type == LoopType.CONDITIONAL
+    assert loop_step.loop_type == LoopType.WHILE
 
     # Check if step
     if_step = builder.plan.steps[1]
@@ -1397,7 +1411,7 @@ def test_loop_inside_else_if_block() -> None:
         builder.if_(first_condition)
         .llm_step(task="Inside first if")
         .else_if_(second_condition)
-        .loop(condition=lambda: True)
+        .loop(while_=lambda: True)
         .llm_step(task="Inside loop in else_if")
         .end_loop()
         .else_()
@@ -1437,7 +1451,7 @@ def test_loop_with_string_condition() -> None:
     """Test loop with string condition."""
     builder = PlanBuilderV2()
 
-    result = builder.loop(condition="x > 0", args={"x": 5}).llm_step(task="Inside loop").end_loop()
+    result = builder.loop(while_="x > 0", args={"x": 5}).llm_step(task="Inside loop").end_loop()
 
     assert result is builder
     assert len(builder.plan.steps) == 3
@@ -1453,15 +1467,17 @@ def test_loop_error_condition_and_over_both_set() -> None:
     """Test that loop raises error when both condition and over are set."""
     builder = PlanBuilderV2()
 
-    with pytest.raises(PlanBuilderError, match="condition and over cannot both be set"):
-        builder.loop(condition=lambda: True, over=StepOutput("items"))
+    with pytest.raises(PlanBuilderError, match="Only one of while_, do_while_, or over can be set"):
+        builder.loop(while_=lambda: True, over=StepOutput("items"))
 
 
 def test_loop_error_neither_condition_nor_over_set() -> None:
     """Test that loop raises error when neither condition nor over is set."""
     builder = PlanBuilderV2()
 
-    with pytest.raises(PlanBuilderError, match="condition or over must be set"):
+    with pytest.raises(
+        PlanBuilderError, match="Exactly one of while_, do_while_, or over must be set"
+    ):
         builder.loop()
 
 
@@ -1486,7 +1502,7 @@ def test_build_with_missing_end_loop_raises_error() -> None:
     """Test that build raises error when loop is not closed."""
     builder = PlanBuilderV2()
 
-    builder.loop(condition=lambda: True)
+    builder.loop(while_=lambda: True)
     with pytest.raises(PlanBuilderError, match="All blocks must be closed"):
         builder.build()
 
@@ -1496,7 +1512,7 @@ def test_loop_method_chaining() -> None:
     builder = PlanBuilderV2()
 
     result = (
-        builder.loop(condition=lambda: True)
+        builder.loop(while_=lambda: True)
         .llm_step(task="Inside loop")
         .end_loop()
         .llm_step(task="After loop")
@@ -1516,7 +1532,7 @@ def test_complex_nested_structure() -> None:
         .function_step(function=lambda: [1, 2, 3], step_name="generate_items")
         .loop(over=StepOutput("generate_items"), step_name="outer_loop")
         .if_(lambda item: item > 1)
-        .loop(condition=lambda: True, step_name="inner_loop")
+        .loop(while_=lambda: True, step_name="inner_loop")
         .llm_step(task="Process item in inner loop")
         .end_loop(step_name="inner_end")
         .else_()
@@ -1552,7 +1568,7 @@ def test_complex_nested_structure() -> None:
     assert steps[3].step_name == "inner_loop"
     inner_loop_step = steps[3]
     assert isinstance(inner_loop_step, LoopStep)
-    assert inner_loop_step.loop_type == LoopType.CONDITIONAL
+    assert inner_loop_step.loop_type == LoopType.WHILE
 
     # Check inner loop content
     assert steps[4].step_name == "step_4"
@@ -1584,7 +1600,7 @@ def test_current_loop_block_property() -> None:
     assert builder._current_loop_block is None
 
     # Start a loop
-    builder.loop(condition=lambda: True)
+    builder.loop(while_=lambda: True)
 
     # Now there should be a current loop block
     current_block = builder._current_loop_block
@@ -1599,12 +1615,12 @@ def test_current_loop_block_property() -> None:
     assert builder._current_loop_block is None
 
     # Test with nested loops
-    builder.loop(condition=lambda: True)
+    builder.loop(while_=lambda: True)
     outer_block = builder._current_loop_block
     assert outer_block is not None
     assert outer_block.start_step_index > 0  # Should have some index
 
-    builder.loop(condition=lambda: True)
+    builder.loop(while_=lambda: True)
     inner_block = builder._current_loop_block
     assert inner_block is not None
     assert (
@@ -1627,7 +1643,7 @@ def test_end_loop_sets_end_index() -> None:
     builder = PlanBuilderV2()
 
     # Start a loop
-    builder.loop(condition=lambda: True, step_name="test_loop")
+    builder.loop(while_=lambda: True, step_name="test_loop")
 
     # Add some steps inside the loop
     builder.llm_step(task="Step 1")
@@ -1681,7 +1697,7 @@ def test_end_loop_non_loop_step_error() -> None:
     builder.llm_step(task="Some step")
 
     # Start a loop (this will create a loop block)
-    builder.loop(condition=lambda: True)
+    builder.loop(while_=lambda: True)
 
     # Manually manipulate the block stack to point to a non-loop step
     # This simulates a corrupted state where the start_step_index points to wrong step type

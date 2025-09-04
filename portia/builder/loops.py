@@ -19,7 +19,9 @@ class LoopBlock(BaseModel):
     """
 
     start_step_index: int = Field(description="The index of the first step in the loop.")
-    end_step_index: int | None = Field(description="The index of the last step in the loop.")
+    end_step_index: int | None = Field(
+        default=None, description="The index of the last step in the loop."
+    )
 
 
 class LoopBlockType(StrEnum):
@@ -32,7 +34,8 @@ class LoopBlockType(StrEnum):
 class LoopType(StrEnum):
     """The type of loop."""
 
-    CONDITIONAL = "CONDITIONAL"
+    WHILE = "WHILE"
+    DO_WHILE = "DO_WHILE"
     FOR_EACH = "FOR_EACH"
 
 
@@ -48,7 +51,7 @@ class LoopStepResult(BaseModel):
     """
 
     block_type: LoopBlockType
-    value: Any | None = Field(default=None, description="The value of the loop step.")
+    value: Any = Field(description="The value of the loop step.")
     loop_result: bool
     start_index: int
     end_index: int
